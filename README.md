@@ -1,0 +1,34 @@
+# WorkBuddy Skills
+
+sm001 原创技能合集，统一管理与发布。
+
+## 技能列表
+
+| 技能 | 说明 |
+|------|------|
+| `drawio-diagram` | draw.io 自动作图，支持流程图、架构图、UML、ER图、时序图、思维导图等 |
+| `workspace-cleanup` | 工作区归档 + JSONL 幽灵任务清理，综合维护工具 |
+| `workbuddy-fs-manager` | 跨平台文件系统管理，归档工作区、同步数据库、清理任务记录 |
+
+## 目录结构
+
+```
+workbuddy-skills/
+├── skills/
+│   ├── drawio-diagram/
+│   ├── workspace-cleanup/
+│   └── workbuddy-fs-manager/
+├── LICENSE
+└── README.md
+```
+
+## 新增技能
+
+1. 将技能文件夹放入 `skills/` 目录
+2. `git add .` → `git commit -m "Add xxx skill"`
+3. `git push gitee main` → `git push origin main`
+
+## 远程仓库
+
+- **Gitee**: https://gitee.com/wUwproject/workbuddy-skills
+- **GitHub**: https://github.com/Ldxs001/workbuddy-skills
