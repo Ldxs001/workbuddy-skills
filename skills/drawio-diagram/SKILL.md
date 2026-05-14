@@ -28,12 +28,12 @@ allowed-tools:
 
 | 文件 | 路径 | 说明 |
 |------|------|------|
-| 核心库 | `C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_gen.py` | 节点/连线/容器/XML生成 |
-| 模板库 | `C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_templates.py` | 8种图表模板 |
-| Agent入口 | `C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_agent.py` | CLI/自然语言解析 |
-| 版本管理 | `C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py` | 5版本回溯系统 |
+| 核心库 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_gen.py` | 节点/连线/容器/XML生成 |
+| 模板库 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_templates.py` | 8种图表模板 |
+| Agent入口 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_agent.py` | CLI/自然语言解析 |
+| 版本管理 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_version.py` | 5版本回溯系统 |
 | draw.io | `C:\Program Files\draw.io\draw.io.exe` | 本地安装路径 |
-| 输出目录 | `C:\Users\sm001\WorkBuddy\2026-05-13-task-1\` | 所有图表输出到此 |
+| 输出目录 | `C:\Users\sm001\WorkBuddy\Claw\reports\` | 所有图表输出到此 |
 
 ---
 
