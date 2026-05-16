@@ -1,5 +1,6 @@
 {
   "enabled": true,
+  "mode": "on_demand",
   "logs_dir": ".problem_logs",
   "exec_pipe": ".exec_output_pipe.txt",
   "problems_file": "PROBLEMS.md",
@@ -13,5 +14,14 @@
     "traceback|Traceback",
     "\\u62d2\\u7edd|\\u5931\\u8d25|\\u9519\\u8bef|\\u5f02\\u5e38"
   ],
-  "auto_resolve_timeout_hours": 24
+  "auto_resolve_timeout_hours": 24,
+  "daemon": {
+    "enabled": false,
+    "start_on_boot": false
+  },
+  "hooks": {
+    "pre_exec_search": true,
+    "auto_record_exception": true,
+    "require_task_confirmation": true
+  }
 }

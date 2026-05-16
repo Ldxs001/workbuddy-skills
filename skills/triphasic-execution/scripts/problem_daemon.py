@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Problem Daemon — 常驻后台的问题监控守护进程
+Problem Daemon — 常驻后台的问题监控守护进程（v4.1：双模式设计）
 =============================================
-独立于 Agent 会话运行，监听 exec 输出管道，自动捕获异常并记录到 JSONL 日志。
+v4.1 核心原则：daemon 仅在全局模式下运行（config.json 中 mode=global）。
+按需模式下 daemon 不会启动（符合"不调用就不记录"的用户习惯）。
 
 路径配置：
   环境变量 TRIPHASIC_HOME 或 --home 参数
   默认值 ~/.workbuddy/triphasic/
 
 用法:
-  python problem_daemon.py start          # 后台启动
+  python problem_daemon.py start          # 后台启动（仅全局模式生效）
   python problem_daemon.py start --fg     # 前台启动（调试）
   python problem_daemon.py stop           # 停止
   python problem_daemon.py status         # 查看状态
@@ -311,8 +312,22 @@ def monitor_pipe_thread():
 # 守护进程主循环
 # ============================================================================
 def run_daemon():
-    """守护进程主循环"""
+    """守护进程主循环（v4.1：仅全局模式启动）"""
     global PID
+
+    # v4.1：检查 mode，非全局模式直接退出
+    config = load_config()
+    if config.get("mode") != "global":
+        print("❌ daemon 不会启动：当前为按需调用模式（config.json 中 mode=on_demand）")
+        print("   → 如需全局自动监控，请运行：python install.py --mode global")
+        print("   → 或手动修改 TRIPHASIC_HOME/config.json：\"mode\": \"global\"")
+        return 1
+
+    # 检查 daemon.enabled 配置
+    if not config.get("daemon", {}).get("enabled", False):
+        print("❌ daemon 不会启动：config.json 中 daemon.enabled=false")
+        print("   → 请修改 TRIPHASIC_HOME/config.json：\"daemon\": {\"enabled\": true}")
+        return 1
 
     PID = os.getpid()
 
@@ -322,6 +337,7 @@ def run_daemon():
 
     log_daemon("=" * 60)
     log_daemon(f"Problem Daemon 已启动 (PID={PID})")
+    log_daemon(f"🔵 模式：全局自动（mode=global）")
     log_daemon(f"监控管道：{get_exec_pipe()}")
     log_daemon(f"问题日志：{get_problems_jsonl()}")
     log_daemon(f"TRIPHASIC_HOME：{get_home()}")
@@ -364,7 +380,7 @@ def run_daemon():
 # CLI 命令
 # ============================================================================
 def cmd_start(args):
-    """启动守护进程"""
+    """启动守护进程（v4.1：检查模式后启动）"""
     pid_file = get_pid_file()
 
     if pid_file.exists():
@@ -379,6 +395,14 @@ def cmd_start(args):
         except (ValueError, OSError):
             pid_file.unlink()
 
+    # v4.1：启动前提示当前模式
+    config = load_config()
+    mode = config.get("mode", "on_demand")
+    print(f"🚀 Problem Daemon 启动中...")
+    print(f"   🎯 当前模式：{'🔵 全局自动' if mode == 'global' else '🟢 按需调用'}")
+    if mode != "global":
+        print(f"   ⚠️  按需模式下 daemon 不会监控 exec 管道，仅手动调用 CLI 记录问题")
+
     if args.fg:
         print("🚀 Problem Daemon 启动中（前台模式）...")
         print(f"   TRIPHASIC_HOME: {get_home()}")
@@ -392,10 +416,10 @@ def cmd_start(args):
             stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
         )
-        print(f"🚀 Problem Daemon 已启动 (PID={proc.pid})")
-        print(f"   TRIPHASIC_HOME: {get_home()}")
-        print(f"   日志：{get_daemon_log()}")
-        print(f"   使用 `python problem_daemon.py status` 查看状态")
+        print(f"✅ Problem Daemon 已启动 (PID={proc.pid})")
+        print(f"   🎯 当前模式：{'🔵 全局自动' if mode == 'global' else '🟢 按需调用'}")
+        if mode == "global":
+            print(f"   → exec 管道异常将自动捕获并记录到 PROBLEMS.md")
         return 0
 
 
@@ -438,11 +462,17 @@ def cmd_stop(args):
 
 
 def cmd_status(args):
-    """查看守护进程状态"""
+    """查看守护进程状态（v4.1：显示当前模式）"""
     pid_file = get_pid_file()
 
     if not pid_file.exists():
+        config = load_config()
+        mode = config.get("mode", "on_demand")
         print("🔴 Problem Daemon 未运行")
+        print(f"   🎯 当前模式：{'🟢 按需调用' if mode == 'on_demand' else '🔵 全局自动'}")
+        if mode == "on_demand":
+            print(f"   💡 提示：按需模式下 daemon 无需启动，手动调用 CLI 即可")
+            print(f"      python problem_logger.py add \"错误信息\"")
         return 1
 
     try:
@@ -455,6 +485,9 @@ def cmd_status(args):
 
         print("🟢 Problem Daemon 正在运行")
         print(f"   PID: {pid}")
+        config = load_config()
+        mode = config.get("mode", "on_demand")
+        print(f"   🎯 当前模式：{'🔵 全局自动' if mode == 'global' else '🟢 按需调用'}")
         print(f"   TRIPHASIC_HOME: {get_home()}")
         print(f"   日志：{get_daemon_log()}")
         print(f"   问题日志：{get_problems_jsonl()}")

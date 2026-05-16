@@ -1,23 +1,79 @@
 ---
 name: triphasic-execution
-version: 3.0.0
+version: 4.1.0
 author: WorkBuddy
 license: MIT
 agent_created: true
 description: >
   Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
   防止无限死循环或单步骤卡住。附带结构化问题日志系统和经验教训登记册。
-  支持两种调用方式：1) 直接调用（Agent 读取本技能后遵循三步框架）；
-  2) 注册为 exec 全局管理（exec_wrapper 拦截所有命令，daemon 后台监控）。
+  v4.1 更新：【双模式设计】+ 【跨平台通用化】+ 【安装路径由调用方决定】
+    - 按需调用模式（默认）：用户主动加载技能 → 执行三步框架；不调用就不记录
+    - 全局自动模式（可选）：配置 mode=global → daemon 后台监控，自动捕获异常并记录
+  核心逻辑 = Python CLI，不依赖任何 Agent 平台。
+  安装路径由调用方（Agent/平台）通过 --target 或 TRIPHASIC_SKILL_DIR 环境变量决定。
   触发关键词：三步执行、循环框架、执行审查推进、triphasic、问题记录、
   经验教训、problem logger、exec wrapper、exec guard。
-tags: [framework, execution, debugging, problem-tracking, lessons-learned]
+tags: [framework, execution, debugging, problem-tracking, lessons-learned, cross-platform]
 category: workflow
 ---
 
-# Triphasic Execution Framework v3.0
+# Triphasic Execution Framework v4.1
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
+
+---
+
+## 双模式设计（v4.1 核心更新）
+
+### 核心理念：用户习惯决定启动方式
+
+| 维度 | 按需调用模式（默认） | 全局自动模式（可选） |
+|---|---|---|
+| **触发条件** | 用户主动加载技能 | 配置 `mode: global` + 启动 daemon |
+| **记录行为** | 调用时才记录三步框架 | 所有任务自动应用三步框架 |
+| **后台守护** | 不启动 daemon | `problem_daemon.py` 持续监控 |
+| **异常捕获** | 靠 Agent 主动调用 CLI 命令记录 | 自动捕获 + 写入 PROBLEMS.md |
+| **适用场景** | 日常简单任务、跨平台协作 | 复杂多步骤项目、长期维护 |
+
+### 按需调用模式（默认，符合"不调用就不记录"习惯）
+
+用户主动加载技能后，Agent 遵循三步框架，通过 CLI 命令手动记录问题。
+
+### 全局自动模式（可选，适合长期项目）
+
+```bash
+# 安装时选择 global 模式
+python install.py --mode global
+
+# 启动守护进程（仅一次）
+python problem_daemon.py start
+
+# 此后所有命令异常 → 自动捕获 → 自动写入 PROBLEMS.md
+```
+
+注意：daemon 不自启，必须手动 `problem_daemon.py start`。
+
+---
+
+## 跨平台通用化设计（v4.1 核心更新）
+
+核心逻辑 = Python CLI，不依赖任何 Agent 平台。安装路径由调用方决定。
+
+```bash
+# 安装路径由调用方通过 --target 或 TRIPHASIC_SKILL_DIR 指定
+python install.py --target /path/to/skills
+
+# 数据目录由调用方通过 --home 或 TRIPHASIC_HOME 指定
+python problem_logger.py --home /path/to/data init
+```
+
+| 平台 | 集成方式 | 是否必须 |
+|---|---|---|
+| **WorkBuddy** | `execute_command` 调用 CLI | 可选（纯 CLI 也可用） |
+| **Cursor** | Terminal 运行 CLI | 可选 |
+| **VS Code** | 任务运行器调用 CLI | 可选 |
+| **纯手动** | 直接运行 Python 脚本 | 原生支持 |
 
 ---
 
@@ -135,6 +191,28 @@ function exec { python "{SKILL_DIR}\scripts\exec_wrapper.py" @args }
 
 ---
 
+## 安装（v4.1：路径由调用方决定）
+
+```bash
+# 基础安装（按需调用模式，默认）
+python install.py
+
+# 全局自动模式
+python install.py --mode global
+
+# 指定安装路径（由 Agent/平台决定）
+python install.py --target ~/.workbuddy/skills/
+python install.py --target ~/.openclaw/workspace/skills/
+
+# 指定数据目录
+python install.py --home ~/.myagent/triphasic/
+
+# 卸载
+python install.py --uninstall
+```
+
+---
+
 ## 配置
 
 首次 `init` 后，编辑 `TRIPHASIC_HOME/config.json` 自定义：
@@ -142,11 +220,25 @@ function exec { python "{SKILL_DIR}\scripts\exec_wrapper.py" @args }
 ```json
 {
   "enabled": true,
+  "mode": "on_demand",
   "poll_interval_ms": 100,
   "error_patterns": ["error|Error|ERROR", "exception|Exception", "failed|Failed"],
-  "auto_resolve_timeout_hours": 24
+  "auto_resolve_timeout_hours": 24,
+  "daemon": {
+    "enabled": false,
+    "start_on_boot": false
+  },
+  "hooks": {
+    "pre_exec_search": true,
+    "auto_record_exception": true,
+    "require_task_confirmation": true
+  }
 }
 ```
+
+- `mode`: `"on_demand"`（默认，按需调用）| `"global"`（全局自动）
+- `daemon.enabled`: 仅 `mode=global` 时应设为 `true`
+- `daemon.start_on_boot`: 始终 `false`，daemon 必须手动启动
 
 ---
 
@@ -195,9 +287,10 @@ web_fetch xx 信源 → 返回 503
 
 | 脚本 | 功能 | 依赖 |
 |------|------|------|
+| `install.py` | 安装/卸载（支持 --mode --target --home） | 无 |
 | `problem_logger.py` | 问题 CRUD + 合并登记册 | 无 |
 | `exec_wrapper.py` | 命令执行拦截器 | 无 |
-| `problem_daemon.py` | 后台监控守护进程 | 无 |
+| `problem_daemon.py` | 后台监控守护进程（仅全局模式） | 无 |
 | `lessons_register.py` | 登记册管理（generate/diff/stats） | 无 |
 | `cron_helper.py` | 定时任务钩子 | 无 |
 
