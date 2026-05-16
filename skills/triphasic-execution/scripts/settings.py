@@ -395,7 +395,7 @@ def main():
             sys.exit(1)
 
     if args.serve_only:
-        # 只启动服务器，返回端口号（不打开浏览器、不阻塞）
+        # 只启动服务器，打印端口号，然后阻塞等待设置完成
         server = start_server(skill_dir, home_dir, port)
         server_thread = threading.Thread(target=server.serve_forever)
         server_thread.daemon = True
@@ -406,21 +406,21 @@ def main():
             done_flag.unlink()
         # 只输出端口号，方便 Agent 解析
         print(f"SERVER_STARTED:{port}")
+        # 阻塞等待用户完成设置
+        try:
+            while not done_flag.exists():
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        print(f"   ✅ 检测到设置完成，正在关闭服务器...")
+        server.shutdown()
+        server.server_close()
+        print(f"✅ 设置完成")
         sys.exit(0)
 
     print(f"⚙️  启动 Triphasic Execution 设置界面...")
     print(f"   📂 技能目录：{skill_dir}")
     print(f"   📁 数据目录：{home_dir}")
-
-    # 查找可用端口
-    if args.port:
-        port = args.port
-    else:
-        try:
-            port = find_available_port()
-        except RuntimeError as e:
-            print(f"   ❌ {e}")
-            sys.exit(1)
 
     # 启动 HTTP 服务器
     server = start_server(skill_dir, home_dir, port)
