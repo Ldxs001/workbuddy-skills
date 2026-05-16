@@ -53,19 +53,24 @@ category: workflow
 
 **方式 1：通过 Agent 对话（推荐）**
 - 向 Agent 发送："打开 triphasic 设置"、"修改配置"、"打开设置界面"
-- Agent 自动调用 `python {SKILL_DIR}/scripts/settings.py`
+- Agent 执行步骤：
+  1. 运行 `python {SKILL_DIR}/scripts/settings.py --serve-only`，解析输出中的 `SERVER_STARTED:<port>`
+  2. 调用 `webbrowser.open(f"http://localhost:{port}/")` 打开浏览器
+  3. 轮询检查 `{SKILL_DIR}/.settings_done` 标志文件是否存在
+  4. 检测到标志文件后，调用 `python -c "from settings import shutdown_server; shutdown_server()"` 关闭服务器
 
-**方式 2：手动运行脚本**
+**方式 2：手动运行脚本（终端）**
 ```bash
 python {SKILL_DIR}/scripts/settings.py
 ```
+（脚本会自动启动服务器、打开浏览器、阻塞等待设置完成）
 
 ### 对话式设置（回退方案）
 
 当 HTML 设置界面无法打开时（例如浏览器不可用、系统无图形界面等），Agent 应通过对话方式收集配置。
 
 **触发条件：**
-- `settings.py` 无法打开浏览器（输出 `BROWSER_UNAVAILABLE`）
+- Agent 调用 `webbrowser.open()` 失败（`--serve-only` 模式下）
 - 用户明确说"使用对话方式设置"、"不用 HTML"
 
 **对话流程（Agent 必须严格遵循）：**
@@ -91,42 +96,25 @@ python {SKILL_DIR}/scripts/settings.py
 
 步骤 4：总结配置
 已收集配置：
-- 调用方式：按需调用模式（on_demand）
-- 数据目录：~/.workbuddy/triphasic/
-- 任务确认：需要确认（true）
+- 调用方式：[用户选择]
+- 数据目录：[用户路径]
+- 任务确认：[true/false]
 确认保存？（y/n）
 
 步骤 5：保存配置
-- 写入 config.json
-- 更新 SKILL.md
+Agent 执行：
+  python {SKILL_DIR}/scripts/settings.py --save-config '{json}'
 ```
 
-**Agent 执行指令（对话式设置流程）：**
+**Agent 执行指令（对话式设置）：**
 
-1. 首先尝试运行 `python {SKILL_DIR}/scripts/settings.py`
-2. 检查退出码：
-   - 退出码 0：HTML 设置成功，无需进一步操作
-   - 退出码 2：`BROWSER_UNAVAILABLE`，启动对话式设置
-3. 按照上方"对话流程"逐步询问用户
-4. 收集完所有配置后，构造 JSON：
-   ```json
-   {
-     "mode": "on_demand",
-     "_triphasic_home": "~/.workbuddy/triphasic/",
-     "problems_file": "PROBLEMS.md",
-     "risks_file": "RISKS.md",
-     "lessons_file": "LESSONS_REGISTER.md",
-     "logs_dir": ".problem_logs",
-     "hooks": {
-       "require_task_confirmation": true
-     }
-   }
-   ```
-5. 调用保存命令：
+1. 先尝试 `--serve-only` 方式打开 HTML 设置界面
+2. 如果浏览器不可用，按上述对话流程逐步询问用户
+3. 收集完配置后，构造 JSON，调用：
    ```bash
    python {SKILL_DIR}/scripts/settings.py --save-config '{json_string}'
    ```
-6. 检查退出码：0 表示成功，向用户确认"✅ 设置已保存"
+4. 检查退出码：0 表示成功，向用户确认"✅ 设置已保存"
 
 **对话式设置完成后的操作：**
 1. 将用户选择写入 `TRIPHASIC_HOME/config.json`

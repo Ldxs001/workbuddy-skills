@@ -373,6 +373,7 @@ def main():
     parser.add_argument("--home", type=str, default=None, help="数据目录路径")
     parser.add_argument("--port", type=int, default=None, help="指定端口（默认随机 8080-8999）")
     parser.add_argument("--save-config", type=str, default=None, help="保存配置（JSON 字符串），不启动服务器")
+    parser.add_argument("--serve-only", action="store_true", help="只启动 HTTP 服务器，返回端口号后退出（供 Agent 调用）")
     args = parser.parse_args()
 
     # 确定路径
@@ -383,15 +384,33 @@ def main():
     if args.save_config:
         return save_config_from_json(skill_dir, home_dir, args.save_config)
 
+    # 查找可用端口
+    if args.port:
+        port = args.port
+    else:
+        try:
+            port = find_available_port()
+        except RuntimeError as e:
+            print(f"   ❌ {e}")
+            sys.exit(1)
+
+    if args.serve_only:
+        # 只启动服务器，返回端口号（不打开浏览器、不阻塞）
+        server = start_server(skill_dir, home_dir, port)
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+        # 清理旧标志文件
+        done_flag = skill_dir / ".settings_done"
+        if done_flag.exists():
+            done_flag.unlink()
+        # 只输出端口号，方便 Agent 解析
+        print(f"SERVER_STARTED:{port}")
+        sys.exit(0)
+
     print(f"⚙️  启动 Triphasic Execution 设置界面...")
     print(f"   📂 技能目录：{skill_dir}")
     print(f"   📁 数据目录：{home_dir}")
-
-    # 清理旧的标志文件
-    done_flag = skill_dir / ".settings_done"
-    if done_flag.exists():
-        done_flag.unlink()
-        print(f"   🧹 已清理旧的标志文件")
 
     # 查找可用端口
     if args.port:
@@ -407,44 +426,45 @@ def main():
     server = start_server(skill_dir, home_dir, port)
     SERVER_INSTANCE = server
 
-    print(f"   🌐 服务器已启动：http://localhost:{port}/")
-
     # 在后台线程中运行服务器
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
 
-    # 打开浏览器
-    url = f"http://localhost:{port}/"
-    success = webbrowser.open(url)
-    if not success:
-        print(f"   ❌ 无法打开浏览器（webbrowser.open 返回 False）")
-        print(f"   💡 请手动打开：{url}")
-        print(f"\n⚠️  BROWSER_UNAVAILABLE - 浏览器不可用，请使用对话式设置")
-        # 返回特定退出码 2 表示浏览器不可用
-        sys.exit(2)
+    # 清理旧的标志文件
+    done_flag = skill_dir / ".settings_done"
+    if done_flag.exists():
+        done_flag.unlink()
 
-    print(f"   ✅ 已在浏览器中打开设置页面")
+    print(f"   ✅ 服务器已启动：http://localhost:{port}/")
+    print(f"   💡 Agent 请执行：webbrowser.open('http://localhost:{port}/')")
+    print(f"   ⏳ 等待用户完成设置（检查 {done_flag} 标志文件）...")
+    print(f"   🛑 设置完成后调用 shutdown_server() 关闭服务器")
 
     # 阻塞等待用户完成设置
-    print(f"\n⏳ 等待用户完成设置...")
     try:
-        while not SETTINGS_DONE:
-            # 检查标志文件
-            if done_flag.exists():
-                print(f"   ✅ 检测到设置已完成标志")
-                break
+        while not done_flag.exists():
             time.sleep(1)
     except KeyboardInterrupt:
         print(f"\n   ⚠️  用户中断")
 
     # 停止服务器
-    print(f"\n🛑 正在关闭服务器...")
+    print(f"   🛑 正在关闭服务器...")
     server.shutdown()
     server.server_close()
-
-    print(f"✅ 设置界面已关闭")
+    print(f"✅ 设置完成")
     return 0
+
+def shutdown_server():
+    """
+    关闭当前运行的 HTTP 服务器（供 Agent 调用）
+    通过 .settings_done 标志文件通知主进程退出
+    """
+    skill_dir = Path(__file__).parent.parent
+    done_flag = skill_dir / ".settings_done"
+    done_flag.touch()
+    print(f"   ✅ 已创建标志文件：{done_flag}")
+    print(f"   💡 主进程将在 1 秒内检测到并退出")
 
 
 if __name__ == "__main__":
