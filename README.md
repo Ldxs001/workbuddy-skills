@@ -7,6 +7,7 @@ Ldxs 原创技能合集，统一管理与发布。
 | 技能 | 说明 |
 |------|------|
 | `drawio-diagram` | draw.io 自动作图，支持流程图、架构图、UML、ER图、时序图、思维导图等 |
+| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架，双模式设计，跨平台通用 |
 | `workspace-cleanup` | 工作区归档 + JSONL 幽灵任务清理，综合维护工具 |
 | `workbuddy-fs-manager` | 跨平台文件系统管理，归档工作区、同步数据库、清理任务记录 |
 
@@ -16,6 +17,7 @@ Ldxs 原创技能合集，统一管理与发布。
 workbuddy-skills/
 ├── skills/
 │   ├── drawio-diagram/
+│   ├── triphasic-execution/
 │   ├── workspace-cleanup/
 │   └── workbuddy-fs-manager/
 ├── LICENSE
