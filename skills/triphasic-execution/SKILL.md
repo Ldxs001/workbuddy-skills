@@ -1,26 +1,137 @@
 ---
 name: triphasic-execution
-version: 4.1.0
+version: 5.0.0
 author: WorkBuddy
 license: MIT
 agent_created: true
 description: >
   Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
   防止无限死循环或单步骤卡住。附带结构化问题日志系统和经验教训登记册。
-  v4.1 更新：【双模式设计】+ 【跨平台通用化】+ 【安装路径由调用方决定】
+  v5.0 更新：【HTML 设置界面】+ 【双模式设计】+ 【跨平台通用化】
+    - 安装后首次运行自动弹出 HTML 设置界面（系统默认浏览器）
+    - 支持配置：调用方式、记录文件路径、任务规划确认
+    - 设置值同时写入 config.json 和 SKILL.md
+    - 支持再次呼出设置界面（发送"打开 triphasic 设置"等）
     - 按需调用模式（默认）：用户主动加载技能 → 执行三步框架；不调用就不记录
     - 全局自动模式（可选）：配置 mode=global → daemon 后台监控，自动捕获异常并记录
   核心逻辑 = Python CLI，不依赖任何 Agent 平台。
   安装路径由调用方（Agent/平台）通过 --target 或 TRIPHASIC_SKILL_DIR 环境变量决定。
   触发关键词：三步执行、循环框架、执行审查推进、triphasic、问题记录、
-  经验教训、problem logger、exec wrapper、exec guard。
-tags: [framework, execution, debugging, problem-tracking, lessons-learned, cross-platform]
+  经验教训、problem logger、exec wrapper、exec guard、
+  打开 triphasic 设置、修改 triphasic 配置、triphasic settings、打开设置界面。
+tags: [framework, execution, debugging, problem-tracking, lessons-learned, cross-platform, settings, configuration, config-ui]
 category: workflow
 ---
 
-# Triphasic Execution Framework v4.1
+# Triphasic Execution Framework v5.0
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
+
+---
+
+## 设置界面（v5.0 新增）
+
+安装技能后首次运行 `install.py` 时，会自动弹出 HTML 设置界面（系统默认浏览器），引导用户完成初始配置。
+
+### 设置项说明
+
+| 设置项 | 选项 | 说明 |
+|---|---|---|
+| **默认调用方式** | 调用模式（按需） / 全局模式 | 控制技能激活方式 |
+| **记录文件路径** | TRIPHASIC_HOME、Problems、Risks、Lessons、Logs | 未自定义时使用默认值 |
+| **任务规划确认** | 询问确认后再执行 / 直接按照规划执行 | 控制 Agent 执行前是否请求确认 |
+
+### 当前配置
+
+> **调用方式**：🟢 按需调用模式（默认）
+> **数据目录**：`~/.workbuddy/triphasic/`
+> **任务规划确认**：询问确认后再执行
+
+（上方配置会根据实际设置值自动更新）
+
+### 再次呼出设置界面
+
+**方式 1：通过 Agent 对话（推荐）**
+- 向 Agent 发送："打开 triphasic 设置"、"修改配置"、"打开设置界面"
+- Agent 自动调用 `python {SKILL_DIR}/scripts/settings.py`
+
+**方式 2：手动运行脚本**
+```bash
+python {SKILL_DIR}/scripts/settings.py
+```
+
+### 对话式设置（回退方案）
+
+当 HTML 设置界面无法打开时（例如浏览器不可用、系统无图形界面等），Agent 应通过对话方式收集配置。
+
+**触发条件：**
+- `settings.py` 无法打开浏览器（输出 `BROWSER_UNAVAILABLE`）
+- 用户明确说"使用对话方式设置"、"不用 HTML"
+
+**对话流程（Agent 必须严格遵循）：**
+
+```
+步骤 1：确认默认调用方式
+请确定默认调用方式（输入 1/2 选择）：
+1. 按需调用模式（默认）— 用户主动加载技能时才启用
+2. 全局自动模式 — 后台 daemon 监控，自动捕获异常
+请输入（1 或 2）：
+
+步骤 2：确认数据目录路径
+当前数据目录为：~/.workbuddy/triphasic/
+- 确认请直接输入 y
+- 更改请输入具体路径（例如：D:\my_data\triphasic）
+请输入：
+
+步骤 3：确认任务规划
+任务规划是否需要确认（输入 1/2 选择）：
+1. 确认 — 执行前询问用户
+2. 无需确认 — 直接按照规划执行
+请输入（1 或 2）：
+
+步骤 4：总结配置
+已收集配置：
+- 调用方式：按需调用模式（on_demand）
+- 数据目录：~/.workbuddy/triphasic/
+- 任务确认：需要确认（true）
+确认保存？（y/n）
+
+步骤 5：保存配置
+- 写入 config.json
+- 更新 SKILL.md
+```
+
+**Agent 执行指令（对话式设置流程）：**
+
+1. 首先尝试运行 `python {SKILL_DIR}/scripts/settings.py`
+2. 检查退出码：
+   - 退出码 0：HTML 设置成功，无需进一步操作
+   - 退出码 2：`BROWSER_UNAVAILABLE`，启动对话式设置
+3. 按照上方"对话流程"逐步询问用户
+4. 收集完所有配置后，构造 JSON：
+   ```json
+   {
+     "mode": "on_demand",
+     "_triphasic_home": "~/.workbuddy/triphasic/",
+     "problems_file": "PROBLEMS.md",
+     "risks_file": "RISKS.md",
+     "lessons_file": "LESSONS_REGISTER.md",
+     "logs_dir": ".problem_logs",
+     "hooks": {
+       "require_task_confirmation": true
+     }
+   }
+   ```
+5. 调用保存命令：
+   ```bash
+   python {SKILL_DIR}/scripts/settings.py --save-config '{json_string}'
+   ```
+6. 检查退出码：0 表示成功，向用户确认"✅ 设置已保存"
+
+**对话式设置完成后的操作：**
+1. 将用户选择写入 `TRIPHASIC_HOME/config.json`
+2. 调用 `update_skill_md()` 更新 `SKILL.md`
+3. 向用户确认"设置已保存"
 
 ---
 
@@ -185,7 +296,7 @@ function exec { python "{SKILL_DIR}\scripts\exec_wrapper.py" @args }
 | `TRIPHASIC_HOME/.exec_output_pipe.txt` | exec 输出管道文件 |
 | `TRIPHASIC_HOME/config.json` | 用户配置 |
 
-**默认值**：`~/.workbuddy/triphasic/`
+**当前配置**：`~/.workbuddy/triphasic/`（可通过设置界面修改）
 
 所有脚本支持 `--home` 参数覆盖，优先级：`--home` > `TRIPHASIC_HOME` > 默认值
 
@@ -235,6 +346,9 @@ python install.py --uninstall
   }
 }
 ```
+
+> **当前配置（由设置界面写入，自动更新）：**
+> 实际配置值存储在 `TRIPHASIC_HOME/config.json`，可通过运行 `python {SKILL_DIR}/scripts/settings.py` 查看和修改。
 
 - `mode`: `"on_demand"`（默认，按需调用）| `"global"`（全局自动）
 - `daemon.enabled`: 仅 `mode=global` 时应设为 `true`
@@ -288,6 +402,7 @@ web_fetch xx 信源 → 返回 503
 | 脚本 | 功能 | 依赖 |
 |------|------|------|
 | `install.py` | 安装/卸载（支持 --mode --target --home） | 无 |
+| `settings.py` | HTML 设置界面（v5.0 新增） | 无 |
 | `problem_logger.py` | 问题 CRUD + 合并登记册 | 无 |
 | `exec_wrapper.py` | 命令执行拦截器 | 无 |
 | `problem_daemon.py` | 后台监控守护进程（仅全局模式） | 无 |

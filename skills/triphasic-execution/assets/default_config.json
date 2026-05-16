@@ -1,5 +1,7 @@
 {
   "enabled": true,
+  "settings_ui_enabled": true,
+  "_triphasic_home": "~/.workbuddy/triphasic/",
   "mode": "on_demand",
   "logs_dir": ".problem_logs",
   "exec_pipe": ".exec_output_pipe.txt",
