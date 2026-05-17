@@ -1,12 +1,16 @@
 ---
 name: triphasic-execution
-version: 5.2.0
+version: 5.3.0
 author: WorkBuddy
 license: MIT
 agent_created: true
 description: >
   Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
   防止无限死循环或单步骤卡住。附带结构化问题日志、风险手册和经验教训登记册。
+  v5.3 更新：【人机交互调用】+ 【中断捕获】+ 【强制记录】
+    - 新增人机交互调用方式（用户对话触发记录）
+    - exec_wrapper.py 支持捕获 Ctrl+C/SIGTERM 中断事件
+    - 问题记录从"AI自觉"改为"任务结束强制步骤"
   v5.2 更新：【完善监控边界说明】+ 【风险记录命令】
     - 新增 add-risk 命令，支持任务拆分阶段的风险记录
     - 明确说明监控能力边界（全局模式 vs 临时调用）
@@ -43,18 +47,18 @@ category: workflow
 
 | 功能 | 全局模式（Global） | 临时调用（按需） |
 |------|-------------------|-----------------|
-| **问题记录** | ✅ 自动（Shell 命令失败） | ❌ 完全手动 |
-| **风险记录** | ✅ 自动（Shell 命令异常） | ✅ 任务拆分时手动 |
+| **问题记录** | ✅ 自动（Shell 命令失败/中断） | ✅ 任务结束后强制执行 |
+| **风险记录** | ✅ 自动（Shell 命令异常） | ✅ 任务拆分时强制执行 |
 | **经验积累** | ❌ 手动调用 merge-to-lessons | ❌ 手动调用 merge-to-lessons |
 
 ### 全局模式的实际覆盖率
 
-> **⚠️ 重要局限**：全局模式只能监控通过 `exec_wrapper.py` 执行的 **Shell 命令**。
+> **✅ 全局模式可以监控**：通过 `exec_wrapper.py` 执行的 **Shell 命令**。
 
 - ✅ **能自动记录**：
   - Shell 命令执行失败（退出码非零）
+  - Shell 命令被中断（Ctrl+C / SIGTERM）
   - Shell 输出中匹配错误模式的文本
-  - 通过 `exec_wrapper.py` 执行的命令
 
 - ❌ **无法自动记录**：
   - Read/Write/Edit 等直接工具调用
@@ -66,11 +70,17 @@ category: workflow
 
 ### 临时调用的实际行为
 
-> **⚠️ 重要局限**：临时调用完全依赖 AI 自觉性，不调用就不记录。
+> **⚠️ 重要**：临时调用模式下，记录是**任务结束后的强制步骤**，不是可选的。
 
-- ✅ **问题记录**：AI 发现问题后手动调用 `problem_logger.py add`
-- ✅ **风险记录**：任务拆分时手动调用 `problem_logger.py add-risk`
-- ❌ **经验积累**：必须手动调用 `merge-to-lessons`
+- ✅ **任务结束后强制记录**：
+  - 识别问题 → 必须调用 `add`
+  - 识别风险 → 必须调用 `add-risk`
+  - 任务完成 → 必须调用 `merge-to-lessons`
+
+- ✅ **用户触发时必须执行**：
+  - 用户说"记录问题" → 立即调用 `add`
+  - 用户说"记录风险" → 立即调用 `add-risk`
+  - 用户说"总结经验" → 立即调用 `merge-to-lessons`
 
 ---
 
@@ -123,6 +133,66 @@ python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 # 查看统计
 python {SKILL_DIR}/scripts/lessons_register.py stats
 ```
+
+---
+
+## 人机交互调用方式（与AI对话触发记录）
+
+### 触发指令示例
+
+用户可以通过以下方式触发AI执行记录：
+
+```
+用户：请审查上面执行的任务，记录问题和风险
+
+用户：任务结束了，帮我总结问题和经验
+
+用户：记录一下刚才的错误：API超时
+
+用户：帮我把今天的经验整理一下
+
+用户：记录一下风险：网络不稳定
+```
+
+### AI响应模板
+
+当用户触发记录时，AI应执行以下流程：
+
+```
+### 📋 任务后记录
+
+**问题记录**：
+python {SKILL_DIR}/scripts/problem_logger.py add \
+  --scene "任务执行" \
+  --symptom "错误描述" \
+  --cause "原因分析" \
+  --solution "解决建议" \
+  --task "任务名称"
+
+**风险记录**：
+python {SKILL_DIR}/scripts/problem_logger.py add-risk \
+  --description "风险描述" \
+  --impact "影响评估" \
+  --mitigation "缓解措施" \
+  --task "任务名称"
+
+**经验积累**：
+python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
+```
+
+### 强制记录规则
+
+> **⚠️ 重要**：每次任务执行完成后，AI必须执行以下记录步骤：
+>
+> 1. **任务结束时自动记录**（强制，非可选）：
+>    - 回顾执行过程，识别问题 → 调用 `add`
+>    - 回顾执行过程，识别风险 → 调用 `add-risk`
+>    - 执行完成后 → 调用 `merge-to-lessons`
+>
+> 2. **用户触发时记录**（必须执行）：
+>    - 用户说"记录问题" → 立即调用 `add`
+>    - 用户说"记录风险" → 立即调用 `add-risk`
+>    - 用户说"总结经验" → 立即调用 `merge-to-lessons`
 
 ---
 

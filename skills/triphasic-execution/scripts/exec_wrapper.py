@@ -28,6 +28,7 @@ import os
 import sys
 import json
 import time
+import signal
 import subprocess
 from pathlib import Path
 from datetime import datetime
@@ -103,6 +104,60 @@ def write_to_pipe(command: str, exit_code: int, stdout: str, stderr: str):
         f.flush()
 
 
+def write_interrupt_to_pipe(command: str, signal_num: int):
+    """记录命令被中断的事件"""
+    pipe = get_exec_pipe()
+    pipe.parent.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    signal_name = {2: "SIGINT(Ctrl+C)", 15: "SIGTERM", 9: "SIGKILL"}.get(signal_num, f"SIG{signal_num}")
+
+    # 中断事件使用特殊退出码 -100 到 -109
+    interrupt_exit_code = -100 - signal_num
+
+    record = f"{timestamp}|{interrupt_exit_code}|{command}\n\n⚠️ 命令被强制中断 - {signal_name}"
+    with open(pipe, "a", encoding="utf-8", errors="replace") as f:
+        f.write(record + "\n" + "=" * 60 + "\n")
+        f.flush()
+
+
+# 全局变量，用于信号处理器
+_current_command = ""
+_current_args = []
+
+
+def handle_interrupt(signum, frame):
+    """信号处理器：捕获 Ctrl+C 或 SIGTERM，记录中断事件"""
+    signal_name = {2: "SIGINT(Ctrl+C)", 15: "SIGTERM"}.get(signum, f"SIG{signum}")
+    print(f"\n⚠️ 捕获信号 {signal_name}，正在记录中断事件...", file=sys.stderr)
+
+    # 写入中断记录
+    if _current_command:
+        write_interrupt_to_pipe(_current_command, signum)
+
+    print("✅ 中断事件已记录，进程退出", file=sys.stderr)
+    sys.exit(128 + signum)
+
+
+# 注册信号处理器（仅在非 Windows 平台）
+if sys.platform != "win32":
+    signal.signal(signal.SIGINT, handle_interrupt)
+    signal.signal(signal.SIGTERM, handle_interrupt)
+else:
+    # Windows: 使用 setconsoleCtrlHandler
+    def win_signal_handler(sig):
+        if sig == 0:  # CTRL_C_EVENT
+            handle_interrupt(2, None)
+        elif sig == 1:  # CTRL_BREAK_EVENT
+            handle_interrupt(21, None)  # SIGBREAK
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleCtrlHandler(ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int)(win_signal_handler), True)
+    except Exception:
+        pass
+
+
 def run_command(command_str: str, cmd_args: list[str]) -> tuple[int, str, str]:
     """执行命令，返回 (exit_code, stdout, stderr)"""
     timeout = 300  # 5 分钟超时
@@ -166,6 +221,11 @@ def main():
         return 1
 
     command_str = " ".join(remaining)
+
+    # 保存当前命令供信号处理器使用
+    global _current_command, _current_args
+    _current_command = command_str
+    _current_args = remaining
 
     print(f"🔧 执行命令：{command_str}")
     print("-" * 60)
