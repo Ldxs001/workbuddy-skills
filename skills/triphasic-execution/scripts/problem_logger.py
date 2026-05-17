@@ -72,6 +72,11 @@ def get_lessons_md() -> Path:
     return get_home() / "LESSONS_REGISTER.md"
 
 
+def get_risks_jsonl() -> Path:
+    """获取 JSONL 风险日志路径"""
+    return get_logs_dir() / "risks.jsonl"
+
+
 def get_exec_pipe() -> Path:
     """获取 exec 输出管道文件路径"""
     return get_home() / ".exec_output_pipe.txt"
@@ -173,6 +178,46 @@ def get_next_problem_number() -> int:
     return max(numbers) + 1 if numbers else 1
 
 
+def get_next_risk_number() -> int:
+    """获取下一个风险编号"""
+    risks = load_risks()
+    if not risks:
+        return 1
+    numbers = []
+    for r in risks:
+        num_str = str(r.get("number", "R0"))
+        try:
+            numbers.append(int(num_str.lstrip("R")))
+        except ValueError:
+            continue
+    return max(numbers) + 1 if numbers else 1
+
+
+def load_risks() -> list[dict]:
+    """加载所有风险记录"""
+    log = get_risks_jsonl()
+    if not log.exists():
+        return []
+    risks = []
+    with open(log, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    risks.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    return risks
+
+
+def save_risk(risk: dict):
+    """追加保存风险记录（JSONL，保证不丢失）"""
+    get_logs_dir().mkdir(parents=True, exist_ok=True)
+    with open(get_risks_jsonl(), "a", encoding="utf-8") as f:
+        f.write(json.dumps(risk, ensure_ascii=False) + "\n")
+        f.flush()
+
+
 # ============================================================================
 # 命令实现
 # ============================================================================
@@ -212,6 +257,45 @@ def cmd_add(args):
         print(f"   原因：{problem['cause']}")
     if problem["solution"] != "待解决":
         print(f"   解决：{problem['solution']}")
+    return 0
+
+
+def cmd_add_risk(args):
+    """添加风险记录"""
+    risk = {
+        "id": f"R{get_next_risk_number():03d}",
+        "number": f"R{get_next_risk_number():03d}",
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "description": args.description,
+        "impact": args.impact or "待评估",
+        "mitigation": args.mitigation or "待制定",
+        "status": "已缓解" if args.mitigation else "监控中",
+        "related_task": args.task or None,
+    }
+
+    save_risk(risk)
+
+    # 更新 RISKS.md
+    risks_file = get_risks_md()
+    risks_file.parent.mkdir(parents=True, exist_ok=True)
+
+    entry = f"""### [{risk['number']}] {risk['description'][:60]}
+
+- **识别时间**: {risk['timestamp']}
+- **影响评估**: {risk['impact']}
+- **缓解措施**: {risk['mitigation']}
+- **状态**: {risk['status']}
+- **关联任务**: {risk.get('related_task', 'N/A')}
+
+---
+"""
+    with open(risks_file, "a", encoding="utf-8") as f:
+        f.write(entry)
+
+    print(f"✅ 风险已记录：{risk['number']} @ {risk['timestamp']}")
+    print(f"   描述：{risk['description'][:60]}...")
+    print(f"   影响：{risk['impact']}")
+    print(f"   缓解：{risk['mitigation']}")
     return 0
 
 
@@ -470,6 +554,13 @@ def main():
     p_add.add_argument("--task", default=None, help="关联任务")
     p_add.add_argument("--force", action="store_true", help="强制添加重复记录")
 
+    # add-risk
+    p_risk = subparsers.add_parser("add-risk", help="添加风险记录")
+    p_risk.add_argument("--description", required=True, help="风险描述")
+    p_risk.add_argument("--impact", default=None, help="影响评估")
+    p_risk.add_argument("--mitigation", default=None, help="缓解措施")
+    p_risk.add_argument("--task", default=None, help="关联任务")
+
     # list
     p_list = subparsers.add_parser("list", help="列出问题记录")
     p_list.add_argument("--recent", type=int, default=MAX_RECENT, help=f"最近 N 条（默认{MAX_RECENT}）")
@@ -502,6 +593,8 @@ def main():
         return cmd_init(args)
     elif args.command == "add":
         return cmd_add(args)
+    elif args.command == "add-risk":
+        return cmd_add_risk(args)
     elif args.command == "list":
         return cmd_list(args)
     elif args.command == "search":

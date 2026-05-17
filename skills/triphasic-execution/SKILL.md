@@ -1,12 +1,16 @@
 ---
 name: triphasic-execution
-version: 5.1.0
+version: 5.2.0
 author: WorkBuddy
 license: MIT
 agent_created: true
 description: >
   Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
-  防止无限死循环或单步骤卡住。附带结构化问题日志系统和经验教训登记册。
+  防止无限死循环或单步骤卡住。附带结构化问题日志、风险手册和经验教训登记册。
+  v5.2 更新：【完善监控边界说明】+ 【风险记录命令】
+    - 新增 add-risk 命令，支持任务拆分阶段的风险记录
+    - 明确说明监控能力边界（全局模式 vs 临时调用）
+    - 说明问题、风险、经验的调用方式和定时任务命令
   v5.1 更新：【修复保存后服务器关闭问题】+ 【添加"完成设置"按钮】
     - 修复：保存配置后服务器保持运行，不再自动关闭
     - 新增：保存成功后显示"完成设置"按钮，手动关闭服务器
@@ -23,13 +27,128 @@ description: >
   触发关键词：三步执行、循环框架、执行审查推进、triphasic、问题记录、
   经验教训、problem logger、exec wrapper、exec guard、
   打开 triphasic 设置、修改 triphasic 配置、triphasic settings、打开设置界面。
-tags: [framework, execution, debugging, problem-tracking, lessons-learned, cross-platform, settings, configuration, config-ui]
+tags: [framework, execution, debugging, problem-tracking, risk-tracking, lessons-learned, cross-platform, settings, configuration, config-ui]
 category: workflow
 ---
 
-# Triphasic Execution Framework v5.1
+# Triphasic Execution Framework v5.2
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
+
+---
+
+## ⚠️ 监控能力边界（重要说明）
+
+### 全局模式 vs 临时调用
+
+| 功能 | 全局模式（Global） | 临时调用（按需） |
+|------|-------------------|-----------------|
+| **问题记录** | ✅ 自动（Shell 命令失败） | ❌ 完全手动 |
+| **风险记录** | ✅ 自动（Shell 命令异常） | ✅ 任务拆分时手动 |
+| **经验积累** | ❌ 手动调用 merge-to-lessons | ❌ 手动调用 merge-to-lessons |
+
+### 全局模式的实际覆盖率
+
+> **⚠️ 重要局限**：全局模式只能监控通过 `exec_wrapper.py` 执行的 **Shell 命令**。
+
+- ✅ **能自动记录**：
+  - Shell 命令执行失败（退出码非零）
+  - Shell 输出中匹配错误模式的文本
+  - 通过 `exec_wrapper.py` 执行的命令
+
+- ❌ **无法自动记录**：
+  - Read/Write/Edit 等直接工具调用
+  - ToolSearch/DeferExecuteTool 等 API 调用
+  - AI 推理错误、幻觉
+  - 逻辑错误（命令成功执行但结果错误）
+
+**实际覆盖率**：约 **30-40%**（仅 Shell 命令部分）
+
+### 临时调用的实际行为
+
+> **⚠️ 重要局限**：临时调用完全依赖 AI 自觉性，不调用就不记录。
+
+- ✅ **问题记录**：AI 发现问题后手动调用 `problem_logger.py add`
+- ✅ **风险记录**：任务拆分时手动调用 `problem_logger.py add-risk`
+- ❌ **经验积累**：必须手动调用 `merge-to-lessons`
+
+---
+
+## 问题、风险、经验调用方式
+
+### 1. 问题记录（Problem Logging）
+
+**触发时机**：任务执行过程中发现错误/异常时
+
+```bash
+# 标准调用
+python {SKILL_DIR}/scripts/problem_logger.py add \
+  --scene "API测试" \
+  --symptom "HTTP 503" \
+  --cause "服务端限流" \
+  --solution "增加重试机制" \
+  --task "用户头像接口"
+
+# 最小调用（仅必填项）
+python {SKILL_DIR}/scripts/problem_logger.py add \
+  --scene "文件读取" \
+  --symptom "FileNotFoundError"
+```
+
+### 2. 风险记录（Risk Logging）
+
+**触发时机**：任务拆分（Phase 1）时识别到潜在风险
+
+```bash
+# 标准调用
+python {SKILL_DIR}/scripts/problem_logger.py add-risk \
+  --description "网络不稳定可能导致API调用失败" \
+  --impact "用户体验下降，转化率降低" \
+  --mitigation "增加重试机制和降级策略" \
+  --task "用户头像接口"
+
+# 最小调用（仅必填项）
+python {SKILL_DIR}/scripts/problem_logger.py add-risk \
+  --description "第三方服务可能宕机"
+```
+
+### 3. 经验积累（Lessons Learned）
+
+**触发时机**：任务完成后或定期（如每天/每周）
+
+```bash
+# 合并问题清单和风险手册到经验教训登记册
+python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
+
+# 查看统计
+python {SKILL_DIR}/scripts/lessons_register.py stats
+```
+
+---
+
+## 定时任务集成
+
+### WorkBuddy 定时任务命令
+
+在 WorkBuddy 中创建定时任务时，使用以下命令：
+
+#### 每日经验积累（推荐）
+
+**任务类型**：Shell 命令
+**命令**：
+```bash
+python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
+```
+
+**定时设置**（根据需求选择）：
+- 每天 22:00：`0 22 * * *`
+- 每天早上 08:00：`0 8 * * *`
+
+#### 定时检查未解决问题
+
+```bash
+python {SKILL_DIR}/scripts/cron_helper.py
+```
 
 ---
 
@@ -225,10 +344,16 @@ Agent 加载本技能后，遵循三步框架。问题由 Agent 通过 `problem_
 # 初始化数据目录（首次使用）
 python {SKILL_DIR}/scripts/problem_logger.py init
 
-# Agent 记录问题
+# 记录问题（任务执行中发现错误时）
 python {SKILL_DIR}/scripts/problem_logger.py add \
   --scene "API测试" --symptom "HTTP 503" \
   --cause "服务端限流" --solution "增加重试机制"
+
+# 记录风险（任务拆分时识别到潜在风险）
+python {SKILL_DIR}/scripts/problem_logger.py add-risk \
+  --description "网络不稳定可能导致API调用失败" \
+  --impact "用户体验下降" \
+  --mitigation "增加重试机制"
 
 # 搜索历史问题（执行前检索，避免重复踩坑）
 python {SKILL_DIR}/scripts/problem_logger.py search "503"
@@ -239,7 +364,7 @@ python {SKILL_DIR}/scripts/problem_logger.py list --recent 10
 # 更新问题（补充原因/解决路径）
 python {SKILL_DIR}/scripts/problem_logger.py update --id P001 --cause "xxx" --solution "yyy"
 
-# 生成经验教训登记册
+# 生成经验教训登记册（任务完成后或定时调用）
 python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 ```
 
@@ -283,6 +408,8 @@ function exec { python "{SKILL_DIR}\scripts\exec_wrapper.py" @args }
 |------|------|
 | `TRIPHASIC_HOME/.problem_logs/problems.jsonl` | JSONL 问题日志（机器可读，防丢失） |
 | `TRIPHASIC_HOME/.problem_logs/daemon.log` | 守护进程运行日志 |
+| `TRIPHASIC_HOME/.problem_logs/problems.jsonl` | JSONL 问题日志（机器可读，防丢失） |
+| `TRIPHASIC_HOME/.problem_logs/risks.jsonl` | JSONL 风险日志（机器可读，防丢失） |
 | `TRIPHASIC_HOME/PROBLEMS.md` | 问题清单（人类可读） |
 | `TRIPHASIC_HOME/RISKS.md` | 风险手册 |
 | `TRIPHASIC_HOME/LESSONS_REGISTER.md` | 经验教训登记册 |
@@ -351,8 +478,23 @@ python install.py --uninstall
 
 ## 定时任务集成
 
+### WorkBuddy 定时任务命令
+
+#### 每日经验积累（推荐）
+
+**任务类型**：Shell 命令
+**命令**：
 ```bash
-# 每天定时检查未解决问题 + 生成登记册
+python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
+```
+
+**定时设置**（根据需求选择）：
+- 每天 22:00：`0 22 * * *`
+- 每天早上 08:00：`0 8 * * *`
+
+#### 定时检查未解决问题
+
+```bash
 python {SKILL_DIR}/scripts/cron_helper.py
 
 # 仅查看统计
@@ -396,7 +538,7 @@ web_fetch xx 信源 → 返回 503
 |------|------|------|
 | `install.py` | 安装/卸载（支持 --mode --target --home） | 无 |
 | `settings.py` | HTML 设置界面（v5.0 新增） | 无 |
-| `problem_logger.py` | 问题 CRUD + 合并登记册 | 无 |
+| `problem_logger.py` | 问题/风险 CRUD + 合并登记册（add/add-risk/list/search/update/merge-to-lessons） | 无 |
 | `exec_wrapper.py` | 命令执行拦截器 | 无 |
 | `problem_daemon.py` | 后台监控守护进程（仅全局模式） | 无 |
 | `lessons_register.py` | 登记册管理（generate/diff/stats） | 无 |
