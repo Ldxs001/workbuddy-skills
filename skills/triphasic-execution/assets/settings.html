@@ -104,13 +104,8 @@
             font-size: 14px;
         }
 
-        .path-input-wrapper {
-            display: flex;
-            gap: 10px;
-        }
-
-        .path-input-wrapper input[type="text"] {
-            flex: 1;
+        .path-item input[type="text"] {
+            width: 100%;
             padding: 8px 12px;
             background: #0f3460;
             border: 1px solid #1a3a6e;
@@ -119,34 +114,13 @@
             font-size: 14px;
         }
 
-        .path-input-wrapper input[type="text"]:focus {
+        .path-item input[type="text"]:focus {
             outline: none;
             border-color: #4ecdc4;
         }
 
-        .btn-browse {
-            padding: 8px 16px;
-            background: #0f3460;
-            border: 1px solid #1a3a6e;
-            border-radius: 6px;
-            color: #4ecdc4;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .btn-browse:hover {
-            background: #1a3a6e;
-            border-color: #4ecdc4;
-        }
-
-        .btn-browse:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .note {
-            color: #ff6b6b;
+            color: #a0a0a0;
             font-size: 12px;
             margin-top: 5px;
         }
@@ -214,6 +188,15 @@
             40% { content: '..'; }
             60%, 100% { content: '...'; }
         }
+
+        .info {
+            padding: 15px;
+            background: rgba(78, 205, 196, 0.1);
+            border: 1px solid #4ecdc4;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -242,41 +225,25 @@
                 <div class="path-group">
                     <div class="path-item">
                         <label>TRIPHASIC_HOME（数据目录）</label>
-                        <div class="path-input-wrapper">
-                            <input type="text" name="triphasic_home" id="triphasic_home" placeholder="~/.workbuddy/triphasic/">
-                            <button type="button" class="btn-browse" onclick="browsePath('triphasic_home')" disabled>选择</button>
-                        </div>
+                        <input type="text" name="triphasic_home" id="triphasic_home" placeholder="~/.workbuddy/triphasic/">
                     </div>
                     <div class="path-item">
                         <label>Problems 文件</label>
-                        <div class="path-input-wrapper">
-                            <input type="text" name="problems_file" id="problems_file" placeholder="PROBLEMS.md">
-                            <button type="button" class="btn-browse" onclick="browsePath('problems_file')" disabled>选择</button>
-                        </div>
+                        <input type="text" name="problems_file" id="problems_file" placeholder="PROBLEMS.md">
                     </div>
                     <div class="path-item">
                         <label>Risks 文件</label>
-                        <div class="path-input-wrapper">
-                            <input type="text" name="risks_file" id="risks_file" placeholder="RISKS.md">
-                            <button type="button" class="btn-browse" onclick="browsePath('risks_file')" disabled>选择</button>
-                        </div>
+                        <input type="text" name="risks_file" id="risks_file" placeholder="RISKS.md">
                     </div>
                     <div class="path-item">
                         <label>Lessons 文件</label>
-                        <div class="path-input-wrapper">
-                            <input type="text" name="lessons_file" id="lessons_file" placeholder="LESSONS_REGISTER.md">
-                            <button type="button" class="btn-browse" onclick="browsePath('lessons_file')" disabled>选择</button>
-                        </div>
+                        <input type="text" name="lessons_file" id="lessons_file" placeholder="LESSONS_REGISTER.md">
                     </div>
                     <div class="path-item">
                         <label>Logs 目录</label>
-                        <div class="path-input-wrapper">
-                            <input type="text" name="logs_dir" id="logs_dir" placeholder=".problem_logs">
-                            <button type="button" class="btn-browse" onclick="browsePath('logs_dir')" disabled>选择</button>
-                        </div>
+                        <input type="text" name="logs_dir" id="logs_dir" placeholder=".problem_logs">
                     </div>
                 </div>
-                <p class="note">💡 未自定义时使用 TRIPHASIC_HOME 的默认路径。由于浏览器安全限制，"选择"按钮已禁用，请手动输入路径。</p>
             </fieldset>
 
             <fieldset>
@@ -291,10 +258,9 @@
                         <span>🔵 直接按照规划执行</span>
                     </label>
                 </div>
-                <p class="note">💡 选择"询问确认"后，Agent 在执行任务规划前会先请求用户确认。</p>
             </fieldset>
 
-            <button type="submit" class="btn-submit" id="btn-submit">确定</button>
+            <button type="submit" class="btn-submit" id="btn-submit">保存配置</button>
         </form>
 
         <div class="loading" id="loading">正在保存设置</div>
@@ -302,20 +268,37 @@
     </div>
 
     <script>
+        // 当前配置数据（用于轮询）
+        let currentConfig = null;
+
         // 页面加载时获取当前配置
         window.addEventListener('load', async () => {
             try {
                 const response = await fetch('/config');
-                if (!response.ok) {
-                    throw new Error('Failed to load config');
-                }
-                const config = await response.json();
-                populateForm(config);
+                if (!response.ok) throw new Error('Failed to load config');
+                currentConfig = await response.json();
+                populateForm(currentConfig);
             } catch (error) {
                 console.error('Error loading config:', error);
                 showMessage('加载当前配置失败，将使用默认值。', 'error');
+                // 使用默认值填充
+                currentConfig = getDefaultConfig();
+                populateForm(currentConfig);
             }
         });
+
+        // 获取默认配置
+        function getDefaultConfig() {
+            return {
+                mode: 'on_demand',
+                triphasic_home: '~/.workbuddy/triphasic/',
+                problems_file: 'PROBLEMS.md',
+                risks_file: 'RISKS.md',
+                lessons_file: 'LESSONS_REGISTER.md',
+                logs_dir: '.problem_logs',
+                require_confirmation: true
+            };
+        }
 
         // 填充表单
         function populateForm(config) {
@@ -324,24 +307,26 @@
             document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
 
             // 记录文件路径
-            document.getElementById('triphasic_home').value = config._triphasic_home || '~/.workbuddy/triphasic/';
+            document.getElementById('triphasic_home').value = config.triphasic_home || '~/.workbuddy/triphasic/';
             document.getElementById('problems_file').value = config.problems_file || 'PROBLEMS.md';
             document.getElementById('risks_file').value = config.risks_file || 'RISKS.md';
             document.getElementById('lessons_file').value = config.lessons_file || 'LESSONS_REGISTER.md';
             document.getElementById('logs_dir').value = config.logs_dir || '.problem_logs';
 
             // 任务规划确认
-            const requireConfirmation = config.hooks && config.hooks.require_task_confirmation !== false;
+            const requireConfirmation = config.require_confirmation !== false;
             document.querySelector(`input[name="require_confirmation"][value="${requireConfirmation}"]`).checked = true;
         }
 
-        // 浏览路径（由于浏览器安全限制，此功能已禁用）
-        function browsePath(inputId) {
-            // 浏览器不支持直接访问文件系统，此功能需要后端支持
-            alert('由于浏览器安全限制，无法打开文件路径选择器。请手动输入路径。');
+        // 显示消息
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.innerHTML = text;
+            message.className = 'message ' + type;
+            message.style.display = 'block';
         }
 
-        // 表单提交
+        // 表单提交 - 通过文件方式保存
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -365,6 +350,7 @@
                 require_confirmation: document.querySelector('input[name="require_confirmation"]:checked').value === 'true'
             };
 
+            // 通过 fetch 请求让 Python 保存配置
             try {
                 const response = await fetch('/save', {
                     method: 'POST',
@@ -377,29 +363,51 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showMessage('✅ 设置已保存！可关闭此页面。', 'success');
-                    // 3秒后自动关闭（可选）
-                    setTimeout(() => {
-                        window.close();
-                    }, 3000);
+                    loading.style.display = 'none';
+                    showMessage('✅ 设置已保存！正在验证...', 'success');
+
+                    // 开始轮询检查保存是否完成
+                    setTimeout(checkSaveStatus, 1000);
                 } else {
                     throw new Error(result.error || 'Unknown error');
                 }
             } catch (error) {
                 console.error('Error saving settings:', error);
+                loading.style.display = 'none';
                 showMessage('❌ 保存失败：' + error.message, 'error');
                 btnSubmit.disabled = false;
-            } finally {
-                loading.style.display = 'none';
             }
         });
 
-        // 显示消息
-        function showMessage(text, type) {
-            const message = document.getElementById('message');
-            message.textContent = text;
-            message.className = 'message ' + type;
-            message.style.display = 'block';
+        // 轮询检查保存状态
+        function checkSaveStatus() {
+            const maxAttempts = 60;
+            let attempts = 0;
+
+            const check = async () => {
+                attempts++;
+                try {
+                    const response = await fetch('/config');
+                    const config = await response.json();
+
+                    // 检查是否包含 _saved 标记
+                    if (config._saved) {
+                        showMessage('✅ <strong>配置已成功保存！</strong><br><br>可以关闭此页面。', 'success');
+                        document.getElementById('btn-submit').disabled = true;
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Check failed:', e);
+                }
+
+                if (attempts < maxAttempts) {
+                    setTimeout(check, 2000);
+                } else {
+                    showMessage('⚠️ 保存超时，请检查 Python 程序是否正常运行。', 'error');
+                }
+            };
+
+            check();
         }
     </script>
 </body>

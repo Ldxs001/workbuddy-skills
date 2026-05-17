@@ -223,6 +223,14 @@ class SettingsHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
+    def do_OPTIONS(self):
+        """处理 CORS 预检请求"""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
     def do_POST(self):
         """处理 POST 请求"""
         if self.path == "/save":
@@ -250,6 +258,7 @@ class SettingsHandler(BaseHTTPRequestHandler):
 
     def send_config(self):
         """返回当前配置 JSON"""
+        # 优先从 home_dir 读取
         config_file = self.server.home_dir / "config.json"
         if not config_file.exists():
             # 使用默认配置
@@ -259,37 +268,103 @@ class SettingsHandler(BaseHTTPRequestHandler):
             with open(config_file, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
-            # 添加 _triphasic_home 字段（方便前端使用）
-            config["_triphasic_home"] = str(self.server.home_dir)
+            # 标准化字段名（与 HTML 表单一致）
+            result = {
+                "mode": config.get("mode", "on_demand"),
+                "triphasic_home": config.get("triphasic_home", str(self.server.home_dir)),
+                "problems_file": config.get("problems_file", "PROBLEMS.md"),
+                "risks_file": config.get("risks_file", "RISKS.md"),
+                "lessons_file": config.get("lessons_file", "LESSONS_REGISTER.md"),
+                "logs_dir": config.get("logs_dir", ".problem_logs"),
+                "require_confirmation": config.get("hooks", {}).get("require_task_confirmation", True),
+                "_saved": config.get("_saved", False)
+            }
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            self.wfile.write(json.dumps(config, indent=2, ensure_ascii=False).encode("utf-8"))
+            self.wfile.write(json.dumps(result, indent=2, ensure_ascii=False).encode("utf-8"))
         except Exception as e:
-            self.send_error(500, f"Error reading config: {e}")
+            # 返回默认配置
+            default_config = {
+                "mode": "on_demand",
+                "triphasic_home": str(self.server.home_dir),
+                "problems_file": "PROBLEMS.md",
+                "risks_file": "RISKS.md",
+                "lessons_file": "LESSONS_REGISTER.md",
+                "logs_dir": ".problem_logs",
+                "require_confirmation": True,
+                "_saved": False
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(default_config, indent=2, ensure_ascii=False).encode("utf-8"))
 
     def handle_save(self):
-        """处理保存请求"""
-        global SETTINGS_DONE
-
+        """处理保存请求 - 先返回响应，再异步保存配置"""
         try:
             # 读取请求体
             content_length = int(self.headers["Content-Length"])
             post_data = self.rfile.read(content_length)
             form_data = json.loads(post_data.decode("utf-8"))
 
-            # 更新 config.json
-            config_file = self.server.home_dir / "config.json"
-            if not config_file.exists():
-                config_file = self.server.skill_dir / "assets" / "default_config.json"
+            # 先返回成功响应（确保客户端能收到）
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "message": "保存中..."}).encode("utf-8"))
+            self.wfile.flush()
 
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = json.load(f)
+            # 在后台线程中保存配置（避免阻塞响应）
+            threading.Thread(
+                target=self._do_save_config,
+                args=(form_data,),
+                daemon=True
+            ).start()
 
-            # 更新字段
+        except Exception as e:
+            print(f"   ❌ 处理保存请求失败：{e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+                self.wfile.flush()
+            except:
+                pass
+
+    def _do_save_config(self, form_data: dict):
+        """实际保存配置的逻辑（在后台线程中执行）"""
+        try:
+            # 确保数据目录存在
+            triphasic_home = form_data.get("triphasic_home", "~/.workbuddy/triphasic/")
+            home_dir = Path(triphasic_home).expanduser()
+            home_dir.mkdir(parents=True, exist_ok=True)
+
+            # 读取现有配置或使用默认配置
+            config_file = home_dir / "config.json"
+            if config_file.exists():
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            else:
+                # 使用默认配置模板
+                default_file = self.server.skill_dir / "assets" / "default_config.json"
+                if default_file.exists():
+                    with open(default_file, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                else:
+                    config = {}
+
+            # 更新配置字段
             config["mode"] = form_data.get("mode", "on_demand")
-            config["_triphasic_home"] = form_data.get("triphasic_home", "~/.workbuddy/triphasic/")
+            config["triphasic_home"] = triphasic_home
             config["problems_file"] = form_data.get("problems_file", "PROBLEMS.md")
             config["risks_file"] = form_data.get("risks_file", "RISKS.md")
             config["lessons_file"] = form_data.get("lessons_file", "LESSONS_REGISTER.md")
@@ -299,13 +374,14 @@ class SettingsHandler(BaseHTTPRequestHandler):
                 config["hooks"] = {}
             config["hooks"]["require_task_confirmation"] = form_data.get("require_confirmation", True)
 
-            # 确保数据目录存在
-            home_dir = Path(form_data.get("triphasic_home", "~/.workbuddy/triphasic/")).expanduser()
-            home_dir.mkdir(parents=True, exist_ok=True)
+            # 添加 _saved 标记（让 HTML 轮询检测到）
+            config["_saved"] = True
 
             # 写入 config.json
-            with open(home_dir / "config.json", "w", encoding="utf-8") as f:
+            with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
+
+            print(f"   ✅ 配置已保存到：{config_file}")
 
             # 更新 SKILL.md
             update_skill_md(self.server.skill_dir, config)
@@ -314,21 +390,10 @@ class SettingsHandler(BaseHTTPRequestHandler):
             done_flag = self.server.skill_dir / ".settings_done"
             done_flag.touch()
 
-            # 设置全局标志
-            SETTINGS_DONE = True
-
-            # 返回成功响应
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
-
         except Exception as e:
-            print(f"   ❌ 保存设置失败：{e}")
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+            print(f"   ❌ 保存配置失败：{e}")
+            import traceback
+            traceback.print_exc()
 
     def send_done_page(self):
         """返回"设置已完成"页面"""
