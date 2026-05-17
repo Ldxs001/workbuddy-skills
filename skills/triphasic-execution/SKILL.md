@@ -1,12 +1,16 @@
 ---
 name: triphasic-execution
-version: 5.0.0
+version: 5.1.0
 author: WorkBuddy
 license: MIT
 agent_created: true
 description: >
   Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
   防止无限死循环或单步骤卡住。附带结构化问题日志系统和经验教训登记册。
+  v5.1 更新：【修复保存后服务器关闭问题】+ 【添加"完成设置"按钮】
+    - 修复：保存配置后服务器保持运行，不再自动关闭
+    - 新增：保存成功后显示"完成设置"按钮，手动关闭服务器
+    - 修复：/done 端点正确创建 .settings_done 标志文件
   v5.0 更新：【HTML 设置界面】+ 【双模式设计】+ 【跨平台通用化】
     - 安装后首次运行自动弹出 HTML 设置界面（系统默认浏览器）
     - 支持配置：调用方式、记录文件路径、任务规划确认
@@ -23,13 +27,13 @@ tags: [framework, execution, debugging, problem-tracking, lessons-learned, cross
 category: workflow
 ---
 
-# Triphasic Execution Framework v5.0
+# Triphasic Execution Framework v5.1
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
 
 ---
 
-## 设置界面（v5.0 新增）
+## 设置界面（v5.1 更新）
 
 安装技能后首次运行 `install.py` 时，会自动弹出 HTML 设置界面（系统默认浏览器），引导用户完成初始配置。
 
