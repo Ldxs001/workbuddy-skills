@@ -386,9 +386,9 @@ class SettingsHandler(BaseHTTPRequestHandler):
             # 更新 SKILL.md
             update_skill_md(self.server.skill_dir, config)
 
-            # 创建 .settings_done 标志文件
-            done_flag = self.server.skill_dir / ".settings_done"
-            done_flag.touch()
+            # 注意：不创建 .settings_done，让服务器继续运行
+            # .settings_done 只在用户明确结束设置时创建
+            print(f"   💡 配置已保存，服务器保持运行")
 
         except Exception as e:
             print(f"   ❌ 保存配置失败：{e}")
@@ -396,7 +396,12 @@ class SettingsHandler(BaseHTTPRequestHandler):
             traceback.print_exc()
 
     def send_done_page(self):
-        """返回"设置已完成"页面"""
+        """返回"设置已完成"页面，并创建标志文件"""
+        # 创建 .settings_done 标志文件（通知主进程退出）
+        done_flag = self.server.skill_dir / ".settings_done"
+        done_flag.touch()
+        print(f"   ✅ 已创建标志文件：{done_flag}")
+
         html = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>

@@ -178,7 +178,25 @@
             color: #4ecdc4;
         }
 
-        .loading:after {
+        .btn-finish {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #c44569 100%);
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .btn-finish:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
             content: '...';
             animation: dots 1.5s steps(4, end) infinite;
         }
@@ -261,6 +279,7 @@
             </fieldset>
 
             <button type="submit" class="btn-submit" id="btn-submit">保存配置</button>
+            <button type="button" class="btn-finish" id="btn-finish" style="display:none;">完成设置</button>
         </form>
 
         <div class="loading" id="loading">正在保存设置</div>
@@ -325,6 +344,17 @@
             message.className = 'message ' + type;
             message.style.display = 'block';
         }
+
+        // 显示完成设置按钮
+        function showFinishButton() {
+            const finishBtn = document.getElementById('btn-finish');
+            finishBtn.style.display = 'block';
+        }
+
+        // 完成设置按钮点击事件
+        document.getElementById('btn-finish').addEventListener('click', () => {
+            window.location.href = '/done';
+        });
 
         // 表单提交 - 通过文件方式保存
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
@@ -394,6 +424,8 @@
                     if (config._saved) {
                         showMessage('✅ <strong>配置已成功保存！</strong><br><br>可以关闭此页面。', 'success');
                         document.getElementById('btn-submit').disabled = true;
+                        // 显示"完成设置"按钮
+                        showFinishButton();
                         return;
                     }
                 } catch (e) {
