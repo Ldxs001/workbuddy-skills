@@ -1,9 +1,10 @@
 ---
 name: simulated-peak-plot
-description: Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, and clickable file:// path output.
+version: v2.1
+description: Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, clickable file:// path output, and CSV data import from device exports.
 ---
 
-# Simulated Peak Plot Skill
+# Simulated Peak Plot Skill v2.1
 
 Generate simulated peak plots with Gaussian peaks, customizable parameters, realistic noise, Markdown table output, and CSV data export.
 
@@ -18,7 +19,7 @@ This skill creates simulated peak spectra for educational, testing, or presentat
 - Markdown table data output (printed in console)
 - Interactive configuration with point recommendations
 
-## New Features (v2.0)
+## New Features (v2.1)
 
 ### 1. Customizable Axis Titles
 - `xlabel`: X-axis title (default: 'Time')

@@ -685,23 +685,6 @@ def main():
         print("✓ Done!")
         sys.exit(0)
 
-    # Check for CSV import in config
-    if config.get('import_csv'):
-        import_config = {
-            'csv_file': config.get('import_csv'),
-            'x_col': config.get('x_col', 0),
-            'y_col': config.get('y_col', 1),
-            'skip_header': config.get('skip_header', True),
-            'output': config.get('output', 'imported_data.png'),
-            'headless': True,
-            'grid': config.get('grid', True),
-            'grid_linestyle': config.get('grid_linestyle', 'dashed'),
-            'grid_alpha': config.get('grid_alpha', 0.6)
-        }
-        t, signal = generate_plot_from_csv(import_config)
-        print("✓ Done!")
-        sys.exit(0)
-
     # Load or create configuration
     if args.config:
         with open(args.config, 'r') as f:
@@ -744,6 +727,23 @@ def main():
             'grid_linestyle': 'dashed',
             'grid_alpha': 0.6
         }
+
+    # Check for CSV import in config (after config is loaded)
+    if config.get('import_csv'):
+        import_config = {
+            'csv_file': config.get('import_csv'),
+            'x_col': config.get('x_col', 0),
+            'y_col': config.get('y_col', 1),
+            'skip_header': config.get('skip_header', True),
+            'output': config.get('output', 'imported_data.png'),
+            'headless': True,
+            'grid': config.get('grid', True),
+            'grid_linestyle': config.get('grid_linestyle', 'dashed'),
+            'grid_alpha': config.get('grid_alpha', 0.6)
+        }
+        t, signal = generate_plot_from_csv(import_config)
+        print("✓ Done!")
+        sys.exit(0)
 
     # Generate plot
     print("\nGenerating peak plot...")
