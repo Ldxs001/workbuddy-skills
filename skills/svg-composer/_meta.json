@@ -1,6 +1,6 @@
 {
   "slug": "svg-composer",
-  "version": "1.2.0",
-  "description": "SVG 拼接工具，支持内置字符集（0-9, A-Z, a-z）和外部 SVG 文件拼接",
+  "version": "3.2.1",
+  "description": "SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式",
   "agent_created": true
 }

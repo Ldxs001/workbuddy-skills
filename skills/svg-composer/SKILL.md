@@ -36,13 +36,6 @@
 ```
 查看 SVG 源码即可看到完整许可证信息。
 
-### @tscircuit/alphabet（备选）
-
-**来源**：https://github.com/tscircuit/alphabet
-**许可**：MIT
-**支持字符**：`0-9`、`A-Z`、`a-z` 及部分符号
-**切换方式**：`compose_text("HELLO", charset='tscircuit')`
-
 ## 颜色支持
 
 **仅支持两种颜色**：
@@ -75,7 +68,7 @@
 | `align` | str | `'center'` | 对齐方式：`'center'` / `'start'` / `'end'` |
 | `fill` | str | `'black'` | 填充颜色：`'black'` 或 `'white'` |
 | `font_height_ratio` | float | `0.8` | 字体高度占画布比例 |
-| `charset` | str | `'fa'` | 字符集：`'fa'` 或 `'tscircuit'` |
+| `charset` | str | `'fa'` | 字符集：`'fa'`（默认） |
 
 **返回值**：SVG 字符串
 
@@ -106,8 +99,8 @@ svg_list = compose_permutations("ABC", fill="black")
 
 **示例**：
 ```python
-# 输入 "AB", length=3 -> 输出 8 个: AAA, AAB, ABA, ABB, BAA, BAB, BBA, BBB
-svg_list = compose_combinations("AB", length=3, fill="black")
+# 输入 "ABC", length=3 -> 输出 27 个: AAA, AAB, AAC, ABA, ABB, ABC... CCC
+svg_list = compose_combinations("ABC", length=3, fill="black")
 ```
 
 ### 5. compose_limited - 模式4：限制长度
@@ -331,7 +324,7 @@ print(f"预览页面已生成: {html_path}")
 |------|------|-----------------|------|
 | 模式1 | `compose_sequence` | ABC | 1 |
 | 模式2 | `compose_permutations` | ABC, ACB, BAC, BCA, CAB, CBA | 6 |
-| 模式3 | `compose_combinations` | AAA, AAB, ABA, ABB, BAA, BAB, BBA, BBB | 8 |
+| 模式3 | `compose_combinations` | AAA, AAB, AAC... CCC (27个) | 27 |
 | 模式4 | `compose_limited` | A, B, C, AB, AC, BA, BC, CA, CB | 9 |
 
 ---
@@ -341,18 +334,16 @@ print(f"预览页面已生成: {html_path}")
 | 字符集 | 0-9 | A-Z | a-z | 来源 |
 |--------|-----|-----|-----|------|
 | **FA Free（默认）** | ✅ | ✅ | ✅（自动转大写） | @fortawesome/fontawesome-free |
-| tschircuit | ✅ | ✅ | ✅ | @tscircuit/alphabet |
 
 ---
 
 ## 注意事项
 
-1. **字符集**：默认使用 Font Awesome Free（`'fa'`），支持 `0-9`、`A-Z`
+1. **字符集**：使用 Font Awesome Free（`'fa'`），支持 `0-9`、`A-Z`
 2. **颜色**：仅支持 `black`（#000000）和 `white`（#FFFFFF）
-3. **小写处理**：FA 模式下小写字母自动转为大写
+3. **小写处理**：小写字母自动转为大写
 4. **尺寸溢出**：当总拼接长度超过画布时，自动整体等比缩放
-5. **advance_ratio**：FA 每个字符独立，tscircuit 统一 0.692
-6. **组合数量**：模式3（笛卡尔积）可能产生大量组合，注意性能
+5. **组合数量**：模式3（笛卡尔积）可能产生大量组合，注意性能
 
 ---
 
