@@ -1,0 +1,25 @@
+{
+  "name": "color-toolkit",
+  "version": "1.0.0",
+  "description": "专业颜色工具集 - HEX/RGB/HSL/HSV/CMYK转换、四种对比度算法、智能配色推荐",
+  "author": "sm001",
+  "tags": ["颜色", "设计", "配色", "对比度", "无障碍"],
+  "created": "2026-05-20",
+  "updated": "2026-05-20",
+  "dependencies": [],
+  "language": "python",
+  "files": [
+    "SKILL.md",
+    "__init__.py",
+    "cli.py",
+    "color_toolkit.py",
+    "color_recommender.py",
+    "preview_generator.py"
+  ],
+  "exclude": [
+    "__pycache__",
+    "*.pyc",
+    "*.html",
+    ".git"
+  ]
+}

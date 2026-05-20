@@ -13,6 +13,7 @@ Ldxs 原创技能合集，统一管理与发布。
 | `simulated-peak-plot` | 高斯峰模拟与可视化，支持多峰叠加、CSV 导入导出、网格线自定义 |
 | `workday-calendar` | 智能周历系统，法定假日/补班日/周末规则计算，日程管理，跨平台纯Python无依赖 |
 | `svg-composer` | SVG符号横向/纵向拼接，支持预览HTML生成，四种拼接模式 |
+| `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能配色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。 |
 
 ## 目录结构
 
@@ -25,7 +26,8 @@ workbuddy-skills/
 │   ├── workbuddy-fs-manager/
 │   ├── simulated-peak-plot/
 │   ├── workday-calendar/
-│   └── svg-composer/
+│   ├── svg-composer/
+│   └── color-toolkit/
 ├── LICENSE
 └── README.md
 ```
