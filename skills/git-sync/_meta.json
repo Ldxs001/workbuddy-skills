@@ -1,0 +1,6 @@
+{
+  "slug": "git-sync",
+  "version": "1.0.0",
+  "description": "规范化推skill代码到码云、GitHub并生成ZIP包",
+  "agent_created": true
+}

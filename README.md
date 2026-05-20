@@ -14,6 +14,7 @@ Ldxs 原创技能合集，统一管理与发布。
 | `workday-calendar` | 智能周历系统，法定假日/补班日/周末规则计算，日程管理，跨平台纯Python无依赖 |
 | `svg-composer` | SVG符号横向/纵向拼接，支持预览HTML生成，四种拼接模式 |
 | `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能配色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。 |
+| `git-sync` | 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表 |
 
 ## 目录结构
 
@@ -27,7 +28,8 @@ workbuddy-skills/
 │   ├── simulated-peak-plot/
 │   ├── workday-calendar/
 │   ├── svg-composer/
-│   └── color-toolkit/
+│   ├── color-toolkit/
+│   └── git-sync/
 ├── LICENSE
 └── README.md
 ```
