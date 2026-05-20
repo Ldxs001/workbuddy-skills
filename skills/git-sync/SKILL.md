@@ -2,6 +2,7 @@
 name: git-sync
 description: 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表
 agent_created: true
+version: 1.1.1
 ---
 
 # git-sync - 三端同步技能
@@ -24,7 +25,7 @@ agent_created: true
 ## Skill 标准文件结构
 
 ```
-skill-name/
+<skill-name>/
 ├── SKILL.md              ✅ 必需 - 技能说明文档
 ├── _meta.json            ✅ 必需 - 元数据
 ├── scripts/              ✅ Python脚本目录
@@ -37,7 +38,7 @@ skill-name/
 │   └── *.json/png
 ├── data/                ✅ 可选 - 数据文件
 │   └── *.json
-└── default_config.json  ✅ 可选 - 默认配置
+└── <config.json>        ✅ 可选 - 默认配置
 ```
 
 **必须排除**：
@@ -51,17 +52,37 @@ skill-name/
 
 ---
 
+## 路径说明
+
+本技能使用以下路径约定（可按需调整）：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `SKILLS_DIR` | `~/.workbuddy/skills` | 技能源目录 |
+| `WORK_REPO` | `~/.workbuddy/workbuddy-skills` | Git工作仓库 |
+| `ZIP_OUTPUT` | `SKILLS_DIR/` | ZIP包输出目录 |
+
+目录结构：
+```
+SKILLS_DIR/
+├── <skill-name>/           ← 技能源目录
+│   ├── SKILL.md
+│   └── scripts/
+└── <skill-name>-v<x.x.x>.zip  ← 打包输出
+
+WORK_REPO/
+├── skills/
+│   └── <skill-name>/      ← 同步目标
+└── README.md
+```
+
+---
+
 ## 完整执行流程
 
 ### 1. 同步文件到工作仓库
 
-```
-本地: ~/.workbuddy/skills/<skill-name>/
-     ↓ 同步（保持原结构）
-仓库: ~/.workbuddy/workbuddy-skills/skills/<skill-name>/
-```
-
-**复制规则**：
+将技能从 `SKILLS_DIR/<skill-name>/` 同步到 `WORK_REPO/skills/<skill-name>/`
 
 | 目录/文件 | 处理 |
 |-----------|------|
@@ -96,8 +117,10 @@ git add → git commit → git pull --rebase → git push
 ### 4. 生成 ZIP 包
 
 ```
+输出路径: SKILLS_DIR/<skill-name>-v<x.x.x>.zip
+
 ZIP包结构（以skill-name为根目录）：
-<skill-name>-v<version>.zip
+<skill-name>-v<x.x.x>.zip
 ├── SKILL.md
 ├── _meta.json
 ├── scripts/
@@ -106,18 +129,28 @@ ZIP包结构（以skill-name为根目录）：
 └── ...（与上传仓库结构一致）
 ```
 
+**安装方式**：将ZIP解压到 `~/.workbuddy/skills/` 目录即可
+
 ---
 
 ## 使用方法
 
 ```bash
-cd ~/.workbuddy/skills/git-sync/scripts
+cd <git-sync>/scripts
 bash git-sync.sh <skill-name> [version]
 
 # 示例
 bash git-sync.sh color-toolkit 1.0.0
 bash git-sync.sh workday-calendar 2.1.0
 ```
+
+**参数说明**：
+- `skill-name`: 技能目录名（必填）
+- `version`: 版本号（默认 1.0.0）
+
+**输出产物**：
+- Git提交到 `WORK_REPO`
+- ZIP包到 `SKILLS_DIR/<skill-name>-v<version>.zip`
 
 ---
 
@@ -126,7 +159,7 @@ bash git-sync.sh workday-calendar 2.1.0
 ### Q1: GitHub 推送失败（443 超时 / Permission denied）
 → 检查网络代理，或手动推送：
 ```bash
-cd ~/.workbuddy/workbuddy-skills
+cd WORK_REPO
 git push origin main
 ```
 
@@ -134,18 +167,18 @@ git push origin main
 → 是之前脚本 bug 造成的。用以下命令修复：
 ```bash
 # 找到干净提交并强制重置
-git log --oneline | head -20  # 找一个没有重复的提交
+git log --oneline | head -20
 git reset --hard <干净commit>
 git push <remote> --force
 ```
 
 ### Q3: 想保留历史 commit
-→ 去掉 `git commit --amend`，用普通 commit
+→ 脚本已改为普通 commit，不再 amend
 
 ### Q4: 本地有 html 文件被混入
 → 先删除临时文件再执行同步：
 ```bash
-rm -f ~/.workbuddy/skills/<skill-name>/*.html
+rm -f SKILLS_DIR/<skill-name>/*.html
 ```
 
 ---
