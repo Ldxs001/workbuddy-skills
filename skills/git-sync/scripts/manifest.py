@@ -89,14 +89,27 @@ def cmd_list(args):
             if isinstance(v, dict):
                 t = v.get("type", "?")
                 d = v.get("added_at", "?")
-                flag = "✅" if v.get("uploaded", False) else "⏳"
+                gitee_ok = v.get("gitee_ok", v.get("uploaded", False))
+                github_ok = v.get("github_ok", v.get("uploaded", False))
+                gitee_ver = v.get("gitee_version", v.get("version", "?"))
+                github_ver = v.get("github_version", v.get("version", "?"))
+
+                # 状态图标
+                if gitee_ok and github_ok:
+                    flag = "✅✅"
+                elif gitee_ok:
+                    flag = "✅⚠️ "
+                elif github_ok:
+                    flag = "⚠️ ✅"
+                else:
+                    flag = "⏳"
+
                 note = v.get("note", "")
-                uploaded_str = "" if v.get("uploaded", False) else " (not uploaded)"
-                print(f"  [{flag}] {name:<30} {t:<8} {d}{uploaded_str}")
+                print(f"  [{flag}] {name:<30} {t:<8} {d}")
+                print(f"         └─ 码云:{gitee_ver} {'✅' if gitee_ok else '❌'}  GitHub:{github_ver} {'✅' if github_ok else '❌'}")
                 if note:
                     print(f"         └─ {note}")
             else:
-                # 兼容旧格式（纯字符串）
                 print(f"  [?] {name:<30} (旧格式: {v})")
         print()
 
@@ -115,15 +128,23 @@ def cmd_add(args):
         print(f"❌ '{args.name}' 已存在于清单 '{args.repo}' 中")
         sys.exit(1)
 
+    gitee_ok = args.gitee_ok or args.uploaded
+    github_ok = args.github_ok or args.uploaded
     items[args.name] = {
         "type": args.type,
         "added_at": date.today().isoformat(),
-        "uploaded": args.uploaded,
+        "uploaded": gitee_ok and github_ok,
+        "gitee_ok": gitee_ok,
+        "github_ok": github_ok,
+        "version": "",
+        "gitee_version": "",
+        "github_version": "",
         "note": args.note or ""
     }
     save_manifest(data)
-    flag = "✅ uploaded" if args.uploaded else "⏳ not uploaded"
-    print(f"  ✅ 已添加: [{flag}] {args.name} → {args.repo}")
+    ge = "✅" if gitee_ok else "❌"
+    gh = "✅" if github_ok else "❌"
+    print(f"  ✅ 已添加: [码云{ge}|GitHub{gh}] {args.name} → {args.repo}")
 
 
 def cmd_remove(args):
@@ -145,9 +166,10 @@ def cmd_remove(args):
 
 
 def cmd_check(args):
-    """检查技能是否在清单内。输出供 git-sync.sh 解析：
-       FOUND:uploaded / FOUND:not-uploaded / NOT_FOUND
-       退出码：0=uploaded, 1=not-uploaded, 2=NOT_FOUND
+    """检查技能是否在清单内，输出双平台状态。
+       输出供 git-sync.sh 解析：
+       FOUND:gitee_ok,github_ok
+       退出码：0=双平台ok, 1=部分/全失败, 2=NOT_FOUND
     """
     data = load_manifest()
     repos = data.get("repos", {})
@@ -161,20 +183,25 @@ def cmd_check(args):
         print("NOT_FOUND")
         sys.exit(2)
 
-    v = items[args.name]
-    if isinstance(v, dict) and v.get("uploaded", False):
-        print("FOUND:uploaded")
-        sys.exit(0)
-    else:
-        print("FOUND:not-uploaded")
+    item = items[args.name]
+    if not isinstance(item, dict):
+        print("FOUND:false,false")
         sys.exit(1)
+
+    gitee_ok = item.get("gitee_ok", item.get("uploaded", False))
+    github_ok = item.get("github_ok", item.get("uploaded", False))
+    print(f"FOUND:{str(gitee_ok).lower()},{str(github_ok).lower()}")
+    if gitee_ok and github_ok:
+        sys.exit(0)   # 双平台都成功
+    else:
+        sys.exit(1)   # 部分或全失败
 
 
 def cmd_version(args):
     """查询或更新清单中某个条目的版本号。
        用法:
-          python manifest.py version <repo> <name>              # 查询
-          python manifest.py version <repo> <name> <version>   # 更新
+          python manifest.py version <repo> <name> [--platform gitee|github]              # 查询
+          python manifest.py version <repo> <name> <version> [--platform gitee|github]   # 更新
     """
     data = load_manifest()
     repos = data.get("repos", {})
@@ -189,19 +216,39 @@ def cmd_version(args):
         sys.exit(1)
 
     item = items[args.name]
+    platform = getattr(args, "platform", None)
+
     if not isinstance(item, dict):
         # 兼容旧格式，先转换
-        items[args.name] = {"type": "skill", "added_at": "", "uploaded": False, "note": str(item), "version": "1.0.0"}
+        items[args.name] = {"type": "skill", "added_at": "", "uploaded": False,
+                            "gitee_ok": False, "github_ok": False,
+                            "version": "1.0.0", "gitee_version": "1.0.0", "github_version": "1.0.0",
+                            "note": str(item)}
         item = items[args.name]
 
     if args.version:
         old = item.get("version", "")
         item["version"] = args.version
+        # 更新平台版本号
+        if platform in ("gitee", "both", None):
+            item["gitee_version"] = args.version
+            item["gitee_ok"] = True
+        if platform in ("github", "both", None):
+            item["github_version"] = args.version
+            item["github_ok"] = True
+        # 重新计算 upload ed
+        item["uploaded"] = item.get("gitee_ok", False) and item.get("github_ok", False)
         save_manifest(data)
-        print(f"  ✅ 版本已更新: {args.name}  {old} → {args.version}")
+        plat_str = f" [{platform}]" if platform else ""
+        print(f"  ✅ 版本已更新{plat_str}: {args.name}  {old} → {args.version}")
     else:
         ver = item.get("version", "(未设置)")
+        gitee_ver = item.get("gitee_version", ver)
+        github_ver = item.get("github_version", ver)
+        ge = "✅" if item.get("gitee_ok") else "❌"
+        gh = "✅" if item.get("github_ok") else "❌"
         print(f"{args.name}  版本: {ver}")
+        print(f"  码云: {gitee_ver} {ge}  GitHub: {github_ver} {gh}")
 
 
 def cmd_diff(args):
@@ -293,6 +340,33 @@ def cmd_sync_readme(args):
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(new_readme)
     print(f"  ✅ README.md 已全量重新生成: {readme_path}")
+
+
+
+def cmd_set_uploaded(args):
+    """标记指定平台为已上传（不更新版本号）
+       用法: python manifest.py set-uploaded <repo> <name> [--platform gitee|github|both]
+    """
+    data = load_manifest()
+    repos = data.get("repos", {})
+    if args.repo not in repos:
+        print(f"ERROR: 仓库 '{args.repo}' 不存在", file=sys.stderr)
+        sys.exit(1)
+    items = repos[args.repo].get("items", {})
+    if args.name not in items:
+        print(f"ERROR: '{args.name}' 不在清单中", file=sys.stderr)
+        sys.exit(1)
+    item = items[args.name]
+    if not isinstance(item, dict):
+        print(f"ERROR: '{args.name}' 格式错误（旧格式）", file=sys.stderr)
+        sys.exit(1)
+    if args.platform in ("gitee", "both"):
+        item["gitee_ok"] = True
+    if args.platform in ("github", "both"):
+        item["github_ok"] = True
+    item["uploaded"] = item.get("gitee_ok", False) and item.get("github_ok", False)
+    save_manifest(data)
+    print(f"  OK: {args.name} gitee={item.get('gitee_ok')} github={item.get('github_ok')} uploaded={item['uploaded']}")
 
 
 def _extract_desc(skill_dir):
@@ -450,7 +524,9 @@ def main():
     p_add.add_argument("repo", help="仓库名")
     p_add.add_argument("name", help="条目名称")
     p_add.add_argument("--type", default="skill", help="条目类型（默认: skill）")
-    p_add.add_argument("--uploaded", action="store_true", help="标记为已上传")
+    p_add.add_argument("--uploaded", action="store_true", help="标记为双平台已上传")
+    p_add.add_argument("--gitee-ok", action="store_true", help="标记为码云已推送")
+    p_add.add_argument("--github-ok", action="store_true", help="标记为 GitHub 已推送")
     p_add.add_argument("--note", help="备注")
 
     # remove
@@ -464,10 +540,12 @@ def main():
     p_check.add_argument("name", help="条目名称")
 
     # version
-    p_version = sub.add_parser("version", help="查询/更新条目版本号")
+    p_version = sub.add_parser("version", help="查询/更新条目版本号（支持分平台）")
     p_version.add_argument("repo", help="仓库名")
     p_version.add_argument("name", help="条目名称")
     p_version.add_argument("version", nargs="?", help="新版本号（不填则查询）")
+    p_version.add_argument("--platform", choices=["gitee", "github", "both"], default="both",
+                           help="指定平台（默认: both）")
 
     # diff
     p_diff = sub.add_parser("diff", help="对比清单(uploaded=true) vs 仓库实际文件")
@@ -476,6 +554,13 @@ def main():
     # sync-readme
     p_sync = sub.add_parser("sync-readme", help="根据仓库实际文件全量重新生成 README.md")
     p_sync.add_argument("repo", help="仓库名")
+
+    # set-uploaded
+    p_set = sub.add_parser("set-uploaded", help="标记指定平台为已上传（不更新版本号）")
+    p_set.add_argument("repo", help="仓库名")
+    p_set.add_argument("name", help="条目名称")
+    p_set.add_argument("--platform", choices=["gitee", "github", "both"], default="both",
+                       help="指定平台（默认: both）")
 
     args = parser.parse_args()
 
@@ -489,6 +574,7 @@ def main():
         "remove": cmd_remove,
         "check": cmd_check,
         "version": cmd_version,
+        "set-uploaded": cmd_set_uploaded,
         "diff": cmd_diff,
         "sync-readme": cmd_sync_readme,
     }
