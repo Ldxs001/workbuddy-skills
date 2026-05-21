@@ -5,7 +5,15 @@
 
 set -euo pipefail
 
-SKILL_NAME="${1:-}"
+# ── 0. 安全校验：SKILL_NAME 路径穿越检查 ──────────
+SKILL_NAME_RAW="${1:-}"
+if echo "$SKILL_NAME_RAW" | grep -qE '(\.\./|\.\.\\|^/|^[a-zA-Z]:)'; then
+    echo "❌ 错误: 技能名称包含非法路径字符: $SKILL_NAME_RAW"
+    echo "  技能名称不能包含 ../、..\\ 或以 / 或盘符开头"
+    exit 1
+fi
+SKILL_NAME="$SKILL_NAME_RAW"
+
 VERSION="${2:-1.0.0}"
 
 if [ -z "$SKILL_NAME" ]; then
@@ -14,7 +22,7 @@ if [ -z "$SKILL_NAME" ]; then
     exit 1
 fi
 
-# ── 路径定义 ──────────────────────────────────────
+# ── 路径定义 ──────────────────────────────
 SKILLS_DIR="$HOME/.workbuddy/skills"
 WORK_REPO="$HOME/.workbuddy/workbuddy-skills"
 README_FILE="$WORK_REPO/README.md"
@@ -25,7 +33,7 @@ echo "============================================"
 echo "  git-sync: $SKILL_NAME v$VERSION"
 echo "============================================"
 
-# ── 0. 前置检查 ──────────────────────────────────────
+# ── 0. 前置检查 ──────────────────────────────
 if [ ! -d "$SKILLS_DIR/$SKILL_NAME" ]; then
     echo "❌ 错误: ~/.workbuddy/skills/$SKILL_NAME 不存在"
     exit 1
@@ -118,68 +126,45 @@ echo ""
 echo "[1/5] 同步文件到工作仓库..."
 
 DST="$WORK_REPO/skills/$SKILL_NAME"
-rm -rf "$DST"
-mkdir -p "$DST"
 
-copy_dir() {
-    local src="$1" dst="$2"
-    if [ -d "$src" ]; then
-        mkdir -p "$dst"
-        find "$src" -type f ! -path "*/__pycache__/*" ! -name "*.pyc" \
-            ! -name "*.html" ! -name "*.log" \
-            -exec sh -c 'mkdir -p "$2/$(dirname "$1")" && cp "$1" "$2/$(dirname "$1")/"' _ {} "$dst" \;
-    fi
-}
+# 安全校验：确保 DST 在预期目录范围内
+DST_REAL=$(realpath -m "$DST" 2>/dev/null || echo "$DST")
+WORK_REPO_REAL=$(realpath -m "$WORK_REPO" 2>/dev/null || echo "$WORK_REPO")
+if [[ "$DST_REAL" != "$WORK_REPO_REAL/skills/"* ]]; then
+    echo "❌ 安全错误：目标路径越界: $DST_REAL"
+    echo "  预期范围: $WORK_REPO_REAL/skills/"
+    exit 1
+fi
 
-# 简单可靠的复制方式
-sync_skill() {
-    local src="$SKILLS_DIR/$SKILL_NAME"
-    local dst="$WORK_REPO/skills/$SKILL_NAME"
+# 用 rsync --delete 替代 rm -rf + cp（更安全）
+if [ -d "$DST" ]; then
+    rsync -a --delete --exclude='__pycache__/' --exclude='*.pyc' "$SKILLS_DIR/$SKILL_NAME/" "$DST/" 2>/dev/null || {
+        # rsync 不可用时的降级方案
+        echo "  ⚠️  rsync 不可用，使用 rm -rf（已通过路径校验）"
+        rm -rf "$DST"
+        mkdir -p "$DST"
+        # 降级：手动 cp
+        cp -r "$SKILLS_DIR/$SKILL_NAME/SKILL.md" "$DST/" 2>/dev/null || true
+        cp -r "$SKILLS_DIR/$SKILL_NAME/_meta.json" "$DST/" 2>/dev/null || true
+        [ -d "$SKILLS_DIR/$SKILL_NAME/scripts" ] && { mkdir -p "$DST/scripts"; cp -r "$SKILLS_DIR/$SKILL_NAME/scripts/"*.py "$DST/scripts/" 2>/dev/null || true; }
+        [ -d "$SKILLS_DIR/$SKILL_NAME/references" ] && { mkdir -p "$DST/references"; cp -r "$SKILLS_DIR/$SKILL_NAME/references/." "$DST/references/" 2>/dev/null || true; }
+        [ -d "$SKILLS_DIR/$SKILL_NAME/assets" ] && { mkdir -p "$DST/assets"; cp -r "$SKILLS_DIR/$SKILL_NAME/assets/." "$DST/assets/" 2>/dev/null || true; }
+        [ -d "$SKILLS_DIR/$SKILL_NAME/data" ] && { mkdir -p "$DST/data"; cp -r "$SKILLS_DIR/$SKILL_NAME/data/." "$DST/data/" 2>/dev/null || true; }
+    }
+else
+    mkdir -p "$DST"
+    # 新目录，直接 cp
+    cp -r "$SKILLS_DIR/$SKILL_NAME/SKILL.md" "$DST/" 2>/dev/null || true
+    cp -r "$SKILLS_DIR/$SKILL_NAME/_meta.json" "$DST/" 2>/dev/null || true
+    [ -d "$SKILLS_DIR/$SKILL_NAME/scripts" ] && { mkdir -p "$DST/scripts"; cp -r "$SKILLS_DIR/$SKILL_NAME/scripts/"*.py "$DST/scripts/" 2>/dev/null || true; }
+    [ -d "$SKILLS_DIR/$SKILL_NAME/references" ] && { mkdir -p "$DST/references"; cp -r "$SKILLS_DIR/$SKILL_NAME/references/." "$DST/references/" 2>/dev/null || true; }
+    [ -d "$SKILLS_DIR/$SKILL_NAME/assets" ] && { mkdir -p "$DST/assets"; cp -r "$SKILLS_DIR/$SKILL_NAME/assets/." "$DST/assets/" 2>/dev/null || true; }
+    [ -d "$SKILLS_DIR/$SKILL_NAME/data" ] && { mkdir -p "$DST/data"; cp -r "$SKILLS_DIR/$SKILL_NAME/data/." "$DST/data/" 2>/dev/null || true; }
+fi
 
-    # SKILL.md + _meta.json（必需）
-    cp "$src/SKILL.md" "$dst/" 2>/dev/null || true
-    cp "$src/_meta.json" "$dst/" 2>/dev/null || true
-
-    # 根目录配置文件（非py，非md）
-    for f in "$src"/*.json "$src"/*.yaml "$src"/*.yml; do
-        [ -f "$f" ] || continue
-        local bn=$(basename "$f")
-        [ "$bn" = "_meta.json" ] && continue
-        cp "$f" "$dst/"
-    done
-
-    # scripts/ 目录
-    if [ -d "$src/scripts" ]; then
-        mkdir -p "$dst/scripts"
-        for f in "$src/scripts/"*.py "$src/scripts/"*.sh; do
-            [ -f "$f" ] && cp "$f" "$dst/scripts/"
-        done
-    fi
-
-    # references/ 目录
-    if [ -d "$src/references" ]; then
-        mkdir -p "$dst/references"
-        cp -r "$src/references/." "$dst/references/" 2>/dev/null || true
-    fi
-
-    # assets/ 目录
-    if [ -d "$src/assets" ]; then
-        mkdir -p "$dst/assets"
-        cp -r "$src/assets/." "$dst/assets/" 2>/dev/null || true
-    fi
-
-    # data/ 目录
-    if [ -d "$src/data" ]; then
-        mkdir -p "$dst/data"
-        cp -r "$src/data/." "$dst/data/" 2>/dev/null || true
-    fi
-
-    # 清理__pycache__
-    find "$dst" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-    find "$dst" -name "*.pyc" -delete 2>/dev/null || true
-}
-
-sync_skill
+# 清理 __pycache__
+find "$DST" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "$DST" -name "*.pyc" -delete 2>/dev/null || true
 
 echo "  已同步文件:"
 find "$DST" -type f | sed "s|$WORK_REPO/skills/$SKILL_NAME/|  - |" | head -20
@@ -217,7 +202,7 @@ else
     echo "  ✅ 已提交: $COMMIT_MSG"
 fi
 
-# ── 3.5 同步成功后更新清单 uploaded 标记 ─────────────
+# ── 3.5 同步成功后更新清单 uploaded 标记 ────────────
 # 如果技能在清单中但 uploaded=false，现在设为 true
 python "$SKILLS_DIR/git-sync/scripts/manifest.py" check workbuddy-skills "$SKILL_NAME" 2>/dev/null
 if [ $? -eq 1 ]; then
@@ -268,47 +253,18 @@ rm -rf "$PACK_DIR" "$ZIP_FILE"
 
 mkdir -p "$PACK_DIR/$SKILL_NAME"
 
-# 复制与上传仓库一致的目录结构
-sync_skill_for_zip() {
-    local src="$SKILLS_DIR/$SKILL_NAME"
-    local dst="$PACK_DIR/$SKILL_NAME"
-
-    cp "$src/SKILL.md" "$dst/" 2>/dev/null || true
-    cp "$src/_meta.json" "$dst/" 2>/dev/null || true
-
-    for f in "$src"/*.json "$src"/*.yaml "$src"/*.yml; do
-        [ -f "$f" ] || continue
-        [ "$(basename "$f")" = "_meta.json" ] && continue
-        cp "$f" "$dst/" 2>/dev/null || true
-    done
-
-    if [ -d "$src/scripts" ]; then
-        mkdir -p "$dst/scripts"
-        for f in "$src/scripts/"*.py "$src/scripts/"*.sh; do
-            [ -f "$f" ] && cp "$f" "$dst/scripts/"
-        done
-    fi
-
-    if [ -d "$src/references" ]; then
-        mkdir -p "$dst/references"
-        cp -r "$src/references/." "$dst/references/" 2>/dev/null || true
-    fi
-
-    if [ -d "$src/assets" ]; then
-        mkdir -p "$dst/assets"
-        cp -r "$src/assets/." "$dst/assets/" 2>/dev/null || true
-    fi
-
-    if [ -d "$src/data" ]; then
-        mkdir -p "$dst/data"
-        cp -r "$src/data/." "$dst/data/" 2>/dev/null || true
-    fi
-
-    find "$dst" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-    find "$dst" -name "*.pyc" -delete 2>/dev/null || true
-}
-
-sync_skill_for_zip
+# 复制与上传仓库一致的目录结构（用 rsync 或 cp）
+if command -v rsync &>/dev/null; then
+    rsync -a --exclude='__pycache__/' --exclude='*.pyc' --exclude='*.html' --exclude='*.log' \
+        "$SKILLS_DIR/$SKILL_NAME/" "$PACK_DIR/$SKILL_NAME/" 2>/dev/null
+else
+    cp -r "$SKILLS_DIR/$SKILL_NAME/SKILL.md" "$PACK_DIR/$SKILL_NAME/" 2>/dev/null || true
+    cp -r "$SKILLS_DIR/$SKILL_NAME/_meta.json" "$PACK_DIR/$SKILL_NAME/" 2>/dev/null || true
+    [ -d "$SKILLS_DIR/$SKILL_NAME/scripts" ] && { mkdir -p "$PACK_DIR/$SKILL_NAME/scripts"; cp -r "$SKILLS_DIR/$SKILL_NAME/scripts/"*.py "$PACK_DIR/$SKILL_NAME/scripts/" 2>/dev/null || true; }
+    [ -d "$SKILLS_DIR/$SKILL_NAME/references" ] && { mkdir -p "$PACK_DIR/$SKILL_NAME/references"; cp -r "$SKILLS_DIR/$SKILL_NAME/references/." "$PACK_DIR/$SKILL_NAME/references/" 2>/dev/null || true; }
+    [ -d "$SKILLS_DIR/$SKILL_NAME/assets" ] && { mkdir -p "$PACK_DIR/$SKILL_NAME/assets"; cp -r "$SKILLS_DIR/$SKILL_NAME/assets/." "$PACK_DIR/$SKILL_NAME/assets/" 2>/dev/null || true; }
+    [ -d "$SKILLS_DIR/$SKILL_NAME/data" ] && { mkdir -p "$PACK_DIR/$SKILL_NAME/data"; cp -r "$SKILLS_DIR/$SKILL_NAME/data/." "$PACK_DIR/$SKILL_NAME/data/" 2>/dev/null || true; }
+fi
 
 # 打包（ZIP根目录为 skill-name/）
 cd "$PACK_DIR"

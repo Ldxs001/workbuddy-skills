@@ -10,11 +10,11 @@
           "uploaded": true,
           "note": "专业颜色工具集"
         },
-        "drawio-diagram": {
+        "drawiodo": {
           "type": "skill",
           "added_at": "2026-05-22",
           "uploaded": true,
-          "note": "draw.io 自动做图技能"
+          "note": "draw.io 自动做图技能（市场slug: drawiodo）"
         },
         "everything-search-breadmemory": {
           "type": "skill",
