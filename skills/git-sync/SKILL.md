@@ -1,8 +1,7 @@
 ---
 name: git-sync
-description: 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表
-agent_created: true
-version: 1.1.1
+description: 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验
+version: 1.2.0
 ---
 
 # git-sync - 三端同步技能
@@ -79,6 +78,20 @@ WORK_REPO/
 ---
 
 ## 完整执行流程
+
+### 0. _meta.json 标准化校验（v1.2.0 新增）
+
+同步前自动校验并修正 `_meta.json`，确保符合标准 5 字段结构：
+
+| 标准字段 | 说明 | 缺失时处理 |
+|---------|------|-----------|
+| `name` | 技能标识名 | 从 `slug` 提取或用目录名 |
+| `version` | 版本号 | 使用传入的 version 参数 |
+| `description` | 技能描述 | 从 SKILL.md 提取 |
+| `author` | 作者 | **强制设为 `wUwproject`** |
+| `tags` | 标签列表 | 设为空数组 `[]` |
+
+**自动删除的非标准字段**：`slug`、`ownerId`、`publishedAt`、`display_name`、`platforms`、`python_version`、`dependencies`、`entry`、`entry_points`、`agent_created`
 
 ### 1. 同步文件到工作仓库
 

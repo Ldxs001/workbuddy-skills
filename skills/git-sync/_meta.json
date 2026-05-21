@@ -1,9 +1,13 @@
 {
   "name": "git-sync",
-  "slug": "git-sync",
-  "version": "1.1.1",
-  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表",
+  "version": "1.2.0",
+  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验",
   "author": "wUwproject",
-  "agent_created": true,
-  "tags": ["git", "sync", "deploy", "packaging"]
+  "tags": [
+    "git",
+    "sync",
+    "deploy",
+    "packaging",
+    "meta-validation"
+  ]
 }
