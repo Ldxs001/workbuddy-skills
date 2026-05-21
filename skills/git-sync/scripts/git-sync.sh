@@ -175,70 +175,11 @@ else
     else
         echo "  📝 添加 $SKILL_NAME 到 README.md..."
 
-        # --- 更新技能列表表格 ---
-        if [ "$ALREADY_IN_TABLE" = false ]; then
-            # 检查 awk 插入行是否已存在（防止重复）
-            AWK_LINE="| \`$SKILL_NAME\` |"
-            if grep -F "$AWK_LINE" "$README_FILE" >/dev/null 2>&1; then
-                echo "  ℹ️  表格中已存在 $SKILL_NAME，跳过表格插入"
-            else
-                # 在表格分隔行 |------|------| 后插入新行
-                awk -v name="$SKILL_NAME" -v desc="$SKILL_DESC" '
-                    /^|------|------|/ {
-                        print $0
-                        print "| `" name "` | " desc " |"
-                        next
-                    }
-                    { print }
-                ' "$README_FILE" > "${README_FILE}.tmp" && mv "${README_FILE}.tmp" "$README_FILE"
-                echo "  ✅ 已添加到技能列表表格"
-            fi
+        # --- 更新技能列表表格 + 目录结构 ---
+        # 统一调用独立 Python 脚本，避免 heredoc 变量展开问题
+        python "$SKILLS_DIR/git-sync/scripts/update_readme.py" \
+            "$README_FILE" "$SKILL_NAME" "$SKILL_DESC"
 
-        fi
-
-        # --- 更新目录结构 ---
-        if [ "$ALREADY_IN_TREE" = false ]; then
-            # 双重检查（防止脚本重复运行）
-            if grep -q "├── $SKILL_NAME/" "$README_FILE" 2>/dev/null || \
-               grep -q "└── $SKILL_NAME/" "$README_FILE" 2>/dev/null; then
-                echo "  ℹ️  目录树中已存在 $SKILL_NAME，跳过"
-            else
-                # 通过sys.argv传递参数，避免heredoc中bash变量展开混乱
-                python - "$SKILL_NAME" "$README_FILE" << 'PYEOF'
-import re, sys
-skill_name = sys.argv[1]
-readme_path = sys.argv[2]
-
-with open(readme_path, "r", encoding="utf-8") as f:
-    lines = f.read().split("\n")
-
-in_skills_block = False
-last_entry_idx = -1
-indent = "│   "
-
-for i, line in enumerate(lines):
-    stripped = line.rstrip()
-    if "├── skills/" in stripped or "└── skills/" in stripped:
-        in_skills_block = True
-    if in_skills_block:
-        if re.match(r"│   ├── .+", stripped) or re.match(r"│   └── .+", stripped):
-            last_entry_idx = i
-
-if last_entry_idx >= 0:
-    last_line = lines[last_entry_idx].rstrip()
-    if "└──" in last_line:
-        lines[last_entry_idx] = last_line.replace("└──", "├──", 1)
-        lines.insert(last_entry_idx + 1, indent + "└── " + skill_name + "/")
-        with open(readme_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
-        print("  ✅ 已更新目录结构")
-    else:
-        print("  ⚠️  最后一个条目不是└──，请手动添加")
-else:
-    print("  ⚠️  未找到skills目录树，请手动添加")
-PYEOF
-            fi
-        fi
     fi
 fi
 

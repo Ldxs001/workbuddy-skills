@@ -1,7 +1,7 @@
 ---
 name: git-sync
 description: 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验
-version: 1.2.0
+version: 1.2.1
 ---
 
 # git-sync - 三端同步技能
