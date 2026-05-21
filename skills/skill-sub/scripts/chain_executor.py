@@ -26,7 +26,7 @@ def get_chain_home():
     env_home = os.environ.get("SKILL_CHAIN_HOME")
     if env_home:
         return Path(env_home)
-    return Path.home() / ".workbuddy" / "skill-chain"
+    return Path.home() / ".workbuddy" / "skill-sub"
 
 
 CHAIN_HOME = get_chain_home()

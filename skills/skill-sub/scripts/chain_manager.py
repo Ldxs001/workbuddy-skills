@@ -25,7 +25,7 @@ def get_chain_home():
     if env_home:
         return Path(env_home)
     # 默认路径
-    default = Path.home() / ".workbuddy" / "skill-chain"
+    default = Path.home() / ".workbuddy" / "skill-sub"
     return default
 
 

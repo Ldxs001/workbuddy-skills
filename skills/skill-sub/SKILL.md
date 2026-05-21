@@ -298,7 +298,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "调用链名称"
 | `CHAIN_HOME/templates/` | 调用链模板（可选，预置常用组合） |
 | `CHAIN_HOME/config.json` | 配置文件 |
 
-**默认 CHAIN_HOME**：`~/.workbuddy/skill-chain/`
+**默认 CHAIN_HOME**：`~/.workbuddy/skill-sub/`
 
 ### 文件格式
 
@@ -326,7 +326,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "调用链名称"
     },
     {
       "index": 2,
-      "skill_name": "skill-chain",
+      "skill_name": "skill-sub",
       "step_name": "打包ZIP",
       "action": "按规则打包技能为ZIP（仅含SKILL.md、_meta.json、scripts/*.py）",
       "depends_on": [1],
