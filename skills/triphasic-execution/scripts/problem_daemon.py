@@ -186,23 +186,6 @@ def detect_problem(output: str, command: str = "", exit_code: int = 0) -> Option
 
     patterns = config.get("error_patterns", [])
 
-    # 检查中断事件（退出码 -102 到 -109 对应信号）
-    if -109 <= exit_code <= -100:
-        signal_num = abs(exit_code) - 100
-        signal_name = {2: "SIGINT(Ctrl+C)", 15: "SIGTERM", 9: "SIGKILL", 21: "SIGBREAK"}.get(signal_num, f"SIG{signal_num}")
-        return {
-            "id": get_problem_id("命令被中断", f"信号 {signal_name}", command),
-            "number": f"P{get_next_problem_number():03d}",
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "scene": "命令被中断",
-            "symptom": f"命令执行被强制中断 - {signal_name}",
-            "cause": f"执行命令：{command[:200]}",
-            "solution": "待分析中断原因",
-            "status": "未解决",
-            "raw_output": output[-10000:],
-            "exit_code": exit_code,
-        }
-
     # 检查退出码
     if exit_code != 0:
         return {

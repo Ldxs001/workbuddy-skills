@@ -192,34 +192,6 @@ def uninstall(args):
     print(f"   {triphasic_home}")
 
 
-def run_settings_ui(args):
-    """安装后运行设置界面"""
-    import subprocess
-
-    target_dir = get_target_dir(args)
-    settings_script = target_dir / "scripts" / "settings.py"
-
-    if not settings_script.exists():
-        print(f"   ⚠️  设置脚本不存在：{settings_script}")
-        return False
-
-    print(f"\n⚙️  正在打开设置界面...")
-    try:
-        result = subprocess.run(
-            [sys.executable, str(settings_script), "--skill-dir", str(target_dir)],
-            cwd=str(target_dir)
-        )
-        if result.returncode == 0:
-            print(f"   ✅ 设置界面已关闭")
-            return True
-        else:
-            print(f"   ⚠️  设置界面退出码：{result.returncode}")
-            return False
-    except Exception as e:
-        print(f"   ❌ 运行设置界面失败：{e}")
-        return False
-
-
 def main():
     parser = argparse.ArgumentParser(description=f"安装 {SKILL_NAME} 技能（v4.1：双模式 + 跨平台）")
     parser.add_argument("--mode", choices=["on_demand", "global"], default="on_demand",
@@ -241,9 +213,6 @@ def main():
         if installed and args.register_exec:
             register_exec(args)
         elif installed:
-            # 安装成功后运行设置界面
-            run_settings_ui(args)
-
             print(f"\n💡 提示：")
             if mode == "global":
                 print(f"   🔵 全局自动模式已启用")
@@ -252,7 +221,6 @@ def main():
             else:
                 print(f"   🟢 按需调用模式已启用（默认）")
                 print(f"   → 需要三步框架时，手动加载技能即可")
-
 
 
 if __name__ == "__main__":

@@ -1,0 +1,12 @@
+{
+  "version": "5.7.0",
+  "name": "triphasic-execution",
+  "description": "Execute→Review→Advance 三步循环执行框架",
+  "author": "wUwproject",
+  "tags": [
+    "execution",
+    "framework",
+    "workflow",
+    "planning"
+  ]
+}
