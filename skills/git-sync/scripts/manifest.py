@@ -170,6 +170,40 @@ def cmd_check(args):
         sys.exit(1)
 
 
+def cmd_version(args):
+    """查询或更新清单中某个条目的版本号。
+       用法:
+          python manifest.py version <repo> <name>              # 查询
+          python manifest.py version <repo> <name> <version>   # 更新
+    """
+    data = load_manifest()
+    repos = data.get("repos", {})
+
+    if args.repo not in repos:
+        print(f"❌ 仓库 '{args.repo}' 不存在")
+        sys.exit(1)
+
+    items = repos[args.repo].get("items", {})
+    if args.name not in items:
+        print(f"❌ '{args.name}' 不在清单 '{args.repo}' 中")
+        sys.exit(1)
+
+    item = items[args.name]
+    if not isinstance(item, dict):
+        # 兼容旧格式，先转换
+        items[args.name] = {"type": "skill", "added_at": "", "uploaded": False, "note": str(item), "version": "1.0.0"}
+        item = items[args.name]
+
+    if args.version:
+        old = item.get("version", "")
+        item["version"] = args.version
+        save_manifest(data)
+        print(f"  ✅ 版本已更新: {args.name}  {old} → {args.version}")
+    else:
+        ver = item.get("version", "(未设置)")
+        print(f"{args.name}  版本: {ver}")
+
+
 def cmd_diff(args):
     data = load_manifest()
     repos = data.get("repos", {})
@@ -412,6 +446,12 @@ def main():
     p_check = sub.add_parser("check", help="检查是否在清单内")
     p_check.add_argument("repo", help="仓库名")
     p_check.add_argument("name", help="条目名称")
+
+    # version
+    p_version = sub.add_parser("version", help="查询/更新条目版本号")
+    p_version.add_argument("repo", help="仓库名")
+    p_version.add_argument("name", help="条目名称")
+    p_version.add_argument("version", nargs="?", help="新版本号（不填则查询）")
 
     # diff
     p_diff = sub.add_parser("diff", help="对比清单(uploaded=true) vs 仓库实际文件")

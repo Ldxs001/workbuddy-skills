@@ -1,12 +1,16 @@
 ---
 name: git-sync
-version: 1.5.0
+version: 1.6.0
 author: wUwproject
 license: MIT
 description: >
   将skill代码规范化推送到码云、GitHub并生成ZIP包，
   自动更新README.md技能列表，附带_meta.json标准化校验
   和三单一致维护清单机制。
+  v1.6 更新：【按需同步】+ 【版本号三方对比】
+    - 不在全量模式下，只同步用户指定的技能
+    - 新增版本号对比：清单 vs 待更新，决定跳过/更新/报异常
+    - manifest.py 新增 version 子命令（查询/更新条目版本号）
   v1.5 更新：【统一输出目录】+ 【HTML 索引页】
     - 所有 ZIP 统一输出到 ~/.workbuddy/skills/.dist/（方案A）
     - 自动生成 index.html 索引页（含 file:// 超链接）（方案C）
@@ -37,11 +41,19 @@ tags: [sync, git, zip, skill-manager, manifest]
 
 ## 核心功能
 
-1. **自动同步文件** - 将 skill 完整目录结构同步到工作仓库
-2. **维护清单机制（v1.3 新增）** - 三单一致，防止 README 与仓库不一致
-3. **自动更新 README** - 从仓库实际文件全量生成
-4. **双平台推送** - 同时推送到 Gitee 和 GitHub
-5. **ZIP 打包** - 生成标准安装包
+1. **按需同步** - 用户指定哪个就同步哪个；只有明确说"全量维护"才遍历所有技能
+2. **版本号三方对比（v1.6 新增）** - 清单版本 vs 待更新版本，决定跳过/更新/报异常
+3. **自动同步文件** - 将 skill 完整目录结构同步到工作仓库
+4. **维护清单机制（v1.3 新增）** - 三单一致，防止 README 与仓库不一致
+5. **自动更新 README** - 从仓库实际文件全量生成
+6. **双平台推送** - 同时推送到 Gitee 和 GitHub
+7. **ZIP 打包** - 生成标准安装包，统一输出到 `.dist/` 并生成 HTML 索引
+
+## 触发场景
+
+- **按需同步**：用户说"同步/上传/推送/打包 X"（指定名称）→ 只同步 X
+- **全量维护**：用户明确说"全量维护"/"同步所有"/"全部上传" → 遍历清单中所有 uploaded=true 的条目
+- 未明确"全量"时，**不要**遍历所有技能
 
 ## 触发场景
 
@@ -87,6 +99,11 @@ tags: [sync, git, zip, skill-manager, manifest]
 
 ## 完整执行流程
 
+### 0.3 安全校验
+
+- SKILL_NAME 路径穿越检查（拒绝 `../`、`..\\`、`/`、`C:` 开头）
+- 目标路径 realpath 范围校验（必须在 `WORK_REPO/skills/` 内）
+
 ### 0.5 维护清单检查（v1.3 新增）
 
 同步前自动检查维护清单（`manifest.json`），决定行为：
@@ -96,6 +113,19 @@ tags: [sync, git, zip, skill-manager, manifest]
 | `FOUND:uploaded`（在清单中且已上传） | ✅ 继续执行 |
 | `FOUND:not-uploaded`（在清单中但未上传） | ⏳ 继续执行，完成后标记 `uploaded=true` |
 | `NOT_FOUND`（不在清单中） | ❓ 询问用户：加入清单 / 仅本次同步 / 中止 |
+
+### 0.7 版本号三方对比（v1.6 新增）
+
+读取维护清单中的 `version` 字段，与待更新版本对比：
+
+| 对比结果 | 行为 |
+|---------|------|
+| 清单无此条目 | ✅ 正常执行，执行完后写入 version 到清单 |
+| 清单 version = 待更新 version | ❓ 询问用户是否跳过（默认跳过） |
+| 清单 version < 待更新 version | ✅ 正常升级，执行完后更新清单 version |
+| 清单 version > 待更新 version | ❌ 版本异常，询问处理策略（覆盖/拉取/合并/中止） |
+
+> **注**：仓库实际文件中的 `_meta.json` version 仅作参考，以清单记录的 version 为准。
 
 ### 0. _meta.json 标准化校验
 
@@ -169,6 +199,10 @@ python manifest.py remove workbuddy-skills my-skill
 # 检查是否在清单内（供 git-sync.sh 调用）
 python manifest.py check workbuddy-skills my-skill
 # 输出：FOUND:uploaded / FOUND:not-uploaded / NOT_FOUND
+
+# 查询/更新条目版本号（v1.6 新增）
+python manifest.py version workbuddy-skills my-skill          # 查询
+python manifest.py version workbuddy-skills my-skill 1.2.0  # 更新
 
 # 对比清单(uploaded=true) vs 仓库实际文件
 python manifest.py diff workbuddy-skills
