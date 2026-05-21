@@ -1,8 +1,8 @@
 ---
 name: color-toolkit
 description: 专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。
-author: Ldxs001
-version: "1.0"
+author: wUwproject
+version: 1.0.1
 tags:
   - color
   - color-conversion
@@ -10,8 +10,6 @@ tags:
   - accessibility
   - design
   - wcag
-created: 2026-05-20
-agent_created: true
 ---
 
 # Color Toolkit - 专业颜色工具集
