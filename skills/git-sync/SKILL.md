@@ -1,66 +1,38 @@
 ---
 name: git-sync
-version: 1.7.6
+version: 1.7.8
 author: "由 config.json 的 author 字段决定"
 license: MIT
 description: >
-  将skill代码规范化推送到码云、GitHub并生成ZIP包，
-  自动更新README.md技能列表，附带_meta.json标准化校验、
-  三单一致维护清单机制，以及敏感信息过滤（v1.7新增）。
-  v1.7 更新：【敏感信息过滤】+ 【双平台独立状态】
-    - 新增 sensitive_scan.py，扫描并脱敏敏感信息
-    - 维护清单支持双平台独立状态（gitee_ok / github_ok / gitee_version / github_version）
-    - manifest.py 新增 set-uploaded 子命令，支持 --platform 参数
-    - git-sync.sh 推送结果分别记录，不再绑死双平台
-    - 执行完成后自动 preview_url 打开 .dist/index.html（写入 SKILL.md 规范）
-  v1.6 更新：【按需同步】+ 【版本号三方对比】
-    - 不在全量模式下，只同步用户指定的技能
-    - 新增版本号对比：清单 vs 待更新，决定跳过/更新/报异常
-    - manifest.py 新增 version 子命令（查询/更新条目版本号）
-  v1.5 更新：【统一输出目录】+ 【HTML 索引页】
-    - 所有 ZIP 统一输出到 ~/.workbuddy/skills/.dist/（方案A）
-    - 自动生成 index.html 索引页（含 file:// 超链接）（方案C）
-    - 打包后自动打开 dist/ 目录（Windows explorer / macOS open）
-    - 修正三单一致原则描述（清单 ⊇ 仓库 = README.md）
-  v1.4 更新：【安全加固】
-    - SKILL_NAME 路径穿越校验（拒绝 ../、盘符等）
-    - realpath 路径范围校验（目标必须在 WORK_REPO/skills/ 内）
-    - rsync --delete 替代 rm -rf + cp（更安全）
-  v1.3 更新：【三单一致清单机制】
-    - 新增 manifest.json 维护清单，记录计划管理的技能全集
-    - 新增 manifest.py CLI，支持 list/add/remove/check/diff/sync-readme
-    - git-sync.sh 同步前检查清单，不在清单中时询问用户
-    - update_readme.py 改为从仓库实际文件全量生成 README.md
-    - 三单一致原则：清单 ⊆ 仓库 ⊆ README.md
-  v1.2 更新：【_meta.json 标准化】+ 【update_readme 独立化】
-    - 新增 normalize_meta.py，标准化 _meta.json 为 5 字段
-    - update_readme.py 改为独立 Python 脚本，修复 idempotency bug
-  v1.1 更新：【ZIP 打包】+ 【双平台推送】
-  核心逻辑 = Bash + Python，不依赖任何 Agent 平台。
-  触发关键词：同步、上传、推送、打包、sync、git-sync。
+  将 skill 代码规范化推送到码云、GitHub 并生成 ZIP 包，
+  自动更新 README.md 技能列表，附带 _meta.json 标准化校验、
+  三单一致维护清单机制，以及敏感信息过滤。
 tags: [sync, git, zip, skill-manager, manifest, security]
 ---
 
-# git-sync - 三端同步技能
+# git-sync — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
 
-## 核心功能
+---
 
-1. **按需同步** - 用户指定哪个就同步哪个；只有明确说"全量维护"才遍历所有技能
-2. **版本号三方对比（v1.6 新增）** - 清单版本 vs 待更新版本，决定跳过/更新/报异常
-3. **敏感信息过滤（v1.7 新增）** - 扫描并脱敏用户名/邮箱/Token/路径等敏感信息，支持按文件粒度交互确认
-4. **自动同步文件** - 将 skill 完整目录结构同步到工作仓库
-5. **维护清单机制（v1.3 新增）** - 三单一致，防止 README 与仓库不一致
-6. **自动更新 README** - 从仓库实际文件全量生成
-7. **双平台推送** - 同时推送到 Gitee 和 GitHub
-8. **ZIP 打包** - 生成标准安装包，统一输出到 `.dist/` 并生成 HTML 索引
+## 快速开始
 
-## 触发场景
+```bash
+# 进入脚本目录
+cd ~/.workbuddy/skills/git-sync/scripts
 
-- **按需同步（默认）**：用户说"同步/上传/推送/打包 X"（指定名称）→ 只同步 X，不遍历维护清单或仓库目录
-- **全量维护**：用户明确说"全量维护"/"同步所有"/"全部上传" → 遍历维护清单（`manifest.json`）中所有 `uploaded=true` 的条目
-- 未明确"全量"时，默认按需同步，不自动遍历
+# 同步指定 skill（自动 bump 版本号）
+bash git-sync.sh <skill-name> <version>
+
+# 示例：同步 color-toolkit v1.0.0
+bash git-sync.sh color-toolkit 1.0.0
+
+# 跳过敏感信息扫描（私有仓库用）
+bash git-sync.sh my-skill 1.0.0 --skip-scan
+```
+
+> 触发关键词：同步、上传、推送、打包、sync、git-sync
 
 ---
 
@@ -90,50 +62,42 @@ tags: [sync, git, zip, skill-manager, manifest, security]
 
 ---
 
-## Skill 标准文件结构
+## 核心功能
 
-```
-<skill-name>/
-├── SKILL.md              ✅ 必需 - 技能说明文档
-├── _meta.json            ✅ 必需 - 元数据
-├── scripts/              ✅ Python脚本目录
-│   ├── __init__.py
-│   └── *.py
-├── references/           ✅ 可选 - 参考文档
-├── assets/              ✅ 可选 - 静态资源
-└── data/                ✅ 可选 - 数据文件
-```
-
-**必须排除**：
-
-| 排除项 | 原因 |
-|--------|------|
-| `__pycache__/` | Python 缓存 |
-| `*.pyc` | 编译文件 |
-| `*.html` | 本地预览文件 |
-| `*.log` | 日志文件 |
+| # | 功能 | 说明 |
+|---|------|------|
+| 1 | **按需同步** | 用户指定哪个就同步哪个；只有明确说"全量维护"才遍历所有技能 |
+| 2 | **版本号三方对比**（v1.6） | 清单版本 vs 待更新版本，决定跳过/更新/报异常 |
+| 3 | **敏感信息过滤**（v1.7） | 扫描并脱敏用户名/邮箱/Token/路径等敏感信息，支持按文件粒度交互确认 |
+| 4 | **自动同步文件** | 将 skill 完整目录结构同步到工作仓库 |
+| 5 | **维护清单机制**（v1.3） | 三单一致，防止 README 与仓库不一致 |
+| 6 | **自动更新 README** | 从仓库实际文件全量生成 |
+| 7 | **双平台推送** | 同时推送到 Gitee 和 GitHub，状态分别记录 |
+| 8 | **ZIP 打包 + HTML 索引** | 生成标准安装包，统一输出到 `.dist/` 并自动生成 `index.html` |
 
 ---
 
-## 路径说明
+## 触发场景
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `SKILLS_DIR` | `~/.workbuddy/skills` | 技能源目录 |
-| `WORK_REPO` | `~/.workbuddy/workbuddy-skills` | Git工作仓库 |
-| `MANIFEST_FILE` | `scripts/manifest.json` | 维护清单文件 |
-| `DIST_DIR` | `SKILLS_DIR/.dist/` | ZIP 统一输出目录（v1.5新增） |
+| 模式 | 触发条件 | 行为 |
+|------|---------|------|
+| **按需同步**（默认） | 用户说"同步/上传/推送/打包 X"（指定名称） | 只同步 X，不遍历维护清单或仓库目录 |
+| **全量维护** | 用户明确说"全量维护"/"同步所有"/"全部上传" | 遍历维护清单（`manifest.json`）中所有 `uploaded=true` 的条目 |
+| **未明确"全量"** | 默认 | 按需同步，不自动遍历 |
 
 ---
 
 ## 完整执行流程
 
-### 0.3 安全校验
+### 步骤 0：安全校验（v1.4 新增）
 
-- SKILL_NAME 路径穿越检查（拒绝 `../`、`..\\`、`/`、`C:` 开头）
-- 目标路径 realpath 范围校验（必须在 `WORK_REPO/skills/` 内）
+| 校验项 | 规则 |
+|--------|------|
+| SKILL_NAME 路径穿越 | 拒绝 `../`、`..\\`、 `/` 开头、`C:` 开头 |
+| 目标路径范围 | `realpath` 必须在 `WORK_REPO/skills/` 内 |
+| 同步工具 | 优先 `rsync --delete`，不可用则 `rm -rf` + `cp -r`（已通过路径校验） |
 
-### 0.5 维护清单检查（v1.3 新增）
+### 步骤 0.5：维护清单检查（v1.3 新增）
 
 同步前自动检查维护清单（`manifest.json`），决定行为：
 
@@ -143,7 +107,7 @@ tags: [sync, git, zip, skill-manager, manifest, security]
 | `FOUND:not-uploaded`（在清单中但未上传） | ⏳ 继续执行，完成后标记 `uploaded=true` |
 | `NOT_FOUND`（不在清单中） | ❓ 询问用户：加入清单 / 仅本次同步 / 中止 |
 
-### 0.7 版本号三方对比（v1.6 新增）
+### 步骤 0.7：版本号三方对比（v1.6 新增）
 
 读取维护清单中的 `version` 字段，与待更新版本对比：
 
@@ -156,7 +120,7 @@ tags: [sync, git, zip, skill-manager, manifest, security]
 
 > **注**：仓库实际文件中的 `_meta.json` version 仅作参考，以清单记录的 version 为准。
 
-### 0. _meta.json 标准化校验
+### 步骤 1：_meta.json 标准化校验
 
 同步前自动校验并修正 `_meta.json`，确保符合标准 5 字段结构：
 
@@ -170,30 +134,37 @@ tags: [sync, git, zip, skill-manager, manifest, security]
 
 **自动删除的非标准字段**：`slug`、`ownerId`、`publishedAt`、`display_name`、`platforms`
 
-### 1. 同步文件到工作仓库
+### 步骤 2：同步文件到工作仓库
 
-将技能从 `SKILLS_DIR/<skill-name>/` 同步到 `WORK_REPO/skills/<skill-name>/`
+将技能从 `SKILLS_DIR/<skill-name>/` 同步到 `WORK_REPO/skills/<skill-name>/`。
 
-### 2. 全量重新生成 README.md
+### 步骤 3：全量重新生成 README.md
 
 **从仓库 `skills/` 实际目录扫描**，全量替换 README.md 中的技能列表表格和目录结构。
 
 > **关键原则**：README.md = 仓库实际内容，不手动维护，从根本上杜绝不一致。
 
-### 3. 提交并推送到双平台
+### 步骤 4：提交并推送到双平台
 
 ```bash
 git add → git commit → git pull --rebase → git push
 ```
 
-### 4. 生成 ZIP 包
+推送结果**分别记录**，不再绑死双平台：
+- 码云成功 → 更新 `gitee_version` + 标记 `gitee_ok=true`
+- GitHub 成功 → 更新 `github_version` + 标记 `github_ok=true`
+- `uploaded` 字段 = `gitee_ok AND github_ok`（双平台都成功才是真正的 uploaded）
+
+### 步骤 5：生成 ZIP 安装包
 
 ```
 输出路径: SKILLS_DIR/.dist/<skill-name>-v<x.x.x>.zip
 （v1.5 起统一输出到 DIST_DIR=~/.workbuddy/skills/.dist/）
 ```
 
-### 5. 统一输出 + HTML 索引（v1.5 新增）
+**打包排除列表**：`*.zip`、`__pycache__/`、`._*`、`.sensitive_scan_*.json`、`git-sync.sh`、`.DS_Store`、`update_manifest_version.py`、`preview_server.py`、`.decisions.json`、`Thumbs.db`、`.git`、`ZIP_OUT`、`*.html`、`build_index_now.py`、`*.log`、`*.pyc`、`.gitignore`
+
+### 步骤 6：统一输出 + HTML 索引（v1.5 新增）
 
 打包完成后自动执行：
 
@@ -201,9 +172,9 @@ git add → git commit → git pull --rebase → git push
 2. **生成 `index.html` 索引页**（方案C）
    - 列出所有 ZIP 包，含 `file://` 超链接
    - 显示文件大小和修改时间
-   - 点击文件名可直接跳转/下载（浏览器需允许 file:// 协议）
+   - 点击文件名可直接跳转/下载（浏览器需允许 `file://` 协议）
 3. **自动打开 dist/ 目录**
-   - Windows: `explorer.exe`
+   - Windows: `explorer`
    - macOS: `open`
    - Linux: `xdg-open`
 
@@ -211,27 +182,60 @@ git add → git commit → git pull --rebase → git push
 
 ## 维护清单管理（manifest.py）
 
-`manifest.py` 是独立 CLI，不污染 git-sync 主逻辑。
+`manifest.py` 是独立 CLI，不污染 git-sync 主流程。
 
-### 子命令
+### 清单条目结构（v1.7 更新）
+
+```json
+{
+  "repos": {
+    "workbuddy-skills": {
+      "items": {
+        "git-sync": {
+          "type": "skill",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "gitee_ok": true,
+          "github_ok": true,
+          "version": "1.7.7",
+          "gitee_version": "1.7.7",
+          "github_version": "1.7.7",
+          "note": ""
+        }
+      }
+    }
+  }
+}
+```
+
+### 子命令速查
 
 ```bash
-# 列出清单
+# 列出清单（支持 --repo 过滤）
+python manifest.py list
 python manifest.py list workbuddy-skills
 
 # 加入清单（默认 uploaded=false）
-python manifest.py add workbuddy-skills my-skill --type skill --uploaded
+python manifest.py add workbuddy-skills my-skill --type skill
+python manifest.py add workbuddy-skills my-skill --type skill --uploaded   # 双平台已上传
+python manifest.py add workbuddy-skills my-skill --type skill --gitee-ok  # 仅码云已上传
 
 # 从清单移除
 python manifest.py remove workbuddy-skills my-skill
 
 # 检查是否在清单内（供 git-sync.sh 调用）
 python manifest.py check workbuddy-skills my-skill
-# 输出：FOUND:uploaded / FOUND:not-uploaded / NOT_FOUND
+# 输出：FOUND:true,false  （逗号分隔：gitee_ok,github_ok）
+# 退出码：0=双平台ok, 1=部分ok, 2=NOT_FOUND
 
-# 查询/更新条目版本号（v1.6 新增）
-python manifest.py version workbuddy-skills my-skill          # 查询
-python manifest.py version workbuddy-skills my-skill 1.2.0  # 更新
+# 查询/更新条目版本号（支持分平台）
+python manifest.py version workbuddy-skills my-skill              # 查询
+python manifest.py version workbuddy-skills my-skill 1.2.0     # 更新双平台
+python manifest.py version workbuddy-skills my-skill 1.2.0 --platform gitee  # 仅更新码云
+
+# 标记指定平台为已上传（不更新版本号）
+python manifest.py set-uploaded workbuddy-skills my-skill --platform gitee
+python manifest.py set-uploaded workbuddy-skills my-skill --platform both
 
 # 对比清单(uploaded=true) vs 仓库实际文件
 python manifest.py diff workbuddy-skills
@@ -253,24 +257,7 @@ python manifest.py sync-readme workbuddy-skills
     └─ 由 sync-readme 全量生成，永远 = 仓库实际内容
 ```
 
-**不会出现 README 里有但仓库里没有的情况。**
-
----
-
-## 使用方法
-
-```bash
-cd <git-sync>/scripts
-bash git-sync.sh <skill-name> [version]
-
-# 示例
-bash git-sync.sh color-toolkit 1.0.0
-bash git-sync.sh workday-calendar 2.1.0
-```
-
-**参数说明**：
-- `skill-name`: 技能目录名（必填）
-- `version`: 版本号（默认 1.0.0）
+> **不会出现 README 里有但仓库里没有的情况。**
 
 ---
 
@@ -290,6 +277,26 @@ bash git-sync.sh workday-calendar 2.1.0
 | 用户名（来自 config.json） | `author` / `gitee.user` / `github.user` 的值 | 🟢 low |
 
 > **注意**：`_meta.json` 的 `author` 字段是署名，**默认不脱敏**。
+
+### 三种运行模式
+
+通过环境变量 `GIT_SYNC_SENSITIVE_MODE` 控制：
+
+| 模式 | 值 | 行为 |
+|------|-----|------|
+| 交互提示（默认） | `prompt` 或未设置 | 扫描后交互式确认每个文件 |
+| 总是脱敏 | `always-sanitize` | 发现敏感信息后自动全部脱敏（非交互） |
+| 保持不变 | `keep-as-is` | 跳过敏感信息扫描，源文件完全不动 |
+
+```bash
+# 示例：总是自动脱敏
+GIT_SYNC_SENSITIVE_MODE=always-sanitize bash git-sync.sh my-skill
+
+# 示例：私有仓库，不脱敏
+GIT_SYNC_SENSITIVE_MODE=keep-as-is bash git-sync.sh my-skill
+```
+
+> 也可用 `--skip-scan` 参数跳过所有扫描（等效于 `keep-as-is`）。
 
 ### 交互式确认（默认模式）
 
@@ -314,27 +321,10 @@ bash git-sync.sh workday-calendar 2.1.0
   5) 中止同步/打包
 ```
 
+- **选项 1**：全部脱敏，适用于公开上架场景
+- **选项 2**：全部保留，适用于私有仓库场景
 - **选项 3**：对每个文件单独选择脱敏/保留
 - **选项 4**：对单个文件的每个敏感条目逐项确认
-- **选项 2**（全部保留）：适用于私有仓库场景
-
-### 三种运行模式
-
-通过环境变量 `GIT_SYNC_SENSITIVE_MODE` 控制：
-
-| 模式 | 值 | 行为 |
-|------|-----|------|
-| 交互提示（默认） | `prompt` 或未设置 | 扫描后交互式确认每个文件 |
-| 总是脱敏 | `always-sanitize` | 发现敏感信息后自动全部脱敏（非交互） |
-| 保持不变 | `keep-as-is` | 跳过敏感信息扫描，源文件完全不动 |
-
-```bash
-# 示例：总是自动脱敏
-GIT_SYNC_SENSITIVE_MODE=always-sanitize bash git-sync.sh my-skill
-
-# 示例：私有仓库，不脱敏
-GIT_SYNC_SENSITIVE_MODE=keep-as-is bash git-sync.sh my-skill
-```
 
 ### 打包时的行为
 
@@ -354,20 +344,64 @@ GIT_SYNC_SENSITIVE_MODE=keep-as-is bash git-sync.sh my-skill
 
 ---
 
+## Skill 标准文件结构
+
+```
+<skill-name>/
+├── SKILL.md              ✅ 必需 - 技能说明文档
+├── _meta.json            ✅ 必需 - 元数据
+├── scripts/              ✅ Python 脚本目录
+│   ├── __init__.py
+│   └── *.py
+├── references/           ✅ 可选 - 参考文档
+├── assets/              ✅ 可选 - 静态资源
+└── data/                ✅ 可选 - 数据文件
+```
+
+**必须排除**（已内置在 `pack_zip.py` 中）：
+
+| 排除项 | 原因 |
+|--------|------|
+| `__pycache__/` | Python 缓存 |
+| `*.pyc` | 编译文件 |
+| `*.html` | 本地预览文件 |
+| `*.log` | 日志文件 |
+| `*.zip` | 历史打包文件 |
+| `.git/` | Git 版本控制目录 |
+| `Thumbs.db` / `.DS_Store` | 系统缩略图缓存 |
+
+---
+
+## 路径说明
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `SKILLS_DIR` | `~/.workbuddy/skills` | 技能源目录 |
+| `WORK_REPO` | `~/.workbuddy/workbuddy-skills` | Git 工作仓库 |
+| `MANIFEST_FILE` | `scripts/manifest.json` | 维护清单文件 |
+| `DIST_DIR` | `SKILLS_DIR/.dist/` | ZIP 统一输出目录（v1.5 新增） |
+
+---
+
 ## 常见问题
 
 ### Q1: GitHub 推送失败（443 超时 / Permission denied）
-→ 检查网络代理，或手动推送：
+
+检查网络代理，或手动推送：
+
 ```bash
 cd WORK_REPO
 git push origin main
 ```
 
 ### Q2: 想保留历史 commit
-→ 脚本已改为普通 commit，不再 amend
 
-### Q3: 本地有 html 文件被混入
-→ 先删除临时文件再执行同步：
+脚本已改为普通 commit，不再 `amend`。
+
+### Q3: 本地有 html 文件被混入 ZIP
+
+先删除临时文件再执行同步：
+
 ```bash
 rm -f SKILLS_DIR/<skill-name>/*.html
 ```
@@ -390,8 +424,58 @@ rm -f SKILLS_DIR/<skill-name>/*.html
 
 **每次 `git-sync` 执行完毕（无论成功/失败），AI 必须主动用 `preview_url` 打开 HTML 索引页：**
 
-```
+```python
 preview_url(url="file:///C:/Users/sm001/.workbuddy/skills/.dist/index.html")
 ```
 
 不等待用户要求，不询问，直接打开。这是固定行为。
+
+---
+
+## 版本更新日志
+
+### v1.7（当前版本）
+
+- 新增敏感信息过滤（`sensitive_scan.py`）
+- 维护清单支持双平台独立状态（`gitee_ok` / `github_ok` / `gitee_version` / `github_version`）
+- `manifest.py` 新增 `set-uploaded` 子命令，支持 `--platform` 参数
+- `git-sync.sh` 推送结果分别标记，不再绑死双平台
+- 执行完成后自动 `preview_url` 打开 `.dist/index.html`（写入本文件规范段落）
+- ZIP 生成后自动刷新 `index.html`（`build_index.py` 自动调用）
+
+### v1.6
+
+- 【按需同步】不在全量模式下，只同步用户指定的技能
+- 【版本号三方对比】清单 vs 待更新，决定跳过/更新/报异常
+- `manifest.py` 新增 `version` 子命令（查询/更新条目版本号）
+
+### v1.5
+
+- 【统一输出目录】所有 ZIP 统一输出到 `~/.workbuddy/skills/.dist/`
+- 【HTML 索引页】自动生成 `index.html`（含 `file://` 超链接）
+- 打包后自动打开 `dist/` 目录（Windows `explorer` / macOS `open`）
+- 修正三单一致原则描述（清单 ⊇ 仓库 = README.md）
+
+### v1.4
+
+- 【安全加固】SKILL_NAME 路径穿越校验（拒绝 `../`、盘符等）
+- 【安全加固】`realpath` 路径范围校验（目标必须在 `WORK_REPO/skills/` 内）
+- 【安全加固】`rsync --delete` 替代 `rm -rf` + `cp`（更安全）
+
+### v1.3
+
+- 【三单一致清单机制】新增 `manifest.json` 维护清单，记录计划管理的技能全集
+- 【三单一致清单机制】新增 `manifest.py` CLI，支持 `list`/`add`/`remove`/`check`/`diff`/`sync-readme`
+- 【三单一致清单机制】`git-sync.sh` 同步前检查清单，不在清单中时询问用户
+- 【三单一致清单】`update_readme.py` 改为从仓库实际文件全量生成 README.md
+- 【三单一致清单】三单一致原则：清单 ⊆ 仓库 ⊆ README.md
+
+### v1.2
+
+- 【_meta.json 标准化】新增 `normalize_meta.py`，标准化 `_meta.json` 为 5 字段
+- 【update_readme 独立化】`update_readme.py` 改为独立 Python 脚本，修复 idempotency bug
+
+### v1.1
+
+- 【ZIP 打包】生成标准 ZIP 安装包
+- 【双平台推送】同时推送到 Gitee 和 GitHub
