@@ -68,9 +68,13 @@ if __name__ == "__main__":
     # 默认排除规则
     default_exclude = [
         '__pycache__', '*.pyc', '*.html', '*.log', '*.zip',
+        '.git', '.gitignore',
         'ZIP_OUT', 'preview_server.py',
         'update_manifest_version.py', 'build_index_now.py',
         'git-sync.sh',   # 同步脚本本身不打入 ZIP
+        '.sensitive_scan_*.json',   # 敏感扫描临时文件
+        '.decisions.json',            # 敏感扫描决策文件
+        '._*', 'Thumbs.db', '.DS_Store',  # 系统隐藏文件
     ]
     all_exclude = list(set(default_exclude + exclude))
 
