@@ -8,6 +8,7 @@
 """
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -21,6 +22,112 @@ BREADCRUMB_FILE = DATA_DIR / "breadcrumb.json"
 
 def ensure_data_dir():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _get_next_backup_index():
+    """计算下一个备份索引，循环 1-9"""
+    existing = sorted([
+        int(f.stem.rsplit('_', 1)[-1])
+        for f in DATA_DIR.glob("breadcrumb_backup_*.bat")
+        if f.stem.rsplit('_', 1)[-1].isdigit()
+    ])
+    if not existing:
+        return 1
+    last = existing[-1]
+    if last < 9:
+        return last + 1
+    return 1  # 循环回到 1
+
+
+def backup_disaster_recovery(entries=None):
+    """
+    容灾备份机制：在每次写入操作前，生成 .bat 备份文件。
+    最多保留 9 个备份（breadcrumb_backup_01 ~ 09），循环覆盖。
+    
+    Args:
+        entries: 当前（修改前）的面包屑条目列表。None 则加载当前文件。
+    
+    Returns:
+        str: 生成的 .bat 文件路径，None 表示跳过（空数据）
+    """
+    if entries is None:
+        entries = load_breadcrumbs()
+    
+    # 空数据不备份（避免无效备份文件）
+    if not entries:
+        return None
+    
+    ensure_data_dir()
+    data = {"entries": entries, "updated_at": datetime.now().isoformat()}
+    
+    # 计算下一个备份索引（循环 1-9）
+    index = _get_next_backup_index()
+    
+    bat_path = DATA_DIR / f"breadcrumb_backup_{index:02d}.bat"
+    py_path = DATA_DIR / f"breadcrumb_backup_{index:02d}.py"
+    
+    # 覆盖旧的同索引文件（循环覆盖）
+    for p in [bat_path, py_path]:
+        if p.exists():
+            p.unlink()
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry_count = len(entries)
+    
+    # 使用 base64 编码避免 JSON null/特殊字符问题
+    data_json_str = json.dumps(data, ensure_ascii=False)
+    data_b64 = base64.b64encode(data_json_str.encode('utf-8')).decode('ascii')
+    
+    # 生成 Python 恢复脚本（base64 编码数据，安全无歧义）
+    py_content = f'''"""Breadcrumb Disaster Recovery - Backup #{index:02d}
+Created: {timestamp}
+Entries: {entry_count}
+Run this script to restore breadcrumb.json to this backup point.
+"""
+
+import json
+import os
+import base64 as _b64
+
+TARGET = r"{BREADCRUMB_FILE}"
+
+DATA_B64 = "{data_b64}"
+DATA = json.loads(_b64.b64decode(DATA_B64).decode('utf-8'))
+
+# 确保目录存在
+os.makedirs(os.path.dirname(TARGET), exist_ok=True)
+
+with open(TARGET, 'w', encoding='utf-8') as f:
+    json.dump(DATA, f, ensure_ascii=False, indent=2)
+
+print(f"[OK] Restored {{len(DATA.get('entries', []))}} entries to:")
+print(f"     {{TARGET}}")
+print(f"Backup timestamp: {{DATA.get('updated_at', 'unknown')}}")
+input("\\nPress Enter to exit...")
+'''
+    
+    with open(py_path, 'w', encoding='utf-8') as f:
+        f.write(py_content)
+    
+    # 生成 .bat 启动器
+    bat_content = f'''@echo off
+chcp 65001 >nul
+echo ============================================
+echo   Breadcrumb Disaster Recovery
+echo   Backup #{index:02d}  |  {timestamp}
+echo   Entries: {entry_count}
+echo ============================================
+echo.
+echo Restoring breadcrumb.json from this backup...
+echo.
+python "%~dp0breadcrumb_backup_{index:02d}.py"
+pause
+'''
+    
+    with open(bat_path, 'w', encoding='utf-8') as f:
+        f.write(bat_content)
+    
+    return str(bat_path)
 
 
 def load_breadcrumbs():
@@ -58,6 +165,9 @@ def add_entry(title, content, source="", tags=None, auto_source=None):
     - next_review_at: 下次应复习时间（艾宾浩斯间隔）
     """
     entries = load_breadcrumbs()
+
+    # 容灾备份：保存修改前的状态
+    backup_disaster_recovery(entries)
 
     now = datetime.now().isoformat()
     entry = {
@@ -110,6 +220,10 @@ def show_entry(entry_id):
 def delete_entry(entry_id):
     """删除条目"""
     entries = load_breadcrumbs()
+
+    # 容灾备份：保存删除前的状态
+    backup_disaster_recovery(entries)
+
     new_entries = [e for e in entries if e["id"] != entry_id]
     deleted = len(entries) - len(new_entries)
     if deleted > 0:
@@ -120,6 +234,10 @@ def delete_entry(entry_id):
 def update_entry(entry_id, title=None, content=None, tags=None, add_source=None):
     """更新条目"""
     entries = load_breadcrumbs()
+
+    # 容灾备份：保存更新前的状态
+    backup_disaster_recovery(entries)
+
     for e in entries:
         if e["id"] == entry_id:
             if title is not None:
@@ -156,6 +274,10 @@ def get_review_records():
 def update_review_record(entry_id, review_count, last_reviewed_at, next_review_at):
     """更新复习记录（供 ebbinghaus 引擎调用）"""
     entries = load_breadcrumbs()
+
+    # 容灾备份：保存更新前的状态
+    backup_disaster_recovery(entries)
+
     for e in entries:
         if e["id"] == entry_id:
             e["review_count"] = review_count

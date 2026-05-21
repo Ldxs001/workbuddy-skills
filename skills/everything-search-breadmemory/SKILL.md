@@ -57,13 +57,69 @@ python {SKILL_DIR}/scripts/ebbinghaus.py mark-reviewed --id <条目ID>
 python {SKILL_DIR}/scripts/ebbinghaus.py stats
 ```
 
-**艾宾浩斯复习间隔**（天）：1, 2, 4, 7, 15, 30, 60, 120
+**艾宾浩斯复习间隔**（天）：1, 2, 4, 7, 14, 30, 60, 120
 
 每条知识记录自动追踪：
 - `created_at`: 首次创建日期
 - `review_count`: 已复习次数
 - `last_reviewed_at`: 上次复习日期
 - `next_review_at`: 下次应复习日期
+
+### 4. 拓扑甜甜圈关联引擎
+
+自动发现面包屑间的逻辑关联，形成"甜甜圈"知识图谱。不强迫闭环，只建立有逻辑的关联。
+
+```bash
+# 生成/更新拓扑甜甜圈（需 ≥ 2 条面包屑）
+python {SKILL_DIR}/scripts/topology_donut.py generate
+
+# 查看所有甜甜圈
+python {SKILL_DIR}/scripts/topology_donut.py show-donut
+
+# 查看指定甜甜圈详情（含节点和关联逻辑）
+python {SKILL_DIR}/scripts/topology_donut.py show-donut --id donut_001
+
+# 查看某条目所属的甜甜圈
+python {SKILL_DIR}/scripts/topology_donut.py show-donut --entry-id <条目ID>
+
+# 复习扩展：获取与某条目关联的所有面包屑及关联逻辑
+python {SKILL_DIR}/scripts/topology_donut.py expand --id <条目ID>
+
+# 甜甜圈统计
+python {SKILL_DIR}/scripts/topology_donut.py stats
+```
+
+**5 种关联类型：**
+
+| 类型 | 说明 | 检测条件 |
+|------|------|---------|
+| `tag_cluster` | 标签聚类 | 共享 ≥ 2 个标签 |
+| `content_bridge` | 内容桥接 | 标题/内容共现 ≥ 2 个关键词 |
+| `source_family` | 同源家族 | 来源文件在同一目录 |
+| `sequential_chain` | 序贯链接 | 通过 auto_source 引用链 |
+| `conceptual_hierarchy` | 概念层级 | 标题含包含关系 或 标签是子集 |
+
+**4 种甜甜圈类型：**
+
+| 类型 | 说明 |
+|------|------|
+| `closed` | 闭合环路 —— 知识形成完整闭环 |
+| `nested` | 嵌套结构 —— 小甜甜圈完全包含在大甜甜圈内 |
+| `branching` | 分支发散 —— 一个中心节点辐射多个子节点 |
+| `chain` | 线性链条 —— 知识沿序贯路径演进 |
+
+**艾宾浩斯复习 + 拓扑扩展：**
+
+```bash
+# 今日复习（含拓扑甜甜圈关联扩展）
+python {SKILL_DIR}/scripts/ebbinghaus.py daily-review-expand [--count 5]
+
+# 或使用 --expand 标志
+python {SKILL_DIR}/scripts/ebbinghaus.py daily-review --expand [--count 5]
+
+# 对指定条目进行拓扑扩展
+python {SKILL_DIR}/scripts/ebbinghaus.py expand-topology --id <条目ID>
+```
 
 ## 完整工作流
 
@@ -107,15 +163,28 @@ python {SKILL_DIR}/scripts/ebbinghaus.py stats
 2. 向用户展示条目内容
 3. 用户确认复习后，调用 `ebbinghaus.py mark-reviewed --id <ID>` 更新状态
 
-### 各平台实现参考
+### 定时任务 3：拓扑甜甜圈更新
 
-| 平台 | 实现方式 |
-|------|---------|
-| **WorkBuddy** | 使用 `automation_update` 工具创建定时任务，调用对应脚本 |
-| **Claude Code** | 使用 cron 定时调度 Python 脚本 |
-| **Cursor** | 在 `.cursor/tasks.json` 中添加定时任务 |
-| **通用（cron）** | `crontab -e` 添加定时 Python 调用 |
-| **通用（手动）** | 用户每日手动触发"复习" |
+**触发频率建议**：每天 1 次 或 每周 1 次
+
+**Agent 执行逻辑**：
+1. 调用 `topology_donut.py generate` 重新分析面包屑关联
+2. 新关联发现时向用户报告变更摘要
+3. 配合 `daily-review-expand` 在复习时自动利用拓扑扩展
+
+### 跨平台调度指南
+
+脚本本身是平台无关的纯 Python CLI，可由任意调度器触发：
+
+| 平台 | 实现方式 | 命令示例 |
+|------|---------|---------|
+| **Linux/macOS cron** | `crontab -e` 添加定时任务 | `0 2 * * * python3 ~/.workbuddy/skills/everything-search-breadmemory/scripts/topology_donut.py generate` |
+| **Windows 任务计划** | `schtasks` 命令行或 GUI | `schtasks /create /tn "拓扑甜甜圈更新" /tr "python topology_donut.py generate" /sc daily /st 02:00` |
+| **macOS Launchd** | 创建 `.plist` 到 `~/Library/LaunchAgents/` | 配置 StartCalendarInterval 和 ProgramArguments |
+| **WorkBuddy** | `automation_update` 工具 | prompt: "调用 topology_donut.py generate" |
+| **Claude Code** | `.claude/settings.json` hooks | 同 cron 语法 |
+| **GitHub Actions** | `.github/workflows/` YAML | `on: schedule: - cron: '0 2 * * *'` |
+| **通用（手动）** | 用户手动执行 | `python topology_donut.py generate` |
 
 ## Agent 行为规范
 
@@ -125,7 +194,9 @@ python {SKILL_DIR}/scripts/ebbinghaus.py stats
 2. **解析结果需归纳**：不是简单复制文件内容，而是提炼核心知识点
 3. **面包屑条目须关联原文**：每条知识必须附带 `--source` 指向原文文件路径
 4. **复习结果需反馈**：每日复习后，告知用户本次复习的条目数和下次复习时间
-5. **自动化任务可信赖**：定时任务出错时需记录并向用户报告
+5. **复习结果需反馈**：每日复习后，告知用户本次复习的条目数和下次复习时间
+6. **拓扑扩展需说明关联逻辑**：复习扩展时，明确展示关联类型（标签聚类/内容桥接等）和学习建议，而非仅列条目名
+7. **自动化任务可信赖**：定时任务出错时需记录并向用户报告
 
 ## 数据存储
 
@@ -133,9 +204,12 @@ python {SKILL_DIR}/scripts/ebbinghaus.py stats
 
 ```
 ~/.everything_search/
-├── breadcrumb.json      # 面包屑知识条目
-├── config.json          # 配置（es.exe路径、艾宾浩斯参数等）
-└── review_log.jsonl     # 复习历史日志
+├── breadcrumb.json         # 面包屑知识条目
+├── donuts.json             # 拓扑甜甜圈关联图谱（独立存储）
+├── config.json             # 配置（es.exe路径、艾宾浩斯参数等）
+├── review_log.jsonl        # 复习历史日志
+├── breadcrumb_backup_01~09.bat  # 容灾备份（循环覆盖）
+└── breadcrumb_backup_01~09.py   # 容灾恢复脚本
 ```
 
 ---
@@ -145,5 +219,6 @@ python {SKILL_DIR}/scripts/ebbinghaus.py stats
 | 脚本 | 功能 |
 |------|------|
 | `scripts/es_search.py` | Everything 搜索封装，检测/安装/搜索 |
-| `scripts/breadcrumb.py` | 面包屑小本本 CRUD |
-| `scripts/ebbinghaus.py` | 艾宾浩斯引擎 + 每日复习入口 |
+| `scripts/breadcrumb.py` | 面包屑小本本 CRUD + 容灾备份 |
+| `scripts/ebbinghaus.py` | 艾宾浩斯引擎 + 每日复习 + 拓扑扩展 |
+| `scripts/topology_donut.py` | 拓扑甜甜圈关联引擎 —— 5种关联检测 + 4种甜甜圈类型 |

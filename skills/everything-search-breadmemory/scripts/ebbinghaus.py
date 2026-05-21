@@ -20,6 +20,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 BREADCRUMB_PY = str(SKILL_DIR / "scripts" / "breadcrumb.py")
+TOPOLOGY_DONUT_PY = str(SKILL_DIR / "scripts" / "topology_donut.py")
 
 # 艾宾浩斯复习间隔（天数）
 EBBINGHAUS_INTERVALS = [1, 2, 4, 7, 15, 30, 60, 120]
@@ -179,6 +180,45 @@ def stats():
     }
 
 
+def expand_topology(entry_id):
+    """
+    调用拓扑甜甜圈引擎，获取关联面包屑
+    """
+    try:
+        result = subprocess.run(
+            [sys.executable, TOPOLOGY_DONUT_PY, "expand", "--id", entry_id],
+            capture_output=True, text=True, encoding="utf-8", errors="replace"
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
+    except Exception as e:
+        return {"error": f"拓扑扩展失败: {e}"}
+    return {"error": "拓扑引擎调用失败"}
+
+
+def daily_review_with_expand(count=None):
+    """
+    获取今日应复习条目，并附加拓扑甜甜圈关联扩展。
+    每个待复习条目都会查询其所属甜甜圈及关联面包屑。
+    """
+    pending = get_pending_reviews(count=count)
+
+    expanded = []
+    for entry in pending:
+        eid = entry.get("id", "")
+        topology = expand_topology(eid)
+        entry["_topology"] = topology
+        expanded.append(entry)
+
+    return {
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "total_pending": len(expanded),
+        "intervals_used": EBBINGHAUS_INTERVALS,
+        "entries": expanded,
+        "note": "每个条目附带 _topology.expansions 展示拓扑甜甜圈关联扩展信息"
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="艾宾浩斯复习引擎")
     subparsers = parser.add_subparsers(dest="command", help="子命令")
@@ -186,10 +226,21 @@ def main():
     # daily-review
     review_parser = subparsers.add_parser("daily-review", help="获取今日应复习条目")
     review_parser.add_argument("--count", type=int, default=5, help="返回条数（默认5）")
+    review_parser.add_argument("--expand", action="store_true", help="附加拓扑甜甜圈关联扩展")
+
+    # daily-review-expand
+    expand_review_parser = subparsers.add_parser("daily-review-expand",
+        help="获取今日应复习条目并附加拓扑甜甜圈关联扩展（等同于 daily-review --expand）")
+    expand_review_parser.add_argument("--count", type=int, default=5, help="返回条数（默认5）")
 
     # mark-reviewed
     mark_parser = subparsers.add_parser("mark-reviewed", help="标记条目已复习")
     mark_parser.add_argument("--id", required=True, help="条目ID")
+
+    # expand-topology
+    expand_parser = subparsers.add_parser("expand-topology",
+        help="对指定条目进行拓扑甜甜圈关联扩展")
+    expand_parser.add_argument("--id", required=True, help="条目ID")
 
     # reset
     reset_parser = subparsers.add_parser("reset", help="重置某条目复习记录")
@@ -201,12 +252,29 @@ def main():
     args = parser.parse_args()
 
     if args.command == "daily-review":
-        pending = get_pending_reviews(count=args.count)
+        if args.expand:
+            result = daily_review_with_expand(count=args.count)
+        else:
+            pending = get_pending_reviews(count=args.count)
+            result = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "total_pending": len(pending),
+                "intervals_used": EBBINGHAUS_INTERVALS,
+                "entries": pending
+            }
+
+    elif args.command == "daily-review-expand":
+        result = daily_review_with_expand(count=args.count)
+
+    elif args.command == "expand-topology":
+        topology = expand_topology(args.id)
+        # 同时获取条目基本信息
+        from breadcrumb import show_entry
+        entry = show_entry(args.id)
         result = {
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "total_pending": len(pending),
-            "intervals_used": EBBINGHAUS_INTERVALS,
-            "entries": pending
+            "entry": {"id": entry["id"], "title": entry.get("title", ""),
+                      "tags": entry.get("tags", [])} if entry else None,
+            "topology": topology
         }
 
     elif args.command == "mark-reviewed":
