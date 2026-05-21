@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-skill_extractor.py - Skill Step Extractor v1.0.0
+skill_extractor.py - Skill Step Extractor v1.1.0
 从 SKILL.md 中自动提取关键执行步骤，供调用链编排使用。
+
+v1.1.0 新增：提取指令名称填入 skill_instruction 字段。
 
 零外部依赖，仅使用 Python 标准库。
 跨平台支持 Windows/Linux/macOS。
@@ -139,7 +141,7 @@ def extract_trigger_keywords(content):
 
 
 def extract_core_commands(content):
-    """提取核心指令/命令"""
+    """提取核心指令/命令（含指令名称供 skill_instruction 使用）"""
     commands = []
 
     # 匹配 ### 标题（通常是子命令/指令名称）
@@ -152,10 +154,45 @@ def extract_core_commands(content):
         elif title and not any(skip in title.lower() for skip in
                                 ["示例", "注意", "核心概念", "数据结构", "触发", "存储",
                                  "安装", "配置", "脚本", "cli", "使用示例", "禁止行为",
-                                "循环规则", "完整示例", "说明", "对比", "模式", "版本"]):
+                                 "循环规则", "完整示例", "说明", "对比", "模式", "版本"]):
             commands.append({"name": title, "command": title})
 
     return commands
+
+
+def extract_skill_instructions(content):
+    """提取可用于调用链的 skill_instruction 候选列表。
+
+    返回指令名称列表，每个名称是 SKILL.md 中识别到的可执行指令，
+    用于在创建调用链时填入 step 的 skill_instruction 字段。
+    """
+    instructions = []
+
+    # 从 ### 标题提取（与 extract_core_commands 同源，但格式更精炼）
+    heading_pattern = r'###\s+(?:\d+\.\s*)?`?(\w[\w\s-]+?)`?\s*(?:\(([^)]+)\))?\s*$'
+    skip_words = [
+        "示例", "注意", "核心概念", "数据结构", "触发", "存储",
+        "安装", "配置", "脚本", "cli", "使用示例", "禁止行为",
+        "循环规则", "完整示例", "说明", "对比", "模式", "版本",
+        "agent", "ai", "必读", "注意事", "快速", "速查"
+    ]
+    for match in re.finditer(heading_pattern, content, re.MULTILINE):
+        name = match.group(1).strip()
+        cmd = match.group(2)
+        # 确定指令名称
+        if cmd:
+            instruction = cmd.strip()
+        else:
+            instruction = name
+        # 过滤掉非指令标题
+        if any(skip in instruction.lower() for skip in skip_words):
+            continue
+        if len(instruction) > 30:
+            instruction = instruction[:30]
+        if instruction and instruction not in instructions:
+            instructions.append(instruction)
+
+    return instructions
 
 
 def extract_key_steps(content):
@@ -224,6 +261,7 @@ def extract_all(skill_name, skill_path=None):
     description = extract_description(content)
     triggers = extract_trigger_keywords(content)
     commands = extract_core_commands(content)
+    skill_instructions = extract_skill_instructions(content)
     key_steps = extract_key_steps(content)
     cli_usage = extract_cli_usage(content)
 
@@ -243,6 +281,7 @@ def extract_all(skill_name, skill_path=None):
         "description": description[:500],
         "trigger_keywords": triggers[:10],
         "core_commands": commands[:10],
+        "skill_instructions": skill_instructions[:20],
         "key_steps": key_steps[:10],
         "cli_examples": cli_usage[:10],
         "has_scripts": (skill_dir / "scripts").is_dir(),
@@ -280,6 +319,12 @@ def cmd_extract(args):
         for c in result["core_commands"]:
             cmd_str = f" ({c['command']})" if c.get("command") and c["command"] != c["name"] else ""
             print(f"     - {c['name']}{cmd_str}")
+
+    # v1.1.0: 显示可用的 skill_instruction 候选
+    if result.get("skill_instructions"):
+        print(f"\n  🏷️ 可用指令（skill_instruction 候选）:")
+        for si in result["skill_instructions"]:
+            print(f"     - {si}")
 
     if result.get("key_steps"):
         print(f"\n  🔧 关键步骤:")
@@ -344,6 +389,9 @@ def cmd_scan(args):
         if r.get("core_commands"):
             cmd_names = [c["name"] for c in r["core_commands"][:5]]
             print(f"     指令: {', '.join(cmd_names)}")
+        if r.get("skill_instructions"):
+            si_names = r["skill_instructions"][:5]
+            print(f"     可用指令: {', '.join(si_names)}")
         scripts = r.get("script_files", [])
         if scripts:
             print(f"     脚本: {', '.join(scripts)}")
@@ -362,7 +410,7 @@ def cmd_scan(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Skill Extractor - 技能关键步骤提取工具",
+        description="Skill Extractor v1.1.0 - 技能关键步骤提取工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
