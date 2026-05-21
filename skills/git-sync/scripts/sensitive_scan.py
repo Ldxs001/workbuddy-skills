@@ -27,6 +27,7 @@ SCAN_EXTENSIONS = {".py", ".sh", ".md", ".json", ".yml", ".yaml", ".txt", ".cfg"
 EXCLUDE_FILES = {
     "SKILL.md",  # 文档通常不含真实敏感信息，但作者名需特殊处理
     "_meta.json",  # author 是署名，默认不脱敏
+    "config.json",  # 本地配置文件，不含真实敏感信息（值为占位符或用户本地值）
 }
 
 # 敏感信息正则规则（按优先级排序）
