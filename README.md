@@ -16,6 +16,7 @@ Ldxs 原创技能合集，统一管理与发布。
 | `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能配色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。 |
 | `git-sync` | 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表 |
 | `round-robin-allocator` | 均匀轮转分配，将N个对象在T个轮次中按比例分配K种选项，贪心算法尽量确保每轮不同 |
+| `everything-search` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎。Agent通用，CLI驱动。 |
 
 ## 目录结构
 
@@ -31,7 +32,8 @@ workbuddy-skills/
 │   ├── svg-composer/
 │   ├── color-toolkit/
 │   ├── git-sync/
-│   └── round-robin-allocator/
+│   ├── round-robin-allocator/
+│   └── everything-search/
 ├── LICENSE
 └── README.md
 ```
