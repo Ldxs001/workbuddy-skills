@@ -9,7 +9,7 @@
 
 ## 技能列表
 
-以下为仓库中实际存在的技能（由 `manifest.py sync-readme` 全量生成，请勿手动修改此表格）：
+以下为仓库中实际存在的技能（由 `git-sync` 全量生成，请勿手动修改此表格）：
 
 | 技能名 | 描述 |
 |--------|------|
@@ -53,7 +53,7 @@ workbuddy-skills/
 
 ## 如何使用
 
-### 方式一：从工蜂（Gitee）安装
+### 方式一：从码云（Gitee）安装
 ```bash
 cd ~/.workbuddy/skills
 git clone https://gitee.com/wUwproject/workbuddy-skills.git temp-skills
@@ -77,7 +77,7 @@ rm -rf temp-skills
 ## 维护说明
 
 - 本仓库由 **git-sync** 技能自动维护
-- README.md 由 `manifest.py sync-readme` **从仓库实际文件全量生成**，不手动编辑
+- README.md 由 `update_readme.py` **从仓库实际文件全量生成**，不手动编辑
 - 维护清单：`git-sync/manifest.json`（记录计划管理的技能全集）
 - 三单一致原则：**清单 ⊇ 仓库 = README.md**
 

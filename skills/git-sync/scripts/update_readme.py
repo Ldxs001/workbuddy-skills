@@ -16,6 +16,29 @@ import sys
 from datetime import date
 
 
+def load_config():
+    """读取 git-sync/config.json"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, '..', 'config.json')
+    config_path = os.path.normpath(config_path)
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+
+def get_clone_urls(config):
+    """从 config.json 生成 gitee/github clone URL"""
+    urls = {'gitee': '', 'github': ''}
+    gitee_cfg = config.get('gitee', {})
+    github_cfg = config.get('github', {})
+    if gitee_cfg.get('user') and gitee_cfg.get('repo'):
+        urls['gitee'] = f"https://gitee.com/{gitee_cfg['user']}/{gitee_cfg['repo']}.git"
+    if github_cfg.get('user') and github_cfg.get('repo'):
+        urls['github'] = f"https://github.com/{github_cfg['user']}/{github_cfg['repo']}.git"
+    return urls
+
+
 def extract_desc(skill_dir):
     """从 _meta.json 或 SKILL.md 提取描述"""
     # 优先 _meta.json
@@ -84,12 +107,11 @@ def generate_readme(repo_path, readme_path):
         tree_lines.append(f"└── {actual_skills[-1][0]}/")
     tree = "\n".join(tree_lines)
 
-    # 读取原 README.md，替换技能列表和目录结构区域
-    if os.path.exists(readme_path):
-        with open(readme_path, "r", encoding="utf-8") as f:
-            content = f.read()
-    else:
-        content = ""
+    # 读取配置中的 clone URL
+    config = load_config()
+    urls = get_clone_urls(config)
+    gitee_url = urls['gitee'] or "https://gitee.com/USER/REPO.git"
+    github_url = urls['github'] or "https://github.com/USER/REPO.git"
 
     # 构建新的 README.md
     new_readme = f"""# WorkBuddy Skills Repository
@@ -103,7 +125,7 @@ def generate_readme(repo_path, readme_path):
 
 ## 技能列表
 
-以下为仓库中实际存在的技能（由 `manifest.py sync-readme` 全量生成，请勿手动修改此表格）：
+以下为仓库中实际存在的技能（由 `git-sync` 全量生成，请勿手动修改此表格）：
 
 | 技能名 | 描述 |
 |--------|------|
@@ -125,10 +147,10 @@ workbuddy-skills/
 
 ## 如何使用
 
-### 方式一：从工蜂（Gitee）安装
+### 方式一：从码云（Gitee）安装
 ```bash
 cd ~/.workbuddy/skills
-git clone https://gitee.com/wUwproject/workbuddy-skills.git temp-skills
+git clone {gitee_url} temp-skills
 cp -r temp-skills/skills/* .
 rm -rf temp-skills
 ```
@@ -136,7 +158,7 @@ rm -rf temp-skills
 ### 方式二：从 GitHub 安装
 ```bash
 cd ~/.workbuddy/skills/
-git clone https://github.com/Ldxs001/workbuddy-skills.git temp-skills
+git clone {github_url} temp-skills
 cp -r temp-skills/skills/* .
 rm -rf temp-skills
 ```
@@ -149,7 +171,7 @@ rm -rf temp-skills
 ## 维护说明
 
 - 本仓库由 **git-sync** 技能自动维护
-- README.md 由 `manifest.py sync-readme` **从仓库实际文件全量生成**，不手动编辑
+- README.md 由 `update_readme.py` **从仓库实际文件全量生成**，不手动编辑
 - 维护清单：`git-sync/manifest.json`（记录计划管理的技能全集）
 - 三单一致原则：**清单 ⊇ 仓库 = README.md**
 

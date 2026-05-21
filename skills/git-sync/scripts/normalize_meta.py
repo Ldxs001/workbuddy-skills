@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 """git-sync _meta.json 标准化校验。用法: python normalize_meta.py <_meta.json路径> <skill-name> <version> <description>"""
+
 import json, sys, os
+
+def load_config():
+    """读取 git-sync/config.json，返回配置字典"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, '..', 'config.json')
+    config_path = os.path.normpath(config_path)
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
 
 def normalize(meta_file, skill_name, version, description):
     """标准化 _meta.json：只保留 name/version/description/author/tags 5 个标准字段。"""
     standard_fields = {'name', 'version', 'description', 'author', 'tags'}
+
+    # 读取默认 author
+    config = load_config()
+    default_author = config.get('author', 'unknown')
 
     if not os.path.exists(meta_file):
         # 创建新文件
@@ -12,12 +27,12 @@ def normalize(meta_file, skill_name, version, description):
             'name': skill_name,
             'version': version,
             'description': description,
-            'author': 'wUwproject',
+            'author': default_author,
             'tags': []
         }
         with open(meta_file, 'w', encoding='utf-8') as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
-        print(f'  ✅ _meta.json 已创建')
+        print(f'  ✅ _meta.json 已创建（author={default_author}）')
         print(f'  📋 name={meta["name"]}, version={meta["version"]}, author={meta["author"]}, tags={len(meta["tags"])}个')
         return
 
@@ -49,8 +64,9 @@ def normalize(meta_file, skill_name, version, description):
         meta['tags'] = []
         added.append('tags')
 
-    # author 强制统一
-    meta['author'] = 'wUwproject'
+    # author：如果已有值且非空，保留；否则用 config 的默认值
+    if 'author' not in meta or not meta.get('author'):
+        meta['author'] = default_author
 
     modified = json.dumps(meta, ensure_ascii=False, indent=2)
 
@@ -63,6 +79,8 @@ def normalize(meta_file, skill_name, version, description):
             changes.append(f'删除: {removed}')
         if added:
             changes.append(f'补全: {added}')
+        if meta.get('author') == default_author:
+            changes.append(f'author: {default_author}')
         print(f'  ✅ _meta.json 已标准化（{" | ".join(changes)}）')
     else:
         print(f'  ✅ _meta.json 已符合标准，无需修改')

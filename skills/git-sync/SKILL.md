@@ -1,12 +1,12 @@
 ---
 name: git-sync
-version: 1.6.0
-author: wUwproject
+version: 1.7.0
+author: "由 config.json 的 author 字段决定"
 license: MIT
 description: >
   将skill代码规范化推送到码云、GitHub并生成ZIP包，
-  自动更新README.md技能列表，附带_meta.json标准化校验
-  和三单一致维护清单机制。
+  自动更新README.md技能列表，附带_meta.json标准化校验、
+  三单一致维护清单机制，以及敏感信息过滤（v1.7新增）。
   v1.6 更新：【按需同步】+ 【版本号三方对比】
     - 不在全量模式下，只同步用户指定的技能
     - 新增版本号对比：清单 vs 待更新，决定跳过/更新/报异常
@@ -32,7 +32,7 @@ description: >
   v1.1 更新：【ZIP 打包】+ 【双平台推送】
   核心逻辑 = Bash + Python，不依赖任何 Agent 平台。
   触发关键词：同步、上传、推送、打包、sync、git-sync。
-tags: [sync, git, zip, skill-manager, manifest]
+tags: [sync, git, zip, skill-manager, manifest, security]
 ---
 
 # git-sync - 三端同步技能
@@ -43,17 +43,44 @@ tags: [sync, git, zip, skill-manager, manifest]
 
 1. **按需同步** - 用户指定哪个就同步哪个；只有明确说"全量维护"才遍历所有技能
 2. **版本号三方对比（v1.6 新增）** - 清单版本 vs 待更新版本，决定跳过/更新/报异常
-3. **自动同步文件** - 将 skill 完整目录结构同步到工作仓库
-4. **维护清单机制（v1.3 新增）** - 三单一致，防止 README 与仓库不一致
-5. **自动更新 README** - 从仓库实际文件全量生成
-6. **双平台推送** - 同时推送到 Gitee 和 GitHub
-7. **ZIP 打包** - 生成标准安装包，统一输出到 `.dist/` 并生成 HTML 索引
+3. **敏感信息过滤（v1.7 新增）** - 扫描并脱敏用户名/邮箱/Token/路径等敏感信息，支持按文件粒度交互确认
+4. **自动同步文件** - 将 skill 完整目录结构同步到工作仓库
+5. **维护清单机制（v1.3 新增）** - 三单一致，防止 README 与仓库不一致
+6. **自动更新 README** - 从仓库实际文件全量生成
+7. **双平台推送** - 同时推送到 Gitee 和 GitHub
+8. **ZIP 打包** - 生成标准安装包，统一输出到 `.dist/` 并生成 HTML 索引
 
 ## 触发场景
 
 - **按需同步（默认）**：用户说"同步/上传/推送/打包 X"（指定名称）→ 只同步 X，不遍历维护清单或仓库目录
 - **全量维护**：用户明确说"全量维护"/"同步所有"/"全部上传" → 遍历维护清单（`manifest.json`）中所有 `uploaded=true` 的条目
 - 未明确"全量"时，默认按需同步，不自动遍历
+
+---
+
+## 安装后配置（必读）
+
+安装后请编辑 `config.json`，将默认值替换为你的实际信息：
+
+```json
+{
+  "author": "你的作者名",
+  "gitee": {
+    "user": "你的码云用户名",
+    "repo": "workbuddy-skills",
+    "branch": "main",
+    "remote_name": "gitee"
+  },
+  "github": {
+    "user": "你的 GitHub 用户名",
+    "repo": "workbuddy-skills",
+    "branch": "main",
+    "remote_name": "origin"
+  }
+}
+```
+
+> **说明**：`author` 字段会作为 `_meta.json` 的默认作者名；`gitee.user` / `github.user` 用于生成查看链接和 README 安装命令。不改的话生成的链接会指向 `your-gitee-username` 等占位符。
 
 ---
 
@@ -132,7 +159,7 @@ tags: [sync, git, zip, skill-manager, manifest]
 | `name` | 技能标识名 | 使用目录名 |
 | `version` | 版本号 | 使用传入的 version 参数 |
 | `description` | 技能描述 | 从 SKILL.md 提取 |
-| `author` | 作者 | **强制设为 `wUwproject`** |
+| `author` | 作者 | 从 `config.json` 的 `author` 字段读取，缺省则为 `your-name-here`（安装后请修改 config.json） |
 | `tags` | 标签列表 | 设为空数组 `[]` |
 
 **自动删除的非标准字段**：`slug`、`ownerId`、`publishedAt`、`display_name`、`platforms`
@@ -238,6 +265,86 @@ bash git-sync.sh workday-calendar 2.1.0
 **参数说明**：
 - `skill-name`: 技能目录名（必填）
 - `version`: 版本号（默认 1.0.0）
+
+---
+
+## 敏感信息过滤（v1.7 新增）
+
+同步到仓库和打包 ZIP 前，自动扫描技能目录中的敏感信息，防止私密数据泄露。
+
+### 检测规则
+
+| 类型 | 说明 | 严重程度 |
+|------|------|----------|
+| 邮箱地址 | `xxx@xxx.com` | 🔴 critical |
+| Token / API Key | `token=xxx`、`api_key=xxx` 等值 | 🔴 critical |
+| 私钥内容 | PEM 格式密钥 | 🔴 critical |
+| 内网 IP | `10.x` / `172.16-31.x` / `192.168.x` | 🟡 medium |
+| 本地绝对路径 | `C:\Users\...` / `/home/...` | 🟡 medium |
+| 用户名（来自 config.json） | `author` / `gitee.user` / `github.user` 的值 | 🟢 low |
+
+> **注意**：`_meta.json` 的 `author` 字段是署名，**默认不脱敏**。
+
+### 交互式确认（默认模式）
+
+扫描完成后按**文件粒度**列出所有检测结果，用户可选择：
+
+```
+发现 3 个文件包含敏感信息：
+
+  1. [🟢] scripts/sensitive_scan.py
+       └─ Python 脚本，包含核心逻辑
+       ├─ 🟢 用户名（来自配置）：「wUwproject」（第 12 行）
+
+  2. [🟡] scripts/git-sync.sh
+       └─ Bash 脚本，包含执行逻辑
+       ├─ 🟢 用户名（来自配置）：「Ldxs001」（第 18 行）
+
+请选择处理方式：
+  1) 全部脱敏（推荐，公开上架用）
+  2) 全部保留（私有仓库用）
+  3) 逐个文件选择
+  4) 针对某个文件提更细的要求（如只脱敏特定条目）
+  5) 中止同步/打包
+```
+
+- **选项 3**：对每个文件单独选择脱敏/保留
+- **选项 4**：对单个文件的每个敏感条目逐项确认
+- **选项 2**（全部保留）：适用于私有仓库场景
+
+### 三种运行模式
+
+通过环境变量 `GIT_SYNC_SENSITIVE_MODE` 控制：
+
+| 模式 | 值 | 行为 |
+|------|-----|------|
+| 交互提示（默认） | `prompt` 或未设置 | 扫描后交互式确认每个文件 |
+| 总是脱敏 | `always-sanitize` | 发现敏感信息后自动全部脱敏（非交互） |
+| 保持不变 | `keep-as-is` | 跳过敏感信息扫描，源文件完全不动 |
+
+```bash
+# 示例：总是自动脱敏
+GIT_SYNC_SENSITIVE_MODE=always-sanitize bash git-sync.sh my-skill
+
+# 示例：私有仓库，不脱敏
+GIT_SYNC_SENSITIVE_MODE=keep-as-is bash git-sync.sh my-skill
+```
+
+### 打包时的行为
+
+打包 ZIP 时，脱敏操作在**临时副本目录**中进行，**不影响源文件**：
+
+```
+源文件（~/.workbuddy/skills/my-skill/）  ← 不变
+     ↓ 复制副本
+临时副本（/tmp/xxx/）                ← 执行脱敏
+     ↓ 打包
+输出 ZIP（~/.workbuddy/skills/.dist/my-skill-v1.0.0.zip）
+     ↓ 清理
+临时副本删除
+```
+
+同步到仓库时，脱敏直接操作 **工作仓库副本**（`WORK_REPO/skills/<name>/`），源文件同样不变。
 
 ---
 

@@ -327,9 +327,25 @@ def _extract_desc(skill_dir):
     return "技能描述"
 
 
+def _load_config():
+    """读取 git-sync/config.json，返回配置字典"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, "..", "config.json")
+    config_path = os.path.normpath(config_path)
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
 def _generate_readme(skills):
     """全量生成 README.md 内容"""
     today = date.today().isoformat()
+
+    # 从 config.json 读取平台用户名
+    config = _load_config()
+    gitee_user = config.get("gitee", {}).get("user", "your-gitee-username")
+    github_user = config.get("github", {}).get("user", "your-github-username")
+    repo_name = config.get("gitee", {}).get("repo", "workbuddy-skills")
 
     # 技能列表表格
     table_lines = []
@@ -383,7 +399,7 @@ workbuddy-skills/
 ### 方式一：从工蜂（Gitee）安装
 ```bash
 cd ~/.workbuddy/skills
-git clone https://gitee.com/wUwproject/workbuddy-skills.git temp-skills
+git clone https://gitee.com/{gitee_user}/{repo_name}.git temp-skills
 cp -r temp-skills/skills/* .
 rm -rf temp-skills
 ```
@@ -391,7 +407,7 @@ rm -rf temp-skills
 ### 方式二：从 GitHub 安装
 ```bash
 cd ~/.workbuddy/skills/
-git clone https://github.com/Ldxs001/workbuddy-skills.git temp-skills
+git clone https://github.com/{github_user}/{repo_name}.git temp-skills
 cp -r temp-skills/skills/* .
 rm -rf temp-skills
 ```
