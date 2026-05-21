@@ -1,12 +1,19 @@
 ---
 name: triphasic-execution
-version: 5.7.0
-author: WorkBuddy
+version: 5.9.0
+author: wUwproject
 license: MIT
-agent_created: true
 description: >
   Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
   防止无限死循环或单步骤卡住。附带结构化问题日志、风险手册和经验教训登记册。
+  v5.9 更新：【规范化】+ 【author统一】
+    - 删除 agent_created 字段，author 统一为 wUwproject
+    - _meta.json 标准化为 5 字段（name/version/description/author/tags）
+  v5.8 更新：【加载协议】+ 【约束精简】
+    - 新增 LOADING PROTOCOL：skill 加载后输出状态标识，表示上下文已建立
+    - 状态输出用于透明可见：出现在任务执行前 = 执行顺序正确；出现在任务执行后 = 顺序错误
+    - 删除无实质意义的强制确认机制（F-00）
+    - F-01~F-10 绝对约束：框架核心，任何模式下不可跳过
   v5.7 更新：【规范标准化】+ 【清理重复文件】
     - 删除根目录重复文件（install.py、problem_daemon.py）
     - 删除垃圾文件（.settings_done、SKILL.md.bak、default_config.json）
