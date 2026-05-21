@@ -1,10 +1,9 @@
 ---
 name: round-robin-allocator
-version: 1.0.0
+version: 1.0.1
 description: >
   均匀轮转分配工具。将 N 个对象在 T 个轮次中，按比例分配 K 种选项，
   并通过贪心算法 + 迭代优化，尽量让每个对象每轮获得不同选项，最大化覆盖率。
-agent_created: true
 tags: [分配, 算法, 可视化, 贪心, 轮转, allocation, greedy]
 ---
 
