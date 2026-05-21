@@ -1,12 +1,18 @@
 ---
 name: git-sync
-version: 1.7.0
+version: 1.7.5
 author: "由 config.json 的 author 字段决定"
 license: MIT
 description: >
   将skill代码规范化推送到码云、GitHub并生成ZIP包，
   自动更新README.md技能列表，附带_meta.json标准化校验、
   三单一致维护清单机制，以及敏感信息过滤（v1.7新增）。
+  v1.7 更新：【敏感信息过滤】+ 【双平台独立状态】
+    - 新增 sensitive_scan.py，扫描并脱敏敏感信息
+    - 维护清单支持双平台独立状态（gitee_ok / github_ok / gitee_version / github_version）
+    - manifest.py 新增 set-uploaded 子命令，支持 --platform 参数
+    - git-sync.sh 推送结果分别记录，不再绑死双平台
+    - 执行完成后自动 preview_url 打开 .dist/index.html（写入 SKILL.md 规范）
   v1.6 更新：【按需同步】+ 【版本号三方对比】
     - 不在全量模式下，只同步用户指定的技能
     - 新增版本号对比：清单 vs 待更新，决定跳过/更新/报异常
@@ -377,3 +383,15 @@ rm -f SKILLS_DIR/<skill-name>/*.html
 5. ✅ ZIP 与仓库结构一致
 6. ✅ 强制覆盖远程前先确认本地是正确的
 7. ✅ **维护清单优先** — 未确认是否加入清单前，不盲目同步
+
+---
+
+## 执行完成后规范
+
+**每次 `git-sync` 执行完毕（无论成功/失败），AI 必须主动用 `preview_url` 打开 HTML 索引页：**
+
+```
+preview_url(url="file:///C:/Users/sm001/.workbuddy/skills/.dist/index.html")
+```
+
+不等待用户要求，不询问，直接打开。这是固定行为。
