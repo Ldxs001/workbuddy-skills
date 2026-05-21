@@ -1,4 +1,11 @@
 {
-  "slug": "skill-sub",
-  "version": "1.2.0"
+  "version": "1.2.1",
+  "author": "wUwproject",
+  "name": "skill-sub",
+  "description": "skill-sub 子技能系统",
+  "tags": [
+    "skill",
+    "sub",
+    "modular"
+  ]
 }
