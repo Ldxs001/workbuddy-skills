@@ -1,4 +1,4 @@
-# everything-search
+# everything-search-breadmemory
 
 基于 Everything (es.exe) 的本地文件搜索引擎，附带面包屑知识管理系统和艾宾浩斯遗忘曲线复习引擎。
 
