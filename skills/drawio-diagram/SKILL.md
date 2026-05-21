@@ -1,9 +1,8 @@
 ---
 name: drawio-diagram
-version: 2.0.0
+version: 2.1.0
 description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。
 tags: [diagram, drawio, flowchart, architecture, uml, er, visualization]
-agent_created: true
 allowed-tools:
   - Bash
   - Read
@@ -28,12 +27,12 @@ allowed-tools:
 
 | 文件 | 路径 | 说明 |
 |------|------|------|
-| 核心库 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_gen.py` | 节点/连线/容器/XML生成 |
-| 模板库 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_templates.py` | 8种图表模板 |
-| Agent入口 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_agent.py` | CLI/自然语言解析 |
-| 版本管理 | `C:\Users\sm001\WorkBuddy\workbuddy-skills\skills\drawio-diagram\drawio_version.py` | 5版本回溯系统 |
+| 核心库 | `scripts/drawio_gen.py` | 节点/连线/容器/XML生成 |
+| 模板库 | `scripts/drawio_templates.py` | 8种图表模板 |
+| Agent入口 | `scripts/drawio_agent.py` | CLI/自然语言解析 |
+| 版本管理 | `scripts/drawio_version.py` | 5版本回溯系统 |
 | draw.io | `C:\Program Files\draw.io\draw.io.exe` | 本地安装路径 |
-| 输出目录 | `C:\Users\sm001\WorkBuddy\Claw\reports\` | 所有图表输出到此 |
+| 输出目录 | `{workspace}` | 所有图表输出到此 |
 
 ---
 
@@ -159,19 +158,19 @@ allowed-tools:
 
 ```bash
 # 初始化版本管理（v1创建时自动执行）
-python C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py init <文件.drawio> "初始版本"
+python {SKILL_DIR}/scripts/drawio_version.py init <文件.drawio> "初始版本"
 
 # 保存新版本（每次修改前执行）
-python C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py save <文件.drawio> "修改了XX"
+python {SKILL_DIR}/scripts/drawio_version.py save <文件.drawio> "修改了XX"
 
 # 查看版本历史
-python C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py list <文件.drawio>
+python {SKILL_DIR}/scripts/drawio_version.py list <文件.drawio>
 
 # 恢复到指定版本
-python C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py restore <文件.drawio> v2
+python {SKILL_DIR}/scripts/drawio_version.py restore <文件.drawio> v2
 
 # 查看版本状态
-python C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py status <文件.drawio>
+python {SKILL_DIR}/scripts/drawio_version.py status <文件.drawio>
 ```
 
 #### 4.2 版本自动管理规则
@@ -207,7 +206,7 @@ python C:\Users\sm001\WorkBuddy\2026-05-13-task-1\drawio_version.py status <文�
 
 ```python
 import sys
-sys.path.insert(0, r"C:\Users\sm001\WorkBuddy\2026-05-13-task-1")
+sys.path.insert(0, "{SKILL_DIR}")
 from drawio_templates import *
 
 # 流程图
@@ -233,9 +232,9 @@ builder.save("output.drawio")
 ### 方式B - CLI调用
 
 ```bash
-cd C:\Users\sm001\WorkBuddy\2026-05-13-task-1
-python drawio_agent.py "画一个用户登录流程图：输入账号 → 验证 → 查询数据库 → 返回结果" --open
-python drawio_agent.py spec.json --open  # JSON模式
+cd {workspace}
+python {SKILL_DIR}/scripts/drawio_agent.py "画一个用户登录流程图：输入账号 → 验证 → 查询数据库 → 返回结果" --open
+python {SKILL_DIR}/scripts/drawio_agent.py spec.json --open  # JSON模式
 ```
 
 ### 方式C - JSON spec文件
@@ -292,10 +291,10 @@ python drawio_agent.py spec.json --open  # JSON模式
 
 ```python
 import sys
-sys.path.insert(0, r"C:\Users\sm001\WorkBuddy\2026-05-13-task-1")
+sys.path.insert(0, "{SKILL_DIR}")
 from drawio_version import VersionManager
 
-vm = VersionManager(base_dir=r"C:\Users\sm001\WorkBuddy\2026-05-13-task-1")
+vm = VersionManager(base_dir="{workspace}")
 vm.init("output.drawio", "初始版本")
 vm.save_version("output.drawio", "修改了颜色")
 vm.list_versions("output.drawio")
@@ -414,7 +413,7 @@ exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;
 
 ## 输出规范
 
-- 输出目录：`C:\Users\sm001\WorkBuddy\2026-05-13-task-1\`
+- 输出目录：`{workspace}`
 - 文件命名：`{类型}_{描述}.drawio`，如 `architecture_microservice.drawio`
 - 生成后自动用 draw.io 打开预览
 - 交付附件给用户
