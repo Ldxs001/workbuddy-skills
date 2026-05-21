@@ -1,0 +1,13 @@
+{
+  "name": "round-robin-allocator",
+  "display_name": "均匀轮转分配",
+  "version": "1.0.0",
+  "description": "将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。",
+  "author": "wUwproject",
+  "tags": ["分配", "算法", "可视化", "贪心", "轮转", "allocation", "greedy"],
+  "entry": "scripts/main.py",
+  "agent_created": true,
+  "platforms": ["workbuddy", "cursor", "vscode", "terminal"],
+  "python_version": ">=3.8",
+  "dependencies": []
+}
