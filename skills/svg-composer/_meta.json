@@ -1,6 +1,12 @@
 {
-  "slug": "svg-composer",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式",
-  "agent_created": true
+  "author": "wUwproject",
+  "name": "svg-composer",
+  "tags": [
+    "svg",
+    "composer",
+    "fontawesome",
+    "generation"
+  ]
 }
