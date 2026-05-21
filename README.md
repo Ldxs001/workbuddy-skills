@@ -14,7 +14,7 @@
 | 技能名 | 描述 |
 |--------|------|
 | `color-toolkit` | 专业颜色工具集 - HEX/RGB/HSL/HSV/CMYK转换、四种对比度算法、智能配色推荐 |
-| `drawio-diagram` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。 |
+| `drawiodo` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。 |
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
 | `git-sync` | 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验和三单一致维护清单机制 |
 | `round-robin-allocator` | 将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。 |
@@ -23,7 +23,7 @@
 | `skill-sub` | skill-sub 子技能系统 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架，附带结构化问题日志、风险手册和经验教训登记册 |
-| `workbuddy-fs-manager` | > |
+| `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
 | `workday-calendar` | 智能周历系统 - 法定假日管理、工作日计算、周历生成、日程管理，含.bat容灾备份 |
 
 ---
@@ -36,7 +36,7 @@ workbuddy-skills/
 ├── LICENSE
 └── skills/
 ├── color-toolkit/
-├── drawio-diagram/
+├── drawiodo/
 ├── everything-search-breadmemory/
 ├── git-sync/
 ├── round-robin-allocator/
@@ -79,7 +79,7 @@ rm -rf temp-skills
 - 本仓库由 **git-sync** 技能自动维护
 - README.md 由 `manifest.py sync-readme` **从仓库实际文件全量生成**，不手动编辑
 - 维护清单：`git-sync/manifest.json`（记录计划管理的技能全集）
-- 三单一致原则：**清单 ⊆ 仓库 ⊆ README.md**
+- 三单一致原则：**清单 ⊇ 仓库 = README.md**（清单是计划全集，仓库是实际上传的子集，README.md 由仓库自动生成）
 
 ---
 

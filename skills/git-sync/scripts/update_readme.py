@@ -151,7 +151,7 @@ rm -rf temp-skills
 - 本仓库由 **git-sync** 技能自动维护
 - README.md 由 `manifest.py sync-readme` **从仓库实际文件全量生成**，不手动编辑
 - 维护清单：`git-sync/manifest.json`（记录计划管理的技能全集）
-- 三单一致原则：**清单 ⊆ 仓库 ⊆ README.md**
+- 三单一致原则：**清单 ⊇ 仓库 = README.md**（清单是计划全集，仓库是实际上传的子集，README.md 由仓库自动生成）
 
 ---
 
