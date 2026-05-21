@@ -17,13 +17,6 @@ wUwproject 原创技能合集，统一管理与发布。
 | `temp_svg-composer` | SVG 拼接工具（轻量版），支持内置字符集（0-9, A-Z, a-z）和外部 SVG 文件拼接 |
 | `workday-calendar` | 智能周历系统，法定假日/补班日管理，工作日计算，日程管理 |
 | `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能配色推荐、HTML 预览生成 |
-| `arxiv-reader` | 利用 python 指定 arxiv_id/url，基于 LLM Agent 对 arxiv 论文进行分类与深度阅读 |
-| `cangjie-skill` | 将一本书蒸馏为可执行的技能集合 |
-| `deep-research` | 结构化深度调研工作流，支持学术调研、benchmark 调研、技术选型等场景 |
-| `legal-logic-analysis` | 像律师一样思考任何法律情境，问题发现、管辖权、风险评估、可行结论 |
-| `semantic-split` | 语义拆分技能，将自然语言拆分为结构化的需求块（目的-行为-动机）|
-| `web-access` | 所有联网操作统一处理，包括搜索、网页抓取、登录后操作、网络交互 |
-| `wecom-unified` | 企业微信 CLI 全能套件，覆盖通讯录、消息、文档、日程、会议、待办 6 大业务域 |
 
 ## 目录结构
 
@@ -41,13 +34,6 @@ workbuddy-skills/
 │   ├── temp_svg-composer/
 │   ├── workday-calendar/
 │   ├── color-toolkit/
-│   ├── arxiv-reader/
-│   ├── cangjie-skill/
-│   ├── deep-research/
-│   ├── legal-logic-analysis/
-│   ├── semantic-split/
-│   ├── web-access/
-│   └── wecom-unified/
 ├── LICENSE
 └── README.md
 ```
