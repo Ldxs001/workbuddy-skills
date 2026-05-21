@@ -17,12 +17,9 @@ wUwproject 原创技能合集，统一管理与发布。
 | `temp_svg-composer` | SVG 拼接工具（轻量版），支持内置字符集（0-9, A-Z, a-z）和外部 SVG 文件拼接 |
 | `workday-calendar` | 智能周历系统，法定假日/补班日管理，工作日计算，日程管理 |
 | `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能配色推荐、HTML 预览生成 |
-| `workspace-cleanup` | 工作区归档 + JSONL 幽灵任务清理，综合维护工具 |
-| `workbuddy-fs-manager` | 跨平台文件系统管理，归档工作区、同步数据库、清理任务记录 |
 | `arxiv-reader` | 利用 python 指定 arxiv_id/url，基于 LLM Agent 对 arxiv 论文进行分类与深度阅读 |
 | `cangjie-skill` | 将一本书蒸馏为可执行的技能集合 |
 | `deep-research` | 结构化深度调研工作流，支持学术调研、benchmark 调研、技术选型等场景 |
-| `drawio-diagram` | draw.io 自动做图 Skill，生成 .drawio 文件并用 draw.io 打开 |
 | `legal-logic-analysis` | 像律师一样思考任何法律情境，问题发现、管辖权、风险评估、可行结论 |
 | `semantic-split` | 语义拆分技能，将自然语言拆分为结构化的需求块（目的-行为-动机）|
 | `web-access` | 所有联网操作统一处理，包括搜索、网页抓取、登录后操作、网络交互 |
@@ -44,8 +41,6 @@ workbuddy-skills/
 │   ├── temp_svg-composer/
 │   ├── workday-calendar/
 │   ├── color-toolkit/
-│   ├── workspace-cleanup/
-│   ├── workbuddy-fs-manager/
 │   ├── arxiv-reader/
 │   ├── cangjie-skill/
 │   ├── deep-research/
