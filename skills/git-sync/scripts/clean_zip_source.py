@@ -4,6 +4,13 @@
 """
 import os, sys, fnmatch
 
+def normalize_path(p):
+    """将路径规范化为 Windows 绝对路径（处理 Git Bash /c/... 格式）"""
+    p = os.path.expanduser(p)
+    if p.startswith("/") and len(p) > 2 and p[1].isalpha() and p[2] == "/":
+        p = p[1].upper() + ":" + p[2:].replace("/", "\\")
+    return os.path.normpath(p)
+
 EXCLUDE_PATTERNS = [
     ".sensitive_scan_*.json",
     ".decisions.json",
@@ -28,7 +35,7 @@ def main():
     if len(sys.argv) < 2:
         print("用法: python clean_zip_source.py <dir>")
         sys.exit(1)
-    target = sys.argv[1]
+    target = normalize_path(sys.argv[1])
     if not os.path.isdir(target):
         print(f"目录不存在: {target}")
         sys.exit(1)

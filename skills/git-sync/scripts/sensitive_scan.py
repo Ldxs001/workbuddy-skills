@@ -18,6 +18,13 @@ import sys
 import argparse
 from pathlib import Path
 
+def normalize_path(p):
+    """将路径规范化为 Windows 绝对路径（处理 Git Bash /c/... 格式）"""
+    p = os.path.expanduser(p)
+    if p.startswith("/") and len(p) > 2 and p[1].isalpha() and p[2] == "/":
+        p = p[1].upper() + ":" + p[2:].replace("/", "\\")
+    return os.path.normpath(p)
+
 # ── 敏感信息检测规则 ───────────────────────────────────────────────────
 
 # 要扫描的文件扩展名
@@ -413,7 +420,8 @@ def _detailed_for_file(entry):
 
 def cmd_scan(args):
     config = load_config(args.config)
-    results = scan_skill(args.skill_dir, config)
+    skill_dir = normalize_path(args.skill_dir)
+    results = scan_skill(skill_dir, config)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
@@ -427,12 +435,13 @@ def cmd_scan(args):
 def cmd_sanitize(args):
     config = load_config(args.config)
     # args.file 是要脱敏的文件，args.replacements 是 JSON 文件或直接 JSON 字符串
+    target_file = normalize_path(args.file)
     if os.path.exists(args.replacements):
         with open(args.replacements, "r", encoding="utf-8") as f:
             replacements = json.load(f)
     else:
         replacements = json.loads(args.replacements)
-    backup = sanitize_file(args.file, replacements, backup=not args.no_backup)
+    backup = sanitize_file(target_file, replacements, backup=not args.no_backup)
     print(f"  ✅ 已脱敏：{args.file}" + (f"（备份：{backup}）" if backup else ""))
 
 
@@ -461,7 +470,7 @@ def cmd_apply(args):
         decisions = json.load(f)
     with open(args.scan_result, "r", encoding="utf-8") as f:
         results = json.load(f)
-    skill_dir = args.skill_dir
+    skill_dir = normalize_path(args.skill_dir)
     # 构建 file → findings 映射
     file_findings = {e["file"]: e["findings"] for e in results}
     for file_rel, decision in decisions.items():

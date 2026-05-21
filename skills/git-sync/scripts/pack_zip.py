@@ -5,12 +5,21 @@ import os
 import sys
 import zipfile
 
+def normalize_path(p):
+    """将路径规范化为 Windows 绝对路径（处理 Git Bash /c/... 格式）"""
+    p = os.path.expanduser(p)
+    # 处理 Git Bash 路径格式：/c/Users/... → C:\Users\...
+    if p.startswith("/") and len(p) > 2 and p[1].isalpha() and p[2] == "/":
+        p = p[1].upper() + ":" + p[2:].replace("/", "\\")
+    return os.path.normpath(p)
+
 def pack_skill(skill_dir, zip_path, exclude_patterns=None):
     """
     skill_dir: 技能源目录 (e.g. ~/.workbuddy/skills/git-sync)
     zip_path: 输出 ZIP 路径
     exclude_patterns: 排除模式列表 (e.g. ['*.sh', '__pycache__'])
     """
+    skill_dir = normalize_path(skill_dir)
     if exclude_patterns is None:
         exclude_patterns = []
 
