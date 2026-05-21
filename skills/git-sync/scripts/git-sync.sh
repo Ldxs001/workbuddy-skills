@@ -14,7 +14,7 @@ if [ -z "$SKILL_NAME" ]; then
     exit 1
 fi
 
-# ── 路径定义 ──────────────────────────────────────────
+# ── 路径定义 ──────────────────────────────────────
 SKILLS_DIR="$HOME/.workbuddy/skills"
 WORK_REPO="$HOME/.workbuddy/workbuddy-skills"
 README_FILE="$WORK_REPO/README.md"
@@ -56,7 +56,48 @@ fi
 
 echo "技能描述: $SKILL_DESC"
 
-# ── 0.5 _meta.json 标准化校验 ─────────────────────────
+# ── 0.5 维护清单检查（v1.3.0 新增）────────────────────
+echo ""
+echo "[0.5/5] 检查维护清单..."
+
+MANIFEST_CHECK=$(python "$SKILLS_DIR/git-sync/scripts/manifest.py" check workbuddy-skills "$SKILL_NAME" 2>&1)
+CHECK_EXIT=$?
+
+if [ $CHECK_EXIT -eq 0 ]; then
+    echo "  ✅ 在清单中，已上传: $SKILL_NAME"
+elif [ $CHECK_EXIT -eq 1 ]; then
+    echo "  ⏳ 在清单中，但未上传: $SKILL_NAME"
+    echo "  → 继续执行同步（完成后将标记为 uploaded）"
+elif [ $CHECK_EXIT -eq 2 ]; then
+    echo "  ❓ $SKILL_NAME 不在维护清单中"
+    echo ""
+    echo "  维护清单中未找到该技能。"
+    echo "  请选择操作："
+    echo "    1) 加入清单并标记为已上传（推荐，同步后加入）"
+    echo "    2) 仅本次同步，不加入清单"
+    echo "    3) 中止同步"
+    echo ""
+    read -p "  请输入选项 [1/2/3]: " MANIFEST_CHOICE
+    case "$MANIFEST_CHOICE" in
+        1)
+            python "$SKILLS_DIR/git-sync/scripts/manifest.py" add workbuddy-skills "$SKILL_NAME" --type skill --uploaded --note "$SKILL_DESC"
+            echo "  ✅ 已加入清单，继续同步..."
+            ;;
+        2)
+            echo "  ⚠️  仅本次同步，未加入清单"
+            ;;
+        3)
+            echo "  ❌ 同步已中止"
+            exit 0
+            ;;
+        *)
+            echo "  ❌ 无效选项，中止"
+            exit 1
+            ;;
+    esac
+fi
+
+# ── 0. _meta.json 标准化校验 ────────────────────────
 echo ""
 echo "[0/5] 校验 _meta.json 标准字段..."
 
@@ -68,9 +109,6 @@ normalize_meta_json() {
     fi
 
     python "$SKILLS_DIR/git-sync/scripts/normalize_meta.py" "$meta_file" "$SKILL_NAME" "$VERSION" "$SKILL_DESC"
-
-    # 确保 _meta.json 也复制到 scripts 同级（以防被忽略）
-    cp "$meta_file" "$SKILLS_DIR/git-sync/scripts/../_meta.json" 2>/dev/null || true
 }
 
 normalize_meta_json
@@ -87,11 +125,9 @@ copy_dir() {
     local src="$1" dst="$2"
     if [ -d "$src" ]; then
         mkdir -p "$dst"
-        # 用find复制，排除__pycache__
         find "$src" -type f ! -path "*/__pycache__/*" ! -name "*.pyc" \
             ! -name "*.html" ! -name "*.log" \
             -exec sh -c 'mkdir -p "$2/$(dirname "$1")" && cp "$1" "$2/$(dirname "$1")/"' _ {} "$dst" \;
-        # 上面的方式太复杂，改用简单方式
     fi
 }
 
@@ -123,8 +159,6 @@ sync_skill() {
     # references/ 目录
     if [ -d "$src/references" ]; then
         mkdir -p "$dst/references"
-        find "$src/references" -type f ! -path "*/__pycache__/*" \
-            -exec cp {} "$dst/references/" \; 2>/dev/null || \
         cp -r "$src/references/." "$dst/references/" 2>/dev/null || true
     fi
 
@@ -157,30 +191,9 @@ echo "[2/5] 更新 README.md..."
 if [ ! -f "$README_FILE" ]; then
     echo "  ⚠️  README.md 不存在，跳过"
 else
-    # 检查技能是否已存在于README（表格 或 目录树）
-    ALREADY_IN_TABLE=false
-    ALREADY_IN_TREE=false
-
-    # README格式: | `skill-name` | description | (注意|后有空格)
-    if grep -qE "\| \`$SKILL_NAME\` \|" "$README_FILE" 2>/dev/null; then
-        ALREADY_IN_TABLE=true
-    fi
-    if grep -q "│   ├── $SKILL_NAME/" "$README_FILE" 2>/dev/null || \
-       grep -q "│   └── $SKILL_NAME/" "$README_FILE" 2>/dev/null; then
-        ALREADY_IN_TREE=true
-    fi
-
-    if [ "$ALREADY_IN_TABLE" = true ] && [ "$ALREADY_IN_TREE" = true ]; then
-        echo "  ℹ️  $SKILL_NAME 已存在于README，跳过更新"
-    else
-        echo "  📝 添加 $SKILL_NAME 到 README.md..."
-
-        # --- 更新技能列表表格 + 目录结构 ---
-        # 统一调用独立 Python 脚本，避免 heredoc 变量展开问题
-        python "$SKILLS_DIR/git-sync/scripts/update_readme.py" \
-            "$README_FILE" "$SKILL_NAME" "$SKILL_DESC"
-
-    fi
+    # 全量重新生成 README.md（从仓库实际文件）
+    echo "  🔄 全量重新生成 README.md（从仓库实际文件）..."
+    python "$SKILLS_DIR/git-sync/scripts/update_readme.py" workbuddy-skills "$README_FILE"
 fi
 
 # ── 3. 提交到工作仓库 ────────────────────────────────
@@ -200,10 +213,29 @@ if git diff --cached --quiet; then
     echo "  ℹ️  没有变更需要提交"
 else
     COMMIT_MSG="feat: sync $SKILL_NAME v$VERSION"
-    # 检查是否已有pending的未推送commit，有的话amend，否则新commit
-    # 简单策略：始终新建commit
     git commit -m "$COMMIT_MSG"
     echo "  ✅ 已提交: $COMMIT_MSG"
+fi
+
+# ── 3.5 同步成功后更新清单 uploaded 标记 ─────────────
+# 如果技能在清单中但 uploaded=false，现在设为 true
+python "$SKILLS_DIR/git-sync/scripts/manifest.py" check workbuddy-skills "$SKILL_NAME" 2>/dev/null
+if [ $? -eq 1 ]; then
+    echo ""
+    echo "  ℹ️  将 $SKILL_NAME 标记为已上传..."
+    # 直接修改 manifest.json 中该条目的 uploaded 字段
+    python -c "
+import json
+with open('$SKILLS_DIR/git-sync/manifest.json', 'r') as f:
+    data = json.load(f)
+items = data.get('repos', {}).get('workbuddy-skills', {}).get('items', {})
+if '$SKILL_NAME' in items and isinstance(items['$SKILL_NAME'], dict):
+    items['$SKILL_NAME']['uploaded'] = True
+with open('$SKILLS_DIR/git-sync/manifest.json', 'w') as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    f.write('\n')
+print('  ✅ 已标记 $SKILL_NAME 为 uploaded')
+" 2>/dev/null || true
 fi
 
 # ── 4. 推送到双平台 ──────────────────────────────────
