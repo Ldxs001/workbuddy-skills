@@ -1,6 +1,9 @@
 {
+  "name": "git-sync",
   "slug": "git-sync",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表",
-  "agent_created": true
+  "author": "wUwproject",
+  "agent_created": true,
+  "tags": ["git", "sync", "deploy", "packaging"]
 }
