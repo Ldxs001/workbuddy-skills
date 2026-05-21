@@ -52,11 +52,15 @@ def normalize(meta_file, skill_name, version, description):
     for key in removed:
         del meta[key]
 
-    # 3. 补全缺失字段
+    # 3. 补全/更新缺失或过期字段
     added = []
     if 'version' not in meta:
         meta['version'] = version
         added.append('version')
+    elif meta['version'] != version:
+        old_ver = meta['version']
+        meta['version'] = version
+        added.append(f'version: {old_ver} → {version}')
     if 'description' not in meta or not meta.get('description'):
         meta['description'] = description or ''
         added.append('description')

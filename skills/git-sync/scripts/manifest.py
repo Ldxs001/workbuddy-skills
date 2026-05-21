@@ -488,6 +488,7 @@ def main():
         "add": cmd_add,
         "remove": cmd_remove,
         "check": cmd_check,
+        "version": cmd_version,
         "diff": cmd_diff,
         "sync-readme": cmd_sync_readme,
     }
