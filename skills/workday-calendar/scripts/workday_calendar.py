@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 智能周历系统 - 工作日计算核心模块
+版本: v1.1.0
 功能：法定假日区间管理、补班日管理、周末规则配置、年度工作日计算、周历生成、日程管理
 """
 
 import json
 import os
 import uuid
+import base64
 from datetime import datetime, timedelta
 from typing import List, Dict, Set, Optional, Tuple
 from pathlib import Path
@@ -261,6 +263,101 @@ def get_schedule_file() -> Path:
     return get_skill_data_dir() / "schedule_events.json"
 
 
+def _chunk_base64(data: str, width: int = 64) -> str:
+    """将base64字符串按指定宽度换行"""
+    return "\n".join(data[i:i+width] for i in range(0, len(data), width))
+
+
+def _create_backup_bat() -> str:
+    """
+    创建日程数据的 .bat 容灾备份文件（最多9个，循环覆盖）
+
+    原理：
+    - 将当前 schedule_events.json 进行 base64 编码后嵌入 .bat 文件
+    - .bat 文件使用 Windows 内置 certutil -decode 解码恢复
+    - 编号 01~09 循环覆盖，第10个备份覆盖第1个
+
+    返回: 备份文件路径，无数据时返回 None
+    """
+    schedule_file = get_schedule_file()
+    if not schedule_file.exists():
+        return None  # 无日程数据，无需备份
+
+    backup_dir = get_skill_data_dir() / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    # 读取当前日程数据
+    with open(schedule_file, 'r', encoding='utf-8') as f:
+        json_data = f.read()
+
+    # Base64 编码（避免 bat 特殊字符问题）
+    encoded = base64.b64encode(json_data.encode('utf-8')).decode('ascii')
+
+    # 读取当前循环索引
+    index_file = backup_dir / "_backup_index.txt"
+    current_index = 1
+    if index_file.exists():
+        with open(index_file, 'r', encoding='utf-8') as f:
+            try:
+                current_index = int(f.read().strip())
+            except (ValueError, TypeError):
+                current_index = 1
+
+    # 生成时间戳
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    event_count = len(json.loads(json_data).get("events", []))
+
+    # 生成 .bat 文件内容
+    # 使用 certutil -decode "%~f0" 技巧：从自身读取 base64 数据并解码
+    bat_content = f"""@echo off
+chcp 65001 >nul
+echo ============================================
+echo   workday-calendar 容灾恢复
+echo   备份编号: {current_index:02d}
+echo   备份时间: {timestamp}
+echo   包含日程: {event_count} 条
+echo ============================================
+echo.
+echo 正在恢复日程数据...
+certutil -decode "%~f0" "%TEMP%\\wc_restore.json" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [错误] 数据解码失败！
+    pause
+    exit /b 1
+)
+move /Y "%TEMP%\\wc_restore.json" "%~dp0..\\schedule_events.json" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [错误] 文件写入失败！请检查目录权限。
+    pause
+    exit /b 1
+)
+echo.
+echo [成功] 日程数据已从备份 {current_index:02d} 恢复！
+echo 备份时间: {timestamp}
+echo 包含日程: {event_count} 条
+echo.
+echo 按任意键退出...
+pause >nul
+exit /b 0
+-----BEGIN CERTIFICATE-----
+{_chunk_base64(encoded)}
+-----END CERTIFICATE-----
+"""
+
+    bat_path = backup_dir / f"schedule_backup_{current_index:02d}.bat"
+    with open(bat_path, 'w', encoding='utf-8') as f:
+        f.write(bat_content)
+
+    # 更新循环索引（1→2→...→9→1）
+    next_index = current_index + 1
+    if next_index > 9:
+        next_index = 1
+    with open(index_file, 'w', encoding='utf-8') as f:
+        f.write(str(next_index))
+
+    return str(bat_path)
+
+
 def save_schedule_events(events: List[ScheduleEvent]) -> str:
     """保存日程事件列表"""
     data = {
@@ -335,10 +432,14 @@ def add_schedule_event(
         category=category
     )
 
+    # ═══ 容灾备份：保存前先创建 .bat 回滚文件 ═══
+    backup_path = _create_backup_bat()
+
     events.append(new_event)
     save_schedule_events(events)
 
-    return new_event, f"日程已添加: {title} ({date} {start_time}-{end_time})"
+    backup_info = f"\n  [备份: {Path(backup_path).name}]" if backup_path else "\n  [备份: 无(首次创建)]"
+    return new_event, f"日程已添加: {title} ({date} {start_time}-{end_time}){backup_info}"
 
 
 def delete_schedule_event(event_id: str) -> str:
@@ -1140,7 +1241,7 @@ if __name__ == "__main__":
         print(export_rules_table(year))
 
     # 工作日计算命令
-    elif command == "calculate":
+    elif command == "add":
         if len(sys.argv) < 6:
             print("用法: add <date> <start> <end> <title> [description] [category]")
             sys.exit(1)

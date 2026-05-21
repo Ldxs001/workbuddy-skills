@@ -1,0 +1,6 @@
+{
+  "slug": "workday-calendar",
+  "version": "1.1.0",
+  "description": "智能周历系统 - 法定假日管理、工作日计算、周历生成、日程管理，含.bat容灾备份",
+  "agent_created": true
+}

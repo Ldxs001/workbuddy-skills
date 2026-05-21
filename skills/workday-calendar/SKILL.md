@@ -1,6 +1,9 @@
 ---
 name: workday-calendar
+version: 1.1.0
 description: 智能周历系统 - 国家法定假日区间管理、年度工作日计算、周历生成、日程管理。支持数据本地JSON存储，AI友好调用接口。
+trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
+---管理、年度工作日计算、周历生成、日程管理。支持数据本地JSON存储，AI友好调用接口。
 trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
 ---
 
@@ -84,6 +87,28 @@ event, msg = add_schedule_event(
 )
 # 返回: (事件对象, "日程已添加: 团队会议 (2026-05-20 14:00-15:00)")
 ```
+
+#### 🛡️ 容灾备份（自动）
+
+每次添加新日程前，系统自动创建 `.bat` 备份文件，确保意外情况下可一键回退。
+
+```python
+# 每次 add_schedule_event() 调用时自动执行，无需手动干预
+# 备份文件存储在: data/backups/schedule_backup_01.bat ~ schedule_backup_09.bat
+# 最多保留 9 个备份，超过后循环覆盖（最新覆盖最旧）
+```
+
+**恢复方式**：
+```bash
+# Windows: 双击 .bat 文件即可恢复
+# 或命令行执行
+cmd /c data/backups/schedule_backup_03.bat
+```
+
+**备份机制**：
+- 每次 `add_schedule_event()` 保存前，自动将当前 `schedule_events.json` 备份
+- .bat 文件使用 `certutil -decode` 自解码技术，无需依赖外部文件
+- 编号 01~09 循环覆盖，第10个备份覆盖第1个
 
 #### 列出指定日期日程
 ```python
@@ -188,7 +213,12 @@ python workday_calendar.py rules 2026
 ├── holiday_intervals_2026.json    # 2026年法定假日
 ├── compensatory_days_2026.json     # 2026年补班日
 ├── weekend_config.json             # 周末规则（全局）
-└── schedule_events.json            # 日程事件（全局）
+├── schedule_events.json            # 日程事件（全局）
+└── backups/                        # 容灾备份（自动）
+    ├── schedule_backup_01.bat      # .bat 回滚脚本，最多9个循环覆盖
+    ├── schedule_backup_02.bat
+    ├── ...
+    └── _backup_index.txt           # 循环索引（记录下一个写入编号）
 ```
 
 ---
