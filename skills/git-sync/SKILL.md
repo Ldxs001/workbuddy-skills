@@ -1,12 +1,21 @@
 ---
 name: git-sync
-version: 1.4.0
+version: 1.5.0
 author: wUwproject
 license: MIT
 description: >
   将skill代码规范化推送到码云、GitHub并生成ZIP包，
   自动更新README.md技能列表，附带_meta.json标准化校验
   和三单一致维护清单机制。
+  v1.5 更新：【统一输出目录】+ 【HTML 索引页】
+    - 所有 ZIP 统一输出到 ~/.workbuddy/skills/.dist/（方案A）
+    - 自动生成 index.html 索引页（含 file:// 超链接）（方案C）
+    - 打包后自动打开 dist/ 目录（Windows explorer / macOS open）
+    - 修正三单一致原则描述（清单 ⊇ 仓库 = README.md）
+  v1.4 更新：【安全加固】
+    - SKILL_NAME 路径穿越校验（拒绝 ../、盘符等）
+    - realpath 路径范围校验（目标必须在 WORK_REPO/skills/ 内）
+    - rsync --delete 替代 rm -rf + cp（更安全）
   v1.3 更新：【三单一致清单机制】
     - 新增 manifest.json 维护清单，记录计划管理的技能全集
     - 新增 manifest.py CLI，支持 list/add/remove/check/diff/sync-readme
@@ -72,7 +81,7 @@ tags: [sync, git, zip, skill-manager, manifest]
 | `SKILLS_DIR` | `~/.workbuddy/skills` | 技能源目录 |
 | `WORK_REPO` | `~/.workbuddy/workbuddy-skills` | Git工作仓库 |
 | `MANIFEST_FILE` | `scripts/manifest.json` | 维护清单文件 |
-| `ZIP_OUTPUT` | `SKILLS_DIR/` | ZIP包输出目录 |
+| `DIST_DIR` | `SKILLS_DIR/.dist/` | ZIP 统一输出目录（v1.5新增） |
 
 ---
 
@@ -121,8 +130,23 @@ git add → git commit → git pull --rebase → git push
 ### 4. 生成 ZIP 包
 
 ```
-输出路径: SKILLS_DIR/<skill-name>-v<x.x.x>.zip
+输出路径: SKILLS_DIR/.dist/<skill-name>-v<x.x.x>.zip
+（v1.5 起统一输出到 DIST_DIR=~/.workbuddy/skills/.dist/）
 ```
+
+### 5. 统一输出 + HTML 索引（v1.5 新增）
+
+打包完成后自动执行：
+
+1. **复制到统一目录** `~/.workbuddy/skills/.dist/`（方案A）
+2. **生成 `index.html` 索引页**（方案C）
+   - 列出所有 ZIP 包，含 `file://` 超链接
+   - 显示文件大小和修改时间
+   - 点击文件名可直接跳转/下载（浏览器需允许 file:// 协议）
+3. **自动打开 dist/ 目录**
+   - Windows: `explorer.exe`
+   - macOS: `open`
+   - Linux: `xdg-open`
 
 ---
 

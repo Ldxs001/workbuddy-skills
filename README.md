@@ -16,7 +16,7 @@
 | `color-toolkit` | 专业颜色工具集 - HEX/RGB/HSL/HSV/CMYK转换、四种对比度算法、智能配色推荐 |
 | `drawiodo` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。 |
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
-| `git-sync` | 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验和三单一致维护清单机制 |
+| `git-sync` | 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验和三单一致维护清单机制；v1.5新增统一dist/输出目录和HTML索引页 |
 | `round-robin-allocator` | 将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。 |
 | `semantic-split` | 语义拆分技能。当用户提出任务请求时，自动将自然语言拆分为结构化的需求块（目的-行为-动机），确保不遗漏任何细节。触发场景：用户表达需求、请求帮助、委托任务时。 |
 | `simulated-peak-plot` | Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, clickable file:// path output, and CSV data import from device exports. |
@@ -79,7 +79,7 @@ rm -rf temp-skills
 - 本仓库由 **git-sync** 技能自动维护
 - README.md 由 `manifest.py sync-readme` **从仓库实际文件全量生成**，不手动编辑
 - 维护清单：`git-sync/manifest.json`（记录计划管理的技能全集）
-- 三单一致原则：**清单 ⊇ 仓库 = README.md**（清单是计划全集，仓库是实际上传的子集，README.md 由仓库自动生成）
+- 三单一致原则：**清单 ⊇ 仓库 = README.md**
 
 ---
 
