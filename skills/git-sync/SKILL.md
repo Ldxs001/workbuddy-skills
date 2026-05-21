@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 1.7.5
+version: 1.7.6
 author: "由 config.json 的 author 字段决定"
 license: MIT
 description: >
