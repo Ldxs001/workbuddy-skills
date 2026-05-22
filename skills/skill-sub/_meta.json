@@ -1,11 +1,14 @@
 {
-  "version": "1.2.1",
+  "version": "1.6.0",
   "author": "wUwproject",
   "name": "skill-sub",
-  "description": "skill-sub 子技能系统",
+  "description": "skill-sub 调用链编辑器与粗粒度规划器",
   "tags": [
-    "skill",
-    "sub",
-    "modular"
+    "chain",
+    "orchestration",
+    "reusable-template",
+    "skill-builder",
+    "planner",
+    "editor"
   ]
 }
