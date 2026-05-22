@@ -18,7 +18,7 @@
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
 | `git-sync` | 将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验和三单一致维护清单机制；v1.5新增统一dist/输出目录和HTML索引页 |
 | `round-robin-allocator` | 将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。 |
-| `semantic-split` | 语义拆分技能。当用户提出任务请求时，自动将自然语言拆分为结构化的需求块（目的-行为-动机），确保不遗漏任何细节。触发场景：用户表达需求、请求帮助、委托任务时。 |
+| `semantic-split` | 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于规则级/能力级json渐进加载生成串并行规划步骤，支持自增强json沉淀机制。 |
 | `simulated-peak-plot` | Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, clickable file:// path output, and CSV data import from device exports. |
 | `skill-sub` | skill-sub 子技能系统 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
