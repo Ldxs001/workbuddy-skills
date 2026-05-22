@@ -5,11 +5,11 @@
 ## v1.9（当前版本）— 渐进式规范改写
 
 - **SKILL.md 从 521 行重构为 89 行核心骨架**（减少 83%），符合 v2.0 标准的 ≤200 行要求
-- **新增 `docs/` 渐进式 MD 文档体系**（4个文件）：
-  - `docs/guide.md` — 完整执行流程步骤 0→6 详细文档
-  - `docs/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
-  - `docs/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
-  - `docs/changelog.md` — 完整版本历史 + Roadmap
+- **新增 `references/` 渐进式 MD 文档体系**（4个文件）：
+  - `references/guide.md` — 完整执行流程步骤 0→6 详细文档
+  - `references/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
+  - `references/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
+  - `references/changelog.md` — 完整版本历史 + Roadmap
 - **frontmatter author** 从非常量引用修正为常量值 `[username-redacted]`
 - **清理根目录遗留垃圾**：删除异常 ZIP 文件 `2.0.0`、6 个 `.tmp_zip_*` 临时目录、过时空目录 `references/`
 - 通过 skill-standardization v2.0 update 验证：**ERROR=0, WARN=1**（WARN 为合理运行时文件例外）

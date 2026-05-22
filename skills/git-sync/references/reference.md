@@ -102,7 +102,7 @@ README.md（技能列表 + 目录树）
 <skill-name>/
 ├── SKILL.md                  # [必填] 技能主文件
 ├── _meta.json                # [必填] 元数据（5字段）
-├── docs/                     # [可选] 渐进式 MD 辅助文档
+├── references/                     # [可选] 渐进式 MD 辅助文档
 │   ├── guide.md
 │   ├── examples.md
 │   ├── reference.md

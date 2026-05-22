@@ -61,7 +61,7 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 | `author` | _meta.json 默认作者名 | `your-name-here` |
 | `gitee.user` / `github.user` | 用于生成查看链接和 README 命令 | `your-gitee-username` |
 
-→ 详见 `docs/guide.md` 完整执行流程（步骤 0 → 6 详解）
+→ 详见 `references/guide.md` 完整执行流程（步骤 0 → 6 详解）
 
 ## 敏感信息过滤
 
@@ -75,7 +75,7 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 
 三种模式：`prompt`（默认交互）/ `always-sanitize`（自动脱敏）/ `keep-as-is`（跳过）
 
-→ 详见 `docs/reference.md` 完整检测规则 + manifest.py CLI 速查
+→ 详见 `references/reference.md` 完整检测规则 + manifest.py CLI 速查
 
 ## 代码管理铁律
 
@@ -86,4 +86,4 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 5. ✅ 维护清单优先 — 未确认是否加入清单前，不盲目同步
 6. ✅ ZIP 与仓库结构一致
 
-→ [FAQ](docs/faq.md) · [版本日志](docs/changelog.md) · [完整参考](docs/reference.md)
+→ [FAQ](references/faq.md) · [版本日志](references/changelog.md) · [完整参考](references/reference.md)
