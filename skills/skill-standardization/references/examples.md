@@ -26,7 +26,7 @@ $ python scripts/skill_builder.py create hello-world --desc "问候技能"
 [CREATE] Directory: ./hello-world
 [CREATE] SKILL.md   → ./hello-world/SKILL.md
 [CREATE] _meta.json → ./hello-world/_meta.json
-[CREATE] docs/      → ./hello-world/docs/.gitkeep
+[CREATE] references/      → ./hello-world/references/.gitkeep
 [CREATE] scripts/   → ./hello-world/scripts/.gitkeep
 
 Done! Next steps:
@@ -92,7 +92,7 @@ tags: []
 # TODO: 最简用法示例（1-3 行即可上手）
 ```
 
-→ 详见 `docs/guide.md` 完整教程
+→ 详见 `references/guide.md` 完整教程
 ```
 
 ---
@@ -160,7 +160,7 @@ Path: ./old-skill
        - Core section:    ✅ found "功能列表"
        - Quick start:     ❌ MANUAL FIX NEEDED
          Suggested heading: ## 快速开始
-[B-04] File size:        ⚠️ 312 lines (> 200, suggest docs/ split)
+[B-04] File size:        ⚠️ 312 lines (> 200, suggest references/ split)
 [B-05] Root directory:   ⚠️ stray files (refactor recommended)
 
 Backup saved: ./old-skill_bak_update_20260522_190000/
@@ -189,8 +189,8 @@ Migration plan:
 ├──────┼───────────────────┼────────────────────────┼────────┤
 │ M-01 │ tool.py            │ scripts/tool.py        │ 18.2KB │
 │ M-01 │ utils.py           │ scripts/utils.py       │ 4.1KB  │
-│ M-02 │ README.md          │ docs/README.md         │ 2.3KB  │
-│ M-02 │ NOTES.md           │ docs/NOTES.md          │ 1.8KB  │
+│ M-02 │ README.md          │ references/README.md         │ 2.3KB  │
+│ M-02 │ NOTES.md           │ references/NOTES.md          │ 1.8KB  │
 │ M-03 │ requirements.txt   │scripts/requirements.txt│ 0.1KB  │
 └──────┴───────────────────┴────────────────────────┴────────┘
 
@@ -217,8 +217,8 @@ Backup: ./legacy-tool_bak_refactor_20260522_191000/
 [3/5] Applying migrations:
       M-01 tool.py      → scripts/tool.py      ✅
       M-01 utils.py     → scripts/utils.py     ✅
-      M-02 README.md    → docs/README.md       ✅
-      M-02 NOTES.md     → docs/NOTES.md        ✅
+      M-02 README.md    → references/README.md       ✅
+      M-02 NOTES.md     → references/NOTES.md        ✅
       M-03 requirements.txt → scripts/requirements.txt ✅
 [4/5] Verifying integrity... ✅ 45,230 bytes match
 [5/5] Writing migration log... ✅
@@ -291,14 +291,14 @@ Root mandatory files (must exist):
   • _meta.json — 元数据（5字段）
 
 Subdirectories (create as needed):
-  • docs/     — 渐进式 MD 辅助文档
+  • references/     — 渐进式 MD 辅助文档
   • scripts/  — 可执行脚本和工具 + spec/
   • assets/   — 静态资源（可选）
   • tests/    — 测试（可选）
 
 Layout levels:
   minimal  — SKILL.md + _meta.json
-  standard — + scripts/ + docs/
+  standard — + scripts/ + references/
   full     — + assets/ + tests/
 
 Migration rules: M-01 ~ M-06 defined
@@ -356,8 +356,8 @@ python scripts/main.py --help
 2. 执行处理
 3. 获取结果
 
-→ 详见 `docs/guide.md` 完整教程
-→ [API 参考](docs/reference.md) 查看全部选项
+→ 详见 `references/guide.md` 完整教程
+→ [API 参考](references/reference.md) 查看全部选项
 
 ## 注意事项
 

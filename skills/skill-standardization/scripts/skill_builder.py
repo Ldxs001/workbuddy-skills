@@ -68,7 +68,7 @@ tags: [{tags}]
 
 <!-- 在此描述主要工作流程 -->
 
-→ 详见 `docs/guide.md` 完整教程（按需创建）
+→ 详见 `references/guide.md` 完整教程（按需创建）
 """
 
 META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}]}}'
@@ -80,7 +80,7 @@ REQUIRED_SECTIONS = [
     ("快速开始", ["快速开始", "快速上手", "Quick Start"]),
 ]
 
-# 可选拆分到 docs/ 的章节关键词（用于 refactor 拆分判断）
+# 可选拆分到 references/ 的章节关键词（用于 refactor 拆分判断）
 SPLITTABLE_KEYWORDS = {
     "详细教程": ["详细教程", "使用指南", "完整指南", "逐步指南"],
     "示例集合": ["示例", "examples", "用例", "案例"],
@@ -120,7 +120,7 @@ def cmd_create(args):
 
     # 创建目录结构
     skill_dir.mkdir(parents=True)
-    (skill_dir / "docs").mkdir(exist_ok=True)
+    (skill_dir / "references").mkdir(exist_ok=True)
     (skill_dir / "scripts").mkdir(exist_ok=True)
 
     # 写入 SKILL.md
@@ -146,18 +146,18 @@ def cmd_create(args):
         f.write(meta_content)
 
     # 创建 .gitkeep 保持空目录
-    (skill_dir / "docs" / ".gitkeep").write_text("", encoding="utf-8")
+    (skill_dir / "references" / ".gitkeep").write_text("", encoding="utf-8")
     (skill_dir / "scripts" / ".gitkeep").write_text("", encoding="utf-8")
 
     print(f"✅ Skill 已创建: {skill_dir}")
     print(f"   ├── SKILL.md      (主文件)")
     print(f"   ├── _meta.json    (元数据)")
-    print(f"   ├── docs/         (渐进式 MD)")
+    print(f"   ├── references/         (渐进式 MD)")
     print(f"   └── scripts/      (脚本目录)")
     print(f"\n下一步:")
     print(f"   1. 编辑 SKILL.md 填写 TODO 占位符")
     print(f"   2. 如需脚本，放入 scripts/")
-    print(f"   3. 如需辅助文档，放入 docs/")
+    print(f"   3. 如需辅助文档，放入 references/")
 
 
 # ═══════════════════════════════════════════════════════
@@ -241,7 +241,7 @@ def cmd_update(args):
         line_count = len(lines)
         if line_count > 200:
             results["warnings"].append(
-                f"💡 SKILL.md 共 {line_count} 行，超过 200 行建议拆分到 docs/"
+                f"💡 SKILL.md 共 {line_count} 行，超过 200 行建议拆分到 references/"
             )
 
     # 检查 3: 目录结构规范性
@@ -347,9 +347,9 @@ def cmd_refactor(args):
     migration_log = []  # (src_rel, dst_rel, action)
 
     # 确保目标子目录存在
-    docs_dir = skill_dir / "docs"
+    references_dir = skill_dir / "references"
     scripts_dir = skill_dir / "scripts"
-    docs_dir.mkdir(exist_ok=True)
+    references_dir.mkdir(exist_ok=True)
     scripts_dir.mkdir(exist_ok=True)
 
     moved_count = 0
@@ -399,8 +399,8 @@ def cmd_refactor(args):
             target_rel = f"scripts/{Path(rel_path).name}"
             action = f"move → scripts/"
         elif ext == ".md" and rel_path != "SKILL.md":
-            target_rel = f"docs/{Path(rel_path).name}"
-            action = f"move → docs/"
+            target_rel = f"references/{Path(rel_path).name}"
+            action = f"move → references/"
         elif ext in (".txt", ".cfg", ".ini", ".toml") and rel_path != ".gitignore":
             target_rel = f"scripts/{Path(rel_path).name}"
             action = f"move → scripts/"
@@ -485,7 +485,7 @@ def cmd_refactor(args):
     # 输出后续建议
     print(f"\n📝 后续建议:")
     print(f"   1. 检查 SKILL.md 是否需要更新（添加渐进式引用等）")
-    print(f"   2. 检查 docs/ 下拆分的文件是否合理归类")
+    print(f"   2. 检查 references/ 下拆分的文件是否合理归类")
     print(f"   3. 如有旧版 _skillhub_meta.json，确认是否可删除")
     print(f"   4. 运行 `python skill_audit.py audit {skill_dir}` 验证")
 
@@ -551,7 +551,7 @@ def _print_refactor_plan(skill_dir, all_files, loose_files):
                 target = "scripts/" + rel_path
                 moves.append((rel_path, target))
             elif ext == ".md":
-                target = "docs/" + rel_path
+                target = "references/" + rel_path
                 moves.append((rel_path, target))
             elif ext in (".png", ".jpg", ".gif", ".svg"):
                 target = "assets/" + rel_path

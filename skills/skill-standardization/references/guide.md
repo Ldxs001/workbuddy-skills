@@ -38,7 +38,7 @@ python scripts/skill_builder.py create <skill-name> --desc "技能描述"
 <skill-name>/
 ├── SKILL.md          # 主文件（含 TODO 占位符模板）
 ├── _meta.json        # 元数据（五字段）
-├── docs/.gitkeep     # 渐进式MD目录占位
+├── references/.gitkeep     # 渐进式MD目录占位
 └── scripts/.gitkeep  # 脚本目录占位
 ```
 
@@ -46,7 +46,7 @@ python scripts/skill_builder.py create <skill-name> --desc "技能描述"
 
 1. **编辑 SKILL.md**：将 TODO 占位符替换为实际内容
 2. **补充脚本**：在 `scripts/` 中添加实际功能代码
-3. **补充文档**：按需在 `docs/` 中创建渐进式 MD
+3. **补充文档**：按需在 `references/` 中创建渐进式 MD
 4. **运行 update**：`python scripts/skill_builder.py update <skill-dir>` 验证合规性
 
 ### 示例：从头创建一个完整 skill
@@ -117,7 +117,7 @@ python scripts/skill_builder.py update <skill-dir> --fix --backup
 
 检查 SKILL.md 行数是否超过 200 行。
 
-建议：超过时考虑拆分到 `docs/`。
+建议：超过时考虑拆分到 `references/`。
 
 #### B-05: 根目录规范性
 
@@ -163,9 +163,9 @@ Backup: ./old-skill_bak_refactor_20260522_190000
 
 Migration plan (4 files):
   M-01 tool.py        → scripts/tool.py       (12KB)
-  M-02 NOTES.md       → docs/NOTES.md         (3KB)
+  M-02 NOTES.md       → references/NOTES.md         (3KB)
   M-03 helper.sh      → scripts/helper.sh      (1KB)
-  M-02 README.md      → docs/README.md         (2KB)
+  M-02 README.md      → references/README.md         (2KB)
 
 Excluded:
   __pycache__/        (M-05: always excluded)

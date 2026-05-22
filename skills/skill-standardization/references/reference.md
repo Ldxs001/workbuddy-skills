@@ -40,7 +40,7 @@ python scripts/skill_builder.py create <name> [--desc <text>] [--dir <path>] [--
 <name>/
 ├── SKILL.md          # 含 frontmatter + TODO 占位符模板
 ├── _meta.json        # {name, version: "0.1.0", description, author: "[username-redacted]", tags}
-├── docs/.gitkeep
+├── references/.gitkeep
 └── scripts/.gitkeep
 ```
 
@@ -92,7 +92,7 @@ python scripts/skill_builder.py update <skill_dir> [--fix] [--backup]
    ✅ _meta.json 结构正常
 
 ⚠️  警告/建议:
-   ⚠️  SKILL.md 共 250 行，超过 200 行建议拆分到 docs/
+   ⚠️  SKILL.md 共 250 行，超过 200 行建议拆分到 references/
 
 结论: ERROR=0 WARN=1 PASS=1
 ```
@@ -130,7 +130,7 @@ python scripts/skill_builder.py refactor <skill_dir> [--no-backup] [--dry-run]
 | 源文件类型 | 目标目录 | 规则 ID |
 |-----------|---------|---------|
 | `.py`, `.sh`, `.bat`, `.ps1` | `scripts/` | M-01 |
-| `.md`（非 SKILL.md） | `docs/` | M-02 |
+| `.md`（非 SKILL.md） | `references/` | M-02 |
 | `.txt`, `.cfg`, `.ini`, `.toml`, `.yaml`, `.yml` | `scripts/` | M-03/M-06 |
 | `.json`（非 meta/spec） | `scripts/` | M-04 |
 | `.png`, `.jpg`, `.gif`, `.svg`, `.ico` | `assets/`（自动创建） | M-05 |
@@ -150,7 +150,7 @@ python scripts/skill_builder.py refactor <skill_dir> [--no-backup] [--dry-run]
   📋 重构计划:
 
   将要移动的文件 (4):
-    README.md                     → docs/README.md
+    README.md                     → references/README.md
     tool.py                       → scripts/tool.py
     config.json                   → scripts/config.json
     logo.png                      → assets/logo.png

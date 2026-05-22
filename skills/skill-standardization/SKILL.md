@@ -44,7 +44,7 @@ tags: [standardization, skill-builder, skill-audit, validation, json-loader, ref
 | 1 | **三种执行模式** | create / update / refactor 覆盖 skill 全生命周期 |
 | 2 | **10 条自动审查规则** | R-01~R-04 (ERROR) + R-05~R-10 (WARN)，纯警告不阻断 |
 | 3 | **标准目录结构规范** | 根目录仅 SKILL.md + _meta.json，三级复杂度布局 |
-| 4 | **渐进式 MD 文件体系** | 主文件 ≤200 行核心，辅助内容拆分到 docs/ 按需加载 |
+| 4 | **渐进式 MD 文件体系** | 主文件 ≤200 行核心，辅助内容拆分到 references/ 按需加载 |
 | 5 | **零依赖 Python 工具** | 所有脚本仅使用标准库，跨平台兼容 |
 | 6 | **信息完整性保障** | refactor 模式强制备份 + 全量扫描 + 仅移动不删除 + 映射报告 |
 
@@ -91,7 +91,7 @@ python scripts/json_loader.py load all                 # 全部规范
   <name>/
   ├── SKILL.md          (含 frontmatter + TODO 占位符模板)
   ├── _meta.json        (五字段元数据)
-  ├── docs/.gitkeep     (渐进式MD目录)
+  ├── references/.gitkeep     (渐进式MD目录)
   └── scripts/.gitkeep  (脚本目录)
   ↓
 输出: 创建结果 + 后续指引
@@ -102,7 +102,7 @@ python scripts/json_loader.py load all                 # 全部规范
 - 版本号从 0.1.0 开始，遵循 SemVer
 - author 默认为 `your-name-here` 占位符（铁律1：不可擅自替换为具体人名）
 
-→ 详见 `docs/guide.md` 完整创建教程（按需编写）
+→ 详见 `references/guide.md` 完整创建教程（按需编写）
 
 ### 模式 B：update（更新）
 
@@ -150,7 +150,7 @@ python scripts/skill_builder.py update ./my-skill --fix --backup
 | ID | 规则 | 示例 |
 |----|------|------|
 | M-01 | 根目录 .py/.sh → `scripts/` | `tool.py` → `scripts/tool.py` |
-| M-02 | 根目录 .md（非 SKILL.md）→ `docs/` | `NOTES.md` → `docs/NOTES.md` |
+| M-02 | 根目录 .md（非 SKILL.md）→ `references/` | `NOTES.md` → `references/NOTES.md` |
 | M-03 | requirements.txt → `scripts/` | `requirements.txt` → `scripts/requirements.txt` |
 | M-04 | config.json 等 → `scripts/` 或保留根目录 | 取决于是否被外部引用 |
 | M-05 | __pycache__/ 始终排除 | 不参与迁移 |
@@ -168,7 +168,7 @@ python scripts/skill_builder.py refactor ./old-skill
 mv ./old-skill_bak_refactor_YYYYMMDD_HHMMSS ./old-skill
 ```
 
-→ 详见 `docs/guide.md` refactor 详细指南（按需编写）
+→ 详见 `references/guide.md` refactor 详细指南（按需编写）
 
 ---
 
@@ -192,7 +192,7 @@ mv ./old-skill_bak_refactor_YYYYMMDD_HHMMSS ./old-skill
 ├── SKILL.md                  # [必填] 主文件
 ├── _meta.json                # [必填] 元数据
 │
-├── docs/                     # 渐进式 MD 辅助文档
+├── references/                     # 渐进式 MD 辅助文档
 │   ├── guide.md              #     使用指南（详细教程）
 │   ├── examples.md           #     示例集合
 │   ├── reference.md          #     API/命令参考
@@ -215,7 +215,7 @@ mv ./old-skill_bak_refactor_YYYYMMDD_HHMMSS ./old-skill
 | 级别 | 适用场景 | 包含目录 | 示例 |
 |------|---------|---------|------|
 | **minimal** | 纯提示型 skill | SKILL.md + _meta.json | color-toolkit |
-| **standard** | 有脚本或文档的 skill | + scripts/ + docs/ | git-sync, triphasic-execution |
+| **standard** | 有脚本或文档的 skill | + scripts/ + references/ | git-sync, triphasic-execution |
 | **full** | 复杂工具型 skill | + assets/ + tests/ | — |
 
 ---
@@ -226,11 +226,11 @@ mv ./old-skill_bak_refactor_YYYYMMDD_HHMMSS ./old-skill
 
 ### 核心原则
 
-> **主 SKILL.md 必须可独立理解核心功能和使用方法。** docs/ 下的渐进式 .md 是按需加载的补充材料，缺失不影响基本使用。
+> **主 SKILL.md 必须可独立理解核心功能和使用方法。** references/ 下的渐进式 .md 是按需加载的补充材料，缺失不影响基本使用。
 
 ### 拆分边界
 
-| 主文件 SKILL.md 必须包含 | 拆分到 docs/ 的渐进式 MD |
+| 主文件 SKILL.md 必须包含 | 拆分到 references/ 的渐进式 MD |
 |--------------------------|------------------------|
 | ✅ frontmatter 元数据 | 📄 详细教程 (`guide.md`) |
 | ✅ 技能名称/一级标题 | 📄 完整示例 (`examples.md`) |
@@ -246,17 +246,17 @@ mv ./old-skill_bak_refactor_YYYYMMDD_HHMMSS ./old-skill
          ↓
     任务简单？ → 直接用 SKILL.md 执行
          ↓ 否
-    任务复杂？ → 检查 SKILL.md 中的 docs/ 引用
+    任务复杂？ → 检查 SKILL.md 中的 references/ 引用
          ↓
-    按需读取 docs/*.md 补充决策
+    按需读取 references/*.md 补充决策
 ```
 
 ### 引用语法（在 SKILL.md 中指向渐进式 MD）
 
 ```markdown
-→ 详见 `docs/guide.md` 完整教程
-→ [API 参考](docs/reference.md) 查看全部选项
-→ `docs/examples.md` 包含更多使用示例
+→ 详见 `references/guide.md` 完整教程
+→ [API 参考](references/reference.md) 查看全部选项
+→ `references/examples.md` 包含更多使用示例
 ```
 
 ---
@@ -353,7 +353,7 @@ skill-standardization/
 
 1. **refactor 前务必先 `--dry-run`**：查看完整的迁移计划后再确认执行
 2. **备份是 refactor 默认行为**：不要用 `--no-backup` 除非明确知道风险
-3. **SKILL.md 控制在 200 行以内**：超过的部分考虑拆到 `docs/`
+3. **SKILL.md 控制在 200 行以内**：超过的部分考虑拆到 `references/`
 4. **审查是纯警告模式**：不会阻止 git-sync 同步，但建议逐步优化
 5. **版本号统一管理**：SKILL.md version + _meta.json version + manifest.json version 三方保持一致
 

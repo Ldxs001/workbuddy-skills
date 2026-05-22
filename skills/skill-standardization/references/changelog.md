@@ -23,7 +23,7 @@
 - **create 命令** — 从模板初始化完全符合标准的 skill 目录结构
   - 自动生成 SKILL.md（含 frontmatter + TODO 占位符模板）
   - 自动生成 _meta.json（五字段标准元数据）
-  - 创建 docs/ 和 scripts/ 占位目录
+  - 创建 references/ 和 scripts/ 占位目录
   - 支持 `--desc`、`--dir`、`--tags` 参数自定义
 
 - **update 命令** — 对已有 skill 进行增量规范化检查
@@ -45,12 +45,12 @@
 - 新增 `spec/structure.json` — 目录结构规范定义
 - 定义三级复杂度模型（minimal / standard / full）
 - 明确根目录仅允许 SKILL.md + _meta.json
-- 规范子目录用途：docs/（渐进式MD）、scripts/（脚本）、assets/（资源）、tests/（测试）
+- 规范子目录用途：references/（渐进式MD）、scripts/（脚本）、assets/（资源）、tests/（测试）
 
 #### 渐进式 MD 文件体系
 - 新增 `spec/progressive_md.json` — 渐进式MD体系规范
 - 定义主文件 vs 辅助文档的拆分边界
-- 明确加载协议（SKILL.md 独立可用 → 复杂任务按需加载 docs/）
+- 明确加载协议（SKILL.md 独立可用 → 复杂任务按需加载 references/）
 - 标准化引用语法（→ 语法指向渐进式文件）
 - 注册 6 个标准渐进式文件名
 
@@ -70,7 +70,7 @@
 
 #### SKILL.md 结构重构
 - 主文件从单一大文档精简为 ≤200 行核心版
-- 详细内容拆分到 docs/ 渐进式 MD 文件
+- 详细内容拆分到 references/ 渐进式 MD 文件
 - 新增三种执行模式详解章节（create/update/refactor）
 - 新增标准目录结构规范章节
 - 新增渐进式 MD 文件体系章节
@@ -83,7 +83,7 @@
 | 脚本数量 | 2 (audit + json_loader) | 4 (audit + json_loader + builder) |
 | Spec 文件数 | 3 (frontmatter + body + rules) | 6 (+ structure + progressive_md + _index) |
 | CLI 命令数 | 2 (audit + load/list/show) | 8 (create/update/refactor + audit + load/list/show/refs) |
-| 文档文件数 | 1 (SKILL.md) | 7 (SKILL.md + 6个docs/*.md) |
+| 文档文件数 | 1 (SKILL.md) | 7 (SKILL.md + 6个references/*.md) |
 | 迁移规则数 | 0 | 6 (M-01 ~ M-06) |
 
 ### 已知限制

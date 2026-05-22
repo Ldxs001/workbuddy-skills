@@ -55,7 +55,7 @@ skill-standardization/                 # Skill 根目录
 ├── SKILL.md                           # 主文件（v2，≤200行核心版）
 ├── _meta.json                         # 五字段元数据
 │
-├── docs/                              # 渐进式 MD 辅助文档
+├── references/                              # 渐进式 MD 辅助文档
 │   ├── guide.md                       # 使用指南（详细教程）
 │   ├── examples.md                    # 示例集合
 │   ├── reference.md                   # API/命令参考手册
@@ -89,7 +89,7 @@ skill-standardization/                 # Skill 根目录
 ### 文件依赖关系
 
 ```
-SKILL.md ← 引用 → docs/*.md（渐进式文档）
+SKILL.md ← 引用 → references/*.md（渐进式文档）
                      ↑
 skill_builder.py ──读取──→ spec/*.json（规范定义）
 skill_audit.py   ──读取──→ spec/rules.json（审查规则）
@@ -107,7 +107,7 @@ git-sync.sh      ──调用──→ skill_audit.py audit
 ┌─────────────────────────────────────────────────┐
 │                  表现层 (Presentation)            │
 │                                                  │
-│   SKILL.md + docs/*.md          CLI (--help)     │
+│   SKILL.md + references/*.md          CLI (--help)     │
 │   (人类可读文档)                 (参数说明)       │
 ├─────────────────────────────────────────────────┤
 │                  业务层 (Business)                │
@@ -240,7 +240,7 @@ SKILL_TEMPLATE.format(name=..., description=..., tags=...)
   ↓                                    ↓
 写入 _meta.json
   ↓
-创建 docs/.gitkeep + scripts/.gitkeep
+创建 references/.gitkeep + scripts/.gitkeep
   ↓
 输出结果摘要
 ```
@@ -293,7 +293,7 @@ cmd_refactor(args)
   ├── .git*                     → keep (git)
   ├── __pycache__/*             → skip (cache)
   ├── .py/.sh/.bat/.ps1         → move → scripts/
-  ├── .md (非 SKILL.md)         → move → docs/
+  ├── .md (非 SKILL.md)         → move → references/
   ├── .png/.jpg/.gif/.svg       → move → assets/
   ├── .txt/.cfg/.ini/.yaml      → move → scripts/
   └── 其他                       → keep (unknown)
@@ -371,7 +371,7 @@ skill_audit.py audit ...
 | `body.json` | 定义章节名/层级/必须性 | 不含写作指导 | SKILL.md 编写 + audit R-06~R-09 |
 | `rules.json` | 完整规则定义（ID/级别/逻辑） | 不含执行引擎 | skill_audit.py |
 | `structure.json` | 目录结构规范 + 迁移规则 | 不含移动逻辑 | create + refactor |
-| `progressive_md.json` | MD 拆分方案 + 加载协议 | 不含文件操作 | docs/ 创建 + 加载协议 |
+| `progressive_md.json` | MD 拆分方案 + 加载协议 | 不含文件操作 | references/ 创建 + 加载协议 |
 | `_index.json` | 模块注册表 + 依赖关系 | 不含具体规范 | json_loader.py |
 
 ### 模块间依赖关系

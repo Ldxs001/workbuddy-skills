@@ -51,7 +51,7 @@ git-sync 负责将 skill 推送到远程仓库，在推送前调用 skill-standa
 | 级别 | 内容 | 适用场景 |
 |------|------|---------|
 | **minimal** | 仅 `SKILL.md` + `_meta.json` | 纯提示型 skill（如 color-toolkit） |
-| **standard** | + `scripts/` + `docs/` | 有脚本或辅助文档的 skill |
+| **standard** | + `scripts/` + `references/` | 有脚本或辅助文档的 skill |
 | **full** | + `assets/` + `tests/` | 复杂工具型 skill |
 
 大多数 skill 属于 standard 级别。
@@ -71,9 +71,9 @@ git-sync 负责将 skill 推送到远程仓库，在推送前调用 skill-standa
 4. `快速开始` — 提供最简使用示例
 
 **可以后续补充的：**
-- 详细教程 → 拆分到 `docs/guide.md`
-- 示例集合 → 拆分到 `docs/examples.md`
-- FAQ → 拆分到 `docs/faq.md`
+- 详细教程 → 拆分到 `references/guide.md`
+- 示例集合 → 拆分到 `references/examples.md`
+- FAQ → 拆分到 `references/faq.md`
 
 ### Q5: create 生成的版本号为什么是 0.1.0？
 
@@ -223,13 +223,13 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 ## 渐进式 MD 体系
 
-### Q17: docs/ 下的文件是必需的吗？
+### Q17: references/ 下的文件是必需的吗？
 
 **A:** 不是。渐进式 MD 文件的设计原则是：
 
-> **SKILL.md 必须可独立理解核心功能和使用方法。docs/ 下的文件是按需加载的补充材料，缺失不影响基本使用。**
+> **SKILL.md 必须可独立理解核心功能和使用方法。references/ 下的文件是按需加载的补充材料，缺失不影响基本使用。**
 
-对于 minimal 级别的 skill，可以完全不创建 docs/ 目录。
+对于 minimal 级别的 skill，可以完全不创建 references/ 目录。
 对于 standard/full 级别，建议至少有 `guide.md`。
 
 ### Q18: SKILL.md 超过 200 行怎么办？
@@ -237,13 +237,13 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 **A:** update 检查时会提示超过 200 行的建议拆分。拆分策略：
 
 1. 识别可独立成文档的大段落（如详细教程、大量示例）
-2. 在 SKILL.md 中保留摘要 + 引用语法指向 docs/
+2. 在 SKILL.md 中保留摘要 + 引用语法指向 references/
 3. 将详细内容移入对应 .md 文件
 
 引用语法示例：
 ```markdown
-→ 详见 `docs/guide.md` 完整教程
-→ `docs/examples.md` 包含更多使用示例
+→ 详见 `references/guide.md` 完整教程
+→ `references/examples.md` 包含更多使用示例
 ```
 
 ### Q19: 渐进式文件的命名有规定吗？
