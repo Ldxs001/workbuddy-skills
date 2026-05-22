@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.0.0
+version: 2.1.0
 author: wUwproject
 license: MIT
 description: >
@@ -325,7 +325,7 @@ skill-standardization/
 ├── _meta.json                        # 元数据
 ├── scripts/
 │   ├── skill_builder.py              # [v2新增] 构建器（create/update/refactor）
-│   ├── skill_audit.py                # 审查工具（与 git-sync 共享）
+│   ├── skill_audit.py                # [v2.1新增] 独立审查工具（本skill自有副本）
 │   ├── json_loader.py               # 渐进式 JSON 加载器
 │   └── spec/                         # 规范定义
 │       ├── _index.json              # [v2] 模块索引（6模块）
@@ -400,6 +400,16 @@ skill-standardization/
 ---
 
 ## 版本更新日志
+
+### v2.1.0（审查脚本独立化）
+
+- **新增** skill_audit.py 独立副本到 scripts/（与 git-sync 完全隔离）
+- **移除** 跨 skill 依赖（不再引用 git-sync 的审查脚本）
+- **修正** 全部版本号位置至 v2.1.0（10 处统一）
+
+### v2.0.1（目录重命名）
+
+- docs/ → references/ 对齐标准规范命名
 
 ### v2.0.0（重大升级）
 

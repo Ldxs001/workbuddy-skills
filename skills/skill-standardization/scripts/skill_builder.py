@@ -30,7 +30,7 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 SPEC_DIR = Path(__file__).parent / "spec"
 SKILL_TEMPLATE = """---
