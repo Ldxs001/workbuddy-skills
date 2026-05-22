@@ -1,7 +1,7 @@
 # WorkBuddy Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-05-22
+> 最后更新：2026-05-23
 
 本仓库存放 WorkBuddy 用户技能，支持码云（Gitee）和 GitHub 双平台同步。
 
