@@ -35,7 +35,7 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-DATA_DIR = Path.home() / ".everything_search"
+DATA_DIR = Path.home() / "standardization" / "everything-search-breadmemory" / "data"
 DONUT_FILE = DATA_DIR / "donuts.json"
 BREADCRUMB_FILE = DATA_DIR / "breadcrumb.json"
 

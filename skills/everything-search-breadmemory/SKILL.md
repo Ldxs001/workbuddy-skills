@@ -30,6 +30,24 @@ references:
 - **已安装**：直接使用
 - **未安装**：引导下载 Everything 便携版，自动放置 es.exe 到技能目录
 
+## 快速开始
+
+```bash
+# 1. 搜索本地文件
+python {SKILL_DIR}/scripts/es_search.py search "关键词" --max 20
+
+# 2. 添加知识条目
+python {SKILL_DIR}/scripts/breadcrumb.py add --title "标题" --content "内容" --tags "标签"
+
+# 3. 每日复习
+python {SKILL_DIR}/scripts/ebbinghaus.py daily-review --count 5
+
+# 4. 生成知识关联图谱
+python {SKILL_DIR}/scripts/topology_donut.py generate
+```
+
+详情见下方各模块说明。
+
 ## 核心能力
 
 ### 1. Everything 本地搜索

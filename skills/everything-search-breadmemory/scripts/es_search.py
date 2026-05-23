@@ -19,7 +19,7 @@ from datetime import datetime
 
 # 技能目录
 SKILL_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = Path.home() / ".everything_search"
+DATA_DIR = Path.home() / "standardization" / "everything-search-breadmemory" / "data"
 ES_EXE_PATH = SKILL_DIR / "es" / "es.exe"
 
 

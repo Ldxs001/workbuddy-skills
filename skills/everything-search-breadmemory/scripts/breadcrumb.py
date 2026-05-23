@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-DATA_DIR = Path.home() / ".everything_search"
+DATA_DIR = Path.home() / "standardization" / "everything-search-breadmemory" / "data"
 BREADCRUMB_FILE = DATA_DIR / "breadcrumb.json"
 
 
