@@ -176,7 +176,7 @@
 1. **补写 YAML frontmatter**（R-01~R-04 修复）
    - 新增 `name: skill-sub`
    - 新增 `version: 1.3.0`
-   - 新增 `author: [username-redacted]`
+   - 新增 `author: wUwproject`
    - 新增 `license: MIT`
    - 新增 `description`
    - 新增 `tags`（含 `"progressive-loading"`）

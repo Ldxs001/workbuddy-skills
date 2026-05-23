@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.9.1
+version: 1.10.0
 author: wUwproject
 license: MIT
 description: >
@@ -189,4 +189,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**1.9.0** — 升级规则及完整变更历史见 `references/changelog.md`
+当前版本：**1.10.0** — v1.10.0：配合 skill-standardization v2.12.0 路径规范升级，同步版本号
