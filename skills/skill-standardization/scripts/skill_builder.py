@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.12.0
+skill_builder.py — Skill 标准化构建器 v2.12.1
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -14,7 +14,7 @@ skill_builder.py — Skill 标准化构建器 v2.12.0
   python skill_builder.py update <skill_dir> [--fix] [--backup] [--workspace <path>]
   python skill_builder.py refactor <skill_dir> [--backup] [--dry-run] [--workspace <path>]
 
-作者：[username-redacted]
+作者：wUwproject
 许可：MIT
 零外部依赖，仅使用 Python 标准库。
 """
@@ -1097,14 +1097,16 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
         })
 
     # 阶段 4: _meta.json data_dir 与代码路径一致性
-    # [v2.10.1] Resolve meta_data_dir to absolute path for fair comparison
+    # [v2.12.1] Normalize both paths (strip trailing sep) for fair comparison
     if meta_has_data_dir and data_dir_vars:
         ws_check = _find_skills_dir(skill_dir)
-        meta_abs = os.path.normpath(os.path.join(str(ws_check), str(meta_data_dir))).replace("\\", "/").lower()
+        meta_raw = os.path.join(str(ws_check), str(meta_data_dir))
+        meta_abs = os.path.normpath(meta_raw).rstrip(os.sep).replace("\\", "/").lower()
         for _, var_name, path_val, _ in data_dir_vars:
             if path_val:
-                code_norm = path_val.replace("\\", "/").lower()
-                if code_norm != meta_abs:
+                code_raw = os.path.join(str(ws_check), str(path_val))
+                code_abs = os.path.normpath(code_raw).rstrip(os.sep).replace("\\", "/").lower()
+                if code_abs != meta_abs:
                     violations.append({
                         "source": f"_meta.json vs {data_dir_vars[0][0]}",
                         "path_literal": str(meta_data_dir),

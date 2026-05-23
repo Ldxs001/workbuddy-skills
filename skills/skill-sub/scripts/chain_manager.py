@@ -98,7 +98,7 @@ def classify_milestones(steps):
 
     for i, step in enumerate(steps):
         idx = step.get("index", i + 1)
-        for dep in step.get("depends_on", []):
+        for dep in (step.get("depends_on") or []):
             if dep in depended_by:
                 depended_by[dep].add(idx)
 
@@ -552,7 +552,7 @@ def cmd_show(args):
             ms = " ★" if fm.get("is_milestone") else "  "
             rp = step.get("retry_policy", {})
             retry_str = str(rp.get("max_retries", _get_default_retry())).center(6)
-            deps = step.get("depends_on", [])
+            deps = (step.get("depends_on") or [])
             dep_str = f" (依赖:{deps})" if deps else ""
             print(f"  │  {idx}  │ {skill} │ {sname} │ {action}{dep_str:<{28-len(dep_str)}} │{ms}      │{retry_str}  │")
         print(f"  └──────┴─────────────────┴──────────────┴──────────────────────────────┴──────────┴──────────┘")
@@ -648,7 +648,7 @@ def cmd_run(args):
     while remaining:
         progress = False
         for idx, step in list(remaining.items()):
-            deps = step.get("depends_on", [])
+            deps = (step.get("depends_on") or [])
             if all(d in executed for d in deps):
                 exec_order.append(step)
                 executed.add(idx)
@@ -693,7 +693,7 @@ def cmd_run(args):
         if not step:
             depth_cache[idx] = 0
             return 0
-        deps = step.get("depends_on", [])
+        deps = (step.get("depends_on") or [])
         if not deps:
             depth_cache[idx] = 0
             return 0
@@ -800,7 +800,7 @@ def cmd_add_step(args):
     for i, step in enumerate(steps):
         step["index"] = i + 1
         new_deps = []
-        for d in step.get("depends_on", []):
+        for d in (step.get("depends_on") or []):
             if d > insert_after:
                 new_deps.append(d + 1)
             else:
@@ -841,7 +841,7 @@ def cmd_remove_step(args):
     for i, step in enumerate(steps):
         step["index"] = i + 1
         new_deps = []
-        for d in step.get("depends_on", []):
+        for d in (step.get("depends_on") or []):
             if d == target:
                 if target > 1:
                     new_deps.append(target - 1)

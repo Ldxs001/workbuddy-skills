@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.10.0
+version: 1.10.1
 author: wUwproject
 license: MIT
 description: >
@@ -9,7 +9,7 @@ description: >
 tags: ["chain", "orchestration", "reusable", "skill-builder", "progressive-loading", "planner", "editor"]
 ---
 
-# skill-sub v1.9.0
+# skill-sub v1.10.1
 
 > 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为调用链。
 
@@ -189,4 +189,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**1.10.0** — v1.10.0：配合 skill-standardization v2.12.0 路径规范升级，同步版本号
+当前版本：**1.10.1** — v1.10.1：修复 depends_on:null 导致 classify_milestones TypeError，SKILL.md 标题版本号同步

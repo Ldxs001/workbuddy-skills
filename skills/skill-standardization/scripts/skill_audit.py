@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit.py — SKILL.md 规范化审查工具 (v2.12.0)
+skill_audit.py — SKILL.md 规范化审查工具 (v2.12.1)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
 
 基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-12 规则。
@@ -948,13 +948,15 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
         })
 
     # 4. check _meta.json data_dir matches code path
-    # [v2.11.1] Resolve both paths to absolute for fair comparison
+    # [v2.12.1] Resolve both paths to absolute for fair comparison; strip trailing sep
     if meta_has_data_dir and data_dir_vars:
         skills_root = _find_skills_dir(skill_dir)
-        meta_abs = os.path.normpath(os.path.join(skills_root, str(meta_data_dir))).lower()
+        meta_raw = os.path.join(skills_root, str(meta_data_dir))
+        meta_abs = os.path.normpath(meta_raw).rstrip(os.sep).lower()
         for _, _, path_val, _ in data_dir_vars:
             if path_val:
-                code_abs = os.path.normpath(os.path.join(skills_root, str(path_val))).lower()
+                code_raw = os.path.join(skills_root, str(path_val))
+                code_abs = os.path.normpath(code_raw).rstrip(os.sep).lower()
                 if code_abs != meta_abs:
                     violations.append({
                         "source": "_meta.json vs " + data_dir_vars[0][0],

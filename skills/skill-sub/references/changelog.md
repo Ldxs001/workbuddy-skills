@@ -2,6 +2,34 @@
 
 ---
 
+## v1.10.1（2026-05-23）
+
+**改写类型：Bug修复 + 版本号同步**
+
+### 修复
+
+- `chain_manager.py` `classify_milestones()` 中 `depends_on: null`（JSON null）导致 `TypeError: 'NoneType' object is not iterable`。修复：所有 `step.get("depends_on", [])` 改为 `(step.get("depends_on") or [])`，覆盖7处调用
+- `SKILL.md` 第12行标题 `v1.9.0` 与 frontmatter `version: 1.10.0` 不一致，修正为 `v1.10.1`
+
+### 变更
+
+- `chain_manager.py` — 7处 `depends_on` 取值逻辑修复
+- `SKILL.md` v1.10.0 → v1.10.1
+- `_meta.json` v1.10.0 → v1.10.1
+
+---
+
+## v1.10.0（2026-05-23）
+
+**改写类型：配合 skill-standardization v2.12.0 路径规范升级**
+
+### 变更内容
+
+- 产出物路径统一至 `skills/.standardization/skill-sub/` 下
+- 配合 skill-standardization v2.12.0 路径规范升级，同步版本号
+
+---
+
 ## v1.9.1（2026-05-23）
 
 **改写类型：修正 _meta.json tags 残留**

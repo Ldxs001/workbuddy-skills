@@ -93,7 +93,7 @@ python scripts/skill_builder.py update <skill-dir> --fix --backup
 | name | string | ✅ | 取目录名 |
 | version | string (SemVer) | ✅ | `0.1.0` |
 | description | string | ✅ | 从 SKILL.md 提取或空 |
-| author | string | ✅ | `[username-redacted]` |
+| author | string | ✅ | `wUwproject` |
 | tags | string[] | ✅ | `[]` |
 
 **--fix 行为**：自动补充缺失字段，使用上述默认值。

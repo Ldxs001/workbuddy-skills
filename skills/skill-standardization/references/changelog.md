@@ -7,8 +7,9 @@
 
 ## 目录
 
-- [v2.10.1（当前版本）](#2101-当前版本)
-- [v2.10.0](#2100)
+- [v2.12.1（当前版本）](#2121-当前版本)
+- [v2.12.0](#2120)
+- [v2.10.1](#2101)
 - [v2.9.0](#290)
 - [v2.8.2](#282)
 - [v2.8.1](#281)
@@ -52,6 +53,28 @@
 - everything-search-breadmemory: PASS（原 5 处 R-12 违规 → 全部消除）
 - semantic-split: PASS（原 3 处 R-12 违规 → 全部消除）
 - 其余 4 个技能：PASS
+
+---
+
+## v2.12.1
+
+### 修复
+
+- **R-12 `_meta.json` data_dir 末尾斜杠误报**: `_meta.json` 的 `data_dir` 值为 `.standardization/semantic-split/data/`（带末尾 `/`），而代码 `DATA_DIR` 由 `Path` 对象转字符串后无末尾 `/`，`os.path.normpath` 归一化后仍不一致。修复：比较前统一 `rstrip(os.sep)` 去除末尾分隔符。
+- **skill_builder.py R-12 同源误报**: `skill_builder.py` 的 `_check_external_data_dir()` 中，`meta_abs` 拼接了 `ws_check` 前缀但 `code_norm` 未拼接，且归一化方式不一致（`replace` vs `normpath`）。修复：两边统一 `os.path.normpath` + `rstrip(os.sep)` + `replace("\\", "/")` + `lower()`。
+
+### 变更
+
+- `skill_audit.py` v2.12.0 → v2.12.1
+- `skill_builder.py` v2.12.0 → v2.12.1
+- SKILL.md v2.12.0 → v2.12.1
+- `_meta.json` v2.12.0 → v2.12.1
+
+---
+
+## v2.12.0
+
+> 变更记录未单独追加（从 v2.10.1 直接跳至 v2.12.0，含 R-12 磁盘存在性检查增强等）
 
 ---
 
