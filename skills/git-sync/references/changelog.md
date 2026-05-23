@@ -2,6 +2,30 @@
 
 ---
 
+## v2.0.1（2026-05-23）
+
+**改写类型：修复 pack_zip.py 排除逻辑根目录判断错误**
+
+### 问题
+
+- `should_exclude()` 判断"根目录"的 logic 有误：`rel_path` 带了 `git-sync/` 前缀，`"/" in p` 永远为 True，导致 `config.json` / `manifest.json` 根目录文件未被排除
+- `scripts/2.3.0` 垃圾文件（zip 碎片）被打进 ZIP 包
+
+### 变更内容
+
+#### `scripts/pack_zip.py` — `should_exclude()` 修复
+
+- **修复前**：用 `"/" not in p` 判断根目录（`p` 是 `git-sync/config.json`，含 `/`）
+- **修复后**：用 `os.path.dirname(p) == ""` 判断真正根目录
+- `pack_skill()` 中 `rel_path` 修正为相对于 `skill_dir` 的路径（之前是相对于 `os.path.dirname(skill_dir)`）
+
+#### 文件变更
+
+- 删除 `scripts/2.3.0`（zip 碎片垃圾文件）
+- `scripts/pack_zip.py` 排除逻辑修正
+
+---
+
 ## v2.0.0（2026-05-23）
 
 **改写类型：统一排除规则（仓库同步 + ZIP 打包）**
@@ -86,7 +110,7 @@
   - `references/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
   - `references/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
   - `references/changelog.md` — 完整版本历史 + Roadmap
-- **frontmatter author** 从非常量引用修正为常量值 `wUwproject`
+- **frontmatter author** 从非常量引用修正为常量值 `[username-redacted]`
 - **清理根目录遗留垃圾**：删除异常 ZIP 文件 `2.0.0`、6 个 `.tmp_zip_*` 临时目录、过时空目录 `references/`
 - 通过 skill-standardization v2.0 update 验证：**ERROR=0, WARN=1**（WARN 为合理运行时文件例外）
 

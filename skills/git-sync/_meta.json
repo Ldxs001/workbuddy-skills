@@ -1,6 +1,6 @@
 {
   "name": "git-sync",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤、SKILL.md规范化审查（R-01~R-10）及渐进式文档体系",
   "author": "wUwproject",
   "tags": [

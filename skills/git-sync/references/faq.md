@@ -14,7 +14,7 @@ git push origin main
 ```
 
 如果 443 超时持续出现，尝试：
-- 切换到 SSH 协议（`git@github.com:...` 替代 `https://github.com/...`）
+- 切换到 SSH 协议（`[email-redacted]:...` 替代 `https://github.com/...`）
 - 检查系统代理设置是否干扰 HTTPS
 
 ### Q2: 想保留历史 commit 而非 amend？
@@ -121,7 +121,7 @@ python manifest.py sync-readme workbuddy-skills
 
 | 误报场景 | 示例 | 处理 |
 |---------|------|------|
-| 示例邮箱 | `user@example.com` 在文档示例中 | 选择"逐项细选"，跳过该条目 |
+| 示例邮箱 | `[email-redacted]` 在文档示例中 | 选择"逐项细选"，跳过该条目 |
 | 类似 Token 字符串 | UUID 格式的 ID 被 Token 规则命中 | 同上，交互式跳过 |
 | 用户名匹配 | 配置中的用户名出现在代码注释中 | 这是 low 级别，可保留 |
 

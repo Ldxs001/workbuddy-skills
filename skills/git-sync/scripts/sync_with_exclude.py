@@ -27,29 +27,30 @@ FUNCTIONAL_WHITELIST = {"settings.html", "preview.html"}
 def should_exclude(rel_path):
     """判断相对路径是否应被排除（与 pack_zip.py 逻辑一致）"""
     import fnmatch
+
     p = rel_path.replace(os.sep, "/")
     name = os.path.basename(p)
 
-    # 1. 白名单
+    # 1. 白名单检查（最先）
     if name.lower() in (w.lower() for w in FUNCTIONAL_WHITELIST):
         return False
 
-    # 2. 目录检查
+    # 2. 目录名检查（rel_path 的每个路径成分，不含文件名）
     parts = p.split("/")
     for part in parts[:-1]:
         if part.lower() in (d.lower() for d in EXCLUDE_DIRS):
             return True
 
-    # 3. 精确文件名（config.json/manifest.json 仅排除根目录）
-    lower_exact = {f.lower() for f in EXCLUDE_FILES_EXACT}
-    if name.lower() in lower_exact:
+    # 3. 精确文件名匹配
+    if name.lower() in (f.lower() for f in EXCLUDE_FILES_EXACT):
+        # config.json / manifest.json 只排除根目录的
         if name.lower() in ("config.json", "manifest.json"):
-            if "/" not in p:
+            if "/" not in p:  # 根目录
                 return True
-            return False
+            return False  # 子目录的保留
         return True
 
-    # 4. glob 模式
+    # 4. glob 模式匹配
     for pat in EXCLUDE_FILES_GLOB:
         if fnmatch.fnmatch(name, pat) or fnmatch.fnmatch(p, pat):
             return True
@@ -66,16 +67,20 @@ def sync_with_exclude(src, dst):
         print(f"❌ 源目录不存在: {src}")
         sys.exit(1)
 
+    # 计算 src 的父目录（用于生成正确的相对路径）
+    src_parent = os.path.dirname(src)
+
     # 清空目标目录（安全：已通过 git-sync.sh 路径校验）
     if os.path.isdir(dst):
         shutil.rmtree(dst)
     os.makedirs(dst, exist_ok=True)
 
-    # 遍历复制（排除规则过滤）
     copy_count = 0
     for root, dirs, files in os.walk(src):
-        rel_root = os.path.relpath(root, os.path.dirname(src))
-        # 过滤目录
+        # 计算相对于 src 的路径（用于排除判断和目的路径）
+        rel_root = os.path.relpath(root, src)
+
+        # 排除目录（原地修改 dirs 以阻止 os.walk 进入）
         dirs[:] = [d for d in dirs if not should_exclude(os.path.join(rel_root, d))]
 
         for fname in files:
