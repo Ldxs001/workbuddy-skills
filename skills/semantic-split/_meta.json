@@ -1,6 +1,6 @@
 {
   "name": "semantic-split",
-  "version": "2.10.1",
+  "version": "2.3.0",
   "description": "语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于规则级/能力级json渐进加载生成串并行规划步骤，支持自增强json沉淀机制。",
   "author": "wUwproject",
   "tags": [
@@ -8,5 +8,6 @@
     "任务规划",
     "json沉淀",
     "渐进加载"
-  ]
+  ],
+  "data_dir": ".standardization/semantic-split/data/"
 }
