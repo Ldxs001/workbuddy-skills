@@ -118,7 +118,7 @@ python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 
 **当前配置**：
 > **调用方式**：🟢 按需调用模式（默认）
-> **数据目录**：`~/.workbuddy/triphasic/`
+> **数据目录**：`skills/.standardization/triphasic-execution/data/`
 > **任务规划确认**：询问确认后再执行
 
 呼出设置界面：向 Agent 发送"打开 triphasic 设置"，或运行 `python {SKILL_DIR}/scripts/settings.py`

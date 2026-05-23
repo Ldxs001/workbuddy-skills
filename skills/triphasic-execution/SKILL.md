@@ -1,6 +1,6 @@
 ---
 name: triphasic-execution
-version: 5.10.1
+version: 5.11.0
 author: wUwproject
 license: MIT
 description: >
@@ -180,4 +180,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**5.10.1** — v5.10.1：修复 task_progress.py init 命令 `--steps` 传入字符串数组时的崩溃问题
+当前版本：**5.11.0** — v5.11.0：产出物路径迁至 skills/.standardization/triphasic-execution/data/，settings.py 新增 get_standardization_dir() 动态路径定位函数；default_config.json/settings.html/reference.md 同步路径更新

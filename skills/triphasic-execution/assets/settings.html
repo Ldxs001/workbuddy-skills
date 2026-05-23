@@ -243,7 +243,7 @@
                 <div class="path-group">
                     <div class="path-item">
                         <label>TRIPHASIC_HOME（数据目录）</label>
-                        <input type="text" name="triphasic_home" id="triphasic_home" placeholder="~/.workbuddy/triphasic/">
+                        <input type="text" name="triphasic_home" id="triphasic_home" placeholder="skills/.standardization/triphasic-execution/data/">
                     </div>
                     <div class="path-item">
                         <label>Problems 文件</label>
@@ -310,7 +310,7 @@
         function getDefaultConfig() {
             return {
                 mode: 'on_demand',
-                triphasic_home: '~/.workbuddy/triphasic/',
+                triphasic_home: 'skills/.standardization/triphasic-execution/data/',
                 problems_file: 'PROBLEMS.md',
                 risks_file: 'RISKS.md',
                 lessons_file: 'LESSONS_REGISTER.md',
@@ -326,7 +326,7 @@
             document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
 
             // 记录文件路径
-            document.getElementById('triphasic_home').value = config.triphasic_home || '~/.workbuddy/triphasic/';
+            document.getElementById('triphasic_home').value = config.triphasic_home || 'skills/.standardization/triphasic-execution/data/';
             document.getElementById('problems_file').value = config.problems_file || 'PROBLEMS.md';
             document.getElementById('risks_file').value = config.risks_file || 'RISKS.md';
             document.getElementById('lessons_file').value = config.lessons_file || 'LESSONS_REGISTER.md';

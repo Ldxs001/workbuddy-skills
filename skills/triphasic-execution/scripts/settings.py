@@ -41,6 +41,18 @@ def get_skill_dir(args) -> Path:
     return Path(__file__).parent.parent
 
 
+def get_standardization_dir(skill_dir: Path) -> Path:
+    """定位 skills/.standardization/<skill>/data/ 目录"""
+    # skill_dir 是技能根目录，如 .../skills/triphasic-execution
+    # 向上找 skills/ 目录
+    p = skill_dir.resolve()
+    for parent in [p] + list(p.parents):
+        if parent.name == "skills" and parent.parent.name != "skills":
+            return parent / ".standardization" / skill_dir.name / "data"
+    # fallback: 用 skill_dir 同级 .standardization/
+    return skill_dir.parent / ".standardization" / skill_dir.name / "data"
+
+
 def get_home_dir(args, skill_dir) -> Path:
     """获取数据目录路径"""
     if args.home:
@@ -59,8 +71,8 @@ def get_home_dir(args, skill_dir) -> Path:
     env_home = os.environ.get("TRIPHASIC_HOME")
     if env_home:
         return Path(env_home).expanduser()
-    # 默认值
-    return Path.home() / ".workbuddy" / "triphasic"
+    # 默认：skills/.standardization/triphasic-execution/data/
+    return get_standardization_dir(skill_dir)
 
 
 def find_available_port(min_port=DEFAULT_PORT_MIN, max_port=DEFAULT_PORT_MAX) -> int:
@@ -96,7 +108,7 @@ def update_skill_md(skill_dir: Path, config: dict):
         # 读取内容
         content = original_content
         mode = config.get("mode", "on_demand")
-        triphasic_home = config.get("_triphasic_home", "~/.workbuddy/triphasic/")
+        triphasic_home = config.get("_triphasic_home", str(get_standardization_dir(self.skill_dir)))
         require_confirm = config.get("hooks", {}).get("require_task_confirmation", True)
 
         # 更新「双模式设计」章节开头
@@ -344,7 +356,7 @@ class SettingsHandler(BaseHTTPRequestHandler):
         """实际保存配置的逻辑（在后台线程中执行）"""
         try:
             # 确保数据目录存在
-            triphasic_home = form_data.get("triphasic_home", "~/.workbuddy/triphasic/")
+            triphasic_home = form_data.get("triphasic_home", str(get_standardization_dir(self.skill_dir)))
             home_dir = Path(triphasic_home).expanduser()
             home_dir.mkdir(parents=True, exist_ok=True)
 

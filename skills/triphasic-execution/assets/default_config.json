@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "settings_ui_enabled": true,
-  "_triphasic_home": "~/.workbuddy/triphasic/",
+  "_triphasic_home": "skills/.standardization/triphasic-execution/data/",
   "mode": "on_demand",
   "logs_dir": ".problem_logs",
   "exec_pipe": ".exec_output_pipe.txt",
@@ -14,7 +14,7 @@
     "exception|Exception|EXCEPTION",
     "failed|Failed|FAILED",
     "traceback|Traceback",
-    "\\u62d2\\u7edd|\\u5931\\u8d25|\\u9519\\u8bef|\\u5f02\\u5e38"
+    "拒绝|失败|错误|异常"
   ],
   "auto_resolve_timeout_hours": 24,
   "daemon": {
