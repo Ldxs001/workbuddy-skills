@@ -2,6 +2,25 @@
 
 ---
 
+## v2.2.0（2026-05-23）
+
+**产出物路径迁移至 standardization 铁律4 结构**
+
+### 变更内容
+- `config.json` + `manifest.json` 路径：`~/.workbuddy/git-sync/` → `<workspace>/standardization/git-sync/data/`
+- 5 个脚本新增 `_find_workspace_root()`：manifest.py, normalize_meta.py, sensitive_scan.py, update_readme.py, git-sync.sh
+- 工作区根目录检测：基于目录结构 `<workspace>/skills/<name>/scripts/` 往上推导，不硬编码 `.workbuddy`
+- 旧空目录 `~/.workbuddy/git-sync/` 已清理
+
+### 升级理由
+- 路径现在遵循 铁律4 `standardization/<skill>/data/` 结构
+- 不依赖 `.workbuddy` 命名，通过目录结构推导工作区根
+
+### 版本号
+- 2.1.0 → 2.2.0（SKILL.md + _meta.json + git-sync.sh + changelog.md）
+
+---
+
 ## v2.1.0（2026-05-23）
 
 **修复：版本相等时默认跳过逻辑（回退错误修改）**

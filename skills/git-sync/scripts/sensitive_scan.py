@@ -98,10 +98,15 @@ SENSITIVE_PATTERNS = [
 
 # ── 工具函数 ─────────────────────────────────────────────────────────────
 
+def _find_workspace_root():
+    """从 scripts/ 往上4级确定工作区根: <workspace>/skills/<name>/scripts/"""
+    return str(Path(__file__).resolve().parent.parent.parent.parent)
+
 def load_config(config_path=None):
-    """读取 ~/.workbuddy/git-sync/config.json，返回配置字典"""
+    """读取 standardization/git-sync/data/config.json，返回配置字典"""
     if config_path is None:
-        config_path = os.path.expanduser("~/.workbuddy/git-sync/config.json")
+        ws = _find_workspace_root()
+        config_path = os.path.join(ws, "standardization", "git-sync", "data", "config.json")
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)

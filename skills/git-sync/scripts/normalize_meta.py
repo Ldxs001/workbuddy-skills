@@ -2,10 +2,16 @@
 """git-sync _meta.json 标准化校验。用法: python normalize_meta.py <_meta.json路径> <skill-name> <version> <description>"""
 
 import json, sys, os
+from pathlib import Path
+
+def _find_workspace_root():
+    """从 scripts/ 往上4级确定工作区根: <workspace>/skills/<name>/scripts/"""
+    return str(Path(__file__).resolve().parent.parent.parent.parent)
 
 def load_config():
-    """读取 ~/.workbuddy/git-sync/config.json，返回配置字典"""
-    config_path = os.path.expanduser("~/.workbuddy/git-sync/config.json")
+    """读取 standardization/git-sync/data/config.json，返回配置字典"""
+    ws = _find_workspace_root()
+    config_path = os.path.join(ws, "standardization", "git-sync", "data", "config.json")
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)

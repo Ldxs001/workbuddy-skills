@@ -14,11 +14,18 @@ import os
 import re
 import sys
 from datetime import date
+from pathlib import Path
+
+
+def _find_workspace_root():
+    """从 scripts/ 往上4级确定工作区根: <workspace>/skills/<name>/scripts/"""
+    return str(Path(__file__).resolve().parent.parent.parent.parent)
 
 
 def load_config():
-    """读取 ~/.workbuddy/git-sync/config.json"""
-    config_path = os.path.expanduser("~/.workbuddy/git-sync/config.json")
+    """读取 standardization/git-sync/data/config.json"""
+    ws = _find_workspace_root()
+    config_path = os.path.join(ws, "standardization", "git-sync", "data", "config.json")
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -170,7 +177,7 @@ rm -rf temp-skills
 
 - 本仓库由 **git-sync** 技能自动维护
 - README.md 由 `update_readme.py` **从仓库实际文件全量生成**，不手动编辑
-- 维护清单：`git-sync/manifest.json`（记录计划管理的技能全集）
+- 维护清单：`standardization/git-sync/data/manifest.json`（记录计划管理的技能全集）
 - 三单一致原则：**清单 ⊇ 仓库 = README.md**
 
 ---
@@ -201,8 +208,9 @@ if __name__ == "__main__":
     repo_name = sys.argv[1]
     readme_path = sys.argv[2]
 
-    # 从 ~/.workbuddy/git-sync/manifest.json 获取仓库路径
-    manifest_path = os.path.expanduser("~/.workbuddy/git-sync/manifest.json")
+    # 从 standardization/git-sync/data/manifest.json 获取仓库路径
+    ws = _find_workspace_root()
+    manifest_path = os.path.join(ws, "standardization", "git-sync", "data", "manifest.json")
 
     if not os.path.exists(manifest_path):
         print(f"❌ manifest.json 不存在: {manifest_path}")

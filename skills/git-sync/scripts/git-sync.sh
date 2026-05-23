@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# git-sync v2.1.0
+# git-sync v2.2.0
 # 将 skill 代码规范化推送到码云/GitHub 并生成 ZIP 包
 # 用法: bash git-sync.sh <skill-name> [version] [--skip-scan]
 set -eo pipefail
 
 # ── 0. 参数解析 ─────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_DIR="$HOME/.workbuddy/skills"
+
+# 从 scripts/ 往上3级确定工作区根: <workspace>/skills/<name>/scripts/
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+SKILLS_DIR="$WORKSPACE_ROOT/skills"
 SKILL_NAME="${1:-}"
 VERSION="${2:-}"
 SKIP_SCAN=false
@@ -31,12 +35,12 @@ fi
 # 路径配置
 SKILL_MD="$SKILLS_DIR/$SKILL_NAME/SKILL.md"
 META_FILE="$SKILLS_DIR/$SKILL_NAME/_meta.json"
-WORK_REPO="$HOME/.workbuddy/workbuddy-skills"
+WORK_REPO="$WORKSPACE_ROOT/workbuddy-skills"
 REPO_NAME="workbuddy-skills"
 DIST_DIR="$SKILLS_DIR/.dist"
 ZIP_NAME="${SKILL_NAME}-v${VERSION}.zip"
 ZIP_FILE="$DIST_DIR/$ZIP_NAME"
-MANIFEST_FILE="$HOME/.workbuddy/git-sync/manifest.json"
+MANIFEST_FILE="$WORKSPACE_ROOT/standardization/git-sync/data/manifest.json"
 README_FILE="$WORK_REPO/README.md"
 
 # 读取 description（用于 README.md）
