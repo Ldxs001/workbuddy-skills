@@ -81,7 +81,7 @@ python scripts/skill_builder.py update <skill_dir> [--fix] [--backup]
 | 3 | `SKILL.md` 存在性 + frontmatter | ❌ | 需手动编辑 |
 | 4 | 必填章节完整性（3个） | ❌ | 模糊匹配关键词 |
 | 5 | 文件大小 + 根目录规范性 | 💡 | 建议性提示 |
-| 6 | scripts/ 产出物路径规范性 | 💡 | 扫描铁律4违规 + 交叉引用追踪（v2.7.1 增强） |
+| 6 | scripts/ + 根目录 产出物路径规范性 | 💡 | 扫描铁律4违规 + 交叉引用追踪（v2.7.2 增强） |
 
 **报告格式：**
 ```
@@ -203,7 +203,7 @@ python scripts/skill_audit.py audit <skill_dir> [--json] [--strict]
 | R-08 | WARN | 核心能力章节 | 匹配核心能力同义词 |
 | R-09 | WARN | 工作流程章节 | 匹配工作流程同义词 |
 | R-10 | WARN | version 一致性 | SKILL.md version == manifest.json version |
-| R-11 | WARN | 产出物路径规范性 | scripts/ 路径规范 + 全目录交叉引用追踪（铁律4） |
+| R-11 | WARN | 产出物路径规范性 | scripts/ + 根目录 路径规范 + 全目录交叉引用追踪（铁律4） |
 
 **JSON 输出格式：**
 ```json

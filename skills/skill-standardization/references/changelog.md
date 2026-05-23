@@ -7,7 +7,9 @@
 
 ## 目录
 
-- [v2.7.1（当前版本）](#271-当前版本)
+- [v2.7.3（当前版本）](#273-当前版本)
+- [v2.7.2](#272)
+- [v2.7.1](#271)
 - [v2.7.0](#270)
 - [v2.6.0](#260)
 - [v2.5.0](#250)
@@ -20,7 +22,90 @@
 
 ---
 
-### v2.7.1（当前版本）
+### v2.7.3（当前版本）
+
+**发布日期：2026-05-23**
+**类型：Minor（R-11 非标准子目录 + 全面产出物定义扩展）**
+
+### 新增
+
+- **R-11 非标准子目录扫描**：在根目录文件检测之外，新增产出物目录递归扫描
+  - `_ARTIFACT_DIR_CLASSIFY`：30+ 产出物目录名 → (分类, 描述) 映射（data/cache/outputs/temp 四类）
+  - `_ARTIFACT_EXTS_COMPREHENSIVE`：50+ 产出物文件扩展名全面定义，按分类组织
+  - `_check_artifact_directories`：检测根目录非标准子目录（data/cache/outputs/temp/logs/等）
+  - `_scan_dir_recursive`：递归扫描产出物目录内所有文件，生成迁移建议
+  - `_scan_unknown_dir`：对未匹配的未知目录，通过内容分析推断是否为产出物目录
+  - **嵌套检测**：同时扫描 scripts/ 和 references/ 下的非标准子目录
+- **产出物分类体系 v2**：
+  - `data/` — 持久化数据：.db/.json/.csv/.pkl/.parquet/.npy 等
+  - `cache/` — 缓存：.cache 目录及缓存文件
+  - `outputs/` — 输出产物：.html/.pdf/.png/.xlsx/.log 等
+  - `temp/` — 临时文件：.tmp/.bak/.swp/.lock/.pid 等
+
+### 变更
+
+- `skill_audit.py` v2.6.0 → v2.7.0
+- `skill_builder.py` v2.6.0 → v2.7.0
+- R-11 描述更新为："scripts/ + 根目录 + 非标子目录 产出路径规范"
+- 根目录白名单扩展：增加 `.gitkeep`
+- `_check_root_artifact_files` 使用新的 `_classify_artifact_by_ext` 统一分类
+- `_ARTIFACT_EXTS_COMPREHENSIVE` 包含 50+ 扩展名（原 16 种 → 50+）
+
+### 设计理由
+
+- 原有 R-11 仅检测根目录文件，遗漏了 data/、cache/、outputs/ 等非标准子目录
+- 这些目录明显是产出物目录（非技能结构组成部分），其内容也需要迁移检查
+- 全面产出物定义让检测不再依赖"已有哪些扩展名"的硬编码枚举，而是建立系统化分类
+
+### 技术细节
+
+| 项目 | v2.7.2 | v2.7.3 |
+|------|--------|--------|
+| 检测范围 | scripts/ + 根目录文件 | + 根目录子目录 + scripts/子目录 + references/子目录 |
+| 产出物目录模式 | — | 30+ 种（data/cache/outputs/temp/logs/backup...） |
+| 产出物文件扩展名 | 16 种 | 50+ 种（.pkl/.parquet/.npy/.xlsx/.lock 等） |
+| 目录递归扫描 | — | os.walk 递归列出所有文件 |
+| 嵌套检测 | — | scripts/data/, references/output/ 等 |
+
+---
+
+### v2.7.2
+
+**发布日期：2026-05-23**
+**类型：Minor（R-11 根目录产出物检测扩展）**
+
+### 新增
+
+- **R-11 根目录产物扫描**：在 scripts/ 扫描之外，新增技能根目录文件检测
+  - `skill_audit.py` 新增 `_check_root_artifact_files`：检测根目录中非 SKILL.md/_meta_json 的数据文件（.json/.csv/.yaml/.db 等）
+  - `skill_builder.py` 新增 `_check_root_artifact_files_builder`：同步增加根目录扫描
+  - 根目录产出物自动分类（data/outputs），给出标准路径迁移建议
+  - 交叉引用追踪修复：根目录文件不再把自身报告为关联引用
+
+### 变更
+
+- `skill_audit.py` v2.5.0 → v2.6.0
+- R-11 描述更新为："scripts/ + 根目录 产出路径规范 + 全目录交叉引用追踪"
+- R-11 检测覆盖从仅 scripts/ 扩展到技能全目录
+
+### 设计理由
+
+- 原有 R-11 只扫描 scripts/ 中的写入模式，无法检测已存在于根目录的产出物文件
+- git-sync 的 config.json / manifest.json 等运行时数据文件在根目录违反了铁律4，但 R-11 未能检出
+- 根目录扫描填补了这一检测盲区，实现"无论产出物从何而来都能被检测到"
+
+### 技术细节
+
+| 项目 | v2.7.1 | v2.7.2 |
+|------|--------|--------|
+| 检测范围 | scripts/ | scripts/ + 根目录 |
+| 根目录白名单 | — | SKILL.md, _meta.json, .gitignore |
+| 根目录产物扩展名 | — | .json/.csv/.yaml/.db 等 16 种 |
+| 交叉引用自排除 | 脚本行号 | 脚本行号 + 根目录文件名 |
+
+---
+
+### v2.7.1
 
 **发布日期：2026-05-23**
 **类型：Patch（R-11 交叉引用追踪增强）**
@@ -70,7 +155,7 @@
 - 审查规则从 10 条增至 11 条（R-01~04 ERROR + R-05~11 WARN）
 - `skill_audit.py` v2.3.0 → v2.4.0
 - `skill_builder.py` v2.4.0 → v2.5.0（文件头已为 v2.5.0，同步工具体现）
-- `spec/rules.json` v2.2.0 → v2.3.0，_total_rules: 10→11，_warn_count: 6→7
+- `scripts/spec/rules.json` v2.2.0 → v2.3.0，_total_rules: 10→11，_warn_count: 6→7
 
 ### 设计理由
 
@@ -447,5 +532,5 @@
 
 ---
 
-*本文件由 skill-standardization v2.7.0 维护。*
+*本文件由 skill-standardization v2.7.3 维护。*
 *最后更新：2026-05-23*

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit.py — SKILL.md 规范化审查工具 (v2.5.0)
+skill_audit.py — SKILL.md 规范化审查工具 (v2.7.0)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
 
 基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-11 规则。
@@ -96,7 +96,7 @@ RULES = [
         "id": "R-11",
         "name": "产出物路径规范性",
         "severity": "WARN",
-        "check": "scripts/ 产出路径规范 + 全目录交叉引用追踪（铁律4）",
+        "check": "scripts/ + 根目录 + 非标子目录 产出路径规范 + 全目录交叉引用追踪（铁律4）",
         "method": "check_artifact_paths",
     },
 ]
@@ -114,7 +114,91 @@ ARTIFACT_DIR_NAMES = [
     "data", "cache", "temp", "tmp", "out",
 ]
 
-# 构建产出目录名的正则 alternation
+# ─────────── R-11 产出物全面定义（v2.7.0 扩展）───────────
+
+# 已知标准目录（非产出物 — 属于技能本身结构的一部分）
+_KNOWN_STANDARD_DIRS = {
+    "scripts",      # 脚本代码
+    "references",   # 参考文档
+    "assets",       # 静态资源（图标、图片等技能自身资源）
+    "__pycache__",  # Python 编译缓存
+    ".git",         # Git 版本控制
+}
+
+# 产出物目录名 → 产出物分类 映射
+# key: 目录名（小写），value: (分类, 描述)
+_ARTIFACT_DIR_CLASSIFY = {
+    # data 类 — 持久化/结构化数据
+    "data":      ("data", "持久化数据目录"),
+    "database":  ("data", "数据库目录"),
+    "db":        ("data", "数据库目录"),
+    "storage":   ("data", "存储目录"),
+    "backup":    ("data", "备份目录"),
+    "backups":   ("data", "备份目录"),
+    "dump":      ("data", "数据转储目录"),
+    "dumps":     ("data", "数据转储目录"),
+    # cache 类 — 缓存/临时计算
+    "cache":     ("cache", "缓存目录"),
+    "caches":    ("cache", "缓存目录"),
+    ".cache":    ("cache", "隐藏缓存目录"),
+    "temp_cache": ("cache", "临时缓存目录"),
+    # outputs 类 — 输出/生成产物
+    "outputs":   ("outputs", "输出产物目录"),
+    "output":    ("outputs", "输出产物目录"),
+    "out":       ("outputs", "输出产物目录"),
+    "results":   ("outputs", "结果目录"),
+    "result":    ("outputs", "结果目录"),
+    "exports":   ("outputs", "导出目录"),
+    "export":    ("outputs", "导出目录"),
+    "reports":   ("outputs", "报告目录"),
+    "report":    ("outputs", "报告目录"),
+    "generated": ("outputs", "生成产物目录"),
+    "build":     ("outputs", "构建产物目录"),
+    "dist":      ("outputs", "分发包目录"),
+    "artifacts": ("outputs", "产出物目录"),
+    # temp 类 — 临时/日志
+    "temp":      ("temp", "临时文件目录"),
+    "tmp":       ("temp", "临时文件目录"),
+    ".tmp":      ("temp", "隐藏临时目录"),
+    "logs":      ("temp", "日志目录"),
+    "log":       ("temp", "日志目录"),
+}
+
+# 全面产出物文件扩展名（按分类）
+_ARTIFACT_EXTS_COMPREHENSIVE = {
+    # data — 数据文件
+    ".json":    "data",   ".csv":   "data",   ".yaml":  "data",
+    ".yml":     "data",   ".db":    "data",   ".sqlite": "data",
+    ".sqlite3": "data",   ".pkl":   "data",   ".pickle": "data",
+    ".parquet": "data",   ".feather": "data", ".h5":    "data",
+    ".hdf5":    "data",   ".npy":   "data",   ".npz":   "data",
+    # outputs — 输出/展示文件
+    ".html":    "outputs", ".pdf":  "outputs", ".png":  "outputs",
+    ".jpg":     "outputs", ".jpeg": "outputs", ".svg":  "outputs",
+    ".gif":     "outputs", ".ico":  "outputs", ".txt":  "outputs",
+    ".log":     "outputs", ".ics":  "outputs", ".xlsx": "outputs",
+    ".xls":     "outputs", ".pptx": "outputs", ".docx": "outputs",
+    ".md":      "outputs",  # 非 SKILL.md / references 的 md 文件
+    # temp — 临时/缓冲文件
+    ".tmp":     "temp",   ".bak":   "temp",   ".swp":  "temp",
+    ".lock":    "temp",   ".pid":   "temp",   ".cache": "temp",
+    # config — 配置快照（仅根目录或非标准目录下才视为产出物）
+    ".env":     "data",   ".cfg":   "data",   ".ini":  "data",
+    ".toml":    "data",
+}
+
+# 根目录已知白名单文件（非产出物）
+_KNOWN_ROOT_FILES = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep"}
+
+# 旧版兼容：产出物扩展名集合（用于根目录文件扫描）
+_ROOT_ARTIFACT_EXTS = set(_ARTIFACT_EXTS_COMPREHENSIVE.keys())
+
+# 根目录文件 → 分类映射（旧版兼容）
+_ROOT_EXT_CLASSIFY = _ARTIFACT_EXTS_COMPREHENSIVE.copy()
+
+# ─────────── R-11 常量定义结束 ───────────
+
+# 构建产出目录名的正则 alternation（用于 scripts/ 正则扫描）
 _ARTIFACT_DIR_PATTERN = "|".join(ARTIFACT_DIR_NAMES)
 
 ARTIFACT_WRITE_PATTERNS = [
@@ -272,41 +356,49 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
 
 
 def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
-    """R-11: 扫描 scripts/ 脚本，检测违反铁律4的产出物路径。
+    """R-11: 全面产出物路径检测（铁律4）。
     
-    检测脚本中是否有硬编码路径把产出物写入技能目录内部，
-    同时反向搜索整个技能目录找出引用同一路径的关联文件。
+    四阶段扫描：
+    1. scripts/ 扫描：检测脚本中的硬编码产出路径（写入操作）
+    2. 根目录文件扫描：检测根目录中非 SKILL.md/_meta.json 的数据文件
+    3. 非标准子目录扫描：检测根目录下明显是产出物的文件夹（data/cache/outputs/等）
+    4. 交叉引用追踪：反向搜索关联文件
     """
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
     
-    scripts_dir = os.path.join(skill_dir, "scripts")
-    if not os.path.isdir(scripts_dir):
-        return {"passed": True, "detail": "跳过：无 scripts/ 目录", "skip": True}
-    
     violations = []  # list of {source, path_literal, suggestion}
     script_exts = {".py", ".sh", ".bat", ".ps1"}
     
-    for fname in sorted(os.listdir(scripts_dir)):
-        fpath = os.path.join(scripts_dir, fname)
-        ext = os.path.splitext(fname)[1].lower()
-        if ext not in script_exts or not os.path.isfile(fpath):
-            continue
-        
-        try:
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                script_lines = f.readlines()
-        except Exception:
-            continue
-        
-        rel_path = os.path.join("scripts", fname)
-        
-        if ext == ".py":
-            _check_python_artifact_paths_v2(rel_path, script_lines, violations)
-        elif ext in (".sh", ".bat", ".ps1"):
-            _check_shell_artifact_paths_v2(rel_path, script_lines, violations)
+    # ── 1. scripts/ 扫描 ──
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if os.path.isdir(scripts_dir):
+        for fname in sorted(os.listdir(scripts_dir)):
+            fpath = os.path.join(scripts_dir, fname)
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in script_exts or not os.path.isfile(fpath):
+                continue
+            
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    script_lines = f.readlines()
+            except Exception:
+                continue
+            
+            rel_path = os.path.join("scripts", fname)
+            
+            if ext == ".py":
+                _check_python_artifact_paths_v2(rel_path, script_lines, violations)
+            elif ext in (".sh", ".bat", ".ps1"):
+                _check_shell_artifact_paths_v2(rel_path, script_lines, violations)
     
-    # ── 交叉引用追踪 ──
+    # ── 2. 根目录文件扫描 ──
+    _check_root_artifact_files(skill_dir, violations)
+    
+    # ── 3. 非标准子目录扫描（v2.7.0 新增）──
+    _check_artifact_directories(skill_dir, violations)
+    
+    # ── 4. 交叉引用追踪 ──
     if violations:
         _trace_cross_references(skill_dir, violations)
     
@@ -325,7 +417,171 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
                           for v in violations],
         }
     else:
-        return {"passed": True, "detail": "scripts/ 中未发现产出物路径违规"}
+        return {"passed": True, "detail": "未发现产出物路径违规（scripts/ + 根目录 + 子目录均通过）"}
+
+
+def _check_root_artifact_files(skill_dir, violations):
+    """根目录产出物文件检测：扫描根目录中非标准数据文件。
+    
+    根目录只应有 SKILL.md、_meta.json、.gitignore。
+    其他数据文件（.json/.csv/.db 等）视为违反铁律4的产出物。
+    """
+    try:
+        root_entries = os.listdir(skill_dir)
+    except OSError:
+        return
+    
+    for fname in sorted(root_entries):
+        fpath = os.path.join(skill_dir, fname)
+        if not os.path.isfile(fpath):
+            continue
+        if fname in _KNOWN_ROOT_FILES:
+            continue
+        
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in _ROOT_ARTIFACT_EXTS:
+            continue
+        
+        cat = _classify_artifact_by_ext(fname)
+        
+        violations.append({
+            "source": f"ROOT/{fname}",
+            "path_literal": fname,
+            "suggestion": f"<workspace>/standardization/<skill>/{cat}/{fname}",
+        })
+
+
+def _check_artifact_directories(skill_dir, violations):
+    """非标准子目录扫描：检测根目录下的产出物目录及其内容。
+    
+    策略：
+    1. 列出根目录所有子目录
+    2. 排除已知标准目录（scripts/references/assets/__pycache__/.git）
+    3. 对疑似产出物目录（名称匹配 _ARTIFACT_DIR_CLASSIFY），递归扫描全部文件
+    4. 也检查 scripts/ 和 references/ 下的非标准子目录
+    """
+    try:
+        root_entries = sorted(os.listdir(skill_dir))
+    except OSError:
+        return
+    
+    for entry in root_entries:
+        entry_path = os.path.join(skill_dir, entry)
+        if not os.path.isdir(entry_path):
+            continue
+        if entry in _KNOWN_STANDARD_DIRS:
+            continue
+        if entry.startswith(".") and entry not in _ARTIFACT_DIR_CLASSIFY:
+            # 跳过非产出物的隐藏目录（如 .vscode, .idea 等IDE配置）
+            continue
+        
+        # 检查是否匹配产出物目录名
+        classification = _ARTIFACT_DIR_CLASSIFY.get(entry.lower())
+        if classification:
+            cat, desc = classification
+            _scan_dir_recursive(skill_dir, entry, entry_path, cat, violations)
+        else:
+            # 非标准目录名但仍需扫描：可能是自定义数据目录
+            # 检查目录内容判断是否为产出物
+            _scan_unknown_dir(skill_dir, entry, entry_path, violations)
+    
+    # 深度扫描：检查 scripts/ 和 references/ 下的非标准子目录
+    for parent_dir_name in ("scripts", "references"):
+        parent_path = os.path.join(skill_dir, parent_dir_name)
+        if not os.path.isdir(parent_path):
+            continue
+        try:
+            sub_entries = sorted(os.listdir(parent_path))
+        except OSError:
+            continue
+        for sub in sub_entries:
+            sub_path = os.path.join(parent_path, sub)
+            if not os.path.isdir(sub_path):
+                continue
+            if sub in _KNOWN_STANDARD_DIRS:
+                continue
+            classification = _ARTIFACT_DIR_CLASSIFY.get(sub.lower())
+            if classification:
+                cat, _desc = classification
+                rel_parent = f"{parent_dir_name}/{sub}"
+                _scan_dir_recursive(skill_dir, rel_parent, sub_path, cat, violations)
+
+
+def _scan_dir_recursive(skill_dir, rel_dir, dir_path, category, violations):
+    """递归扫描一个产出物目录，列出其中所有文件作为违规。
+    
+    Args:
+        skill_dir: 技能根目录（用于计算相对路径）
+        rel_dir: 在技能中的相对路径（如 "data"、"scripts/output"）
+        dir_path: 目录的绝对路径
+        category: 产出物分类（data/cache/outputs/temp）
+    """
+    try:
+        for root, dirs, files in os.walk(dir_path):
+            # 排除 __pycache__
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            
+            for fname in sorted(files):
+                # 跳过 .gitkeep 等占位文件
+                if fname in (".gitkeep", ".gitignore"):
+                    continue
+                
+                # 建议路径：仅用分类 + 文件名，避免路径冗余
+                violations.append({
+                    "source": f"DIR/{rel_dir}/{fname}",
+                    "path_literal": f"{rel_dir}/{fname}",
+                    "suggestion": f"<workspace>/standardization/<skill>/{category}/{fname}",
+                })
+    except OSError:
+        return
+
+
+def _scan_unknown_dir(skill_dir, entry, entry_path, violations):
+    """扫描未知目录名 — 检查其内容判断是否为产出物目录。
+    
+    如果目录内包含产出物类型文件（匹配 _ARTIFACT_EXTS_COMPREHENSIVE），
+    则推断为产出物目录并标记。
+    """
+    # 检查第一层内容
+    try:
+        entries = sorted(os.listdir(entry_path))
+    except OSError:
+        return
+    
+    artifact_files = []
+    is_script_dir = False
+    
+    for sub in entries:
+        sub_path = os.path.join(entry_path, sub)
+        if os.path.isfile(sub_path):
+            ext = os.path.splitext(sub)[1].lower()
+            if ext in _ARTIFACT_EXTS_COMPREHENSIVE:
+                artifact_files.append(sub)
+            if ext in (".py", ".sh", ".bat", ".ps1"):
+                is_script_dir = True
+    
+    if is_script_dir and not artifact_files:
+        # 可能是代码目录（如 tools/），跳过
+        return
+    
+    if artifact_files:
+        # 推断为产出物目录
+        cat = "outputs"  # 默认分类
+        for sub in artifact_files:
+            violations.append({
+                "source": f"DIR/{entry}/{sub}",
+                "path_literal": f"{entry}/{sub}",
+                "suggestion": f"<workspace>/standardization/<skill>/{cat}/{sub}",
+            })
+
+
+def _classify_artifact_by_ext(filename):
+    """根据文件名扩展名推断产出物分类（data/cache/outputs/temp）"""
+    ext = os.path.splitext(filename)[1].lower()
+    cat = _ROOT_EXT_CLASSIFY.get(ext, "outputs")
+    if cat == "temp":
+        cat = "outputs"  # temp 类文件在根目录默认归为 outputs
+    return cat
 
 
 def _extract_path_literal(line_text, matched_target):
@@ -471,8 +727,8 @@ def _trace_cross_references(skill_dir, violations):
     # 回填到 violations
     for v in violations:
         refs = pattern_to_refs.get(v["path_literal"], [])
-        # 排除自身（同一文件的 source）
-        refs = [r for r in refs if r != v["source"]]
+        # 排除自身：脚本引用自身行号 / 根目录文件自身
+        refs = [r for r in refs if r != v["source"] and r != v["source"].replace("ROOT/", "")]
         if refs:
             v["cross_refs"] = refs
 
@@ -480,6 +736,9 @@ def _trace_cross_references(skill_dir, violations):
 def _classify_artifact(dirname):
     """根据目录名推断产出物分类（data/cache/outputs/temp）"""
     d = dirname.lower().rstrip("s")
+    # 优先使用 _ARTIFACT_DIR_CLASSIFY
+    if d in _ARTIFACT_DIR_CLASSIFY:
+        return _ARTIFACT_DIR_CLASSIFY[d][0]
     mapping = {
         "data": "data", "backup": "data", "dump": "data",
         "cache": "cache", "tmp": "temp", "temp": "temp",

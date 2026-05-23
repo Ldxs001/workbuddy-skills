@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.6.0
+skill_builder.py — Skill 标准化构建器 v2.7.0
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -30,7 +30,7 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-__version__ = "2.6.0"
+__version__ = "2.7.0"
 
 SPEC_DIR = Path(__file__).parent / "spec"
 SKILL_TEMPLATE = """---
@@ -537,7 +537,7 @@ def cmd_refactor(args):
 
 # ── 辅助函数 ──────────────────────────────────────────
 
-# -- 产出物路径检测（铁律4） --
+# -- 产出物路径检测（铁律4 v2.7.0） --
 
 _ARTIFACT_DIR_NAMES = [
     "outputs", "output", "artifacts", "results", "exports",
@@ -567,6 +567,62 @@ _ARTIFACT_CLASSIFY = {
     "artifact": "outputs", "artifacts": "outputs",
 }
 
+# ─────────── R-11 产出物全面定义（v2.7.0 扩展）───────────
+
+# 已知标准目录（非产出物）
+_KNOWN_STANDARD_DIRS = {
+    "scripts", "references", "assets", "__pycache__", ".git",
+}
+
+# 产出物目录名 → (分类, 描述)
+_ARTIFACT_DIR_CLASSIFY = {
+    "data": ("data", "持久化数据目录"), "database": ("data", "数据库目录"),
+    "db": ("data", "数据库目录"), "storage": ("data", "存储目录"),
+    "backup": ("data", "备份目录"), "backups": ("data", "备份目录"),
+    "dump": ("data", "数据转储目录"), "dumps": ("data", "数据转储目录"),
+    "cache": ("cache", "缓存目录"), "caches": ("cache", "缓存目录"),
+    ".cache": ("cache", "隐藏缓存目录"), "temp_cache": ("cache", "临时缓存目录"),
+    "outputs": ("outputs", "输出产物目录"), "output": ("outputs", "输出产物目录"),
+    "out": ("outputs", "输出产物目录"),
+    "results": ("outputs", "结果目录"), "result": ("outputs", "结果目录"),
+    "exports": ("outputs", "导出目录"), "export": ("outputs", "导出目录"),
+    "reports": ("outputs", "报告目录"), "report": ("outputs", "报告目录"),
+    "generated": ("outputs", "生成产物目录"),
+    "build": ("outputs", "构建产物目录"), "dist": ("outputs", "分发包目录"),
+    "artifacts": ("outputs", "产出物目录"),
+    "temp": ("temp", "临时文件目录"), "tmp": ("temp", "临时文件目录"),
+    ".tmp": ("temp", "隐藏临时目录"),
+    "logs": ("temp", "日志目录"), "log": ("temp", "日志目录"),
+}
+
+# 全面产出物文件扩展名（按分类）
+_ARTIFACT_EXTS_COMPREHENSIVE = {
+    ".json": "data", ".csv": "data", ".yaml": "data", ".yml": "data",
+    ".db": "data", ".sqlite": "data", ".sqlite3": "data",
+    ".pkl": "data", ".pickle": "data", ".parquet": "data",
+    ".feather": "data", ".h5": "data", ".hdf5": "data",
+    ".npy": "data", ".npz": "data",
+    ".html": "outputs", ".pdf": "outputs", ".png": "outputs",
+    ".jpg": "outputs", ".jpeg": "outputs", ".svg": "outputs",
+    ".gif": "outputs", ".ico": "outputs", ".txt": "outputs",
+    ".log": "outputs", ".ics": "outputs",
+    ".xlsx": "outputs", ".xls": "outputs", ".pptx": "outputs",
+    ".docx": "outputs", ".md": "outputs",
+    ".tmp": "temp", ".bak": "temp", ".swp": "temp",
+    ".lock": "temp", ".pid": "temp", ".cache": "temp",
+    ".env": "data", ".cfg": "data", ".ini": "data", ".toml": "data",
+}
+
+# 根目录已知文件白名单
+_BUILDER_KNOWN_ROOT = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep"}
+
+# 产出物扩展名集合（用于根目录扫描）
+_BUILDER_ROOT_ARTIFACT_EXTS = set(_ARTIFACT_EXTS_COMPREHENSIVE.keys())
+
+_BUILDER_ROOT_CLASSIFY = dict(_ARTIFACT_EXTS_COMPREHENSIVE)
+
+# ─────────── R-11 常量定义结束 ───────────
+
 _TEXT_EXTS = {".md", ".json", ".yaml", ".yml", ".txt", ".cfg", ".toml", ".ini", ".html"}
 
 
@@ -580,81 +636,90 @@ def _extract_path_literal(line_text, matched_target):
 
 
 def _check_artifact_paths(skill_dir):
-    """扫描 scripts/ 下脚本，检测违反铁律4的产出物路径。
+    """全面产出物路径检测（铁律4 v2.7.0）。
     
-    同时反向搜索整个 skill 目录找出引用同一路径的关联文件。
+    四阶段扫描：
+    1. scripts/ 扫描：检测脚本中的硬编码产出路径
+    2. 根目录文件扫描：检测根目录中非标准数据文件
+    3. 非标准子目录扫描：检测产出物目录及其内容
+    4. 交叉引用追踪：反向搜索关联文件
     
     Returns:
         list: 违规描述字符串列表（含交叉引用信息），空列表表示无违规
     """
-    scripts_dir = skill_dir / "scripts"
-    if not scripts_dir.is_dir():
-        return []
-    
     violations = []  # {source, path_literal, suggestion}
-    for fpath in sorted(scripts_dir.iterdir()):
-        ext = fpath.suffix.lower()
-        if ext not in (".py", ".sh", ".bat", ".ps1"):
-            continue
-        if not fpath.is_file():
-            continue
-        
-        try:
-            lines = fpath.read_text(encoding="utf-8", errors="replace").split("\n")
-        except Exception:
-            continue
-        
-        rel = f"scripts/{fpath.name}"
-        
-        if ext == ".py":
-            for i, line in enumerate(lines, 1):
-                s = line.strip()
-                if not s or s.startswith("#") or s.startswith("import ") or s.startswith("from "):
-                    continue
-                for pat in _ARTIFACT_WRITE_PATTERNS:
-                    m = pat.search(s)
-                    if m and "standardization" not in s.lower() and '"r"' not in s and "'r'" not in s:
-                        target = m.group(1)
-                        path_literal = _extract_path_literal(s, target)
-                        # 根据 target 结构确定分类和建议
-                        if "/" in target:
-                            dir_part = target.split("/")[0]
-                            cat = _ARTIFACT_CLASSIFY.get(dir_part.lower(), "outputs")
-                            filename = target.split("/")[-1]
-                            if "." in filename:
-                                suggestion = f"<workspace>/standardization/<skill>/{cat}/{filename}"
-                            else:
+    
+    # ── 1. scripts/ 扫描 ──
+    scripts_dir = skill_dir / "scripts"
+    if scripts_dir.is_dir():
+        for fpath in sorted(scripts_dir.iterdir()):
+            ext = fpath.suffix.lower()
+            if ext not in (".py", ".sh", ".bat", ".ps1"):
+                continue
+            if not fpath.is_file():
+                continue
+            
+            try:
+                lines = fpath.read_text(encoding="utf-8", errors="replace").split("\n")
+            except Exception:
+                continue
+            
+            rel = f"scripts/{fpath.name}"
+            
+            if ext == ".py":
+                for i, line in enumerate(lines, 1):
+                    s = line.strip()
+                    if not s or s.startswith("#") or s.startswith("import ") or s.startswith("from "):
+                        continue
+                    for pat in _ARTIFACT_WRITE_PATTERNS:
+                        m = pat.search(s)
+                        if m and "standardization" not in s.lower() and '"r"' not in s and "'r'" not in s:
+                            target = m.group(1)
+                            path_literal = _extract_path_literal(s, target)
+                            if "/" in target:
+                                dir_part = target.split("/")[0]
+                                cat = _ARTIFACT_CLASSIFY.get(dir_part.lower(), "outputs")
+                                filename = target.split("/")[-1]
+                                if "." in filename:
+                                    suggestion = f"<workspace>/standardization/<skill>/{cat}/{filename}"
+                                else:
+                                    suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                            elif "." in target:
+                                cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
                                 suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
-                        elif "." in target:
-                            cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
-                            suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
-                        else:
-                            cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
-                            suggestion = f"<workspace>/standardization/<skill>/{cat}/"
-                        
+                            else:
+                                cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
+                                suggestion = f"<workspace>/standardization/<skill>/{cat}/"
+                            
+                            violations.append({
+                                "source": f"{rel}:{i}",
+                                "path_literal": path_literal,
+                                "suggestion": suggestion,
+                            })
+                            break
+            elif ext in (".sh", ".bat", ".ps1"):
+                for i, line in enumerate(lines, 1):
+                    s = line.strip()
+                    if not s or s.startswith("#") or s.startswith("::"):
+                        continue
+                    m = re.search(rf'[>]+\s*["\']?\.?({_ARTIFACT_DIR_RE})/', s)
+                    if m and "standardization" not in s.lower():
+                        target = m.group(1)
+                        path_literal = _extract_path_literal(s, target) or f"{target}/"
+                        cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
                         violations.append({
                             "source": f"{rel}:{i}",
                             "path_literal": path_literal,
-                            "suggestion": suggestion,
+                            "suggestion": f"<workspace>/standardization/<skill>/{cat}/",
                         })
-                        break
-        elif ext in (".sh", ".bat", ".ps1"):
-            for i, line in enumerate(lines, 1):
-                s = line.strip()
-                if not s or s.startswith("#") or s.startswith("::"):
-                    continue
-                m = re.search(rf'[>]+\s*["\']?\.?({_ARTIFACT_DIR_RE})/', s)
-                if m and "standardization" not in s.lower():
-                    target = m.group(1)
-                    path_literal = _extract_path_literal(s, target) or f"{target}/"
-                    cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
-                    violations.append({
-                        "source": f"{rel}:{i}",
-                        "path_literal": path_literal,
-                        "suggestion": f"<workspace>/standardization/<skill>/{cat}/",
-                    })
     
-    # ── 交叉引用追踪 ──
+    # ── 2. 根目录文件扫描 ──
+    _check_root_artifact_files_builder(skill_dir, violations)
+    
+    # ── 3. 非标准子目录扫描（v2.7.0 新增）──
+    _check_artifact_dirs_builder(skill_dir, violations)
+    
+    # ── 4. 交叉引用追踪 ──
     if violations:
         _trace_cross_refs(skill_dir, violations)
     
@@ -667,6 +732,120 @@ def _check_artifact_paths(skill_dir):
         result.append(line)
     
     return result
+
+
+def _check_root_artifact_files_builder(skill_dir, violations):
+    """根目录产出物文件检测：扫描根目录中非标准数据文件。"""
+    try:
+        for fpath in sorted(skill_dir.iterdir()):
+            if not fpath.is_file():
+                continue
+            fname = fpath.name
+            if fname in _BUILDER_KNOWN_ROOT:
+                continue
+            
+            ext = fpath.suffix.lower()
+            if ext not in _BUILDER_ROOT_ARTIFACT_EXTS:
+                continue
+            
+            cat = _BUILDER_ROOT_CLASSIFY.get(ext, "outputs")
+            if cat == "temp":
+                cat = "outputs"  # temp 类文件在根目录默认归为 outputs
+            violations.append({
+                "source": f"ROOT/{fname}",
+                "path_literal": fname,
+                "suggestion": f"<workspace>/standardization/<skill>/{cat}/{fname}",
+            })
+    except OSError:
+        return
+
+
+def _check_artifact_dirs_builder(skill_dir, violations):
+    """非标准子目录扫描：检测根目录下的产出物目录及其内容。
+    
+    1. 列出根目录所有子目录
+    2. 排除已知标准目录（scripts/references/assets/__pycache__/.git）
+    3. 对匹配产出物目录名的，递归扫描全部文件
+    4. 也检查 scripts/ 和 references/ 下的非标准子目录
+    """
+    for entry_path in sorted(skill_dir.iterdir()):
+        if not entry_path.is_dir():
+            continue
+        entry = entry_path.name
+        if entry in _KNOWN_STANDARD_DIRS:
+            continue
+        if entry.startswith(".") and entry not in _ARTIFACT_DIR_CLASSIFY:
+            continue
+        
+        classification = _ARTIFACT_DIR_CLASSIFY.get(entry.lower())
+        if classification:
+            cat, _desc = classification
+            _scan_dir_recursive_builder(str(skill_dir), entry, str(entry_path), cat, violations)
+        else:
+            _scan_unknown_dir_builder(str(skill_dir), entry, str(entry_path), violations)
+    
+    # 深度扫描：检查 scripts/ 和 references/ 下的非标准子目录
+    for parent_dir_name in ("scripts", "references"):
+        parent_path = skill_dir / parent_dir_name
+        if not parent_path.is_dir():
+            continue
+        for sub_path in sorted(parent_path.iterdir()):
+            if not sub_path.is_dir():
+                continue
+            sub = sub_path.name
+            if sub in _KNOWN_STANDARD_DIRS:
+                continue
+            classification = _ARTIFACT_DIR_CLASSIFY.get(sub.lower())
+            if classification:
+                cat, _desc = classification
+                rel_parent = f"{parent_dir_name}/{sub}"
+                _scan_dir_recursive_builder(str(skill_dir), rel_parent, str(sub_path), cat, violations)
+
+
+def _scan_dir_recursive_builder(skill_dir_str, rel_dir, dir_path, category, violations):
+    """递归扫描产出物目录，列出所有文件作为违规。"""
+    for root, dirs, files in os.walk(dir_path):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        
+        for fname in sorted(files):
+            if fname in (".gitkeep", ".gitignore"):
+                continue
+            violations.append({
+                "source": f"DIR/{rel_dir}/{fname}",
+                "path_literal": f"{rel_dir}/{fname}",
+                "suggestion": f"<workspace>/standardization/<skill>/{category}/{fname}",
+            })
+
+
+def _scan_unknown_dir_builder(skill_dir_str, entry, entry_path, violations):
+    """扫描未知目录名 — 检查内容判断是否为产出物目录。"""
+    try:
+        entries = sorted(os.listdir(entry_path))
+    except OSError:
+        return
+    
+    artifact_files = []
+    is_script_dir = False
+    
+    for sub in entries:
+        sub_path = os.path.join(entry_path, sub)
+        if os.path.isfile(sub_path):
+            ext = os.path.splitext(sub)[1].lower()
+            if ext in _ARTIFACT_EXTS_COMPREHENSIVE:
+                artifact_files.append(sub)
+            if ext in (".py", ".sh", ".bat", ".ps1"):
+                is_script_dir = True
+    
+    if is_script_dir and not artifact_files:
+        return
+    
+    if artifact_files:
+        for sub in artifact_files:
+            violations.append({
+                "source": f"DIR/{entry}/{sub}",
+                "path_literal": f"{entry}/{sub}",
+                "suggestion": f"<workspace>/standardization/<skill>/outputs/{sub}",
+            })
 
 
 def _trace_cross_refs(skill_dir, violations):
@@ -704,7 +883,8 @@ def _trace_cross_refs(skill_dir, violations):
     
     for v in violations:
         refs = pattern_to_refs.get(v["path_literal"], [])
-        refs = [r for r in refs if r != v["source"]]
+        # 排除自身：脚本引用自身行号 / 根目录文件自身
+        refs = [r for r in refs if r != v["source"] and r != v["source"].replace("ROOT/", "")]
         if refs:
             v["cross_refs"] = refs
 

@@ -1,15 +1,16 @@
 ---
 name: skill-standardization
-version: 2.7.1
+version: 2.7.3
 author: wUwproject
 license: MIT
 description: >
-  Skill 标准化规范引擎 v2（渐进式加载）。
-  支持 R-01~R-10 审查、create/update/refactor 三模式。
-tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading"]
+  Skill 标准化规范引擎 v2.7.3（渐进式加载）。
+  支持 R-01~R-11 审查（含根目录+子目录全面产出物检测）、
+  create/update/refactor 三模式。
+tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading", "artifact-detection"]
 ---
 
-# skill-standardization v2
+# skill-standardization v2.7.3
 
 > Skill 标准化规范引擎，支持 R-01~R-11 审查、create/update/refactor 三模式、渐进式 MD 体系。
 
@@ -138,7 +139,7 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 | R-08 | WARN | 含核心能力章节 |
 | R-09 | WARN | 含工作流程章节 |
 | R-10 | WARN | SKILL.md version == _meta.json version |
-| R-11 | WARN | scripts/ 产出物路径规范性（铁律4）— 无硬编码产出 + 全目录交叉引用追踪 |
+| R-11 | WARN | scripts/ + 根目录 产出物路径规范性（铁律4）— 脚本扫描 + 根目录文件检测 + 全目录交叉引用追踪 |
 
 > ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
 
@@ -245,5 +246,5 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 
 #### 执行层面
 
-- **R-11 自动审查 + 交叉引用追踪**：`skill_audit.py` 和 `skill_builder.py update` 会自动扫描 `scripts/` 下的脚本，检测硬编码产出路径。**同时反向搜索整个技能目录**（SKILL.md、references/*.md 等），找出所有引用同一路径的关联文件，一并报告。修正路径时按报告中的"关联引用"列表逐文件更新，确保一致性。
+- **R-11 自动审查 + 交叉引用追踪**：`skill_audit.py` 和 `skill_builder.py update` 会扫描 `scripts/` 下的脚本（硬编码产出路径）和**根目录**（非标准数据文件），检测违反铁律4的产出物。**同时反向搜索整个技能目录**（SKILL.md、references/*.md 等），找出所有引用同一路径的关联文件，一并报告。修正路径时按报告中的"关联引用"列表逐文件更新，确保一致性。
 - **refactor 建议**：`skill_builder.py refactor` 在 dry-run 阶段也会报告产出物路径违规，供改造时一并修正
