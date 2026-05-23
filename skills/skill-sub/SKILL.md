@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.10.1
+version: 1.11.0
 author: wUwproject
 license: MIT
 description: >
@@ -9,7 +9,7 @@ description: >
 tags: ["chain", "orchestration", "reusable", "skill-builder", "progressive-loading", "planner", "editor"]
 ---
 
-# skill-sub v1.10.1
+# skill-sub v1.11.0
 
 > 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为调用链。
 
@@ -29,10 +29,13 @@ tags: ["chain", "orchestration", "reusable", "skill-builder", "progressive-loadi
 - ✅ **粗粒度规划器** — 理解用户意图，规划哪些 Skill 参与、执行顺序、依赖关系
 - ✅ **编排器** — 将规划结果拼接为调用链 JSON，本身不参与调用链执行
 
-### skill-sub 不是什么
+### 能力边界
 
-- ❌ 本身参与调用链执行（skill-sub 是编辑器/规划器/编排器，不是链的一环）
-- ❌ 针对单次任务生成绑定产物（输出的是调用链，可复用于同类任务）
+- ✅ **能做**：创建/编辑/管理调用链、规划 Skill 参与顺序和依赖关系
+- ❌ **不能做**：执行链中步骤（只编排不干活）、代替被编排 Skill（只读取能力描述）
+- ⚠️ **不适合**：一次性任务 → 直接用 Skill；单 Skill → 不需要编排；高度定制临时流程 → 复用价值低
+
+> 更多反模式与正确做法 → `references/faq.md`
 
 ---
 
@@ -95,14 +98,16 @@ tags: ["chain", "orchestration", "reusable", "skill-builder", "progressive-loadi
 - "执行发布流水线"
 - "列出所有调用链"
 - "用 skill-sub 管理调用链"
-- "编辑调用链 XXX 的步骤"
-- "推荐适合当前任务的调用链"
 
-### 2. 意图关键词自动匹配（推荐）
+### 2. 自动推荐（满足任一条件即触发）
 
-当用户意图与已保存调用链的 `tags`/`description`/`user_intent` 重合度 > 50% 时，**自动推荐**匹配的调用链，用户可选择执行或编辑。
+| 条件 | 示例 |
+|------|------|
+| 多 Skill 协作意图 | 「先审查再打包推送」 |
+| 流程/模式词 | 「流水线」「一键」「端到端」「流程」 |
+| 已有链匹配 | tags/description 重合 > 50% |
 
-匹配逻辑详见 `references/workflow.md`。
+被推荐后用户可选择**执行**或**编辑**。匹配逻辑详见 `references/workflow.md`。
 
 ---
 
@@ -167,7 +172,7 @@ python {SKILL_DIR}/scripts/settings.py
 | ✅ 触发方式（含推荐逻辑） | 📄 `chain_schema.md` — Chain/Step 结构定义 |
 | ✅ 工作流程概述 | 📄 `examples.md` — 完整使用示例（含编辑、推荐场景） |
 | ✅ 快速开始（核心命令） | 📄 `changelog.md` — 版本更新日志 |
-| ✅ 审查规则自查 | — |
+| ✅ 审查规则自查 | 📄 `faq.md` — 反模式、常见错误、使用技巧 |
 
 ---
 
@@ -189,4 +194,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**1.10.1** — v1.10.1：修复 depends_on:null 导致 classify_milestones TypeError，SKILL.md 标题版本号同步
+当前版本：**1.11.0** — 文档质量优化：能力边界精确化、触发条件表格化、新增 references/faq.md 反模式指南
