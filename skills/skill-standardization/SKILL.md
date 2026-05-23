@@ -1,18 +1,18 @@
 ---
 name: skill-standardization
-version: 2.7.3
+version: 2.10.1
 author: wUwproject
 license: MIT
 description: >
-  Skill 标准化规范引擎 v2.7.3（渐进式加载）。
-  支持 R-01~R-11 审查（含根目录+子目录全面产出物检测）、
+  Skill 标准化规范引擎 v2.10.0（渐进式加载）。
+  支持 R-01~R-12 审查（含外部数据目录规范性检查）、
   create/update/refactor 三模式。
-tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading", "artifact-detection"]
+tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading", "artifact-detection", "data-dir-validation"]
 ---
 
-# skill-standardization v2.7.3
+# skill-standardization v2.10.0
 
-> Skill 标准化规范引擎，支持 R-01~R-11 审查、create/update/refactor 三模式、渐进式 MD 体系。
+> Skill 标准化规范引擎，支持 R-01~R-12 审查、create/update/refactor 三模式、渐进式 MD 体系。
 
 提供 Skill 全生命周期标准化管理：
 **create**（创建）→ **update**（更新）→ **refactor**（改造）→ **audit**（审查）→ **规范加载**
@@ -139,7 +139,8 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 | R-08 | WARN | 含核心能力章节 |
 | R-09 | WARN | 含工作流程章节 |
 | R-10 | WARN | SKILL.md version == _meta.json version |
-| R-11 | WARN | scripts/ + 根目录 产出物路径规范性（铁律4）— 脚本扫描 + 根目录文件检测 + 全目录交叉引用追踪 |
+| R-11 | WARN | scripts/ + 根目录 + 非标准子目录 产出物路径规范性（铁律4）|
+| R-12 | WARN | 外部数据目录路径（`DATA_DIR`等）必须遵循 `standardization/<skill-name>/` 约定（与铁律4同一目录），且 `_meta.json` 必须声明 `data_dir` 字段与之一致 |
 
 > ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
 

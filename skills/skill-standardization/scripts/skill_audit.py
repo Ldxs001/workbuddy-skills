@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit.py — SKILL.md 规范化审查工具 (v2.7.0)
+skill_audit.py — SKILL.md 规范化审查工具 (v2.10.1)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
 
-基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-11 规则。
+基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-12 规则。
 支持独立运行（CLI）和被 git-sync.sh 调用（--json 模式）。
 
 用法:
@@ -18,8 +18,9 @@ import os
 import re
 import json
 import argparse
+from pathlib import Path
 
-# ── 规则定义 (R-01 ~ R-10) ──────────────────────────────────────
+# ── 规则定义 (R-01 ~ R-12) ──────────────────────────────────────
 
 RULES = [
     {
@@ -98,6 +99,13 @@ RULES = [
         "severity": "WARN",
         "check": "scripts/ + 根目录 + 非标子目录 产出路径规范 + 全目录交叉引用追踪（铁律4）",
         "method": "check_artifact_paths",
+    },
+    {
+        "id": "R-12",
+        "name": "外部数据目录规范性",
+        "severity": "WARN",
+        "check": "scripts/ 中外部数据目录（DATA_DIR等）路径符合 standardization/<skill-name>/ 约定（与铁律4同一目录，非框架绑定），_meta.json 含 data_dir 字段且一致",
+        "method": "check_external_data_dir",
     },
 ]
 
@@ -401,7 +409,10 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
     # ── 4. 交叉引用追踪 ──
     if violations:
         _trace_cross_references(skill_dir, violations)
-    
+
+    # ── 5. [v2.10.0] 标准化路径磁盘验证 ──
+    _verify_standardization_paths(skill_dir, violations)
+
     if violations:
         detail_lines = [f"发现 {len(violations)} 处产出物路径违规："]
         for v in violations:
@@ -733,6 +744,49 @@ def _trace_cross_references(skill_dir, violations):
             v["cross_refs"] = refs
 
 
+def _verify_standardization_paths(skill_dir, violations):
+    """[v2.10.0] 验证脚本中声称的 standardization/ 路径在磁盘上真实存在。"""
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return
+
+    ws_root = _find_workspace_root(skill_dir)
+    std_re = re.compile(r'standardization/([^"\')\s,。，；：！？、…—]+)')
+
+    for fname in sorted(os.listdir(scripts_dir)):
+        fpath = os.path.join(scripts_dir, fname)
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in (".py", ".sh", ".bat", ".ps1"):
+            continue
+        if not os.path.isfile(fpath):
+            continue
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+        except Exception:
+            continue
+
+        rel = os.path.join("scripts", fname)
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            matches = std_re.findall(stripped)
+            for matched_path in matches:
+                # 跳过模板占位符：<skill>, {name}, {cat}, ([^ 等
+                if "<" in matched_path or "{" in matched_path or matched_path.startswith("([^"):
+                    continue
+                full_rel = "standardization/" + matched_path
+                dir_part = "/".join(full_rel.split("/")[:-1]) if "." in full_rel.split("/")[-1] else full_rel
+                abs_dir = os.path.join(ws_root, dir_part.replace("/", os.sep))
+                if not os.path.exists(abs_dir):
+                    violations.append({
+                        "source": rel + ":" + str(i),
+                        "path_literal": full_rel,
+                        "suggestion": "directory missing: " + abs_dir + ", please create it",
+                    })
+
+
 def _classify_artifact(dirname):
     """根据目录名推断产出物分类（data/cache/outputs/temp）"""
     d = dirname.lower().rstrip("s")
@@ -751,7 +805,175 @@ def _classify_artifact(dirname):
 
 
 # 方法分派表
+def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
+    """R-12: External data directory path validation.
+    
+    1. scan scripts/ for data dir variable assignments (generalized detection)
+    2. check paths conform to standardization/<skill-name>/ convention (same as R-11)
+    3. check _meta.json declares data_dir field
+    4. check _meta.json data_dir matches code path
+    5. [v2.10.0] disk existence: verify standardization/<skill>/data/ actually exists
+    """
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return {"passed": True, "detail": "skip: cannot determine skill dir", "skip": True}
+
+    dirname = os.path.basename(os.path.abspath(skill_dir))
+    violations = []
+    expected_pattern = "standardization/" + dirname + "/"
+
+    # 1. scan scripts/ for data dir definitions (generalized variable detection)
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    data_dir_vars = []
+    _DATA_VAR_RE = re.compile(
+        r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*(?:_DIR|_PATH))\s*=\s*(.+)$'
+    )
+
+    if os.path.isdir(scripts_dir):
+        for fname in sorted(os.listdir(scripts_dir)):
+            fpath = os.path.join(scripts_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in (".py", ".sh", ".bat", ".ps1"):
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    for lineno, line in enumerate(f, 1):
+                        stripped = line.strip()
+                        m = _DATA_VAR_RE.match(stripped)
+                        if m:
+                            val = m.group(2).strip()
+                            path_val = _extract_path_value(val)
+                            data_dir_vars.append((
+                                os.path.join("scripts", fname),
+                                m.group(1),
+                                path_val,
+                                lineno
+                            ))
+            except Exception:
+                continue
+
+    # 2. check paths conform to standardization/<skill-name>/ convention (same as R-11)
+    # [v2.10.1] Normalize both sides to handle cross-platform path separator differences
+    expected_norm = os.path.normpath("standardization/" + dirname + "/data/").lower()
+    for rel_file, var_name, path_val, lineno in data_dir_vars:
+        if not path_val:
+            continue
+        norm = os.path.normpath(path_val).lower()
+        if expected_norm not in norm:
+            violations.append({
+                "source": rel_file + ":" + str(lineno),
+                "var_name": var_name,
+                "path_value": path_val,
+                "expected": "standardization/" + dirname + "/data/",
+                "detail": var_name + "=" + path_val + " violates standardization/<skill>/ convention (same as R-11)",
+            })
+
+    # 3. check _meta.json has data_dir field
+    meta_file = os.path.join(skill_dir, "_meta.json")
+    meta_has_data_dir = False
+    meta_data_dir = None
+    if os.path.isfile(meta_file):
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            if "data_dir" in meta:
+                meta_has_data_dir = True
+                meta_data_dir = meta["data_dir"]
+        except Exception:
+            pass
+
+    if data_dir_vars and not meta_has_data_dir:
+        violations.append({
+            "source": "_meta.json",
+            "var_name": "data_dir",
+            "path_value": "(missing)",
+            "expected": "should add data_dir field",
+            "detail": "_meta.json missing data_dir field (scripts/ defines data dir variable)",
+        })
+
+    # 4. check _meta.json data_dir matches code path
+    # [v2.10.1] Resolve meta_data_dir to absolute path for fair comparison
+    if meta_has_data_dir and data_dir_vars:
+        ws_check = _find_workspace_root(skill_dir)
+        meta_abs = os.path.normpath(os.path.join(ws_check, str(meta_data_dir))).lower()
+        for _, _, path_val, _ in data_dir_vars:
+            if path_val:
+                code_norm = os.path.normpath(path_val).lower()
+                if code_norm != meta_abs:
+                    violations.append({
+                        "source": "_meta.json vs " + data_dir_vars[0][0],
+                        "var_name": "data_dir",
+                        "path_value": meta_data_dir,
+                        "expected": path_val,
+                        "detail": "_meta.json data_dir=" + str(meta_data_dir) + " != code " + data_dir_vars[0][1] + "=" + path_val,
+                    })
+                    break
+
+    # 5. [v2.10.0] disk existence: verify standardization/<skill>/data/ actually exists
+    # 仅在 skill 实际使用外部数据时检查（有 data_dir 变量 或 _meta.json 声明了 data_dir）
+    uses_external_data = bool(data_dir_vars) or meta_has_data_dir
+    if uses_external_data:
+        ws = _find_workspace_root(skill_dir)
+        expected_disk_path = os.path.join(ws, "standardization", dirname, "data")
+        if not os.path.isdir(expected_disk_path):
+            violations.append({
+                "source": "DISK",
+                "var_name": "disk",
+                "path_value": expected_disk_path,
+                "expected": "directory should exist: " + expected_disk_path,
+                "detail": "标准化数据目录不存在: " + expected_disk_path,
+            })
+
+    if violations:
+        detail_lines = ["Found " + str(len(violations)) + " external data dir violations:"]
+        for v in violations:
+            detail_lines.append("  " + v["source"] + ": " + v["detail"])
+            detail_lines.append("    suggestion: " + v["expected"])
+        return {
+            "passed": False,
+            "detail": "\n".join(detail_lines),
+            "violations": violations,
+        }
+    else:
+        if data_dir_vars:
+            return {"passed": True, "detail": "External data dir paths conform to standard, _meta.json data_dir declared and consistent"}
+        else:
+            return {"passed": True, "detail": "No external data dir variables defined in scripts/ (nothing to check)", "skip": True}
+
+
+def _extract_path_value(val_expr):
+    """Extract path string from Python assignment expression."""
+    if "Path.home()" in val_expr or "Path(" in val_expr:
+        frags = re.findall(r"""['"]([^'"]*)['"]""", val_expr)
+        if not frags:
+            return val_expr
+        if "Path.home()" in val_expr:
+            return str(Path.home() / "/".join(frags))
+        return "/".join(frags)
+    m = re.match(r"""^['"](.+?)['"]$""", val_expr.strip())
+    if m:
+        return m.group(1)
+    return val_expr.strip()
+
+
+def _find_workspace_root(skill_dir):
+    """Find workspace root by traversing up from skill_dir to locate .workbuddy directory.
+    
+    Returns the parent of the .workbuddy directory (i.e., the workspace root).
+    Falls back to skill_dir's parent if .workbuddy is not found.
+    """
+    p = os.path.abspath(skill_dir)
+    while p != os.path.dirname(p):
+        if os.path.isdir(os.path.join(p, ".workbuddy")):
+            return p
+        p = os.path.dirname(p)
+    return os.path.dirname(os.path.abspath(skill_dir))
+
+
+
 METHOD_MAP = {
+    "check_external_data_dir": check_external_data_dir,
     "regex_frontmatter_exists": regex_frontmatter_exists,
     "yaml_has_name": yaml_has_name,
     "yaml_has_semver_version": yaml_has_semver_version,
@@ -990,7 +1212,7 @@ def cmd_audit_all(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="SKILL.md 规范化审查工具 (R-01~R-11)",
+        description="SKILL.md 规范化审查工具 (R-01~R-12)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.7.0
+skill_builder.py — Skill 标准化构建器 v2.10.1
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -30,7 +30,12 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-__version__ = "2.7.0"
+__version__ = "2.10.0"
+
+# R-12: 外部数据目录变量检测模式（通用化，非框架绑定）
+_DATA_VAR_RE = re.compile(
+    r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*(?:_DIR|_PATH))\s*=\s*(.+)$'
+)
 
 SPEC_DIR = Path(__file__).parent / "spec"
 SKILL_TEMPLATE = """---
@@ -71,7 +76,7 @@ tags: [{tags}]
 → 详见 `references/guide.md` 完整教程（按需创建）
 """
 
-META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}]}}'
+META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "standardization/{name}/data/"}}'
 
 # 主 SKILL.md 必须包含的章节（用于 update/refactor 检查）
 REQUIRED_SECTIONS = [
@@ -184,15 +189,16 @@ def cmd_update(args):
         try:
             with open(meta_file, "r", encoding="utf-8") as f:
                 meta = json.load(f)
-            required_meta_keys = ["name", "version", "description", "author", "tags"]
+            required_meta_keys = ["name", "version", "description", "author", "tags", "data_dir"]
             missing = [k for k in required_meta_keys if k not in meta]
-            if missing:
-                results["warnings"].append(f"_meta.json 缺少字段: {missing}")
-                if args.fix:
-                    for k in missing:
+            if args.fix:
+                for k in missing:
+                    if k == "data_dir":
+                        meta[k] = f"standardization/{name}/data/"
+                    else:
                         meta[k] = "" if k != "tags" else []
-                    _write_json(meta_file, meta)
-                    results["fixes"].append(f"补充 _meta.json 缺失字段: {missing}")
+                _write_json(meta_file, meta)
+                results["fixes"].append(f"补充 _meta.json 缺失字段: {missing}")
             else:
                 results["checks"].append("✅ _meta.json 结构正常")
         except json.JSONDecodeError as e:
@@ -263,8 +269,21 @@ def cmd_update(args):
         for v in artifact_violations:
             results["warnings"].append(f"   {v}")
 
+    # 检查 4.5: 外部数据目录规范性（R-12，v2.10.0 接入）
+    _check_external_data_dir(skill_dir, results, args.workspace)
+
     # 输出报告
     print(f"\n{'='*50}")
+
+    # 检查 5: 版本号自动更新（--version-bump）
+    if args.version_bump:
+        _bump_version(skill_dir, args.version_bump, results)
+        # 检查 6: changelog 自动追加（与版本更新联动）
+        if args.changelog:
+            _append_changelog(skill_dir, args.version_bump, args.changelog, results)
+
+    # 输出报告
+    print(f"{'='*50}")
     print(f"📋 Skill 更新检查报告: {name}")
     print(f"{'='*50}")
 
@@ -722,7 +741,10 @@ def _check_artifact_paths(skill_dir):
     # ── 4. 交叉引用追踪 ──
     if violations:
         _trace_cross_refs(skill_dir, violations)
-    
+
+    # ── 5. [v2.10.0] 标准化路径磁盘验证 ──
+    _verify_standardization_paths_builder(skill_dir, violations)
+
     # 格式化为输出字符串
     result = []
     for v in violations:
@@ -889,6 +911,187 @@ def _trace_cross_refs(skill_dir, violations):
             v["cross_refs"] = refs
 
 
+def _verify_standardization_paths_builder(skill_dir, violations):
+    """[v2.10.0] 验证脚本中声称的 standardization/ 路径在磁盘上真实存在。
+    
+    扫描 scripts/ 中所有引用 "standardization/" 的行，
+    提取路径字面量，用 _find_workspace_root 解析为绝对路径，
+    检查目录是否存在。
+    """
+    scripts_dir = skill_dir / "scripts"
+    if not scripts_dir.is_dir():
+        return
+
+    ws_root = _get_workspace_dir(skill_dir)
+    std_re = re.compile(r'standardization/([^"\')\s,。，；：！？、…—]+)')
+
+    for fpath in sorted(scripts_dir.iterdir()):
+        ext = fpath.suffix.lower()
+        if ext not in (".py", ".sh", ".bat", ".ps1"):
+            continue
+        if not fpath.is_file():
+            continue
+        try:
+            lines = fpath.read_text(encoding="utf-8", errors="replace").split("\n")
+        except Exception:
+            continue
+
+        rel = f"scripts/{fpath.name}"
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            matches = std_re.findall(stripped)
+            for matched_path in matches:
+                # 跳过模板占位符：<skill>, {name}, {cat}, ([^ 等
+                if "<" in matched_path or "{" in matched_path or matched_path.startswith("([^"):
+                    continue
+                full_rel = f"standardization/{matched_path}"
+                # 提取直到目录部分（去掉文件名）
+                dir_part = "/".join(full_rel.split("/")[:-1]) if "." in full_rel.split("/")[-1] else full_rel
+                abs_dir = ws_root / dir_part
+                if not abs_dir.exists():
+                    violations.append({
+                        "source": f"{rel}:{i}",
+                        "path_literal": full_rel,
+                        "suggestion": f"目录不存在: {abs_dir}，请创建它",
+                    })
+
+
+# -- R-12: 外部数据目录检查（v2.10.0 接入 cmd_update） --
+
+def _check_external_data_dir(skill_dir, results, workspace_arg=None):
+    """检查外部数据目录路径规范性（铁律4 外部数据约定 v2.10.0 增强版）。
+
+    四阶段：
+    1. 扫描 scripts/ 中 DATA/STORAGE/CONFIG 类变量赋值
+    2. 检查路径是否遵循 standardization/<skill>/ 约定（子串匹配）
+    3. 验证 _meta.json 声明 data_dir 字段
+    4. 验证 _meta.json data_dir 与代码路径一致
+    5. **[v2.10.0 新增]** 磁盘存在性验证：检查 standardization/<skill>/ 目录真实存在
+    """
+    name = skill_dir.resolve().name
+    expected_pattern = "standardization/" + name + "/"
+    violations = []
+
+    # 阶段 1: 扫描 scripts/ 中的数据目录变量
+    scripts_dir = skill_dir / "scripts"
+    data_dir_vars = []
+
+    if scripts_dir.is_dir():
+        for fpath in sorted(scripts_dir.iterdir()):
+            ext = fpath.suffix.lower()
+            if ext not in (".py", ".sh", ".bat", ".ps1"):
+                continue
+            if not fpath.is_file():
+                continue
+            try:
+                for lineno, line in enumerate(fpath.read_text(encoding="utf-8", errors="replace").split("\n"), 1):
+                    stripped = line.strip()
+                    m = _DATA_VAR_RE.match(stripped)
+                    if m:
+                        val = m.group(2).strip()
+                        path_val = _extract_path_value(val)
+                        data_dir_vars.append((
+                            f"scripts/{fpath.name}",
+                            m.group(1),
+                            path_val,
+                            lineno
+                        ))
+            except Exception:
+                continue
+
+    # 阶段 2: 检查路径是否符合 standardization/<skill>/ 约定
+    for rel_file, var_name, path_val, lineno in data_dir_vars:
+        if not path_val:
+            continue
+        norm = path_val.replace("\\", "/").lower()
+        if expected_pattern.lower() not in norm:
+            violations.append({
+                "source": f"{rel_file}:{lineno}",
+                "path_literal": path_val,
+                "expected": f"standardization/{name}/data/",
+                "detail": f"{var_name}={path_val} 不符合 standardization/<skill>/ 约定",
+            })
+
+    # 阶段 3: _meta.json data_dir 字段检查
+    meta_file = skill_dir / "_meta.json"
+    meta_has_data_dir = False
+    meta_data_dir = None
+    if meta_file.exists():
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            if "data_dir" in meta:
+                meta_has_data_dir = True
+                meta_data_dir = meta["data_dir"]
+        except Exception:
+            pass
+
+    if data_dir_vars and not meta_has_data_dir:
+        violations.append({
+            "source": "_meta.json",
+            "path_literal": "(缺失)",
+            "expected": f'"data_dir": "standardization/{name}/data/"',
+            "detail": "_meta.json 缺少 data_dir 字段（scripts/ 中定义了数据目录变量）",
+        })
+
+    # 阶段 4: _meta.json data_dir 与代码路径一致性
+    # [v2.10.1] Resolve meta_data_dir to absolute path for fair comparison
+    if meta_has_data_dir and data_dir_vars:
+        ws_check = _get_workspace_dir(skill_dir)
+        meta_abs = os.path.normpath(os.path.join(str(ws_check), str(meta_data_dir))).replace("\\", "/").lower()
+        for _, var_name, path_val, _ in data_dir_vars:
+            if path_val:
+                code_norm = path_val.replace("\\", "/").lower()
+                if code_norm != meta_abs:
+                    violations.append({
+                        "source": f"_meta.json vs {data_dir_vars[0][0]}",
+                        "path_literal": str(meta_data_dir),
+                        "expected": path_val,
+                        "detail": f"_meta.json data_dir={meta_data_dir} != 代码 {var_name}={path_val}",
+                    })
+                    break
+
+    # 阶段 5 [v2.10.0]: 磁盘存在性验证（仅在 skill 实际使用外部数据时执行）
+    uses_external_data = bool(data_dir_vars) or meta_has_data_dir
+    if uses_external_data:
+        ws = _get_workspace_dir(skill_dir, workspace_arg)
+        expected_dir = ws / "standardization" / name / "data"
+        if not expected_dir.exists():
+            violations.append({
+                "source": "DISK",
+                "path_literal": str(expected_dir),
+                "expected": f"目录应存在: {expected_dir}",
+                "detail": f"标准化数据目录不存在，请创建: mkdir -p {expected_dir}",
+            })
+
+    # 输出到 results
+    if violations:
+        results["warnings"].append(
+            f"🔍 外部数据目录违规（R-12）— 发现 {len(violations)} 处："
+        )
+        for v in violations:
+            results["warnings"].append(f"   {v['source']}: {v['detail']}")
+            results["warnings"].append(f"      → 预期: {v['expected']}")
+    else:
+        results["checks"].append("✅ R-12 外部数据目录路径符合规范，磁盘目录存在")
+
+
+def _extract_path_value(val_expr):
+    """从 Python 赋值表达式中提取路径字符串（与 skill_audit.py 一致）。"""
+    if "Path.home()" in val_expr or "Path(" in val_expr:
+        frags = re.findall(r"""['"]([^'"]*)['"]""", val_expr)
+        if not frags:
+            return val_expr
+        if "Path.home()" in val_expr:
+            return str(Path.home() / "/".join(frags))
+        return "/".join(frags)
+    m = re.match(r"""^['"](.+?)['"]$""", val_expr.strip())
+    if m:
+        return m.group(1)
+    return val_expr.strip()
+
+
 # -- 文件扫描 --
 
 def _scan_all_files(directory):
@@ -908,21 +1111,158 @@ def _scan_all_files(directory):
     return result
 
 
+def _bump_version(skill_dir, bump_type, results):
+    """自动升级版本号（SemVer）。
+
+    更新位置：
+    - SKILL.md frontmatter `version:`
+    - _meta.json `"version"`
+    - skill_builder.py `__version__` + 文件头版本注释
+    - skill_audit.py 文件头版本注释（如存在）
+    """
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.exists():
+        results["warnings"].append("⚠️  SKILL.md 不存在，无法升级版本号")
+        return
+
+    # 1. 读取并解析当前版本
+    content = skill_md.read_text(encoding="utf-8")
+    m = re.search(r'^version:\s*([\d.]+)', content, re.MULTILINE)
+    if not m:
+        results["warnings"].append("⚠️  SKILL.md 中未找到 version 字段")
+        return
+    old_ver = m.group(1).strip()
+    parts = old_ver.split(".")
+    if len(parts) < 3:
+        parts = (parts + ["0", "0"])[:3]
+    major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+
+    if bump_type == "patch":
+        patch += 1
+    elif bump_type == "minor":
+        minor += 1; patch = 0
+    elif bump_type == "major":
+        major += 1; minor = 0; patch = 0
+    new_ver = f"{major}.{minor}.{patch}"
+    results["fixes"].append(f"版本号: {old_ver} → {new_ver} ({bump_type})")
+
+    # 2. 更新 SKILL.md frontmatter version
+    new_content = re.sub(r'(^version:\s*)[\d.]+', rf'\g<1>{new_ver}', content, count=1, flags=re.MULTILINE)
+    # 同时更新正文中版本号引用（如 "# skill-standardization vX.Y.Z"）
+    new_content = re.sub(rf'(?<=v){re.escape(old_ver)}', new_ver, new_content, count=1)
+    skill_md.write_text(new_content, encoding="utf-8")
+
+    # 3. 更新 _meta.json version
+    meta_file = skill_dir / "_meta.json"
+    if meta_file.exists():
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            meta["version"] = new_ver
+            _write_json(meta_file, meta)
+        except Exception as e:
+            results["warnings"].append(f"⚠️  _meta.json 版本更新失败: {e}")
+
+    # 4. 更新 skill_builder.py __version__ 和文件头
+    builder_path = Path(__file__)
+    _update_py_header_version(builder_path, old_ver, new_ver, results)
+
+    # 5. 更新 skill_audit.py 文件头（如存在）
+    audit_path = skill_dir / "scripts" / "skill_audit.py"
+    if audit_path.exists():
+        _update_py_header_version(audit_path, old_ver, new_ver, results, label="skill_audit.py")
+
+
+def _update_py_header_version(py_path, old_ver, new_ver, results, label=None):
+    """更新 .py 文件中的版本号：__version__ + 文件头版本注释"""
+    fname = label or py_path.name
+    try:
+        content = py_path.read_text(encoding="utf-8")
+    except Exception as e:
+        results["warnings"].append(f"⚠️  {fname} 读取失败: {e}")
+        return
+
+    updated = False
+    # 更新 __version__ = "X.Y.Z"
+    if re.search(r'__version__\s*=\s*"[^"]*"', content):
+        content = re.sub(rf'__version__\s*=\s*"{re.escape(old_ver)}"',
+                         f'__version__ = "{new_ver}"', content)
+        updated = True
+    # 更新文件头版本注释：vX.Y.Z
+    header_lines = "\n".join(content.split("\n")[:5])
+    if re.search(rf'v{re.escape(old_ver)}', header_lines):
+        content = re.sub(rf'v{re.escape(old_ver)}', f'v{new_ver}', content, count=3)
+        updated = True
+
+    if updated:
+        py_path.write_text(content, encoding="utf-8")
+        results["fixes"].append(f"  {fname} 版本号已同步: v{old_ver} → v{new_ver}")
+    else:
+        results["warnings"].append(f"⚠️  {fname} 中未找到版本号 v{old_ver}")
+
+
+def _append_changelog(skill_dir, bump_type, message, results):
+    """自动追加变更记录到 references/changelog.md"""
+    changelog_file = skill_dir / "references" / "changelog.md"
+    if not changelog_file.exists():
+        results["warnings"].append("⚠️  references/changelog.md 不存在，无法追加")
+        return
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    bump_label = {"patch": "Patch", "minor": "Minor", "major": "Major"}.get(bump_type, bump_type)
+
+    # 读取当前 SKILL.md 版本号
+    skill_md = skill_dir / "SKILL.md"
+    ver_line = ""
+    if skill_md.exists():
+        m = re.search(r'^version:\s*([\d.]+)', skill_md.read_text(encoding="utf-8"), re.MULTILINE)
+        if m:
+            ver_line = m.group(1).strip()
+
+    entry = f"""
+
+### v{ver_line}
+
+**发布日期：{today}**
+**类型：{bump_label}（{message}）**
+
+### {bump_label}
+
+- {message}
+
+---
+
+*本条目由 skill_builder.py --changelog 自动生成。*
+"""
+
+    try:
+        with open(changelog_file, "a", encoding="utf-8") as f:
+            f.write(entry)
+        results["fixes"].append(f"changelog 已追加: references/changelog.md (v{ver_line}, {bump_label})")
+    except Exception as e:
+        results["warnings"].append(f"⚠️  changelog 写入失败: {e}")
+
+
 def _get_workspace_dir(skill_dir, workspace_arg=None):
     """解析标准化工作区根目录。
 
     优先级：
     1. --workspace 参数显式指定
-    2. 当前工作目录 (Path.cwd())
+    2. 从 skill_dir 向上查找 .workbuddy 目录，其父目录即为 workspace（标准化目录 standardiation/ 放在 .workbuddy 同级）
 
     返回工作区根路径（Path 对象）。
     工作区标准化路径为：<workspace>/standardization/<skill_name>/
     """
     if workspace_arg:
-        ws = Path(workspace_arg).resolve()
-    else:
-        ws = Path.cwd()
-    return ws
+        return Path(workspace_arg).resolve()
+
+    # 从 skill_dir 向上查找 .workbuddy 目录
+    p = Path(skill_dir).resolve()
+    while p != p.parent:
+        if (p / ".workbuddy").is_dir():
+            return p
+        p = p.parent
+    # 兜底：找不到 .workbuddy 则退回到 Path.cwd()
+    return Path.cwd()
 
 
 def _get_standardization_dir(skill_dir, workspace_arg=None):
@@ -1045,6 +1385,10 @@ def main():
     p_update.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
     p_update.add_argument("--backup", action="store_true", help="修改前自动备份")
     p_update.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认当前目录），产出物将存至 <workspace>/standardization/<skill>/")
+    p_update.add_argument("--version-bump", choices=["patch", "minor", "major"], default=None,
+                          help="自动升级版本号（按 SemVer：patch=0.0.1, minor=0.1.0, major=1.0.0）")
+    p_update.add_argument("--changelog", "-c", default=None,
+                          help="变更说明（将自动追加到 references/changelog.md，与 --version-bump 联动）")
 
     # refactor 子命令
     p_refactor = subparsers.add_parser("refactor", help="整体改造非标 skill 到标准结构")
