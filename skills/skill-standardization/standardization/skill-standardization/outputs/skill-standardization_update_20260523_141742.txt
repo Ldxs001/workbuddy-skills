@@ -1,0 +1,14 @@
+Skill 更新检查报告: skill-standardization
+==================================================
+
+通过项:
+  ✅ _meta.json 结构正常
+  ✅ SKILL.md 有 frontmatter
+  ✅ 包含章节: 触发场景
+  ✅ 包含章节: 核心能力
+  ✅ 包含章节: 快速开始
+
+警告/建议:
+  💡 SKILL.md 共 250 行，超过 200 行建议拆分到 references/
+
+结论: ERROR=0 WARN=1 PASS=5

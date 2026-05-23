@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.3.0",
-  "description": "Skill 标准化规范引擎 v2 — 集规范定义、创建器、更新器、改造器于一体的全生命周期工具，支持 R-01~R-10 审查与渐进式 JSON 加载",
+  "version": "2.7.1",
+  "description": "Skill 标准化规范引擎 v2 — 集规范定义、创建器、更新器、改造器于一体的全生命周期工具，支持 R-01~R-11 审查与渐进式 JSON 加载",
   "author": "wUwproject",
   "tags": [
     "standardization",

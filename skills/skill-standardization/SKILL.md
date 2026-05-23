@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.3.0
+version: 2.7.1
 author: wUwproject
 license: MIT
 description: >
@@ -11,7 +11,7 @@ tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refact
 
 # skill-standardization v2
 
-> Skill 标准化规范引擎，支持 R-01~R-10 审查、create/update/refactor 三模式、渐进式 MD 体系。
+> Skill 标准化规范引擎，支持 R-01~R-11 审查、create/update/refactor 三模式、渐进式 MD 体系。
 
 提供 Skill 全生命周期标准化管理：
 **create**（创建）→ **update**（更新）→ **refactor**（改造）→ **audit**（审查）→ **规范加载**
@@ -33,7 +33,7 @@ tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refact
 | # | 功能 | 说明 |
 |---|------|------|
 | 1 | **三种执行模式** | create / update / refactor |
-| 2 | **10 条审查规则** | R-01~04 ERROR + R-05~10 WARN，纯警告不阻断 |
+| 2 | **11 条审查规则** | R-01~04 ERROR + R-05~11 WARN，纯警告不阻断 |
 | 3 | **标准目录结构** | 根目录仅 SKILL.md + _meta.json，三级复杂度 |
 | 4 | **渐进式 MD 体系** | 主文件 ≤200 行，辅助内容拆分 references/ 按需加载 |
 | 5 | **零依赖 Python 工具** | 仅标准库，跨平台兼容 |
@@ -112,6 +112,16 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
   任务复杂？ → 检查 SKILL.md 中的 references/ 引用 → 按需读取
 ```
 
+### 增量更新记录规范
+
+**核心规则：** update/refactor 模式下产生的更新记录（变更日志、差异报告、迁移映射等）必须写入 `references/changelog.md`，**禁止写入主 SKILL.md**。
+
+| 规则 | 说明 |
+|------|------|
+| 主文件仅保留版本号 | SKILL.md frontmatter `version:` 是唯一的版本标识，不承载变更历史 |
+| 变更记录渐进式加载 | 每次 update/refactor 操作产出的记录追加至 `references/changelog.md` |
+| 主文件行数可控 | 详细历史信息不占主文件篇幅，确保 SKILL.md ≤200 行 |
+
 ---
 
 ## 审查规则（R-01 ~ R-10 概述）
@@ -128,6 +138,7 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 | R-08 | WARN | 含核心能力章节 |
 | R-09 | WARN | 含工作流程章节 |
 | R-10 | WARN | SKILL.md version == _meta.json version |
+| R-11 | WARN | scripts/ 产出物路径规范性（铁律4）— 无硬编码产出 + 全目录交叉引用追踪 |
 
 > ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
 
@@ -197,3 +208,42 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 - 修改任何文件前，先用 Read 工具阅读完整内容
 - 理解每个字段的含义、引用关系、被哪些脚本使用
 - 特别注意：`config.json`（运行时配置）、`manifest.json`（维护清单状态数据）、`_meta.json`（标准化元数据）
+
+### 铁律 4：产出物路径管理规范
+
+**核心规则：** 任何技能在运行时产生的业务文件（日程、任务清单、缓存、导出、配置快照等）统一存放至工作区标准化路径，**禁止放在技能文件夹下**，防止技能更新/重装时积累性数据丢失。
+
+> 这条规则约束的是技能**运行期**产生的用户数据，不是标准化过程本身的备份。无论是 create/update/refactor 模式还是日常运行，技能都不应把自己的产出物嵌在自身目录内。
+
+#### 工作区标准化路径
+
+`<workspace>` 指执行标准化操作或技能运行的根目录（项目根目录或当前工作目录），非特定框架绑定。
+
+```
+<workspace>/standardization/<skill_name>/
+├── data/             # 持久化业务数据（日程 .ics、任务清单 .json、配置快照等）
+├── cache/            # 短期缓存（可重建，可随技能升级清空）
+├── outputs/          # 生成/导出产物（报表 .html、图表 .png、文档 .md 等）
+└── temp/             # 临时文件（会话级，可随时清理）
+```
+
+#### 分类规则
+
+| 产出物类型 | 目标子目录 | 典型文件示例 |
+|-----------|-----------|-------------|
+| **持久化业务数据** | `data/` | 日程 `.ics`、任务清单 `.json`、配置快照、用户偏好、积累性数据 |
+| **短期缓存** | `cache/` | HTTP 缓存、模型推理缓存、`*.pkl`、中间计算结果 |
+| **生成/导出产物** | `outputs/` | 报表 `.html/.pdf`、图表 `.png`、导出 `.csv`、生成的文档 |
+| **临时文件** | `temp/` | `*.tmp`、`draft_*`、阶段性中间产物、会话级临时数据 |
+
+#### 设计理由
+
+- **技能文件夹干净**：仅保留源代码（SKILL.md + scripts/ + references/ 等），更新覆盖不丢失用户积累的数据
+- **工作区级隔离**：不同技能的产出物存放在各自子目录，互不污染
+- **跨版本持久化**：不受技能更新/重装影响，历史数据持续可查
+- **生命周期分明**：`data/` 永久保留，`cache/` 可重建，`outputs/` 按需保留，`temp/` 随时清
+
+#### 执行层面
+
+- **R-11 自动审查 + 交叉引用追踪**：`skill_audit.py` 和 `skill_builder.py update` 会自动扫描 `scripts/` 下的脚本，检测硬编码产出路径。**同时反向搜索整个技能目录**（SKILL.md、references/*.md 等），找出所有引用同一路径的关联文件，一并报告。修正路径时按报告中的"关联引用"列表逐文件更新，确保一致性。
+- **refactor 建议**：`skill_builder.py refactor` 在 dry-run 阶段也会报告产出物路径违规，供改造时一并修正

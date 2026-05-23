@@ -7,7 +7,12 @@
 
 ## 目录
 
-- [v2.3.0（当前版本）](#230-当前版本)
+- [v2.7.1（当前版本）](#271-当前版本)
+- [v2.7.0](#270)
+- [v2.6.0](#260)
+- [v2.5.0](#250)
+- [v2.4.0](#240)
+- [v2.3.0](#230)
 - [v2.1.0](#210)
 - [v2.0.1](#201)
 - [v2.0.0（重大升级）](#200-重大升级)
@@ -15,7 +20,159 @@
 
 ---
 
-### v2.3.0（当前版本）
+### v2.7.1（当前版本）
+
+**发布日期：2026-05-23**
+**类型：Patch（R-11 交叉引用追踪增强）**
+
+### 新增
+
+- **R-11 交叉引用追踪**：从 `scripts/` 发现的每个违规路径出发，反向搜索整个技能目录（SKILL.md、references/*.md、_meta.json 等），找出所有引用同一路径的关联文件，一并报告在"关联引用"列表中
+- 违规格式从纯文本字符串升级为结构化对象 `{source, path_literal, suggestion, cross_refs}`
+- `_extract_path_literal()` 辅助函数：从违规行提取完整路径字面量
+- `_trace_cross_references()`：独立的交叉引用搜索引擎，排除 scripts/ 自身，仅扫描文本文件
+
+### 修复
+
+- `open("output/report.html", "w")` regex 改为捕获完整路径 `output/report.html` 而非仅捕获目录名 `output`
+- 建议路径 `suggestion` 现在正确处理完整文件路径（如 `outputs/report.html` 而非 `outputs/`）
+- `_ARTIFACT_DIR_NAMES` 排序优化：长名在前避免部分匹配（`outputs` 优先于 `output`）
+- Shell 正则统一使用 `_ARTIFACT_DIR_RE` 而非硬编码
+
+### 变更
+
+- `skill_audit.py` v2.4.0 → v2.5.0
+- `skill_builder.py` v2.5.0 → v2.6.0
+
+### 测试验证
+
+- 模拟 5 处违规 + 3 个文件引用同一路径：全部检出并正确报告关联文件位置
+- skill-standardization 自身审查：R-11 PASS
+
+---
+
+### v2.7.0
+
+**发布日期：2026-05-23**
+**类型：Minor（新审查规则 R-11）**
+
+### 新增
+
+- **R-11：产出物路径规范性审查（铁律4落地检测）**：
+  - `skill_audit.py` 新增 `check_artifact_paths` 方法，自动扫描 `scripts/` 下 `.py/.sh/.bat/.ps1` 文件，检测硬编码产出路径指向技能目录内部的违规行为
+  - `skill_builder.py` `cmd_update()` 同步增加产出物路径检查（检查4）
+  - 检测模式覆盖：`Path(__file__).parent / "output"`、`os.path.dirname(__file__)` + 产出子目录、`open("output/...", "w")` 相对路径写入、`Path("data").mkdir()` 等
+  - 自动区分合规/违规：含 `"standardization"` 关键字的路径放行，纯读操作 `"r"` 模式放行
+  - 根据目录名自动推断产出物分类（data/cache/outputs/temp），给出迁移建议
+
+### 变更
+
+- 审查规则从 10 条增至 11 条（R-01~04 ERROR + R-05~11 WARN）
+- `skill_audit.py` v2.3.0 → v2.4.0
+- `skill_builder.py` v2.4.0 → v2.5.0（文件头已为 v2.5.0，同步工具体现）
+- `spec/rules.json` v2.2.0 → v2.3.0，_total_rules: 10→11，_warn_count: 6→7
+
+### 设计理由
+
+- 铁律4（产出物路径管理规范）此前只定义了规范，缺少自动化检测手段
+- update/refactor 模式下可以主动发现违规并提示修正，形成"规范定义 → 审查检测 → 建议修正"完整闭环
+- 检测仅告警不阻断（WARN 级），由技能维护者决定是否修正
+
+### 技术细节
+
+| 项目 | v2.6.0 | v2.7.0 |
+|------|--------|--------|
+| 审查规则数 | 10 | 11 |
+| 检测代码新增 | — | ~150 行（audit+builder） |
+| 检测文件类型 | — | .py/.sh/.bat/.ps1 |
+| 违规模式数 | — | 6 种正则 + shell 重定向检测 |
+
+---
+
+### v2.6.0
+
+**发布日期：2026-05-23**
+**类型：Minor（规范语义修正 + 路径重命名）**
+
+### 新增/修正内容
+
+#### 规范修正
+
+- **铁律4 语义重写**：从"标准化工具自身备份/报告路径"改为"所有技能运行时产出物统一路径管理"。核心概念从工具自指变为通用规范——日程技能出 `.ics`、任务技能出清单 `.json`、数据处理出缓存，全部走 `<workspace>/standardization/<skill>/` 统一管理。
+
+- **子目录重命名**（更通用）：
+  - `backups/` → `data/`（持久化业务数据）
+  - `reports/` → `outputs/`（生成/导出产物）
+  - `cache/` → 保留（短期缓存）
+  - `temp/` → 保留（临时文件）
+
+#### 工具同步
+
+- **skill_builder.py v2.4.0 → v2.5.0**：`_create_backup()` 目标从 `data/`（原 `backups/`），`_save_report()` 目标从 `outputs/`（原 `reports/`）
+
+### 技术细节
+
+| 项目 | v2.5.0 | v2.6.0 |
+|------|--------|--------|
+| 铁律4 适用范围 | create/update/refactor 三模式 | 所有技能一切运行时 |
+| 备份路径 | `.../backups/` | `.../data/` |
+| 报告路径 | `.../reports/` | `.../outputs/` |
+| skill_builder.py | v2.4.0 | v2.5.0 |
+
+---
+
+### v2.5.0
+
+**发布日期：2026-05-23**
+**类型：Minor（工具路径改造）**
+
+### 新增/修正内容
+
+#### 工具改造
+
+- **skill_builder.py v2.2.0 → v2.4.0**：产出物路径全面改造 — `_create_backup()` 备份路径从 `skill_dir.parent` 改为 `<workspace>/standardization/<skill>/backups/`，新增 `_get_workspace_dir()`、`_get_standardization_dir()`、`_save_report()` 辅助函数。update/refactor 模式报告自动落盘到 `<workspace>/standardization/<skill>/reports/`。新增 `--workspace` / `-w` CLI 参数。
+
+#### 设计理由
+
+- 技能更新/重装时备份和报告不再因覆盖而丢失（铁律4落地实现）
+- 工作区级隔离，不同 skill 产出物互不污染
+- `--workspace` / `-w` 可显式指定，默认使用 `Path.cwd()`
+
+### 技术细节
+
+| 项目 | v2.4.0 | v2.5.0 |
+|------|--------|--------|
+| skill_builder.py 版本 | v2.1.0 | v2.4.0 |
+| 备份路径 | `skill_dir.parent/` | `workspace/standardization/<skill>/backups/` |
+| 报告输出 | 仅 stdout | stdout + `reports/*.txt` |
+| CLI 参数 | — | + `--workspace` / `-w` |
+
+---
+
+### v2.4.0
+
+**发布日期：2026-05-23**
+**类型：Minor（规范新增）**
+
+### 新增/修正内容
+
+#### 规范新增
+
+- **增量更新记录渐进式加载规定**：update/refactor 模式下产出的变更记录必须写入 `references/changelog.md`，禁止写入主 SKILL.md。确保主文件行数可控，详细历史信息按需加载。
+
+- **铁律 4：产出物路径管理规范**（新增）：create/update/refactor 三种模式产生的所有产出物类文件（备份、报告、缓存、临时文件等）统一存至工作区标准化路径 `<workspace>/.workbuddy/standardization/<skill_name>/` 下分门别类子目录（`backups/`、`reports/`、`cache/`、`temp/`），禁止放在技能文件夹下，防止更新覆盖导致积累性产出丢失。
+
+### 技术细节
+
+| 项目 | v2.3.0 | v2.4.0 |
+|------|--------|--------|
+| 铁律数量 | 3 条 | 4 条（新增铁律4） |
+| 渐进式MD规范 | 基本拆分规则 | + 增量changelog加载规则 |
+| SKILL.md 行数 | 200 行 | ~250 行（新增2节规范内容） |
+
+---
+
+### v2.3.0
 
 **发布日期：2026-05-23**
 **类型：Minor（Bug 修复 + 版本号同步）**
@@ -290,5 +447,5 @@
 
 ---
 
-*本文件由 skill-standardization v2.2.0 维护。*
+*本文件由 skill-standardization v2.7.0 维护。*
 *最后更新：2026-05-23*

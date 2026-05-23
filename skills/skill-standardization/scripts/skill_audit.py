@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit.py — SKILL.md 规范化审查工具 (v2.3.0)
+skill_audit.py — SKILL.md 规范化审查工具 (v2.5.0)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
 
-基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-10 规则。
+基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-11 规则。
 支持独立运行（CLI）和被 git-sync.sh 调用（--json 模式）。
 
 用法:
@@ -92,12 +92,43 @@ RULES = [
         "check": "SKILL.md 中 version 与 manifest.json 记录一致",
         "method": "version_matches_manifest",
     },
+    {
+        "id": "R-11",
+        "name": "产出物路径规范性",
+        "severity": "WARN",
+        "check": "scripts/ 产出路径规范 + 全目录交叉引用追踪（铁律4）",
+        "method": "check_artifact_paths",
+    },
 ]
 
 # 同义章节关键词映射
 TRIGGER_KEYWORDS = ["触发条件", "触发场景", "适用场景", "触发"]
 CORE_KEYWORDS = ["核心功能", "核心能力", "概述", "核心概念", "Overview", "技能概述"]
-WORKFLOW_KEYWORDS = ["工作流程", "使用方式", "Workflow", "完整执行流程", "核心指令"]
+WORKFLOW_KEYWORDS = ["工作流程", "使用方式", "Workflow", "完整执行流程", "核心指令", "完整工作流"]
+
+# R-11: 产出物路径检测 — 违规模式关键词（长名在前防止部分匹配）
+ARTIFACT_DIR_NAMES = [
+    "outputs", "output", "artifacts", "results", "exports",
+    "reports", "report", "backups", "backup", "generated",
+    "dumps", "dump", "build", "dist", "logs", "log",
+    "data", "cache", "temp", "tmp", "out",
+]
+
+# 构建产出目录名的正则 alternation
+_ARTIFACT_DIR_PATTERN = "|".join(ARTIFACT_DIR_NAMES)
+
+ARTIFACT_WRITE_PATTERNS = [
+    # Path(__file__).parent / "data_dir" — 产出到脚本同目录
+    re.compile(rf'__file__\s*\)\s*\.\s*parent\s*/\s*"({_ARTIFACT_DIR_PATTERN})"'),
+    re.compile(rf'os\.path\.dirname\s*\(\s*__file__\s*\)\s*,\s*"({_ARTIFACT_DIR_PATTERN})"'),
+    re.compile(rf'os\.path\.join\s*\(\s*os\.path\.dirname\s*\(\s*__file__\s*\)\s*,\s*"({_ARTIFACT_DIR_PATTERN})"'),
+    # open("output/report.html", "w") — 捕获完整路径（目录+文件名）
+    re.compile(rf'open\s*\(\s*["\'](?:\./)?({_ARTIFACT_DIR_PATTERN}/[^"\']+)["\']\s*,\s*["\']w["\']'),
+    # Path("output_dir").mkdir() — 创建产出目录
+    re.compile(rf'Path\s*\(\s*["\']\.?({_ARTIFACT_DIR_PATTERN})["\']'),
+    # with open("file.json", "w") — 直接写入 JSON/CSV 到工作目录
+    re.compile(r'open\s*\(\s*["\']([^"\']+\.(json|csv|html|png|jpg|pdf|txt|ics))["\']\s*,\s*["\']w["\']'),
+]
 
 
 # ── 轻量 YAML 解析器（零依赖） ──────────────────────────────────
@@ -240,6 +271,226 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
             "detail": f"SKILL.md({fm['version']}) {'==' if matched else '!='} manifest({manifest_version})"}
 
 
+def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
+    """R-11: 扫描 scripts/ 脚本，检测违反铁律4的产出物路径。
+    
+    检测脚本中是否有硬编码路径把产出物写入技能目录内部，
+    同时反向搜索整个技能目录找出引用同一路径的关联文件。
+    """
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
+    
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return {"passed": True, "detail": "跳过：无 scripts/ 目录", "skip": True}
+    
+    violations = []  # list of {source, path_literal, suggestion}
+    script_exts = {".py", ".sh", ".bat", ".ps1"}
+    
+    for fname in sorted(os.listdir(scripts_dir)):
+        fpath = os.path.join(scripts_dir, fname)
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in script_exts or not os.path.isfile(fpath):
+            continue
+        
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                script_lines = f.readlines()
+        except Exception:
+            continue
+        
+        rel_path = os.path.join("scripts", fname)
+        
+        if ext == ".py":
+            _check_python_artifact_paths_v2(rel_path, script_lines, violations)
+        elif ext in (".sh", ".bat", ".ps1"):
+            _check_shell_artifact_paths_v2(rel_path, script_lines, violations)
+    
+    # ── 交叉引用追踪 ──
+    if violations:
+        _trace_cross_references(skill_dir, violations)
+    
+    if violations:
+        detail_lines = [f"发现 {len(violations)} 处产出物路径违规："]
+        for v in violations:
+            line = f"  {v['source']}  产出 \"{v['path_literal']}\" — 应迁至 {v['suggestion']}"
+            if v.get("cross_refs"):
+                line += f"\n    ⚠️ 关联引用 ({len(v['cross_refs'])}处): {', '.join(v['cross_refs'])}"
+            detail_lines.append(line)
+        return {
+            "passed": False,
+            "detail": "\n".join(detail_lines),
+            "violations": [{"source": v["source"], "path": v["path_literal"],
+                           "suggestion": v["suggestion"], "cross_refs": v.get("cross_refs", [])}
+                          for v in violations],
+        }
+    else:
+        return {"passed": True, "detail": "scripts/ 中未发现产出物路径违规"}
+
+
+def _extract_path_literal(line_text, matched_target):
+    """从违规行中提取完整的路径字面量（引号内的内容）。
+    
+    优先返回包含 matched_target 的完整引号字符串，
+    降级返回 matched_target 本身。
+    """
+    # 匹配所有引号字符串
+    quoted = re.findall(r"""["']([^"']+)["']""", line_text)
+    for q in quoted:
+        if matched_target in q:
+            # 保留相对路径前缀（./ 等）
+            return q
+    return matched_target
+
+
+def _check_python_artifact_paths_v2(rel_path, script_lines, violations):
+    """检查 Python 脚本中的产出物路径违规（v2：结构化输出）"""
+    for i, line in enumerate(script_lines, 1):
+        stripped = line.strip()
+        if stripped.startswith("#") or not stripped:
+            continue
+        if stripped.startswith("import ") or stripped.startswith("from "):
+            continue
+        
+        for pat in ARTIFACT_WRITE_PATTERNS:
+            m = pat.search(stripped)
+            if m:
+                target = m.group(1)
+                if "standardization" in stripped.lower():
+                    continue
+                if '"r"' in stripped or "'r'" in stripped:
+                    continue
+                
+                path_literal = _extract_path_literal(stripped, target)
+                # 根据 target 结构确定分类和建议
+                if "/" in target:
+                    dir_part = target.split("/")[0]
+                    cat = _classify_artifact(dir_part)
+                    filename = target.split("/")[-1]
+                    if "." in filename:
+                        suggestion = f"<workspace>/standardization/<skill>/{cat}/{filename}"
+                    else:
+                        suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                elif "." in target:
+                    # 独立文件名：results.json → outputs/results.json
+                    cat = _classify_artifact(target)
+                    suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                else:
+                    # 纯目录名：output → outputs/
+                    cat = _classify_artifact(target)
+                    suggestion = f"<workspace>/standardization/<skill>/{cat}/"
+                
+                violations.append({
+                    "source": f"{rel_path}:{i}",
+                    "path_literal": path_literal,
+                    "suggestion": suggestion,
+                })
+                break
+
+
+def _check_shell_artifact_paths_v2(rel_path, script_lines, violations):
+    """检查 Shell/Batch/PowerShell 脚本中的产出物路径违规（v2）"""
+    for i, line in enumerate(script_lines, 1):
+        stripped = line.strip()
+        if stripped.startswith("#") or stripped.startswith("::") or not stripped:
+            continue
+        
+        m = re.search(rf'[>]+\s*["\']?\.?({_ARTIFACT_DIR_PATTERN})/', stripped)
+        if m and "standardization" not in stripped.lower():
+            target = m.group(1)
+            path_literal = _extract_path_literal(stripped, target) or f"{target}/"
+            cat = _classify_artifact(target)
+            violations.append({
+                "source": f"{rel_path}:{i}",
+                "path_literal": path_literal,
+                "suggestion": f"<workspace>/standardization/<skill>/{cat}/",
+            })
+            continue
+        
+        m = re.search(rf'(?:mkdir|New-Item)\s+.*["\']?\.?({_ARTIFACT_DIR_PATTERN})["\']?', stripped)
+        if m and "standardization" not in stripped.lower():
+            target = m.group(1)
+            path_literal = _extract_path_literal(stripped, target) or target
+            cat = _classify_artifact(target)
+            violations.append({
+                "source": f"{rel_path}:{i}",
+                "path_literal": path_literal,
+                "suggestion": f"<workspace>/standardization/<skill>/{cat}/",
+            })
+
+
+def _trace_cross_references(skill_dir, violations):
+    """反向搜索整个 skill 目录，找出引用每个违规路径的关联文件。
+    
+    搜索范围：SKILL.md、references/*.md、_meta.json 等文本文件。
+    排除 scripts/ 目录（已由违规检测覆盖）。
+    
+    结果原地写入每个 violation 的 cross_refs 字段。
+    """
+    # 收集所有需要搜索的 path_literal（去重）
+    search_patterns = list(set(v["path_literal"] for v in violations))
+    
+    # 收集所有可搜索的文件
+    text_exts = {".md", ".json", ".yaml", ".yml", ".txt", ".cfg", ".toml", ".ini", ".html"}
+    searchable_files = []
+    
+    for root, dirs, files in os.walk(skill_dir):
+        # 排除 __pycache__、.git、scripts
+        dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git")]
+        rel_root = os.path.relpath(root, skill_dir).replace("\\", "/")
+        if rel_root == ".":
+            rel_root = ""
+        
+        # 跳过 scripts/ 目录
+        if rel_root.startswith("scripts") or rel_root == "scripts":
+            continue
+        
+        for fname in files:
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in text_exts:
+                continue
+            fpath = os.path.join(root, fname)
+            rel = os.path.join(rel_root, fname).replace("\\", "/") if rel_root else fname
+            searchable_files.append((rel, fpath))
+    
+    # 对每个 path_literal，在所有搜索文件中查找引用
+    pattern_to_refs = {}  # path_literal → [fname:line, ...]
+    
+    for rel, fpath in searchable_files:
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                file_lines = f.readlines()
+        except Exception:
+            continue
+        
+        for i, line in enumerate(file_lines, 1):
+            for pattern in search_patterns:
+                if pattern in line:
+                    pattern_to_refs.setdefault(pattern, []).append(f"{rel}:{i}")
+    
+    # 回填到 violations
+    for v in violations:
+        refs = pattern_to_refs.get(v["path_literal"], [])
+        # 排除自身（同一文件的 source）
+        refs = [r for r in refs if r != v["source"]]
+        if refs:
+            v["cross_refs"] = refs
+
+
+def _classify_artifact(dirname):
+    """根据目录名推断产出物分类（data/cache/outputs/temp）"""
+    d = dirname.lower().rstrip("s")
+    mapping = {
+        "data": "data", "backup": "data", "dump": "data",
+        "cache": "cache", "tmp": "temp", "temp": "temp",
+        "output": "outputs", "out": "outputs", "result": "outputs",
+        "export": "outputs", "report": "outputs", "log": "outputs",
+        "build": "outputs", "dist": "outputs", "generated": "outputs",
+        "artifact": "outputs",
+    }
+    return mapping.get(d, "outputs")
+
+
 # 方法分派表
 METHOD_MAP = {
     "regex_frontmatter_exists": regex_frontmatter_exists,
@@ -252,6 +503,7 @@ METHOD_MAP = {
     "body_has_core_section": body_has_core_section,
     "body_has_workflow_section": body_has_workflow_section,
     "version_matches_manifest": version_matches_manifest,
+    "check_artifact_paths": check_artifact_paths,
 }
 
 
@@ -301,6 +553,7 @@ def audit_skill(skill_dir, manifest_version=None):
             fm=fm,
             body=body,
             dirname=dirname,
+            skill_dir=skill_dir,
             manifest_version=manifest_version,
         )
         passed = result.get("passed", False)
@@ -478,7 +731,7 @@ def cmd_audit_all(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="SKILL.md 规范化审查工具 (R-01~R-10)",
+        description="SKILL.md 规范化审查工具 (R-01~R-11)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:

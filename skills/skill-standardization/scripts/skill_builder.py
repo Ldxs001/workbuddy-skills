@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.3.0
+skill_builder.py — Skill 标准化构建器 v2.6.0
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -11,8 +11,8 @@ skill_builder.py — Skill 标准化构建器 v2.3.0
 
 用法：
   python skill_builder.py create <name> --desc "描述" [--dir <path>] [--tags tag1,tag2]
-  python skill_builder.py update <skill_dir> [--fix] [--backup]
-  python skill_builder.py refactor <skill_dir> [--backup] [--dry-run]
+  python skill_builder.py update <skill_dir> [--fix] [--backup] [--workspace <path>]
+  python skill_builder.py refactor <skill_dir> [--backup] [--dry-run] [--workspace <path>]
 
 作者：[username-redacted]
 许可：MIT
@@ -30,7 +30,7 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-__version__ = "2.1.0"
+__version__ = "2.6.0"
 
 SPEC_DIR = Path(__file__).parent / "spec"
 SKILL_TEMPLATE = """---
@@ -174,7 +174,7 @@ def cmd_update(args):
     name = skill_dir.name
     backup_dir = None
     if args.backup:
-        backup_dir = _create_backup(skill_dir, "update")
+        backup_dir = _create_backup(skill_dir, "update", args.workspace)
 
     results = {"checks": [], "fixes": [], "warnings": []}
 
@@ -254,6 +254,15 @@ def cmd_update(args):
             f"💡 根目录有非常规文件: {sorted(unexpected_root)}（建议移入对应子目录）"
         )
 
+    # 检查 4: 产出物路径规范性（铁律4）
+    artifact_violations = _check_artifact_paths(skill_dir)
+    if artifact_violations:
+        results["warnings"].append(
+            f"🔍 产出物路径违规（铁律4）— 发现 {len(artifact_violations)} 处："
+        )
+        for v in artifact_violations:
+            results["warnings"].append(f"   {v}")
+
     # 输出报告
     print(f"\n{'='*50}")
     print(f"📋 Skill 更新检查报告: {name}")
@@ -281,6 +290,26 @@ def cmd_update(args):
     warn_count = len(results["warnings"]) - error_count
 
     print(f"\n结论: ERROR={error_count} WARN={warn_count} PASS={len(results['checks'])}")
+
+    # 保存报告到标准化工作区
+    report_lines = [f"Skill 更新检查报告: {name}", "=" * 50, ""]
+    report_lines.append("通过项:")
+    for c in results["checks"]:
+        report_lines.append(f"  {c}")
+    if results["warnings"]:
+        report_lines.append("\n警告/建议:")
+        for w in results["warnings"]:
+            report_lines.append(f"  {w}")
+    if results.get("fixes"):
+        report_lines.append("\n已修复:")
+        for f in results["fixes"]:
+            report_lines.append(f"  {f}")
+    report_lines.append(f"\n结论: ERROR={error_count} WARN={warn_count} PASS={len(results['checks'])}")
+    if backup_dir:
+        report_lines.append(f"\n备份位置: {backup_dir}")
+
+    report_path = _save_report(skill_dir, "update", "\n".join(report_lines), args.workspace)
+    print(f"📄 报告位置: {report_path}")
 
 
 # ═══════════════════════════════════════════════════════
@@ -338,7 +367,7 @@ def cmd_refactor(args):
     # 阶段 2：备份（强制）
     backup_dir = None
     if not args.no_backup:
-        backup_dir = _create_backup(skill_dir, "refactor")
+        backup_dir = _create_backup(skill_dir, "refactor", args.workspace)
 
     # 阶段 3：构建迁移计划并执行
     print(f"\n🔧 阶段 2: 执行标准化迁移")
@@ -489,8 +518,198 @@ def cmd_refactor(args):
     print(f"   3. 如有旧版 _skillhub_meta.json，确认是否可删除")
     print(f"   4. 运行 `python skill_audit.py audit {skill_dir}` 验证")
 
+    # 保存迁移报告到标准化工作区
+    report_lines = [f"Skill 改造报告: {name}", "=" * 60, ""]
+    report_lines.append(f"迁移前: {len(original_clean)} 个文件, 总大小 {original_total_size:,} 字节")
+    report_lines.append(f"迁移后: {len(after_clean)} 个文件, 总大小 {after_total_size:,} 字节")
+    report_lines.append(f"移动了: {moved_count} 个文件")
+    report_lines.append(f"保留了: {skipped_count} 个文件")
+    report_lines.append("\n迁移映射表:")
+    report_lines.append("-" * 60)
+    for src, dst, act in migration_log:
+        report_lines.append(f"  {src:<35} → {dst if dst else '—':<35} ({act})")
+    if backup_dir:
+        report_lines.append(f"\n备份位置: {backup_dir}")
+
+    report_path = _save_report(skill_dir, "refactor", "\n".join(report_lines), args.workspace)
+    print(f"📄 报告位置: {report_path}")
+
 
 # ── 辅助函数 ──────────────────────────────────────────
+
+# -- 产出物路径检测（铁律4） --
+
+_ARTIFACT_DIR_NAMES = [
+    "outputs", "output", "artifacts", "results", "exports",
+    "reports", "report", "backups", "backup", "generated",
+    "dumps", "dump", "build", "dist", "logs", "log",
+    "data", "cache", "temp", "tmp", "out",
+]
+
+_ARTIFACT_DIR_RE = "|".join(_ARTIFACT_DIR_NAMES)
+
+_ARTIFACT_WRITE_PATTERNS = [
+    re.compile(rf'__file__\s*\)\s*\.\s*parent\s*/\s*"({_ARTIFACT_DIR_RE})"'),
+    re.compile(rf'os\.path\.dirname\s*\(\s*__file__\s*\)\s*,\s*"({_ARTIFACT_DIR_RE})"'),
+    re.compile(rf'os\.path\.join\s*\(\s*os\.path\.dirname\s*\(\s*__file__\s*\)\s*,\s*"({_ARTIFACT_DIR_RE})"'),
+    re.compile(rf'open\s*\(\s*["\'](?:\./)?({_ARTIFACT_DIR_RE}/[^"\']+)["\']\s*,\s*["\']w["\']'),
+    re.compile(rf'Path\s*\(\s*["\']\.?({_ARTIFACT_DIR_RE})["\']'),
+    re.compile(r'open\s*\(\s*["\']([^"\']+\.(json|csv|html|png|jpg|pdf|txt|ics))["\']\s*,\s*["\']w["\']'),
+]
+
+_ARTIFACT_CLASSIFY = {
+    "data": "data", "backup": "data", "backups": "data", "dump": "data", "dumps": "data",
+    "cache": "cache", "tmp": "temp", "temp": "temp",
+    "output": "outputs", "outputs": "outputs", "out": "outputs",
+    "result": "outputs", "results": "outputs", "export": "outputs", "exports": "outputs",
+    "report": "outputs", "reports": "outputs", "log": "outputs", "logs": "outputs",
+    "build": "outputs", "dist": "outputs", "generated": "outputs",
+    "artifact": "outputs", "artifacts": "outputs",
+}
+
+_TEXT_EXTS = {".md", ".json", ".yaml", ".yml", ".txt", ".cfg", ".toml", ".ini", ".html"}
+
+
+def _extract_path_literal(line_text, matched_target):
+    """从违规行中提取完整的路径字面量（引号内的内容）。"""
+    quoted = re.findall(r"""["']([^"']+)["']""", line_text)
+    for q in quoted:
+        if matched_target in q:
+            return q
+    return matched_target
+
+
+def _check_artifact_paths(skill_dir):
+    """扫描 scripts/ 下脚本，检测违反铁律4的产出物路径。
+    
+    同时反向搜索整个 skill 目录找出引用同一路径的关联文件。
+    
+    Returns:
+        list: 违规描述字符串列表（含交叉引用信息），空列表表示无违规
+    """
+    scripts_dir = skill_dir / "scripts"
+    if not scripts_dir.is_dir():
+        return []
+    
+    violations = []  # {source, path_literal, suggestion}
+    for fpath in sorted(scripts_dir.iterdir()):
+        ext = fpath.suffix.lower()
+        if ext not in (".py", ".sh", ".bat", ".ps1"):
+            continue
+        if not fpath.is_file():
+            continue
+        
+        try:
+            lines = fpath.read_text(encoding="utf-8", errors="replace").split("\n")
+        except Exception:
+            continue
+        
+        rel = f"scripts/{fpath.name}"
+        
+        if ext == ".py":
+            for i, line in enumerate(lines, 1):
+                s = line.strip()
+                if not s or s.startswith("#") or s.startswith("import ") or s.startswith("from "):
+                    continue
+                for pat in _ARTIFACT_WRITE_PATTERNS:
+                    m = pat.search(s)
+                    if m and "standardization" not in s.lower() and '"r"' not in s and "'r'" not in s:
+                        target = m.group(1)
+                        path_literal = _extract_path_literal(s, target)
+                        # 根据 target 结构确定分类和建议
+                        if "/" in target:
+                            dir_part = target.split("/")[0]
+                            cat = _ARTIFACT_CLASSIFY.get(dir_part.lower(), "outputs")
+                            filename = target.split("/")[-1]
+                            if "." in filename:
+                                suggestion = f"<workspace>/standardization/<skill>/{cat}/{filename}"
+                            else:
+                                suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                        elif "." in target:
+                            cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
+                            suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                        else:
+                            cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
+                            suggestion = f"<workspace>/standardization/<skill>/{cat}/"
+                        
+                        violations.append({
+                            "source": f"{rel}:{i}",
+                            "path_literal": path_literal,
+                            "suggestion": suggestion,
+                        })
+                        break
+        elif ext in (".sh", ".bat", ".ps1"):
+            for i, line in enumerate(lines, 1):
+                s = line.strip()
+                if not s or s.startswith("#") or s.startswith("::"):
+                    continue
+                m = re.search(rf'[>]+\s*["\']?\.?({_ARTIFACT_DIR_RE})/', s)
+                if m and "standardization" not in s.lower():
+                    target = m.group(1)
+                    path_literal = _extract_path_literal(s, target) or f"{target}/"
+                    cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
+                    violations.append({
+                        "source": f"{rel}:{i}",
+                        "path_literal": path_literal,
+                        "suggestion": f"<workspace>/standardization/<skill>/{cat}/",
+                    })
+    
+    # ── 交叉引用追踪 ──
+    if violations:
+        _trace_cross_refs(skill_dir, violations)
+    
+    # 格式化为输出字符串
+    result = []
+    for v in violations:
+        line = f"{v['source']}  产出 \"{v['path_literal']}\" — 应迁至 {v['suggestion']}"
+        if v.get("cross_refs"):
+            line += f"\n      ⚠️ 关联引用 ({len(v['cross_refs'])}处): {', '.join(v['cross_refs'])}"
+        result.append(line)
+    
+    return result
+
+
+def _trace_cross_refs(skill_dir, violations):
+    """反向搜索整个 skill 目录，找出引用每个违规路径的关联文件。"""
+    search_patterns = list(set(v["path_literal"] for v in violations))
+    
+    # 收集搜索目标文件
+    searchable_files = []
+    for root, dirs, files in os.walk(skill_dir):
+        dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git")]
+        rel_root = os.path.relpath(root, skill_dir).replace("\\", "/")
+        if rel_root == ".":
+            rel_root = ""
+        if rel_root.startswith("scripts") or rel_root == "scripts":
+            continue
+        for fname in files:
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in _TEXT_EXTS:
+                continue
+            fpath = os.path.join(root, fname)
+            rel_f = os.path.join(rel_root, fname).replace("\\", "/") if rel_root else fname
+            searchable_files.append((rel_f, fpath))
+    
+    pattern_to_refs = {}
+    for rel, fpath in searchable_files:
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                file_lines = f.readlines()
+        except Exception:
+            continue
+        for i, line in enumerate(file_lines, 1):
+            for pattern in search_patterns:
+                if pattern in line:
+                    pattern_to_refs.setdefault(pattern, []).append(f"{rel}:{i}")
+    
+    for v in violations:
+        refs = pattern_to_refs.get(v["path_literal"], [])
+        refs = [r for r in refs if r != v["source"]]
+        if refs:
+            v["cross_refs"] = refs
+
+
+# -- 文件扫描 --
 
 def _scan_all_files(directory):
     """递归扫描目录下所有文件，返回 {相对路径: {size, mtime}}"""
@@ -509,11 +728,40 @@ def _scan_all_files(directory):
     return result
 
 
-def _create_backup(skill_dir, operation):
-    """创建时间戳备份"""
+def _get_workspace_dir(skill_dir, workspace_arg=None):
+    """解析标准化工作区根目录。
+
+    优先级：
+    1. --workspace 参数显式指定
+    2. 当前工作目录 (Path.cwd())
+
+    返回工作区根路径（Path 对象）。
+    工作区标准化路径为：<workspace>/standardization/<skill_name>/
+    """
+    if workspace_arg:
+        ws = Path(workspace_arg).resolve()
+    else:
+        ws = Path.cwd()
+    return ws
+
+
+def _get_standardization_dir(skill_dir, workspace_arg=None):
+    """获取标准化产出物根目录：<workspace>/standardization/<skill_name>/"""
+    ws = _get_workspace_dir(skill_dir, workspace_arg)
+    return ws / "standardization" / skill_dir.name
+
+
+def _create_backup(skill_dir, operation, workspace_arg=None):
+    """创建时间戳备份到标准化工作区（铁律4：持久化数据 → data/）。
+
+    备份路径：<workspace>/standardization/<skill_name>/data/<skill_name>_bak_<op>_<timestamp>/
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_name = f"{skill_dir.name}_bak_{operation}_{timestamp}"
-    backup_path = skill_dir.parent / backup_name
+    std_dir = _get_standardization_dir(skill_dir, workspace_arg)
+    backup_base = std_dir / "data"
+    backup_base.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_base / backup_name
 
     if backup_path.exists():
         shutil.rmtree(backup_path)
@@ -524,6 +772,21 @@ def _create_backup(skill_dir, operation):
         shutil.rmtree(pcp, ignore_errors=True)
 
     return backup_path
+
+
+def _save_report(skill_dir, operation, report_text, workspace_arg=None):
+    """保存标准化报告到工作区（铁律4：生成产物 → outputs/）。
+
+    报告路径：<workspace>/standardization/<skill_name>/outputs/<skill_name>_<op>_<timestamp>.txt
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_name = f"{skill_dir.name}_{operation}_{timestamp}.txt"
+    std_dir = _get_standardization_dir(skill_dir, workspace_arg)
+    report_base = std_dir / "outputs"
+    report_base.mkdir(parents=True, exist_ok=True)
+    report_path = report_base / report_name
+    report_path.write_text(report_text, encoding="utf-8")
+    return report_path
 
 
 def _write_json(filepath, data):
@@ -582,8 +845,9 @@ def main():
 示例:
   %(prog)s create my-skill --desc "我的技能" --tags test,tool
   %(prog)s update ./my-skill --fix
+  %(prog)s update ./my-skill --backup --workspace /path/to/project
   %(prog)s refactor ./old-skill --dry-run
-  %(prog)s refactor ./old-skill --backup
+  %(prog)s refactor ./old-skill --backup --workspace /path/to/project
 """,
     )
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
@@ -600,12 +864,14 @@ def main():
     p_update.add_argument("skill_dir", help="Skill 目录路径")
     p_update.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
     p_update.add_argument("--backup", action="store_true", help="修改前自动备份")
+    p_update.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认当前目录），产出物将存至 <workspace>/standardization/<skill>/")
 
     # refactor 子命令
     p_refactor = subparsers.add_parser("refactor", help="整体改造非标 skill 到标准结构")
     p_refactor.add_argument("skill_dir", help="要改造的 Skill 目录路径")
     p_refactor.add_argument("--no-backup", action="store_true", help="不创建备份（不推荐）")
     p_refactor.add_argument("--dry-run", action="store_true", help="仅输出计划不执行")
+    p_refactor.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认当前目录），产出物将存至 <workspace>/standardization/<skill>/")
 
     args = parser.parse_args()
 
