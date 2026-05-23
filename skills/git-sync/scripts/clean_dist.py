@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """清理 dist/ 目录中的旧版本 ZIP，只保留 _meta.json 中的最新版本"""
 import json, os, re, glob
+from pathlib import Path
 
-SKILLS_DIR = os.path.expanduser("~/.workbuddy/skills")
+# 从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/
+SKILLS_DIR = str(Path(__file__).resolve().parent.parent.parent)
 DIST_DIR = os.path.join(SKILLS_DIR, ".dist")
 
 # 读取所有技能最新版本

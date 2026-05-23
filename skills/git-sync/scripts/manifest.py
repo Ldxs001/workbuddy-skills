@@ -28,12 +28,12 @@ from datetime import date
 from pathlib import Path
 
 # ── 路径解析 ───────────────────────────────────────────
-def _find_workspace_root():
-    """从 scripts/ 往上4级确定工作区根: <workspace>/skills/<name>/scripts/"""
-    return str(Path(__file__).resolve().parent.parent.parent.parent)
+def _find_skills_dir():
+    """从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/"""
+    return str(Path(__file__).resolve().parent.parent.parent)
 
-WORKSPACE_ROOT = _find_workspace_root()
-GIT_SYNC_DATA = os.path.join(WORKSPACE_ROOT, "standardization", "git-sync", "data")
+SKILLS_DIR = _find_skills_dir()
+GIT_SYNC_DATA = os.path.join(SKILLS_DIR, ".standardization", "git-sync", "data")
 MANIFEST_PATH = os.path.join(GIT_SYNC_DATA, "manifest.json")
 
 def load_manifest():
@@ -407,7 +407,7 @@ def _extract_desc(skill_dir):
 
 
 def _load_config():
-    """读取 standardization/git-sync/data/config.json，返回配置字典"""
+    """读取 skills/.standardization/git-sync/data/config.json，返回配置字典"""
     config_path = os.path.join(GIT_SYNC_DATA, "config.json")
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
@@ -498,7 +498,7 @@ rm -rf temp-skills
 
 - 本仓库由 **git-sync** 技能自动维护
 - README.md 由 `manifest.py sync-readme` **从仓库实际文件全量生成**，不手动编辑
-- 维护清单：`standardization/git-sync/data/manifest.json`（记录计划管理的技能全集）
+- 维护清单：`skills/.standardization/git-sync/data/manifest.json`（记录计划管理的技能全集）
 - 三单一致原则：**清单 ⊆ 仓库 ⊆ README.md**
 
 ---

@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.2.0
+version: 2.4.0
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -120,3 +120,9 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 6. ✅ ZIP 与仓库结构一致
 
 → [FAQ](references/faq.md) · [版本日志](references/changelog.md) · [完整参考](references/reference.md)
+
+---
+
+## 版本
+
+当前版本：**2.4.0** — v2.4.0：配合 skill-standardization v2.12.0 路径规范升级，同步版本号
