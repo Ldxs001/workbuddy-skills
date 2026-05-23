@@ -2,6 +2,25 @@
 
 ---
 
+## v2.0.4（2026-05-23）
+
+**改写类型：补充"工作流程"章节（R-09 合规）**
+
+### 变更内容
+- SKILL.md 新增 `## 工作流程` 章节，含 AI 执行节奏流程图 + 步骤概览表（步骤 0→6）
+- 版本号：2.0.3 → 2.0.4（SKILL.md + _meta.json）
+
+---
+
+## v2.0.3（2026-05-23）
+
+**改写类型：skill-standardization update 自动补充 _meta.json 字段**
+
+### 变更内容
+- `_meta.json` 补充缺失标签字段（`tags` 等），通过 skill-standardization v2.10.0 `update --fix` 自动完成
+
+---
+
 ## v2.0.2（2026-05-23）
 
 **改写类型：修复 sync_with_exclude.py 根目录判断错误**

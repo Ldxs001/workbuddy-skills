@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.0.3
+version: 2.0.4
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -35,6 +35,39 @@ tags: [sync, git, zip, skill-manager, manifest, security]
 | 4 | **SKILL.md 规范审查**（v1.8） | 同步前自动检查 R-01~R-10 合规性（纯警告不阻断） |
 | 5 | **三单一致机制**（v1.3） | manifest.json ≥ 仓库实际文件 = README.md |
 | 6 | **ZIP 打包 + HTML 索引**（v1.5） | 统一输出到 `.dist/` 并自动生成 index.html |
+
+## 工作流程
+
+### AI 执行节奏
+
+```
+用户请求同步 → 加载本 SKILL.md
+  ↓
+确定同步模式
+  ├── 按需同步（指定 skill 名）──→ 单 skill 流水线
+  └── 全量维护（明确说"全量"/"同步所有"）──→ 遍历 manifest.json
+  ↓
+执行同步流水线：
+  安全校验 → 清单检查 → 版本对比 → 敏感扫描 → 规范审查 → 同步推送 → ZIP打包 → README更新
+  ↓
+输出结果报告（✅/❌/⚠️）
+```
+
+### 步骤概览
+
+| 步骤 | 名称 | 说明 |
+|------|------|------|
+| 0 | 安全校验 | 路径穿越防护、目标范围检查 |
+| 0.5 | 清单检查 | manifest.json 状态验证 |
+| 0.7 | 版本对比 | 清单版本 vs 待更新版本 |
+| 1 | 敏感扫描 | Token/邮箱/路径检测与脱敏 |
+| 2 | 规范审查 | R-01~R-12 audit（纯警告） |
+| 3 | 同步推送 | Git 双端推送（Gitee + GitHub） |
+| 4 | ZIP 打包 | 生成 `.dist/` 包 + index.html |
+| 5 | README 更新 | 全量重建技能列表 |
+| 6 | 清单维护 | 更新 manifest.json 状态标记 |
+
+→ 完整步骤详解见 `references/guide.md`
 
 ## 快速开始
 
