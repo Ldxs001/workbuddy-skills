@@ -59,7 +59,7 @@ SKILL_DIR = get_skill_dir()
 # 里程碑关键词：步骤名包含这些关键词时，自动标记为里程碑
 MILESTONE_KEYWORDS = [
     "审计", "安全", "部署", "发布", "上线", "打包",
-    "测试", "验证", "校验", "审批", "审核",
+    "测试", "验证", "校验", "审核",
     "付款", "支付", "下单", "提交", "推送",
     "导入", "导出", "迁移", "备份", "恢复",
     "audit", "deploy", "release", "publish", "push",
@@ -104,15 +104,15 @@ def classify_milestones(steps):
     results = []
     for i, step in enumerate(steps):
         idx = step.get("index", i + 1)
-        fm = step.get("failure_mode", {})
+        explicit_milestone = step.get("is_milestone")  # 从步骤本身读取，不是从 failure_mode
 
         # 规则1：显式标记 true
-        if fm.get("is_milestone") is True:
+        if explicit_milestone is True:
             results.append({"step_index": idx, "is_milestone": True, "reason": "用户显式标记"})
             continue
 
         # 规则2：显式标记 false
-        if fm.get("is_milestone") is False:
+        if explicit_milestone is False:
             # 仍然检查其他规则，但显式 false 会覆盖
             pass
 
@@ -146,7 +146,7 @@ def classify_milestones(steps):
             continue
 
         # 规则7：默认非里程碑（如果用户没有显式设 false，也按默认处理）
-        explicit_false = fm.get("is_milestone") is False
+        explicit_false = step.get("is_milestone") is False
         results.append({
             "step_index": idx,
             "is_milestone": False,
@@ -282,7 +282,6 @@ def validate_retry_policy(policy):
             for et in policy["error_types"]:
                 if et not in VALID_ERROR_TYPES:
                     errors.append(f"retry_policy.error_types 中的未知错误类型: {et}")
-
     return errors
 
 
@@ -365,7 +364,7 @@ def cmd_init(args):
         config.setdefault("version", "1.2.0")
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"✅ 初始化完成")
+    print("✅ 初始化完成")
     print(f"   数据目录: {CHAIN_HOME}")
     print(f"   调用链目录: {CHAINS_DIR}")
 
@@ -375,10 +374,11 @@ def cmd_init(args):
     naming = config.get("naming_mode", "manual")
     retries = config.get("default_max_retries", 3)
     print(f"   设置: 记忆参考={'是' if mem_ref else '否'} | 命名={'自动' if naming == 'auto' else '人工'} | 重试={retries}次")
+    return 0
 
 
 def cmd_create(args):
-    """创建调用链"""
+    """创建调用链（里程碑分类在首次保存前完成，合并为一次保存）"""
     ensure_dirs()
 
     # 解析步骤
@@ -421,30 +421,33 @@ def cmd_create(args):
         print(f"⚠️ 调用链 '{args.name}' 已存在。使用 update-step 或 rename 修改。")
         return 1
 
-    save_chain(chain_data)
-    print(f"✅ 调用链已创建: {args.name}")
-    print(f"   描述: {args.description or '(无)'}")
-    print(f"   步骤数: {len(steps)}")
-    print(f"   标签: {', '.join(chain_data['tags']) or '(无)'}")
-
-    # 里程碑分类
+    # 里程碑分类（在首次保存前完成，合并为一次保存）
     if steps:
         ms_results = classify_milestones(steps)
-        milestones = [r for r in ms_results if r["is_milestone"]]
-        if milestones:
-            ms_names = [f"步骤{r['step_index']}({steps[r['step_index']-1].get('step_name', '')})" for r in milestones]
-            print(f"   里程碑: {', '.join(ms_names)}")
-            # 输出判断依据
-            for r in milestones:
+        for r in ms_results:
+            if r["is_milestone"]:
                 step_obj = steps[r["step_index"] - 1]
-                # 如果不是显式标记，应用里程碑设置
+                # 不是显式标记才自动设置（显式标记的用户意图已保留）
                 if step_obj.get("failure_mode", {}).get("is_milestone") is not True:
                     step_obj.setdefault("failure_mode", {})
                     step_obj["failure_mode"]["is_milestone"] = True
                     step_obj["failure_mode"].setdefault("on_exhaust", "abort")
-            # 保存更新后的里程碑
-            chain_data["steps"] = steps
-            save_chain(chain_data)
+        chain_data["steps"] = steps
+
+    # 一次保存
+    save_chain(chain_data)
+
+    # 输出结果
+    print(f"✅ 调用链已创建: {args.name}")
+    print(f"   描述: {args.description or '(无)'}")
+    print(f"   步骤数: {len(steps)}")
+    print(f"   标签: {', '.join(chain_data['tags']) or '(无)'}")
+    if steps:
+        ms_results = classify_milestones(steps)
+        milestone_steps = [steps[r["step_index"]-1] for r in ms_results if r["is_milestone"]]
+        if milestone_steps:
+            ms_names = [f"步骤{s.get('index', '?')}({s.get('step_name', '')})" for s in milestone_steps]
+            print(f"   里程碑: {', '.join(ms_names)}")
         else:
             print(f"   里程碑: 无")
     return 0
