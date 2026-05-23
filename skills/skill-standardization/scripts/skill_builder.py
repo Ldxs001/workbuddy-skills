@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.1.0
+skill_builder.py — Skill 标准化构建器 v2.3.0
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill

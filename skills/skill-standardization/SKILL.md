@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.2.0
+version: 2.3.0
 author: wUwproject
 license: MIT
 description: >
@@ -79,7 +79,7 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 ### 三种模式快速对照
 
 | 模式 | 用途 | 关键参数 |
-|------|------|---------|
+|------|------|----------|
 | `create` | 从模板新建标准 skill | `--desc`, `--tags` |
 | `update` | 增量检查/修复 | `--fix`, `--backup` |
 | `refactor` | 整体结构改造 | `--dry-run`, `--no-backup` |
@@ -128,7 +128,7 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 | R-07 | WARN | 含触发条件章节 |
 | R-08 | WARN | 含核心能力章节 |
 | R-09 | WARN | 含工作流程章节 |
-| R-10 | WARN | SKILL.md version == manifest.json version |
+| R-10 | WARN | SKILL.md version == _meta.json version |
 
 > ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
 
@@ -183,7 +183,7 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 | `SKILL.md` | frontmatter `version:` | 按 SemVer 直接升级，无需询问 |
 | `_meta.json` | `"version"` | 与 SKILL.md 保持一致，直接升级 |
 | `scripts/spec/*.json` | `"_version"` 字段 | 对应模块变更时直接升级 |
-| `scripts/*.py` | 文件头版本字符串（如 `v2.1.0`） | 脚本逻辑变更时直接升级 |
+| `scripts/*.py` | 文件头版本字符串（如 `v2.3.0`） | 脚本逻辑变更时直接升级 |
 
 **规范未覆盖的文件/字段 — 必须询问用户：**
 
@@ -198,5 +198,3 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 - 修改任何文件前，先用 Read 工具阅读完整内容
 - 理解每个字段的含义、引用关系、被哪些脚本使用
 - 特别注意：`config.json`（运行时配置）、`manifest.json`（维护清单状态数据）、`_meta.json`（标准化元数据）
-
----

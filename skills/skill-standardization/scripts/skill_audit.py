@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit.py — SKILL.md 规范化审查工具 (v2.2.0)
+skill_audit.py — SKILL.md 规范化审查工具 (v2.3.0)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
 
 基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-10 规则。
@@ -182,7 +182,7 @@ def yaml_has_semver_version(filepath, content, fm, body, **kw):
 
 def yaml_has_description(filepath, content, fm, body, **kw):
     has_desc = fm is not None and "description" in fm
-    dv = str(fm.get("description", ""))[:60]
+    dv = str(fm.get("description", ""))[:60] if has_desc else ""
     return {"passed": has_desc,
             "detail": f"description = \"{dv}\"" if has_desc else "缺少 description 字段"}
 
