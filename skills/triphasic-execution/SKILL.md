@@ -1,6 +1,6 @@
 ---
 name: triphasic-execution
-version: 5.10.0
+version: 5.10.1
 author: wUwproject
 license: MIT
 description: >
@@ -40,6 +40,21 @@ category: workflow
 | 6 | **最多 3 次重试（F-08）** | 同一步骤失败 3 次必须换方案，禁止第 4 次重试 |
 | 7 | **双模式支持** | 按需调用模式（默认）/ 全局自动模式 |
 | 8 | **HTML 设置界面** | `settings.py` 可视化配置技能参数 |
+
+---
+
+## 快速开始
+
+```bash
+# 按需调用（默认）— 任务开头说出关键词即可
+"使用 triphasic-execution 执行以下任务：..."
+
+# 全局自动模式 — 所有任务自动套用框架
+编辑 assets/default_config.json → "mode": "auto"
+
+# 可视化配置
+python {SKILL_DIR}/scripts/settings.py
+```
 
 ---
 
@@ -165,4 +180,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**5.10.0** — v5.10：skill-standardization 规范改造，新增触发条件/核心能力章节，主文件拆分至 ≤200 行
+当前版本：**5.10.1** — v5.10.1：修复 task_progress.py init 命令 `--steps` 传入字符串数组时的崩溃问题

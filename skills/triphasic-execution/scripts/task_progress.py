@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.6)
+task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.6.1)
 
 功能：
   init    -- 初始化进度文件（任务规划后调用）
@@ -93,11 +93,19 @@ def cmd_init(args):
         try:
             steps_data = json.loads(steps_json)
             for i, s in enumerate(steps_data, 1):
+                if isinstance(s, str):
+                    desc = s
+                    purpose = ""
+                    tool = ""
+                else:
+                    desc = s.get("description", "")
+                    purpose = s.get("purpose", "")
+                    tool = s.get("tool", "")
                 step = {
                     "index": i,
-                    "description": s.get("description", ""),
-                    "purpose": s.get("purpose", ""),
-                    "tool": s.get("tool", ""),
+                    "description": desc,
+                    "purpose": purpose,
+                    "tool": tool,
                     "status": "pending",  # pending/running/success/failed/skipped
                     "retries": 0,
                     "review": "",
