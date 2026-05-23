@@ -2,6 +2,17 @@
 
 ---
 
+## v1.9.1（2026-05-23）
+
+**改写类型：修正 _meta.json tags 残留**
+
+### 变更内容
+
+- `_meta.json` tags 中残留 `"reusable-template"`，修正为 `"reusable"`
+- `SKILL.md` 大标题 `v1.7.0` 残留，修正为 `v1.9.1`
+
+---
+
 ## v1.9.0（2026-05-23）
 
 **改写类型：修复 cmd_create 双次保存问题**
