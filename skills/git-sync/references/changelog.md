@@ -2,6 +2,38 @@
 
 ---
 
+## v1.10.0（2026-05-23）
+
+**改写类型：pack_zip.py 排除规则体系重构**
+
+### 变更内容
+
+#### 问题
+- 原 `default_exclude` 使用 `*.html` blanket 排除，导致 `settings.html` 等功能文件被错误排除
+- 排除规则按扩展名粗放分类，未区分文件角色
+
+#### 修复设计
+重构为**按文件角色分类**的三层排除体系：
+
+| 层级 | 变量 | 说明 |
+|------|--------|------|
+| 目录排除 | `EXCLUDE_DIRS` | `__pycache__`、`.git`、`dist`、`node_modules` 等 |
+| 精确文件名 | `EXCLUDE_FILES_EXACT` | `config.json`（仅根目录）、`manifest.json`、`pack_zip.py` 等 |
+| glob 模式 | `EXCLUDE_FILES_GLOB` | `*.pyc`、`*.log`、`*.zip`、`*.bak` 等 |
+| 功能性白名单 | `FUNCTIONAL_FILE_WHITELIST` | `settings.html`、`preview.html` 不受 `*.html` 规则影响 |
+
+#### 关键变更
+- **移除 `*.html` blanket 排除**（不再需要，`index.html` 不在 skill 目录中）
+- **新增 `FUNCTIONAL_FILE_WHITELIST`**：`settings.html`、`preview.html`
+- `config.json` / `manifest.json` 精确匹配**仅排除根目录**，子目录的同名文件保留
+- `should_exclude()` 函数重写，支持白名单优先逻辑
+
+#### 文件变更
+- `scripts/pack_zip.py`：整体重写，版本逻辑不变（v1.10.0 为 skill 级别版本）
+
+---
+
+
 ## v1.9（当前版本）— 渐进式规范改写
 
 - **SKILL.md 从 521 行重构为 89 行核心骨架**（减少 83%），符合 v2.0 标准的 ≤200 行要求
