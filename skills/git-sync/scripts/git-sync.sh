@@ -80,15 +80,8 @@ VER_ACTION="normal"
 if [ -z "$REPO_VER" ]; then
     echo "  → 仓库无版本记录，正常同步"
 elif [ "$REPO_VER" = "$LOCAL_VER" ]; then
-    echo "  ⏭️  仓库版本 = 本地版本（$REPO_VER），跳过同步"
-    # 交互环境询问是否强制；非交互环境直接跳过
-    if [ -t 0 ]; then
-        read -p "  是否强制更新？（y=强制 / n=跳过）[Y/n]: " FORCE_CHOICE
-        case "$FORCE_CHOICE" in y|Y) VER_ACTION="normal" ;; *) echo "  ⏭️  已跳过（版本相同 $LOCAL_VER）"; exit 0 ;; esac
-    else
-        echo "  ⏭️  非交互环境，已跳过（版本相同 $LOCAL_VER）"
-        exit 0
-    fi
+    echo "  ⏭️  仓库版本 = 本地版本（$REPO_VER），强制重新同步（含打包）"
+    VER_ACTION="force"
 elif ver_lt "$REPO_VER" "$LOCAL_VER"; then
     echo "  ✅ 仓库版本 < 本地版本，正常升级"
 else
