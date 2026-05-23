@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.10.1
+skill_builder.py — Skill 标准化构建器 v2.12.0
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -30,7 +30,7 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-__version__ = "2.10.0"
+__version__ = "2.12.0"
 
 # R-12: 外部数据目录变量检测模式（通用化，非框架绑定）
 _DATA_VAR_RE = re.compile(
@@ -76,7 +76,7 @@ tags: [{tags}]
 → 详见 `references/guide.md` 完整教程（按需创建）
 """
 
-META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "standardization/{name}/data/"}}'
+META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "skills/.standardization/{name}/data/"}}'
 
 # 主 SKILL.md 必须包含的章节（用于 update/refactor 检查）
 REQUIRED_SECTIONS = [
@@ -194,7 +194,7 @@ def cmd_update(args):
             if args.fix:
                 for k in missing:
                     if k == "data_dir":
-                        meta[k] = f"standardization/{name}/data/"
+                        meta[k] = f"skills/.standardization/{name}/data/"
                     else:
                         meta[k] = "" if k != "tags" else []
                 _write_json(meta_file, meta)
@@ -576,6 +576,28 @@ _ARTIFACT_WRITE_PATTERNS = [
     re.compile(r'open\s*\(\s*["\']([^"\']+\.(json|csv|html|png|jpg|pdf|txt|ics))["\']\s*,\s*["\']w["\']'),
 ]
 
+# [v2.11.0] 通用硬编码路径检测
+_HARDCODED_PATH_RE = re.compile(
+    r'["\']'  # opening quote
+    r'((?:~|/home/|/Users/|[A-Za-z]:[\\/]Users|[A-Za-z]:[\\/]home|[A-Za-z]:[\\/])[^"\' \t]*?)'  # path
+    r'["\']'  # closing quote
+)
+_PATH_EXCLUDE_RE = re.compile(
+    r'^(?:\.standardization/|<[^>]+>|\{[^}]+\}|https?://|ftp://|file://|\$\{|\$\w+)$'
+)
+
+def _is_hardcoded_path(s):
+    """判断字符串是否是硬编码路径（需要改为 skills/.standardization/ 结构）"""
+    if not s or len(s) < 5:
+        return False
+    if _PATH_EXCLUDE_RE.search(s):
+        return False
+    if '.standardization/' in s.replace('\\', '/'):
+        return False
+    if '/' in s or '\\' in s or s.startswith('~'):
+        return True
+    return False
+
 _ARTIFACT_CLASSIFY = {
     "data": "data", "backup": "data", "backups": "data", "dump": "data", "dumps": "data",
     "cache": "cache", "tmp": "temp", "temp": "temp",
@@ -692,7 +714,7 @@ def _check_artifact_paths(skill_dir):
                         continue
                     for pat in _ARTIFACT_WRITE_PATTERNS:
                         m = pat.search(s)
-                        if m and "standardization" not in s.lower() and '"r"' not in s and "'r'" not in s:
+                        if m and ".standardization" not in s.lower() and "standardization" not in s.lower() and '"r"' not in s and "'r'" not in s:
                             target = m.group(1)
                             path_literal = _extract_path_literal(s, target)
                             if "/" in target:
@@ -700,15 +722,15 @@ def _check_artifact_paths(skill_dir):
                                 cat = _ARTIFACT_CLASSIFY.get(dir_part.lower(), "outputs")
                                 filename = target.split("/")[-1]
                                 if "." in filename:
-                                    suggestion = f"<workspace>/standardization/<skill>/{cat}/{filename}"
+                                    suggestion = f"skills/.standardization/<skill>/{cat}/{filename}"
                                 else:
-                                    suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                                    suggestion = f"skills/.standardization/<skill>/{cat}/{target}"
                             elif "." in target:
                                 cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
-                                suggestion = f"<workspace>/standardization/<skill>/{cat}/{target}"
+                                suggestion = f"skills/.standardization/<skill>/{cat}/{target}"
                             else:
                                 cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
-                                suggestion = f"<workspace>/standardization/<skill>/{cat}/"
+                                suggestion = f"skills/.standardization/<skill>/{cat}/"
                             
                             violations.append({
                                 "source": f"{rel}:{i}",
@@ -716,20 +738,59 @@ def _check_artifact_paths(skill_dir):
                                 "suggestion": suggestion,
                             })
                             break
-            elif ext in (".sh", ".bat", ".ps1"):
+
+                    # [v2.11.0] 通用硬编码路径检测（Python）
+                    for m in _HARDCODED_PATH_RE.finditer(s):
+                        path_str = m.group(1)
+                        if not _is_hardcoded_path(path_str):
+                            continue
+                        if ".standardization" in path_str.lower() or "standardization" in path_str.lower():
+                            continue
+                        basename = os.path.basename(path_str.rstrip("/\\"))
+                        if basename and "." in basename:
+                            cat = _ARTIFACT_CLASSIFY.get(os.path.splitext(basename)[1].lower(), "outputs")
+                            suggestion = f"skills/.standardization/<skill>/{cat}/{basename}"
+                        else:
+                            cat = "data"
+                            suggestion = f"skills/.standardization/<skill>/{cat}/"
+                        violations.append({
+                            "source": f"{rel}:{i}",
+                            "path_literal": path_str,
+                            "suggestion": suggestion,
+                        })
                 for i, line in enumerate(lines, 1):
                     s = line.strip()
                     if not s or s.startswith("#") or s.startswith("::"):
                         continue
                     m = re.search(rf'[>]+\s*["\']?\.?({_ARTIFACT_DIR_RE})/', s)
-                    if m and "standardization" not in s.lower():
+                    if m and ".standardization" not in s.lower() and "standardization" not in s.lower():
                         target = m.group(1)
                         path_literal = _extract_path_literal(s, target) or f"{target}/"
                         cat = _ARTIFACT_CLASSIFY.get(target.lower(), "outputs")
                         violations.append({
                             "source": f"{rel}:{i}",
                             "path_literal": path_literal,
-                            "suggestion": f"<workspace>/standardization/<skill>/{cat}/",
+                            "suggestion": f"skills/.standardization/<skill>/{cat}/",
+                        })
+
+                    # [v2.11.0] 通用硬编码路径检测（Shell）
+                    for m in _HARDCODED_PATH_RE.finditer(s):
+                        path_str = m.group(1)
+                        if not _is_hardcoded_path(path_str):
+                            continue
+                        if ".standardization" in path_str.lower() or "standardization" in path_str.lower():
+                            continue
+                        basename = os.path.basename(path_str.rstrip("/\\"))
+                        if basename and "." in basename:
+                            cat = _ARTIFACT_CLASSIFY.get(os.path.splitext(basename)[1].lower(), "outputs")
+                            suggestion = f"skills/.standardization/<skill>/{cat}/{basename}"
+                        else:
+                            cat = "data"
+                            suggestion = f"skills/.standardization/<skill>/{cat}/"
+                        violations.append({
+                            "source": f"{rel}:{i}",
+                            "path_literal": path_str,
+                            "suggestion": suggestion,
                         })
     
     # ── 2. 根目录文件扫描 ──
@@ -776,7 +837,7 @@ def _check_root_artifact_files_builder(skill_dir, violations):
             violations.append({
                 "source": f"ROOT/{fname}",
                 "path_literal": fname,
-                "suggestion": f"<workspace>/standardization/<skill>/{cat}/{fname}",
+                "suggestion": f"skills/.standardization/<skill>/{cat}/{fname}",
             })
     except OSError:
         return
@@ -835,7 +896,7 @@ def _scan_dir_recursive_builder(skill_dir_str, rel_dir, dir_path, category, viol
             violations.append({
                 "source": f"DIR/{rel_dir}/{fname}",
                 "path_literal": f"{rel_dir}/{fname}",
-                "suggestion": f"<workspace>/standardization/<skill>/{category}/{fname}",
+                "suggestion": f"skills/.standardization/<skill>/{category}/{fname}",
             })
 
 
@@ -866,7 +927,7 @@ def _scan_unknown_dir_builder(skill_dir_str, entry, entry_path, violations):
             violations.append({
                 "source": f"DIR/{entry}/{sub}",
                 "path_literal": f"{entry}/{sub}",
-                "suggestion": f"<workspace>/standardization/<skill>/outputs/{sub}",
+                "suggestion": f"skills/.standardization/<skill>/outputs/{sub}",
             })
 
 
@@ -912,18 +973,18 @@ def _trace_cross_refs(skill_dir, violations):
 
 
 def _verify_standardization_paths_builder(skill_dir, violations):
-    """[v2.10.0] 验证脚本中声称的 standardization/ 路径在磁盘上真实存在。
+    """[v2.10.0] 验证脚本中声称的 skills/.standardization/ 路径在磁盘上真实存在。
     
-    扫描 scripts/ 中所有引用 "standardization/" 的行，
-    提取路径字面量，用 _find_workspace_root 解析为绝对路径，
+    扫描 scripts/ 中所有引用 ".standardization/" 的行，
+    提取路径字面量，用 _find_skills_dir 解析为绝对路径，
     检查目录是否存在。
     """
     scripts_dir = skill_dir / "scripts"
     if not scripts_dir.is_dir():
         return
 
-    ws_root = _get_workspace_dir(skill_dir)
-    std_re = re.compile(r'standardization/([^"\')\s,。，；：！？、…—]+)')
+    skills_dir = _find_skills_dir(skill_dir)
+    std_re = re.compile(r'\.standardization/([^"\')\s,。，；：！？、…—]+)')
 
     for fpath in sorted(scripts_dir.iterdir()):
         ext = fpath.suffix.lower()
@@ -946,10 +1007,10 @@ def _verify_standardization_paths_builder(skill_dir, violations):
                 # 跳过模板占位符：<skill>, {name}, {cat}, ([^ 等
                 if "<" in matched_path or "{" in matched_path or matched_path.startswith("([^"):
                     continue
-                full_rel = f"standardization/{matched_path}"
+                full_rel = f".standardization/{matched_path}"
                 # 提取直到目录部分（去掉文件名）
                 dir_part = "/".join(full_rel.split("/")[:-1]) if "." in full_rel.split("/")[-1] else full_rel
-                abs_dir = ws_root / dir_part
+                abs_dir = skills_dir / dir_part
                 if not abs_dir.exists():
                     violations.append({
                         "source": f"{rel}:{i}",
@@ -965,13 +1026,13 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
 
     四阶段：
     1. 扫描 scripts/ 中 DATA/STORAGE/CONFIG 类变量赋值
-    2. 检查路径是否遵循 standardization/<skill>/ 约定（子串匹配）
+    2. 检查路径是否遵循 skills/.standardization/<skill>/ 约定（子串匹配）
     3. 验证 _meta.json 声明 data_dir 字段
     4. 验证 _meta.json data_dir 与代码路径一致
-    5. **[v2.10.0 新增]** 磁盘存在性验证：检查 standardization/<skill>/ 目录真实存在
+    5. **[v2.10.0 新增]** 磁盘存在性验证：检查 skills/.standardization/<skill>/ 目录真实存在
     """
     name = skill_dir.resolve().name
-    expected_pattern = "standardization/" + name + "/"
+    expected_pattern = ".standardization/" + name + "/"
     violations = []
 
     # 阶段 1: 扫描 scripts/ 中的数据目录变量
@@ -1001,7 +1062,7 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
             except Exception:
                 continue
 
-    # 阶段 2: 检查路径是否符合 standardization/<skill>/ 约定
+    # 阶段 2: 检查路径是否符合 skills/.standardization/<skill>/ 约定
     for rel_file, var_name, path_val, lineno in data_dir_vars:
         if not path_val:
             continue
@@ -1010,8 +1071,8 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
             violations.append({
                 "source": f"{rel_file}:{lineno}",
                 "path_literal": path_val,
-                "expected": f"standardization/{name}/data/",
-                "detail": f"{var_name}={path_val} 不符合 standardization/<skill>/ 约定",
+                "expected": f".standardization/{name}/data/",
+                "detail": f"{var_name}={path_val} 不符合 skills/.standardization/<skill>/ 约定",
             })
 
     # 阶段 3: _meta.json data_dir 字段检查
@@ -1031,14 +1092,14 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
         violations.append({
             "source": "_meta.json",
             "path_literal": "(缺失)",
-            "expected": f'"data_dir": "standardization/{name}/data/"',
+            "expected": f'"data_dir": "skills/.standardization/{name}/data/"',
             "detail": "_meta.json 缺少 data_dir 字段（scripts/ 中定义了数据目录变量）",
         })
 
     # 阶段 4: _meta.json data_dir 与代码路径一致性
     # [v2.10.1] Resolve meta_data_dir to absolute path for fair comparison
     if meta_has_data_dir and data_dir_vars:
-        ws_check = _get_workspace_dir(skill_dir)
+        ws_check = _find_skills_dir(skill_dir)
         meta_abs = os.path.normpath(os.path.join(str(ws_check), str(meta_data_dir))).replace("\\", "/").lower()
         for _, var_name, path_val, _ in data_dir_vars:
             if path_val:
@@ -1055,8 +1116,8 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
     # 阶段 5 [v2.10.0]: 磁盘存在性验证（仅在 skill 实际使用外部数据时执行）
     uses_external_data = bool(data_dir_vars) or meta_has_data_dir
     if uses_external_data:
-        ws = _get_workspace_dir(skill_dir, workspace_arg)
-        expected_dir = ws / "standardization" / name / "data"
+        skills_dir = _find_skills_dir(skill_dir, workspace_arg)
+        expected_dir = skills_dir / ".standardization" / name / "data"
         if not expected_dir.exists():
             violations.append({
                 "source": "DISK",
@@ -1079,6 +1140,11 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
 
 def _extract_path_value(val_expr):
     """从 Python 赋值表达式中提取路径字符串（与 skill_audit.py 一致）。"""
+    # [v2.11.1] SKILL_DIR.parent / ".standardization" / ... pattern
+    if "SKILL_DIR" in val_expr and ".standardization" in val_expr:
+        frags = re.findall(r"""['"]([^'"]*)['"]""", val_expr)
+        if frags:
+            return "/".join(frags)
     if "Path.home()" in val_expr or "Path(" in val_expr:
         frags = re.findall(r"""['"]([^'"]*)['"]""", val_expr)
         if not frags:
@@ -1242,39 +1308,38 @@ def _append_changelog(skill_dir, bump_type, message, results):
         results["warnings"].append(f"⚠️  changelog 写入失败: {e}")
 
 
-def _get_workspace_dir(skill_dir, workspace_arg=None):
-    """解析标准化工作区根目录。
+def _find_skills_dir(skill_dir, workspace_arg=None):
+    """查找 skills 目录。
 
     优先级：
     1. --workspace 参数显式指定
-    2. 从 skill_dir 向上查找 .workbuddy 目录，其父目录即为 workspace（标准化目录 standardiation/ 放在 .workbuddy 同级）
+    2. 从 skill_dir 向上查找名为 'skills' 的目录（最多 5 层）
 
-    返回工作区根路径（Path 对象）。
-    工作区标准化路径为：<workspace>/standardization/<skill_name>/
+    返回 skills 目录路径（Path 对象）。
     """
     if workspace_arg:
         return Path(workspace_arg).resolve()
 
-    # 从 skill_dir 向上查找 .workbuddy 目录
     p = Path(skill_dir).resolve()
-    while p != p.parent:
-        if (p / ".workbuddy").is_dir():
+    for _ in range(5):
+        if p.name == "skills" and p.is_dir():
             return p
+        if p == p.parent:
+            break
         p = p.parent
-    # 兜底：找不到 .workbuddy 则退回到 Path.cwd()
-    return Path.cwd()
+    return Path(skill_dir).resolve().parent
 
 
 def _get_standardization_dir(skill_dir, workspace_arg=None):
-    """获取标准化产出物根目录：<workspace>/standardization/<skill_name>/"""
-    ws = _get_workspace_dir(skill_dir, workspace_arg)
-    return ws / "standardization" / skill_dir.name
+    """获取标准化产出物根目录：skills/.standardization/<skill_name>/"""
+    skills_dir = _find_skills_dir(skill_dir, workspace_arg)
+    return skills_dir / ".standardization" / skill_dir.name
 
 
 def _create_backup(skill_dir, operation, workspace_arg=None):
     """创建时间戳备份到标准化工作区（铁律4：持久化数据 → data/）。
 
-    备份路径：<workspace>/standardization/<skill_name>/data/<skill_name>_bak_<op>_<timestamp>/
+    备份路径：skills/.standardization/<skill_name>/data/<skill_name>_bak_<op>_<timestamp>/
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_name = f"{skill_dir.name}_bak_{operation}_{timestamp}"
@@ -1297,7 +1362,7 @@ def _create_backup(skill_dir, operation, workspace_arg=None):
 def _save_report(skill_dir, operation, report_text, workspace_arg=None):
     """保存标准化报告到工作区（铁律4：生成产物 → outputs/）。
 
-    报告路径：<workspace>/standardization/<skill_name>/outputs/<skill_name>_<op>_<timestamp>.txt
+    报告路径：skills/.standardization/<skill_name>/outputs/<skill_name>_<op>_<timestamp>.txt
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_name = f"{skill_dir.name}_{operation}_{timestamp}.txt"
@@ -1384,7 +1449,7 @@ def main():
     p_update.add_argument("skill_dir", help="Skill 目录路径")
     p_update.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
     p_update.add_argument("--backup", action="store_true", help="修改前自动备份")
-    p_update.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认当前目录），产出物将存至 <workspace>/standardization/<skill>/")
+    p_update.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认 skills 目录），产出物将存至 skills/.standardization/<skill>/")
     p_update.add_argument("--version-bump", choices=["patch", "minor", "major"], default=None,
                           help="自动升级版本号（按 SemVer：patch=0.0.1, minor=0.1.0, major=1.0.0）")
     p_update.add_argument("--changelog", "-c", default=None,
@@ -1395,7 +1460,7 @@ def main():
     p_refactor.add_argument("skill_dir", help="要改造的 Skill 目录路径")
     p_refactor.add_argument("--no-backup", action="store_true", help="不创建备份（不推荐）")
     p_refactor.add_argument("--dry-run", action="store_true", help="仅输出计划不执行")
-    p_refactor.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认当前目录），产出物将存至 <workspace>/standardization/<skill>/")
+    p_refactor.add_argument("--workspace", "-w", default=None, help="工作区根目录（默认当前目录），产出物将存至 skills/.standardization/<skill>/")
 
     args = parser.parse_args()
 

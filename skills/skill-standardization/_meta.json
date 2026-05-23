@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.10.1",
-  "description": "Skill 标准化规范引擎 v2.10.1 — 集规范定义、创建器、更新器、改造器于一体，支持 R-01~R-12 审查（含外部数据目录规范性检查与磁盘路径验证）与渐进式 JSON 加载，版本号自动更新+changelog自动追加，cmd_update 全面接入 R-12/R-11 增强验证",
+  "version": "2.12.0",
+  "description": "Skill 标准化规范引擎 v2.12.0 — 集规范定义、创建器、更新器、改造器于一体，支持 R-01~R-12 审查（产出物路径统一至 skills/.standardization/ 结构）与渐进式 JSON 加载，版本号自动更新+changelog自动追加，cmd_update 全面接入 R-12/R-11 增强验证",
   "author": "wUwproject",
   "tags": [
     "standardization",
