@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.6.0
+version: 1.7.0
 author: wUwproject
 license: MIT
 description: >
@@ -9,10 +9,9 @@ description: >
 tags: ["chain", "orchestration", "reusable-template", "skill-builder", "progressive-loading", "planner", "editor"]
 ---
 
-# skill-sub v1.6.0（渐进式加载示范）
+# skill-sub v1.7.0
 
-> 本文档示范渐进式 MD：主文件 ≤200 行含核心内容，
-> 详细教程、数据结构、脚本参考拆分到 `references/` 按需加载。
+> 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为可复用模板。
 
 调用链编排器，兼具**编辑器**和**粗粒度规划器**双重角色，将多个 Skill 编排为可复用的通用调用链模板。
 
