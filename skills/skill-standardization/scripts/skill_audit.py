@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit.py — SKILL.md 规范化审查工具 (v2.12.1)
+skill_audit.py — SKILL.md 规范化审查工具 (v2.12.2)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
 
 基于 SKILL.md 标准化规范草案 v0.1 的 R-01~R-12 规则。
@@ -948,7 +948,7 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
         })
 
     # 4. check _meta.json data_dir matches code path
-    # [v2.12.1] Resolve both paths to absolute for fair comparison; strip trailing sep
+    # [v2.12.2] Resolve both paths to absolute for fair comparison; strip trailing sep
     if meta_has_data_dir and data_dir_vars:
         skills_root = _find_skills_dir(skill_dir)
         meta_raw = os.path.join(skills_root, str(meta_data_dir))
@@ -981,6 +981,49 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                 "expected": "directory should exist: " + expected_disk_path,
                 "detail": "标准化数据目录不存在: " + expected_disk_path,
             })
+
+    # 6. [v2.12.2] references/*.md 中的数据目录路径检查
+    # 检测 references/ 目录下 md 文件中出现的硬编码数据目录路径
+    # （不含 .standardization/ 的路径都应报违规）
+    refs_dir = os.path.join(skill_dir, "references")
+    if os.path.isdir(refs_dir):
+        _REFS_PATH_RE = re.compile(
+            r'(?:~|/home/\w+|/Users/\w+|C:\\Users\\\w+|/c/Users/\w+)?'
+            r'(?:/|\\)(?:\.?workbuddy(?:/|\\)(?:skills(?:/|\\))?)?'
+            r'([\w.-]+(?:/|\\)data(?:/|\\))'
+        )
+        for fname in sorted(os.listdir(refs_dir)):
+            fpath = os.path.join(refs_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            ext = os.path.splitext(fname)[1].lower()
+            if ext != ".md":
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    for lineno, line in enumerate(f, 1):
+                        stripped = line.strip()
+                        # 跳过标题行、注释行、空行
+                        if not stripped or stripped.startswith('#') or stripped.startswith('<!--'):
+                            continue
+                        # 跳过含 .standardization/ 的行（合规路径）
+                        if '.standardization/' in stripped:
+                            continue
+                        for m in _REFS_PATH_RE.finditer(stripped):
+                            matched_path = m.group(1)  # e.g. "semantic-split/data/"
+                            # 提取 skill name
+                            path_parts = matched_path.replace('\\', '/').rstrip('/').split('/')
+                            if len(path_parts) >= 2 and path_parts[-1] == 'data':
+                                skill_name_in_path = path_parts[-2]
+                                violations.append({
+                                    "source": f"references/{fname}:{lineno}",
+                                    "var_name": "path_text",
+                                    "path_value": matched_path,
+                                    "expected": f".standardization/{dirname}/data/",
+                                    "detail": f"references/{fname}:{lineno} contains non-standard data path '{matched_path}' — should use .standardization/{dirname}/data/ (铁律4)",
+                                })
+            except Exception:
+                continue
 
     if violations:
         detail_lines = ["Found " + str(len(violations)) + " external data dir violations:"]

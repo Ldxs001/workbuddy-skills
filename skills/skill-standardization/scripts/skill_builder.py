@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder.py — Skill 标准化构建器 v2.12.1
+skill_builder.py — Skill 标准化构建器 v2.12.2
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -1097,7 +1097,7 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
         })
 
     # 阶段 4: _meta.json data_dir 与代码路径一致性
-    # [v2.12.1] Normalize both paths (strip trailing sep) for fair comparison
+    # [v2.12.2] Normalize both paths (strip trailing sep) for fair comparison
     if meta_has_data_dir and data_dir_vars:
         ws_check = _find_skills_dir(skill_dir)
         meta_raw = os.path.join(str(ws_check), str(meta_data_dir))
@@ -1127,6 +1127,38 @@ def _check_external_data_dir(skill_dir, results, workspace_arg=None):
                 "expected": f"目录应存在: {expected_dir}",
                 "detail": f"标准化数据目录不存在，请创建: mkdir -p {expected_dir}",
             })
+
+    # 阶段 6 [v2.12.2]: references/*.md 中的数据目录路径检查
+    refs_dir = skill_dir / "references"
+    if refs_dir.is_dir():
+        _REFS_PATH_RE = re.compile(
+            r'(?:~|/home/\w+|/Users/\w+|C:\\\\Users\\\\\w+|/c/Users/\w+)?'
+            r'(?:/|\\\\)(?:\.?workbuddy(?:/|\\\\)(?:skills(?:/|\\\\))?)?'
+            r'([\w.-]+(?:/|\\\\)data(?:/|\\\\))'
+        )
+        for ref_file in sorted(refs_dir.iterdir()):
+            if not ref_file.is_file() or ref_file.suffix.lower() != ".md":
+                continue
+            try:
+                with open(ref_file, "r", encoding="utf-8", errors="replace") as f:
+                    for lineno, line in enumerate(f, 1):
+                        stripped = line.strip()
+                        if not stripped or stripped.startswith('#') or stripped.startswith('<!--'):
+                            continue
+                        if '.standardization/' in stripped:
+                            continue
+                        for m in _REFS_PATH_RE.finditer(stripped):
+                            matched_path = m.group(1)
+                            path_parts = matched_path.replace('\\', '/').rstrip('/').split('/')
+                            if len(path_parts) >= 2 and path_parts[-1] == 'data':
+                                violations.append({
+                                    "source": f"references/{ref_file.name}:{lineno}",
+                                    "path_literal": matched_path,
+                                    "expected": f".standardization/{name}/data/",
+                                    "detail": f"references/{ref_file.name}:{lineno} 含非标准数据路径 '{matched_path}' — 应使用 .standardization/{name}/data/ (铁律4)",
+                                })
+            except Exception:
+                continue
 
     # 输出到 results
     if violations:

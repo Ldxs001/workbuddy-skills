@@ -275,9 +275,9 @@ python scripts/json_manager.py categorize --threshold 5
 ```bash
 # params 模式：AI 决定替换映射，脚本执行替换
 python scripts/json_manager.py generalize \
-  --input ~/.workbuddy/semantic-split/data/capabilities/xxx_concrete.json \
+  --input ~/.workbuddy/skills/.standardization/semantic-split/data/capabilities/xxx_concrete.json \
   --params "钛合金马扎=[产品名称]" "材料参数=[核心参数]" "明天=[截止时间]" \
-  --output ~/.workbuddy/semantic-split/data/capabilities/xxx_v1.json
+  --output ~/.workbuddy/skills/.standardization/semantic-split/data/capabilities/xxx_v1.json
 
 # auto 模式：仅收集已有的中括号占位符（不替换）
 python scripts/json_manager.py generalize --input xxx.json --auto
@@ -300,7 +300,7 @@ python scripts/json_manager.py rule-gen --files a.json b.json c.json
 python scripts/json_manager.py create --type capability --name make_report_v1
 
 # 验证格式
-python scripts/json_manager.py validate --file ~/.workbuddy/semantic-split/data/capabilities/make_report_v1.json
+python scripts/json_manager.py validate --file ~/.workbuddy/skills/.standardization/semantic-split/data/capabilities/make_report_v1.json
 ```
 
 ---
@@ -308,15 +308,12 @@ python scripts/json_manager.py validate --file ~/.workbuddy/semantic-split/data/
 ## 四、JSON 存储结构
 
 ```
-~/.workbuddy/skills/semantic-split/
-├── SKILL.md                          # 技能主文件
-├── _meta.json                        # 技能元数据
-├── data/                             # → 已迁移至 ~/.workbuddy/semantic-split/data/（铁律4）
-│   ├── capabilities/                 # 能力级 json 存储目录
-│   │   ├── make_product_ppt_v1.json
-│   │   └── ...
-│   └── rules/                        # 规则级 json 存储目录
-│       ├── rule_ppt_v1.json
-│       ├── rule_report_v1.json
-│       └── ...
+skills/.standardization/semantic-split/data/    ← 铁律4：产出物不嵌入技能目录
+├── capabilities/                     # 能力级 json 存储目录
+│   ├── make_product_ppt_v1.json
+│   └── ...
+└── rules/                            # 规则级 json 存储目录
+    ├── rule_ppt_v1.json
+    ├── rule_report_v1.json
+    └── ...
 ```

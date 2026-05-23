@@ -10,7 +10,7 @@
 收到用户任务
     │
     ▼
-① 先扫描规则级 json 库（~/.workbuddy/semantic-split/data/rules/）
+① 先扫描规则级 json 库（skills/.standardization/semantic-split/data/rules/）
     │
     ├─ ✅ 命中规则级（完全匹配）
     │       └─→ 用规则级 condensed_steps 生成规划 → 展示
@@ -44,7 +44,7 @@
     └─ ❌ 规则级完全不命中
             │
             ▼
-         ② 扫描能力级 json 库（~/.workbuddy/semantic-split/data/capabilities/）
+         ② 扫描能力级 json 库（skills/.standardization/semantic-split/data/capabilities/）
                 │
                 ├─ ✅ 命中能力级（完全/组合匹配）
                 │       └─→ 直接复用/拼装能力级 json → 生成规划 → 展示

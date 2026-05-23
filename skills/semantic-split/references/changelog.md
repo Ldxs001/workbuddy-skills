@@ -2,6 +2,36 @@
 
 ---
 
+## v2.5.0（2026-05-23）
+
+**改写类型：标准化改造 — SKILL.md 结构规范化 + 示例更新 + 路径修正**
+
+### 变更内容
+
+#### SKILL.md 结构规范化
+- 章节重排为规范模板顺序：触发场景→核心能力→快速开始→主要流程→注意事项→脚本工具→参考文档
+- 去掉标题中的版本号 `(Semantic Split v2.4)`，版本号仅在 frontmatter
+- 「第一/二/三部分」改为标准章节名（语义拆分规则摘要、完整执行流程、触发场景→注意事项）
+- 新增「注意事项」章节：双方案是内部推理、约束强度需上下文推断、锚定/反查不可跳过
+- 触发场景从末尾移至第二个章节（核心能力之后）
+
+#### examples.md 更新
+- 新增示例 1：v2.4+ 增强格式（含约束标注🔴🟡⚪、5W2H维度、核心句、自我反查、隐式约束升级🟡🔴、双视角整合规划输出）
+- 保留示例 2：v2.3 基础格式作为对照
+
+#### 路径修正
+- `json_schema.md` 第四节目录树：修正为 `skills/.standardization/semantic-split/data/`（铁律4）
+- `automation_tasks.md` 第三节目录树：同上修正
+- `loading_decision_tree.md` 两处路径：同上修正
+- `changelog.md` 三处历史路径记录：同上修正
+- `SKILL.md` 知识库路径说明：同上修正
+
+### 标准化审查结果
+- ERROR=0, PASS=11, SKIP=1(R-10)
+- SKILL.md 行数=200（符合≤200行规范）
+
+---
+
 ## v2.4.1（2026-05-23）
 
 **改写类型：标准化改造 — SKILL.md 瘦身 + 渐进式MD体系完善**
@@ -82,7 +112,7 @@
 ### 变更内容
 
 #### R-11 产出物路径修正（铁律4）
-- `data/capabilities/make_product_ppt_v1.json` 从技能目录迁移至 `~/.workbuddy/semantic-split/data/capabilities/`
+- `data/capabilities/make_product_ppt_v1.json` 从技能目录迁移至 `skills/.standardization/semantic-split/data/capabilities/`
 - `scripts/json_manager.py` DATA_DIR 路径常量更新：`SKILL_DIR / "data"` → `Path.home() / ".workbuddy" / "semantic-split" / "data"`
 - 旧 `data/` 目录已删除
 
@@ -93,7 +123,7 @@
 
 #### 结构补全
 - 新增「快速开始」章节（含 scan/categorize/create/generalize 四个核心命令示例）
-- 知识库路径说明：`~/.workbuddy/semantic-split/data/`
+- 知识库路径说明：`skills/.standardization/semantic-split/data/`
 
 #### 版本号同步
 - SKILL.md `version:` `2.1.0` → `2.2.0`

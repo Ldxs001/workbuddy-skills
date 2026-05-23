@@ -1,7 +1,7 @@
 ---
 name: semantic-split
 description: 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于5W2H维度提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，支持自增强json沉淀机制。
-version: "2.4.1"
+version: "2.5.0"
 author: wUwproject
 tags:
   - semantic-split
@@ -12,7 +12,15 @@ tags:
   - constraint-annotation
 ---
 
-# 语义拆分与智能规划技能 (Semantic Split v2.4)
+# semantic-split — 语义拆分与智能规划
+
+将自然语言拆分为结构化需求块，基于 5W2H 维度提取与约束标注增强语义理解，双视角推理整合为单一执行步骤。
+
+## 触发场景
+
+- 用户提出任务请求："帮我做..."、"我需要..."、"交给你了..."
+- 用户描述问题寻求帮助、表达需求、委托工作
+- 简单问答和闲聊无需拆分
 
 ## 核心能力
 
@@ -27,8 +35,6 @@ tags:
 | 7 | **自增强闭环** | 一次使用 → 沉淀 json → 下次复用 |
 | 8 | **json 管理工具** | `json_manager.py` CLI 统一管理能力级/规则级 json |
 
----
-
 ## 快速开始
 
 ```bash
@@ -38,11 +44,11 @@ python scripts/json_manager.py create --type capability --name my_task_v1  # 创
 python scripts/json_manager.py generalize --input <path> --params "具体值=[占位符]"  # 通用化
 ```
 
-> 知识库 JSON 存放于 `~/.workbuddy/semantic-split/data/`（铁律4：产出物不嵌入技能目录）
+> 知识库 JSON 存放于 `skills/.standardization/semantic-split/data/`（铁律4：产出物不嵌入技能目录）
 
----
+## 工作流程
 
-## 第一部分：语义拆分规则（摘要）
+### 语义拆分规则（摘要）
 
 > 详细规则见 `references/split_rules.md`
 
@@ -62,15 +68,13 @@ python scripts/json_manager.py generalize --input <path> --params "具体值=[�
 | 举例内容干扰 | 「比如/例如」后内容 → [EXAMPLE]，不作为核心约束 |
 | json 库为空 | 跳过①②，直接进入③模型思考 |
 
----
+### 完整执行流程
 
-## 第二部分：完整执行流程
-
-### 步骤 1-2：接收输入 → 识别主语 & 划分块
+**步骤 1-2**：接收输入 → 识别主语 & 划分块
 
 接收用户原文 → 扫描识别主语代词（我/你/他/她/它/名称），每个独立主语 = 一个块
 
-### 步骤 2.5：任务类型识别与 5W2H 初始化
+**步骤 2.5**：任务类型识别与 5W2H 初始化
 
 > 内部执行，不输出。首次执行时读取 `references/task_type_defaults.md` + `references/constraint_annotation.md`
 
@@ -78,7 +82,7 @@ python scripts/json_manager.py generalize --input <path> --params "具体值=[�
 2. **5W2H 维度初始化**：按任务类型从默认映射表填入默认值
 3. **约束强度预标注**：🔴硬约束 / 🟡软约束 / ⚪无约束
 
-### 步骤 3：提取块内元素（增强版）
+**步骤 3**：提取块内元素（增强版）
 
 **注意力锚定**（内部执行，不输出，详见 `references/constraint_annotation.md` 第三节）：
 1. `[CRITICAL]` — 硬约束，后续不可违反
@@ -90,7 +94,7 @@ python scripts/json_manager.py generalize --input <path> --params "具体值=[�
 
 逐句提取目的/行为/动机 + 5W2H维度 + 约束强度（详见 `references/split_rules.md` 第五节）
 
-### 步骤 4：结构化输出（增强版）
+**步骤 4**：结构化输出（增强版）
 
 ```
 【拆分结果】
@@ -108,7 +112,7 @@ python scripts/json_manager.py generalize --input <path> --params "具体值=[�
 【确认询问】拆分是否完整准确？
 ```
 
-### 步骤 4.5：自我反查（内部执行，不输出）
+**步骤 4.5**：自我反查（内部执行，不输出）
 
 > 展示前强制执行（详见 `references/constraint_annotation.md` 第三节）：
 
@@ -120,12 +124,12 @@ python scripts/json_manager.py generalize --input <path> --params "具体值=[�
 | 3 | 举例干扰：`[EXAMPLE]` 被当核心诉求？ | 降级 |
 | 4 | 5W2H 缺失：有明显可推断维度？ | 补充 `[推断]` |
 
-### 步骤 5：用户确认
+**步骤 5**：用户确认
 
 - 如有遗漏 → 用户补充 → 更新结构
 - 如全部正确 → 进入步骤 6
 
-### 步骤 6：渐进加载与规划生成（增强版）
+**步骤 6**：渐进加载与规划生成（增强版）
 
 > 加载：`references/loading_decision_tree.md`（必须）+ `references/planning_rules.md` + `references/constraint_annotation.md` + `references/json_schema.md`（按需）
 
@@ -157,19 +161,18 @@ c) **整合**（输出）：聚焦为骨架 + 发散创新点→🌟增强步骤
 来源：[规则级json / 能力级json / 模型思考（双视角整合）]
 ```
 
-### 步骤 7：执行与 json 生成
+**步骤 7**：执行与 json 生成
 
 - 用户确认执行 → 执行任务
 - 分支③（不命中+确认执行）→ 完成后生成通用化能力级 json（加载 `json_schema.md`）
 - 其他分支 → 不生成新 json（除非用户主动要求）
 
----
+## 注意事项
 
-## 第三部分：触发条件
-
-用户提出任务请求（"帮我做..."）、表达需求（"我需要..."）、委托工作（"交给你了..."）、描述问题寻求帮助时触发。简单问答和闲聊无需拆分。
-
----
+1. **双方案是内部推理，不输出给用户**：聚焦+发散仅在模型内部执行，最终整合为单一执行步骤
+2. **约束强度不能只看关键词**：需上下文推断（如"尽量用公司模板"属组织规范，应升级为🟡🔴）
+3. **注意力锚定在步骤3前强制执行**：[CRITICAL]/[CORE]/[ENTITY]/[EXAMPLE]/[RESISTANCE] 标记不可跳过
+4. **自我反查在展示前强制执行**：4项检查+反查2b（隐式约束升级），全部通过才进入用户确认
 
 ## 脚本工具
 
@@ -182,8 +185,6 @@ c) **整合**（输出）：聚焦为骨架 + 发散创新点→🌟增强步骤
 | `generalize` / `rule-gen` | 字段通用化 / 从能力级生成规则级 |
 | `list` / `info` | 列出所有 json / 显示详情 |
 
----
-
 ## 参考文档（渐进加载）
 
 | 文件 | 加载时机 |
@@ -194,7 +195,6 @@ c) **整合**（输出）：聚焦为骨架 + 发散创新点→🌟增强步骤
 | `json_schema.md` | 生成 json 时 |
 | `constraint_annotation.md` | 步骤 2.5 / 3 / 6 |
 | `task_type_defaults.md` | 步骤 2.5 首次 |
-| `automation_tasks.md` | 定时任务时 |
 | `examples.md` | 参考格式时 |
 
-**v2.4.1** — 5W2H维度提取 · 约束强度标注(🔴🟡⚪) · 注意力锚定 · 双视角推理整合 · 工作包分解
+**v2.5.0** — 5W2H维度提取 · 约束强度标注(🔴🟡⚪) · 注意力锚定 · 双视角推理整合 · 工作包分解
