@@ -4,10 +4,8 @@
 import json, sys, os
 
 def load_config():
-    """读取 git-sync/config.json，返回配置字典"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, '..', 'config.json')
-    config_path = os.path.normpath(config_path)
+    """读取 ~/.workbuddy/git-sync/config.json，返回配置字典"""
+    config_path = os.path.expanduser("~/.workbuddy/git-sync/config.json")
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)

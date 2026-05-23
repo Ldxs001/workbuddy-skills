@@ -36,7 +36,7 @@ REPO_NAME="workbuddy-skills"
 DIST_DIR="$SKILLS_DIR/.dist"
 ZIP_NAME="${SKILL_NAME}-v${VERSION}.zip"
 ZIP_FILE="$DIST_DIR/$ZIP_NAME"
-MANIFEST_FILE="$WORK_REPO/maintenance-manifest.json"
+MANIFEST_FILE="$HOME/.workbuddy/git-sync/manifest.json"
 README_FILE="$WORK_REPO/README.md"
 
 # 读取 description（用于 README.md）

@@ -17,10 +17,8 @@ from datetime import date
 
 
 def load_config():
-    """读取 git-sync/config.json"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, '..', 'config.json')
-    config_path = os.path.normpath(config_path)
+    """读取 ~/.workbuddy/git-sync/config.json"""
+    config_path = os.path.expanduser("~/.workbuddy/git-sync/config.json")
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -203,10 +201,8 @@ if __name__ == "__main__":
     repo_name = sys.argv[1]
     readme_path = sys.argv[2]
 
-    # 从 manifest.json 获取仓库路径
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    manifest_path = os.path.join(script_dir, "..", "manifest.json")
-    manifest_path = os.path.normpath(manifest_path)
+    # 从 ~/.workbuddy/git-sync/manifest.json 获取仓库路径
+    manifest_path = os.path.expanduser("~/.workbuddy/git-sync/manifest.json")
 
     if not os.path.exists(manifest_path):
         print(f"❌ manifest.json 不存在: {manifest_path}")

@@ -27,9 +27,8 @@ import re
 from datetime import date
 
 # ── 路径解析 ───────────────────────────────────────────
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MANIFEST_PATH = os.path.join(SCRIPT_DIR, "..", "manifest.json")
-MANIFEST_PATH = os.path.normpath(MANIFEST_PATH)
+GIT_SYNC_DATA = os.path.expanduser("~/.workbuddy/git-sync")
+MANIFEST_PATH = os.path.join(GIT_SYNC_DATA, "manifest.json")
 
 def load_manifest():
     if not os.path.exists(MANIFEST_PATH):
@@ -402,10 +401,8 @@ def _extract_desc(skill_dir):
 
 
 def _load_config():
-    """读取 git-sync/config.json，返回配置字典"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, "..", "config.json")
-    config_path = os.path.normpath(config_path)
+    """读取 ~/.workbuddy/git-sync/config.json，返回配置字典"""
+    config_path = os.path.join(GIT_SYNC_DATA, "config.json")
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
