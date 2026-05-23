@@ -1,19 +1,19 @@
 ---
 name: skill-sub
-version: 1.7.0
+version: 1.8.0
 author: wUwproject
 license: MIT
 description: >
   调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。
-  理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为可复用模板。
-tags: ["chain", "orchestration", "reusable-template", "skill-builder", "progressive-loading", "planner", "editor"]
+  理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为调用链。
+tags: ["chain", "orchestration", "reusable", "skill-builder", "progressive-loading", "planner", "editor"]
 ---
 
 # skill-sub v1.7.0
 
-> 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为可复用模板。
+> 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为调用链。
 
-调用链编排器，兼具**编辑器**和**粗粒度规划器**双重角色，将多个 Skill 编排为可复用的通用调用链模板。
+调用链编排器，兼具**编辑器**和**粗粒度规划器**双重角色，将多个 Skill 编排为调用链。
 
 ---
 
@@ -21,7 +21,7 @@ tags: ["chain", "orchestration", "reusable-template", "skill-builder", "progress
 
 ### 什么是调用链
 
-调用链（Chain）是一条预定义的执行流水线，将多个 Skill 的关键步骤按依赖关系串联，形成可复用的执行模板。
+调用链（Chain）是一条预定义的执行流水线，将多个 Skill 的关键步骤按依赖关系串联，形成可复用的调用链。
 
 ### skill-sub 的三个角色（重要）
 
@@ -32,7 +32,7 @@ tags: ["chain", "orchestration", "reusable-template", "skill-builder", "progress
 ### skill-sub 不是什么
 
 - ❌ 本身参与调用链执行（skill-sub 是编辑器/规划器/编排器，不是链的一环）
-- ❌ 针对单次任务生成绑定产物（输出的是通用模板，可复用于同类任务）
+- ❌ 针对单次任务生成绑定产物（输出的是调用链，可复用于同类任务）
 
 ---
 
@@ -121,7 +121,7 @@ tags: ["chain", "orchestration", "reusable-template", "skill-builder", "progress
   ├── 编辑：add-step / remove-step / update-step / rename
   └── 管理：list / show / delete
   ↓
-【编排器角色】拼接为可复用模板 → 保存到 chains/*.json
+【编排器角色】拼接为调用链 → 保存到 chains/*.json
   ↓
 输出：调用链已保存，可复用；或意图匹配推荐已有调用链
 ```
@@ -180,7 +180,7 @@ python {SKILL_DIR}/scripts/settings.py
 ## 注意事项
 
 1. **skill-sub 本身不参与调用链** — 它是编辑器/规划器/编排器，不是链的执行环节
-2. **生成的调用链是通用模板** — 不绑定单次任务，可复用于同类任务
+2. **生成的调用链是可复用的** — 不绑定单次任务，可复用于同类任务
 3. **三阶段缺一不可**：不理解→摘取不全；不摘取→链内容空洞；不拼接→无产出
 4. **里程碑步骤失败强制中止** — 无论 `on_exhaust` 设置
 5. **本文件 ≤200 行** — 超出部分拆分到 `references/`

@@ -2,6 +2,39 @@
 
 ---
 
+## v1.8.0（2026-05-23）
+
+**改写类型：修正"模板"错误描述 + 调用链真正保存**
+
+### 变更内容
+
+#### SKILL.md 描述修正
+- 删除所有"模板"错误描述（调用链就是调用链，不是模板）
+- 副标题：`拼接为可复用模板` → `拼接为调用链`
+- 角色描述：`通用调用链模板` → `调用链`
+- `tags`：`"reusable-template"` → `"reusable"`
+
+#### _meta.json 同步
+- `tags` 字段同步修正：`"reusable-template"` → `"reusable"`
+
+#### 调用链真正保存
+- 使用 `chain_manager.py create` 真正保存调用链 `skill-standardization-refactor`
+- 之前只是往 `examples.md` 瞎写内容，未真正保存
+
+#### examples.md 清理
+- 删除瞎写的"示例 6"（"通用调用链模板"错误内容）
+- 示例 4 标题/描述修正：`生成通用调用链模板` → `摘取步骤形成调用链`
+
+### 技术细节
+
+| 项目 | v1.7.0 | v1.8.0 |
+|------|--------|--------|
+| SKILL.md "模板"关键词 | 有（多处） | 无 ✅ |
+| _meta.json tags | `"reusable-template"` | `"reusable"` ✅ |
+| 调用链真正保存 | 否（只写在 examples.md） | 是（`chain_manager.py`）✅ |
+
+---
+
 ## v1.7.0（2026-05-23）
 
 **改写类型：修正 SKILL.md 标题/副标题描述**
