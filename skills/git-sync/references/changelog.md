@@ -2,31 +2,31 @@
 
 ---
 
-## v2.0.1（2026-05-23）
+## v2.0.2（2026-05-23）
 
-**改写类型：修复 pack_zip.py 排除逻辑根目录判断错误**
+**改写类型：修复 sync_with_exclude.py 根目录判断错误**
 
 ### 问题
 
-- `should_exclude()` 判断"根目录"的 logic 有误：`rel_path` 带了 `git-sync/` 前缀，`"/" in p` 永远为 True，导致 `config.json` / `manifest.json` 根目录文件未被排除
-- `scripts/2.3.0` 垃圾文件（zip 碎片）被打进 ZIP 包
+- `sync_with_exclude.py` 的 `should_exclude()` 用 `"/" not in p` 判断根目录，但 `rel_path` 带了 `git-sync/` 前缀，导致 `config.json` / `manifest.json` 根目录文件未被排除
+- `pack_zip.py` 的 `pack_skill()` 传给 `should_exclude` 的 `rel_path` 也带了 `skill_name/` 前缀，同样误判
 
 ### 变更内容
 
-#### `scripts/pack_zip.py` — `should_exclude()` 修复
+#### `scripts/sync_with_exclude.py` — `should_exclude()` 修复
+- 改用 `os.path.dirname(p) == ""` 判断真正根目录
+- `sync_with_exclude()` 中 `rel_path` 修正为相对于 `src` 根目录的路径
 
-- **修复前**：用 `"/" not in p` 判断根目录（`p` 是 `git-sync/config.json`，含 `/`）
-- **修复后**：用 `os.path.dirname(p) == ""` 判断真正根目录
-- `pack_skill()` 中 `rel_path` 修正为相对于 `skill_dir` 的路径（之前是相对于 `os.path.dirname(skill_dir)`）
+#### `scripts/pack_zip.py` — `should_exclude()` 修复
+- 同上的根目录判断修复
+- `pack_skill()` 中 `rel_path` 计算修正
 
 #### 文件变更
-
 - 删除 `scripts/2.3.0`（zip 碎片垃圾文件）
-- `scripts/pack_zip.py` 排除逻辑修正
 
 ---
 
-## v2.0.0（2026-05-23）
+## v2.0.1（2026-05-23）
 
 **改写类型：统一排除规则（仓库同步 + ZIP 打包）**
 

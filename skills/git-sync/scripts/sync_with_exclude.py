@@ -7,6 +7,7 @@ import os
 import sys
 import shutil
 
+
 # ── 排除规则（与 pack_zip.py 保持一致）──────────────────────────
 EXCLUDE_DIRS = {
     "__pycache__", ".git", ".eggs", "eggs", "dist", "build",
@@ -19,40 +20,51 @@ EXCLUDE_FILES_EXACT = {
 EXCLUDE_FILES_GLOB = {
     "*.pyc", "*.pyo", "*.log", "*.zip", "*.bak",
     "*.tmp", "._*", ".decisions.json",
-    "zip_out", "preview_server.py",
+    "*.sensitive_scan_*.json", "zip_out", "preview_server.py",
 }
-FUNCTIONAL_WHITELIST = {"settings.html", "preview.html"}
+FUNCTIONAL_FILE_WHITELIST = {"settings.html", "preview.html"}
 
 
 def should_exclude(rel_path):
-    """判断相对路径是否应被排除（与 pack_zip.py 逻辑一致）"""
+    """判断相对路径是否应被排除。
+
+    rel_path: 相对于技能源目录的路径（正反斜杠均可），如 "config.json" 或 "scripts/foo.py"
+    returns: True 表示排除，False 表示保留
+    """
     import fnmatch
 
     p = rel_path.replace(os.sep, "/")
     name = os.path.basename(p)
+    parent_dir = os.path.dirname(p)  # "" 表示根目录
 
-    # 1. 白名单检查（最先）
-    if name.lower() in (w.lower() for w in FUNCTIONAL_WHITELIST):
-        return False
+    # 1. 白名单检查（最先）：功能性文件跳过所有排除规则
+    lower_name = name.lower()
+    for w in FUNCTIONAL_FILE_WHITELIST:
+        if lower_name == w.lower():
+            return False
 
-    # 2. 目录名检查（rel_path 的每个路径成分，不含文件名）
+    # 2. 目录名检查（rel_path 的每个路径成分）
     parts = p.split("/")
-    for part in parts[:-1]:
+    for part in parts[:-1]:  # 最后一个成分是文件名，不算目录
         if part.lower() in (d.lower() for d in EXCLUDE_DIRS):
             return True
 
     # 3. 精确文件名匹配
-    if name.lower() in (f.lower() for f in EXCLUDE_FILES_EXACT):
-        # config.json / manifest.json 只排除根目录的
+    lower_exact = {f.lower() for f in EXCLUDE_FILES_EXACT}
+    if name.lower() in lower_exact:
+        # config.json / manifest.json 只排除根目录的（parent_dir == ""）
         if name.lower() in ("config.json", "manifest.json"):
-            if "/" not in p:  # 根目录
+            if parent_dir == "":
                 return True
-            return False  # 子目录的保留
+            else:
+                return False  # 子目录的保留
         return True
 
     # 4. glob 模式匹配
     for pat in EXCLUDE_FILES_GLOB:
-        if fnmatch.fnmatch(name, pat) or fnmatch.fnmatch(p, pat):
+        if fnmatch.fnmatch(name, pat):
+            return True
+        if fnmatch.fnmatch(p, pat):
             return True
 
     return False
@@ -67,9 +79,6 @@ def sync_with_exclude(src, dst):
         print(f"❌ 源目录不存在: {src}")
         sys.exit(1)
 
-    # 计算 src 的父目录（用于生成正确的相对路径）
-    src_parent = os.path.dirname(src)
-
     # 清空目标目录（安全：已通过 git-sync.sh 路径校验）
     if os.path.isdir(dst):
         shutil.rmtree(dst)
@@ -77,14 +86,18 @@ def sync_with_exclude(src, dst):
 
     copy_count = 0
     for root, dirs, files in os.walk(src):
-        # 计算相对于 src 的路径（用于排除判断和目的路径）
+        # rel_root: 相对于 src 根目录的路径（"" 表示根目录本身）
         rel_root = os.path.relpath(root, src)
+        rel_root = "" if rel_root == "." else rel_root
 
         # 排除目录（原地修改 dirs 以阻止 os.walk 进入）
-        dirs[:] = [d for d in dirs if not should_exclude(os.path.join(rel_root, d))]
+        if rel_root:
+            dirs[:] = [d for d in dirs if not should_exclude(os.path.join(rel_root, d))]
+        else:
+            dirs[:] = [d for d in dirs if not should_exclude(d)]
 
         for fname in files:
-            rel_path = os.path.join(rel_root, fname)
+            rel_path = os.path.join(rel_root, fname) if rel_root else fname
             if should_exclude(rel_path):
                 continue
             src_file = os.path.join(root, fname)
