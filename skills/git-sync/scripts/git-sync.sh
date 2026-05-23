@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# git-sync v2.0.0
+# git-sync v2.1.0
 # 将 skill 代码规范化推送到码云/GitHub 并生成 ZIP 包
 # 用法: bash git-sync.sh <skill-name> [version] [--skip-scan]
 set -eo pipefail
@@ -77,9 +77,15 @@ VER_ACTION="normal"
 if [ -z "$REPO_VER" ]; then
     echo "  → 仓库无版本记录，正常同步"
 elif [ "$REPO_VER" = "$LOCAL_VER" ]; then
-    echo "  ⚠️  仓库版本 = 本地版本（$REPO_VER），可能无需更新"
-    read -p "  是否跳过同步？（y=跳过 / n=强制更新）[Y/n]: " SKIP_CHOICE
-    case "$SKIP_CHOICE" in n|N) VER_ACTION="normal" ;; y|Y|*) echo "  ⏭️  跳过同步"; exit 0 ;; esac
+    echo "  ⏭️  仓库版本 = 本地版本（$REPO_VER），跳过同步"
+    # 交互环境询问是否强制；非交互环境直接跳过
+    if [ -t 0 ]; then
+        read -p "  是否强制更新？（y=强制 / n=跳过）[Y/n]: " FORCE_CHOICE
+        case "$FORCE_CHOICE" in y|Y) VER_ACTION="normal" ;; *) echo "  ⏭️  已跳过（版本相同 $LOCAL_VER）"; exit 0 ;; esac
+    else
+        echo "  ⏭️  非交互环境，已跳过（版本相同 $LOCAL_VER）"
+        exit 0
+    fi
 elif ver_lt "$REPO_VER" "$LOCAL_VER"; then
     echo "  ✅ 仓库版本 < 本地版本，正常升级"
 else
