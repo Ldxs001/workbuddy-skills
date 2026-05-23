@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-chain_manager.py - Skill Sub Manager v1.2.0
+chain_manager.py - Skill Sub Manager v1.2.1
 调用链管理核心脚本：创建、查询、更新、删除、执行调用链。
 
 v1.1.0: retry_policy、failure_mode、skill_instruction 字段支持。
 v1.2.0: 设置功能集成（记忆参考、命名方式、重试次数）、里程碑通用逻辑规则。
+v1.2.1: 修复 --tags 参数解析 bug：支持 JSON 数组字符串输入，兼容逗号分隔回退。
 
 零外部依赖，仅使用 Python 标准库。
 跨平台支持 Windows/Linux/macOS。
@@ -377,6 +378,21 @@ def cmd_init(args):
     return 0
 
 
+def _parse_tags(tags_str):
+    """解析 --tags 参数：支持 JSON 数组字符串（如 '["a","b"]'）和逗号分隔字符串（如 'a,b'）。"""
+    if not tags_str:
+        return []
+    stripped = tags_str.strip()
+    if stripped.startswith("["):
+        try:
+            result = json.loads(stripped)
+            if isinstance(result, list):
+                return [str(t).strip() for t in result if str(t).strip()]
+        except json.JSONDecodeError:
+            pass
+    return [t.strip() for t in stripped.split(",") if t.strip()]
+
+
 def cmd_create(args):
     """创建调用链（里程碑分类在首次保存前完成，合并为一次保存）"""
     ensure_dirs()
@@ -400,7 +416,7 @@ def cmd_create(args):
         "description": args.description or "",
         "purpose": args.purpose or "",
         "user_intent": args.user_intent or "",
-        "tags": args.tags.split(",") if args.tags else [],
+        "tags": _parse_tags(args.tags),
         "steps": steps,
         "created_at": now_iso(),
         "updated_at": now_iso(),
