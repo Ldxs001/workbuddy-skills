@@ -1,7 +1,7 @@
 ---
 name: semantic-split
 description: 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于规则级/能力级json渐进加载生成串并行规划步骤，支持自增强json沉淀机制。
-version: "2.1.0"
+version: "2.2.0"
 author: wUwproject
 tags:
   - semantic-split
@@ -10,7 +10,7 @@ tags:
   - progressive-loading
 ---
 
-# 语义拆分与智能规划技能 (Semantic Split v2.1)
+# 语义拆分与智能规划技能 (Semantic Split v2.2)
 
 ## 核心能力
 
@@ -21,6 +21,26 @@ tags:
 | 3 | **渐进式加载** | 规则级/能力级 json 渐进匹配，未命中时模型思考 |
 | 4 | **自增强闭环** | 一次使用 → 沉淀 json → 下次复用 |
 | 5 | **json 管理工具** | `json_manager.py` CLI 统一管理能力级/规则级 json
+
+---
+
+## 快速开始
+
+```bash
+# 扫描知识库匹配任务
+python scripts/json_manager.py scan --keywords 制作 PPT 产品
+
+# 归类统计（判断是否达到规则级凝练阈值）
+python scripts/json_manager.py categorize --threshold 5
+
+# 创建能力级 JSON 骨架
+python scripts/json_manager.py create --type capability --name my_task_v1
+
+# 通用化（字段替换为占位符）
+python scripts/json_manager.py generalize --input <json_path> --params "具体值=[占位符]"
+```
+
+> 知识库 JSON 文件存放于 `~/.workbuddy/semantic-split/data/`（铁律4：产出物不嵌入技能目录）
 
 ---
 

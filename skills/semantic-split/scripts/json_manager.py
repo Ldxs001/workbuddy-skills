@@ -4,6 +4,7 @@ semantic-split JSON Manager v1.0
 
 统一管理能力级/规则级 json 的 CLI 工具。
 零外部依赖，仅使用 Python 标准库。
+产出物遵循铁律4：数据统一存放于 ~/.workbuddy/semantic-split/data/。
 
 用法:
   python json_manager.py <subcommand> [options]
@@ -29,11 +30,11 @@ from datetime import datetime, date
 from copy import deepcopy
 
 # ============================================================
-# 路径常量
+# 路径常量（铁律4：产出物存至 ~/.workbuddy/semantic-split/data/）
 # ============================================================
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = SKILL_DIR / "data"
+DATA_DIR = Path.home() / ".workbuddy" / "semantic-split" / "data"
 CAP_DIR = DATA_DIR / "capabilities"
 RULE_DIR = DATA_DIR / "rules"
 
