@@ -1,0 +1,115 @@
+{
+  "repos": {
+    "workbuddy-skills": {
+      "path": "~/.workbuddy/workbuddy-skills",
+      "description": "WorkBuddy 用户技能仓库（Gitee + GitHub 双平台）",
+      "items": {
+        "color-toolkit": {
+          "type": "skill",
+          "version": "1.0.1",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "专业颜色工具集"
+        },
+        "drawiodo": {
+          "type": "skill",
+          "version": "2.1.1",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "draw.io 自动做图技能（市场slug: drawiodo）"
+        },
+        "everything-search-breadmemory": {
+          "type": "skill",
+          "version": "1.2.0",
+          "added_at": "2026-05-22",
+          "uploaded": false,
+          "note": "Everything搜索 + 面包屑笔记本",
+          "gitee_version": "1.2.0",
+          "gitee_ok": true
+        },
+        "git-sync": {
+          "type": "skill",
+          "version": "1.10.0",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "技能同步到 Gitee/GitHub + ZIP 打包",
+          "gitee_version": "1.10.0",
+          "gitee_ok": true,
+          "github_version": "1.9.0",
+          "github_ok": true
+        },
+        "round-robin-allocator": {
+          "type": "skill",
+          "version": "1.0.1",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "均匀轮转分配工具"
+        },
+        "semantic-split": {
+          "type": "skill",
+          "version": "2.0.0",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "语义拆分与智能规划技能"
+        },
+        "simulated-peak-plot": {
+          "type": "skill",
+          "version": "2.2.0",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "模拟峰值图生成"
+        },
+        "skill-sub": {
+          "type": "skill",
+          "version": "1.9.0",
+          "added_at": "2026-05-23",
+          "uploaded": true,
+          "note": "调用链编辑器与粗粒度规划器（三角色：编辑器/规划器/编排器）",
+          "gitee_version": "1.9.0",
+          "gitee_ok": true,
+          "github_version": "1.8.0",
+          "github_ok": true
+        },
+        "svg-composer": {
+          "type": "skill",
+          "version": "3.2.2",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "SVG 组合器"
+        },
+        "triphasic-execution": {
+          "type": "skill",
+          "version": "5.9.0",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "三步执行框架（Execute→Review→Advance）"
+        },
+        "workday-calendar": {
+          "type": "skill",
+          "version": "1.1.1",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "智能周历系统"
+        },
+        "workbuddy-fs-manager": {
+          "type": "skill",
+          "version": "1.0.0",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "文件系统管理器"
+        },
+        "skill-standardization": {
+          "type": "skill",
+          "version": "2.3.0",
+          "added_at": "2026-05-22",
+          "uploaded": true,
+          "note": "SKILL.md 标准化规范引擎 v2（渐进式加载，R-01~R-10 审查）",
+          "gitee_version": "2.3.0",
+          "gitee_ok": true,
+          "github_version": "2.3.0",
+          "github_ok": true
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,50 @@
 
 ---
 
+## v2.0.0（2026-05-23）
+
+**改写类型：统一排除规则（仓库同步 + ZIP 打包）**
+
+### 问题
+
+- 排除规则只作用于 `pack_zip.py`（ZIP 打包），`git-sync.sh` 的 `rsync` 步骤排除规则不完整
+- `rsync` fallback（rm -rf + cp）完全没有排除逻辑，存在安全隐患
+
+### 变更内容
+
+#### 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `scripts/.git-sync-exclude.txt` | 排除规则配置文件（rsync + python 共用） |
+| `scripts/sync_with_exclude.py` | Python 排除复制（rsync 不可用时的 fallback） |
+
+#### `git-sync.sh` 改进
+
+- **新增 `RSYNC_OPTS` 数组**：与 `pack_zip.py` / `.git-sync-exclude.txt` 规则完全一致
+- **白名单优先**：`--include=settings.html` + `--include=preview.html` 在排除参数之前
+- **rsync fallback 重写**：不再用 `rm -rf` + 裸 `cp`，改为调用 `sync_with_exclude.py`
+- 移除原 fallback 中重复的 `references/` 复制块（逻辑错误）
+
+#### `pack_zip.py` 排除规则（已有，本次补充文档）
+
+| 层级 | 变量 | 说明 |
+|------|--------|------|
+| 目录排除 | `EXCLUDE_DIRS` | `__pycache__`、`.git`、`dist` 等 |
+| 精确文件名 | `EXCLUDE_FILES_EXACT` | `config.json`（仅根目录）、`manifest.json` 等 |
+| glob 模式 | `EXCLUDE_FILES_GLOB` | `*.pyc`、`*.log`、`*.zip`、`*.bak` 等 |
+| 功能性白名单 | `FUNCTIONAL_FILE_WHITELIST` | `settings.html`、`preview.html` |
+
+#### 规则维护约定
+
+- 修改排除规则时，需同步更新 3 个位置：
+  1. `scripts/.git-sync-exclude.txt`（配置文件）
+  2. `scripts/pack_zip.py`（Python 规则变量）
+  3. `scripts/git-sync.sh`（RSYNC_OPTS 数组）
+- 三者保持一致，否则排除行为会出现差异
+
+---
+
 ## v1.10.0（2026-05-23）
 
 **改写类型：pack_zip.py 排除规则体系重构**
@@ -42,7 +86,7 @@
   - `references/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
   - `references/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
   - `references/changelog.md` — 完整版本历史 + Roadmap
-- **frontmatter author** 从非常量引用修正为常量值 `[username-redacted]`
+- **frontmatter author** 从非常量引用修正为常量值 `wUwproject`
 - **清理根目录遗留垃圾**：删除异常 ZIP 文件 `2.0.0`、6 个 `.tmp_zip_*` 临时目录、过时空目录 `references/`
 - 通过 skill-standardization v2.0 update 验证：**ERROR=0, WARN=1**（WARN 为合理运行时文件例外）
 
