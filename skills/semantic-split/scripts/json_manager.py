@@ -30,11 +30,11 @@ from datetime import datetime, date
 from copy import deepcopy
 
 # ============================================================
-# 路径常量（铁律4：产出物存至 ~/standardization/semantic-split/data/）
+# 路径常量（铁律4：产出物存至 skills/.standardization/semantic-split/data/）
 # ============================================================
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = Path.home() / "standardization" / "semantic-split" / "data"
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "semantic-split" / "data"
 CAP_DIR = DATA_DIR / "capabilities"
 RULE_DIR = DATA_DIR / "rules"
 

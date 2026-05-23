@@ -67,7 +67,9 @@
       "parallel_group": null,
       "milestone": true,
       "dependency_heat": 0,
-      "depends_on": []
+      "depends_on": [],
+      "constraint_level": "none",
+      "source": "focus"
     },
     {
       "id": "s2",
@@ -76,7 +78,9 @@
       "parallel_group": null,
       "milestone": true,
       "dependency_heat": 9,
-      "depends_on": ["s1"]
+      "depends_on": ["s1"],
+      "constraint_level": "none",
+      "source": "focus"
     },
     {
       "id": "s3a",
@@ -85,7 +89,9 @@
       "parallel_group": "pg1",
       "milestone": false,
       "dependency_heat": 8,
-      "depends_on": ["s2"]
+      "depends_on": ["s2"],
+      "constraint_level": "none",
+      "source": "focus"
     },
     {
       "id": "s3b",
@@ -94,7 +100,20 @@
       "parallel_group": "pg1",
       "milestone": false,
       "dependency_heat": 5,
-      "depends_on": ["s2"]
+      "depends_on": ["s2"],
+      "constraint_level": "soft",
+      "source": "focus"
+    },
+    {
+      "id": "s3c",
+      "name": "AI生成备选视觉方案",
+      "action": "用AI工具生成3个不同风格的视觉草稿供选择",
+      "parallel_group": "pg1",
+      "milestone": false,
+      "dependency_heat": 4,
+      "depends_on": ["s2"],
+      "constraint_level": "none",
+      "source": "divergent_enhanced"
     },
     {
       "id": "s4",
@@ -144,6 +163,8 @@
 | `milestone` | ✅ | 是否为里程碑步骤 |
 | `dependency_heat` | ✅ | 关联热度 0-10 |
 | `depends_on` | ✅ | 依赖的前置步骤 id 数组 |
+| `constraint_level` | ❌ | 约束强度：`critical` / `soft` / `none`，对应🔴🟡⚪ |
+| `source` | ❌ | 步骤来源：`focus` / `divergent_enhanced`，聚焦步骤可不填（默认 focus） |
 
 ---
 

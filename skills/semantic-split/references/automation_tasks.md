@@ -17,7 +17,7 @@
 4. 生成规则级 json，内嵌 `capability_refs` 引用所有来源能力级
 5. 保存至 `~/.workbuddy/semantic-split/data/rules/` 目录
 
-**注意**：规则级 json 的结构规范见 `references/json_schema.md`。
+**注意**：规则级 json 的结构规范见 `json_schema.md`。
 
 ---
 
@@ -35,7 +35,7 @@
 5. 可生成多个 json（一个任务一个）
 6. 可选：对归类后 ≥ 5 份的类别顺带生成规则级 json
 
-**注意**：重量级任务消耗更多 token，建议在低峰时段执行。通用化规则见 `references/json_schema.md`。
+**注意**：重量级任务消耗更多 token，建议在低峰时段执行。通用化规则见 `json_schema.md`。
 
 ---
 
