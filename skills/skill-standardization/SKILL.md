@@ -9,10 +9,9 @@ description: >
 tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading"]
 ---
 
-# skill-standardization v2（渐进式加载示范）
+# skill-standardization v2
 
-> 本文档示范渐进式 MD 体系：主文件 ≤200 行含核心内容，
-> 详细教程、架构设计、更新日志拆分到 `references/` 按需加载。
+> Skill 标准化规范引擎，支持 R-01~R-10 审查、create/update/refactor 三模式、渐进式 MD 体系。
 
 提供 Skill 全生命周期标准化管理：
 **create**（创建）→ **update**（更新）→ **refactor**（改造）→ **audit**（审查）→ **规范加载**
