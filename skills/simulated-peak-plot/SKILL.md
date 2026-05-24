@@ -1,10 +1,36 @@
 ---
 name: simulated-peak-plot
-version: 2.2.0
+version: 2.3.2
 description: Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, clickable file:// path output, and CSV data import from device exports.
 ---
 
-# Simulated Peak Plot Skill v2.1
+## 触发条件
+
+当用户出现以下意图时，加载本技能：
+
+- 说出"生成峰图"、"模拟信号"、"创建峰谱"
+- 说出"可视化保留时间"、"输出 Markdown 表格"
+- 说出"导入 CSV 数据"、"生成模拟数据"
+- 需要色谱/光谱峰模拟、信号可视化、数据导出等场景
+
+**否定条件**：除非用户明确提到生成峰图或模拟数据，否则不要主动触发。
+
+→ 权限说明详见 `references/permission.md`（低风险，unified 授权）
+
+## 快速开始
+
+```bash
+# 交互式生成峰图
+python {SKILL_DIR}/scripts/generate_peak.py --interactive
+
+# 从 CSV 文件导入数据
+python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv
+
+# 使用 JSON 配置文件
+python {SKILL_DIR}/scripts/generate_peak.py --config config.json
+```
+
+# Simulated Peak Plot Skill v2.3.2
 
 Generate simulated peak plots with Gaussian peaks, customizable parameters, realistic noise, Markdown table output, and CSV data export.
 
@@ -48,9 +74,9 @@ This skill creates simulated peak spectra for educational, testing, or presentat
 
 **命令行用法：**
 ```bash
-python scripts/generate_peak.py --import-csv data.csv
-python scripts/generate_peak.py --import-csv data.csv --x-col 0 --y-col 1
-python scripts/generate_peak.py --import-csv data.csv --no-header --output my_plot.png
+python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv
+python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv --x-col 0 --y-col 1
+python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv --no-header --output my_plot.png
 ```
 
 **参数说明：**
@@ -158,10 +184,10 @@ Recommended points = max(500, [calculated_value])
 
 ### 4. Generate Plot and Output Data
 
-Use the `scripts/generate_peak.py` script:
+Use the `{SKILL_DIR}/scripts/generate_peak.py` script:
 
 ```bash
-python scripts/generate_peak.py --interactive
+python {SKILL_DIR}/scripts/generate_peak.py --interactive
 ```
 
 The script will:
@@ -227,8 +253,8 @@ The flexibility allows users to simulate almost any peak shape by adjusting sub-
 
 ## File References
 
-- **Script**: `scripts/generate_peak.py` - Main generation script with Markdown table output
-- **Parameters reference**: `references/parameters.md` - Detailed parameter documentation
+- **Script**: `{SKILL_DIR}/scripts/generate_peak.py` - Main generation script with Markdown table output
+- **Parameters reference**: `{SKILL_DIR}/references/parameters.md` - Detailed parameter documentation
 
 ## Example Usage
 
