@@ -4,7 +4,29 @@
 
 ---
 
-## v2.4.0（当前版本）
+## v2.5.0（当前版本）
+
+2026-05-25
+
+**改写类型：Bug 修复 — 数据路径规范化**
+
+### 变更内容
+
+- ✅ 新增 `get_skill_data_dir()` 函数（返回 `.standardization/simulated-peak-plot/data/` 路径）
+- ✅ 修改 `generate_peak_plot()` 函数，让 `output_file` 使用 `get_skill_data_dir()` 返回的路径
+- ✅ 修改 `generate_plot_from_csv()` 函数，让 `output_file` 使用正确路径
+- ✅ 修改 `export_csv_file()` 函数，让 `csv_file` 使用正确路径
+- 📝 更新版本号：2.4.0 → 2.5.0
+
+### 影响
+
+- 输出文件（PNG/CSV）现在统一保存到 `.standardization/simulated-peak-plot/data/` 下
+- 符合 `skill-standardization` 规范（数据/产出物路径统一到 `.standardization/<skill>/` 下）
+- 审计 17/17 PASS
+
+---
+
+## v2.4.0
 
 2026-05-25
 

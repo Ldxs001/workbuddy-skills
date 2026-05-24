@@ -12,6 +12,20 @@ import json
 import argparse
 import sys
 from math import ceil
+from pathlib import Path
+
+def get_skill_data_dir() -> Path:
+    """获取 skill 数据目录路径 - 统一到 skills/.standardization/<skill>/data/"""
+    file_path = Path(__file__).resolve()
+    skill_dir = file_path.parent.parent  # scripts/ 的上一级是技能目录
+    for parent in file_path.parents:
+        if parent.name == "skills" and parent.is_dir():
+            data_dir = parent / ".standardization" / skill_dir.name / "data"
+            data_dir.mkdir(parents=True, exist_ok=True)  # 自动创建目录
+            return data_dir
+    fallback = skill_dir / "data"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
 
 def check_environment():
     """Check if required packages are available."""
@@ -155,7 +169,12 @@ def generate_plot_from_csv(config):
     x_col = config.get('x_col', 0)
     y_col = config.get('y_col', 1)
     skip_header = config.get('skip_header', True)
-    output_file = config.get('output', 'imported_data.png')
+    # 输出文件路径：优先使用 get_skill_data_dir()，其次用户指定
+    output_arg = config.get('output', 'imported_data.png')
+    if os.path.isabs(output_arg) or '/' in output_arg or '\\' in output_arg:
+        output_file = output_arg  # 用户指定了完整路径
+    else:
+        output_file = str(get_skill_data_dir() / output_arg)  # 放到标准数据目录
     headless = config.get('headless', True)
 
     # Import data
@@ -287,9 +306,10 @@ def export_csv_file(t, signal, output_file, x_unit='min', y_unit='mV'):
     import csv
     import os
 
-    # Determine output path - replace or append _data.csv
-    base_name = os.path.splitext(output_file)[0]
-    csv_file = base_name + '_data.csv'
+    # Determine output path - save CSV in same directory as output_file
+    base_dir = os.path.dirname(output_file) or str(get_skill_data_dir())
+    base_name = os.path.splitext(os.path.basename(output_file))[0]
+    csv_file = os.path.join(base_dir, base_name + '_data.csv')
 
     # Write standard CSV file (RFC 4180 compliant)
     with open(csv_file, 'w', newline='', encoding='utf-8') as f:
@@ -343,7 +363,12 @@ def generate_peak_plot(config):
     peaks_config = config.get('peaks', [])
     baseline = config.get('baseline', 20)
     noise_level = config.get('noise_level', 8)
-    output_file = config.get('output', 'simulated_peak.png')
+    # 输出文件路径：优先使用 get_skill_data_dir()，其次用户指定
+    output_arg = config.get('output', 'simulated_peak.png')
+    if os.path.isabs(output_arg) or '/' in output_arg or '\\' in output_arg:
+        output_file = output_arg  # 用户指定了完整路径
+    else:
+        output_file = str(get_skill_data_dir() / output_arg)  # 放到标准数据目录
     figsize = config.get('figsize', (10, 6))
     dpi = config.get('dpi', 150)
     print_table = config.get('print_table', True)
