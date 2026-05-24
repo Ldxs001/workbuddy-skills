@@ -7,7 +7,8 @@
 
 ## 目录
 
-- [v2.13.1（当前版本）](#2131-当前版本)
+- [v2.13.1](#2131)
+- [v2.13.2（当前版本）](#2132-当前版本)
 - [v2.13.0](#2130)
 - [v2.12.2](#2122)
 - [v2.12.1](#2121)
@@ -29,6 +30,19 @@
 - [v2.0.1](#201)
 - [v2.0.0（重大升级）](#200-重大升级)
 - [v1.0.0（初始版本）](#100-初始版本)
+
+---
+
+### v2.13.2（当前版本）
+
+**发布日期：2026-05-24**
+**类型：Patch（修复 permission_checker.py 假阳性）**
+
+### 修复
+
+- **SENSITIVE_PATTERNS**：为所有凭证相关正则添加单词边界（），避免误匹配错误处理代码中的关键词列表（如 unauthorized、token、credential）
+- **DELETE_PATTERNS**：移除 r"del "（误匹配 Python del 变量删除语句），保留 os.remove/os.rmdir/shutil.rmtree/unlink/rm/rmdir 等真实文件删除检测
+- **permission_checker.py v1.0.1**：降低 skill-sub 等 skill 的假阳性风险等级
 
 ---
 

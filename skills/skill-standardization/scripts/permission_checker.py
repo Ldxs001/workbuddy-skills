@@ -26,19 +26,20 @@ import re
 import json
 import sys
 import ast
+import tokenize
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional, Any
 
 # ── 常量定义 ────────────────────────────────────────────────────────────────────
 
 SENSITIVE_PATTERNS = [
-    # 记忆文件路径
-    r"memory/", r"\.workbuddy/memory", r"MEMORY\.md", r"\d{4}-\d{2}-\d{2}\.md",
-    # 凭证相关
-    r"credentials", r"credential", r"password", r"passwd", r"secret", r"api[_-]?key",
-    r"token", r"apikey", r"api_key", r"access[_-]?token", r"private[_-]?key",
-    # 环境变量敏感词
-    r"OPENAI_API_KEY", r"ANTHROPIC_API_KEY", r"GITHUB_TOKEN", r"AWS_",
+    # 记忆文件路径（路径级，需单词边界或路径分隔符）
+    r"\bmemory/", r"\.workbuddy/memory", r"\bMEMORY\.md\b", r"\b\d{4}-\d{2}-\d{2}\.md\b",
+    # 凭证相关（加单词边界，避免匹配关键词列表）
+    r"\bcredential\w*\b", r"\bpasswd\b", r"\bsecret\b", r"\bapi[_-]?key\b",
+    r"\btoken\w*\b", r"\baccess[_-]?token\b", r"\bprivate[_-]?key\b",
+    # 环境变量敏感词（精确匹配环境变量名）
+    r"\bOPENAI_API_KEY\b", r"\bANTHROPIC_API_KEY\b", r"\bGITHUB_TOKEN\b", r"\bAWS_\w+\b",
 ]
 
 CRITICAL_PATH_PATTERNS = [
@@ -59,7 +60,7 @@ NETWORK_PATTERNS = [
 
 DELETE_PATTERNS = [
     r"os\.remove", r"os\.rmdir", r"shutil\.rmtree",
-    r"unlink", r"del ", r"rm ", r"rmdir",
+    r"\bos\.unlink\b", r"\brm\b", r"\brmdir\b",
     r"fs\.unlink", r"fs\.rmdir", r"fs\.rm",
 ]
 
@@ -115,6 +116,7 @@ class PermissionChecker:
             "file_delete": 0,
             "subprocess_call": 0,
         }
+        self._current_string_ranges = []  # (start_char, end_char) for .py string literals
 
     # ── 公共接口 ────────────────────────────────────────────────────────────────
 
@@ -165,6 +167,42 @@ class PermissionChecker:
                 if file_path.is_file():
                     self._scan_file(file_path)
 
+    def _get_ast_string_ranges(self, content: str) -> List[Tuple[int, int]]:
+        """
+        用 AST 解析 Python 源码，返回所有字符串字面量的字符偏移范围。
+        用于跳过字符串内容中的关键词误匹配。
+        """
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return []
+
+        ranges = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                # 有精确结束位置（Python 3.8+）
+                if hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
+                    start = self._linecol_to_offset(content, node.lineno, node.col_offset)
+                    end = self._linecol_to_offset(content, node.end_lineno, node.end_col_offset)
+                    if start is not None and end is not None:
+                        ranges.append((start, end))
+        return ranges
+
+    def _linecol_to_offset(self, content: str, line: int, col: int) -> Optional[int]:
+        """(line, col) → 字符偏移。"""
+        lines = content.splitlines(True)
+        if line < 1 or line > len(lines):
+            return None
+        offset = sum(len(lines[i]) for i in range(line - 1))
+        return offset + col
+
+    def _in_string(self, pos: int) -> bool:
+        """检查字符位置是否在字符串字面量内。"""
+        for (s, e) in self._current_string_ranges:
+            if s <= pos < e:
+                return True
+        return False
+
     def _scan_file(self, file_path: Path) -> None:
         """
         扫描单个文件，检测权限相关操作。
@@ -182,6 +220,11 @@ class PermissionChecker:
 
         self.stats["files_scanned"] += 1
         self.stats["lines_scanned"] += len(content.splitlines())
+
+        # 对 .py 文件，用 AST 计算字符串字面量范围，用于跳过误匹配
+        self._current_string_ranges = []
+        if file_path.suffix == '.py':
+            self._current_string_ranges = self._get_ast_string_ranges(content)
 
         # 检测各类操作
         self._check_sensitive_access(file_path, content)
@@ -203,6 +246,8 @@ class PermissionChecker:
         for pattern in SENSITIVE_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
+                if self._in_string(match.start()):
+                    continue
                 line_num = content[:match.start()].count("\n") + 1
                 self.stats["sensitive_access"] += 1
                 self.issues.append({
@@ -226,6 +271,8 @@ class PermissionChecker:
         for pattern in CRITICAL_PATH_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
+                if self._in_string(match.start()):
+                    continue
                 # 排除注释和字符串中的无害引用
                 line_num = content[:match.start()].count("\n") + 1
                 line_content = content.splitlines()[line_num - 1] if line_num <= len(content.splitlines()) else ""
@@ -254,6 +301,8 @@ class PermissionChecker:
         for pattern in NETWORK_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
+                if self._in_string(match.start()):
+                    continue
                 line_num = content[:match.start()].count("\n") + 1
                 self.stats["network_access"] += 1
                 self.issues.append({
@@ -277,6 +326,8 @@ class PermissionChecker:
         for pattern in DELETE_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
+                if self._in_string(match.start()):
+                    continue
                 line_num = content[:match.start()].count("\n") + 1
                 self.stats["file_delete"] += 1
                 self.issues.append({
@@ -300,6 +351,8 @@ class PermissionChecker:
         for pattern in SUBPROCESS_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
+                if self._in_string(match.start()):
+                    continue
                 line_num = content[:match.start()].count("\n") + 1
                 # 排除注释
                 line_content = content.splitlines()[line_num - 1] if line_num <= len(content.splitlines()) else ""
