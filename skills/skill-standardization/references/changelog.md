@@ -8,6 +8,7 @@
 ## 目录
 
 - [v2.13.1](#2131)
+- [v2.13.3（当前版本）](#2133-当前版本)
 - [v2.13.2（当前版本）](#2132-当前版本)
 - [v2.13.0](#2130)
 - [v2.12.2](#2122)
@@ -30,6 +31,21 @@
 - [v2.0.1](#201)
 - [v2.0.0（重大升级）](#200-重大升级)
 - [v1.0.0（初始版本）](#100-初始版本)
+
+---
+
+### v2.13.3（当前版本）
+
+**发布日期：2026-05-24**
+**类型：Patch（增加完整性校验）**
+
+### 新增
+- **permission_checks.py v2.13.3**：`_run_permission_checker()` 增加 `permission_checker.py` 的 SHA-256 哈希完整性校验
+- **脚本哈希存储**：`~/.workbuddy/skills/.standardization/skill-standardization/script_hashes.json`
+- **哈希不匹配警告**：检测到 `permission_checker.py` 被篡改时输出警告
+
+### 修复
+- **重复 import os**：移除 `_run_permission_checker()` 函数内的重复 `import os`
 
 ---
 
