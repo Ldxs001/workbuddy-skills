@@ -7,7 +7,7 @@
 **产出物路径迁移至 standardization 铁律4 结构**
 
 ### 变更内容
-- `config.json` + `manifest.json` 路径：`~/.workbuddy/git-sync/` → `<workspace>/standardization/git-sync/data/`
+- `config.json` + `manifest.json` 路径：`~/.workbuddy/git-sync/` → `<workspace>/.standardization/git-sync/data`
 - 5 个脚本新增 `_find_workspace_root()`：manifest.py, normalize_meta.py, sensitive_scan.py, update_readme.py, git-sync.sh
 - 工作区根目录检测：基于目录结构 `<workspace>/skills/<name>/scripts/` 往上推导，不硬编码 `.workbuddy`
 - 旧空目录 `~/.workbuddy/git-sync/` 已清理

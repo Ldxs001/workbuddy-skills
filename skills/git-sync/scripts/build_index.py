@@ -111,6 +111,15 @@ def build_index(dist_dir):
 
 
 if __name__ == "__main__":
+    # 授权检查（R-15 合规：自治模式，不阻断执行）
+    import subprocess
+    _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")
+    if os.path.exists(_auth_script):
+        _r = subprocess.run([sys.executable, _auth_script, "request", "--type", "autonomous", "--reason", "build_index: 生成 .dist/ HTML 索引"], capture_output=True, text=True)
+        if _r.returncode != 0:
+            print(f"❌ 授权被拒绝: {_r.stderr.strip()}")
+            sys.exit(1)
     if len(sys.argv) < 2:
         print("用法: python build_index.py <dist_dir>")
         sys.exit(1)

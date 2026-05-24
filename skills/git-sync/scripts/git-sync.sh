@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# git-sync v2.3.0
+# git-sync v2.4.0
 # 将 skill 代码规范化推送到码云/GitHub 并生成 ZIP 包
 # 用法: bash git-sync.sh <skill-name> [version] [--skip-scan]
 set -eo pipefail
@@ -13,7 +13,8 @@ WORKSPACE_ROOT="$(cd "$SKILLS_DIR/.." && pwd)"
 SKILL_NAME="${1:-}"
 VERSION="${2:-}"
 SKIP_SCAN=false
-for arg in "$@"; do [ "$arg" = "--skip-scan" ] && SKIP_SCAN=true; done
+FORCE=false
+for arg in "$@"; do [ "$arg" = "--skip-scan" ] && SKIP_SCAN=true; [ "$arg" = "--force" ] && FORCE=true; done
 
 if [ -z "$SKILL_NAME" ]; then
     echo "用法: bash git-sync.sh <skill-name> [version] [--skip-scan]"
@@ -80,8 +81,19 @@ VER_ACTION="normal"
 if [ -z "$REPO_VER" ]; then
     echo "  → 仓库无版本记录，正常同步"
 elif [ "$REPO_VER" = "$LOCAL_VER" ]; then
-    echo "  ⏭️  仓库版本 = 本地版本（$REPO_VER），强制重新同步（含打包）"
-    VER_ACTION="force"
+    echo "  ⏭️  仓库版本 = 本地版本（$REPO_VER），跳过同步"
+    if [ -t 0 ]; then
+        read -p "  是否强制更新（含重新打包）？（y=强制 / n=跳过）[N/n]: " FORCE_CHOICE
+        case "$FORCE_CHOICE" in y|Y) echo "  🔄 强制重新同步..."; VER_ACTION="force" ;; *) echo "  ⏭️  已跳过（版本相同 $LOCAL_VER）"; exit 0 ;; esac
+    else
+        if [ "$FORCE" = true ]; then
+            echo "  🔄 强制重新同步..."
+            VER_ACTION="force"
+        else
+            echo "  ⏭️  非交互环境，版本一致已跳过（如需重新打包请加 --force 或交互运行）"
+            exit 0
+        fi
+    fi
 elif ver_lt "$REPO_VER" "$LOCAL_VER"; then
     echo "  ✅ 仓库版本 < 本地版本，正常升级"
 else
@@ -188,13 +200,17 @@ RSYNC_OPTS=(
     --exclude="*.pyo"
     --exclude="*.log"
     --exclude="*.zip"
-    --exclude="*.bak"
+    --exclude="*.bak*"
     --exclude="*.tmp"
     --exclude="._*"
     --exclude=".decisions.json"
     --exclude=".sensitive_scan_*.json"
     --exclude="zip_out"
     --exclude="preview_server.py"
+    --exclude="*_fixed.py"
+    --exclude="stderr.txt"
+    --exclude="stdout.txt"
+    --exclude=".standardization"
 )
 
 if [ -d "$DST" ]; then

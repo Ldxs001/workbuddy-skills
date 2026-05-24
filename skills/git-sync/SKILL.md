@@ -8,6 +8,8 @@ description: >
   自动更新 README.md 技能列表，附带 _meta.json 标准化校验、
   三单一致维护清单机制、敏感信息过滤和 SKILL.md 规范化审查。
 tags: [sync, git, zip, skill-manager, manifest, security]
+sensitive_access: true
+critical_write: true
 ---
 
 # git-sync — 三端同步技能

@@ -12,15 +12,17 @@ import shutil
 EXCLUDE_DIRS = {
     "__pycache__", ".git", ".eggs", "eggs", "dist", "build",
     ".eggs-info", ".pytest_cache", ".mypy_cache", "node_modules",
+    ".standardization", "outputs", "test-outputs",
 }
 EXCLUDE_FILES_EXACT = {
     ".gitignore", ".ds_store", "thumbs.db",
     "config.json", "manifest.json", "pack_zip.py",
 }
 EXCLUDE_FILES_GLOB = {
-    "*.pyc", "*.pyo", "*.log", "*.zip", "*.bak",
+    "*.pyc", "*.pyo", "*.log", "*.zip", "*.bak*",
     "*.tmp", "._*", ".decisions.json",
     "*.sensitive_scan_*.json", "zip_out", "preview_server.py",
+    "*_fixed.py", "stderr.txt", "stdout.txt",
 }
 FUNCTIONAL_FILE_WHITELIST = {"settings.html", "preview.html"}
 
@@ -111,6 +113,18 @@ def sync_with_exclude(src, dst):
 
 
 if __name__ == "__main__":
+    # R-15 合规：自治模式授权检查（不阻断执行）
+    _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")
+    if os.path.exists(_auth_script):
+        _r = __import__("subprocess").run(
+            [sys.executable, _auth_script, "request", "--type", "autonomous", "--reason", "git-sync 高危操作"],
+            capture_output=True, text=True
+        )
+        if _r.returncode != 0:
+            print(f"⚠️ 授权检查警告: {_r.stderr.strip()}")
+
+
     if len(sys.argv) < 3:
         print("用法: python sync_with_exclude.py <src_dir> <dst_dir>")
         sys.exit(1)
