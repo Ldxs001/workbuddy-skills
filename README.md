@@ -20,7 +20,7 @@
 | `round-robin-allocator` | 将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。 |
 | `semantic-split` | 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于5W2H维度提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，支持自增强json沉淀机制。 |
 | `simulated-peak-plot` | Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, clickable file:// path output, and CSV data import from device exports. |
-| `skill-standardization` | Skill 标准化规范引擎 v2.17.0（安全增强版）。修复 R-11 路径提取误收全角右括号 bug，修复 R-12 references 扫描误报 changelog.md 历史路径问题，审计自身 17/17 PASS。 |
+| `skill-standardization` | Skill 标准化规范引擎 v2.18.0（安全增强版）。修复 refactor _build_migration_plan() 不处理子目录的 bug，新增自动搬迁 skill 到 .standardization/ 下功能，permissions.md 文件名修正为 permission.md。 |
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架，附带结构化问题日志、风险手册和经验教训登记册 |

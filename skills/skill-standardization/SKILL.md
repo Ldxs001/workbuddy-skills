@@ -1,15 +1,15 @@
 ---
 name: skill-standardization
-version: 2.17.0
+version: 2.18.0
 author: wUwproject
 license: MIT
-description: "Skill 标准化规范引擎 v2.17.0（安全增强版）。支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查、触发条件合规性）、create/update/refactor 三模式，服务于其他 skill 的安全创建/更新/改造。新增授权方式智能判断（根据技能工作性质决定 unified/immediate/silent）。"
+description: "Skill 标准化规范引擎 v2.18.0（安全增强版）。支持 R-01~R-17 审查、create/update/refactor 三模式。新增 refactor 自动搬迁 skill 到 .standardization/ 下，修复 _build_migration_plan() 不处理子目录的 bug。"
 tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading", "security", "permission-check"]
 sensitive_access: false
 critical_write: false
 ---
 
-# skill-standardization v2.17.0
+# skill-standardization v2.18.0
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
