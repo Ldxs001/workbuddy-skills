@@ -36,7 +36,30 @@
 
 ---
 
-### v2.14.0（当前版本）
+### v2.15.0（当前版本）
+
+**完整授权注入系统 — 从 Markdown 描述升级为可执行授权代码**
+
+### 新增
+- **`_render_auth_check_py()` 重写**：改用逐行拼接，彻底解决模板转义问题（`{{}} → 实际输出为 `{{}}` 导致语法错误）
+- **`_generate_auth_check_py()`**：根据权限检查报告生成 `scripts/auth_check.py` 并写入磁盘
+- **`_inject_auth_imports()`**：在技能 `scripts/` 下所有 `.py` 文件头部注入 `from auth_check import authorize, initialize`
+- **`_inject_initialize_calls()`**：在所有 `scripts/*.py` 的 `if __name__ == "__main__":` 块内注入一次 `initialize()` 调用
+- **`_inject_auth_calls()`**：在每个高风险操作所在行之前注入 `if not authorize("rule_name", "description"): return` 调用（按文件分组，插入位置按倒序处理以防行号偏移）
+- **`refactor.py` 同步更新**：通过 Agent 将 `updater.py` 的授权注入方法完整同步到 `refactor.py`，包含 `_render_auth_check_py / _generate_auth_check_py / _inject_auth_imports / _inject_initialize_calls / _inject_auth_calls / _run_permission_checker / _inject_auth_section`
+
+### 修复
+- **授权方式智能判断**：`permission_checker.py` 的 `suggest_authorization_methods()` 根据技能工作性质（`automated` / `interactive`）决定授权方式，而非一刀切按 severity 判死
+- **注入逻辑完善**：`_inject_auth_section()` 现在调用上述所有新方法，实现完整授权系统注入（生成 `auth_check.py` + 注入 `authorize()` 调用 + 注入 SKILL.md 文档章节）
+
+### 影响范围
+- `scripts/skill_builder/updater.py`：新增 7 个授权注入方法，`_inject_auth_section()` 重写为完整注入流程
+- `scripts/skill_builder/refactor.py`：同步更新（Agent 执行），支持 `--inject-auth` 参数
+- `references/changelog.md`：新增本条目
+
+---
+
+## v2.14.0（当前版本）
 
 **发布日期：2026-05-24**
 **类型：Minor（授权方式智能判断：根据技能工作性质决定 unified/immediate/silent）**
