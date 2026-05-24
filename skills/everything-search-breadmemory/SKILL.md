@@ -1,6 +1,6 @@
 ---
 name: everything-search-breadmemory
-version: 1.2.0
+version: 1.4.0
 description: 基于 Everything/es.exe 的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联。
 author: wUwproject
 license: MIT
@@ -120,3 +120,9 @@ python {SKILL_DIR}/scripts/ebbinghaus.py expand-topology --id <条目ID>
 ## 数据存储
 
 详见 [references/data-storage.md](references/data-storage.md)。
+
+---
+
+## 版本
+
+当前版本：**1.4.0** — v1.4.0：补充权限权重说明（R-16），references/agent-behavior.md 追加权限权重表格及风险等级评估

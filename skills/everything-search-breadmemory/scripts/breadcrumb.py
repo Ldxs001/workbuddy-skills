@@ -16,7 +16,8 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-DATA_DIR = Path.home() / "standardization" / "everything-search-breadmemory" / "data"
+SKILL_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "everything-search-breadmemory" / "data"
 BREADCRUMB_FILE = DATA_DIR / "breadcrumb.json"
 
 

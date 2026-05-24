@@ -35,7 +35,8 @@ from pathlib import Path
 
 # ── 常量 ──────────────────────────────────────────────
 
-DATA_DIR = Path.home() / "standardization" / "everything-search-breadmemory" / "data"
+SKILL_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "everything-search-breadmemory" / "data"
 DONUT_FILE = DATA_DIR / "donuts.json"
 BREADCRUMB_FILE = DATA_DIR / "breadcrumb.json"
 
