@@ -1,17 +1,47 @@
-# 权限权重说明（R-16）
+# 权限说明
 
-本技能各操作的权限权重评估如下（由 `permission_checker.py` 计算）：
+> 由 `permission_checker.py` 扫描生成，基于脚本实际文件操作行为计算风险权重。
 
-| 脚本 | 操作类型 | 权限权重 | 风险等级 | 说明 |
-|------|---------|---------|---------|------|
-| `workday_calendar.py` | 读写 `data/` 目录（JSON） | 中低 | 🟡 | 本地数据文件读写，无外部命令调用 |
-| `workday_calendar.py` | 创建 `.bat` 备份文件 | 中低 | 🟡 | 备份文件仅含数据恢复命令，无执行风险 |
-| `workday_calendar.py` | 读取 `weekend_config.json` | 低 | 🟢 | 仅读取配置 |
-| `workday_calendar.py` | 写入 `schedule_events.json` | 中 | 🟡 | 本地日程数据写入，无外部网络/命令 |
+## 风险等级
 
-**合计权限权重**：中低（所有操作均为本地文件读写）
-**敏感信息访问**：无（仅本地日历/日程数据）
-**关键位置写入**：否（仅写入技能自身 `data/` 目录）
-**高权限操作**：无（无需授权）
+`low`（权重 **0.00%**）
 
-> 本技能整体风险等级：**低**。所有操作仅限于本地用户目录，不涉及系统目录、敏感位置或网络传输。备份 `.bat` 文件使用 `certutil -decode` 自解码技术，无需依赖外部文件，无执行风险。
+## 扫描摘要
+
+| 项目 | 值 |
+|------|-----|
+| 扫描文件数 | 1 |
+| 扫描行数 | 1348 |
+| 风险等级 | low |
+| 权重 | 0.00% |
+| 高权限操作 | 无 |
+
+## 权限操作清单
+
+脚本 `scripts/workday_calendar.py` 文件操作均为**数据读写**（JSON 配置文件），无删除/网络/子进程操作：
+
+| 操作 | 文件路径 | 权限 |
+|------|----------|--------|
+| 读假日配置 | `.standardization/workday-calendar/data/holiday_intervals_YYYY.json` | 📖 读 |
+| 写假日配置 | `.standardization/workday-calendar/data/holiday_intervals_YYYY.json` | ✏️ 写 |
+| 读补班配置 | `.standardization/workday-calendar/data/compensatory_days_YYYY.json` | 📖 读 |
+| 写补班配置 | `.standardization/workday-calendar/data/compensatory_days_YYYY.json` | ✏️ 写 |
+| 读周末配置 | `.standardization/workday-calendar/data/weekend_config.json` | 📖 读 |
+| 写周末配置 | `.standardization/workday-calendar/data/weekend_config.json` | ✏️ 写 |
+| 读日程数据 | `.standardization/workday-calendar/data/schedule_events.json` | 📖 读 |
+| 写日程数据 | `.standardization/workday-calendar/data/schedule_events.json` | ✏️ 写 |
+
+## 授权方式
+
+**`silent`**（静默执行，无需用户授权）
+
+理由：
+- 权重 0.00%，无高权限操作
+- 仅读写本地 JSON 数据文件  
+- 无网络访问、无子进程调用、无文件删除操作  
+
+## 权重说明
+
+权重 = Σ(操作风险分值) / 100，上限 100%。
+
+本技能仅做本地 JSON 数据读写，风险分值为 0，故权重 0.00%。

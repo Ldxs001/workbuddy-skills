@@ -19,9 +19,12 @@ from pathlib import Path
 # ============================================================
 
 def get_skill_data_dir() -> Path:
-    """获取skill数据目录路径"""
-    skill_dir = Path(__file__).parent.parent
-    return skill_dir / "data"
+    """获取skill数据目录路径 - 统一到 skills/.standardization/<skill>/data/"""
+    file_path = Path(__file__).resolve()
+    for parent in file_path.parents:
+        if parent.name == "skills" and parent.is_dir():
+            return parent / ".standardization" / "workday-calendar" / "data"
+    return Path(__file__).parent.parent / "data"
 
 def get_holiday_file(year: int = None) -> Path:
     """获取法定假日数据文件路径"""
