@@ -64,7 +64,7 @@ skill-standardization/                 # Skill 根目录
 │   └── architecture.md                # 本文件 — 架构设计
 │
 └── scripts/                           # 核心脚本与规范定义
-    ├── skill_builder/                 # [v2.14.0重构] 构建器包（面向对象）
+    ├── skill_builder/                 # [v2.13.0重构] 构建器包（面向对象）
     │   ├── __init__.py              #   主入口 + argparse 解析
     │   ├── __main__.py              #   支持 python -m skill_builder 执行
     │   ├── creator.py               #   SkillCreator 类（create 模式）
@@ -73,7 +73,7 @@ skill-standardization/                 # Skill 根目录
     │   ├── version_manager.py       #   VersionManager 类（版本号管理）
     │   └── utils.py                 #   工具函数（备份、模板等）
     │
-    ├── skill_audit/                  # [v2.14.0重构] 审查器包（面向对象）
+    ├── skill_audit/                  # [v2.13.0重构] 审查器包（面向对象）
     │   ├── __init__.py            #   主入口 + argparse + audit_skill()
     │   ├── __main__.py            #   支持 python -m skill_audit 执行
     │   ├── frontmatter_checker.py  #   R-01~R-05 检查函数

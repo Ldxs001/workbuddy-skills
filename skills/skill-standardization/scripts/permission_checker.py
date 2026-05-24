@@ -26,35 +26,31 @@ import re
 import json
 import sys
 import ast
+import tokenize
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional, Any
 
 # ── 常量定义 ────────────────────────────────────────────────────────────────────
 
 SENSITIVE_PATTERNS = [
-    # 记忆文件路径
-    r"memory/", r"\.workbuddy/memory", r"MEMORY\.md", r"\d{4}-\d{2}-\d{2}\.md",
-    # 凭证相关
-    r"credentials", r"credential", r"password", r"passwd", r"secret", r"api[_-]?key",
-    r"token", r"apikey", r"api_key", r"access[_-]?token", r"private[_-]?key",
-    # 环境变量敏感词
-    r"OPENAI_API_KEY", r"ANTHROPIC_API_KEY", r"GITHUB_TOKEN", r"AWS_",
+    # 记忆文件路径（路径级，需单词边界或路径分隔符）
+    r"\bmemory/", r"\.workbuddy/memory", r"\bMEMORY\.md\b", r"\b\d{4}-\d{2}-\d{2}\.md\b",
+    # 凭证相关（加单词边界，避免匹配关键词列表）
+    r"\bcredential\w*\b", r"\bpasswd\b", r"\bsecret\b", r"\bapi[_-]?key\b",
+    r"\btoken\w*\b", r"\baccess[_-]?token\b", r"\bprivate[_-]?key\b",
+    # 环境变量敏感词（精确匹配环境变量名）
+    r"\bOPENAI_API_KEY\b", r"\bANTHROPIC_API_KEY\b", r"\bGITHUB_TOKEN\b", r"\bAWS_\w+\b",
 ]
 
 CRITICAL_PATH_PATTERNS = [
-    # 记忆文件（跨 skill 访问才是风险，但统一标出由人工判断）
-    r"memory/", r"\.workbuddy/memory", r"MEMORY\.md", r"\d{4}-\d{2}-\d{2}\.md",
-    # 凭证文件路径
-    r"credentials", r"credential", r"password", r"passwd", r"secret",
-    # 系统配置目录（非 skill 自身目录） 
-    r"\.config/", r"\.ssh/", r"AppData",
-    # 根目录写入（非常危险） 
-    r"/$", r"^[A-Za-z]:[\/]$",
-    r"C:\$", r"/usr/", r"/etc/", r"/var/",
-]
     # 技能目录
+    r"skills/", r"\.workbuddy/skills",
     # 系统配置目录
+    r"\.workbuddy/", r"\.config/", r"\.ssh/", r"AppData",
     # 根目录写入
+    r"/$", r"^[A-Za-z]:[\\/]$",  # 根目录
+    r"C:\\\\", r"/usr/", r"/etc/", r"/var/",
+]
 
 NETWORK_PATTERNS = [
     r"import requests", r"from requests", r"urllib", r"httpx",
@@ -64,7 +60,7 @@ NETWORK_PATTERNS = [
 
 DELETE_PATTERNS = [
     r"os\.remove", r"os\.rmdir", r"shutil\.rmtree",
-    r"unlink", r"del ", r"rm ", r"rmdir",
+    r"\bos\.unlink\b", r"\brm\b", r"\brmdir\b",
     r"fs\.unlink", r"fs\.rmdir", r"fs\.rm",
 ]
 
@@ -111,7 +107,6 @@ class PermissionChecker:
         self.skill_dir = Path(skill_dir).resolve()
         self.verbose = verbose
         self.issues: List[Dict] = []
-        self._seen: Set[Tuple[str, int, str]] = set()  # (file, line, type) 去重
         self.stats = {
             "files_scanned": 0,
             "lines_scanned": 0,
@@ -121,6 +116,7 @@ class PermissionChecker:
             "file_delete": 0,
             "subprocess_call": 0,
         }
+        self._current_string_ranges = []  # (start_char, end_char) for .py string literals
 
     # ── 公共接口 ────────────────────────────────────────────────────────────────
 
@@ -146,6 +142,13 @@ class PermissionChecker:
         # 4. 确定风险等级
         risk_level = self._determine_risk_level(weight)
 
+        # 4.5 生成授权方式建议，并合并进 issues
+        suggestions = self.suggest_authorization_methods()
+        for i, sug in enumerate(suggestions):
+            if i < len(self.issues):
+                self.issues[i]["authorization_method"] = sug["authorization_method"]
+                self.issues[i]["reason"] = sug["reason"]
+
         # 5. 生成报告
         report = self._generate_report(weight, risk_level)
 
@@ -166,10 +169,46 @@ class PermissionChecker:
                 print(f"[!] scripts/ 目录不存在: {scripts_dir}")
             return
 
-        for ext in ["*.py", "*.js"]:  # 只扫描 Python/JS，避免 shell 脚本误报
+        for ext in ["*.py", "*.js", "*.sh", "*.ps1", "*.bat"]:
             for file_path in scripts_dir.glob(ext):
                 if file_path.is_file():
                     self._scan_file(file_path)
+
+    def _get_ast_string_ranges(self, content: str) -> List[Tuple[int, int]]:
+        """
+        用 AST 解析 Python 源码，返回所有字符串字面量的字符偏移范围。
+        用于跳过字符串内容中的关键词误匹配。
+        """
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return []
+
+        ranges = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                # 有精确结束位置（Python 3.8+）
+                if hasattr(node, 'end_lineno') and hasattr(node, 'end_col_offset'):
+                    start = self._linecol_to_offset(content, node.lineno, node.col_offset)
+                    end = self._linecol_to_offset(content, node.end_lineno, node.end_col_offset)
+                    if start is not None and end is not None:
+                        ranges.append((start, end))
+        return ranges
+
+    def _linecol_to_offset(self, content: str, line: int, col: int) -> Optional[int]:
+        """(line, col) → 字符偏移。"""
+        lines = content.splitlines(True)
+        if line < 1 or line > len(lines):
+            return None
+        offset = sum(len(lines[i]) for i in range(line - 1))
+        return offset + col
+
+    def _in_string(self, pos: int) -> bool:
+        """检查字符位置是否在字符串字面量内。"""
+        for (s, e) in self._current_string_ranges:
+            if s <= pos < e:
+                return True
+        return False
 
     def _scan_file(self, file_path: Path) -> None:
         """
@@ -189,43 +228,17 @@ class PermissionChecker:
         self.stats["files_scanned"] += 1
         self.stats["lines_scanned"] += len(content.splitlines())
 
+        # 对 .py 文件，用 AST 计算字符串字面量范围，用于跳过误匹配
+        self._current_string_ranges = []
+        if file_path.suffix == '.py':
+            self._current_string_ranges = self._get_ast_string_ranges(content)
+
         # 检测各类操作
         self._check_sensitive_access(file_path, content)
         self._check_critical_write(file_path, content)
         self._check_network_access(file_path, content)
         self._check_file_delete(file_path, content)
         self._check_subprocess_call(file_path, content)
-
-
-    def _is_false_positive(self, file_path: Path, content: str, match) -> bool:
-        """
-        判断匹配是否是 False Positive。
-        排除：注释行、模式定义行、字符串字面量中的模式。
-        """
-        line_num = content[:match.start()].count(chr(10)) + 1
-        lines = content.splitlines()
-        if line_num < 1 or line_num > len(lines):
-            return False
-        line = lines[line_num - 1]
-
-        # 1. 排除注释行（Python # 或 shell #）
-        stripped = line.strip()
-        if stripped.startswith('#') or stripped.startswith('//'):
-            return True
-
-        # 2. 排除模式定义行：匹配内容被引号包围（是模式字符串本身）
-        matched_text = match.group(0)
-        start = match.start()
-        # 检查匹配前后是否有引号（说明这是字符串里的模式定义）
-        if start > 0 and content[start-1] in ('"', "'"):
-            # 前面有引号 -> 可能是 r"xxx" 模式定义
-            return True
-
-        # 3. 排除 permission_checker.py 自身（包含模式但不执行）
-        if file_path.name == 'permission_checker.py':
-            return True
-
-        return False
 
     # ── 内部方法：操作检测 ─────────────────────────────────────────────────────
 
@@ -240,17 +253,11 @@ class PermissionChecker:
         for pattern in SENSITIVE_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
-                # 排除 False Positive（注释行、模式定义行等）
-                if self._is_false_positive(file_path, content, match):
+                if self._in_string(match.start()):
                     continue
                 line_num = content[:match.start()].count("\n") + 1
-                key = (str(file_path.relative_to(self.skill_dir)), line_num, "sensitive_access")
-                if key in self._seen:
-                    continue
-                self._seen.add(key)
                 self.stats["sensitive_access"] += 1
                 self.issues.append({
-                    "rule": "sensitive_access",
                     "type": "sensitive_access",
                     "file": str(file_path.relative_to(self.skill_dir)),
                     "line": line_num,
@@ -271,28 +278,22 @@ class PermissionChecker:
         for pattern in CRITICAL_PATH_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
-                # 排除注释和字符串中的无害引用
-                if self._is_false_positive(file_path, content, match):
+                if self._in_string(match.start()):
                     continue
+                # 排除注释和字符串中的无害引用
                 line_num = content[:match.start()].count("\n") + 1
                 line_content = content.splitlines()[line_num - 1] if line_num <= len(content.splitlines()) else ""
                 if line_content.strip().startswith("#"):
                     continue
 
-                key = (str(file_path.relative_to(self.skill_dir)), line_num, "critical_write")
-                if key in self._seen:
-                    continue
-                self._seen.add(key)
-
                 self.stats["critical_write"] += 1
                 self.issues.append({
-                    "rule": "critical_write",
                     "type": "critical_write",
                     "file": str(file_path.relative_to(self.skill_dir)),
                     "line": line_num,
                     "pattern": pattern,
                     "match": match.group(0),
-                    "description": "检测到关键位置写入（skills/<skill-name>/ 安装目录）",
+                    "description": "检测到关键位置写入（skills/.workbuddy/系统目录）",
                     "severity": "HIGH",
                 })
 
@@ -307,17 +308,11 @@ class PermissionChecker:
         for pattern in NETWORK_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
-                if self._is_false_positive(file_path, content, match):
+                if self._in_string(match.start()):
                     continue
                 line_num = content[:match.start()].count("\n") + 1
-                key = (str(file_path.relative_to(self.skill_dir)), line_num, "network_access")
-                if key in self._seen:
-                    continue
-                self._seen.add(key)
-
                 self.stats["network_access"] += 1
                 self.issues.append({
-                    "rule": "network_access",
                     "type": "network_access",
                     "file": str(file_path.relative_to(self.skill_dir)),
                     "line": line_num,
@@ -338,17 +333,11 @@ class PermissionChecker:
         for pattern in DELETE_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
-                if self._is_false_positive(file_path, content, match):
+                if self._in_string(match.start()):
                     continue
                 line_num = content[:match.start()].count("\n") + 1
-                key = (str(file_path.relative_to(self.skill_dir)), line_num, "file_delete")
-                if key in self._seen:
-                    continue
-                self._seen.add(key)
-
                 self.stats["file_delete"] += 1
                 self.issues.append({
-                    "rule": "file_delete",
                     "type": "file_delete",
                     "file": str(file_path.relative_to(self.skill_dir)),
                     "line": line_num,
@@ -369,7 +358,7 @@ class PermissionChecker:
         for pattern in SUBPROCESS_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
             for match in matches:
-                if self._is_false_positive(file_path, content, match):
+                if self._in_string(match.start()):
                     continue
                 line_num = content[:match.start()].count("\n") + 1
                 # 排除注释
@@ -377,14 +366,8 @@ class PermissionChecker:
                 if line_content.strip().startswith("#"):
                     continue
 
-                key = (str(file_path.relative_to(self.skill_dir)), line_num, "subprocess_call")
-                if key in self._seen:
-                    continue
-                self._seen.add(key)
-
                 self.stats["subprocess_call"] += 1
                 self.issues.append({
-                    "rule": "subprocess_call",
                     "type": "subprocess_call",
                     "file": str(file_path.relative_to(self.skill_dir)),
                     "line": line_num,
@@ -418,7 +401,6 @@ class PermissionChecker:
         # 检查 sensitive_access 声明
         if "sensitive_access" not in fm_content and self.stats["sensitive_access"] > 0:
             self.issues.append({
-                "rule": "missing_declaration",
                 "type": "missing_declaration",
                 "file": "SKILL.md",
                 "line": 1,
@@ -431,7 +413,6 @@ class PermissionChecker:
         # 检查 critical_write 声明
         if "critical_write" not in fm_content and self.stats["critical_write"] > 0:
             self.issues.append({
-                "rule": "missing_declaration",
                 "type": "missing_declaration",
                 "file": "SKILL.md",
                 "line": 1,
@@ -535,6 +516,141 @@ class PermissionChecker:
                           "必须实施完整的授权检查机制。",
         }
         return recommendations.get(risk_level, "未知风险等级。")
+
+    def _detect_skill_nature(self) -> str:
+        """
+        检测技能工作性质：automated（自动化）或 interactive（交互式）。
+
+        判断依据（按优先级）：
+        1. SKILL.md frontmatter 含 `automated: true` / `cron: true` → automated
+        2. SKILL.md frontmatter 含 `interactive: true` → interactive
+        3. description 含关键词（自动/定时/cron/schedule）→ automated
+        4. tags 含 automation/cron/schedule → automated
+        5. 默认 → interactive（保守）
+
+        Returns:
+            str: "automated" 或 "interactive"
+        """
+        skill_md = self.skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            return "interactive"
+
+        try:
+            content = skill_md.read_text(encoding="utf-8")
+        except Exception:
+            return "interactive"
+
+        fm_match = re.search(r"^---\s*\n(.*?)\n---", content, re.DOTALL | re.MULTILINE)
+        fm_content = fm_match.group(1) if fm_match else ""
+        desc_match = re.search(r"description:\s*>(.*?)(?=\n\w|$)", content, re.DOTALL)
+        description = desc_match.group(1) if desc_match else ""
+
+        # 1. frontmatter 显式声明
+        if re.search(r"^\s*automated\s*:\s*true", fm_content, re.MULTILINE | re.IGNORECASE):
+            return "automated"
+        if re.search(r"^\s*cron\s*:\s*true", fm_content, re.MULTILINE | re.IGNORECASE):
+            return "automated"
+        if re.search(r"^\s*interactive\s*:\s*true", fm_content, re.MULTILINE | re.IGNORECASE):
+            return "interactive"
+
+        # 2. description 关键词
+        auto_keywords = ["自动", "定时", "cron", "schedule", "周期性", "每天", "每周", "hourly", "daily", "weekly"]
+        if any(kw in description.lower() for kw in auto_keywords):
+            return "automated"
+
+        # 3. tags 关键词
+        tags_match = re.search(r"tags:\s*\[(.*?)\]", fm_content, re.DOTALL)
+        if tags_match:
+            tags_str = tags_match.group(1).lower()
+            if any(kw in tags_str for kw in ["automation", "cron", "schedule", "sync", "backup"]):
+                return "automated"
+
+        return "interactive"
+
+    def suggest_authorization_methods(self) -> List[Dict]:
+        """
+        为每个检测到的风险操作建议授权方式。
+
+        授权方式决策逻辑：
+        1. 先判断技能工作性质（_detect_skill_nature）：
+           - automated：自动化技能（如 git-sync、定时任务）
+           - interactive：交互式技能（需要用户对话触发）
+
+        2. 根据性质和风险类型决定授权方式：
+           [automated 技能]
+           - critical_write（skills/系统目录写入）→ unified（一次性授权，后续不再询问）
+           - file_delete（文件删除）→ unified
+           - subprocess_call（子进程调用）→ unified
+           - sensitive_access（敏感信息访问）→ unified
+           - 中风险 → silent（静默执行，仅记录）
+           - 极关键操作（如删除非工作区目录）→ immediate（每次确认）
+
+           [interactive 技能]
+           - 高风险 → immediate（每次执行前确认）
+           - 中风险 → unified（一次性授权）
+           - 低风险 → silent
+
+        Returns:
+            list: 含授权建议的操作列表，每项含 {
+                "file", "line", "type", "severity",
+                "description", "authorization_method", "reason"
+            }
+        """
+        nature = self._detect_skill_nature()
+        suggestions = []
+
+        for issue in self.issues:
+            severity = issue.get("severity", "")
+            issue_type = issue.get("type", "")
+            method = "silent"
+            reason = ""
+
+            if nature == "automated":
+                # 自动化技能：优先 unified，减少用户打扰
+                if severity in ("HIGH", "ERROR"):
+                    # 判断是否「极关键操作」→ 才用 immediate
+                    is_critical = (
+                        issue_type == "critical_write"
+                        and "outside" in issue.get("description", "").lower()
+                    ) or (
+                        issue_type == "file_delete"
+                        and "system" in issue.get("description", "").lower()
+                    )
+                    if is_critical:
+                        method = "immediate"
+                        reason = "极关键操作，即使是自动化技能也需每次确认"
+                    else:
+                        method = "unified"
+                        reason = "自动化技能：一次性授权，后续自动执行不再询问"
+                elif severity == "MEDIUM":
+                    method = "silent"
+                    reason = "自动化技能：中风险静默执行，仅记录"
+                else:
+                    method = "silent"
+                    reason = "低风险操作，静默执行，仅记录"
+            else:
+                # 交互式技能：保守策略
+                if severity in ("HIGH", "ERROR"):
+                    method = "immediate"
+                    reason = "高风险操作，每次执行前需用户确认"
+                elif severity == "MEDIUM":
+                    method = "unified"
+                    reason = "中风险操作，可批量统一授权"
+                else:
+                    method = "silent"
+                    reason = "低风险操作，静默执行，仅记录"
+
+            suggestions.append({
+                "file": issue.get("file", ""),
+                "line": issue.get("line", 0),
+                "type": issue_type,
+                "severity": severity,
+                "description": issue.get("description", ""),
+                "authorization_method": method,
+                "reason": reason,
+            })
+
+        return suggestions
 
 
 # ── CLI 入口 ─────────────────────────────────────────────────────────────────────

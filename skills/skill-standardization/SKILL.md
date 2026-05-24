@@ -1,12 +1,13 @@
 ---
 name: skill-standardization
-version: 2.15.0
+version: 2.14.0
 author: wUwproject
 license: MIT
 description: >
   Skill 标准化规范引擎 v2.14.0（安全增强版）。
   支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查、触发条件合规性）、
   create/update/refactor 三模式，服务于其他 skill 的安全创建/更新/改造。
+  新增授权方式智能判断（根据技能工作性质决定 unified/immediate/silent）。
 tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading", "security", "permission-check"]
 sensitive_access: false
 critical_write: false
@@ -82,10 +83,6 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
   └── 复杂（refactor / 不熟悉规范）──→ 读取 references/*.md
   ↓
 执行对应模式 → 输出结果报告
-  ↓
-如报告含权限风险（R-13~R-17）──→ 按需加载 `references/permissions.md`
-  ↓
-向用户说明权限类型、风险等级、触发行为，协助用户决策
 ```
 
 ### 三种模式快速对照
@@ -101,145 +98,6 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 
 ---
 
-## 三模式执行流程（明确规定）
-
-> AI 执行三模式时必须严格按以下流程推进，不可跳步或靠自觉。
-
-### 创建模式（create）— 规范流程
-
-```
-Step 1  理解用户意图
-        明确要创建什么 skill、触发场景、核心能力
-        ↓
-Step 2  规划渐进式拆分
-        明确 SKILL.md 主文件保留什么（≤230行）
-        明确 references/changelog.md、guide.md、permissions.md 各放什么
-        ↓
-Step 3  执行创建
-        调用 creator.create() 创建骨架（SKILL.md + _meta.json + 三个 references/ 文件）
-        ↓
-Step 4  填充内容（AI 执行）
-        填充 SKILL.md（确保 ≤230 行，含渐进式加载引用表）
-        填充 references/guide.md（详细指南）
-        ↓
-Step 5  权限扫描 → 写权限声明
-        运行: python scripts/permission_checker.py <skill_dir>
-        根据扫描结果更新 references/permissions.md
-        更新 SKILL.md frontmatter 的 authorization: 字段
-        ↓
-Step 6  审计循环（目标 ≥95%）
-        运行: python -m scripts.skill_audit <skill_dir>
-        如 verdict=PASS 且通过率 ≥95% → 进入 Step 7
-        否则：根据审计报告修正 → 重跑审计 → 循环直到 ≥95%
-        ↓
-Step 7  收尾
-        更新 references/changelog.md 记录创建版本
-        输出创建报告给用户
-```
-
-**关键规则：**
-- 权限扫描必须在内容填充后执行（扫描真实内容， not 模板）
-- 审计循环由 AI 协调：`_check_skill_audit()` → 读结果 → 修正 → 重跑
-- 不必 100%，≥95% 即可通过
-
----
-
-### 更新模式（update）— 规范流程
-
-```
-Step 1  理解更新需求
-        明确要更新什么功能、修复什么问题、版本号如何变更
-        ↓
-Step 2  执行更新检查
-        调用 updater.update() 进行全面检查
-        加 --fix 参数可自动修复部分问题
-        加 --backup 参数创建备份
-        ↓
-Step 3  审计循环（目标 ≥95%）
-        运行: python -m scripts.skill_audit <skill_dir>
-        如 verdict=PASS 且通过率 ≥95% → 进入 Step 4
-        否则：根据审计报告修正 → 重跑审计 → 循环直到 ≥95%
-        ↓
-Step 4  版本号更新
-        更新 SKILL.md frontmatter version: 字段
-        更新 _meta.json version 字段（必须一致）
-        更新 references/changelog.md 记录本次更新
-        ↓
-Step 5  输出更新报告
-        输出检查结果、修复内容、版本变更
-```
-
-**关键规则：**
-- update 模式不改 SKILL.md 主文件结构，只做增量修改
-- 版本号更新必须在审计通过后执行
-- 如更新涉及权限变更，需重新运行 permission_checker.py
-
----
-
-### 改造模式（refactor）— 规范流程
-
-```
-Step 1  先跑审计，获取所有问题
-        运行: python -m scripts.skill_audit <skill_dir>
-        记录所有 ERROR/WARN 项
-        ↓
-Step 2  规划改造方案
-        根据审计结果 + refactor.MIGRATION_RULES 规划文件迁移方案
-        先 dry-run 确认改造计划（--dry-run）
-        ↓
-Step 3  执行改造
-        调用 refactor.refactor() 执行改造
-        自动创建备份（除非 --no-backup）
-        执行文件迁移（scripts/、references/ 归位）
-        ↓
-Step 4  保全检查（第一次）
-        调用 refactor._preservation_check()
-        检查：结构完整性 + Python 语法 + Shell 语法
-        如有语法错误 → 修正 → 重跑保全检查
-        ↓
-Step 5  审计循环（目标 ≥95%）
-        运行: python -m scripts.skill_audit <skill_dir>
-        如 verdict=PASS 且通过率 ≥95% → 进入 Step 6
-        否则：修正 → 重跑审计 → 循环直到 ≥95%
-        ↓
-Step 6  保全检查（第二次）
-        再次调用 refactor._preservation_check()
-        确认改造后功能不受损
-        ↓
-Step 7  版本号更新
-        更新 SKILL.md frontmatter version: 字段（建议 +0.1.0）
-        更新 _meta.json version 字段
-        更新 references/changelog.md 记录本次改造
-        ↓
-Step 8  输出改造报告
-        输出迁移计划、备份位置、检查结果、保全状态
-```
-
-**关键规则：**
-- 改造前必须先 dry-run（--dry-run）确认方案
-- 保全检查必须执行两次（改造后 + 审计通过后各一次）
-- refactor 不改变 skill 功能，只改变目录结构和规范性
-
----
-
-### 审计循环通用说明
-
-```
-审计循环（三模式共用）：
-    ↓
-运行 skill_audit（R-01~R-17 规则审查）
-    ↓
-verdict == "PASS" 且通过率 ≥95%？
-    ├── 是 → 通过，继续下一步
-    └── 否 → 根据审计报告修正问题 → 回到"运行 skill_audit"
-    ↓
-（最多循环 5 次，如仍 <95% 则输出剩余问题给用户决策）
-```
-
-**通过率计算：** `通过率 = (PASS 数) / (Total 数 - SKIP 数)`
-
-
-
 ## 渐进式 MD 文件体系
 
 **核心原则：** 主 SKILL.md 必须可独立理解核心功能。references/ 下是按需加载的补充材料。
@@ -250,10 +108,9 @@ verdict == "PASS" 且通过率 ≥95%？
 |----------------------------|---------------------------|
 | ✅ 触发场景、核心能力、快速开始 | 📄 `guide.md` — 三种模式详细教程 |
 | ✅ 工作流程（本节） | 📄 `examples.md` — 完整示例集合 |
-| ✅ 核心能力概述 | 📄 `reference.md` — API/命令参考 + 权限类型说明 |
+| ✅ 核心能力概述 | 📄 `reference.md` — API/命令参考 |
 | ✅ 版本号更新映射表 | 📄 `architecture.md` — 架构设计 |
 | ✅ 注意事项、铁律 | 📄 `changelog.md` — 版本更新日志 |
-| | 📄 `permissions.md` — 权限类型、风险等级、行为对照表 |
 | | 📄 `faq.md` — 常见问题 |
 
 **加载协议：**
@@ -301,9 +158,6 @@ verdict == "PASS" 且通过率 ≥95%？
 
 > ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
 
-→ 权限详细说明（类型、风险等级、触发条件、skill 行为对照表）
-→ 详见 `references/permissions.md`
-
 → 完整规则定义（含检查方法、修复指引、同义关键词）
 → 见 `references/reference.md`
 
@@ -318,10 +172,9 @@ verdict == "PASS" 且通过率 ≥95%？
 |----------------------------|---------------------------|
 | ✅ 触发场景、核心能力、快速开始 | 📄 `guide.md` — 三种模式详细教程 + 安全增强功能 |
 | ✅ 工作流程（本节） | 📄 `examples.md` — 完整示例集合 |
-| ✅ 核心能力概述 | 📄 `reference.md` — API/命令参考 + 权限类型说明 |
+| ✅ 核心能力概述 | 📄 `reference.md` — API/命令参考 + 新增脚本 |
 | ✅ 审查规则概述（R-01~R-17） | 📄 `rules.md` — 铁律条款详解 |
 | ✅ 增量更新记录规范 | 📄 `changelog.md` — 版本更新日志 |
-| | 📄 `permissions.md` — 权限类型、风险等级、行为对照表 |
 | | 📄 `faq.md` — 常见问题 |
 
 → 详见 `references/guide.md`（按需加载）
@@ -339,3 +192,21 @@ verdict == "PASS" 且通过率 ≥95%？
 → 详见 `references/guide.md`（按需加载）
 
 ---
+
+## ⚙️ 版本号管理规范
+
+**权威来源**：`_meta.json` 中的 `version` 字段为版本号唯一权威来源。
+
+**同步规则**：
+- `SKILL.md` frontmatter `version:` 须与 `_meta.json` 保持一致
+- `scripts/` 下的 `.py` 文件头版本注释为辅助信息，不强制同步
+- 使用 `python scripts/skill_builder.py update .` 可自动检测并提示版本不一致
+
+**自修改禁止**：`skill_builder.py` 的 `_bump_version` 函数只更新目标 skill 的版本号，不修改自身源代码。
+
+---
+
+## ⚙️ 改写/更新铁律（AI 执行前必须遵守）
+
+→ 详见 `references/rules.md`（按需加载）
+

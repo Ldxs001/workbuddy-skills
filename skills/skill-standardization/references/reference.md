@@ -366,9 +366,6 @@ python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
 | 网络访问 | 20% | 发起 HTTP 请求 |
 | 文件删除 | 10% | 删除文件或目录 |
 
-> 权限类型详细说明（含触发条件、风险等级、skill 行为对照表）
-> → 详见 [references/permissions.md](./permissions.md)
-
 ---
 
 ## authorization_manager.py

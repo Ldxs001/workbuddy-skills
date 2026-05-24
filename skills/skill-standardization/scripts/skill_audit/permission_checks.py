@@ -14,13 +14,38 @@ import tempfile
 
 def _run_permission_checker(skill_dir, check_type=None):
     """调用 permission_checker.py CLI 获取检查结果。"""
-    import os
     script_dir = os.path.dirname(os.path.abspath(__file__))
     checker_script = os.path.join(script_dir, "..", "permission_checker.py")
     checker_script = os.path.normpath(checker_script)
 
     if not os.path.isfile(checker_script):
         return None
+
+    # 完整性校验：计算 permission_checker.py 的 SHA-256 哈希
+    _hash_file = os.path.join(
+        os.path.dirname(script_dir), ".standardization",
+        "skill-standardization", "script_hashes.json"
+    )
+    try:
+        import hashlib, json as _json
+        with open(checker_script, "rb") as _f:
+            _hash = hashlib.sha256(_f.read()).hexdigest()
+        if os.path.isfile(_hash_file):
+            with open(_hash_file) as _f:
+                _records = _json.load(_f)
+            _rel = os.path.relpath(checker_script, os.path.dirname(_hash_file) + "/../../")
+            if _rel in _records and _records[_rel] != _hash:
+                print(f"⚠️ 警告: permission_checker.py 哈希不匹配（可能被篡改）: {_rel}")
+            else:
+                _records[_rel] = _hash
+                with open(_hash_file, "w") as _f:
+                    _json.dump(_records, _f, indent=2, ensure_ascii=False)
+        else:
+            os.makedirs(os.path.dirname(_hash_file), exist_ok=True)
+            with open(_hash_file, "w") as _f:
+                _json.dump({os.path.relpath(checker_script, os.path.dirname(_hash_file) + "/../../"): _hash}, _f, indent=2, ensure_ascii=False)
+    except Exception as _e:
+        print(f"⚠️ 哈希校验失败: {_e}")
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         output_file = f.name
@@ -122,7 +147,7 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
         r"authorization_manager",
         r"request.*authorization",
         r"check.*permission",
-        r"authorize",
+        r"\bauthoriz\w*\b",  # 单词边界，避免误匹配 unauthorized 等
     ]
 
     found_auth = False

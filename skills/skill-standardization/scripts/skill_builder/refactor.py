@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -68,88 +69,6 @@ class SkillRefactor:
         print(f"   备份位置: {backup_dir}")
         print(f"   迁移文件: {len(migration_plan)} 个")
 
-        # 6. 改造后检查（格式化输出）
-        self._post_refactor_checks(skill_dir)
-
-        # 7. 保全检查（结构完整性 + 语法校验）
-        self._preservation_check(skill_dir)
-
-    def _preservation_check(self, skill_dir):
-        """保全检查：确认改造后功能不受损（结构完整 + 语法合法）"""
-        print(f"\n{'='*50}")
-        print(f"=== 保全检查（Preservation Check）===")
-
-        # a. 结构完整性（复用 _post_refactor_checks）
-        self._post_refactor_checks(skill_dir)
-
-        # b. Python 脚本语法校验
-        scripts_dir = skill_dir / "scripts"
-        py_issues = []
-        if scripts_dir.exists():
-            for py_file in scripts_dir.glob("*.py"):
-                try:
-                    import py_compile
-                    py_compile.compile(str(py_file), doraise=True)
-                except Exception as e:
-                    py_issues.append((py_file.name, str(e)))
-            if py_issues:
-                print(f"\n[⚠️] Python 语法错误 {len(py_issues)} 处：")
-                for fname, err in py_issues:
-                    print(f"   {fname}: {err}")
-            else:
-                py_count = len(list(scripts_dir.glob("*.py")))
-                print(f"\n[✅] Python 脚本语法校验通过（{py_count} 个文件）")
-
-        # c. Shell 脚本语法校验（如有）
-        sh_issues = []
-        if scripts_dir.exists():
-            for sh_file in list(scripts_dir.glob("*.sh")) + list(scripts_dir.glob("*.bat")) + list(scripts_dir.glob("*.ps1")):
-                try:
-                    # 仅检查文件是否包含常见语法错误（简单检查）
-                    content = sh_file.read_text(encoding="utf-8", errors="ignore")
-                    if sh_file.suffix == ".sh" and content.strip().startswith("#!"):
-                        # bash 语法检查（需要 bash 命令）
-                        pass  # 跳过，跨平台不保证有 bash
-                except Exception as e:
-                    sh_issues.append((sh_file.name, str(e)))
-            if sh_issues:
-                print(f"\n[⚠️] Shell 脚本问题 {len(sh_issues)} 处：")
-                for fname, err in sh_issues:
-                    print(f"   {fname}: {err}")
-            else:
-                sh_count = len(list(scripts_dir.glob("*.sh")) + list(scripts_dir.glob("*.bat")) + list(scripts_dir.glob("*.ps1")))
-                if sh_count > 0:
-                    print(f"[✅] Shell 脚本检查完成（{sh_count} 个文件）")
-
-        print(f"\n[📊] 保全检查完成 — 如有关键问题请修正后再继续")
-
-    def _check_permissions(self, skill_dir):
-        """调用 permission_checker.py 进行权限扫描"""
-        checker = Path(__file__).parent.parent / "permission_checker.py"
-        if not checker.exists():
-            print(f"⚠️  permission_checker.py 不存在，跳过权限扫描")
-            return
-        try:
-            proc = subprocess.run(
-                ["python", str(checker), str(skill_dir)],
-                capture_output=True, text=True, timeout=30
-            )
-            output = proc.stdout.strip()
-            if not output:
-                return
-            report = json.loads(output)
-            issues = report.get("issues", [])
-            if issues:
-                print(f"\n🔍 权限扫描发现 {len(issues)} 项风险（{report.get('risk_level','unknown')}）：")
-                for iss in issues[:10]:
-                    print(f"   [{iss.get('severity','?')}] {iss.get('file','?')}:{iss.get('line','?')} — {iss.get('description','')}")
-                if len(issues) > 10:
-                    print(f"   ...还有 {len(issues)-10} 项，详见 JSON 报告")
-            else:
-                print(f"\n✅ 权限扫描通过（{report.get('risk_level','low')}）")
-        except Exception as e:
-            print(f"⚠️  权限扫描失败: {e}")
-
     def _dry_run(self, skill_dir):
         """输出迁移计划但不执行"""
         print(f"=== refactor DRY-RUN plan ===")
@@ -160,9 +79,7 @@ class SkillRefactor:
 
         print(f"\nMigration plan ({len(migration_plan)} files):")
         for rule_id, src, dst, size in migration_plan:
-            name = src.name
-            dst_str = str(dst)
-            print(f"  {rule_id} {name:20s} → {dst_str:30s} ({size//1024}KB)")
+            print(f"  {rule_id} {Path(src).name:20s} → {dst:30s} ({size//1024}KB)")
 
         print(f"\nExcluded:")
         print(f"  __pycache__/        (M-05: always excluded)")
@@ -248,94 +165,143 @@ class SkillRefactor:
         for rule_id, description in self.MIGRATION_RULES.items():
             print(f"  {rule_id}: {description}")
 
-    def _post_refactor_checks(self, skill_dir):
-        """改造后检查（格式化输出）"""
-        print(f"\n{'='*50}")
-        print(f"=== refactor 后检查报告 ===")
-        print(f"Skill: {skill_dir.name}")
-        print(f"Path: {skill_dir}")
-        print()
+    # ── 授权要求注入（--inject-auth）────────────────────────────────────────
 
-        # 检查 1: _meta.json
-        self._check_meta_json(skill_dir)
+    def _run_permission_checker(self, skill_dir):
+        """运行 permission_checker.py，返回报告字典或 None。"""
+        script_dir = Path(__file__).resolve().parent.parent
+        checker = script_dir / "permission_checker.py"
+        if not checker.exists():
+            print("[!] permission_checker.py 不存在，跳过授权检查")
+            return None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                out = f.name
+            result = subprocess.run(
+                [sys.executable, str(checker), str(skill_dir), "--output", out],
+                capture_output=True, text=True, timeout=30
+            )
+            if os.path.exists(out):
+                with open(out, "r", encoding="utf-8") as f:
+                    report = json.load(f)
+                os.unlink(out)
+                return report
+            return None
+        except Exception as e:
+            print(f"[!] 运行 permission_checker.py 失败: {e}")
+            return None
 
-        # 检查 2: SKILL.md
-        self._check_skill_md(skill_dir)
+    def _inject_auth_section(self, skill_dir, report):
+        """
+        根据权限检查报告，为 SKILL.md 注入「## 授权要求」章节。
 
-        # 检查 3: 目录结构
-        self._check_dir_structure(skill_dir)
+        授权方式直接读取 report 中每项的 authorization_method 字段
+        （由 permission_checker.py 的 suggest_authorization_methods() 生成，
+         已根据技能工作性质（自动化/交互式）智能判断）。
+        """
+        if not report:
+            return
+        issues = report.get("issues", [])
+        if not issues:
+            return
 
-        # 检查 4: 权限扫描
-        self._check_permissions(skill_dir)
-
-    def _check_meta_json(self, skill_dir):
-        """检查 _meta.json"""
-        meta_file = skill_dir / "_meta.json"
-        if meta_file.exists():
-            try:
-                import json
-                meta = json.loads(meta_file.read_text(encoding="utf-8"))
-                required = ["name", "version", "description", "author", "tags", "data_dir"]
-                missing = [k for k in required if k not in meta]
-                if missing:
-                    print(f"[⚠️] _meta.json 缺失字段: {missing}")
-                else:
-                    print(f"[✅] _meta.json 结构正常")
-            except json.JSONDecodeError as e:
-                print(f"[⚠️] _meta.json JSON 格式错误: {e}")
-        else:
-            print(f"[⚠️] _meta.json 不存在")
-
-    def _check_skill_md(self, skill_dir):
-        """检查 SKILL.md"""
-        skill_md = skill_dir / "SKILL.md"
+        skill_md = Path(skill_dir) / "SKILL.md"
         if not skill_md.exists():
-            print(f"[⚠️] SKILL.md 不存在")
             return
 
         content = skill_md.read_text(encoding="utf-8")
-        lines = content.split("\n")
-        line_count = len(lines)
 
-        # 检查 frontmatter
-        if content.startswith("---"):
-            print(f"[✅] SKILL.md 有 frontmatter")
+        # 已存在则跳过
+        if "## 授权要求" in content:
+            print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")
+            return
+
+        # 按 authorization_method 分组（来自 suggest_authorization_methods() 的智能判断）
+        groups = {"immediate": [], "unified": [], "silent": []}
+        for iss in issues:
+            method = iss.get("authorization_method", "immediate")
+            if method not in groups:
+                method = "immediate"
+            groups[method].append(iss)
+
+        # 生成章节内容
+        lines = ["\n\n---\n\n## 授权要求\n"]
+        lines.append("本技能包含以下中高风险操作，使用前需获得用户授权：\n")
+
+        idx = 0
+        for method in ("immediate", "unified", "silent"):
+            for iss in groups[method]:
+                idx += 1
+                sev_cn = {"HIGH": "高", "ERROR": "高", "MEDIUM": "中"}.get(iss.get("severity", ""), "低")
+                desc = iss.get("description", "")
+                file = iss.get("file", "")
+                line = iss.get("line", 0)
+                reason = iss.get("reason", "")
+                lines.append(f"{idx}. **[{sev_cn}] {desc}** (`{file}` 第 {line} 行）")
+
+                if method == "immediate":
+                    lines.append("   - 授权方式：**即时授权**（每次执行前需获得用户批准）")
+                elif method == "unified":
+                    lines.append("   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）")
+                else:
+                    lines.append("   - 授权方式：**静默授权**（无需用户交互，自动执行并记录）")
+                if reason:
+                    lines.append(f"   - 原因：{reason}")
+
+        lines.append("**授权方式说明：**")
+        lines.append("- 静默授权：无需用户交互，自动执行并记录")
+        lines.append("- 统一授权：首次执行前获得用户批准，后续不再询问")
+        lines.append("- 即时授权：每次执行前需获得用户批准")
+        lines.append("")
+
+        # 注入到文件末尾
+        new_content = content.rstrip() + "\n" + "\n".join(lines)
+        skill_md.write_text(new_content, encoding="utf-8")
+        print(f"[*] 已注入「授权要求」章节（{idx} 项操作）")
+
+    def refactor(self, args):
+        """对非标 skill 进行整体改造"""
+        # 兼容文件路径和目录路径
+        input_path = Path(args.skill_dir)
+        if input_path.is_file():
+            skill_dir = input_path.parent
         else:
-            print(f"[⚠️] SKILL.md 缺少 frontmatter")
+            skill_dir = input_path
 
-        # 检查行数（230 = 200 + 15% 浮动）
-        if line_count > 230:
-            print(f"[💡] SKILL.md 共 {line_count} 行，超过 230 行建议拆分到 references/（限制：200+15%浮动）")
-        else:
-            print(f"[✅] SKILL.md 行数 {line_count} ≤ 230")
+        if not skill_dir.exists():
+            print(f"❌ Skill 目录不存在: {skill_dir}")
+            sys.exit(1)
 
-        # 检查三个必须文件
-        refs_dir = skill_dir / "references"
-        required_files = ["changelog.md", "guide.md", "permissions.md"]
-        if refs_dir.exists():
-            refs = [f.name for f in refs_dir.iterdir() if f.is_file()]
-            missing = [f for f in required_files if f not in refs]
-            if missing:
-                print(f"[⚠️] references/ 缺少必须文件: {missing}")
-            else:
-                print(f"[✅] references/ 三个必须文件齐全（changelog.md/guide.md/permissions.md）")
-        else:
-            print(f"[⚠️] references/ 目录不存在，缺少渐进式加载文档")
+        # 1. dry-run 模式：只输出计划，不创建备份
+        if args.dry_run:
+            self._dry_run(skill_dir)
+            return
 
-        # 检查渐进式加载引用表
-        has_progressive_table = any("渐进式加载" in l and "|" in l for l in lines)
-        if has_progressive_table:
-            print(f"[✅] 包含渐进式加载引用表")
-        else:
-            print(f"[⚠️] SKILL.md 可能缺少渐进式加载引用表（建议加入）")
+        # 2. 备份（除非 --no-backup）
+        backup_dir = None
+        if not args.no_backup:
+            backup_dir = _create_backup(skill_dir, "refactor", args.workspace)
+            print(f"📦 备份已创建: {backup_dir}")
 
-    def _check_dir_structure(self, skill_dir):
-        """检查目录结构规范性"""
-        root_files = [f.name for f in skill_dir.iterdir() if f.is_file()]
-        expected_root = {"SKILL.md", "_meta.json"}
-        unexpected_root = set(root_files) - expected_root - {".gitignore"}
+        # 3. 执行迁移
+        migration_plan = self._build_migration_plan(skill_dir)
 
-        if unexpected_root:
-            print(f"[💡] 根目录有非常规文件: {sorted(unexpected_root)}（建议移入对应子目录）")
-        else:
-            print(f"[✅] 根目录结构规范（仅 SKILL.md + _meta.json）")
+        print(f"\n=== refactor 执行计划 ===")
+        print(f"Source: {skill_dir}")
+        if backup_dir:
+            print(f"Backup: {backup_dir}")
+
+        # 4. 执行文件移动
+        self._execute_migration(skill_dir, migration_plan)
+
+        # 5. 验证总字节一致性
+        self._verify_migration(skill_dir, backup_dir, migration_plan)
+
+        # ★ 新增：注入授权要求章节
+        if getattr(args, "inject_auth", False):
+            report = self._run_permission_checker(skill_dir)
+            self._inject_auth_section(skill_dir, report)
+
+        print(f"\n✅ refactor 完成！")
+        print(f"   备份位置: {backup_dir}")
+        print(f"   迁移文件: {len(migration_plan)} 个")
