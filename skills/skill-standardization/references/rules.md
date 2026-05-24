@@ -9,7 +9,7 @@
 - 技能是通用工具，author 默认值必须为 `your-name-here` 占位符
 - 已有 author 值（如 `"由 config.json 的 author 字段决定"`）保留原值不变
 - 只有用户明确指定时才写入真实署名
-- **本 skill 例外**：author 为 `wUwproject`（维护者署名，铁律1例外条款）
+- **本 skill 例外**：author 为 `[username-redacted]`（维护者署名，铁律1例外条款）
 
 ---
 

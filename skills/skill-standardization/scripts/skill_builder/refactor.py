@@ -6,7 +6,9 @@ SkillRefactor — 负责 refactor 模式（改造非标 Skill）
 import json
 import os
 import shutil
+import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -162,3 +164,146 @@ class SkillRefactor:
         print(f"\n迁移规则:")
         for rule_id, description in self.MIGRATION_RULES.items():
             print(f"  {rule_id}: {description}")
+
+    # ── 授权要求注入（--inject-auth）────────────────────────────────────────
+
+    def _run_permission_checker(self, skill_dir):
+        """运行 permission_checker.py，返回报告字典或 None。"""
+        script_dir = Path(__file__).resolve().parent.parent
+        checker = script_dir / "permission_checker.py"
+        if not checker.exists():
+            print("[!] permission_checker.py 不存在，跳过授权检查")
+            return None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                out = f.name
+            result = subprocess.run(
+                [sys.executable, str(checker), str(skill_dir), "--output", out],
+                capture_output=True, text=True, timeout=30
+            )
+            if os.path.exists(out):
+                with open(out, "r", encoding="utf-8") as f:
+                    report = json.load(f)
+                os.unlink(out)
+                return report
+            return None
+        except Exception as e:
+            print(f"[!] 运行 permission_checker.py 失败: {e}")
+            return None
+
+    def _inject_auth_section(self, skill_dir, report):
+        """
+        根据权限检查报告，为 SKILL.md 注入「## 授权要求」章节。
+
+        授权方式判定规则：
+        - HIGH / ERROR  → 即时授权（immediate）
+        - MEDIUM        → 统一授权（unified）
+        - 其他           → 静默授权（silent）
+        """
+        if not report:
+            return
+        issues = report.get("issues", [])
+        if not issues:
+            return
+
+        skill_md = Path(skill_dir) / "SKILL.md"
+        if not skill_md.exists():
+            return
+
+        content = skill_md.read_text(encoding="utf-8")
+
+        # 已存在则跳过
+        if "## 授权要求" in content:
+            print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")
+            return
+
+        # 按授权方式分组
+        groups = {"immediate": [], "unified": [], "silent": []}
+        for iss in issues:
+            sev = iss.get("severity", "")
+            if sev in ("HIGH", "ERROR"):
+                method = "immediate"
+            elif sev == "MEDIUM":
+                method = "unified"
+            else:
+                method = "silent"
+            groups[method].append((method, iss))
+
+        # 生成章节内容
+        lines = ["\n\n---\n\n## 授权要求\n"]
+        lines.append("本技能包含以下中高风险操作，使用前需获得用户授权：\n")
+
+        idx = 0
+        for method in ("immediate", "unified", "silent"):
+            for m, iss in groups[method]:
+                idx += 1
+                sev_cn = {"HIGH": "高", "ERROR": "高", "MEDIUM": "中"}.get(iss.get("severity", ""), "低")
+                desc = iss.get("description", "")
+                file = iss.get("file", "")
+                line = iss.get("line", 0)
+                lines.append(f"{idx}. **[{sev_cn}] {desc}** (`{file}` 第 {line} 行）")
+
+                if method == "immediate":
+                    lines.append("   - 授权方式：**即时授权**（每次执行前需获得用户批准）\n")
+                elif method == "unified":
+                    lines.append("   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）\n")
+                else:
+                    lines.append("   - 授权方式：**静默授权**（无需用户交互，自动执行并记录）\n")
+
+        lines.append("**授权方式说明：**")
+        lines.append("- 静默授权：无需用户交互，自动执行并记录")
+        lines.append("- 统一授权：首次执行前获得用户批准，后续不再询问")
+        lines.append("- 即时授权：每次执行前需获得用户批准")
+        lines.append("")
+
+        # 注入到文件末尾
+        new_content = content.rstrip() + "\n" + "\n".join(lines)
+        skill_md.write_text(new_content, encoding="utf-8")
+        print(f"[*] 已注入「授权要求」章节（{idx} 项操作）")
+
+    def refactor(self, args):
+        """对非标 skill 进行整体改造"""
+        # 兼容文件路径和目录路径
+        input_path = Path(args.skill_dir)
+        if input_path.is_file():
+            skill_dir = input_path.parent
+        else:
+            skill_dir = input_path
+
+        if not skill_dir.exists():
+            print(f"❌ Skill 目录不存在: {skill_dir}")
+            sys.exit(1)
+
+        # 1. dry-run 模式：只输出计划，不创建备份
+        if args.dry_run:
+            self._dry_run(skill_dir)
+            return
+
+        # 2. 备份（除非 --no-backup）
+        backup_dir = None
+        if not args.no_backup:
+            backup_dir = _create_backup(skill_dir, "refactor", args.workspace)
+            print(f"📦 备份已创建: {backup_dir}")
+
+        # 3. 执行迁移
+        migration_plan = self._build_migration_plan(skill_dir)
+
+        print(f"\n=== refactor 执行计划 ===")
+        print(f"Source: {skill_dir}")
+        if backup_dir:
+            print(f"Backup: {backup_dir}")
+
+        # 4. 执行文件移动
+        self._execute_migration(skill_dir, migration_plan)
+
+        # 5. 验证总字节一致性
+        self._verify_migration(skill_dir, backup_dir, migration_plan)
+
+        # ★ 新增：注入授权要求章节
+        if getattr(args, "inject_auth", False):
+            report = self._run_permission_checker(skill_dir)
+            self._inject_auth_section(skill_dir, report)
+
+        print(f"\n✅ refactor 完成！")
+        print(f"   备份位置: {backup_dir}")
+        print(f"   迁移文件: {len(migration_plan)} 个")

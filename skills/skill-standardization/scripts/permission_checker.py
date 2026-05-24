@@ -510,6 +510,49 @@ class PermissionChecker:
         }
         return recommendations.get(risk_level, "未知风险等级。")
 
+    def suggest_authorization_methods(self) -> List[Dict]:
+        """
+        为每个检测到的风险操作建议授权方式。
+
+        授权方式映射：
+        - 静默授权 (silent)：低风险，无需用户交互，仅记录
+        - 一次性授权 (unified)：中风险，用户一次性批准，后续不再询问
+        - 即时授权 (immediate)：高风险，每次执行前需获得用户批准
+
+        Returns:
+            list: 含授权建议的操作列表，每项含 {
+                "file", "line", "type", "severity",
+                "description", "authorization_method", "reason"
+            }
+        """
+        suggestions = []
+        for issue in self.issues:
+            severity = issue.get("severity", "")
+            issue_type = issue.get("type", "")
+
+            # 根据严重度和类型确定授权方式
+            if severity in ("HIGH", "ERROR"):
+                method = "immediate"
+                reason = "高风险操作，每次执行前需用户确认"
+            elif severity == "MEDIUM":
+                method = "unified"
+                reason = "中风险操作，可批量统一授权"
+            else:
+                method = "silent"
+                reason = "低风险操作，静默执行，仅记录"
+
+            suggestions.append({
+                "file": issue.get("file", ""),
+                "line": issue.get("line", 0),
+                "type": issue_type,
+                "severity": severity,
+                "description": issue.get("description", ""),
+                "authorization_method": method,
+                "reason": reason,
+            })
+
+        return suggestions
+
 
 # ── CLI 入口 ─────────────────────────────────────────────────────────────────────
 

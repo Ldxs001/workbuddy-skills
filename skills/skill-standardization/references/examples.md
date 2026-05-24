@@ -51,7 +51,7 @@ python scripts/skill_builder.py create \
   "name": "data-processor",
   "version": "0.1.0",
   "description": "数据处理流水线",
-  "author": "wUwproject",
+  "author": "[username-redacted]",
   "tags": ["data", "pipeline", "etl"]
 }
 ```
@@ -62,7 +62,7 @@ python scripts/skill_builder.py create \
 ---
 name: hello-world
 version: 0.1.0
-author: wUwproject
+author: [username-redacted]
 license: MIT
 description: >
   问候技能
@@ -316,7 +316,7 @@ Migration rules: M-01 ~ M-06 defined
 ---
 name: example-skill
 version: 1.0.0
-author: wUwproject
+author: [username-redacted]
 license: MIT
 description: >
   一个示例技能，演示标准的 SKILL.md 写法。
