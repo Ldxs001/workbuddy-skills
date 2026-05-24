@@ -64,15 +64,26 @@ skill-standardization/                 # Skill 根目录
 │   └── architecture.md                # 本文件 — 架构设计
 │
 └── scripts/                           # 核心脚本与规范定义
-    ├── skill_builder.py               # [v2新增] 构建器主程序 (~623行)
-    │                                 #   ├─ cmd_create()  创建模式
-    │                                 #   ├─ cmd_update()  更新模式
-    │                                 #   └─ cmd_refactor() 改造模式
+    ├── skill_builder/                 # [v2.13.0重构] 构建器包（面向对象）
+    │   ├── __init__.py              #   主入口 + argparse 解析
+    │   ├── __main__.py              #   支持 python -m skill_builder 执行
+    │   ├── creator.py               #   SkillCreator 类（create 模式）
+    │   ├── updater.py               #   SkillUpdater 类（update 模式）
+    │   ├── refactor.py              #   SkillRefactor 类（refactor 模式）
+    │   ├── version_manager.py       #   VersionManager 类（版本号管理）
+    │   └── utils.py                 #   工具函数（备份、模板等）
     │
-    ├── skill_audit.py                 # 审查工具
-    │                                 #   ├─ R-01~R-10 规则实现
-    │                                 #   └─ audit 命令入口
+    ├── skill_audit/                  # [v2.13.0重构] 审查器包（面向对象）
+    │   ├── __init__.py            #   主入口 + argparse + audit_skill()
+    │   ├── __main__.py            #   支持 python -m skill_audit 执行
+    │   ├── frontmatter_checker.py  #   R-01~R-05 检查函数
+    │   ├── structure_checker.py    #   R-06~R-09 检查函数
+    │   ├── artifact_checker.py     #   R-11~R-12 检查函数
+    │   ├── permission_checks.py   #   R-13~R-17 检查函数
+    │   └── utils.py               #   工具函数（常量、辅助函数）
     │
+    ├── permission_checker.py                 # 权限检查器
+    ├── authorization_manager.py             # 授权管理器
     ├── json_loader.py                 # 渐进式 JSON 加载器
     │                                 #   ├─ load/list/show/refs 子命令
     │                                 #   └─ 从 _index.json 发现模块
@@ -91,7 +102,13 @@ skill-standardization/                 # Skill 根目录
 ```
 SKILL.md ← 引用 → references/*.md（渐进式文档）
                      ↑
-skill_builder.py ──读取──→ spec/*.json（规范定义）
+skill_builder/ ──读取──→ spec/*.json（规范定义）
+  ├─ __init__.py       主入口 + argparse
+  ├─ creator.py        SkillCreator 类
+  ├─ updater.py        SkillUpdater 类
+  ├─ refactor.py        SkillRefactor 类
+  ├─ version_manager.py  VersionManager 类
+  └─ utils.py           工具函数
 skill_audit.py   ──读取──→ spec/rules.json（审查规则）
 json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 git-sync.sh      ──调用──→ skill_audit.py audit

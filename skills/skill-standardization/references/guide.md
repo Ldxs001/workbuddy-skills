@@ -93,7 +93,7 @@ python scripts/skill_builder.py update <skill-dir> --fix --backup
 | name | string | ✅ | 取目录名 |
 | version | string (SemVer) | ✅ | `0.1.0` |
 | description | string | ✅ | 从 SKILL.md 提取或空 |
-| author | string | ✅ | `wUwproject` |
+| author | string | ✅ | `[username-redacted]` |
 | tags | string[] | ✅ | `[]` |
 
 **--fix 行为**：自动补充缺失字段，使用上述默认值。
@@ -288,3 +288,53 @@ skill-standardization 要求以下三处版本号保持一致：
 | 注册清单 | git-sync 的 `manifest.json` | 对应条目的 `version` |
 
 **update/refactor 模式会自动检测和提示不一致。**
+
+---
+
+## 7. 安全增强功能（v2.13.0）
+
+> 本 skill 在创建/更新/改造其他 skill 时，会自动进行权限检查和授权管理。
+
+### 权限检查流程
+
+`skill-standardization` 在 `update` 模式下会自动调用 `permission_checker.py` 扫描目标 skill 的脚本，计算权限权重，生成风险报告。
+
+```
+skill_builder.py update <skill-dir>
+  ↓
+调用 permission_checker.py 扫描脚本
+  ↓
+计算权限权重（敏感信息 40% + 关键位置 30% + 网络 20% + 删除 10%）
+  ↓
+生成 JSON 报告 → 打印到终端
+  ↓
+如发现中高风险操作，提示用户审批
+```
+
+### 授权管理流程
+
+当目标 skill 包含高权限操作（文件删除、网络请求、subprocess 调用）时，`authorization_manager.py` 会介入：
+
+- **统一审批**：累积多个风险操作，一次性列出，由用户统一审批
+- **即时审批**：高风险操作执行前，立即请求用户授权
+
+### R-13~R-17 规则说明
+
+| 规则 | 严重度 | 检查内容 |
+|------|---------|----------|
+| R-13 | ERROR | 敏感信息访问声明（读取 memory/credentials/token 等须声明 `sensitive_access: true`） |
+| R-14 | ERROR | 关键位置写入声明（写入 skills/.workbuddy/系统目录须声明 `critical_write: true`） |
+| R-15 | ERROR | 高权限操作授权检查（文件删除/网络请求/subprocess 调用前须调用 `authorization_manager.py`） |
+| R-16 | WARN | 权限权重说明（建议在 SKILL.md 或 references/ 中说明各操作的权限权重） |
+| R-17 | ERROR | 渐进加载引用（SKILL.md > 200 行时必须拆分到 references/ 并通过引用链接） |
+
+
+---
+
+## 注意事项
+
+1. **refactor 前务必先 `--dry-run`**
+2. **备份是 refactor 默认行为**：不要用 `--no-backup` 除非明确知道风险
+3. **本文件控制在 200 行以内**：超过部分已拆分到 `references/`
+4. **审查是纯警告模式**：不会阻止 git-sync 同步
+5. **版本号三方一致**：修改后按上表同步

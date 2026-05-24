@@ -67,10 +67,10 @@ RULES = [
     },
     {
         "id": "R-07",
-        "name": "触发条件章节",
-        "severity": "WARN",
-        "check": "正文含 ## 触发条件 或同义章节标题",
-        "method": "body_has_trigger_section",
+        "name": "触发条件章节（合规）",
+        "severity": "ERROR",
+        "check": "正文含 ## 触发场景 章节，且含正向触发词≥3个、否定条件≥1个，无「自动执行」等危险表述",
+        "method": "body_has_trigger_section_compliant",
     },
     {
         "id": "R-08",
@@ -88,24 +88,60 @@ RULES = [
     },
     {
         "id": "R-10",
-        "name": "version 与 manifest 一致",
-        "severity": "WARN",
-        "check": "SKILL.md 中 version 与 manifest.json 记录一致",
-        "method": "version_matches_manifest",
+        "name": "version 一致性",
+        "severity": "ERROR",
+        "check": "SKILL.md version == _meta.json version（与铁律2版本号更新规则一致）",
+        "method": "version_matches_meta_json",
     },
     {
         "id": "R-11",
-        "name": "产出物路径规范性",
-        "severity": "WARN",
-        "check": "scripts/ + 根目录 + 非标子目录 产出路径规范 + 全目录交叉引用追踪（铁律4：skills/.standardization/<skill>/）",
-        "method": "check_artifact_paths",
+        "name": "产出物路径规范性（含风险检测）",
+        "severity": "ERROR",
+        "check": "产出物路径符合 skills/.standardization/<skill>/ 规范，且无路径遍历、跨目录写入、敏感信息泄露风险",
+        "method": "check_artifact_paths_secure",
     },
     {
         "id": "R-12",
-        "name": "外部数据目录规范性",
+        "name": "外部数据目录规范性（含风险检测）",
+        "severity": "ERROR",
+        "check": "外部数据目录路径符合 skills/.standardization/<skill-name>/ 约定，_meta.json 含 data_dir 字段且一致，且无数据泄露风险",
+        "method": "check_external_data_dir_secure",
+    },
+    # ── 新增规则 R-13 ~ R-17 (v2.13.0) ────────────────────────────────
+    {
+        "id": "R-13",
+        "name": "敏感信息访问声明",
+        "severity": "ERROR",
+        "check": "脚本含敏感信息访问（memory/credentials/token）时，frontmatter 须声明 sensitive_access: true 并说明用途",
+        "method": "check_sensitive_access_declaration",
+    },
+    {
+        "id": "R-14",
+        "name": "关键位置写入声明",
+        "severity": "ERROR",
+        "check": "脚本含关键位置写入（skills/.workbuddy/系统目录）时，frontmatter 须声明 critical_write: true 并说明用途",
+        "method": "check_critical_write_declaration",
+    },
+    {
+        "id": "R-15",
+        "name": "高权限操作授权检查",
+        "severity": "ERROR",
+        "check": "脚本含文件删除/网络请求/subprocess 调用时，执行前须调用 authorization_manager.py 请求用户授权",
+        "method": "check_authorization_present",
+    },
+    {
+        "id": "R-16",
+        "name": "权限权重说明",
         "severity": "WARN",
-        "check": "scripts/ 中外部数据目录（DATA_DIR等）路径符合 skills/.standardization/<skill-name>/ 约定（与铁律4同一目录，非框架绑定），_meta.json 含 data_dir 字段且一致",
-        "method": "check_external_data_dir",
+        "check": "建议在 SKILL.md 或 references/ 中说明各操作的权限权重，便于审查时评估风险",
+        "method": "check_permission_weight_explained",
+    },
+    {
+        "id": "R-17",
+        "name": "渐进加载引用（强制）",
+        "severity": "ERROR",
+        "check": "SKILL.md > 200 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用",
+        "method": "check_progressive_loading_forced",
     },
 ]
 
@@ -1317,48 +1353,3 @@ def cmd_audit_all(args):
                 print(format_report(r, verbose=True))
                 print()
 
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="SKILL.md 规范化审查工具 (R-01~R-12)",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例:
-  python skill_audit.py audit ~/.workbuddy/skills/git-sync
-  python skill_audit.py audit ~/.workbuddy/skills/svg-composer --json
-  python skill_audit.py audit-all ~/.workbuddy/skills --manifest manifest.json
-  python skill_audit.py rules
-        """,
-    )
-    subparsers = parser.add_subparsers(dest="command", help="可用命令")
-
-    # audit 子命令
-    p_audit = subparsers.add_parser("audit", help="审查单个 skill")
-    p_audit.add_argument("skill_dir", help="skill 目录路径")
-    p_audit.add_argument("--json", action="store_true", help="JSON 格式输出")
-    p_audit.add_argument("--manifest-version", metavar="VER", help="manifest 中记录的版本号（用于 R-10）")
-
-    # audit-all 子命令
-    p_all = subparsers.add_parser("audit-all", help="批量审查所有 skill")
-    p_all.add_argument("skills_dir", help="skills 根目录")
-    p_all.add_argument("--manifest", metavar="FILE", help="manifest.json 路径（用于 R-10 版本比对）")
-    p_all.add_argument("--json", action="store_true", help="JSON 格式输出")
-
-    # rules 子命令
-    subparsers.add_parser("rules", help="列出所有审查规则")
-
-    args = parser.parse_args()
-
-    if args.command == "audit":
-        cmd_audit(args)
-    elif args.command == "audit-all":
-        cmd_audit_all(args)
-    elif args.command == "rules":
-        cmd_rules()
-    else:
-        parser.print_help()
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

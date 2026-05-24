@@ -7,7 +7,8 @@
 
 ## 目录
 
-- [v2.12.2（当前版本）](#2122-当前版本)
+- [v2.13.0（当前版本）](#2130-当前版本)
+- [v2.12.2](#2122)
 - [v2.12.1](#2121)
 - [v2.12.0](#2120)
 - [v2.10.1](#2101)
@@ -27,6 +28,56 @@
 - [v2.0.1](#201)
 - [v2.0.0（重大升级）](#200-重大升级)
 - [v1.0.0（初始版本）](#100-初始版本)
+
+---
+
+### v2.13.0（当前版本）
+
+**发布日期：2026-05-24**
+**类型：Minor（安全增强 — 权限检查 + 授权管理 + 代码重构）**
+
+### 新增
+
+- **R-13~R-17 规则**：敏感信息访问声明、关键位置写入声明、高权限操作授权检查、权限权重说明、渐进加载引用强制
+- **`permission_checker.py` v1.0.0**：权限检查器，扫描 skill 脚本，提取文件操作，计算权限权重，生成风险报告
+- **`authorization_manager.py` v1.0.0**：授权管理器，统一审批 + 即时审批，防止未授权高风险操作
+- **`skill_audit.py` R-13~R-17 检查方法**：调用 `permission_checker.py` CLI 进行权限检查
+
+### 变更
+
+- `skill_audit.py` v2.12.2 → v2.13.0
+- `skill_builder.py` v2.12.2 → v2.13.0（update 模式调用 `permission_checker.py`）
+- `SKILL.md` v2.12.2 → v2.13.0（从 267 行降至 198 行，符合 R-17）
+
+### 重构
+
+- **`skill_builder.py` → `skill_builder/` 包**：面向对象重构，拆分为 6 个模块（~200-300 行/模块）
+  - `creator.py`：SkillCreator 类，负责 create 模式
+  - `updater.py`：SkillUpdater 类，负责 update 模式
+  - `refactor.py`：SkillRefactor 类，负责 refactor 模式
+  - `version_manager.py`：VersionManager 类，负责版本号管理
+  - `utils.py`：工具函数（备份、模板等）
+  - `__init__.py`：主入口 + argparse 解析
+  - `__main__.py`：支持 `python -m skill_builder` 执行
+- **`skill_audit.py` → `skill_audit/` 包**：面向对象重构，拆分为 6 个模块（~200-300 行/模块）
+  - `frontmatter_checker.py`：R-01~R-05、R-10 检查函数
+  - `structure_checker.py`：R-06~R-09 检查函数
+  - `artifact_checker.py`：R-11、R-12 检查函数
+  - `permission_checks.py`：R-13~R-17 检查函数
+  - `utils.py`：常量定义和工具函数
+  - `__init__.py`：主入口 + `audit_skill()` + `format_report()` + CLI 命令
+  - `__main__.py`：支持 `python -m skill_audit` 执行
+- **版本号管理改进**：`_bump_version` 移除自我修改行为，版本号权威来源改为 `_meta.json`
+- **触发条件精确化**：SKILL.md 增加精确触发词 + 否定条件，避免误触发
+- `_meta.json` v2.12.2 → v2.13.0
+- `references/guide.md` 新增"安全增强功能（v2.13.0）"章节
+- `references/reference.md` 更新审查规则一览表（R-01~R-17）
+- `references/rules.md` 新增 R-13~R-17 规则详解
+
+### 修复
+
+- `skill_audit.py` METHOD_MAP 缺少 R-13~R-17 方法映射（已添加）
+- `permission_checker.py` 对 semantic-split 误判为高风险（已修复权重计算逻辑）
 
 ---
 
@@ -434,3 +485,40 @@
 - 手动修复建议（无自动 fix 模式）
 
 *本文件由 skill-standardization v2.10.0 维护。*
+# Changelog — skill-standardization
+
+---
+
+## v2.13.0 (YYYY-MM-DD)
+
+### 新增功能
+- 新增 R-13~R-17 安全审查规则（敏感信息访问声明、关键位置写入声明、高权限操作授权检查、权限权重说明、渐进加载强制）
+- 新增 `scripts/permission_checker.py`（扫描脚本权限、计算权重、生成风险报告）
+- 新增 `scripts/authorization_manager.py`（统一审批 + 即时审批，防止未授权高风险操作）
+- `skill_builder.py` 的 `cmd_update` 模式现在自动调用 `permission_checker.py` 进行权限扫描
+
+### 规则调整
+- R-07：严重度 WARN → ERROR，增加触发条件合规性检查（正向触发词≥3、否定条件≥1、禁止危险表述）
+- R-10：检查目标从 `manifest.json` 改为 `_meta.json`，与铁律2版本号更新规则一致
+- R-11：严重度 WARN → ERROR，增加路径遍历检测、跨目录写入检测、敏感信息检测
+- R-12：严重度 WARN → ERROR，增加数据泄露风险检测
+
+### 文档更新
+- `SKILL.md` 描述更新为 v2.13.0（安全增强版），frontmatter 新增 `sensitive_access: false` 和 `critical_write: false`
+- `_meta.json` 版本号和描述更新
+- `references/guide.md` 追加安全增强功能章节
+- `references/reference.md` 追加 `permission_checker.py` 和 `authorization_manager.py` CLI 参考
+- 新增 `references/rules.md`（铁律条款详解，从 SKILL.md 拆分）
+
+### 修复
+- 修复 R-10 检查逻辑，改为比对 `_meta.json` 而非 `manifest.json`
+- 修复 `skill_builder.py` 缺少 `import subprocess` 的问题
+
+---
+
+## v2.12.2 (2025-XX-XX)
+
+### 修复
+- 修复 R-11 路径检测逻辑
+- 修复 R-12 外部数据目录检查
+
