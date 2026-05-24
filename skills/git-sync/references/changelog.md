@@ -2,6 +2,23 @@
 
 ---
 
+## v2.6.1（2026-05-24）
+
+> 发布日期：2026-05-24
+
+### 修复
+- **6个脚本移除外部授权脚本依赖** — `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py`、`sync_with_exclude.py`、`build_index.py`、`clean_dist.py` 不再调用 `skill-standardization/scripts/authorization_manager.py`，消除跨包外部依赖风险
+- **修正动态导入** — 全部 `__import__("subprocess")` 动态导入已移除
+- **修复重复 `main()` 调用** — 修复脚本 bug 导致的 `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py` 末尾重复 `main()` 问题
+- **SKILL.md 版本号不一致** — 顶部/底部版本号已统一
+
+### 安全审计
+- 外部依赖：✅ 无跨包脚本调用
+- 动态导入：✅ 无 `__import__()` 用法
+- 语法检查：✅ 全部6个脚本通过 `py_compile`
+
+---
+
 ## v2.5.1（2026-05-24）
 
 > 发布日期：2026-05-24
