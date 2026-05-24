@@ -1,7 +1,7 @@
 ---
 name: simulated-peak-plot
-version: 2.5.0
-description: Generate simulated peak plots with customizable Gaussian peaks for chromatography, spectroscopy, or any signal visualization. Use when user asks to generate peak spectra, simulate signal data, create peak plots, visualize retention times, or output data as Markdown table. Supports custom peak parameters, noise levels, baseline settings, composite peaks (N sub-peaks combined), customizable axis titles/units, CSV full data export, clickable file:// path output, and CSV data import from device exports.
+version: 2.6.0
+description: 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。当用户要求生成峰谱、模拟信号数据、创建峰图、可视化保留时间或输出数据为Markdown表格时触发。支持自定义峰参数、噪声水平、基线设置、复合峰（N个子峰组合）、自定义坐标轴标题/单位、CSV完整数据导出、可点击的file:///路径输出、以及从设备导出数据导入CSV。
 ---
 
 ## 触发条件
@@ -30,46 +30,42 @@ python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv
 python {SKILL_DIR}/scripts/generate_peak.py --config config.json
 ```
 
-# Simulated Peak Plot Skill v2.3.2
+## 概述
 
-Generate simulated peak plots with Gaussian peaks, customizable parameters, realistic noise, Markdown table output, and CSV data export.
+本技能用于生成模拟峰图（高斯峰），适用于教学、测试或演示场景。支持：
+- 多种峰类型，包括**复合峰**（任意数量子峰组合）
+- 可自定义时间范围、基线和噪声
+- **可自定义坐标轴标题和单位**（X/Y标签，mV/V/吸光度等）
+- **CSV完整数据导出**（全部数据点）
+- **可点击的 file:/// 路径**，方便直接打开图片
+- Markdown表格数据输出（在控制台打印）
+- 交互式配置，带点数推荐
 
-## Overview
+## 新功能（v2.1）
 
-This skill creates simulated peak spectra for educational, testing, or presentation purposes. It supports:
-- Multiple peak types including **composite peaks** (any number of sub-peaks combined)
-- Customizable time range, baseline, and noise
-- **Customizable axis titles and units** (X/Y labels, mV/V/absorbance/etc.)
-- **CSV complete data export** with full data points
-- **Clickable file:/// path** for easy image opening
-- Markdown table data output (printed in console)
-- Interactive configuration with point recommendations
+### 1. 可自定义坐标轴标题
+- `xlabel`：X轴标题（默认：`Time`）
+- `ylabel`：Y轴标题（默认：`Response`）
+- `x_unit`：X轴单位（默认：`min`）
+- `y_unit`：Y轴单位（默认：`mV`，可设为`V`、`absorbance`等）
 
-## New Features (v2.1)
+### 2. CSV完整数据导出
+- 将完整数据集导出为CSV文件
+- 格式：`[(t1, s1), (t2, s2), ...]`
+- **RFC 4180标准格式**：UTF-8编码，逗号分隔，数值型数据
+- 表头：`Time_<unit>,Signal_<unit>`
+- 输出文件路径带 `file:///` URI，可直接点击
 
-### 1. Customizable Axis Titles
-- `xlabel`: X-axis title (default: 'Time')
-- `ylabel`: Y-axis title (default: 'Response')
-- `x_unit`: X-axis unit (default: 'min')
-- `y_unit`: Y-axis unit (default: 'mV', can be 'V', 'absorbance', etc.)
+### 3. 可自定义网格线
+- `grid`：是否显示网格线（默认：`True`）
+- `grid_linestyle`：网格线样式 - `'solid'`、`'dashed'`、`'dotted'`、`'dashdot'`
+  - solid：实线（-）
+  - dashed：虚线（--）
+  - dotted：点线（:）
+  - dashdot：点划线（-.)
+- `grid_alpha`：网格线透明度（默认：0.6）
 
-### 2. CSV Full Data Export
-- Export complete dataset as CSV file
-- Format: `[(t1, s1), (t2, s2), ...]`
-- **RFC 4180 标准格式**：UTF-8编码，逗号分隔，数值型数据
-- Header: `Time_<unit>,Signal_<unit>`
-- 输出文件路径 with `file:///` URI for clicking
-
-### 3. Customizable Grid Lines
-- `grid`: 是否显示网格线 (default: True)
-- `grid_linestyle`: 网格线样式 - `'solid'`, `'dashed'`, `'dotted'`, `'dashdot'`
-  - solid: 实线 (-)
-  - dashed: 虚线 (--)
-  - dotted: 点线 (:)
-  - dashdot: 点划线 (-.)
-- `grid_alpha`: 网格线透明度 (default: 0.6)
-
-### 4. CSV Data Import (Device Export)
+### 4. CSV数据导入（设备导出）
 直接导入设备导出的原始CSV数据，无需手动配置峰参数。
 
 **命令行用法：**
@@ -93,128 +89,128 @@ python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv --no-header --
 - 逗号分隔，UTF-8编码
 - 自动跳过非数值行
 
-### 3. Clickable Image Path
-- Automatically outputs `file:///C:/path/to/image.png`
-- Click directly to open in default viewer
+### 3. 可点击图片路径
+- 自动输出 `file:///C:/path/to/image.png`
+- 直接点击在默认查看器中打开
 
-## Workflow
+## 工作流程
 
-### 1. Environment Check
+### 1. 环境检查
 
-**Always start by checking the environment:**
+**始终从检查环境开始：**
 
 ```bash
-# Check Python availability
+# 检查 Python 可用性
 python --version
 
-# Check required packages
-python -c "import numpy; import matplotlib; print('All packages available')"
+# 检查必需包
+python -c "import numpy; import matplotlib; print('所有包可用')"
 ```
 
-If packages are missing, instruct user to install:
+如果缺少包，指导用户安装：
 ```bash
 pip install numpy matplotlib
 ```
 
-### 2. Parameter Configuration (Interactive Dialogue)
+### 2. 参数配置（交互式对话）
 
-Engage in dialogue to configure parameters. **Show the Point Recommendation Table** first.
+通过对话配置参数。**首先显示点数推荐表**。
 
-**Time range:**
-- Start: 5 min
-- End: 15 min
+**时间范围：**
+- 起始：5 min
+- 结束：15 min
 
-**Default peaks (including composite with 3 sub-peaks):**
-- Blank: RT=5.8, Height=300, HWHM=0.1
-- Peak A: RT=7.7, Height=1500, HWHM=0.08
-- Peak B: RT=10.3, Height=1200, HWHM=0.12
-- Composite (3 sub-peaks): RT=11.5/12.0/12.5, Heights=1100/800/600, HWHM=0.15
+**默认峰（包括含3个子峰的复合峰）：**
+- 空白峰：RT=5.8, Height=300, HWHM=0.1
+- 峰 A：RT=7.7, Height=1500, HWHM=0.08
+- 峰 B：RT=10.3, Height=1200, HWHM=0.12
+- 复合峰（3个子峰）：RT=11.5/12.0/12.5, Heights=1100/800/600, HWHM=0.15
 
-**Signal settings:**
-- Baseline: 20
-- Noise level: 8
+**信号设置：**
+- 基线：20
+- 噪声水平：8
 
-**Output:** PNG + Markdown table (printed to console)
+**输出：** PNG + Markdown表格（打印到控制台）
 
-Ask user:
-1. "How many peaks do you want? (default: 4 including blank peak and composite)"
-2. "For each peak, provide: Name, Retention Time (RT), Height, HWHM"
-3. "For composite peaks: Enter number of sub-peaks (2+=composite), then provide RT/Height/HWHM for each sub-peak"
-4. "Do you want to modify baseline or noise level? (default: baseline=20, noise=8)"
-5. "Do you want to print data as Markdown table? (default: y)"
-6. "Sample interval for table (print every N-th point)? (default: 20)"
-7. "Do you want to change output filename? (default: simulated_peak)"
-8. "Customize axis labels? (xlabel/ylabel, x_unit, y_unit) [default: Time/min, Response/mV]"
-9. "Export complete data as CSV? (y/n) [default: n]"
-10. "Show grid lines? (y/n) [default: y]"
-    - If yes: "Grid line style? (1=solid, 2=dashed, 3=dotted, 4=dashdot) [default: 2]"
-    - If yes: "Grid transparency (0.1-1.0)? [default: 0.6]"
-11. Clickable file:/// path is always output for easy opening
+询问用户：
+1. "你想要多少个峰？（默认：4，包括空白峰和复合峰）"
+2. "为每个峰提供：名称、保留时间（RT）、高度、HWHM"
+3. "对于复合峰：输入子峰数量（2+=复合），然后为每个子峰提供RT/高度/HWHM"
+4. "是否要修改基线或噪声水平？（默认：baseline=20, noise=8）"
+5. "是否要打印数据为Markdown表格？（默认：y）"
+6. "表格采样间隔（每N个点打印一次）？（默认：20）"
+7. "是否要更改输出文件名？（默认：simulated_peak）"
+8. "自定义坐标轴标签？（xlabel/ylabel, x_unit, y_unit）[默认：Time/min, Response/mV]"
+9. "导出完整数据为CSV？（y/n）[默认：n]"
+10. "显示网格线？（y/n）[默认：y]"
+    - 如果选是："网格线样式？（1=实线, 2=虚线, 3=点线, 4=点划线）[默认：2]"
+    - 如果选是："网格透明度（0.1-1.0）？[默认：0.6]"
+11. 始终输出可点击的 file:/// 路径，方便直接打开
 
-### 3. Point Recommendation Table
+### 3. 点数推荐表
 
-Display a recommendation table based on:
-- Time range duration
-- Number of peaks
-- Baseline variation
-- Peak sharpness (HWHM)
+根据以下因素显示推荐表：
+- 时间范围持续时间
+- 峰数量
+- 基线变化
+- 峰锐度（HWHM）
 
-**Recommendation formula:**
+**推荐公式：**
 ```
 points = max(500, duration * peaks * sharpness_factor * 2)
 ```
 
-Typical recommendations:
+典型推荐：
 
-| Duration (min) | Peaks | Baseline | Suggested Points |
+| 持续时间（min） | 峰数 | 基线 | 推荐点数 |
 |----------------|-------|----------|-------------------|
-| 5-10 | 2-4 | Low (<50) | 500-800 |
-| 10-20 | 4-8 | Medium (50-100) | 800-1200 |
-| 20-30 | 8+ | High (>100) | 1200-2000 |
-| 30+ | Any | Any | 2000+ |
+| 5-10 | 2-4 | 低（<50） | 500-800 |
+| 10-20 | 4-8 | 中（50-100） | 800-1200 |
+| 20-30 | 8+ | 高（>100） | 1200-2000 |
+| 30+ | 任意 | 任意 | 2000+ |
 
-Also show calculation:
+同时显示计算：
 ```
-For your settings:
-Duration = [t_end - t_start] min
-Peaks = [num_peaks]
-Baseline = [baseline]
-Recommended points = max(500, [calculated_value])
+对于您的设置：
+持续时间 = [t_end - t_start] min
+峰数 = [num_peaks]
+基线 = [baseline]
+推荐点数 = max(500, [calculated_value])
 ```
 
-### 4. Generate Plot and Output Data
+### 4. 生成图表并输出数据
 
-Use the `{SKILL_DIR}/scripts/generate_peak.py` script:
+使用 `{SKILL_DIR}/scripts/generate_peak.py` 脚本：
 
 ```bash
 python {SKILL_DIR}/scripts/generate_peak.py --interactive
 ```
 
-The script will:
-1. Generate the peak plot with annotations
-2. Save PNG file with plot
-3. Print data as Markdown table in console (optional)
+脚本将：
+1. 生成带标注的峰图
+2. 保存PNG文件
+3. 在控制台打印数据作为Markdown表格（可选）
 
-### 5. Output
+### 5. 输出
 
-The script will:
-- Generate the spectrum plot (PNG)
-- **Output clickable file:/// path** for direct opening
-- **Export CSV file with full data** (if enabled)
-- Print time and signal data as Markdown table in console (optional)
-- Display plot (if running in interactive environment)
+脚本将：
+- 生成光谱图（PNG）
+- **输出可点击的 file:/// 路径**，可直接打开
+- **导出完整数据CSV文件**（如果启用）
+- 在控制台打印时间和信号数据作为Markdown表格（可选）
+- 显示图表（如果在交互式环境中运行）
 
-## Composite Peak (N Sub-Peaks)
+## 复合峰（N个子峰）
 
-Composite peaks are created by combining **any number** of Gaussian peaks. This allows for various complex peak shapes:
+复合峰通过组合**任意数量**的高斯子峰创建。这允许各种复杂峰形：
 
-### Common Shapes
-- **Doublet (2 peaks)**: M-shaped or shoulder peaks
-- **Triplet (3 peaks)**: W-shaped or triple-peak patterns
+### 常见形状
+- **双重峰（2个子峰）**：M形或肩峰
+- **三重峰（3个子峰）**：W形或三峰模式
 - **Multiple (4+ peaks)**:馒头形(Mantou), Poisson-like, or irregular shapes
 
-### Configuration
-Composite peaks can be defined as:
+### 配置
+复合峰可定义为：
 ```json
 {
   "name": "3-peak Composite",
@@ -227,62 +223,62 @@ Composite peaks can be defined as:
 }
 ```
 
-### Examples of Peak Shapes
-| Sub-peaks | RT Distribution | Height Distribution | Resulting Shape |
+### 峰形示例
+| 子峰数 | RT分布 | 高度分布 | 结果形状 |
 |-----------|-----------------|---------------------|-----------------|
-| 2 | Close RTs | Different heights | M-shape / Shoulder |
-| 3 | Evenly spaced | Gradually decreasing | W-shape / Triple |
-| 4 | Close RTs | Random | Irregular / Jagged |
+| 2 | 接近的RT | 不同高度 | M形 / 肩峰 |
+| 3 | 均匀间隔 | 递减 | W形 / 三重 |
+| 4 | 接近的RT | 随机 | 不规则 / 锯齿 |
 | 3 | Same RT | Increasing then decreasing | 馒头形 (Bun shape) |
 
-The flexibility allows users to simulate almost any peak shape by adjusting sub-peak parameters.
+通过调整子峰参数，灵活性允许用户模拟几乎任何峰形。
 
-## Important Notes
+## 重要注意事项
 
-1. **Blank peak preservation**: Always keep the first peak as a blank/reference peak (can be unnamed)
-2. **Peak naming**: Rename compounds to generic "Peak A", "Peak B", etc. for universality
-3. **Markdown table output**: Print data as Markdown table in console for easy copy-paste
-4. **Composite peaks**: Use 'composite' type with any number of sub-peaks (1=single, 2+=complex)
-5. **Point recommendation**: Show recommendation table in interactive mode to help users choose appropriate resolution
-6. **Flexible shapes**: By adjusting sub-peak count and parameters, you can create M-shape,馒头形, Poisson-like, or any irregular shape
-7. **Axis customization**: Use xlabel/ylabel/x_unit/y_unit to customize axis labels and units
-8. **CSV export**: Set `export_csv: true` to export complete data with `[(t1, s1), (t2, s2), ...]` format
-9. **Clickable path**: file:/// path is always output for easy image opening
-10. **Grid lines**: Set `grid: false` to hide, or customize `grid_linestyle` and `grid_alpha`
-11. **CSV Standard**: Output follows RFC 4180 format with UTF-8 encoding
+1. **空白峰保留**：始终保留第一个峰作为空白/参考峰（可以无名）
+2. **峰命名**：将化合物重命名为通用名"Peak A"、"Peak B"等，以保持通用性
+3. **Markdown表格输出**：在控制台中打印数据为Markdown表格，便于复制粘贴
+4. **复合峰**：使用'composite'类型，支持任意数量子峰（1=单个，2+=复杂）
+5. **点数推荐**：在交互模式下显示推荐表，帮助用户选择适当的分辨率
+6. **灵活形状**：通过调整子峰数量和参数，可以创建M形、馒头形、泊松型或任何不规则形状
+7. **坐标轴自定义**：使用xlabel/ylabel/x_unit/y_unit自定义坐标轴标签和单位
+8. **CSV导出**：设置`export_csv: true`以`[(t1, s1), (t2, s2), ...]`格式导出完整数据
+9. **可点击路径**：始终输出file:///路径，便于直接打开图片
+10. **网格线**：设置`grid: false`隐藏，或自定义`grid_linestyle`和`grid_alpha`
+11. **CSV标准**：输出遵循RFC 4180格式，使用UTF-8编码
 
-## File References
+## 文件引用
 
-- **Script**: `{SKILL_DIR}/scripts/generate_peak.py` - Main generation script with Markdown table output
-- **Parameters reference**: `{SKILL_DIR}/references/parameters.md` - Detailed parameter documentation
+- **脚本**：`{SKILL_DIR}/scripts/generate_peak.py` - 主生成脚本，支持Markdown表格输出
+- **参数参考**：`{SKILL_DIR}/references/parameters.md` - 详细参数文档
 
-## Example Usage
+## 使用示例
 
-**User request**: "Generate a peak spectrum with 5 peaks including one 3-sub-peak composite, output data as table"
+**用户请求**："生成包含5个峰（含1个3子峰复合峰）的峰谱，输出数据为表格"
 
-**Response workflow**:
-1. Check environment
-2. Show point recommendation table
-3. Ask for peak parameters (including sub-peak count for composite)
-4. Generate spectrum with Markdown table output
-5. Save PNG file and print table in console
+**响应工作流**：
+1. 检查环境
+2. 显示点数推荐表
+3. 询问峰参数（包括复合峰的子峰数量）
+4. 生成带Markdown表格输出的光谱
+5. 保存PNG文件并在控制台打印表格
 
-## Customization
+## 自定义选项
 
-Users can modify:
-- Number of peaks (including composite peaks with N sub-peaks)
-- Peak parameters (RT, height, HWHM)
-- Sub-peak count in composite (2+ for complex shapes)
-- Time range
-- Noise and baseline levels
-- Output filename and format
-- Plot aesthetics (colors, labels, grid)
-- Markdown table output (enable/disable, sample interval)
-- **Axis titles and units (xlabel, ylabel, x_unit, y_unit)**
-- **CSV full data export (export_csv: true/false)**
-- **Clickable file:/// path (clickable_path: true/false)**
+用户可以修改：
+- 峰数量（包括含N个子峰的复合峰）
+- 峰参数（RT、高度、HWHM）
+- 复合峰中的子峰数量（2+用于复杂形状）
+- 时间范围
+- 噪声和基线水平
+- 输出文件名和格式
+- 图表美学（颜色、标签、网格）
+- Markdown表格输出（启用/禁用，采样间隔）
+- **坐标轴标题和单位（xlabel、ylabel、x_unit、y_unit）**
+- **CSV完整数据导出（export_csv: true/false）**
+- **可点击的file:///路径（clickable_path: true/false）**
 
-## JSON Configuration Example
+## JSON 配置示例
 
 ```json
 {
@@ -315,7 +311,7 @@ Users can modify:
 }
 ```
 
-### CSV Output Format (RFC 4180 Standard)
+### CSV 输出格式（RFC 4180 标准）
 ```csv
 Time_min,Signal_mV
 2.000000,49.782199
@@ -323,8 +319,8 @@ Time_min,Signal_mV
 ...
 ```
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `grid` | `true` | Show/hide grid lines |
-| `grid_linestyle` | `solid/dashed/dotted/dashdot` | Grid line style |
-| `grid_alpha` | `0.1-1.0` | Grid transparency |
+| 参数 | 值 | 说明 |
+|------|------|------|
+|  |  | 显示/隐藏网格线 |
+|  |  | 网格线样式 |
+|  |  | 网格透明度 |

@@ -1,97 +1,97 @@
-# Simulated Peak Plot - Parameters Reference
+# Simulated Peak Plot - 参数参考文档
 
-## Overview
+## 概述
 
-This document provides detailed information about all parameters used in the simulated peak plot generation.
+本文档提供模拟峰图生成中所有参数的详细信息。
 
-## Time Range Parameters
+## 时间范围参数
 
-### t_start (Start Time)
-- **Description**: Start of time axis
-- **Default**: 5 minutes
-- **Typical range**: 0-30 minutes
-- **Notes**: Should be less than t_end
+### t_start（起始时间）
+- **说明**：时间轴起始点
+- **默认值**：5 分钟
+- **典型范围**：0-30 分钟
+- **注意**：应小于 t_end
 
-### t_end (End Time)
-- **Description**: End of time axis
-- **Default**: 15 minutes
-- **Typical range**: 5-60 minutes
-- **Notes**: Should be greater than t_start
+### t_end（结束时间）
+- **说明**：时间轴结束点
+- **默认值**：15 分钟
+- **典型范围**：5-60 分钟
+- **注意**：应大于 t_start
 
-### t_points (Number of Points)
-- **Description**: Number of data points in the simulation
-- **Default**: 1000 (or calculated based on recommendation)
-- **Typical range**: 500-10000
-- **Notes**: Higher values give smoother curves but increase computation time
+### t_points（点数）
+- **说明**：模拟中的数据点数量
+- **默认值**：1000（或根据推荐值计算）
+- **典型范围**：500-10000
+- **注意**：更高的值提供更平滑的曲线，但增加计算时间
 
-#### Point Recommendation Formula
+#### 点数推荐公式
 
 ```
 points = max(500, ceil(duration * num_peaks * sharpness_factor * 2))
 
-Where:
+其中：
 - duration = t_end - t_start
-- sharpness_factor = 1.0 / hwhm_avg (average HWHM of all peaks)
-- Adjustment for baseline: multiply by 1.2 if baseline > 50, 1.5 if > 100
+- sharpness_factor = 1.0 / hwhm_avg（所有峰的平均HWHM）
+- 基线调整：如果 baseline > 50 乘以 1.2，> 100 乘以 1.5
 ```
 
-#### Recommendation Table
+#### 推荐表
 
-| Duration (min) | Peaks | Baseline | Suggested Points |
+| 持续时间（min） | 峰数 | 基线 | 推荐点数 |
 |----------------|-------|----------|-------------------|
-| 5-10 | 2-4 | Low (<50) | 500-800 |
-| 10-20 | 4-8 | Medium (50-100) | 800-1200 |
-| 20-30 | 8+ | High (>100) | 1200-2000 |
-| 30+ | Any | Any | 2000+ |
+| 5-10 | 2-4 | 低（<50） | 500-800 |
+| 10-20 | 4-8 | 中（50-100） | 800-1200 |
+| 20-30 | 8+ | 高（>100） | 1200-2000 |
+| 30+ | 任意 | 任意 | 2000+ |
 
-## Peak Parameters
+## 峰参数
 
-### Single Peak
+### 单个峰
 
-Each regular peak is defined by three parameters:
+每个常规峰由三个参数定义：
 
-#### RT (Retention Time)
-- **Description**: The time at which the peak maximum occurs
-- **Unit**: minutes
-- **Default values**:
-  - Blank peak: 5.8 min
-  - Peak A: 7.7 min
-  - Peak B: 10.3 min
-- **Typical range**: Within [t_start, t_end]
-- **Notes**: Represents the time at peak center
+#### RT（保留时间）
+- **说明**：峰最大值出现的时间
+- **单位**：分钟
+- **默认值**：
+  - 空白峰：5.8 min
+  - 峰 A：7.7 min
+  - 峰 B：10.3 min
+- **典型范围**：在 [t_start, t_end] 内
+- **注意**：表示峰中心时间
 
-#### Height
-- **Description**: The peak height (intensity at RT)
-- **Unit**: arbitrary units (e.g., mV)
-- **Default values**:
-  - Blank peak: 300
-  - Peak A: 1500
-  - Peak B: 1200
-- **Typical range**: 100-10000
-- **Notes**: Represents signal intensity
+#### Height（高度）
+- **说明**：峰高度（RT处的强度）
+- **单位**：任意单位（例如 mV）
+- **默认值**：
+  - 空白峰：300
+  - 峰 A：1500
+  - 峰 B：1200
+- **典型范围**：100-10000
+- **注意**：表示信号强度
 
-#### HWHM (Half-Width at Half-Maximum)
-- **Description**: The half-width of the peak at half of its maximum height
-- **Unit**: minutes
-- **Default values**:
-  - Blank peak: 0.1
-  - Peak A: 0.08
-  - Peak B: 0.12
-- **Typical range**: 0.01-0.5 minutes
-- **Notes**: Smaller values indicate sharper (more resolved) peaks
+#### HWHM（半高半宽）
+- **说明**：峰在半高度处的半宽度
+- **单位**：分钟
+- **默认值**：
+  - 空白峰：0.1
+  - 峰 A：0.08
+  - 峰 B：0.12
+- **典型范围**：0.01-0.5 分钟
+- **注意**：更小的值表示更尖锐（分辨率更高）的峰
 
-### Composite Peak (N Sub-Peaks)
+### 复合峰（N个子峰）
 
-Composite peaks are created by combining **any number** of Gaussian sub-peaks. This allows for various complex peak shapes:
-- **Doublet (2 peaks)**: M-shaped or shoulder peaks
-- **Triplet (3 peaks)**: W-shaped or triple-peak patterns
-- **Multiple (4+ peaks)**:馒头形 (bun shape), Poisson-like, or irregular shapes
+复合峰通过组合**任意数量**的高斯子峰创建。这允许各种复杂峰形：
+- **双重峰（2个子峰）**：M形或肩峰
+- **三重峰（3个子峰）**：W形或三峰模式
+- **多重峰（4+个子峰）**：馒头形、泊松型或不规则形状
 
-#### Configuration
+#### 配置
 
 ```json
 {
-  "name": "Peak C (3-peak composite)",
+  "name": "峰 C（3-峰复合）",
   "type": "composite",
   "peaks": [
     {"RT": 11.5, "height": 1100, "HWHM": 0.15},
@@ -101,93 +101,93 @@ Composite peaks are created by combining **any number** of Gaussian sub-peaks. T
 }
 ```
 
-#### Parameters for Composite Peaks
+#### 复合峰参数
 
-##### Sub-peak Count
-- **Description**: Number of sub-peaks to combine
-- **Value**: 1 (single peak), 2+ (composite)
-- **Notes**: 2=肩膀峰/M峰, 3+=W峰/馒头峰/泊松峰等
+##### 子峰数量
+- **说明**：要组合的子峰数量
+- **值**：1（单个峰），2+（复合）
+- **注意**：2=肩膀峰/M峰，3+=W峰/馒头峰/泊松峰等
 
 ##### RT1, RT2, ... RTn
-- **Description**: Retention times of each sub-peak
-- **Recommended spread**: 0.2-0.5 min apart for partial resolution, 0.1-0.2 for tight clustering
-- **Notes**: Spacing determines resulting shape character
+- **说明**：每个子峰的保留时间
+- **推荐间隔**：0.2-0.5 min（部分分辨），0.1-0.2（紧密聚集）
+- **注意**：间隔决定结果形状特征
 
 ##### Height1, Height2, ... Heightn
-- **Description**: Heights of each sub-peak
-- **Recommended variation**: Can be equal (馒头形) or decreasing/increasing (M/W形)
-- **Notes**: Height variation creates asymmetry and complexity
+- **说明**：每个子峰的高度
+- **推荐变化**：可以相等（馒头形）或递减/递增（M/W形）
+- **注意**：高度变化创建不对称性和复杂性
 
 ##### HWHM1, HWHM2, ... HWHMn
-- **Description**: Half-widths of each sub-peak
-- **Recommended**: Can be same (uniform broadening) or varied (mixed sharpness)
-- **Typical value**: 0.1-0.2
+- **说明**：每个子峰的半高半宽
+- **推荐**：可以相同（均匀展宽）或变化（混合锐度）
+- **典型值**：0.1-0.2
 
-## Signal Parameters
+## 信号参数
 
-### Baseline
-- **Description**: The baseline signal level (noise floor)
-- **Unit**: same as height (e.g., mV)
-- **Default**: 20
-- **Typical range**: 0-100
-- **Notes**: Represents background signal
+### Baseline（基线）
+- **说明**：基线信号水平（噪声底）
+- **单位**：与高度相同（例如 mV）
+- **默认值**：20
+- **典型范围**：0-100
+- **注意**：表示背景信号
 
-### Noise Level
-- **Description**: Standard deviation of Gaussian noise added to the signal
-- **Unit**: same as height
-- **Default**: 8
-- **Typical range**: 0-50
-- **Notes**: Higher values create more realistic but noisier spectra
+### Noise Level（噪声水平）
+- **说明**：添加到信号的高斯噪声的标准差
+- **单位**：与高度相同
+- **默认值**：8
+- **典型范围**：0-50
+- **注意**：更高的值创建更真实但更嘈杂的光谱
 
-## Output Parameters
+## 输出参数
 
-### Output Filename (PNG)
-- **Description**: Name of the output PNG file
-- **Default**: `simulated_peak.png`
-- **Notes**: Markdown table is printed to console (not saved to file)
+### Output Filename（输出文件名，PNG）
+- **说明**：输出PNG文件的名称
+- **默认值**：`simulated_peak.png`
+- **注意**：Markdown表格打印到控制台（不保存到文件）
 
-### Print Markdown Table
-- **Description**: Whether to print time-series data as Markdown table in console
-- **Default**: True
-- **Notes**: Table is sampled (every N-th point) to avoid huge output
+### Print Markdown Table（打印Markdown表格）
+- **说明**：是否将时间序列数据作为Markdown表格打印到控制台
+- **默认值**：True
+- **注意**：表格是采样的（每N个点）以避免巨大输出
 
-### Table Sample Interval
-- **Description**: Print every N-th point in Markdown table
-- **Default**: 20
-- **Typical range**: 10-100
-- **Notes**: Smaller values give more detail but larger table
+### Table Sample Interval（表格采样间隔）
+- **说明**：在Markdown表格中每N个点打印一次
+- **默认值**：20
+- **典型范围**：10-100
+- **注意**：更小的值提供更多细节但表格更大
 
-### Figure Size
-- **Description**: Size of the output figure in inches
-- **Default**: (10, 6) width × height
-- **Notes**: Can be adjusted for different display requirements
+### Figure Size（图表尺寸）
+- **说明**：输出图表的尺寸（英寸）
+- **默认值**：(10, 6) 宽 × 高
+- **注意**：可以根据不同显示需求调整
 
-### DPI
-- **Description**: Dots per inch (resolution) of output image
-- **Default**: 150
-- **Typical range**: 72-300
-- **Notes**: Higher DPI gives better quality but larger file size
+### DPI（分辨率）
+- **说明**：输出图像的点每英寸（分辨率）
+- **默认值**：150
+- **典型范围**：72-300
+- **注意**：更高DPI提供更好质量但文件更大
 
-## Peak Naming Convention
+## 峰命名约定
 
-For universality, compounds are named generically:
-- First peak (index 0): Can be blank (empty name) or "Peak 0"
-- Subsequent peaks: "Peak A", "Peak B", "Peak C", etc.
-- Composite peaks: "Peak X (N-peak composite)" or keep generic name
+为了通用性，化合物使用通用名命名：
+- 第一个峰（索引0）：可以为空（无名）或 "Peak 0"
+- 后续峰："Peak A"、"Peak B"、"Peak C" 等
+- 复合峰："Peak X (N-peak composite)" 或保持通用名
 
-This avoids language-specific compound names and makes the skill universally applicable.
+这避免了特定语言的化合物名称，使技能普遍适用。
 
-## Configuration File Format (JSON)
+## 配置文件格式（JSON）
 
 ```json
 {
   "time_range": [5, 15, 1000],
   "peaks": [
-    {"name": " ", "RT": 5.8, "height": 300, "HWHM": 0.1},
+    {"name": "空白", "RT": 5.8, "height": 300, "HWHM": 0.1},
     {"name": "Peak A", "RT": 7.7, "height": 1500, "HWHM": 0.08},
     {"name": "Peak B", "RT": 10.3, "height": 1200, "HWHM": 0.12},
     {
-      "name": "Peak C (3-peak composite)",
+      "name": "Peak C（3-峰复合）",
       "type": "composite",
       "peaks": [
         {"RT": 11.5, "height": 1100, "HWHM": 0.15},
@@ -206,12 +206,12 @@ This avoids language-specific compound names and makes the skill universally app
 }
 ```
 
-## Tips for Realistic Simulation
+## 真实模拟技巧
 
-1. **Peak spacing**: Ensure RT values are separated by at least 3×HWHM for clear resolution
-2. **Composite peaks**: Use 2-3 sub-peaks with 0.2-0.5 min spacing for M/W shapes; use same RT with varied heights for馒头形
-3. **Noise level**: Set noise_level to ~5-10% of smallest peak height for realistic appearance
-4. **Baseline**: Keep baseline low (10-50) relative to peak heights
-5. **HWHM values**: Smaller values (<0.1) for sharp peaks, larger values (0.1-0.3) for broad peaks
-6. **Points selection**: Use recommendation table or formula; more points for sharper peaks (small HWHM)
-7. **Markdown table**: Use print_table=true for data output in console; adjust table_sample for detail level
+1. **峰间距**：确保RT值至少间隔3×HWHM以获得清晰分辨
+2. **复合峰**：使用2-3个子峰，间隔0.2-0.5 min创建M/W形；使用相同RT但不同高度创建馒头形
+3. **噪声水平**：设置noise_level为最小峰高度的~5-10%以获得真实外观
+4. **基线**：保持基线低（10-50）相对于峰高度
+5. **HWHM值**：更小的值（<0.1）用于尖锐峰，更大的值（0.1-0.3）用于宽峰
+6. **点数选择**：使用推荐表或公式；更尖锐的峰（小HWHM）需要更多点
+7. **Markdown表格**：使用print_table=true在控制台输出数据；调整table_sample以控制细节级别
