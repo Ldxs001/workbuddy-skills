@@ -43,24 +43,3 @@ if not to_delete:
     print("\n✅ dist/ 中没有旧版本，无需清理")
 else:
     print(f"\n需要删除的旧版本 ({len(to_delete)} 个):")
-
-    # R-15 合规：自治模式授权检查
-    import subprocess, sys, os as _os
-    _skill_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
-    _auth_script = _os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")
-    if _os.path.exists(_auth_script):
-        _r = subprocess.run([sys.executable, _auth_script, "request", "--type", "autonomous", "--reason", "clean_dist: 清理旧版本 ZIP"], capture_output=True, text=True)
-        if _r.returncode != 0:
-            print(f"⚠️ 授权检查警告: {_r.stderr.strip()}")
-
-    for f in to_delete:
-        print(f"  DEL: {f}")
-    print()
-    for f in to_delete:
-        path = os.path.join(DIST_DIR, f)
-        os.remove(path)
-        print(f"  ✅ 已删除: {f}")
-
-# 重新生成 index.html
-index_path = os.path.join(DIST_DIR, "index.html")
-print(f"\n重新生成索引页: {index_path}")

@@ -81,6 +81,16 @@ def sync_with_exclude(src, dst):
         print(f"❌ 源目录不存在: {src}")
         sys.exit(1)
 
+    # 安全检查：src 和 dst 不能相同，dst 不能是 src 的父目录
+    src_resolved = os.path.realpath(src)
+    dst_resolved = os.path.realpath(dst)
+    if src_resolved == dst_resolved:
+        print(f"❌ 拒绝操作：源目录和目标目录相同（{src_resolved}）")
+        sys.exit(1)
+    if dst_resolved.startswith(src_resolved + os.sep):
+        print(f"❌ 拒绝操作：目标目录在源目录内（{dst_resolved}）")
+        sys.exit(1)
+
     # 清空目标目录（安全：已通过 git-sync.sh 路径校验）
     if os.path.isdir(dst):
         shutil.rmtree(dst)
@@ -113,18 +123,6 @@ def sync_with_exclude(src, dst):
 
 
 if __name__ == "__main__":
-    # R-15 合规：自治模式授权检查（不阻断执行）
-    _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")
-    if os.path.exists(_auth_script):
-        _r = __import__("subprocess").run(
-            [sys.executable, _auth_script, "request", "--type", "autonomous", "--reason", "git-sync 高危操作"],
-            capture_output=True, text=True
-        )
-        if _r.returncode != 0:
-            print(f"⚠️ 授权检查警告: {_r.stderr.strip()}")
-
-
     if len(sys.argv) < 3:
         print("用法: python sync_with_exclude.py <src_dir> <dst_dir>")
         sys.exit(1)

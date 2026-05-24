@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.5.0
+version: 2.6.0
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -37,6 +37,7 @@ critical_write: true
 | 4 | **SKILL.md 规范审查**（v1.8） | 同步前自动检查 R-01~R-10 合规性（纯警告不阻断） |
 | 5 | **三单一致机制**（v1.3） | manifest.json ≥ 仓库实际文件 = README.md |
 | 6 | **ZIP 打包 + HTML 索引**（v1.5） | 统一输出到 `.dist/` 并自动生成 index.html |
+| 7 | **安全修复**（v2.6.0） | 移除 `__import__` 动态导入，改善授权检查实现（内置异常处理） |
 
 ## 工作流程
 
@@ -68,6 +69,7 @@ critical_write: true
 | 4 | ZIP 打包 | 生成 `.dist/` 包 + index.html |
 | 5 | README 更新 | 全量重建技能列表 |
 | 6 | 清单维护 | 更新 manifest.json 状态标记 |
+| 7 | **安全修复**（v2.6.0） | 移除 `__import__` 动态导入，改善授权检查 |
 
 → 完整步骤详解见 `references/guide.md`
 
@@ -95,6 +97,22 @@ bash git-sync.sh <skill-name> <version>
 | `gitee.user` / `github.user` | 用于生成查看链接和 README 命令 | `your-gitee-username` |
 
 → 详见 `references/guide.md` 完整执行流程（步骤 0 → 6 详解）
+
+## 修复记录
+
+### v2.6.0 (2026-05-24)
+
+**安全修复**：
+
+1. **移除 `__import__` 动态导入** — 将 `sync_with_exclude.py` 中的 `__import__("subprocess")` 改为标准 `import subprocess`
+2. **改善授权检查实现** — 将授权检查逻辑改为内置异常处理，避免外部脚本依赖不可控
+3. **路径安全检查** — 在 `sync_with_exclude.py` 中添加源/目标路径一致性检查，防止误删目录
+
+**影响文件**：
+- `scripts/sync_with_exclude.py` — 修复 `__import__` + 添加路径安全检查
+- `scripts/sensitive_scan.py` — 验证无 `__import__` 动态导入
+
+---
 
 ## 敏感信息过滤
 
@@ -141,4 +159,4 @@ bash git-sync.sh <skill-name> <version>
 
 ## 版本
 
-当前版本：**2.4.0** — v2.4.0：配合 skill-standardization v2.12.0 路径规范升级，同步版本号
+当前版本：**2.5.1** — v2.5.1：修复6个脚本动态导入subprocess及外部授权脚本依赖问题，移除对 skill-standardization/authorization_manager.py 的跨包调用

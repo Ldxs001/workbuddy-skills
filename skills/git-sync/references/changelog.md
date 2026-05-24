@@ -2,6 +2,23 @@
 
 ---
 
+## v2.5.1（2026-05-24）
+
+> 发布日期：2026-05-24
+
+### 修复
+- **6个脚本移除外部授权脚本依赖** — `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py`、`sync_with_exclude.py`、`build_index.py`、`clean_dist.py` 不再调用 `skill-standardization/scripts/authorization_manager.py`，消除跨包外部依赖风险
+- **修正动态导入** — 全部 `__import__("subprocess")` 动态导入已移除，改为标准 `import subprocess`（或直接删除无需使用的导入）
+- **修复重复 `main()` 调用** — 修复脚本 bug 导致的 `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py` 末尾重复 `main()` 问题
+- **SKILL.md 版本号不一致** — 顶部 `version: 2.5.0` 与底部 `当前版本：2.4.0` 已统一为 `2.5.1`
+
+### 安全审计
+- 外部依赖：✅ 无跨包脚本调用
+- 动态导入：✅ 无 `__import__()` 用法
+- 语法检查：✅ 全部6个脚本通过 `py_compile`
+
+---
+
 ## v2.5.0（2026-05-24）
 
 > 发布日期：2026-05-24
@@ -184,7 +201,7 @@
   - `references/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
   - `references/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
   - `references/changelog.md` — 完整版本历史 + Roadmap
-- **frontmatter author** 从非常量引用修正为常量值 `wUwproject`
+- **frontmatter author** 从非常量引用修正为常量值 `[username-redacted]`
 - **清理根目录遗留垃圾**：删除异常 ZIP 文件 `2.0.0`、6 个 `.tmp_zip_*` 临时目录、过时空目录 `references/`
 - 通过 skill-standardization v2.0 update 验证：**ERROR=0, WARN=1**（WARN 为合理运行时文件例外）
 

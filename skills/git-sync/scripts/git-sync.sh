@@ -35,8 +35,8 @@ fi
 # 路径配置
 SKILL_MD="$SKILLS_DIR/$SKILL_NAME/SKILL.md"
 META_FILE="$SKILLS_DIR/$SKILL_NAME/_meta.json"
-WORK_REPO="$WORKSPACE_ROOT/$REPO_NAME"
 REPO_NAME="workbuddy-skills"
+WORK_REPO="$WORKSPACE_ROOT/$REPO_NAME"
 DIST_DIR="$SKILLS_DIR/.dist"
 ZIP_NAME="${SKILL_NAME}-v${VERSION}.zip"
 ZIP_FILE="$DIST_DIR/$ZIP_NAME"
@@ -315,8 +315,8 @@ else
 fi
 
 echo "  → 推送到 GitHub..."
-git pull origin main --rebase 2>/dev/null || echo "  ⚠️  GitHub pull失败，继续..."
-if git push origin main 2>&1; then
+git pull github main --rebase 2>/dev/null || echo "  ⚠️  GitHub pull失败，继续..."
+if git push github main 2>&1; then
     echo "  ✅ GitHub推送成功"
     GITHUB_OK=true
 else
