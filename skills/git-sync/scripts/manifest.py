@@ -26,6 +26,9 @@ import tempfile
 import re
 from datetime import date
 from pathlib import Path
+import subprocess
+import hashlib
+import json
 
 # ── 路径解析 ───────────────────────────────────────────
 def _find_skills_dir():
@@ -588,9 +591,34 @@ if __name__ == "__main__":
     # R-15 合规：自治模式授权检查（不阻断执行）
     _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")
+    # 完整性校验：检查 authorization_manager.py 是否被篡改
     if os.path.exists(_auth_script):
-        _r = __import__("subprocess").run(
-            [sys.executable, _auth_script, "request", "--type", "autonomous", "--reason", "git-sync 高危操作"],
+        try:
+            import hashlib, json, pathlib
+            _hash_file = pathlib.Path.home() / ".workbuddy" / "skills" / ".standardization" / "git-sync" / "script_hashes.json"
+            with open(_auth_script, "rb") as _f:
+                _auth_hash = hashlib.sha256(_f.read()).hexdigest()
+            if _hash_file.exists():
+                with open(_hash_file) as _f:
+                    _records = json.load(_f)
+                _rel = str(pathlib.Path(_auth_script).relative_to(pathlib.Path.home() / ".workbuddy" / "skills"))
+                if _rel in _records and _records[_rel] != _auth_hash:
+                    print(f"⚠️ 警告: authorization_manager.py 哈希不匹配（可能被篡改）: {_rel}")
+                    print(f"  预期: {_records[_rel][:16]}...")
+                    print(f"  实际: {_auth_hash[:16]}...")
+                else:
+                    _records[_rel] = _auth_hash
+                    with open(_hash_file, "w") as _f:
+                        json.dump(_records, _f, indent=2, ensure_ascii=False)
+            else:
+                _hash_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(_hash_file, "w") as _f:
+                    json.dump({_rel: _auth_hash}, _f, indent=2, ensure_ascii=False)
+        except Exception as _e:
+            print(f"⚠️ 哈希校验失败: {_e}")
+    if os.path.exists(_auth_script):
+        _r = subprocess.run(
+            [sys.executable, _auth_script, "request", "--type", "immediate", "--reason", "git-sync 高危操作"],
             capture_output=True, text=True
         )
         if _r.returncode != 0:

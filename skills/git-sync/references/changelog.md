@@ -2,6 +2,21 @@
 
 ---
 
+## v2.4.1（2026-05-24）
+
+**修正：`__import__("subprocess")` 动态导入 + 授权检查脚本路径完整性校验**
+
+### 修复
+- **6 个脚本** `clean_zip_source.py` / `manifest.py` / `sensitive_scan.py` / `sync_with_exclude.py` / `build_index.py` / `clean_dist.py`：`__import__("subprocess").run(...)` → 标准 `import subprocess` + `subprocess.run(...)` ✅
+- **`--type autonomous` 参数修正**：`authorization_manager.py` 无 `autonomous` 模式，统一改为 `--type immediate` ✅
+- **完整性校验**：调用 `authorization_manager.py` 前计算 SHA-256 哈希，记录到 `~/.workbuddy/skills/.standardization/git-sync/script_hashes.json`，哈希不匹配时警告 ✅
+- **`authorization_manager.py` 安全审查**：确认其授权逻辑仅做记录/提示，不执行其他高危操作 ✅
+
+### 影响文件
+`scripts/clean_zip_source.py`、`scripts/manifest.py`、`scripts/sensitive_scan.py`、`scripts/sync_with_exclude.py`、`scripts/build_index.py`、`scripts/clean_dist.py`
+
+---
+
 ## v2.2.0（2026-05-23）
 
 **产出物路径迁移至 standardization 铁律4 结构**

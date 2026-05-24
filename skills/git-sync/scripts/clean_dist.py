@@ -49,7 +49,7 @@ else:
     _skill_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
     _auth_script = _os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")
     if _os.path.exists(_auth_script):
-        _r = subprocess.run([sys.executable, _auth_script, "request", "--type", "autonomous", "--reason", "clean_dist: 清理旧版本 ZIP"], capture_output=True, text=True)
+        _r = subprocess.run([sys.executable, _auth_script, "request", "--type", "immediate", "--reason", "clean_dist: 清理旧版本 ZIP"], capture_output=True, text=True)
         if _r.returncode != 0:
             print(f"⚠️ 授权检查警告: {_r.stderr.strip()}")
 
