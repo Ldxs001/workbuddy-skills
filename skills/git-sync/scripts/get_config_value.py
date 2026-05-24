@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from auth_check import authorize, initialize
-
 """从 config.json 读取值，返回纯文本（供 bash 使用）"""
 import json, sys
 
@@ -21,5 +19,4 @@ def main():
         print("")
 
 if __name__ == "__main__":
-        initialize()
     main()

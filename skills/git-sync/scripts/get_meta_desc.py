@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from auth_check import authorize, initialize
-
 """从 _meta.json 读取 description 字段"""
 import json, sys
 
@@ -15,5 +13,4 @@ def main():
         print("")
 
 if __name__ == "__main__":
-        initialize()
     main()

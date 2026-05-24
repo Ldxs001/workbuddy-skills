@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.6.0
+version: 2.5.0
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -48,11 +48,9 @@ critical_write: true
 确定同步模式
   ├── 按需同步（指定 skill 名）──→ 单 skill 流水线
   └── 全量维护（明确说"全量"/"同步所有"）──→ 遍历 manifest.json
-
   ↓
 执行同步流水线：
   安全校验 → 清单检查 → 版本对比 → 敏感扫描 → 规范审查 → 同步推送 → ZIP打包 → README更新
-
   ↓
 输出结果报告（✅/❌/⚠️）
 ```
@@ -71,23 +69,21 @@ critical_write: true
 | 5 | README 更新 | 全量重建技能列表 |
 | 6 | 清单维护 | 更新 manifest.json 状态标记 |
 
-完整步骤详解见 `references/guide.md`
+→ 完整步骤详解见 `references/guide.md`
 
 ## 快速开始
 
+> 详细命令和参数说明见 `references/guide.md`（按需加载）
+
+**核心命令：**
+
 ```bash
-# 进入脚本目录
-cd ~/.workbuddy/skills/git-sync/scripts
-
-# 同步指定 skill（自动 bump 版本号）
 bash git-sync.sh <skill-name> <version>
-
-# 示例：同步 color-toolkit v1.0.0
-bash git-sync.sh color-toolkit 1.0.0
-
-# 跳过敏感信息扫描（私有仓库用）
-bash git-sync.sh my-skill 1.0.0 --skip-scan
 ```
+
+- `<skill-name>`：技能目录名（如 `color-toolkit`）
+- `<version>`：版本号（如 `1.0.0`）
+- 可选：`--skip-scan` 跳过敏感信息扫描
 
 ## 安装后配置
 
@@ -98,7 +94,7 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 | `author` | _meta.json 默认作者名 | `your-name-here` |
 | `gitee.user` / `github.user` | 用于生成查看链接和 README 命令 | `your-gitee-username` |
 
-详见 `references/guide.md` 完整执行流程（步骤 0 → 6 详解）
+→ 详见 `references/guide.md` 完整执行流程（步骤 0 → 6 详解）
 
 ## 敏感信息过滤
 
@@ -108,11 +104,11 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 |------|------|--------|
 | 邮箱地址 | `xxx@xxx.com` | 🔴 critical |
 | Token / API Key | `token=xxx` | 🔴 critical |
-| 本地路径 | `C:\Users\...` | ⚠️ medium |
+| 本地路径 | `C:\Users\...` | 🟡 medium |
 
 三种模式：`prompt`（默认交互）/ `always-sanitize`（自动脱敏）/ `keep-as-is`（跳过）
 
-详见 `references/reference.md` 完整检测规则 + manifest.py CLI 速查
+→ 详见 `references/reference.md` 完整检测规则 + manifest.py CLI 速查
 
 ## 代码管理铁律
 
@@ -123,141 +119,26 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 5. ✅ 维护清单优先 — 未确认是否加入清单前，不盲目同步
 6. ✅ ZIP 与仓库结构一致
 
- [FAQ](references/faq.md) · [版本日志](references/changelog.md) · [完整参考](references/reference.md)
+→ [FAQ](references/faq.md) · [版本日志](references/changelog.md) · [完整参考](references/reference.md)
 
 ---
 
+## 渐进式加载引用表
+
+> 本表声明渐进式加载结构：SKILL.md 主文件含核心触发 + 引用表，详细内容拆分至 references/ 按需加载。
+
+| 本文件（SKILL.md）包含 | 拆分到 references/ |
+|----------------------------|---------------------------|
+| ✅ 触发场景、核心能力、快速开始、工作流程（渐进式加载） | 📄 `references/guide.md` — 步骤详解 + 敏感信息过滤规则 |
+| ✅ 版本记录 | 📄 `references/changelog.md` — 版本更新历史 |
+| ✅ 权限说明 | 📄 `references/permissions.md` — 权限类型、风险等级、行为对照表 |
+| ✅ 详细参考 | 📄 `references/reference.md` — API/命令参考 |
+| ✅ 常见问题 | 📄 `references/faq.md` — FAQ |
+
+→ 详见 `references/guide.md`（按需加载）
 
 ---
 
-## 授权要求
+## 版本
 
-本技能包含以下中高风险操作，使用前需获得用户授权：
-
-1. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\build_index.py` 第 6 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-2. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\build_index.py` 第 6 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-3. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\build_index.py` 第 6 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-4. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\build_index.py` 第 115 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-5. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\build_index.py` 第 146 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-6. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\clean_dist.py` 第 61 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-7. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\clean_dist.py` 第 48 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-8. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\clean_dist.py` 第 52 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-9. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\clean_zip_source.py` 第 52 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-10. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\clean_zip_source.py` 第 64 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-11. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\clean_zip_source.py` 第 6 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-12. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\clean_zip_source.py` 第 100 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-13. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\manifest.py` 第 58 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-14. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\manifest.py` 第 29 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-15. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\manifest.py` 第 620 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-16. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\pack_zip.py` 第 168 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-17. **[高] 检测到敏感信息访问（memory/credentials/token）**（`scripts\sensitive_scan.py` 第 71 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-18. **[高] 检测到敏感信息访问（memory/credentials/token）**（`scripts\sensitive_scan.py` 第 71 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-19. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\sensitive_scan.py` 第 20 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-20. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\sensitive_scan.py` 第 581 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-21. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\sync_with_exclude.py` 第 89 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-22. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\sync_with_exclude.py` 第 9 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-23. **[高] 检测到 subprocess 调用（os.system/subprocess等）**（`scripts\sync_with_exclude.py` 第 148 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-24. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 71 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-25. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 170 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-26. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 173 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-27. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 234 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-28. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 245 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-29. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 265 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-30. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）**（`scripts\git-sync.sh` 第 292 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-31. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 162 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-32. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 231 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-33. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 250 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-34. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 269 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-35. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 272 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-36. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 358 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-37. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 375 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-38. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 389 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-39. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 398 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-40. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 401 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-41. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）**（`scripts\git-sync.sh` 第 414 行）
-   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）
-   - 原因：自动化技能：一次性授权，后续自动执行不再询问
-**授权方式说明：**
-- 静默授权：无需用户交互，自动执行并记录
-- 统一授权：首次执行前获得用户批准，后续不再询问
-- 即时授权：每次执行前需获得用户批准
+当前版本：**2.4.0** — v2.4.0：配合 skill-standardization v2.12.0 路径规范升级，同步版本号

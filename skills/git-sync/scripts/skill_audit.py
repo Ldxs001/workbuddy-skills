@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from auth_check import authorize, initialize
-
 """
 skill_audit.py — SKILL.md 规范化审查工具 (v1.0.0)
 集成到 git-sync 流程，在同步前自动检查 SKILL.md 合规性。
@@ -521,5 +519,4 @@ def main():
 
 
 if __name__ == "__main__":
-        initialize()
     main()

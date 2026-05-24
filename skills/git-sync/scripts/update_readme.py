@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from auth_check import authorize, initialize
-
 """
 update_readme.py - 全量重新生成 README.md（从仓库实际文件）
 
@@ -202,7 +200,6 @@ MIT License
 
 
 if __name__ == "__main__":
-        initialize()
     if len(sys.argv) < 3:
         print("用法: python update_readme.py <repo_name> <readme_path>")
         print("示例: python update_readme.py workbuddy-skills /path/to/README.md")

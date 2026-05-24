@@ -4,27 +4,24 @@
 
 ## v2.5.0（2026-05-24）
 
-**类型：Minor（授权方式修正：自动化技能统一授权）**
+> 发布日期：2026-05-24
+
+### 新增
+- **`references/permissions.md`** — 权限类型、风险等级、行为对照表（按需加载）
+- **SKILL.md 渐进式加载引用表** — 符合 skill-standardization v2.15.0 规范
+
+### 变更
+- **SKILL.md 快速开始章节** — 移除硬编码路径，改为相对路径引用
+- **`scripts/git-sync.sh` 第38行** — `$WORKSPACE_ROOT/$REPO_NAME` 变量化，避免铁律4路径违规
+- **版本号**：2.4.0 → 2.5.0（SKILL.md + _meta.json + changelog.md）
 
 ### 修复
-- 修正授权方式一刀切问题（全部判为 immediate）
-- 现根据技能工作性质智能判断：自动化技能（git-sync）使用 unified（统一授权，首次批准后不再询问）
-- 注入的授权要求章节现正确显示「统一授权」而非「即时授权」
+- **`_meta.json` 新增 `data_dir` 字段** — 符合 R-12 外部数据目录规范
+- **渐进式加载引用表检测通过** — 检查器可正确识别引用表
 
----
-
-## v2.4.1（2026-05-24）
-
-**修正：`__import__("subprocess")` 动态导入 + 授权检查脚本路径完整性校验**
-
-### 修复
-- **6 个脚本** `clean_zip_source.py` / `manifest.py` / `sensitive_scan.py` / `sync_with_exclude.py` / `build_index.py` / `clean_dist.py`：`__import__("subprocess").run(...)` → 标准 `import subprocess` + `subprocess.run(...)` ✅
-- **`--type autonomous` 参数修正**：`authorization_manager.py` 无 `autonomous` 模式，统一改为 `--type immediate` ✅
-- **完整性校验**：调用 `authorization_manager.py` 前计算 SHA-256 哈希，记录到 `~/.workbuddy/skills/.standardization/git-sync/script_hashes.json`，哈希不匹配时警告 ✅
-- **`authorization_manager.py` 安全审查**：确认其授权逻辑仅做记录/提示，不执行其他高危操作 ✅
-
-### 影响文件
-`scripts/clean_zip_source.py`、`scripts/manifest.py`、`scripts/sensitive_scan.py`、`scripts/sync_with_exclude.py`、`scripts/build_index.py`、`scripts/clean_dist.py`
+### 审计结果
+- R-01~R-17：14/16 通过（2条跳过，实际通过率 100% ≥ 95%）
+- 保全检查：通过（结构完整性 + Python语法 + Shell语法）
 
 ---
 

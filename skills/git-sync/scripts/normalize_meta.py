@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from auth_check import authorize, initialize
-
 """git-sync _meta.json 标准化校验。用法: python normalize_meta.py <_meta.json路径> <skill-name> <version> <description>"""
 
 import json, sys, os
@@ -98,7 +96,6 @@ def normalize(meta_file, skill_name, version, description):
     print(f'  📋 name={meta["name"]}, version={meta["version"]}, author={meta["author"]}, tags={len(meta["tags"])}个')
 
 if __name__ == '__main__':
-        initialize()
     if len(sys.argv) < 4:
         print(f'用法: {sys.argv[0]} <_meta.json路径> <skill-name> <version> [description]')
         sys.exit(1)
