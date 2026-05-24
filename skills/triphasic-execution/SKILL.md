@@ -1,6 +1,6 @@
 ---
 name: triphasic-execution
-version: 5.12.0
+version: 5.13.0
 author: wUwproject
 license: MIT
 description: >
@@ -10,7 +10,7 @@ tags: [framework, execution, debugging, problem-tracking, risk-tracking, lessons
 category: workflow
 ---
 
-# Triphasic Execution Framework v5.12.0
+# Triphasic Execution Framework v5.13.0
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
 
@@ -181,4 +181,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**5.12.0** — v5.12.0：complete 子命令新增 Python 侧强制校验（--enforce 默认开启），步骤完成率<50% 拒绝完成；复杂任务（步骤≥4）强制检查 PROBLEMS.md/RISKS.md/LESSONS_REGISTER.md/summary.json；--force 语义收窄为仅跳过步骤检查，--no-enforce 关闭记录校验（需双因子 --force --no-enforce 才完全跳过）
+当前版本：**5.13.0** — v5.13.0：补充权限权重说明（R-16），references/reference.md 追加权限权重表格及风险等级评估

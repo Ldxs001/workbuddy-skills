@@ -176,3 +176,27 @@ python install.py --uninstall              # 卸载
 | `task_progress.py` | 临时进度文件管理（init/update/resume/complete/abort/clean） |
 
 所有脚本零外部依赖，仅使用 Python 标准库。跨平台支持 Windows/Linux/macOS。
+
+---
+
+## 权限权重说明（R-16）
+
+本技能各操作的权限权重评估如下（由 `skill-standardization/scripts/permission_checker.py` 计算）：
+
+| 脚本 | 操作类型 | 权限权重 | 风险等级 | 说明 |
+|------|---------|---------|---------|------|
+| `task_progress.py` | 读写 `.active_tasks/*.json` | 中低 | 🟡 | 仅读写本地进度文件，无外部命令调用 |
+| `problem_logger.py` | 读写 `.problem_logs/*.jsonl`、合并登记册 | 中 | 🟡 | 本地日志文件写入，无网络/外部命令 |
+| `settings.py` | 读/写 `config.json`，启动 HTTP 服务 | 中 | 🟡 | 本地配置读写，HTTP 仅本地 `localhost` |
+| `install.py` | 创建目录、写配置文件、注册守护进程 | 中高 | 🟠 | 涉及目录创建和配置写入，无系统级操作 |
+| `problem_daemon.py` | 后台守护进程，监控任务执行 | 中 | 🟡 | 仅本地监控，无外部访问 |
+| `exec_wrapper.py` | 拦截命令执行，记录问题 | 中高 | 🟠 | 涉及命令执行拦截，但仅记录不修改 |
+| `lessons_register.py` | 读写 `LESSONS_REGISTER.md` | 低 | 🟢 | 仅本地文件读写 |
+| `cron_helper.py` | 定时任务钩子 | 中低 | 🟡 | 仅本地定时任务管理 |
+
+**合计权限权重**：中（所有脚本均无高风险操作）
+**敏感信息访问**：无（仅本地文件读写）
+**关键位置写入**：否（仅写入技能自身 `data/` 和 `.active_tasks/` 目录）
+**高权限操作**：无（无需授权）
+
+> 本技能整体风险等级：**低至中等**。所有写入操作仅限于本地用户目录，不涉及系统目录、敏感位置或网络传输。命令行拦截器（`exec_wrapper.py`）仅做记录和监控，不修改原始命令。

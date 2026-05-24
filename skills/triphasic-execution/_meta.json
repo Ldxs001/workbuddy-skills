@@ -1,6 +1,6 @@
 {
   "name": "triphasic-execution",
-  "version": "5.12.0",
+  "version": "5.13.0",
   "description": "Execute→Review→Advance 三步循环执行框架，附带结构化问题日志、风险手册和经验教训登记册",
   "author": "wUwproject",
   "tags": [
