@@ -1,10 +1,10 @@
 ---
 name: skill-standardization
-version: 2.14.0
+version: 2.15.1
 author: wUwproject
 license: MIT
 description: >
-  Skill 标准化规范引擎 v2.14.0（安全增强版）。
+  Skill 标准化规范引擎 v2.15.1（安全增强版）。
   支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查、触发条件合规性）、
   create/update/refactor 三模式，服务于其他 skill 的安全创建/更新/改造。
   新增授权方式智能判断（根据技能工作性质决定 unified/immediate/silent）。
