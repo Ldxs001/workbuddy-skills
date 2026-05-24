@@ -176,7 +176,7 @@
   - `references/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
   - `references/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
   - `references/changelog.md` — 完整版本历史 + Roadmap
-- **frontmatter author** 从非常量引用修正为常量值 `wUwproject`
+- **frontmatter author** 从非常量引用修正为常量值 `[username-redacted]`
 - **清理根目录遗留垃圾**：删除异常 ZIP 文件 `2.0.0`、6 个 `.tmp_zip_*` 临时目录、过时空目录 `references/`
 - 通过 skill-standardization v2.0 update 验证：**ERROR=0, WARN=1**（WARN 为合理运行时文件例外）
 

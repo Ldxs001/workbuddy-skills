@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.4.1
+version: 2.4.2
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -128,3 +128,138 @@ bash git-sync.sh my-skill 1.0.0 --skip-scan
 ## 版本
 
 当前版本：**2.4.0** — v2.4.0：配合 skill-standardization v2.12.0 路径规范升级，同步版本号
+
+
+---
+
+## 授权要求
+
+本技能包含以下中高风险操作，使用前需获得用户授权：
+
+1. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\build_index.py` 第 6 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+2. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\build_index.py` 第 6 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+3. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\build_index.py` 第 6 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+4. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\build_index.py` 第 115 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+5. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\build_index.py` 第 146 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+6. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\clean_dist.py` 第 61 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+7. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\clean_dist.py` 第 48 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+8. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\clean_dist.py` 第 52 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+9. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\clean_zip_source.py` 第 52 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+10. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\clean_zip_source.py` 第 64 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+11. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\clean_zip_source.py` 第 6 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+12. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\clean_zip_source.py` 第 100 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+13. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\manifest.py` 第 58 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+14. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\manifest.py` 第 29 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+15. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\manifest.py` 第 620 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+16. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\pack_zip.py` 第 168 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+17. **[高] 检测到敏感信息访问（memory/credentials/token）** (`scripts\sensitive_scan.py` 第 71 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+18. **[高] 检测到敏感信息访问（memory/credentials/token）** (`scripts\sensitive_scan.py` 第 71 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+19. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\sensitive_scan.py` 第 20 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+20. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\sensitive_scan.py` 第 581 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+21. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\sync_with_exclude.py` 第 89 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+22. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\sync_with_exclude.py` 第 9 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+23. **[高] 检测到 subprocess 调用（os.system/subprocess等）** (`scripts\sync_with_exclude.py` 第 148 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+24. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 71 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+25. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 170 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+26. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 173 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+27. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 234 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+28. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 245 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+29. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 265 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+30. **[高] 检测到关键位置写入（skills/.workbuddy/系统目录）** (`scripts\git-sync.sh` 第 292 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+31. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 162 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+32. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 231 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+33. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 250 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+34. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 269 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+35. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 272 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+36. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 358 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+37. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 375 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+38. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 389 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+39. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 398 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+40. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 401 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+41. **[高] 检测到文件删除操作（os.remove/shutil.rmtree等）** (`scripts\git-sync.sh` 第 414 行）
+   - 授权方式：**即时授权**（每次执行前需获得用户批准）
+
+**授权方式说明：**
+- 静默授权：无需用户交互，自动执行并记录
+- 统一授权：首次执行前获得用户批准，后续不再询问
+- 即时授权：每次执行前需获得用户批准
