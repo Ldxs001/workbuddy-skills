@@ -1,0 +1,1934 @@
+{
+  "perm_1": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_2": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_3": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_4": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_5": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_6": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_7": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_8": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_9": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_10": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_11": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_12": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_13": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_14": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_15": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_16": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_17": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_18": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_19": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_20": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_21": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_22": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_23": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_24": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_25": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_26": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_27": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_28": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_29": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_30": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_31": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_32": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_33": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_34": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_35": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_36": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_37": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_38": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_39": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_40": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_41": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_42": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_43": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_44": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_45": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_46": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_47": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_48": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_49": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_50": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_51": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_52": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_53": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_54": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_55": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_56": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_57": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_58": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_59": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_60": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_61": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_62": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_63": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_64": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_65": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_66": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_67": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_68": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_69": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_70": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_71": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_72": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_73": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_74": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_75": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_76": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_77": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_78": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_79": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_80": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_81": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_82": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_83": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_84": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_85": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_86": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_87": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_88": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_89": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_90": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_91": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_92": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_93": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_94": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_95": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_96": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_97": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_98": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_99": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_100": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_101": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_102": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_103": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_104": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_105": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_106": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_107": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_108": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_109": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_110": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_111": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_112": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_113": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_114": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_115": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_116": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_117": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_118": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_119": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_120": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_121": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_122": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_123": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_124": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_125": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_126": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_127": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_128": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_129": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_130": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_131": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_132": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_133": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_134": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_135": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_136": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_137": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_138": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_139": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_140": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_141": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_142": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_143": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_144": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_145": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_146": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_147": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_148": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_149": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_150": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_151": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_152": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_153": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_154": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_155": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_156": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_157": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_158": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_159": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_160": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_161": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_162": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_163": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_164": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_165": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_166": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_167": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_168": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_169": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_170": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_171": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_172": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_173": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_174": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_175": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_176": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_177": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_178": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_179": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_180": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_181": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_182": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_183": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_184": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_185": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_186": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_187": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_188": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_189": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_190": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_191": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_192": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_193": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_194": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_195": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_196": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_197": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_198": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_199": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_200": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_201": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_202": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_203": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_204": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_205": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_206": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_207": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_208": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_209": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_210": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_211": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_212": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_213": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_214": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_215": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_216": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_217": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_218": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_219": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_220": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_221": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_222": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_223": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_224": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_225": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_226": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_227": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_228": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_229": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_230": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_231": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_232": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_233": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_234": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_235": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_236": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_237": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_238": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_239": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_240": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_241": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_242": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_243": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_244": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_245": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_246": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_247": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_248": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_249": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_250": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_251": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_252": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_253": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_254": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_255": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_256": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_257": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_258": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_259": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_260": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_261": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_262": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_263": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_264": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_265": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_266": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_267": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_268": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_269": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_270": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_271": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_272": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_273": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_274": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_275": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_276": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_277": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_278": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_279": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_280": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_281": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_282": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_283": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_284": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_285": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_286": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_287": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_288": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_289": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_290": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_291": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_292": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_293": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_294": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_295": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_296": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_297": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_298": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_299": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_300": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_301": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_302": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_303": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_304": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_305": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_306": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_307": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_308": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_309": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_310": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_311": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_312": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_313": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_314": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_315": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_316": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_317": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_318": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_319": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_320": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_321": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_322": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_323": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_324": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_325": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_326": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_327": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_328": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_329": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_330": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_331": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_332": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_333": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_334": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_335": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_336": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_337": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_338": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_339": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_340": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_341": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_342": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_343": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_344": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_345": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_346": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_347": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_348": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_349": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_350": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_351": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_352": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_353": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_354": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_355": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_356": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_357": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_358": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_359": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_360": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_361": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_362": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_363": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_364": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_365": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_366": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_367": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_368": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_369": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_370": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_371": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_372": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_373": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_374": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_375": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_376": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_377": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_378": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_379": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_380": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_381": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_382": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_383": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_384": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_385": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_386": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_387": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_388": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_389": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_390": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_391": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_392": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_393": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_394": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_395": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_396": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_397": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_398": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_399": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_400": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_401": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_402": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_403": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_404": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_405": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_406": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_407": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_408": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_409": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_410": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_411": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_412": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_413": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_414": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_415": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_416": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_417": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_418": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_419": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_420": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_421": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_422": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_423": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_424": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_425": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_426": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_427": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_428": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_429": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_430": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_431": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_432": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_433": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_434": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_435": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_436": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_437": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_438": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_439": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_440": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_441": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_442": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_443": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_444": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_445": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_446": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_447": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_448": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_449": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_450": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_451": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_452": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_453": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_454": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_455": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_456": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_457": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_458": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_459": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_460": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_461": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_462": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_463": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_464": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_465": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_466": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_467": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_468": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_469": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_470": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_471": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_472": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_473": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_474": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_475": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_476": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_477": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_478": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "perm_479": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "sensitive_access": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "critical_write": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "file_delete": {
+    "authorized": true,
+    "mode": "unified"
+  },
+  "subprocess_call": {
+    "authorized": true,
+    "mode": "unified"
+  }
+}

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """
 build_index.py - 为 dist/ 目录生成 HTML 索引页（含 file:// 超链接）
 
@@ -111,6 +113,7 @@ def build_index(dist_dir):
 
 
 if __name__ == "__main__":
+        initialize()
     # 授权检查（R-15 合规：自治模式，不阻断执行）
     import subprocess
 import hashlib

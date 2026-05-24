@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """将扫描结果 JSON 转为「全部脱敏」决策 JSON（供 always-sanitize 模式用）"""
 import json, sys
 
@@ -14,4 +16,5 @@ def main():
         print("{}")
 
 if __name__ == "__main__":
+        initialize()
     main()

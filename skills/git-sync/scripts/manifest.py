@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """
 manifest.py - 通用维护清单管理 CLI
 独立脚本，不污染 git-sync 主逻辑。
@@ -588,6 +590,7 @@ def main():
 
 
 if __name__ == "__main__":
+        initialize()
     # R-15 合规：自治模式授权检查（不阻断执行）
     _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")

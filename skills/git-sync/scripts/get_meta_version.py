@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """从 _meta.json 读取 version 字段"""
 import json, sys
 
@@ -13,4 +15,5 @@ def main():
         print("1.0.0")
 
 if __name__ == "__main__":
+        initialize()
     main()

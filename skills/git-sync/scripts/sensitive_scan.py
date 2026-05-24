@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """
 sensitive_scan.py - 敏感信息扫描与脱敏模块
 
@@ -549,6 +551,7 @@ def main():
 
 
 if __name__ == "__main__":
+        initialize()
     # R-15 合规：自治模式授权检查（不阻断执行）
     _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")

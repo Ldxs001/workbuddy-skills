@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """测试 sensitive_scan.py 完整流程"""
 import json, os, sys, shutil
 

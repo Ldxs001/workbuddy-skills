@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """清理打包源目录中的残留文件（扫描产物、系统隐藏文件）
 用法：python clean_zip_source.py <zip_source_dir>
 """
@@ -68,6 +70,7 @@ def main():
     print(f"  ✅ 清理完成，共删除 {deleted} 项")
 
 if __name__ == "__main__":
+        initialize()
     # R-15 合规：自治模式授权检查（不阻断执行）
     _skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _auth_script = os.path.join(_skill_dir, "skill-standardization", "scripts", "authorization_manager.py")

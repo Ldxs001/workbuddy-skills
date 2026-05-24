@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """清理 dist/ 目录中的旧版本 ZIP，只保留 _meta.json 中的最新版本"""
 import json, os, re, glob
 from pathlib import Path

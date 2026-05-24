@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from auth_check import authorize, initialize
+
 """更新 _meta.json 的 version 字段"""
 import json, sys
 
