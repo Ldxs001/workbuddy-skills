@@ -65,8 +65,47 @@ METHOD_MAP = {
 }
 
 
-def audit_skill(skill_dir, manifest_version=None):
-    """审查单个 skill 目录中的 SKILL.md。"""
+def _apply_fixes(skill_md, fixes):
+    """
+    将 fixes 列表应用到 SKILL.md 的 frontmatter。
+    fixes: [{"key": "sensitive_access", "value": True, "reason": "..."}, ...]
+    """
+    with open(skill_md, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return []  # 无 frontmatter，无法修正
+
+    applied = []
+    for fix in fixes:
+        key = fix["key"]
+        val = fix["value"]
+        fm[key] = val
+        applied.append(f"{key}: {val} ({fix.get('reason', '')})")
+
+    # 重新组装 frontmatter + body
+    import io
+    buf = io.StringIO()
+    buf.write("---\n")
+    for k, v in fm.items():
+        if isinstance(v, bool):
+            buf.write(f"{k}: {'true' if v else 'false'}\n")
+        elif isinstance(v, (int, float)):
+            buf.write(f"{k}: {v}\n")
+        else:
+            buf.write(f"{k}: {v}\n")
+    buf.write("---\n")
+    buf.write(body)
+
+    with open(skill_md, "w", encoding="utf-8") as f:
+        f.write(buf.getvalue())
+
+    return applied
+
+
+def audit_skill(skill_dir, manifest_version=None, _fix_applied=False):
+    """审查单个 skill 目录中的 SKILL.md。_fix_applied 防止无限递归。"""
     skill_md = os.path.join(skill_dir, "SKILL.md")
     dirname = os.path.basename(os.path.normpath(skill_dir))
 
@@ -90,6 +129,7 @@ def audit_skill(skill_dir, manifest_version=None):
     warn_count = 0
     pass_count = 0
     skip_count = 0
+    fixes = []
 
     for rule in RULES:
         method_fn = METHOD_MAP.get(rule["method"])
@@ -118,6 +158,10 @@ def audit_skill(skill_dir, manifest_version=None):
         }
         results.append(entry)
 
+        # 收集 fix 建议
+        if not passed and not skipped and result.get("fix"):
+            fixes.append(result["fix"])
+
         if skipped:
             skip_count += 1
         elif passed:
@@ -126,6 +170,19 @@ def audit_skill(skill_dir, manifest_version=None):
             error_count += 1
         else:
             warn_count += 1
+
+    # 自动修正：有不一致的声明，且还没修正过，且不是 dry-run 模式
+    fixed = []
+    dry_run = os.environ.get("SKILL_AUDIT_DRY_RUN", "0") == "1"
+    if fixes and not _fix_applied and not dry_run:
+        applied = _apply_fixes(skill_md, fixes)
+        if applied:
+            fixed = applied
+            # 重新审计一次，确保修正后通过
+            re_result = audit_skill(skill_dir, manifest_version=manifest_version, _fix_applied=True)
+            re_result["fixed"] = fixed
+            re_result["re_audit"] = True
+            return re_result
 
     fail_count = error_count + warn_count
     total = len(results)
@@ -137,7 +194,7 @@ def audit_skill(skill_dir, manifest_version=None):
     else:
         verdict = "PASS"
 
-    return {
+    r = {
         "skill": dirname,
         "path": skill_dir,
         "results": results,
@@ -151,6 +208,9 @@ def audit_skill(skill_dir, manifest_version=None):
         },
         "verdict": verdict,
     }
+    if fixed:
+        r["fixed"] = fixed
+    return r
 
 
 def format_report(audit_result, verbose=True):
@@ -168,6 +228,16 @@ def format_report(audit_result, verbose=True):
 
     s = r["summary"]
     lines.append(f"  总计: {s['total']} | 通过: {s['pass']} | 失败: {s['fail']} | 跳过: {s['skip']}")
+
+    # 显示自动修正信息
+    if r.get("fixed"):
+        lines.append(f"\n{'─'*55}")
+        lines.append("  ⚠️  已自动修正以下 frontmatter 字段：")
+        for fix_desc in r["fixed"]:
+            lines.append(f"    • {fix_desc}")
+        if r.get("re_audit"):
+            lines.append("  （已重新审计，确保修正后通过）")
+        lines.append(f"{'─'*55}")
 
     if verbose:
         lines.append("")

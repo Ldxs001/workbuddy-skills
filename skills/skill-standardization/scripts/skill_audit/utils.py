@@ -290,7 +290,7 @@ def parse_simple_yaml_frontmatter(text):
     result = {}
     current_key = None
 
-    for line in fm_text.split("\n"):
+    for line_no, line in enumerate(fm_text.split("\n")):
         stripped = line.strip()
         if not stripped or stripped.startswith(">"):
             continue
@@ -319,8 +319,16 @@ def parse_simple_yaml_frontmatter(text):
                 else:
                     result[key] = []
             elif val:
-                result[key] = val
+                # 转换 true/false 为布尔值（YAML 兼容）
+                if val.lower() == "true":
+                    result[key] = True
+                elif val.lower() == "false":
+                    result[key] = False
+                else:
+                    result[key] = val
                 current_key = key
+        # 调试输出（正式版关闭）
+        # print(f"DEBUG L{line_no+1}: key={key!r} val={val!r} → result has {len(result)} keys")
 
     return result, body
 

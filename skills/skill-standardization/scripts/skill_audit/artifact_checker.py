@@ -292,17 +292,8 @@ def _check_shell_artifact_paths_v2(rel_path, script_lines, violations):
                 "suggestion": suggestion,
             })
 
-        # Legacy artifact dir check
-        m = re.search(rf'[>]+\s*["\']?\\.?({_ARTIFACT_DIR_PATTERN})/', stripped)
-        if m and ".standardization" not in stripped.lower() and "standardization" not in stripped.lower():
-            target = m.group(1)
-            path_literal = _extract_path_literal(stripped, target) or f"{target}/"
-            cat = _classify_artifact(target)
-            violations.append({
-                "source": f"{rel_path}:{i}",
-                "path_literal": path_literal,
-                "suggestion": f"skills/.standardization/<skill>/{cat}/",
-            })
+        # Legacy artifact dir check（已合并到上方 _ARTIFACT_WRITE_PATTERNS 检查，跳过）
+        continue  # noqa: 296 遗留死代码，变量已废弃
 
 
 def _trace_cross_references(skill_dir, violations):
