@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder package — Skill 标准化构建器 v2.15.0
+skill_builder package — Skill 标准化构建器 v2.13.0
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -96,7 +96,7 @@ SPLITTABLE_KEYWORDS = {
 
 def main():
     """主入口函数"""
-    parser = argparse.ArgumentParser(description="Skill 标准化构建器 v2.15.0")
+    parser = argparse.ArgumentParser(description="Skill 标准化构建器 v2.13.0")
     subparsers = parser.add_subparsers(dest="command", help="执行模式")
 
     # create 子命令
@@ -112,8 +112,6 @@ def main():
     update_parser.add_argument("--fix", action="store_true", help="自动修复可修复项")
     update_parser.add_argument("--backup", action="store_true", help="备份后再修改")
     update_parser.add_argument("--workspace", default=".", help="工作区根目录")
-    update_parser.add_argument("--inject-auth", action="store_true",
-                             help="扫描风险操作并注入授权要求章节到 SKILL.md")
 
     # refactor 子命令
     refactor_parser = subparsers.add_parser("refactor", help="改造非标 Skill")
@@ -122,8 +120,6 @@ def main():
     refactor_parser.add_argument("--no-backup", action="store_true", help="跳过备份（不推荐）")
     refactor_parser.add_argument("--dry-run", action="store_true", help="仅输出计划，不执行")
     refactor_parser.add_argument("--workspace", default=".", help="工作区根目录")
-    refactor_parser.add_argument("--inject-auth", action="store_true",
-                             help="扫描风险操作并注入授权要求章节到 SKILL.md")
 
     args = parser.parse_args()
 

@@ -8,11 +8,6 @@
 ## 目录
 
 - [v2.14.0（当前版本）](#2140-当前版本)
-- [v2.13.4](#2134)
-- [v2.13.3](#2133)
-- [v2.13.2](#2132)
-- [v2.13.1](#2131)
-- [v2.13.0](#2130)
 - [v2.12.2](#2122)
 - [v2.12.1](#2121)
 - [v2.12.0](#2120)
@@ -36,196 +31,66 @@
 
 ---
 
-### v2.15.0（当前版本）
+## v2.15.0（当前版本）
 
-**完整授权注入系统 — 从 Markdown 描述升级为可执行授权代码**
-
-### 新增
-- **`_render_auth_check_py()` 重写**：改用逐行拼接，彻底解决模板转义问题（`{{}} → 实际输出为 `{{}}` 导致语法错误）
-- **`_generate_auth_check_py()`**：根据权限检查报告生成 `scripts/auth_check.py` 并写入磁盘
-- **`_inject_auth_imports()`**：在技能 `scripts/` 下所有 `.py` 文件头部注入 `from auth_check import authorize, initialize`
-- **`_inject_initialize_calls()`**：在所有 `scripts/*.py` 的 `if __name__ == "__main__":` 块内注入一次 `initialize()` 调用
-- **`_inject_auth_calls()`**：在每个高风险操作所在行之前注入 `if not authorize("rule_name", "description"): return` 调用（按文件分组，插入位置按倒序处理以防行号偏移）
-- **`refactor.py` 同步更新**：通过 Agent 将 `updater.py` 的授权注入方法完整同步到 `refactor.py`，包含 `_render_auth_check_py / _generate_auth_check_py / _inject_auth_imports / _inject_initialize_calls / _inject_auth_calls / _run_permission_checker / _inject_auth_section`
-
-### 修复
-- **授权方式智能判断**：`permission_checker.py` 的 `suggest_authorization_methods()` 根据技能工作性质（`automated` / `interactive`）决定授权方式，而非一刀切按 severity 判死
-- **注入逻辑完善**：`_inject_auth_section()` 现在调用上述所有新方法，实现完整授权系统注入（生成 `auth_check.py` + 注入 `authorize()` 调用 + 注入 SKILL.md 文档章节）
-
-### 影响范围
-- `scripts/skill_builder/updater.py`：新增 7 个授权注入方法，`_inject_auth_section()` 重写为完整注入流程
-- `scripts/skill_builder/refactor.py`：同步更新（Agent 执行），支持 `--inject-auth` 参数
-- `references/changelog.md`：新增本条目
-
----
-
-## v2.14.0（当前版本）
-
-**发布日期：2026-05-24**
-**类型：Minor（授权方式智能判断：根据技能工作性质决定 unified/immediate/silent）**
+> 发布日期：2026-05-24
 
 ### 新增
-- `permission_checker.py`：新增 `_detect_skill_nature()` 方法，自动判断技能工作性质（自动化/交互式）
-- `permission_checker.py`：`suggest_authorization_methods()` 重写，根据技能性质智能决定授权方式
-- `permission_checker.py`：`scan()` 方法新增调用 `suggest_authorization_methods()` 并将结果合并进 issues
-- `updater.py` / `refactor.py`：`inject_auth_section()` 改为读取 report 中的 `authorization_method` 字段，不再自行按 severity 判死
-
-### 修复
-- 修复授权方式一刀切问题（全部判为 immediate），现根据技能性质智能判断
-
----
-
-### v2.13.4
-
-**发布日期：2026-05-24**
-**类型：Minor（新增 --inject-auth 参数，支持自动注入授权要求章节）**
-
-### 新增
-- **`skill_builder/updater.py`**：新增 `_run_permission_checker()` 和 `_inject_auth_section()` 方法，支持在 update 模式下扫描目标技能风险操作并注入授权要求章节
-- **`skill_builder/refactor.py`**：同上，在 refactor 模式下注入授权要求章节
-- **`skill_builder/__init__.py`**：为 `update` 和 `refactor` 子命令新增 `--inject-auth` 参数
-- **`scripts/permission_checker.py`**：新增 `suggest_authorization_methods()` 方法，为每个风险操作建议授权方式（静默/统一/即时）
-
-### 修复
-- 无
-
----
-
-### v2.13.3
-
-**发布日期：2026-05-24**
-**类型：Patch（增加完整性校验）**
-
-### 新增
-- **permission_checks.py v2.13.3**：`_run_permission_checker()` 增加 `permission_checker.py` 的 SHA-256 哈希完整性校验
-- **脚本哈希存储**：`~/.workbuddy/skills/.standardization/skill-standardization/script_hashes.json`
-- **哈希不匹配警告**：检测到 `permission_checker.py` 被篡改时输出警告
-
-### 修复
-- **重复 import os**：移除 `_run_permission_checker()` 函数内的重复 `import os`
-
----
-
-### v2.13.2
-
-**发布日期：2026-05-24**
-**类型：Patch（修复 permission_checker.py 假阳性）**
-
-### 修复
-
-- **SENSITIVE_PATTERNS**：为所有凭证相关正则添加单词边界（），避免误匹配错误处理代码中的关键词列表（如 unauthorized、token、credential）
-- **DELETE_PATTERNS**：移除 r"del "（误匹配 Python del 变量删除语句），保留 os.remove/os.rmdir/shutil.rmtree/unlink/rm/rmdir 等真实文件删除检测
-- **permission_checker.py v1.0.1**：降低 skill-sub 等 skill 的假阳性风险等级
-
----
-
-### v2.13.1（当前版本）
-
-**发布日期：2026-05-24**
-**类型：Patch（修复 R-15 误匹配）**
-
-### 修复
-
-- **R-15 检查逻辑**：`auth_patterns` 中 `r"authorize"` 误匹配 `unauthorized` 等子串，改为 `r"\bauthoriz\w*\b"`（单词边界），消除假阳性
-- **`skill_audit/permission_checks.py`**：精确化授权检查正则，避免非授权相关关键词触发误报
-
----
-
-### v2.13.0（当前版本）
-
-**发布日期：2026-05-24**
-**类型：Minor（安全增强 — 权限检查 + 授权管理 + 代码重构）**
-
-### 新增
-
-- **R-13~R-17 规则**：敏感信息访问声明、关键位置写入声明、高权限操作授权检查、权限权重说明、渐进加载引用强制
-- **`permission_checker.py` v1.0.0**：权限检查器，扫描 skill 脚本，提取文件操作，计算权限权重，生成风险报告
-- **`authorization_manager.py` v1.0.0**：授权管理器，统一审批 + 即时审批，防止未授权高风险操作
-- **`skill_audit.py` R-13~R-17 检查方法**：调用 `permission_checker.py` CLI 进行权限检查
+- **三模式执行流程显式化**：SKILL.md 新增"三模式执行流程（明确规定）"段落
+  - 创建模式：规划拆分 → 创建骨架 → 填充内容 → 权限扫描 → 审计循环 ≥95%
+  - 更新模式：理解需求 → 执行检查 → 审计循环 ≥95% → 版本号更新
+  - 改造模式：先审计获问题 → 规划改造 → 保全检查（第一次）→ 审计循环 ≥95% → 保全检查（第二次）→ 版本号更新
+- **保全检查（`_preservation_check()`）**：`refactor.py` 新增保全检查方法
+  - 结构完整性检查（复用 `_post_refactor_checks()`）
+  - Python 脚本语法校验（`py_compile`）
+  - Shell 脚本检查
+- **`creator.py` 补全方法**：新增 `_check_permissions()` 和 `_check_skill_audit()` 方法
 
 ### 变更
-
-- `skill_audit.py` v2.12.2 → v2.13.0
-- `skill_builder.py` v2.12.2 → v2.13.0（update 模式调用 `permission_checker.py`）
-- `SKILL.md` v2.12.2 → v2.13.0（从 267 行降至 198 行，符合 R-17）
-
-### 重构
-
-- **`skill_builder.py` → `skill_builder/` 包**：面向对象重构，拆分为 6 个模块（~200-300 行/模块）
-  - `creator.py`：SkillCreator 类，负责 create 模式
-  - `updater.py`：SkillUpdater 类，负责 update 模式
-  - `refactor.py`：SkillRefactor 类，负责 refactor 模式
-  - `version_manager.py`：VersionManager 类，负责版本号管理
-  - `utils.py`：工具函数（备份、模板等）
-  - `__init__.py`：主入口 + argparse 解析
-  - `__main__.py`：支持 `python -m skill_builder` 执行
-- **`skill_audit.py` → `skill_audit/` 包**：面向对象重构，拆分为 6 个模块（~200-300 行/模块）
-  - `frontmatter_checker.py`：R-01~R-05、R-10 检查函数
-  - `structure_checker.py`：R-06~R-09 检查函数
-  - `artifact_checker.py`：R-11、R-12 检查函数
-  - `permission_checks.py`：R-13~R-17 检查函数
-  - `utils.py`：常量定义和工具函数
-  - `__init__.py`：主入口 + `audit_skill()` + `format_report()` + CLI 命令
-  - `__main__.py`：支持 `python -m skill_audit` 执行
-- **版本号管理改进**：`_bump_version` 移除自我修改行为，版本号权威来源改为 `_meta.json`
-- **触发条件精确化**：SKILL.md 增加精确触发词 + 否定条件，避免误触发
-- `_meta.json` v2.12.2 → v2.13.0
-- `references/guide.md` 新增"安全增强功能（v2.13.0）"章节
-- `references/reference.md` 更新审查规则一览表（R-01~R-17）
-- `references/rules.md` 新增 R-13~R-17 规则详解
+- `creator.py`：`create()` 末尾改为提示 AI 填充内容后执行权限扫描 + 审计循环
+- `refactor.py`：`refactor()` 末尾新增 `_preservation_check()` 调用（改造后保全）
+- `updater.py`：`_check_skill_audit()` 方法已修正（直接 import 调用 skill_audit）
+- SKILL.md 版本号：2.14.0 → 2.15.0
+- `_meta.json` 版本号：2.14.0 → 2.15.0，description 同步更新
 
 ### 修复
-
-- `skill_audit.py` METHOD_MAP 缺少 R-13~R-17 方法映射（已添加）
-- `permission_checker.py` 对 semantic-split 误判为高风险（已修复权重计算逻辑）
+- `creator.py` 权限流程纠正：不再在模板阶段跑权限扫描，改为提示 AI 填充内容后执行
+- `refactor.py` 保全检查流程：改造后先跑保全，审计通过后再跑一次保全
 
 ---
 
-### v2.12.2（当前版本）
+## v2.14.0
 
-**发布日期：2026-05-23**
-**类型：Patch（R-12 检测范围补全 — references/*.md 路径扫描）**
+> 发布日期：2026-05-24
 
-### 修复
-
-- **R-12 检测盲区**：`references/*.md` 中硬编码的数据目录路径（如 `~/.workbuddy/semantic-split/data/`）未被检测。原 R-12 只扫描 `scripts/*.py` 中的 `DATA_DIR` 变量，不扫描 md 文件中的路径文字。新增「阶段6：references/*.md 数据目录路径检查」，对不含 `.standardization/` 的数据目录路径报违规
-- 同步修复 `skill_builder.py` 的 R-12 检测，新增同样的阶段6
+### 新增
+- 新增 `references/permissions.md`：权限类型详细说明文档
+  - 风险等级定义（high / medium / low）
+  - 5 种权限类型说明（sensitive_access、critical_write、subprocess_call、network_access、file_delete）
+  - 触发条件、frontmatter 声明字段、典型场景
+  - skill 行为对照表（以 git-sync 为例）
+  - 授权决策逻辑参考（默认审批 / 即时审批 / 统一审批）
+- `SKILL.md` 工作流更新：扫描后如含权限风险，加载 `permissions.md` 向用户说明
 
 ### 变更
+- `references/guide.md`：「授权管理流程」章节改为弱引用，指向 `permissions.md`
+- `scripts/permission_checker.py`：issue 字典新增 `rule` 字段（`type` 副本），使报告权限名有意义
+- 版本号：2.13.0 → 2.14.0
 
-- `skill_audit.py` v2.12.1 → v2.12.2
-- `skill_builder.py` v2.12.1 → v2.12.2
-- SKILL.md v2.12.1 → v2.12.2
-- `_meta.json` v2.12.1 → v2.12.2
-
----
-
-### v2.10.1
-
-**发布日期：2026-05-23**
-**类型：Patch（R-11/R-12 假阳性修复 — 路径比较器规范化 + 中文标点过滤）**
+### 删除
+- 删除 `scripts/authorization_manager.py`（授权决策改由 AI 自觉参考 `permissions.md`，不再强制注入）
 
 ### 修复
-
-- **R-12 _meta.json vs 代码路径比较**: `_meta.json data_dir` 用相对路径（`standardization/...`），代码 `DATA_DIR` 解析为绝对路径（`C:\Users\...\standardization\...`）→ 直接字符串比较永远失败。修复：将 `meta_data_dir` 按 workspace root 解析为绝对路径后再比较。
-- **R-12 路径分隔符假阳性**: `os.path.normpath()` 在 Windows 下将 `/` 转为 `\`，但 `expected_pattern` 保留 `/` → `expected_pattern not in norm` 在 Windows 上误报。修复：`expected_pattern` 同样通过 `os.path.normpath()` 规范化。
-- **R-11 中文标点误收**: 路径提取正则 `[^"\')\s,]+` 不排除中文标点 `。，；：！？、…—` → docstring 末尾 `。` 被收入路径 `standardization/semantic-split/data/。`。修复：扩展排除字符集。
-
-### 变更
-
-- `skill_audit.py` v2.10.0 → v2.10.1（2 处修复）
-- `skill_builder.py` v2.10.0 → v2.10.1（2 处修复）
-- SKILL.md v2.10.0 → v2.10.1
-- `_meta.json` v2.10.0 → v2.10.1
-
-### 验证
-
-批量审查 6 个技能（git-sync, skill-sub, triphasic-execution, everything-search-breadmemory, semantic-split, skill-standardization）：
-- everything-search-breadmemory: PASS（原 5 处 R-12 违规 → 全部消除）
-- semantic-split: PASS（原 3 处 R-12 违规 → 全部消除）
-- 其余 4 个技能：PASS
+- `reference.md`：「权限权重计算」章节末尾加 `permissions.md` 引用
+- `SKILL.md`：两张渐进式加载表 + R-13~R-17 章节，均加入 `permissions.md` 引用
 
 ---
+
+## v2.12.2 (2025-XX-XX)
+
+### 修复
+- 修复 R-11 路径检测逻辑
+- 修复 R-12 外部数据目录检查
 
 ## v2.12.1
 
@@ -588,37 +453,4 @@
 # Changelog — skill-standardization
 
 ---
-
-## v2.13.0 (YYYY-MM-DD)
-
-### 新增功能
-- 新增 R-13~R-17 安全审查规则（敏感信息访问声明、关键位置写入声明、高权限操作授权检查、权限权重说明、渐进加载强制）
-- 新增 `scripts/permission_checker.py`（扫描脚本权限、计算权重、生成风险报告）
-- 新增 `scripts/authorization_manager.py`（统一审批 + 即时审批，防止未授权高风险操作）
-- `skill_builder.py` 的 `cmd_update` 模式现在自动调用 `permission_checker.py` 进行权限扫描
-
-### 规则调整
-- R-07：严重度 WARN → ERROR，增加触发条件合规性检查（正向触发词≥3、否定条件≥1、禁止危险表述）
-- R-10：检查目标从 `manifest.json` 改为 `_meta.json`，与铁律2版本号更新规则一致
-- R-11：严重度 WARN → ERROR，增加路径遍历检测、跨目录写入检测、敏感信息检测
-- R-12：严重度 WARN → ERROR，增加数据泄露风险检测
-
-### 文档更新
-- `SKILL.md` 描述更新为 v2.13.0（安全增强版），frontmatter 新增 `sensitive_access: false` 和 `critical_write: false`
-- `_meta.json` 版本号和描述更新
-- `references/guide.md` 追加安全增强功能章节
-- `references/reference.md` 追加 `permission_checker.py` 和 `authorization_manager.py` CLI 参考
-- 新增 `references/rules.md`（铁律条款详解，从 SKILL.md 拆分）
-
-### 修复
-- 修复 R-10 检查逻辑，改为比对 `_meta.json` 而非 `manifest.json`
-- 修复 `skill_builder.py` 缺少 `import subprocess` 的问题
-
----
-
-## v2.12.2 (2025-XX-XX)
-
-### 修复
-- 修复 R-11 路径检测逻辑
-- 修复 R-12 外部数据目录检查
 

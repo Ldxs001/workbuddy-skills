@@ -39,7 +39,7 @@ python scripts/skill_builder.py create <name> [--desc <text>] [--dir <path>] [--
 ```
 <name>/
 ├── SKILL.md          # 含 frontmatter + TODO 占位符模板
-├── _meta.json        # {name, version: "0.1.0", description, author: "wUwproject", tags}
+├── _meta.json        # {name, version: "0.1.0", description, author: "[username-redacted]", tags}
 ├── references/.gitkeep
 └── scripts/.gitkeep
 ```
@@ -365,6 +365,9 @@ python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
 | 关键位置写入 | 30% | 写入 skills/.workbuddy/系统目录 |
 | 网络访问 | 20% | 发起 HTTP 请求 |
 | 文件删除 | 10% | 删除文件或目录 |
+
+> 权限类型详细说明（含触发条件、风险等级、skill 行为对照表）
+> → 详见 [references/permissions.md](./permissions.md)
 
 ---
 

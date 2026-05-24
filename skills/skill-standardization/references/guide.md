@@ -93,7 +93,7 @@ python scripts/skill_builder.py update <skill-dir> --fix --backup
 | name | string | ✅ | 取目录名 |
 | version | string (SemVer) | ✅ | `0.1.0` |
 | description | string | ✅ | 从 SKILL.md 提取或空 |
-| author | string | ✅ | `wUwproject` |
+| author | string | ✅ | `[username-redacted]` |
 | tags | string[] | ✅ | `[]` |
 
 **--fix 行为**：自动补充缺失字段，使用上述默认值。
@@ -291,7 +291,7 @@ skill-standardization 要求以下三处版本号保持一致：
 
 ---
 
-## 7. 安全增强功能（v2.13.0）
+## 7. 安全增强功能（v2.14.0）
 
 > 本 skill 在创建/更新/改造其他 skill 时，会自动进行权限检查和授权管理。
 
@@ -308,15 +308,17 @@ skill_builder.py update <skill-dir>
   ↓
 生成 JSON 报告 → 打印到终端
   ↓
-如发现中高风险操作，提示用户审批
+如报告含权限风险（R-13~R-17）──→ 按需加载 `references/permissions.md`
+  ↓
+向用户说明权限类型、风险等级、触发行为，协助用户决策
 ```
 
-### 授权管理流程
+### 授权决策参考
 
-当目标 skill 包含高权限操作（文件删除、网络请求、subprocess 调用）时，`authorization_manager.py` 会介入：
+> 授权决策逻辑（默认审批 / 即时审批 / 统一审批）已整理到 `references/permissions.md` 的「授权决策逻辑参考」章节，供 AI 自觉参考。
+> 本 skill **不进行强制注入**，授权逻辑由 AI 根据实际情况灵活处理。
 
-- **统一审批**：累积多个风险操作，一次性列出，由用户统一审批
-- **即时审批**：高风险操作执行前，立即请求用户授权
+---
 
 ### R-13~R-17 规则说明
 

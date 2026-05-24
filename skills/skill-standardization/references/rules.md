@@ -1,6 +1,6 @@
 # 改写/更新铁律（AI 执行前必须遵守）
 
-> 本文件为 skill-standardization v2.13.0 的铁律条款，AI 修改任何 skill 前必须严格遵守。
+> 本文件为 skill-standardization v2.14.0 的铁律条款，AI 修改任何 skill 前必须严格遵守。
 
 ---
 
@@ -9,7 +9,7 @@
 - 技能是通用工具，author 默认值必须为 `your-name-here` 占位符
 - 已有 author 值（如 `"由 config.json 的 author 字段决定"`）保留原值不变
 - 只有用户明确指定时才写入真实署名
-- **本 skill 例外**：author 为 `wUwproject`（维护者署名，铁律1例外条款）
+- **本 skill 例外**：author 为 `[username-redacted]`（维护者署名，铁律1例外条款）
 
 ---
 
@@ -85,7 +85,7 @@ skills/
 
 ## 铁律 5：R-13~R-17 安全规则强制检查
 
-> 自 v2.13.0 起，所有 skill 必须通过上述 5 条安全规则检查。
+> 自 v2.14.0 起，所有 skill 必须通过上述 5 条安全规则检查。
 
 ### R-13：敏感信息访问声明
 
