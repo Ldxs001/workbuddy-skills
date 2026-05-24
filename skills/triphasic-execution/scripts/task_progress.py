@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.6.1)
+task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.12.0)
 
 功能：
   init    -- 初始化进度文件（任务规划后调用）
@@ -10,6 +10,13 @@ task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.6.1)
   abort   -- 手动中止任务（标记为已中止）
   clean   -- 清理已完成的进度文件
 
+v5.12.0 新增：
+  - complete 子命令新增 --enforce 强制校验（默认开启）
+  - --force 语义收窄：仅跳过步骤完成率检查，不跳过记录校验
+  - 需同时传 --force --no-enforce 才完全跳过所有校验（双因子）
+  - 复杂任务（步骤≥4）强制检查 PROBLEMS.md/RISKS.md/LESSONS_REGISTER.md/summary.json
+  - 新增 _auto_generate_summary() 辅助函数
+
 使用：
   python task_progress.py init --task "任务名称" --plan "规划内容"
   python task_progress.py update --task "任务名称" --step 1 --status "success" --review "审查结论" --advance "推进决策"
@@ -17,6 +24,8 @@ task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.6.1)
   python task_progress.py list
   python task_progress.py abort --task "任务名称"
   python task_progress.py complete --task "任务名称"
+  python task_progress.py complete --task "任务名称" --force  # 跳过步骤检查（仍做记录校验）
+  python task_progress.py complete --task "任务名称" --force --no-enforce  # 完全跳过
 """
 
 import argparse
@@ -196,6 +205,11 @@ def cmd_update(args):
     elif new_status in ("success", "failed", "skipped"):
         step_found["completed_at"] = datetime.now().isoformat()
         if new_status == "failed":
+            # F-08 强制：同一步骤失败 3 次后必须换方案，禁止第 4 次重试
+            if step_found["retries"] >= 3:
+                print(f"❌ F-08 违规：步骤 {step_idx} 已失败 {step_found['retries']} 次，禁止第 4 次重试")
+                print(f"   必须换方案。建议：将步骤标记为 'skipped' 或采用不同方法")
+                sys.exit(1)
             step_found["retries"] += 1
 
     # 重新计算完成数
@@ -315,6 +329,28 @@ def cmd_list(args):
     print()
 
 
+def _auto_generate_summary(data: dict, summary_path: str):
+    """根据进度文件自动生成 summary.json"""
+    steps_done = [s for s in data.get("steps", []) if s["status"] in ("success", "skipped")]
+    steps_fail = [s for s in data.get("steps", []) if s["status"] == "failed"]
+
+    summary = {
+        "task_name": data.get("task_name", ""),
+        "status": "completed",
+        "purpose": data.get("context", {}).get("purpose", ""),
+        "completed_steps": f"{data.get('completed_steps', 0)}/{data.get('total_steps', 0)}",
+        "failed_steps": len(steps_fail),
+        "generated_at": datetime.now().isoformat(),
+        "artifacts": [],
+        "issues": []
+    }
+
+    # 写入文件
+    with open(summary_path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+    print(f"  📝 已自动生成总结文件：{os.path.basename(summary_path)}")
+
+
 def cmd_complete(args):
     """标记任务完成并删除进度文件"""
     task_name = args.task
@@ -327,17 +363,84 @@ def cmd_complete(args):
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # 验证所有步骤是否完成
+    # ── 校验1：步骤完成率 ──────────────────────────────────────────
+    total = data.get("total_steps", 0)
+    completed = data.get("completed_steps", 0)
     incomplete = [s for s in data["steps"] if s["status"] not in ("success", "skipped")]
+
     if incomplete and not args.force:
         print(f"警告: 以下步骤尚未完成:")
         for s in incomplete:
             print(f"  步骤 {s['index']}: {s['description']} [{s['status']}]")
-        print(f"\n使用 --force 强制完成并删除进度文件")
+        print(f"\n使用 --force 跳过步骤完成率检查")
         sys.exit(1)
 
+    if total > 0 and completed / total < 0.5 and not args.force:
+        print(f"警告: 步骤完成率 {completed}/{total}（{completed/total*100:.0f}%）低于 50%")
+        print(f"使用 --force 跳过此警告")
+        sys.exit(1)
+
+    # ── 校验2：强制记录检查（--enforce，默认开启）────────────────
+    if args.enforce:
+        home = get_home()
+        missing = []
+
+        # 判断是否为"复杂任务"：步骤≥4 或 预估 tool calls ≥8
+        is_complex = (total >= 4)
+
+        if is_complex:
+            # 检查 PROBLEMS.md 是否存在且有内容
+            problems_md = os.path.join(home, "PROBLEMS.md")
+            problems_jsonl = os.path.join(home, ".problem_logs", "problems.jsonl")
+            has_problems = (os.path.exists(problems_md) and os.path.getsize(problems_md) > 50)
+            if not has_problems and os.path.exists(problems_jsonl):
+                has_problems = os.path.getsize(problems_jsonl) > 10
+            if not has_problems:
+                missing.append("PROBLEMS.md（复杂任务必须记录问题）")
+
+            # 检查 RISKS.md
+            risks_md = os.path.join(home, "RISKS.md")
+            if os.path.exists(risks_md) and os.path.getsize(risks_md) > 50:
+                pass  # OK
+            else:
+                missing.append("RISKS.md（复杂任务建议记录风险）")
+
+            # 检查 LESSONS_REGISTER.md
+            lessons_md = os.path.join(home, "LESSONS_REGISTER.md")
+            if os.path.exists(lessons_md) and os.path.getsize(lessons_md) > 50:
+                pass  # OK
+            else:
+                missing.append("LESSONS_REGISTER.md（复杂任务必须固化经验）")
+
+        # 检查 summary.json（所有任务都必须有总结）
+        summary_path = filepath.replace(".json", "_summary.json")
+        # 先尝试自动生成，再检查
+        if not os.path.exists(summary_path):
+            _auto_generate_summary(data, summary_path)
+        # 再次检查
+        if not os.path.exists(summary_path):
+            missing.append("summary.json（任务总结文件）")
+
+        if missing and not args.force:
+            print(f"❌ 强制校验失败（--enforce 开启），以下文件缺失：")
+            for m in missing:
+                print(f"  - {m}")
+            print(f"\n复杂任务判定：{'是（步骤≥4）' if is_complex else '否（步骤<4）'}")
+            print(f"  （若任务非复杂，传 --no-enforce 跳过记录检查）")
+            print(f"  （若确需跳过，同时使用 --force --no-enforce）")
+            sys.exit(1)
+        elif missing and args.force:
+            print(f"⚠️  强制校验有缺失项（已用 --force 跳过）：")
+            for m in missing:
+                print(f"  - {m}")
+
+    # ── 校验通过，执行完成 ─────────────────────────────────────────
     if not args.keep:
         os.remove(filepath)
+        # 同时删除关联的 summary 文件
+        summary_path = filepath.replace(".json", "_summary.json")
+        if os.path.exists(summary_path):
+            os.remove(summary_path)
         print(f"任务 '{task_name}' 已完成，进度文件已删除")
     else:
         data["status"] = "completed"
@@ -518,7 +621,12 @@ def main():
     # complete
     p_complete = subparsers.add_parser("complete", help="完成任务")
     p_complete.add_argument("--task", "-t", required=True, help="任务名称")
-    p_complete.add_argument("--force", "-f", action="store_true", help="强制完成（即使有未完成步骤）")
+    p_complete.add_argument("--force", "-f", action="store_true",
+                            help="强制完成（跳过未完成步骤检查）")
+    # --enforce 默认开启（default=True），--no-enforce 关闭
+    p_complete.add_argument("--no-enforce", action="store_false", dest="enforce",
+                            default=True,
+                            help="关闭强制校验（不推荐；需同时加 --force 才能完全跳过）")
     p_complete.add_argument("--keep", "-k", action="store_true", help="保留进度文件")
     p_complete.add_argument("--home", help="数据目录（覆盖 TRIPHASIC_HOME）")
 

@@ -1,6 +1,6 @@
 ---
 name: triphasic-execution
-version: 5.11.0
+version: 5.12.0
 author: wUwproject
 license: MIT
 description: >
@@ -10,7 +10,7 @@ tags: [framework, execution, debugging, problem-tracking, risk-tracking, lessons
 category: workflow
 ---
 
-# Triphasic Execution Framework v5.10
+# Triphasic Execution Framework v5.12.0
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
 
@@ -35,11 +35,12 @@ category: workflow
 | 1 | **语义拆分前置（F-01）** | 任务开始前强制输出语义拆分，明确主语/目的/诉求/动机 |
 | 2 | **任务规划强制（F-02）** | 所有任务必须先输出规划，无论大小 |
 | 3 | **三步循环执行** | Execute→Review→Advance，每步必须完整，不可跳过 |
-| 4 | **进度文件持久化（F-03/F-07/F-09）** | init→update→complete，中断后可 resume 恢复 |
-| 5 | **问题/风险/经验记录** | 任务完成后强制记录，积累 PROBLEMS.md / RISKS.md / LESSONS_REGISTER.md |
+| 4 | **进度文件持久化（F-03/F-07/F-09）** | init→update→complete，中断后可 resume 恢复；**complete 强制校验（v5.12）** |
+| 5 | **问题/风险/经验记录** | 任务完成后强制记录（复杂任务 Python 侧校验），积累 PROBLEMS.md / RISKS.md / LESSONS_REGISTER.md |
 | 6 | **最多 3 次重试（F-08）** | 同一步骤失败 3 次必须换方案，禁止第 4 次重试 |
 | 7 | **双模式支持** | 按需调用模式（默认）/ 全局自动模式 |
 | 8 | **HTML 设置界面** | `settings.py` 可视化配置技能参数 |
+| 9 | **complete 强制校验（v5.12）** | `complete` 时 Python 侧校验步骤完成率、记录文件、总结文件；`--force` 只跳过步骤检查，`--no-enforce` 关闭记录校验 |
 
 ---
 
@@ -78,18 +79,18 @@ skill 加载后，AI 输出以下状态标识：
 
 > **本节是整个技能的执行宪法。违反任意一条 = 违规，必须立即停止并补救。**
 
-| 序号 | 约束内容 | 触发时机 |
-|------|---------|---------|
-| **F-01** | 收到任务后首先执行语义拆分，禁止直接进入规划 | 收到任务第一个响应 |
-| **F-02** | 语义拆分完成后必须输出【任务规划】，禁止直接执行 | 语义拆分输出后 |
-| **F-03** | 任务规划输出后立即调用 `task_progress.py init` | 规划确认后 |
-| **F-04** | 每步 EXECUTE 开始前重述本步骤任务目的 | 每步执行前 |
-| **F-05** | 每步执行后必须紧跟 REVIEW，禁止连续执行两步 | 每步执行后 |
-| **F-06** | 每步 REVIEW 后必须紧跟 ADVANCE | 每步 REVIEW 后 |
-| **F-07** | 每步 ADVANCE 后调用 `task_progress.py update` | 每步 ADVANCE 后 |
-| **F-08** | 同一步骤失败 3 次后必须换方案，禁止第 4 次重试 | 重试计数达到 3 |
-| **F-09** | 任务完成后调用 `task_progress.py complete` | 任务完成时 |
-| **F-10** | 任务完成后必须输出【任务完成】总结 | 任务结束时 |
+| 序号 | 约束内容 | 触发时机 | Python 强制 |
+|------|---------|---------|------------|
+| **F-01** | 收到任务后首先执行语义拆分，禁止直接进入规划 | 收到任务第一个响应 | ❌ AI 自觉 |
+| **F-02** | 语义拆分完成后必须输出【任务规划】，禁止直接执行 | 语义拆分输出后 | ❌ AI 自觉（需用户确认规划）|
+| **F-03** | 任务规划输出后立即调用 `task_progress.py init` | 规划确认后 | ✅ 文件不存在则后续 update/complete 报错 |
+| **F-04** | 每步 EXECUTE 开始前重述本步骤任务目的 | 每步执行前 | ❌ AI 自觉 |
+| **F-05** | 每步执行后必须紧跟 REVIEW，禁止连续执行两步 | 每步执行后 | ❌ AI 自觉 |
+| **F-06** | 每步 REVIEW 后必须紧跟 ADVANCE | 每步 REVIEW 后 | ❌ AI 自觉 |
+| **F-07** | 每步 ADVANCE 后调用 `task_progress.py update` | 每步 ADVANCE 后 | ✅ update 校验 init 存在性 |
+| **F-08** | 同一步骤失败 3 次后必须换方案，禁止第 4 次重试 | 重试计数达到 3 | ⚠️ 部分（update 记录重试次数）|
+| **F-09** | 任务完成后调用 `task_progress.py complete` | 任务完成时 | ✅ **v5.12 强制**：校验步骤完成率、记录文件、summary.json |
+| **F-10** | 任务完成后必须输出【任务完成】总结 | 任务结束时 | ⚠️ 部分（summary.json 自动生成）|
 
 ### 自检指令
 
@@ -154,7 +155,7 @@ task_progress.py init → 创建进度文件
 # 进度文件
 python {SKILL_DIR}/scripts/task_progress.py init --task "名称" --purpose "目的" --requirements "要求" --risks "风险" --steps '[...]'
 python {SKILL_DIR}/scripts/task_progress.py update --task "名称" --step 1 --status success --review "..." --advance "..."
-python {SKILL_DIR}/scripts/task_progress.py complete --task "名称"
+python {SKILL_DIR}/scripts/task_progress.py complete --task "名称"  # --force 跳过步骤检查；--no-enforce 关闭记录校验
 python {SKILL_DIR}/scripts/task_progress.py resume --task "名称"
 
 # 问题/风险/经验
@@ -180,4 +181,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**5.11.0** — v5.11.0：产出物路径迁至 skills/.standardization/triphasic-execution/data/，settings.py 新增 get_standardization_dir() 动态路径定位函数；default_config.json/settings.html/reference.md 同步路径更新
+当前版本：**5.12.0** — v5.12.0：complete 子命令新增 Python 侧强制校验（--enforce 默认开启），步骤完成率<50% 拒绝完成；复杂任务（步骤≥4）强制检查 PROBLEMS.md/RISKS.md/LESSONS_REGISTER.md/summary.json；--force 语义收窄为仅跳过步骤检查，--no-enforce 关闭记录校验（需双因子 --force --no-enforce 才完全跳过）
