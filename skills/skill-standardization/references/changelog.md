@@ -12,6 +12,11 @@
 
 ### 变更内容
 
+> **修正（2026-05-25 00:15）**：删除错误的  函数。
+> 该函数错误地试图把整个技能目录搬到  下，违背了规范架构
+> （技能安装目录在 ，只有数据/产出物路径在 ）。
+
+
 - ✅ 修复 R-11 路径提取正则：排除全角右括号 `）`，不再误收 docstring 标点
 - ✅ 修复 R-12 references 扫描误报：`changelog.md` 历史路径描述不再触发违规
 - 📦 更新 `SKILL.md` frontmatter 版本号到 2.17.0（description 改为普通字符串，移除折叠块 `>`）
@@ -24,7 +29,28 @@
 - R-12 不再误报 `changelog.md` 中的历史路径描述文字
 
 ---
-## v2.18.0（当前版本）
+## v2.19.0（当前版本）
+
+2026-05-25
+
+**改写类型：Bug 修复 — 调用方式错误 & 变量名错误修复**
+
+### 变更内容
+
+- ✅ 修复 reference.md 中的调用方式错误（多处 `python scripts/` → `python -m `）
+- ✅ 修复 refactor.py 中的变量名错误（`_checker` → `checker`）
+- ✅ 修复 SKILL.md 版本号不一致（frontmatter 2.19.0，正文标题 v2.18.0）
+- ✅ 修复 _meta.json 版本号不一致（2.18.0 → 2.19.0）
+- ✅ 修复 reference.md 错误码总表中的工具名称（`.py` 后缀移除）
+
+### 影响
+
+- skill-standardization 自身审计 17/17 PASS
+- 调用方式 now 完全符合包结构规范（`python -m skill_builder`）
+- 变量名错误修复，权限检查器 now 能正确运行
+
+---
+## v2.18.0
 
 2026-05-24
 
@@ -32,16 +58,16 @@
 
 ### 变更内容
 
-- ✅ 修复 `_build_migration_plan()` 不处理子目录的 bug（原代码只判断 `item.is_file()`，跳过所有目录）
-- ✅ 新增 `_ensure_standardization_location()` 方法：检测 skill 是否在 `.standardization/<skill>/` 下，如果不在则自动搬迁整个目录到正确位置
+- ✅ 修复 `_build_migration_plan()` 不处理子目录的 bug（原代码第102行只判断 `item.is_file()`，跳过所有目录）
 - ✅ 修复 `refactor()` 方法重复定义问题（原第30行和第264行两个定义，后者覆盖前者）
 - ✅ 修正 `permissions.md` → `permission.md`（3处：注释、变量、打印信息）
 - 📝 更新 `skill_builder/__init__.py` 版本号 2.15.2 → 2.18.0
+- 🐛 **删除错误的 `_ensure_standardization_location()` 函数**（该函数错误地试图把整个技能目录搬到 `.standardization/` 下，违背规范架构）
 
 ### 影响
 
 - refactor 模式现在能正确检测并迁移子目录（如 `data/`、`outputs/`、`cache/` 等）
-- 非标 skill 不在 `.standardization/` 下时，refactor 会先搬迁整个目录再执行内部整理
+- 技能安装目录保持在 `skills/<skill-name>/`，只有数据/产出物路径指向 `.standardization/<skill-name>/`
 - `permission.md` 文件名全线统一（不再有 `permissions.md` 复数形式残留）
 
 ---

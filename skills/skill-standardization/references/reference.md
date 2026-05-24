@@ -7,15 +7,15 @@
 
 ## 目录
 
-1. [skill_builder.py — 构建器](#skill_builderpy)
-2. [skill_audit.py — 审查器](#skill_auditpy)
+1. [skill_builder — 构建器](#skill_builder)
+2. [skill_audit — 审查器](#skill_audit)
 3. [json_loader.py — 规范加载器](#json_loaderpy)
 
 ---
 
-## skill_builder.py
+## skill_builder
 
-> 路径：`scripts/skill_builder.py`
+> 路径：`scripts/skill_builder/`
 >
 > 用途：Skill 全生命周期管理（创建/更新/改造）
 
@@ -25,7 +25,7 @@
 
 **语法：**
 ```bash
-python scripts/skill_builder.py create <name> [--desc <text>] [--dir <path>] [--tags <tag1,tag2,...>]
+python -m skill_builder create <name> [--desc <text>] [--dir <path>] [--tags <tag1,tag2,...>]
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -52,7 +52,7 @@ python scripts/skill_builder.py create <name> [--desc <text>] [--dir <path>] [--
 
 **示例：**
 ```bash
-python scripts/skill_builder.py create my-tool --desc "通用工具" --tags tool,utility
+python -m skill_builder create my-tool --desc "通用工具" --tags tool,utility
 ```
 
 ---
@@ -63,7 +63,7 @@ python scripts/skill_builder.py create my-tool --desc "通用工具" --tags tool
 
 **语法：**
 ```bash
-python scripts/skill_builder.py update <skill_dir> [--fix] [--backup]
+python -m skill_builder update <skill_dir> [--fix] [--backup]
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -108,7 +108,7 @@ python scripts/skill_builder.py update <skill_dir> [--fix] [--backup]
 
 **语法：**
 ```bash
-python scripts/skill_builder.py refactor <skill_dir> [--no-backup] [--dry-run]
+python -m skill_builder refactor <skill_dir> [--no-backup] [--dry-run]
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -170,9 +170,9 @@ python scripts/skill_builder.py refactor <skill_dir> [--no-backup] [--dry-run]
 
 ---
 
-## skill_audit.py
+## skill_audit
 
-> 路径：`scripts/skill_audit.py`
+> 路径：`scripts/skill_audit/`
 >
 > 用途：基于 R-01~R-17 规则对 SKILL.md 进行自动化审查
 
@@ -180,7 +180,7 @@ python scripts/skill_builder.py refactor <skill_dir> [--no-backup] [--dry-run]
 
 **语法：**
 ```bash
-python scripts/skill_audit.py audit <skill_dir> [--json] [--strict]
+python -m skill_audit audit <skill_dir> [--json] [--strict]
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -239,7 +239,7 @@ python scripts/skill_audit.py audit <skill_dir> [--json] [--strict]
 
 **语法：**
 ```bash
-python scripts/json_loader.py load <module_name>
+python -m json_loader load <module_name>
 ```
 
 **可用模块：**
@@ -258,7 +258,7 @@ python scripts/json_loader.py load <module_name>
 列出所有可用模块及其状态。
 
 ```bash
-python scripts/json_loader.py list
+python -m json_loader list
 ```
 
 ### show 子命令
@@ -266,7 +266,7 @@ python scripts/json_loader.py list
 显示模块的详细元信息（版本、依赖等）。
 
 ```bash
-python scripts/json_loader.py show <module_name>
+python -m json_loader show <module_name>
 ```
 
 ### refs 子命令
@@ -274,7 +274,7 @@ python scripts/json_loader.py show <module_name>
 查看模块间的引用关系图。
 
 ```bash
-python scripts/json_loader.py refs
+python -m json_loader refs
 ```
 
 ---
@@ -283,12 +283,12 @@ python scripts/json_loader.py refs
 
 | 工具 | 退出码 | 含义 |
 |------|--------|------|
-| skill_builder.py | `0` | 成功 |
-| skill_builder.py | `1` | 参数错误/目录已存在/不存在 |
-| skill_audit.py | `0` | 审查完成（默认模式） |
-| skill_audit.py | `1` | 严格模式下有 ERROR（--strict） |
-| json_loader.py | `0` | 成功 |
-| json_loader.py | `1` | 模块不存在/文件读取失败 |
+| skill_builder | `0` | 成功 |
+| skill_builder | `1` | 参数错误/目录已存在/不存在 |
+| skill_audit | `0` | 审查完成（默认模式） |
+| skill_audit | `1` | 严格模式下有 ERROR（--strict） |
+| json_loader | `0` | 成功 |
+| json_loader | `1` | 模块不存在/文件读取失败 |
 
 ---
 
@@ -328,10 +328,10 @@ python scripts/json_loader.py refs
 
 ```bash
 # 扫描单个 skill
-python scripts/permission_checker.py <skill-dir> [--json]
+python -m permission_checker.py <skill-dir> [--json]
 
 # 输出 JSON 报告（供 AI 解析）
-python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
+python -m permission_checker.py ~/.workbuddy/skills/my-skill --json
 ```
 
 ### 输出格式（JSON）
@@ -378,26 +378,26 @@ python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
 
 ```bash
 # 请求统一审批（累积多个操作）
-python scripts/authorization_manager.py request --type batch \
+python -m authorization_manager.py request --type batch \
   --operations '[{"type":"delete","file":"/path/to/file"},...]' \
   --skill-dir <skill-dir>
 
 # 请求即时审批（单个高风险操作）
-python scripts/authorization_manager.py request --type immediate \
+python -m authorization_manager.py request --type immediate \
   --operation '{"type":"delete","file":"/path/to/file"}' \
   --reason "需要删除临时文件" \
   --skill-dir <skill-dir>
 
 # 检查是否已授权
-python scripts/authorization_manager.py check \
+python -m authorization_manager.py check \
   --operation '{"type":"delete","file":"/path/to/file"}' \
   --skill-dir <skill-dir>
 
 # 列出待审批操作
-python scripts/authorization_manager.py list --skill-dir <skill-dir>
+python -m authorization_manager.py list --skill-dir <skill-dir>
 
 # 审批（通过/拒绝）
-python scripts/authorization_manager.py approve <request-id> [--approve|--reject]
+python -m authorization_manager.py approve <request-id> [--approve|--reject]
 ```
 
 ### AI 调用示例

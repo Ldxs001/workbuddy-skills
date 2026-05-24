@@ -23,7 +23,7 @@ from pathlib import Path
 # ── 导入子模块 ──────────────────────────────────────────────
 from .creator import SkillCreator
 from .updater import SkillUpdater
-from .refactor import SkillRefactor
+from .refactor import Refactor
 from .version_manager import VersionManager
 from .utils import *
 
@@ -134,7 +134,7 @@ def main():
         updater = SkillUpdater()
         updater.update(args)
     elif args.command == "refactor":
-        refactor = SkillRefactor()
+        refactor = Refactor()
         refactor.refactor(args)
     else:
         parser.print_help()

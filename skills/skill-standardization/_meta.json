@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.18.0",
+  "version": "2.19.0",
   "description": "Skill 标准化规范引擎 v2.18.0（安全增强版）。修复 refactor _build_migration_plan() 不处理子目录的 bug，新增自动搬迁 skill 到 .standardization/ 下功能，permissions.md 文件名修正为 permission.md。",
   "author": "wUwproject",
   "tags": [
