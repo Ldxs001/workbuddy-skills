@@ -2,6 +2,24 @@
 
 ---
 
+## v1.12.0（2026-05-24）
+
+**发布日期：2026-05-24**
+**类型：Patch（修复 R-16 WARN + 版本 bump）**
+
+### 修复
+- **R-16 WARN**：`references/reference.md` 末尾追加"权限权重说明（R-16）"章节
+  - 脚本权限分析表格（4个脚本 × 5个维度）
+  - 授权方式说明（低/中/高权重对应静默/统一/即时）
+  - 风险缓解措施
+- **版本号统一**：`SKILL.md` / `_meta.json`：`1.11.0` → `1.12.0`
+
+### 影响
+- `skill_audit` 审查 `skill-sub` 时 R-16 将通过 ✅
+- 权限权重透明化，便于安全审查
+
+---
+
 ## v1.11.0（2026-05-23）
 
 **改写类型：文档质量优化**
@@ -231,7 +249,7 @@
 1. **补写 YAML frontmatter**（R-01~R-04 修复）
    - 新增 `name: skill-sub`
    - 新增 `version: 1.3.0`
-   - 新增 `author: wUwproject`
+   - 新增 `author: [username-redacted]`
    - 新增 `license: MIT`
    - 新增 `description`
    - 新增 `tags`（含 `"progressive-loading"`）
