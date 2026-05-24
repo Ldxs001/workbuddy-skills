@@ -122,7 +122,7 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
         r"authorization_manager",
         r"request.*authorization",
         r"check.*permission",
-        r"authorize",
+        r"\bauthoriz\w*\b",  # 单词边界，避免误匹配 unauthorized 等
     ]
 
     found_auth = False

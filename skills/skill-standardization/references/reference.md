@@ -39,7 +39,7 @@ python scripts/skill_builder.py create <name> [--desc <text>] [--dir <path>] [--
 ```
 <name>/
 ├── SKILL.md          # 含 frontmatter + TODO 占位符模板
-├── _meta.json        # {name, version: "0.1.0", description, author: "[username-redacted]", tags}
+├── _meta.json        # {name, version: "0.1.0", description, author: "wUwproject", tags}
 ├── references/.gitkeep
 └── scripts/.gitkeep
 ```
