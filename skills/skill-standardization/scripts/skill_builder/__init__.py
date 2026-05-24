@@ -28,7 +28,7 @@ from .version_manager import VersionManager
 from .utils import *
 
 # ── 常量 ──────────────────────────────────────────────
-__version__ = "2.14.0"
+__version__ = "2.15.2"
 
 # R-12: 外部数据目录变量检测模式（通用化，非框架绑定）
 _DATA_VAR_RE = re.compile(
@@ -96,7 +96,7 @@ SPLITTABLE_KEYWORDS = {
 
 def main():
     """主入口函数"""
-    parser = argparse.ArgumentParser(description="Skill 标准化构建器 v2.13.0")
+    parser = argparse.ArgumentParser(description="Skill 标准化构建器 v2.15.2")
     subparsers = parser.add_subparsers(dest="command", help="执行模式")
 
     # create 子命令

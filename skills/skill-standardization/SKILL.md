@@ -1,10 +1,10 @@
 ---
 name: skill-standardization
-version: 2.15.1
+version: 2.15.2
 author: wUwproject
 license: MIT
 description: >
-  Skill 标准化规范引擎 v2.15.1（安全增强版）。
+  Skill 标准化规范引擎 v2.15.2（安全增强版）。
   支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查、触发条件合规性）、
   create/update/refactor 三模式，服务于其他 skill 的安全创建/更新/改造。
   新增授权方式智能判断（根据技能工作性质决定 unified/immediate/silent）。
@@ -13,7 +13,7 @@ sensitive_access: false
 critical_write: false
 ---
 
-# skill-standardization v2.14.0
+# skill-standardization v2.15.2
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
@@ -50,21 +50,41 @@ critical_write: false
 ## 快速开始
 
 ```bash
-# 创建
-python scripts/skill_builder.py create my-skill --desc "描述" --tags t1,t2
-# 检查（含权限扫描）
-python scripts/skill_builder.py update ~/.workbuddy/skills/my-skill
-# 改造（先 dry-run！）
-python scripts/skill_builder.py refactor ~/.workbuddy/skills/old-skill --dry-run
-# 审查
-python scripts/skill_audit.py audit ~/.workbuddy/skills/my-skill
-# 权限检查（独立运行）
+# ═══════════════════════════════════════════════════════════════
+# 调用指引（非常重要！）
+# ═══════════════════════════════════════════════════════════════
+#
+# 本 skill 的 scripts/ 下有两种结构：
+#   1. 包结构（需 python -m 调用）：skill_builder、skill_audit
+#   2. 单文件（直接 python 调用）：permission_checker.py、authorization_manager.py、json_loader.py
+#
+# 工作目录必须切换到 scripts/ 下再执行，或使用绝对路径。
+#
+# ═══════════════════════════════════════════════════════════════
+
+# 创建（包结构，必须用 python -m）
+cd ~/.workbuddy/skills/skill-standardization/scripts
+python -m skill_builder create my-skill --desc "描述" --tags t1,t2
+
+# 更新（包结构，必须用 python -m）
+python -m skill_builder update ~/.workbuddy/skills/my-skill
+
+# 改造（包结构，必须用 python -m，先 dry-run！）
+python -m skill_builder refactor ~/.workbuddy/skills/old-skill --dry-run
+
+# 审查（包结构，必须用 python -m）
+python -m skill_audit audit ~/.workbuddy/skills/my-skill
+python -m skill_audit audit-all ~/.workbuddy/skills
+
+# 权限检查（单文件，直接调用）
 python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
-# 授权请求（AI 调用）
+
+# 授权请求（单文件，直接调用）
 python scripts/authorization_manager.py request --type immediate --reason "需要删除临时文件"
-# 加载规范（渐进式）
-python scripts/json_loader.py load structure          # 目录结构
-python scripts/json_loader.py load progressive_md     # 渐进式MD体系
+
+# 加载规范（单文件，直接调用）
+python scripts/json_loader.py load structure
+python scripts/json_loader.py load progressive_md
 ```
 
 → 完整命令参考见 `references/reference.md`
@@ -200,7 +220,7 @@ python scripts/json_loader.py load progressive_md     # 渐进式MD体系
 **同步规则**：
 - `SKILL.md` frontmatter `version:` 须与 `_meta.json` 保持一致
 - `scripts/` 下的 `.py` 文件头版本注释为辅助信息，不强制同步
-- 使用 `python scripts/skill_builder.py update .` 可自动检测并提示版本不一致
+- 使用 `python -m skill_builder update .` 可自动检测并提示版本不一致
 
 **自修改禁止**：`skill_builder.py` 的 `_bump_version` 函数只更新目标 skill 的版本号，不修改自身源代码。
 

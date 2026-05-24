@@ -7,7 +7,8 @@
 
 ## 目录
 
-- [v2.14.0（当前版本）](#2140-当前版本)
+- [v2.15.2（当前版本）](#2152-当前版本)
+- [v2.14.0](#2140)
 - [v2.13.4](#2134)
 - [v2.13.3](#2133)
 - [v2.13.2](#2132)
@@ -36,7 +37,28 @@
 
 ---
 
-### v2.14.0（当前版本）
+## v2.15.2（当前版本）
+
+**发布日期：2026-05-24**
+**类型：Patch（SKILL.md 与代码脱节修复 + 调用指引增强）**
+
+### 修复
+- **SKILL.md 标题版本号**：`v2.14.0` → `v2.15.2`（与 _meta.json 一致）
+- **SKILL.md 描述版本号**：`v2.14.0` → `v2.15.2`
+- **快速开始命令全部修正**：
+  - `python scripts/skill_builder.py` → `python -m skill_builder`（包结构正确调用方式）
+  - `python scripts/skill_audit.py` → `python -m skill_audit`（包结构正确调用方式）
+- **新增"调用指引"章节**：明确说明 scripts/ 下两种结构（包结构 vs 单文件）及对应调用方式
+- **`skill_builder/__init__.py` `__version__`**：`2.14.0` → `2.15.2`
+- **第205行命令修正**：`python scripts/skill_builder.py update .` → `python -m skill_builder update .`
+
+### 影响
+- AI 调用 `skill-standardization` 时不再因命令错误而失败
+- 包结构（skill_builder、skill_audit）与单文件（permission_checker.py 等）调用方式明确区分
+
+---
+
+### v2.14.0
 
 **发布日期：2026-05-24**
 **类型：Minor（授权方式智能判断：根据技能工作性质决定 unified/immediate/silent）**

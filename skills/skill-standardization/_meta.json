@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.15.1",
+  "version": "2.15.2",
   "description": "Skill 标准化规范引擎 v2.15.1 — create/update/refactor 三模式权限扫描自动写入 references/permissions.md，修复 sync_with_exclude.py 路径检查防止误删源目录，支持 R-01~R-17 审查、permission_checker.py 集成、授权要求自动注入。",
   "author": "wUwproject",
   "tags": [
