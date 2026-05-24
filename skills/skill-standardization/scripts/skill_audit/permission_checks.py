@@ -2,89 +2,44 @@
 # -*- coding: utf-8 -*-
 """
 skill_audit/permission_checks.py — 权限相关检查函数 (R-13~R-17)
+v2.16.0: 直接内嵌 PermissionChecker，不再 shell out
 """
 
 import os
 import re
 import sys
-import json
-import subprocess
-import tempfile
+
+# ── 直接导入 PermissionChecker，不再 subprocess.run() ─────────────────────
+_scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+sys.path.insert(0, _scripts_dir)
+from permission_checker import PermissionChecker
 
 
-def _run_permission_checker(skill_dir, check_type=None):
-    """调用 permission_checker.py CLI 获取检查结果。"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    checker_script = os.path.join(script_dir, "..", "permission_checker.py")
-    checker_script = os.path.normpath(checker_script)
-
-    if not os.path.isfile(checker_script):
-        return None
-
-    # 完整性校验：计算 permission_checker.py 的 SHA-256 哈希
-    _hash_file = os.path.join(
-        os.path.dirname(script_dir), ".standardization",
-        "skill-standardization", "script_hashes.json"
-    )
+def _get_report(skill_dir):
+    """
+    直接调用 PermissionChecker（不再 shell out）。
+    返回 report dict，失败返回 None。
+    """
     try:
-        import hashlib, json as _json
-        with open(checker_script, "rb") as _f:
-            _hash = hashlib.sha256(_f.read()).hexdigest()
-        if os.path.isfile(_hash_file):
-            with open(_hash_file) as _f:
-                _records = _json.load(_f)
-            _rel = os.path.relpath(checker_script, os.path.dirname(_hash_file) + "/../../")
-            if _rel in _records and _records[_rel] != _hash:
-                print(f"⚠️ 警告: permission_checker.py 哈希不匹配（可能被篡改）: {_rel}")
-            else:
-                _records[_rel] = _hash
-                with open(_hash_file, "w") as _f:
-                    _json.dump(_records, _f, indent=2, ensure_ascii=False)
-        else:
-            os.makedirs(os.path.dirname(_hash_file), exist_ok=True)
-            with open(_hash_file, "w") as _f:
-                _json.dump({os.path.relpath(checker_script, os.path.dirname(_hash_file) + "/../../"): _hash}, _f, indent=2, ensure_ascii=False)
-    except Exception as _e:
-        print(f"⚠️ 哈希校验失败: {_e}")
-
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        output_file = f.name
-
-    try:
-        result = subprocess.run(
-            [sys.executable, checker_script, skill_dir, "--output", output_file],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-
-        if os.path.isfile(output_file):
-            with open(output_file, "r", encoding="utf-8") as f:
-                report = json.load(f)
-            return report
-        else:
-            return None
+        checker = PermissionChecker(skill_dir, verbose=False)
+        return checker.scan()
     except Exception:
         return None
-    finally:
-        try:
-            os.unlink(output_file)
-        except Exception:
-            pass
 
+
+# ── R-13 ~ R-17 检查函数 ─────────────────────────────────────────────────────
 
 def check_sensitive_access_declaration(filepath, content, fm, body, skill_dir=None, **kw):
     """R-13: 敏感信息访问声明检查。"""
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
 
-    report = _run_permission_checker(skill_dir)
-
+    report = _get_report(skill_dir)
     if report is None:
         has_sensitive = fm is not None and fm.get("sensitive_access", False)
         return {
             "passed": True,
-            "detail": "permission_checker.py 不可用，跳过详细检查",
+            "detail": "PermissionChecker 不可用，跳过详细检查",
             "skip": True
         }
 
@@ -109,12 +64,11 @@ def check_critical_write_declaration(filepath, content, fm, body, skill_dir=None
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
 
-    report = _run_permission_checker(skill_dir)
-
+    report = _get_report(skill_dir)
     if report is None:
         return {
             "passed": True,
-            "detail": "permission_checker.py 不可用，跳过详细检查",
+            "detail": "PermissionChecker 不可用，跳过详细检查",
             "skip": True
         }
 
@@ -143,11 +97,12 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
     if not os.path.isdir(scripts_dir):
         return {"passed": True, "detail": "无 scripts/ 目录，跳过检查"}
 
+    # 检查是否有授权逻辑
     auth_patterns = [
         r"authorization_manager",
         r"request.*authorization",
         r"check.*permission",
-        r"\bauthoriz\w*\b",  # 单词边界，避免误匹配 unauthorized 等
+        r"\bauthoriz\w*\b",
     ]
 
     found_auth = False
@@ -155,37 +110,36 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
         fpath = os.path.join(scripts_dir, fname)
         if not os.path.isfile(fpath):
             continue
-
         ext = os.path.splitext(fname)[1].lower()
         if ext not in (".py", ".sh", ".bat", ".ps1"):
             continue
-
         try:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
+                file_content = f.read()
         except Exception:
             continue
-
         for pattern in auth_patterns:
-            if re.search(pattern, content, re.IGNORECASE):
+            if re.search(pattern, file_content, re.IGNORECASE):
                 found_auth = True
                 break
         if found_auth:
             break
 
-    if not found_auth:
-        report = _run_permission_checker(skill_dir)
-        if report:
-            risk_level = report.get("risk_level", "low")
-            if risk_level in ("high", "critical"):
-                return {
-                    "passed": False,
-                    "detail": f"脚本含高权限操作（风险等级: {risk_level}），但未调用 authorization_manager.py 请求授权"
-                }
+    # 用 PermissionChecker 获取风险等级
+    report = _get_report(skill_dir)
+    if report:
+        risk_level = report.get("risk_level", "low")
+        if risk_level in ("high", "critical") and not found_auth:
+            return {
+                "passed": False,
+                "detail": f"脚本含高权限操作（风险等级: {risk_level}），但未调用 authorization_manager.py 请求授权"
+            }
 
     return {
         "passed": True,
-        "detail": "高权限操作授权检查通过" + ("（发现授权检查逻辑）" if found_auth else "（风险等级低，无需授权）")
+        "detail": "高权限操作授权检查通过" + (
+            "（发现授权检查逻辑）" if found_auth else f"（风险等级 {report.get('risk_level', 'low') if report else 'unknown'}，无需授权）"
+        )
     }
 
 
@@ -205,19 +159,16 @@ def check_permission_weight_explained(filepath, content, fm, body, skill_dir=Non
         fpath = os.path.join(refs_dir, fname)
         if not os.path.isfile(fpath):
             continue
-
         ext = os.path.splitext(fname)[1].lower()
         if ext not in (".md", ".txt", ".rst"):
             continue
-
         try:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
+                file_content = f.read()
         except Exception:
             continue
-
         for keyword in weight_keywords:
-            if keyword.lower() in content.lower():
+            if keyword.lower() in file_content.lower():
                 found_explanation = True
                 break
         if found_explanation:

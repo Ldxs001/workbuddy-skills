@@ -85,7 +85,7 @@ RULES = [
         "name": "产出物路径规范性（含风险检测）",
         "severity": "ERROR",
         "check": "产出物路径符合 skills/.standardization/<skill>/ 规范，且无路径遍历、跨目录写入、敏感信息泄露风险",
-        "method": "check_artifact_paths_secure",
+        "method": "check_artifact_paths",
     },
     {
         "id": "R-12",

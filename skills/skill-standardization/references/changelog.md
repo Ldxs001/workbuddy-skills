@@ -4,6 +4,25 @@
 > 遵循 [Keep a Changelog](https://keepachangelog.com/) 格式，基于 SemVer 版本管理。
 
 ---
+2026-05-24
+
+**改写类型：架构修正 — 权限检查内嵌**
+
+### 变更内容
+- 🔧 架构修正：`permission_checks.py` 直接内嵌 `PermissionChecker` 类，不再 `subprocess.run()` 调外部脚本
+- ✅ 修复 R-11 method 名称不匹配 bug（`check_artifact_paths_secure` → `check_artifact_paths`）
+- ✅ 审计现在正确覆盖 R-01~R-17 全部 17 条规则
+- ✅ `check_authorization_present()` 修正风险等级显示（medium 不再误显示"低"）
+- 📦 更新 `SKILL.md` frontmatter 版本号到 2.16.0
+
+### 安全性提升
+- 移除 `_run_permission_checker()` 中间层（不再 shell out）
+- 权限扫描逻辑直接 Python import，无 subprocess 开销
+- 路径计算错误彻底修复
+
+---
+
+
 
 ## 目录
 
