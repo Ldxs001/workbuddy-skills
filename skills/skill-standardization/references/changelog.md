@@ -7,7 +7,8 @@
 
 ## 目录
 
-- [v2.13.4（当前版本）](#2134-当前版本)
+- [v2.14.0（当前版本）](#2140-当前版本)
+- [v2.13.4](#2134)
 - [v2.13.3](#2133)
 - [v2.13.2](#2132)
 - [v2.13.1](#2131)
@@ -35,7 +36,23 @@
 
 ---
 
-### v2.13.4（当前版本）
+### v2.14.0（当前版本）
+
+**发布日期：2026-05-24**
+**类型：Minor（授权方式智能判断：根据技能工作性质决定 unified/immediate/silent）**
+
+### 新增
+- `permission_checker.py`：新增 `_detect_skill_nature()` 方法，自动判断技能工作性质（自动化/交互式）
+- `permission_checker.py`：`suggest_authorization_methods()` 重写，根据技能性质智能决定授权方式
+- `permission_checker.py`：`scan()` 方法新增调用 `suggest_authorization_methods()` 并将结果合并进 issues
+- `updater.py` / `refactor.py`：`inject_auth_section()` 改为读取 report 中的 `authorization_method` 字段，不再自行按 severity 判死
+
+### 修复
+- 修复授权方式一刀切问题（全部判为 immediate），现根据技能性质智能判断
+
+---
+
+### v2.13.4
 
 **发布日期：2026-05-24**
 **类型：Minor（新增 --inject-auth 参数，支持自动注入授权要求章节）**

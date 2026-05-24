@@ -28,7 +28,7 @@ from .version_manager import VersionManager
 from .utils import *
 
 # ── 常量 ──────────────────────────────────────────────
-__version__ = "2.13.4"
+__version__ = "2.14.0"
 
 # R-12: 外部数据目录变量检测模式（通用化，非框架绑定）
 _DATA_VAR_RE = re.compile(

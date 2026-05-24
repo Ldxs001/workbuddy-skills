@@ -195,10 +195,9 @@ class SkillRefactor:
         """
         根据权限检查报告，为 SKILL.md 注入「## 授权要求」章节。
 
-        授权方式判定规则：
-        - HIGH / ERROR  → 即时授权（immediate）
-        - MEDIUM        → 统一授权（unified）
-        - 其他           → 静默授权（silent）
+        授权方式直接读取 report 中每项的 authorization_method 字段
+        （由 permission_checker.py 的 suggest_authorization_methods() 生成，
+         已根据技能工作性质（自动化/交互式）智能判断）。
         """
         if not report:
             return
@@ -217,17 +216,13 @@ class SkillRefactor:
             print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")
             return
 
-        # 按授权方式分组
+        # 按 authorization_method 分组（来自 suggest_authorization_methods() 的智能判断）
         groups = {"immediate": [], "unified": [], "silent": []}
         for iss in issues:
-            sev = iss.get("severity", "")
-            if sev in ("HIGH", "ERROR"):
+            method = iss.get("authorization_method", "immediate")
+            if method not in groups:
                 method = "immediate"
-            elif sev == "MEDIUM":
-                method = "unified"
-            else:
-                method = "silent"
-            groups[method].append((method, iss))
+            groups[method].append(iss)
 
         # 生成章节内容
         lines = ["\n\n---\n\n## 授权要求\n"]
@@ -235,20 +230,23 @@ class SkillRefactor:
 
         idx = 0
         for method in ("immediate", "unified", "silent"):
-            for m, iss in groups[method]:
+            for iss in groups[method]:
                 idx += 1
                 sev_cn = {"HIGH": "高", "ERROR": "高", "MEDIUM": "中"}.get(iss.get("severity", ""), "低")
                 desc = iss.get("description", "")
                 file = iss.get("file", "")
                 line = iss.get("line", 0)
+                reason = iss.get("reason", "")
                 lines.append(f"{idx}. **[{sev_cn}] {desc}** (`{file}` 第 {line} 行）")
 
                 if method == "immediate":
-                    lines.append("   - 授权方式：**即时授权**（每次执行前需获得用户批准）\n")
+                    lines.append("   - 授权方式：**即时授权**（每次执行前需获得用户批准）")
                 elif method == "unified":
-                    lines.append("   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）\n")
+                    lines.append("   - 授权方式：**统一授权**（首次执行前获得用户批准，后续不再询问）")
                 else:
-                    lines.append("   - 授权方式：**静默授权**（无需用户交互，自动执行并记录）\n")
+                    lines.append("   - 授权方式：**静默授权**（无需用户交互，自动执行并记录）")
+                if reason:
+                    lines.append(f"   - 原因：{reason}")
 
         lines.append("**授权方式说明：**")
         lines.append("- 静默授权：无需用户交互，自动执行并记录")

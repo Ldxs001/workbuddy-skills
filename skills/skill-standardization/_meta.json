@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.13.4",
+  "version": "2.14.0",
   "description": "Skill 标准化规范引擎 v2.13.4 — 集规范定义、创建器、更新器、改造器于一体，支持 R-01~R-17 审查（含权限分级、敏感信息检测、授权检查、触发条件合规性），新增 permission_checker.py 和 authorization_manager.py，服务于其他 skill 的安全创建/更新/改造。新增 --inject-auth 参数，支持自动注入授权要求章节。",
   "author": "wUwproject",
   "tags": [

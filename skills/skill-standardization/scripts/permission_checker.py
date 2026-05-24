@@ -142,6 +142,13 @@ class PermissionChecker:
         # 4. 确定风险等级
         risk_level = self._determine_risk_level(weight)
 
+        # 4.5 生成授权方式建议，并合并进 issues
+        suggestions = self.suggest_authorization_methods()
+        for i, sug in enumerate(suggestions):
+            if i < len(self.issues):
+                self.issues[i]["authorization_method"] = sug["authorization_method"]
+                self.issues[i]["reason"] = sug["reason"]
+
         # 5. 生成报告
         report = self._generate_report(weight, risk_level)
 
@@ -510,14 +517,78 @@ class PermissionChecker:
         }
         return recommendations.get(risk_level, "未知风险等级。")
 
+    def _detect_skill_nature(self) -> str:
+        """
+        检测技能工作性质：automated（自动化）或 interactive（交互式）。
+
+        判断依据（按优先级）：
+        1. SKILL.md frontmatter 含 `automated: true` / `cron: true` → automated
+        2. SKILL.md frontmatter 含 `interactive: true` → interactive
+        3. description 含关键词（自动/定时/cron/schedule）→ automated
+        4. tags 含 automation/cron/schedule → automated
+        5. 默认 → interactive（保守）
+
+        Returns:
+            str: "automated" 或 "interactive"
+        """
+        skill_md = self.skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            return "interactive"
+
+        try:
+            content = skill_md.read_text(encoding="utf-8")
+        except Exception:
+            return "interactive"
+
+        fm_match = re.search(r"^---\s*\n(.*?)\n---", content, re.DOTALL | re.MULTILINE)
+        fm_content = fm_match.group(1) if fm_match else ""
+        desc_match = re.search(r"description:\s*>(.*?)(?=\n\w|$)", content, re.DOTALL)
+        description = desc_match.group(1) if desc_match else ""
+
+        # 1. frontmatter 显式声明
+        if re.search(r"^\s*automated\s*:\s*true", fm_content, re.MULTILINE | re.IGNORECASE):
+            return "automated"
+        if re.search(r"^\s*cron\s*:\s*true", fm_content, re.MULTILINE | re.IGNORECASE):
+            return "automated"
+        if re.search(r"^\s*interactive\s*:\s*true", fm_content, re.MULTILINE | re.IGNORECASE):
+            return "interactive"
+
+        # 2. description 关键词
+        auto_keywords = ["自动", "定时", "cron", "schedule", "周期性", "每天", "每周", "hourly", "daily", "weekly"]
+        if any(kw in description.lower() for kw in auto_keywords):
+            return "automated"
+
+        # 3. tags 关键词
+        tags_match = re.search(r"tags:\s*\[(.*?)\]", fm_content, re.DOTALL)
+        if tags_match:
+            tags_str = tags_match.group(1).lower()
+            if any(kw in tags_str for kw in ["automation", "cron", "schedule", "sync", "backup"]):
+                return "automated"
+
+        return "interactive"
+
     def suggest_authorization_methods(self) -> List[Dict]:
         """
         为每个检测到的风险操作建议授权方式。
 
-        授权方式映射：
-        - 静默授权 (silent)：低风险，无需用户交互，仅记录
-        - 一次性授权 (unified)：中风险，用户一次性批准，后续不再询问
-        - 即时授权 (immediate)：高风险，每次执行前需获得用户批准
+        授权方式决策逻辑：
+        1. 先判断技能工作性质（_detect_skill_nature）：
+           - automated：自动化技能（如 git-sync、定时任务）
+           - interactive：交互式技能（需要用户对话触发）
+
+        2. 根据性质和风险类型决定授权方式：
+           [automated 技能]
+           - critical_write（skills/系统目录写入）→ unified（一次性授权，后续不再询问）
+           - file_delete（文件删除）→ unified
+           - subprocess_call（子进程调用）→ unified
+           - sensitive_access（敏感信息访问）→ unified
+           - 中风险 → silent（静默执行，仅记录）
+           - 极关键操作（如删除非工作区目录）→ immediate（每次确认）
+
+           [interactive 技能]
+           - 高风险 → immediate（每次执行前确认）
+           - 中风险 → unified（一次性授权）
+           - 低风险 → silent
 
         Returns:
             list: 含授权建议的操作列表，每项含 {
@@ -525,21 +596,49 @@ class PermissionChecker:
                 "description", "authorization_method", "reason"
             }
         """
+        nature = self._detect_skill_nature()
         suggestions = []
+
         for issue in self.issues:
             severity = issue.get("severity", "")
             issue_type = issue.get("type", "")
+            method = "silent"
+            reason = ""
 
-            # 根据严重度和类型确定授权方式
-            if severity in ("HIGH", "ERROR"):
-                method = "immediate"
-                reason = "高风险操作，每次执行前需用户确认"
-            elif severity == "MEDIUM":
-                method = "unified"
-                reason = "中风险操作，可批量统一授权"
+            if nature == "automated":
+                # 自动化技能：优先 unified，减少用户打扰
+                if severity in ("HIGH", "ERROR"):
+                    # 判断是否「极关键操作」→ 才用 immediate
+                    is_critical = (
+                        issue_type == "critical_write"
+                        and "outside" in issue.get("description", "").lower()
+                    ) or (
+                        issue_type == "file_delete"
+                        and "system" in issue.get("description", "").lower()
+                    )
+                    if is_critical:
+                        method = "immediate"
+                        reason = "极关键操作，即使是自动化技能也需每次确认"
+                    else:
+                        method = "unified"
+                        reason = "自动化技能：一次性授权，后续自动执行不再询问"
+                elif severity == "MEDIUM":
+                    method = "silent"
+                    reason = "自动化技能：中风险静默执行，仅记录"
+                else:
+                    method = "silent"
+                    reason = "低风险操作，静默执行，仅记录"
             else:
-                method = "silent"
-                reason = "低风险操作，静默执行，仅记录"
+                # 交互式技能：保守策略
+                if severity in ("HIGH", "ERROR"):
+                    method = "immediate"
+                    reason = "高风险操作，每次执行前需用户确认"
+                elif severity == "MEDIUM":
+                    method = "unified"
+                    reason = "中风险操作，可批量统一授权"
+                else:
+                    method = "silent"
+                    reason = "低风险操作，静默执行，仅记录"
 
             suggestions.append({
                 "file": issue.get("file", ""),
