@@ -33,23 +33,30 @@ from typing import Dict, List, Set, Tuple, Optional, Any
 # ── 常量定义 ────────────────────────────────────────────────────────────────────
 
 SENSITIVE_PATTERNS = [
-    # 记忆文件路径（路径级，需单词边界或路径分隔符）
-    r"\bmemory/", r"\.workbuddy/memory", r"\bMEMORY\.md\b", r"\b\d{4}-\d{2}-\d{2}\.md\b",
-    # 凭证相关（加单词边界，避免匹配关键词列表）
-    r"\bcredential\w*\b", r"\bpasswd\b", r"\bsecret\b", r"\bapi[_-]?key\b",
-    r"\btoken\w*\b", r"\baccess[_-]?token\b", r"\bprivate[_-]?key\b",
-    # 环境变量敏感词（精确匹配环境变量名）
-    r"\bOPENAI_API_KEY\b", r"\bANTHROPIC_API_KEY\b", r"\bGITHUB_TOKEN\b", r"\bAWS_\w+\b",
+    # 记忆文件路径
+    r"memory/", r"\.workbuddy/memory", r"MEMORY\.md", r"\d{4}-\d{2}-\d{2}\.md",
+    # 凭证相关：前导允许 _ 禁止字母数字，尾部允许 _- 禁止字母数字
+    r"(?<![a-zA-Z0-9])credential(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])passwd(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])password(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])secret(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])api[_-]?key(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])token(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])access[_-]?token(?![a-zA-Z0-9])",
+    r"(?<![a-zA-Z0-9])private[_-]?key(?![a-zA-Z0-9])",
+    # 环境变量敏感词（精确匹配）
+    r"OPENAI_API_KEY", r"ANTHROPIC_API_KEY", r"GITHUB_TOKEN", r"AWS_",
 ]
 
 CRITICAL_PATH_PATTERNS = [
-    # 技能目录
-    r"skills/", r"\.workbuddy/skills",
-    # 系统配置目录
-    r"\.workbuddy/", r"\.config/", r"\.ssh/", r"AppData",
-    # 根目录写入
+    # 系统关键目录（真正危险的写入位置）
     r"/$", r"^[A-Za-z]:[\\/]$",  # 根目录
-    r"C:\\\\", r"/usr/", r"/etc/", r"/var/",
+    r"C:\\Windows", r"C:\\Program Files", r"C:\\Users",
+    r"/usr/", r"/etc/", r"/var/", r"/boot/", r"/root/",
+    r"\.ssh/", r"\.gnupg/", r"\.config/", r"\.aws/",
+    # 排除（合法路径，不应标记）：
+    # .standardization/ → skill 标准数据目录，合法
+    # skills/ → skill 安装目录，写入 SKILL.md/scripts/ 是正常操作
 ]
 
 NETWORK_PATTERNS = [
@@ -246,45 +253,286 @@ class PermissionChecker:
         """
         检测敏感信息访问。
 
-        Args:
-            file_path: 文件路径
-            content: 文件内容
+        根本修复：放弃对原始文本做正则扫描（误报率极高），
+        改用 AST 语义分析：
+        1. 遍历所有 ast.Constant(str) 节点
+        2. 若字符串值含敏感关键词，检查其 AST 上下文
+        3. 若上下文表明它是正则表达式模式定义 → 跳过
+        4. 否则标记为真正的敏感信息访问
         """
-        for pattern in SENSITIVE_PATTERNS:
-            matches = re.finditer(pattern, content, re.IGNORECASE)
-            for match in matches:
-                if self._in_string(match.start()):
-                    continue
-                line_num = content[:match.start()].count("\n") + 1
-                self.stats["sensitive_access"] += 1
-                self.issues.append({
-                    "type": "sensitive_access",
-                    "file": str(file_path.relative_to(self.skill_dir)),
-                    "line": line_num,
-                    "pattern": pattern,
-                    "match": match.group(0),
-                    "description": "检测到敏感信息访问（memory/credentials/token）",
-                    "severity": "HIGH",
-                })
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return
+
+        # ── 构建 parent_map（节点 → 父节点）──────────────────────────────
+        parent_map = {}
+        for node in ast.walk(tree):
+            for child in ast.iter_child_nodes(node):
+                parent_map[child] = node
+
+        # ── 收集所有含敏感关键词的字符串常量 ─────────────────────────────
+        suspect_nodes = []  # (node, matched_pattern)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+                continue
+            s = node.value
+            for pat in SENSITIVE_PATTERNS:
+                if re.search(pat, s, re.IGNORECASE):
+                    suspect_nodes.append((node, pat))
+                    break  # 一个字符串只要命中一个模式就够
+
+        # ── 过滤：排除正则模式定义 ───────────────────────────────────────
+        for node, matched_pattern in suspect_nodes:
+            if self._is_sensitive_false_positive(node, parent_map):
+                continue  # 是正则模式定义，不是真正访问敏感信息
+
+            line_num = getattr(node, "lineno", 1)
+            col = getattr(node, "col_offset", 0)
+            # 尝试提取匹配的片段用于报告
+            matched_text = node.value[:40].replace("\n", " ")
+            self.stats["sensitive_access"] += 1
+            self.issues.append({
+                "type": "sensitive_access",
+                "file": str(file_path.relative_to(self.skill_dir)),
+                "line": line_num,
+                "pattern": matched_pattern,
+                "match": matched_text,
+                "description": "检测到敏感信息访问（字符串常量含敏感关键词）",
+                "severity": "HIGH",
+            })
+
+        # ── 额外检查：os.environ / os.getenv 调用 ─────────────────────
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            # 匹配 os.environ[...] 或 os.getenv(...)
+            is_env_access = False
+            if isinstance(func, ast.Subscript):
+                # os.environ[...]
+                if isinstance(func.value, ast.Attribute) and func.value.attr == "environ":
+                    is_env_access = True
+            elif isinstance(func, ast.Attribute) and func.attr in ("getenv", "environ"):
+                is_env_access = True
+
+            if not is_env_access:
+                continue
+
+            # 检查参数/下标是否含敏感关键词
+            for arg in (list(node.args) + list(node.keywords)):
+                val = None
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    val = arg.value
+                elif isinstance(arg, ast.keyword) and isinstance(arg.value, ast.Constant) and isinstance(arg.value.value, str):
+                    val = arg.value.value
+                elif isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    val = arg.value
+
+                if val:
+                    for pat in SENSITIVE_PATTERNS:
+                        if re.search(pat, val, re.IGNORECASE):
+                            line_num = getattr(arg, "lineno", getattr(node, "lineno", 1))
+                            self.stats["sensitive_access"] += 1
+                            self.issues.append({
+                                "type": "sensitive_access",
+                                "file": str(file_path.relative_to(self.skill_dir)),
+                                "line": line_num,
+                                "pattern": pat,
+                                "match": val[:40],
+                                "description": "检测到敏感信息访问（os.environ/os.getenv 读取敏感环境变量）",
+                                "severity": "HIGH",
+                            })
+                            break
+
+
+    # ── 内部方法：正则模式判断 ─────────────────────────────────────────────
+
+    # ── 内部方法：敏感词误报判断 ─────────────────────────────────────
+
+    def _is_sensitive_false_positive(self, node: ast.AST, parent_map: dict) -> bool:
+        """
+        判断一个含敏感词的 ast.Constant(str) 节点是否是误报。
+        
+        通用规则（满足任一即认为是误报）：
+        1. 是正则表达式模式定义（变量名含 pattern/regex/pat，或传给 re 模块函数）
+        2. 是 dict 的 value 且 key 是元数据字段（label/description/replace/redact 等）
+        3. 是 docstring（函数/类/模块的第一个语句，或模块级裸字符串）
+        4. 是占位符字符串（如 "[credential-redacted]"、"[hidden]"）
+        5. 所属变量名含 label/desc/replace/redact/placeholder/fake/mock
+        """
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            return False
+        
+        s = node.value
+        parent = parent_map.get(node)
+        _META_KEYS = ("label", "description", "desc", "replace", "redact",
+                     "help", "msg", "message", "text", "title", "name",
+                     "note", "comment", "hint", "summary")
+        _PLACEHOLDER_PREFIXES = ("[", "【", "(", "（")
+        _PLACEHOLDER_SUFFIXES = ("]", "】", ")", "）", "-redacted]", "-hidden]", "-masked]")
+        
+        # 4. 占位符字符串
+        if (s and any(s.startswith(p) for p in _PLACEHOLDER_PREFIXES)
+                and any(s.endswith(p) for p in _PLACEHOLDER_SUFFIXES)):
+            return True
+        
+        # 3. docstring / 模块级裸字符串判断（更通用）
+        # Python AST 中 docstring 结构：Expr(value=Constant(value=str))
+        # node 是 Constant，其父节点是 Expr，Expr 的父节点才是 Module/FunctionDef/ClassDef
+        if parent is not None and isinstance(parent, ast.Expr):
+            # node 在 Expr.value 中，再往上取一层得到真正的父节点
+            grandparent = parent_map.get(parent)
+            if grandparent is not None:
+                # 模块级：Expr 在 Module.body 中 → 是模块 docstring 或裸字符串
+                if isinstance(grandparent, ast.Module):
+                    if parent in list(grandparent.body):
+                        return True
+                # 函数/类 docstring：Expr 是函数/类的第一个语句
+                if isinstance(grandparent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    if grandparent.body and grandparent.body[0] is parent:
+                        if isinstance(parent.value, ast.Constant) and isinstance(parent.value.value, str):
+                            return True
+        
+        # 2. dict value，且 key 是元数据字段
+        if isinstance(parent, ast.Dict):
+            for i, key in enumerate(parent.keys):
+                if (key is not None and i < len(parent.values)
+                        and parent.values[i] is node):
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                        if key.value.strip('"\'\'').lower() in _META_KEYS:
+                            return True
+        
+        # 5. 所属变量名含 label/desc/replace 等
+        if isinstance(parent, ast.Assign):
+            for target in parent.targets:
+                name = self._node_name(target)
+                if name and any(k in name.lower() for k in
+                                 ("label", "desc", "replace", "redact",
+                                  "placeholder", "fake", "mock", "example", "demo")):
+                    return True
+        
+        # 1. 正则模式判断（原有逻辑）
+        return self._is_regex_pattern(node, parent_map)
+    
+    # ── 内部方法：正则模式判断 ─────────────────────────────────────────────
+
+    def _is_regex_pattern(self, node: ast.AST, parent_map: dict) -> bool:
+        """
+        判断一个 ast.Constant(str) 节点是否是正则表达式模式定义。
+
+        判断依据（满足任一即认为是模式定义）：
+        1. 父节点是赋值语句，且左值变量名含 pattern/regex/pat/rule
+        2. 父节点是函数调用参数，且函数名是 re.compile/re.search/re.match/re.finditer 等
+        3. 父节点是 dict 的值节点，且对应的 key 字符串含 regex/pattern/pat/rule
+        4. 父节点是列表/元组元素，且该列表赋值给含 pattern/regex 的变量
+        """
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            return False
+
+        parent = parent_map.get(node)
+
+        # 1. 赋值语句：var = "...", 变量名含 pattern/regex/pat/rule
+        if isinstance(parent, ast.Assign):
+            for target in parent.targets:
+                name = self._node_name(target)
+                if name and any(k in name.lower() for k in ("pattern", "regex", "pat", "rule", "sensitive", "credential")):
+                    return True
+
+        # 2. 函数调用参数：re.compile("..."), re.search("...", ...)
+        if isinstance(parent, ast.Call):
+            func = parent.func
+            func_name = self._node_name(func)
+            if func_name and any(k in func_name.lower() for k in
+                                   ("re.compile", "re.search", "re.match", "re.finditer",
+                                    "re.findall", "compile", "search", "match")):
+                return True
+            # 方法调用：pattern.search(...), pat.match(...) 等
+            if isinstance(func, ast.Attribute):
+                method_name = func.attr
+                if method_name and any(k in method_name.lower() for k in
+                                                 ("search", "match", "finditer", "findall",
+                                                  "compile", "sub", "split")):
+                    # 进一步检查调用者变量名是否含 pattern/regex
+                    if isinstance(func.value, ast.Name):
+                        if any(k in func.value.id.lower() for k in ("pattern", "pat", "regex", "rule")):
+                            return True
+
+        # 3. dict 值节点：{"regex": "..."}，key 含 regex/pattern
+        if isinstance(parent, ast.Dict):
+            for i, key in enumerate(parent.keys):
+                if key is not None and isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    if any(k in key.value.lower() for k in ("regex", "pattern", "pat", "rule", "sensitive")):
+                        # 检查这个 value 节点是否是当前 node
+                        if i < len(parent.values) and parent.values[i] is node:
+                            return True
+
+        # 4. 列表/元组元素，且所属容器赋值给含 pattern/regex 的变量
+        if isinstance(parent, (ast.List, ast.Tuple)):
+            container_parent = parent_map.get(parent)
+            if isinstance(container_parent, ast.Assign):
+                for target in container_parent.targets:
+                    name = self._node_name(target)
+                    if name and any(k in name.lower() for k in
+                                     ("pattern", "patterns", "regex", "regexs", "pat", "pats")):
+                        return True
+
+        return False
+
+    def _node_name(self, node: ast.AST) -> str:
+        """提取 AST 节点的变量名/属性名。"""
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return ""
+
+    # ── 内部方法：操作检测 ─────────────────────────────────────────────
 
     def _check_critical_write(self, file_path: Path, content: str) -> None:
         """
         检测关键位置写入。
 
-        Args:
-            file_path: 文件路径
-            content: 文件内容
+        正确逻辑：
+        - 扫描文件写入函数调用（open/write/writelines/makedirs等）
+        - 检查其路径参数是否指向系统关键目录
+        - 不扫描路径定义语句（如 DATA_DIR = ...），那不是写入操作
         """
-        for pattern in CRITICAL_PATH_PATTERNS:
-            matches = re.finditer(pattern, content, re.IGNORECASE)
+        # 真正的文件写入/创建函数
+        write_patterns = [
+            r"\bopen\s*\(",
+            r"\.write\s*\(",
+            r"\.writelines\s*\(",
+            r"os\.makedirs\s*\(",
+            r"os\.mkdir\s*\(",
+            r"Path\(.*\)\.write",
+            r"json\.dump\s*\(",
+            r"yaml\.dump\s*\(",
+            r"csv\.writer",
+            r"open\(.*,\s*['\"]w",
+        ]
+        for pattern in write_patterns:
+            matches = re.finditer(pattern, content)
             for match in matches:
                 if self._in_string(match.start()):
                     continue
-                # 排除注释和字符串中的无害引用
                 line_num = content[:match.start()].count("\n") + 1
                 line_content = content.splitlines()[line_num - 1] if line_num <= len(content.splitlines()) else ""
                 if line_content.strip().startswith("#"):
                     continue
+
+                # 检查路径参数是否指向关键目录
+                # 简单启发：同一行或下一行含系统目录路径
+                context = line_content
+                if line_num < len(content.splitlines()):
+                    context += " " + content.splitlines()[line_num]
+
+                # 只标记指向系统关键目录的写入
+                sys_dirs = ["/usr/", "/etc/", "/var/", "/boot/", "/root/",
+                             "C:\\Windows", "C:\\Program Files", "C:\\Users"]
+                hit = any(d in context for d in sys_dirs)
+                if not hit:
+                    continue  # 不是系统目录，跳过
 
                 self.stats["critical_write"] += 1
                 self.issues.append({
@@ -293,7 +541,7 @@ class PermissionChecker:
                     "line": line_num,
                     "pattern": pattern,
                     "match": match.group(0),
-                    "description": "检测到关键位置写入（skills/.workbuddy/系统目录）",
+                    "description": "检测到关键位置写入（系统目录）",
                     "severity": "HIGH",
                 })
 

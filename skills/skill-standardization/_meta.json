@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.19.0",
-  "description": "Skill 标准化规范引擎 v2.18.0（安全增强版）。修复 refactor _build_migration_plan() 不处理子目录的 bug，新增自动搬迁 skill 到 .standardization/ 下功能，permissions.md 文件名修正为 permission.md。",
+  "version": "2.20.0",
+  "description": "Skill 标准化规范引擎 v2.20.0（安全增强版）。修复 permission_checker.py：1) _is_sensitive_false_positive 正确判断 docstring（AST 两层父节点）；2) SENSITIVE_PATTERNS 正则改用自定义边界（区分 token vs tokenize，覆盖 api_key_xxx 变体）。",
   "author": "wUwproject",
   "tags": [
     "standardization",

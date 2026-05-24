@@ -31,12 +31,18 @@ def _get_report(skill_dir):
 
 def check_sensitive_access_declaration(filepath, content, fm, body, skill_dir=None, **kw):
     """R-13: 敏感信息访问声明检查。"""
+    # 修复：先检查 frontmatter 是否缺少字段
+    if fm is None:
+        return {"passed": False, "detail": "SKILL.md 缺少 frontmatter（--- 包裹的元数据区）"}
+    
+    if "sensitive_access" not in fm:
+        return {"passed": False, "detail": "frontmatter 缺少 sensitive_access 字段（必须声明，值为 true 或 false）"}
+    
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
 
     report = _get_report(skill_dir)
     if report is None:
-        has_sensitive = fm is not None and fm.get("sensitive_access", False)
         return {
             "passed": True,
             "detail": "PermissionChecker 不可用，跳过详细检查",
@@ -45,12 +51,12 @@ def check_sensitive_access_declaration(filepath, content, fm, body, skill_dir=No
 
     stats = report.get("stats", {})
     has_sensitive_access = stats.get("sensitive_access", 0) > 0
-    fm_sensitive = fm is not None and fm.get("sensitive_access", False)
+    fm_sensitive = fm.get("sensitive_access", False)
 
     if has_sensitive_access and not fm_sensitive:
         return {
             "passed": False,
-            "detail": "脚本含敏感信息访问（memory/credentials/token），但 frontmatter 未声明 sensitive_access: true"
+            "detail": "脚本含敏感信息访问（memory/credentials/token），但 frontmatter 声明 sensitive_access: false"
         }
 
     return {
@@ -61,6 +67,13 @@ def check_sensitive_access_declaration(filepath, content, fm, body, skill_dir=No
 
 def check_critical_write_declaration(filepath, content, fm, body, skill_dir=None, **kw):
     """R-14: 关键位置写入声明检查。"""
+    # 修复：先检查 frontmatter 是否缺少字段
+    if fm is None:
+        return {"passed": False, "detail": "SKILL.md 缺少 frontmatter（--- 包裹的元数据区）"}
+    
+    if "critical_write" not in fm:
+        return {"passed": False, "detail": "frontmatter 缺少 critical_write 字段（必须声明，值为 true 或 false）"}
+    
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
 
@@ -74,12 +87,12 @@ def check_critical_write_declaration(filepath, content, fm, body, skill_dir=None
 
     stats = report.get("stats", {})
     has_critical_write = stats.get("critical_write", 0) > 0
-    fm_critical = fm is not None and fm.get("critical_write", False)
+    fm_critical = fm.get("critical_write", False)
 
     if has_critical_write and not fm_critical:
         return {
             "passed": False,
-            "detail": "脚本含关键位置写入（skills/.workbuddy/系统目录），但 frontmatter 未声明 critical_write: true"
+            "detail": "脚本含关键位置写入（skills/.workbuddy/系统目录），但 frontmatter 声明 critical_write: false"
         }
 
     return {
