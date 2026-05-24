@@ -357,7 +357,7 @@ def _verify_standardization_paths(skill_dir, violations):
         return
 
     skills_dir = _find_skills_dir(skill_dir)
-    std_re = re.compile(r'\.standardization/([^"\')\s,。，；：！？、…—]+)')
+    std_re = re.compile(r'\.standardization/([^"\')\s,。，；：！？、…—）】」』%]+)')
 
     for fname in sorted(os.listdir(scripts_dir)):
         fpath = os.path.join(scripts_dir, fname)
@@ -513,6 +513,8 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
             r'([\w.-]+(?:/|\\)data(?:/|\\))'
         )
         for fname in sorted(os.listdir(refs_dir)):
+            if fname == "changelog.md":
+                continue
             fpath = os.path.join(refs_dir, fname)
             if not os.path.isfile(fpath):
                 continue

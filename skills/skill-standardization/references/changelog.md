@@ -4,6 +4,27 @@
 > 遵循 [Keep a Changelog](https://keepachangelog.com/) 格式，基于 SemVer 版本管理。
 
 ---
+## v2.17.0（当前版本）
+
+2026-05-24
+
+**改写类型：Bug 修复 — R-11 路径提取 & R-12 误报修复**
+
+### 变更内容
+
+- ✅ 修复 R-11 路径提取正则：排除全角右括号 `）`，不再误收 docstring 标点
+- ✅ 修复 R-12 references 扫描误报：`changelog.md` 历史路径描述不再触发违规
+- 📦 更新 `SKILL.md` frontmatter 版本号到 2.17.0（description 改为普通字符串，移除折叠块 `>`）
+- 📦 更新 `_meta.json` 版本号和描述（移除重复 description 字段）
+
+### 影响
+
+- skill-standardization 自身审计 17/17 PASS
+- R-11 不再误报 `authorization_manager.py` docstring 中的路径
+- R-12 不再误报 `changelog.md` 中的历史路径描述文字
+
+---
+
 2026-05-24
 
 **改写类型：架构修正 — 权限检查内嵌**
@@ -26,7 +47,8 @@
 
 ## 目录
 
-- [v2.15.2（当前版本）](#2152-当前版本)
+- [v2.17.0（当前版本）](#2170-当前版本)
+- [v2.15.2](#2152-当前版本)
 - [v2.14.0](#2140)
 - [v2.13.4](#2134)
 - [v2.13.3](#2133)
