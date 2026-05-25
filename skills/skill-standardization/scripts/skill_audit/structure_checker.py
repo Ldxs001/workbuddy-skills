@@ -398,11 +398,25 @@ def _check_writing_standards_text(text, filename=""):
     for word, suggestion in forbidden:
         if word in cleaned:
             # v2.24.2 误判排除：如果模糊词出现在"修复"、"删除"等动词后面，说明是在描述修复动作，不是实际模糊表述
+            # v2.24.5 新增：被动语态排除（"可能被"、"应该被" 等），描述可能性而非模糊表述
             lines = cleaned.splitlines()
             is_false_positive = False
             for line in lines:
                 if word in line:
+                    # 排除1：修复动作（修复、删除、统一、修改、更新、移除、去掉）
                     if any(verb in line for verb in ["修复", "删除", "统一", "修改", "更新", "移除", "去掉"]):
+                        is_false_positive = True
+                        break
+                    # 排除2：被动语态（可能被、应该被、可以被 等）
+                    if re.search(r'(可能|应该|可以)被', line):
+                        is_false_positive = True
+                        break
+                    # 排除3：条件句式（如果可能、若可能 等）
+                    if re.search(r'(如果|若|假如|假设).*?(可能|应该)', line):
+                        is_false_positive = True
+                        break
+                    # v2.24.6 新增：疑问句排除（"应该" 在疑问句里是询问建议，不是模糊表述）
+                    if word == "应该" and ('？' in line or '？' in line):
                         is_false_positive = True
                         break
             if not is_false_positive:

@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.24.0
+version: 2.24.6
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.24.0。新增：R-21 渐进式加载显式说明检查；R-20 写作规范分级（🔴必须修/🟡建议修/⚪可选择修）。
+description: Skill 标准化规范引擎 v2.24.6。R-20 修复疑问句误报 bug（v2.24.6）：添加疑问句排除逻辑（「应该」在疑问句里是询问建议，不是模糊表述）。
 tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
 sensitive_access: true
 critical_write: false
@@ -31,7 +31,7 @@ section_antipattern: true
 
 
 
-# skill-standardization v2.22.0
+# skill-standardization v2.24.6
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-20 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
