@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.6.19
+version: 2.6.20
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -15,7 +15,17 @@ writing_standards: fix_terms
 progressive_loading_explicit: true
 antipattern_count: add_examples
 antipattern_progressive: true
+antipattern_reference: true
+antipattern_detail: add_detail
 ---
+
+
+
+
+
+
+
+
 
 
 
@@ -90,33 +100,13 @@ antipattern_progressive: true
 
 → 完整步骤详解见 `references/guide.md`
 
-## 反模式
-
-> 常见错误和注意事项，避免误用本技能。
-
-### 1. 盲目全量同步
-
-**错误做法**：用户只是提了一下某个 skill，就自动触发全量同步。
-
-**正确做法**：除非用户明确说"全量维护"/"同步所有"，否则只同步指定的 skill。
-
-### 2. 忽略敏感信息扫描
-
-**错误做法**：跳过敏感信息扫描，直接同步推送。
-
-**正确做法**：同步前必须运行敏感信息扫描，防止 Token/邮箱/路径泄露。
-
-### 3. 滥用 `--skip-scan`
-
-**错误做法**：对私有仓库直接使用 `--skip-scan` 跳过扫描，不考虑后续分享风险。
-
-**正确做法**：私有内容经常被后续镜像、打包分享、或推送到其他 remote。`--skip-scan` 仅限完全确认无敏感信息时使用。
-
-→ 详见 `references/antipatterns.md`
-
 ## 快速开始
 
 > 详细命令和参数说明见 `references/guide.md`（按需加载）
+> 
+> **配置存放位置**：`config.json` 按规范存放在数据目录 `skills/.standardization/git-sync/data/config.json`，脚本自动读取，无需手动创建。
+> 
+
 
 **核心命令：**
 
@@ -127,17 +117,6 @@ bash git-sync.sh <skill-name> <version>
 - `<skill-name>`：技能目录名（如 `color-toolkit`）
 - `<version>`：版本号（如 `1.0.0`）
 - 可选：`--skip-scan` 跳过敏感信息扫描（⚠️ 仅限确认无敏感信息时）
-
-## 安装后配置
-
-编辑 `config.json` 替换占位值：
-
-| 字段 | 说明 | 默认值 |
-|------|------|--------|
-| `author` | _meta.json 默认作者名 | `your-name-here` |
-| `gitee.user` / `github.user` | 用于生成查看链接和 README 命令 | `your-gitee-username` |
-
-→ 详见 `references/guide.md` 完整执行流程（步骤 0 → 6 详解）
 
 ## 修复记录
 
@@ -205,6 +184,7 @@ bash git-sync.sh <skill-name> <version>
 | ✅ 版本记录 | 📄 `references/changelog.md` — 版本更新历史 |
 | ✅ 权限说明 | 📄 `references/permissions.md` — 权限类型、风险等级、行为对照表 |
 | ✅ 详细参考 | 📄 `references/reference.md` — API/命令参考 |
+| ✅ 反模式收录 | 📄 `references/antipatterns.md` — 反模式示例与禁忌 |
 | ✅ 常见问题 | 📄 `references/faq.md` — FAQ |
 
 → 详见 `references/guide.md`（按需加载）
@@ -213,6 +193,6 @@ bash git-sync.sh <skill-name> <version>
 
 ## 版本
 
-当前版本：**2.6.18** — v2.6.18：Git 操作 Python 调用规范（彻底阻止 CredentialHelperSelector 弹窗）
+当前版本：**2.6.21** — v2.6.21：Git 操作 Python 调用规范（彻底阻止 CredentialHelperSelector 弹窗）
 
 → [更新日志](references/changelog.md) · [完整参考](references/reference.md)

@@ -18,6 +18,7 @@ EXCLUDE_FILES_EXACT = {
     ".gitignore", ".ds_store", "thumbs.db",
     "config.json", "manifest.json", "pack_zip.py",
     ".gitkeep",  # 占位空文件，不应同步到仓库
+    # config.json / manifest.json 无论在哪一律排除（含敏感信息/本地状态）
 }
 EXCLUDE_FILES_GLOB = {
     "*.pyc", "*.pyo", "*.log", "*.zip", "*.bak*",
@@ -61,12 +62,7 @@ def should_exclude(rel_path, file_path=None):
     # 3. 精确文件名匹配
     lower_exact = {f.lower() for f in EXCLUDE_FILES_EXACT}
     if name.lower() in lower_exact:
-        # config.json / manifest.json 只排除根目录的（parent_dir == ""）
-        if name.lower() in ("config.json", "manifest.json"):
-            if parent_dir == "":
-                return True
-            else:
-                return False  # 子目录的保留
+        # config.json / manifest.json 无论在哪一律排除（含敏感信息/本地状态）
         return True
 
     # 4. glob 模式匹配

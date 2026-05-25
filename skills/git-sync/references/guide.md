@@ -250,3 +250,105 @@ bash git-sync.sh <skill-name> <version>
 # ❌ 避免：直接从其他目录用绝对路径调用
 bash "C:/Users/sm001/.workbuddy/skills/git-sync/scripts/git-sync.sh" <skill-name> <version>
 ```
+
+---
+
+## 配置说明（LLM 参考）
+
+> 本技能的配置存放在数据目录，脚本自动读取，无需手动创建文件。
+
+### 配置文件位置
+
+| 文件 | 路径 | 说明 |
+|------|------|------|
+|  |  | 平台用户名、仓库名、分支等配置 |
+|  |  | 技能同步状态清单 |
+
+### config.json 字段说明
+
+| 字段 | 说明 | 默认值 |
+|------|------|--------|
+|  |  默认作者名；敏感扫描中的用户名检测基准 |  |
+|  | 码云用户名，用于生成查看链接和 README 命令 |  |
+|  | 码云仓库名 |  |
+|  | 码云推送目标分支 |  |
+|  | GitHub 用户名 |  |
+|  | GitHub 仓库名 |  |
+|  | GitHub 推送目标分支 |  |
+
+### 脚本读取方式
+
+所有  脚本通过以下逻辑定位 ：
+
+
+
+### 初始化配置
+
+首次使用本技能前，确保数据目录中存在 ：
+
+
+
+> ⚠️  含用户名等敏感信息，已被  排除在同步/打包范围外，不会上传到远程仓库。
+
+---
+
+## 配置说明（LLM 参考）
+
+> 本技能的配置存放在数据目录，脚本自动读取，无需手动创建文件。
+
+### 配置文件位置
+
+| 文件 | 路径 | 说明 |
+|------|------|------|
+| `config.json` | `skills/.standardization/git-sync/data/config.json` | 平台用户名、仓库名、分支等配置 |
+| `manifest.json` | `skills/.standardization/git-sync/data/manifest.json` | 技能同步状态清单 |
+
+### config.json 字段说明
+
+| 字段 | 说明 | 默认值 |
+|------|------|--------|
+| `author` | `_meta.json` 默认作者名；敏感扫描中的用户名检测基准 | `[username-redacted]` |
+| `gitee.user` | 码云用户名，用于生成查看链接和 README 命令 | `[username-redacted]` |
+| `gitee.repo` | 码云仓库名 | `workbuddy-skills` |
+| `gitee.branch` | 码云推送目标分支 | `main` |
+| `github.user` | GitHub 用户名 | `[username-redacted]` |
+| `github.repo` | GitHub 仓库名 | `workbuddy-skills` |
+| `github.branch` | GitHub 推送目标分支 | `main` |
+
+### 脚本读取方式
+
+所有 `git-sync` 脚本通过以下逻辑定位 `config.json`：
+
+```python
+import os
+SKILLS_DIR = os.path.expanduser('~/.workbuddy/skills')
+GIT_SYNC_DATA = os.path.join(SKILLS_DIR, '.standardization', 'git-sync', 'data')
+config_path = os.path.join(GIT_SYNC_DATA, 'config.json')
+```
+
+### 初始化配置
+
+首次使用本技能前，确保数据目录中存在 `config.json`：
+
+```bash
+mkdir -p ~/.workbuddy/skills/.standardization/git-sync/data
+cat > ~/.workbuddy/skills/.standardization/git-sync/data/config.json << 'EOF'
+{
+  "author": "your-name-here",
+  "gitee": {
+    "user": "your-gitee-username",
+    "repo": "workbuddy-skills",
+    "branch": "main",
+    "remote_name": "gitee"
+  },
+  "github": {
+    "user": "your-github-username",
+    "repo": "workbuddy-skills",
+    "branch": "main",
+    "remote_name": "origin"
+  }
+}
+EOF
+```
+
+> ⚠️ `config.json` 含用户名等敏感信息，已被 `--exclude=config.json` 排除在同步/打包范围外，不会上传到远程仓库。

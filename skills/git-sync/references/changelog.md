@@ -8,17 +8,17 @@
 ### 修复
 
 - **`step_skill_audit` 行为修正**
-  - 明确为「只读扫描，不修改、不阻断」
+  - 明确为「只读扫描，不更新、不阻断」
   - 删除逐条 ERROR/WARN 细节输出，只输出结论（PASS / WARN / FAIL）
-  - 函数文档字符串（docstring）明确声明不修改任何文件
-  - `skill_audit` 调用参数确保只传 `audit` 子命令，不传 `--fix` / `--refactor` 等修改类参数
+  - 函数文档字符串（docstring）明确声明不更新任何文件
+  - `skill_audit` 调用参数确保只传 `audit` 子命令，不传 `--fix` / `--refactor` 等更新类参数
 
 ### 影响文件
 
 - `scripts/git-sync.py` — `step_skill_audit()`
 
 ---
-
+## v2.6.19（2026-05-25）
 
 > 发布日期：2026-05-25
 
@@ -30,7 +30,7 @@
   - `step_skill_audit` 改为 `python -m skill_audit`，以 `cwd=SCRIPT_DIR` 调用本地包
 
 - **`step_sensitive_scan` 日志增强**
-  - 扫描结果：显示每个涉事文件的具体类型、行号、替换目标（不再只显示计数）
+  - 扫描结果：显示每个涉事文件的具体类型、行号、替换目标
   - 脱敏结果：显示哪些文件被脱敏、各条目的替换动作
   - 不再打印原始匹配内容（避免敏感信息泄露到终端）
 
@@ -40,6 +40,7 @@
 - `scripts/skill_audit/` — 新增，从 `skill-standardization` 复制
 - `scripts/skill_audit.py` — 删除
 
+---
 ---
 
 ## v2.6.18（2026-05-25）
@@ -97,7 +98,7 @@
 > 发布日期：2026-05-25
 
 ### 修复
-- **排除规则误删合法工具脚本** — 移除 `fix_*.py` 通配符排除规则（sync_with_exclude.py、git-sync.sh），避免误删 `fix_r20.py` 等合法工具脚本
+- **排除规则误删合法工具脚本** — 删除 `fix_*.py` 通配符排除规则（sync_with_exclude.py、git-sync.sh），避免误删 `fix_r20.py` 等合法工具脚本
 - **排除规则精确化** — 只排除真正的临时文件（test_*.py、*.bat、*_fixed.py），不再使用 `fix_*.py` 通配符
 
 ### 影响
@@ -132,7 +133,7 @@
 - **触发条件** — 添加否定条件（R-07 修复）
 - **渐进式加载说明** — 在 ## 核心能力 章节添加固定模板句（R-21 修复）
 - **反模式章节** — 添加反模式章节，引用 references/antipatterns.md（R-18 修复）
-- **写作规范** — 修复术语不一致（移除→删除、修改→更新）、中英文混排缺少空格、模糊表述（可能→常见原因包括）（R-20 修复）
+- **写作规范** — 修复术语不一致（删除→删除、更新→更新）、中英文混排缺少空格、模糊表述（可能→常见原因包括）（R-20 修复）
 - **版本号一致性** — 修复 SKILL.md 正文版本号与 _meta.json 不一致问题
 
 ---
@@ -353,7 +354,7 @@
   - `references/reference.md` — CLI 速查、变量表、ZIP 排除列表、敏感信息规则
   - `references/faq.md` — 14 个 FAQ 按场景分类（同步/ZIP/清单/敏感/审查）
   - `references/changelog.md` — 完整版本历史 + Roadmap
-- **frontmatter author** 从非常量引用修正为常量值 `wUwproject`
+- **frontmatter author** 从非常量引用修正为常量值 `[username-redacted]`
 - **清理根目录遗留垃圾**：删除异常 ZIP 文件 `2.0.0`、6 个 `.tmp_zip_*` 临时目录、过时空目录 `references/`
 - 通过 skill-standardization v2.0 update 验证：**ERROR=0, WARN=1**（WARN 为合理运行时文件例外）
 
