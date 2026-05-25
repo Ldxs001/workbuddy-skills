@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.6.14
+version: 2.6.18
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -205,6 +205,6 @@ bash git-sync.sh <skill-name> <version>
 
 ## 版本
 
-当前版本：**2.6.5** — v2.6.5：打包排除空文件（0 KB）+ .gitkeep；增加--skip-scan安全警告
+当前版本：**2.6.18** — v2.6.18：Git 操作 Python 调用规范（彻底阻止 CredentialHelperSelector 弹窗）
 
 → [更新日志](references/changelog.md) · [完整参考](references/reference.md)

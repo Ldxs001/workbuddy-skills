@@ -41,32 +41,50 @@ def log(step, total, msg, level="info"):
     color = {"info":C.C,"ok":C.G,"warn":C.Y,"err":C.R,"skip":C.W}.get(level,"")
     print(f"{color}[{step}/{total}] {tag} {msg}{C.N}")
 
+def _git_env(base_env: dict = None) -> dict:
+    """
+    构造一个完全静默的 git 环境变量字典。
+    用 GIT_CONFIG_COUNT 注入 credential.helper=（空=禁用），
+    优先级高于所有配置文件，覆盖所有子进程（含 Python 脚本内调 git）。
+    """
+    env = base_env.copy() if base_env else os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_CONFIG_COUNT"] = "1"
+    env["GIT_CONFIG_KEY_0"] = "credential.helper"
+    env["GIT_CONFIG_VALUE_0"] = ""
+    return env
+
+
 def run_python(script: Path, *args, capture=False, check=True):
     """运行 scripts/ 下的 Python 辅助脚本"""
-    env = os.environ.copy()
+    env = _git_env()
     env["PYTHONUTF8"] = "1"
-    env["GIT_TERMINAL_PROMPT"] = "0"
     cmd = [sys.executable, str(script), *[str(a) for a in args]]
     return subprocess.run(cmd, capture_output=capture, encoding="utf-8",
-                        check=check, env=env,
-                        stdin=subprocess.DEVNULL)
+                         check=check, env=env,
+                         stdin=subprocess.DEVNULL)
 
 def run_git(*args, workdir=None, check=True):
-    """运行 git 命令，完全静默不弹 UI"""
-    env = os.environ.copy()
-    env["GIT_TERMINAL_PROMPT"] = "0"
-    # Windows：隐藏子进程所有窗口，彻底阻止 CredentialHelperSelector 弹窗
+    """
+    运行 git 命令，完全静默不弹 UI。
+    用 _git_env() 注入 GIT_CONFIG_COUNT，彻底阻止所有子进程弹窗。
+    """
+    env = _git_env()
     si = None
     if os.name == "nt":
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         si.wShowWindow = 0  # SW_HIDE
-    cmd = ["git", *[str(a) for a in args]]
+    cmd = ["git",
+           "-c", "credential.helper=",
+           "-c", "credential.https://gitee.com.provider=",
+           "-c", "credential.https://github.com.provider=",
+           *[str(a) for a in args]]
     return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
-                        capture_output=True, encoding="utf-8",
-                        check=check, env=env,
-                        stdin=subprocess.DEVNULL,
-                        startupinfo=si)
+                         capture_output=True, encoding="utf-8",
+                         check=check, env=env,
+                         stdin=subprocess.DEVNULL,
+                         startupinfo=si)
 
 # ── 步骤 1：检查维护清单 ─────────────────────────────────────────────────────
 def step_manifest(skill_name: str, version: str, repo_name="workbuddy-skills"):
@@ -270,11 +288,8 @@ def step_update_readme(repo_name="workbuddy-skills"):
 # ── 步骤 6：提交并推送到双平台 ────────────────────────────────────────────
 def _detect_remote(url_pattern: str) -> str:
     """根据 URL 关键字检测远程名，找不到返回空字符串"""
-    r = subprocess.run(
-        ["git", "remote", "-v"],
-        cwd=str(WORK_REPO), capture_output=True,
-        encoding="utf-8", check=False
-    )
+    r = run_git("remote", "-v",
+                 workdir=WORK_REPO, check=False)
     for line in r.stdout.splitlines():
         parts = line.split()
         if len(parts) >= 2 and url_pattern in parts[1]:
@@ -309,61 +324,51 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector。
     返回 (success: bool, error_msg: str)
     """
-    r = subprocess.run(
-        ["git", "remote", "get-url", remote_name],
-        cwd=str(WORK_REPO), capture_output=True,
-        encoding="utf-8", check=False
-    )
+    # 用 run_git 读取 remote URL（带 -c credential.helper= 覆盖）
+    r = run_git("remote", "get-url", remote_name,
+                 workdir=WORK_REPO, check=False)
     if r.returncode != 0:
         return False, f"获取 remote URL 失败: {r.stderr.strip()}"
     raw_url = r.stdout.strip()
 
     # 从 raw_url 提取 host（如 github.com）
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, urlunparse
     parsed = urlparse(raw_url)
     host = parsed.hostname or ""
-    
+
     cred_url = _get_cred_url(host)
     if not cred_url:
         return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
-    
+
     # 如果 cred_url 缺少路径（只有主机名），从 raw_url 补全
-    from urllib.parse import urlparse, urlunparse
     parsed_cred = urlparse(cred_url)
     if not parsed_cred.path or parsed_cred.path == '/':
         parsed_raw = urlparse(raw_url)
-        # 重建 URL：scheme + netloc(含凭证) + raw_url 的 path
         cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
-    
+
     # 临时覆盖 remote URL（含凭证），push 完立刻恢复
-    subprocess.run(
-        ["git", "remote", "set-url", remote_name, cred_url],
-        cwd=str(WORK_REPO), capture_output=True, check=False
-    )
+    run_git("remote", "set-url", remote_name, cred_url,
+             workdir=WORK_REPO, check=False)
     try:
-        r = run_git("push", remote_name, branch, check=False)
+        r = run_git("push", remote_name, branch,
+                     workdir=WORK_REPO, check=False)
         if r.returncode == 0:
             return True, ""
         return False, r.stderr.strip() or r.stdout.strip()
     finally:
-        subprocess.run(
-            ["git", "remote", "set-url", remote_name, raw_url],
-            cwd=str(WORK_REPO), capture_output=True, check=False
-        )
+        run_git("remote", "set-url", remote_name, raw_url,
+                 workdir=WORK_REPO, check=False)
 
 
 def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """用凭证嵌入 URL 直接 pull，完全绕开 CredentialHelperSelector"""
-    r = subprocess.run(
-        ["git", "remote", "get-url", remote_name],
-        cwd=str(WORK_REPO), capture_output=True,
-        encoding="utf-8", check=False
-    )
+    r = run_git("remote", "get-url", remote_name,
+                 workdir=WORK_REPO, check=False)
     if r.returncode != 0:
         return False, f"获取 remote URL 失败: {r.stderr.strip()}"
     raw_url = r.stdout.strip()
 
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, urlunparse
     parsed = urlparse(raw_url)
     host = parsed.hostname or ""
 
@@ -371,18 +376,20 @@ def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     if not cred_url:
         return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
 
-    subprocess.run(
-        ["git", "remote", "set-url", remote_name, cred_url],
-        cwd=str(WORK_REPO), capture_output=True, check=False
-    )
+    parsed_cred = urlparse(cred_url)
+    if not parsed_cred.path or parsed_cred.path == '/':
+        parsed_raw = urlparse(raw_url)
+        cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
+
+    run_git("remote", "set-url", remote_name, cred_url,
+             workdir=WORK_REPO, check=False)
     try:
-        r = run_git("pull", remote_name, branch, "--rebase", check=False)
-        return True, ""  # pull 失败不阻断
+        r = run_git("pull", remote_name, branch, "--rebase",
+                     workdir=WORK_REPO, check=False)
+        return True, ""
     finally:
-        subprocess.run(
-            ["git", "remote", "set-url", remote_name, raw_url],
-            cwd=str(WORK_REPO), capture_output=True, check=False
-        )
+        run_git("remote", "set-url", remote_name, raw_url,
+                 workdir=WORK_REPO, check=False)
 
 
 def step_commit_and_push(skill_name: str, version: str):

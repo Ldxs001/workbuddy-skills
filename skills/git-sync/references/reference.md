@@ -4,6 +4,150 @@
 
 ---
 
+## Git 操作 Python 调用规范
+
+> ⚠️ **关键**：所有 Git 操作必须通过 `run_git()` 函数调用，**禁止**直接使用 `subprocess.run(["git", ...])`，否则会触发 CredentialHelperSelector 弹窗。
+
+### 核心函数：`run_git()`
+
+```python
+def run_git(*args, workdir=None, check=True):
+    """
+    运行 git 命令，完全静默不弹 UI。
+    关键：-c credential.helper= 覆盖所有配置文件，
+          _git_env() 注入 GIT_CONFIG_COUNT，彻底阻止弹窗。
+    """
+    env = _git_env()
+    si = None
+    if os.name == "nt":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0  # SW_HIDE
+    cmd = ["git",
+           "-c", "credential.helper=",
+           "-c", "credential.https://gitee.com.provider=",
+           "-c", "credential.https://github.com.provider=",
+           *[str(a) for a in args]]
+    return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
+                         capture_output=True, encoding="utf-8",
+                         check=check, env=env,
+                         stdin=subprocess.DEVNULL,
+                         startupinfo=si)
+```
+
+### 核心函数：`_git_env()`
+
+```python
+def _git_env(base_env: dict = None) -> dict:
+    """
+    构造完全静默的 git 环境变量字典。
+    用 GIT_CONFIG_COUNT 注入 credential.helper=（空=禁用），
+    优先级高于所有配置文件，覆盖所有子进程（含 Python 脚本内调 git）。
+    """
+    env = base_env.copy() if base_env else os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_CONFIG_COUNT"] = "1"
+    env["GIT_CONFIG_KEY_0"] = "credential.helper"
+    env["GIT_CONFIG_VALUE_0"] = ""
+    return env
+```
+
+### 核心函数：`run_python()`
+
+```python
+def run_python(script: Path, *args, capture=False, check=True):
+    """运行 scripts/ 下的 Python 辅助脚本"""
+    env = _git_env()  # 关键：Python 脚本内调 git 也会继承这个环境
+    env["PYTHONUTF8"] = "1"
+    cmd = [sys.executable, str(script), *[str(a) for a in args]]
+    return subprocess.run(cmd, capture_output=capture, encoding="utf-8",
+                         check=check, env=env,
+                         stdin=subprocess.DEVNULL)
+```
+
+### 正确调用示例
+
+```python
+# ✅ 正确：通过 run_git() 调用
+r = run_git("remote", "get-url", remote_name, workdir=WORK_REPO, check=False)
+raw_url = r.stdout.strip()
+
+r = run_git("push", remote_name, branch, workdir=WORK_REPO, check=False)
+
+r = run_git("pull", remote_name, branch, "--rebase",
+              workdir=WORK_REPO, check=False)
+
+# ❌ 错误：直接 subprocess.run(["git", ...]) 会弹窗！
+r = subprocess.run(["git", "push", "origin", "main"], ...)  # 会触发 CredentialHelperSelector
+```
+
+### 弹窗根因说明
+
+| 原因 | 说明 |
+|------|------|
+| `credential.helper=helper-selector` | PortableGit system config 自带，GUI 弹窗来源 |
+| `GIT_TERMINAL_PROMPT=0` 不够 | 只抑制终端提示，不抑制 GUI 弹窗 |
+| per-url 配置 `credential.https://gitee.com.provider=generic` | 优先级高于 global，也会触发弹窗 |
+| Python 脚本内调 `subprocess.run(["git", ...])` | 没继承 `-c credential.helper=` 参数 |
+
+### 彻底解决方案（三管齐下）
+
+1. **`run_git()` 加 `-c credential.helper=`** — 命令行参数优先级最高，覆盖所有配置层
+2. **`_git_env()` 注入 `GIT_CONFIG_COUNT`** — 覆盖所有子进程（含 Python 脚本内调 git）
+3. **清除 system/global config 中的 `helper-selector`**（一次性操作）：
+   ```bash
+   git config --system --unset credential.helper
+   git config --global --unset credential.helper
+   git config --global credential.helper store
+   ```
+
+### 凭证管理
+
+```python
+def _get_cred_url(host: str) -> str:
+    """从 ~/.git-credentials 读取指定 host 的凭证，嵌入 URL"""
+    cred_file = Path.home() / ".git-credentials"
+    if not cred_file.exists():
+        return ""
+    for line in cred_file.read_text().splitlines():
+        if host in line and "@" in line:
+            return line.strip()
+    return ""
+
+def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
+    """用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector"""
+    r = run_git("remote", "get-url", remote_name,
+                 workdir=WORK_REPO, check=False)
+    raw_url = r.stdout.strip()
+    parsed = urlparse(raw_url)
+    host = parsed.hostname or ""
+
+    cred_url = _get_cred_url(host)
+    if not cred_url:
+        return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
+
+    # 如果 cred_url 缺少路径，从 raw_url 补全
+    parsed_cred = urlparse(cred_url)
+    if not parsed_cred.path or parsed_cred.path == '/':
+        parsed_raw = urlparse(raw_url)
+        cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
+
+    # 临时覆盖 remote URL（含凭证），push 完立刻恢复
+    run_git("remote", "set-url", remote_name, cred_url,
+             workdir=WORK_REPO, check=False)
+    try:
+        r = run_git("push", remote_name, branch,
+                     workdir=WORK_REPO, check=False)
+        if r.returncode == 0:
+            return True, ""
+        return False, r.stderr.strip() or r.stdout.strip()
+    finally:
+        run_git("remote", "set-url", remote_name, raw_url,
+                 workdir=WORK_REPO, check=False)
+```
+
+---
+
 ## manifest.py 子命令速查
 
 `manifest.py` 是独立 CLI，管理维护清单（manifest.json），不污染 git-sync 主流程。

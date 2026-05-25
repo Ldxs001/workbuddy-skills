@@ -1,6 +1,38 @@
 # git-sync 版本更新日志
 
 ---
+## v2.6.18（2026-05-25）
+
+> 发布日期：2026-05-25
+
+### 新增
+
+- **`references/reference.md` 新增「Git 操作 Python 调用规范」章节**
+  - 明确 `run_git()` / `_git_env()` / `run_python()` 的正确用法
+  - 列出弹窗根因表（credential.helper=helper-selector 等）
+  - 提供彻底解决方案（三管齐下）
+  - 附 `_push_with_cred_url()` 完整示例代码
+
+### 修复
+
+- **彻底阻止 CredentialHelperSelector 弹窗**
+  - `run_git()` 追加 `-c credential.helper=` + per-url provider 覆盖
+  - 新增 `_git_env()` 函数，注入 `GIT_CONFIG_COUNT` 环境变量
+  - `run_python()` 改用 `_git_env()`，覆盖 Python 脚本内调 git 的子进程
+  - `_push_with_cred_url()` / `_pull_with_cred_url()` / `_detect_remote()` 全部改用 `run_git()`，消除直接 `subprocess.run(["git", ...])` 调用
+
+### 影响文件
+
+- `scripts/git-sync.py` — `run_git()` / `_git_env()` / `run_python()` / `_push_with_cred_url()` 等
+- `references/reference.md` — 新增「Git 操作 Python 调用规范」章节
+
+### 审计结果
+
+- 弹窗问题：✅ 彻底解决（`GIT_CONFIG_COUNT` + `-c credential.helper=` 双保险）
+- 所有 git 调用路径：✅ 全部经过 `run_git()` 或继承 `_git_env()`
+
+---
+
 ## v2.6.6（2026-05-25）
 
 > 发布日期：2026-05-25
