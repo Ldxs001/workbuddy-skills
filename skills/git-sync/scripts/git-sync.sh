@@ -211,7 +211,6 @@ RSYNC_OPTS=(
     --exclude="stderr.txt"
     --exclude="stdout.txt"
     --exclude="*.bat"          # Windows 批处理文件
-    --exclude="fix_*.py"       # 临时修复脚本
     --exclude="test_*.py"      # 测试脚本
     --exclude=".standardization"
 )

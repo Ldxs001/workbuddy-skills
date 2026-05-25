@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.6.3
+version: 2.6.4
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -28,7 +28,7 @@ antipattern_count: add_examples
 
 
 
-# git-sync — 三端同步技能
+# git-sync v2.6.4 — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
 
