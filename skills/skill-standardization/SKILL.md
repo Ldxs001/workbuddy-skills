@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.23.0
+version: 2.24.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.22.0。新增：渐进式文件写作质量审查（R-18~R-20 覆盖 references/*.md）；修复 SKILL.md 渐进式加载合规（≤230行）。
+description: Skill 标准化规范引擎 v2.24.0。新增：R-21 渐进式加载显式说明检查；R-20 写作规范分级（🔴必须修/🟡建议修/⚪可选择修）。
 tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
 sensitive_access: true
 critical_write: false
@@ -15,6 +15,12 @@ writing_standards: fix_terms
 antipattern_vague: add_detail
 section_antipattern: true
 ---
+
+
+
+
+
+
 
 
 

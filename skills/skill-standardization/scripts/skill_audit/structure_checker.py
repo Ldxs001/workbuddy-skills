@@ -472,3 +472,51 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                      "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
 
 
+
+def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
+    """
+    R-21: 渐进式加载显式说明检查 (v2.24.0 新增)
+    检查 SKILL.md 是否在显眼位置（核心能力/工作流程章节）显式说明渐进式加载。
+    """
+    # 关键词：用于检测是否显式说明了渐进式加载
+    prog_keywords = [
+        "渐进式加载", "渐进式 MD", "progressive loading",
+        "SKILL.md 为入口", "SKILL.md 为入口文件",
+        "按需加载", "拆分到 references",
+    ]
+
+    # ── 检查1：## 核心能力 章节 ──────────────────────────────
+    from .utils import CORE_KEYWORDS, WORKFLOW_KEYWORDS
+    import re
+
+    # 收集所有显眼位置的文本（核心能力 + 工作流程章节）
+    prominent_texts = []
+    for keywords, section_name in [(CORE_KEYWORDS, "核心能力"), (WORKFLOW_KEYWORDS, "工作流程")]:
+        found, title, section_text = _section_text(body, keywords)
+        if found:
+            prominent_texts.append((section_name, title, section_text))
+
+    if not prominent_texts:
+        return {"passed": False,
+                "detail": "未找到核心能力/工作流程章节，无法检查渐进式加载显式说明",
+                "fix": {"key": "progressive_loading_explicit", "value": True,
+                         "location": f"{filepath} ## 核心能力 或 ## 工作流程 章节",
+                         "operation": "在 ## 核心能力 章节添加渐进式加载说明：\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。",
+                         "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
+
+    # ── 检查2：显眼位置是否包含渐进式加载关键词 ─────────────────
+    for section_name, title, section_text in prominent_texts:
+        for kw in prog_keywords:
+            if kw in section_text:
+                return {"passed": True,
+                        "detail": f"在 ## {title} 章节发现渐进式加载显式说明（关键词：{kw}）"}
+
+    # ── 未找到关键词 ─────────────────────────────────────────────
+    # 获取第一个显眼章节的名称，用于 fix 建议
+    first_section = prominent_texts[0][0]
+    return {"passed": False,
+            "detail": f"在 ## {prominent_texts[0][1]} 等显眼章节未找到渐进式加载显式说明（须含「渐进式加载」或「progressive」等关键词）",
+            "fix": {"key": "progressive_loading_explicit", "value": True,
+                     "location": f"{filepath} ## {first_section} 章节",
+                     "operation": f"在 ## {first_section} 章节添加渐进式加载说明：\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。\n（用本技能创建/更新/改造的技能均遵循此规范）",
+                     "verification": "重新运行 audit_skill()，确认 R-21 passed"}}

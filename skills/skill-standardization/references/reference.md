@@ -213,6 +213,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-18 | WARN | 反模式具体性 | 正文含 ## 反模式/常见错误 章节，且每条反模式含具体描述（≥20字）或代码示例 |
 | R-19 | WARN | FAQ 有意义性 | 正文含 ## FAQ/常见问题 章节，且 Q&A 对有意义（Q≥10字，A≥15字） |
 | R-20 | WARN | 写作规范（术语一致/无模糊表述/中英文混排） | 正文术语一致、无模糊表述（可能/应该/大概）、中英文混排有空格 |
+| R-21 | WARN | 渐进式加载显式说明 | SKILL.md 在显眼位置（核心能力/工作流程章节）显式说明渐进式加载（含「渐进式加载」或「progressive」关键词） |
 
 **JSON 输出格式：**
 ```json
@@ -449,14 +450,14 @@ else:
 | 更新类型 | 需同步版本号的文件位置 | 升级类型 |
 |---------|----------------------|---------|
 | 修正错别字/排版（仅 SKILL.md） | SKILL.md `version` + `_meta.json` `"version"` | PATCH（2.1.0→2.1.1） |
-| 修改 `scripts/spec/*.json` 规范 | 对应 `.json` 的 `"_version"` + SKILL.md + `_meta.json` | PATCH 或 MINOR（视变更范围） |
-| 修改 `scripts/*.py` 脚本逻辑 | `.py` 文件头版本字符串 + SKILL.md + `_meta.json` | MINOR（2.1.0→2.2.0） |
+| 更新 `scripts/spec/*.json` 规范 | 对应 `.json` 的 `"_version"` + SKILL.md + `_meta.json` | PATCH 或 MINOR（视更新范围） |
+| 更新 `scripts/*.py` 脚本逻辑 | `.py` 文件头版本字符串 + SKILL.md + `_meta.json` | MINOR（2.1.0→2.2.0） |
 | 新增功能/新脚本 | 所有上述文件 + `manifest.json`（上传时同步） | MINOR 或 MAJOR |
 | 仅改 `references/*.md` | 视情况——内容影响功能时升 SKILL.md + `_meta.json` | 通常 PATCH |
 | git-sync 上传成功后 | `manifest.json` 由 git-sync 自动更新 | 跟随 SKILL.md 版本 |
 
 **关键原则：**
 
-- 本地修改只改 SKILL.md + _meta.json + 受影响的脚本/json 文件内的版本字符串
+- 本地更新只改 SKILL.md + _meta.json + 受影响的脚本/json 文件内的版本字符串
 - `manifest.json` 由 git-sync 上传流程负责，本地不应擅改
 - **不确定是否升级版本号时，必须询问用户**（适用于所有上述文件类型）

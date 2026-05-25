@@ -1,6 +1,6 @@
 # 改写/更新铁律（AI 执行前必须遵守）
 
-> 本文件为 skill-standardization v2.13.0 的铁律条款，AI 修改任何 skill 前必须严格遵守。
+> 本文件为 skill-standardization v2.13.0 的铁律条款，AI 更新任何 skill 前必须严格遵守。
 
 ---
 
@@ -21,8 +21,8 @@
 |------|-----------|----------|
 | `SKILL.md` | frontmatter `version:` | 按 SemVer 直接升级，无需询问 |
 | `_meta.json` | `"version"` | 与 SKILL.md 保持一致，直接升级 |
-| `scripts/spec/*.json` | `"_version"` 字段 | 对应模块变更时直接升级 |
-| `scripts/*.py` | 文件头版本字符串（如 `v2.3.0`） | 脚本逻辑变更时直接升级 |
+| `scripts/spec/*.json` | `"_version"` 字段 | 对应模块更新时直接升级 |
+| `scripts/*.py` | 文件头版本字符串（如 `v2.3.0`） | 脚本逻辑更新时直接升级 |
 
 **规范未覆盖的文件/字段 — 必须询问用户：**
 
@@ -36,7 +36,7 @@
 
 ## 铁律 3：改写前必须理解每个文件的作用
 
-- 修改任何文件前，先用 Read 工具阅读完整内容
+- 更新任何文件前，先用 Read 工具阅读完整内容
 - 理解每个字段的含义、引用关系、被哪些脚本使用
 - 特别注意：`config.json`（运行时配置）、`manifest.json`（维护清单状态数据）、`_meta.json`（标准化元数据）
 

@@ -35,6 +35,7 @@ from .structure_checker import (
     body_has_workflow_section,
     body_has_antipattern_section, body_has_faq_section,
     body_check_writing_standards,
+    body_has_progressive_loading_explicit,
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
@@ -67,6 +68,7 @@ METHOD_MAP = {
     "body_has_antipattern_section": body_has_antipattern_section,
     "body_has_faq_section": body_has_faq_section,
     "body_check_writing_standards": body_check_writing_standards,
+    "body_has_progressive_loading_explicit": body_has_progressive_loading_explicit,
 }
 
 

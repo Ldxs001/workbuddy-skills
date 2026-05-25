@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.23.0",
-  "description": "Skill 标准化规范引擎 v2.21.0。修复：1) parse_simple_yaml_frontmatter() 布尔值解析（true/false → Python bool）；2) 增强 R-13~R-16 自动修正（字段缺失时返回 fix 建议）；3) 修复 R-15 字段缺失检查。",
+  "version": "2.24.0",
+  "description": "Skill 标准化规范引擎 v2.24.0。新增：R-21 渐进式加载显式说明检查；R-20 写作规范分级（🔴必须修/🟡建议修/⚪可选择修）。",
   "author": "wUwproject",
   "tags": [
     "standardization",

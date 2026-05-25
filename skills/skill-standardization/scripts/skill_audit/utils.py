@@ -192,6 +192,16 @@ RULES = [
         "fixable": False,
         "create_template": "保持术语统一（创建/更新/删除），避免模糊词，中英文间加空格",
     },
+    # ── 新增规则 R-21 (v2.24.0) ──────────────────────────────────
+    {
+        "id": "R-21",
+        "name": "渐进式加载显式说明",
+        "severity": "WARN",
+        "check": "SKILL.md 在显眼位置（核心能力/工作流程章节）显式说明渐进式加载（含「渐进式加载」或「progressive」关键词）",
+        "method": "body_has_progressive_loading_explicit",
+        "fixable": False,
+        "create_template": "## 核心能力\n\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。",
+    },
 ]
 
 # 同义章节关键词映射
