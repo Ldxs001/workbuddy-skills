@@ -45,15 +45,23 @@ def run_python(script: Path, *args, capture=False, check=True):
     """运行 scripts/ 下的 Python 辅助脚本"""
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
+    env["GIT_TERMINAL_PROMPT"] = "0"
     cmd = [sys.executable, str(script), *[str(a) for a in args]]
     return subprocess.run(cmd, capture_output=capture, encoding="utf-8",
-                        check=check, env=env)
+                        check=check, env=env,
+                        stdin=subprocess.DEVNULL)
 
-def run_git(*args, workdir=None, check=True):
-    """运行 git 命令"""
+def run_git(*args, workdir=None, check=True, env_extra=None):
+    """运行 git 命令，完全静默不弹 UI"""
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    if env_extra:
+        env.update(env_extra)
     cmd = ["git", *[str(a) for a in args]]
     return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
-                        capture_output=True, text=True, check=check)
+                        capture_output=True, encoding="utf-8",
+                        check=check, env=env,
+                        stdin=subprocess.DEVNULL)
 
 # ── 步骤 1：检查维护清单 ─────────────────────────────────────────────────────
 def step_manifest(skill_name: str, version: str, repo_name="workbuddy-skills"):
@@ -79,7 +87,7 @@ def step_version_compare(skill_name: str, local_ver: str) -> str:
     repo_ver = ""
     if repo_meta.exists():
         try:
-            repo_ver = json.load(open(repo_meta))["version"]
+            repo_ver = json.load(open(repo_meta, encoding="utf-8"))["version"]
         except Exception:
             pass
     print(f"  仓库版本: {repo_ver or '（无）'}")
@@ -128,7 +136,7 @@ def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
     # 读取清单中的版本号
     manifest_ver = ""
     try:
-        m = json.load(open(manifest_file))
+        m = json.load(open(manifest_file, encoding="utf-8"))
         items = m.get("repos", {}).get("workbuddy-skills", {}).get("items", {})
         manifest_ver = items.get(skill_name, {}).get("version", "")
     except Exception:
@@ -252,35 +260,56 @@ def step_update_readme(repo_name="workbuddy-skills"):
     log(5, 8, "README.md 已更新", "ok")
 
 # ── 步骤 6：提交并推送到双平台 ────────────────────────────────────────────
+def _get_git_env():
+    """获取 git 环境变量字典，阻止 CredentialHelperSelector 弹出"""
+    env_extra = {}
+    r = subprocess.run(
+        ["git", "config", "--get", "credential.helper"],
+        cwd=str(WORK_REPO), capture_output=True,
+        encoding="utf-8", check=False
+    )
+    if r.returncode != 0 or not r.stdout.strip():
+        # 未配置：设为空字符串禁用助手，依赖已缓存凭证（完全静默）
+        env_extra["GIT_CREDENTIAL_HELPER"] = ""
+        log(6, 8, "凭证助手未配置，已禁用（使用缓存凭证）", "warn")
+    else:
+        configured = r.stdout.strip()
+        env_extra["GIT_CREDENTIAL_HELPER"] = configured
+        log(6, 8, f"凭证助手已配置: {configured}", "ok")
+    return env_extra
+
+
 def step_commit_and_push(skill_name: str, version: str):
     log(6, 8, "提交并推送...")
     if not WORK_REPO.exists():
         log(6, 8, f"工作仓库不存在: {WORK_REPO}", "err")
         return False, False
 
+    env_extra = _get_git_env()
+
     # git config
-    run_git("config", "user.email", "workbuddy@local", check=False)
-    run_git("config", "user.name",  "WorkBuddy",  check=False)
+    run_git("config", "user.email", "workbuddy@local", check=False, env_extra=env_extra)
+    run_git("config", "user.name",  "WorkBuddy",  check=False, env_extra=env_extra)
 
     # add
-    run_git("add", f"skills/{skill_name}/")
-    run_git("add", "README.md", check=False)
+    run_git("add", f"skills/{skill_name}/", env_extra=env_extra)
+    run_git("add", "README.md", check=False, env_extra=env_extra)
 
     # commit
-    r = run_git("diff", "--cached", "--quiet", check=False)
+    r = run_git("diff", "--cached", "--quiet", check=False, env_extra=env_extra)
     if r.returncode == 0:
         log(6, 8, "没有变更需要提交", "skip")
         return True, True  # 无变更也算成功
 
     msg = f"feat: sync {skill_name} v{version}"
-    run_git("commit", "-m", msg)
+    run_git("commit", "-m", msg, env_extra=env_extra)
     log(6, 8, f"已提交: {msg}", "ok")
 
     # push to Gitee
     gitee_ok = False
     log(6, 8, "推送到码云...", "info")
-    r = run_git("pull", "gitee", "main", "--rebase", check=False)
-    r = run_git("push", "gitee", "main", check=False)
+    r = run_git("pull", "gitee", "main", "--rebase", check=False, env_extra=env_extra)
+    r = run_git("push", "gitee", "main", check=False, env_extra=env_extra)
     if r.returncode == 0:
         log(6, 8, "码云推送成功", "ok")
         gitee_ok = True
@@ -290,8 +319,8 @@ def step_commit_and_push(skill_name: str, version: str):
     # push to GitHub
     github_ok = False
     log(6, 8, "推送到 GitHub...", "info")
-    r = run_git("pull", "origin", "main", "--rebase", check=False)
-    r = run_git("push", "origin", "main", check=False)
+    r = run_git("pull", "origin", "main", "--rebase", check=False, env_extra=env_extra)
+    r = run_git("push", "origin", "main", check=False, env_extra=env_extra)
     if r.returncode == 0:
         log(6, 8, "GitHub 推送成功", "ok")
         github_ok = True
@@ -437,7 +466,7 @@ def main():
     if not version:
         if meta_file.exists():
             try:
-                version = json.load(open(meta_file))["version"]
+                version = json.load(open(meta_file, encoding="utf-8"))["version"]
             except Exception:
                 pass
         if not version:

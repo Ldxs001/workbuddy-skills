@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.6.6",
-  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查。v2.6.6：新增跨平台环境适配说明（references/guide.md），含rsync安装指引、Windows路径转换问题根因与解决方案",
+  "version": "2.6.7",
+  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查。v2.6.7：修复 git-sync.py 完全静默推送（CredentialHelperSelector 弹出问题）、修复所有 json.load(open(...)) 编码问题、新增 _get_git_env() 智能凭证环境检测",
   "author": "wUwproject",
   "tags": [
     "sync",
