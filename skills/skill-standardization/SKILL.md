@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.24.6
+version: 2.24.7
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.24.6。R-20 修复疑问句误报 bug（v2.24.6）：添加疑问句排除逻辑（「应该」在疑问句里是询问建议，不是模糊表述）。
@@ -14,6 +14,7 @@ section_faq: true
 writing_standards: fix_terms
 antipattern_vague: add_detail
 section_antipattern: true
+progressive_loading_explicit: true
 ---
 
 
@@ -31,7 +32,9 @@ section_antipattern: true
 
 
 
-# skill-standardization v2.24.6
+
+
+# skill-standardization v2.24.7
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-20 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
@@ -52,7 +55,7 @@ section_antipattern: true
 
 ## 核心能力
 
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细规范、架构说明、反模式、FAQ 拆分到 `references/*.md` 按需加载。用本技能创建/更新/改造的技能均遵循此规范。
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。用本技能创建/更新/改造的技能均遵循此规范。
 
 | # | 功能 | 说明 |
 |---|------|------|

@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.24.6",
-  "description": "Skill 标准化规范引擎 v2.24.6。R-20 修复疑问句误报 bug（v2.24.6）：添加疑问句排除逻辑（「应该」在疑问句里是询问建议，不是模糊表述）。",
+  "version": "2.24.7",
+  "description": "Skill 标准化规范引擎 v2.24.7。R-18 支持反模式渐进式引用审查（支持列表/表格/### 标题三种格式）。",
   "author": "wUwproject",
   "tags": [
     "standardization",

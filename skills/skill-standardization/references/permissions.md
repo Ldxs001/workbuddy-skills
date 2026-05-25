@@ -36,22 +36,22 @@
    - 位置：`scripts\permission_checker.py` 第 439 行
    - 原因：高风险操作，每次执行前需用户确认
 
-2. **[高] 检测到 subprocess 调用（os.system/subprocess等）**
+2. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
    - 位置：`scripts\permission_checker.py` 第 74 行
    - 原因：高风险操作，每次执行前需用户确认
 
-3. **[高] 检测到 subprocess 调用（os.system/subprocess等）**
+3. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
    - 位置：`scripts\permission_checker.py` 第 86 行
    - 原因：高风险操作，每次执行前需用户确认
 
-4. **[高] 检测到 subprocess 调用（os.system/subprocess等）**
+4. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
    - 位置：`scripts\permission_checker.py` 第 248 行
    - 原因：高风险操作，每次执行前需用户确认
 
-5. **[高] 检测到 subprocess 调用（os.system/subprocess等）**
+5. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
    - 位置：`scripts\permission_checker.py` 第 598 行
    - 原因：高风险操作，每次执行前需用户确认
 
-6. **[高] 检测到 subprocess 调用（os.system/subprocess等）**
+6. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
    - 位置：`scripts\permission_checker.py` 第 606 行
    - 原因：高风险操作，每次执行前需用户确认

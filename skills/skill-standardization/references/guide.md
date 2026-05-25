@@ -38,7 +38,7 @@ python scripts/skill_builder.py create <skill-name> --desc "技能描述"
 <skill-name>/
 ├── SKILL.md          # 主文件（含 TODO 占位符模板）
 ├── _meta.json        # 元数据（五字段）
-├── references/.gitkeep     # 渐进式MD目录占位
+├── references/.gitkeep     # 渐进式 MD 目录占位
 └── scripts/.gitkeep  # 脚本目录占位
 ```
 
@@ -273,7 +273,7 @@ A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需
 
 | 检查项 | 通过条件 | 失败建议 |
 |--------|----------|----------|
-| 术语一致性 | 同一概念不混用多种表述（如 `创建/新建`、`更新/修改`、`删除/移除`、`配置/设置`） | 统一为首选术语（`创建`、`更新`、`删除`、`配置`） |
+| 术语一致性 | 同一概念不混用多种表述（如 `创建/创建`、`更新/更新`、`删除/删除`、`配置/配置`） | 统一为首选术语（`创建`、`更新`、`删除`、`配置`） |
 | 禁止模糊表述 | 不含 `可能`、`应该`、`大概`、`差不多` 等 | 改用确定性描述，或明确标注「建议」 |
 | 中英文混排空格 | 中文与英文/数字之间应有空格（例外：版本号、类名） | 在中文与英文/数字之间加空格 |
 | 脚本调用验证 | `SKILL.md` 提到的脚本文件真实存在，且能正常运行 `--help` | 检查脚本路径是否正确、参数定义是否有误 |
@@ -364,7 +364,7 @@ python scripts/json_loader.py load frontmatter    # Frontmatter 字段规范
 python scripts/json_loader.py load body           # 正文章节规范
 python scripts/json_loader.py load rules          # 审查规则 R-01~R-10
 python scripts/json_loader.py load structure      # 目录结构规范 [v2]
-python scripts/json_loader.py load progressive_md # 渐进式MD体系 [v2]
+python scripts/json_loader.py load progressive_md # 渐进式 MD 体系 [v2]
 
 # 全量加载
 python scripts/json_loader.py load all
@@ -399,9 +399,9 @@ git sync 执行
   ├─ 步骤 3.5: 审查每个 skill ← skill_audit.py 自动调用
   │   ├─ PASS → 继续推送
   │   ├─ WARN → 🟡 打印警告，继续推送
-  │   └─ FAIL(含ERROR) → 🟡 打印警告，继续推送（纯警告模式）
+  │   └─ FAIL(含 ERROR) → 🟡 打印警告，继续推送（纯警告模式）
   │
-  └─ 步骤 4~6: 推送/生成ZIP/更新manifest
+  └─ 步骤 4~6: 推送/生成 ZIP/更新 manifest
 ```
 
 ### 版本号三方一致

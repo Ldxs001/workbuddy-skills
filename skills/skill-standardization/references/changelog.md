@@ -4,6 +4,30 @@
 > 遵循 [Keep a Changelog](https://keepachangelog.com/) 格式，基于 SemVer 版本管理。
 
 ---
+## v2.24.7（当前版本）
+
+2026-05-25
+
+**改写类型：Bug 修复 — R-18/R-19 渐进式引用审查逻辑重构**
+
+### 更新内容
+
+- ✅ **重构 R-18 反模式审查逻辑**：强制渐进式（SKILL.md 直接写反模式 → FAIL），检查 `references/antipatterns.md` 引用、文件存在性、内容质量（≥2 条具体示例 + 错误做法/正确做法标记）
+- ✅ **重构 R-19 FAQ 审查逻辑**：强制渐进式（SKILL.md 直接写 FAQ → FAIL），检查 `references/faq.md` 引用、文件存在性、Q&A 质量（≥3 对 + 问题≥10字 + 答案≥15字）
+- ✅ **支持表格格式**：R-18 现在能正确解析 `references/antipatterns.md` 中的表格格式反模式条目
+- 📦 更新 `SKILL.md` 版本号到 v2.24.7
+- 📦 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- R-18 现在正确强制渐进式（不再接受 SKILL.md 直接写反模式）
+- R-19 现在正确强制渐进式（不再接受 SKILL.md 直接写 FAQ）
+- 所有渐进式文件审查逻辑统一：检查引用 → 检查文件存在 → 检查内容质量
+- skill-standardization 自身审计 20/20 PASS（0 ERROR, 0 WARN）
+
+---
+
+
 ## v2.17.0（当前版本）
 
 2026-05-24

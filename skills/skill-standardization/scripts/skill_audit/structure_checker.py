@@ -152,160 +152,154 @@ def body_has_workflow_section(filepath, content, fm, body, **kw):
 # ─────────────────────────────────────────────────────────────
 
 def body_has_antipattern_section(filepath, content, fm, body, **kw):
-    """R-18: 反模式/常见错误章节具体性检查（v2.22.0 支持渐进式文件）"""
-    anti_keywords = ["反模式", "常见错误", "注意事项", "坑", "anti-pattern", "common mistake"]
-
-    found, title, section_text = _section_text(body, anti_keywords)
-    if not found:
-        # R-18 渐进式：SKILL.md 无反模式章节时，尝试在 references/antipatterns.md 中查找
-        skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
-        antipattern_file = os.path.join(skill_dir, 'references', 'antipatterns.md')
-        if os.path.isfile(antipattern_file):
-            with open(antipattern_file, 'r', encoding='utf-8') as f:
-                ap_content = f.read()
-            # 匹配 ### AP-01 格式的反模式标题（antipatterns.md 格式）
-            ap_items = re.findall(r'^###\s*AP-\d+[:：]', ap_content, re.MULTILINE)
-            if not ap_items:
-                # 降级：匹配列表项
-                ap_items = re.findall(r'^[-*]\s*.+', ap_content, re.MULTILINE)
-            if not ap_items:
-                ap_items = re.findall(r'^\d+\.\s*.+', ap_content, re.MULTILINE)
-            if len(ap_items) >= 2:
-                # 检查是否有具体描述（错误做法/正确做法标记）
-                has_detail = bool(re.search(r'错误做法[:：]|正确做法[:：]|深层原因[:：]', ap_content))
-                if has_detail:
-                    return {"passed": True,
-                            "detail": f"反模式在 references/antipatterns.md 中（{len(ap_items)} 条具体示例）"}
-                else:
-                    return {"passed": False,
-                            "detail": f"references/antipatterns.md 缺少具体描述（须含 **错误做法：**、**正确做法：** 标记）",
-                            "fix": {"key": "antipattern_detail", "value": "add_detail",
-                                     "location": f"{antipattern_file}",
-                                     "operation": "为每个反模式添加 **错误做法：**、**正确做法：** 和 **深层原因：** 标记",
-                                     "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-        # 无章节且无渐进式文件（或文件质量不足），返回原 FAIL
+    """R-18: 反模式/常见错误章节具体性检查（必须渐进式，v2.24.7 重构）"""
+    antipattern_keywords = ["反模式", "常见错误", "注意事项", "坑", "anti-pattern", "common mistake"]
+    
+    # 1. 检查 SKILL.md 是否直接包含反模式章节（这是错的，必须用渐进式）
+    found, title, section_text = _section_text(body, antipattern_keywords)
+    
+    if found:
         return {"passed": False,
-                "detail": f"未找到[{', '.join(anti_keywords)}]章节（建议添加，或引用 references/antipatterns.md）",
-                "fix": {"key": "section_antipattern", "value": True,
+                "detail": f"反模式不应直接写在 SKILL.md 的 ## {title} 章节里，须改用渐进式（移到 references/antipatterns.md）",
+                "fix": {"key": "antipattern_progressive", "value": True,
+                         "location": f"{filepath} ## {title} 章节",
+                         "operation": "将反模式内容移到 references/antipatterns.md，在 SKILL.md 中添加引用 `→ 详见 references/antipatterns.md`",
+                         "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
+    
+    # 2. 检查 SKILL.md 是否有引用 references/antipatterns.md
+    has_ref = bool(re.search(r'references/antipatterns\.md', body))
+    if not has_ref:
+        return {"passed": False,
+                "detail": "未找到对 references/antipatterns.md 的引用（反模式须用渐进式）",
+                "fix": {"key": "antipattern_reference", "value": True,
                          "location": f"{filepath} 正文",
-                         "operation": "添加 ## 反模式 或 ## 常见错误 章节，列出 2-3 个具体错误示例，或在 SKILL.md 中引用 references/antipatterns.md",
-                         "verification": "重新运行 audit_skill()，确认 R-18 passed"},
-                "skipped": True}
-
-    # 检查具体性：每条反模式须包含具体描述（≥20字）或代码示例
-    items = re.findall(r'^[-*]\s*.+', section_text, re.MULTILINE)
-    if not items:
-        items = re.findall(r'^\d+\.\s*.+', section_text, re.MULTILINE)
-
-    if len(items) < 2:
+                         "operation": "创建 references/antipatterns.md，并在 SKILL.md 中添加引用 `→ 详见 references/antipatterns.md`",
+                         "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
+    
+    # 3. 检查 references/antipatterns.md 是否存在
+    skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+    antipattern_file = os.path.join(skill_dir, 'references', 'antipatterns.md')
+    
+    if not os.path.isfile(antipattern_file):
         return {"passed": False,
-                "detail": f"反模式条目不足（当前 {len(items)} 条，建议 ≥2 条具体示例）",
+                "detail": "SKILL.md 引用了 references/antipatterns.md 但该文件不存在",
+                "fix": {"key": "antipattern_file_missing", "value": True,
+                         "location": f"{antipattern_file}",
+                         "operation": "创建 references/antipatterns.md，包含至少 2 条具体反模式示例（含 **错误做法：**、**正确做法：** 标记）",
+                         "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
+    
+    # 4. 检查 references/antipatterns.md 内容质量
+    with open(antipattern_file, 'r', encoding='utf-8') as f:
+        ap_content = f.read()
+    
+    # 匹配反模式条目（支持 ### AP-01 格式、列表项、表格）
+    ap_items = re.findall(r'^###\s*AP-\d+[:\uff1a]', ap_content, re.MULTILINE)
+    if not ap_items:
+        ap_items = re.findall(r'^[-*]\s*.+', ap_content, re.MULTILINE)
+    if not ap_items:
+        ap_items = re.findall(r'^\d+\.\s*.+', ap_content, re.MULTILINE)
+    # 表格格式支持
+    if not ap_items:
+        table_rows = re.findall(r'^\|.*\|$', ap_content, re.MULTILINE)
+        data_rows = [r for r in table_rows if not re.match(r'^\|[\s\-:|]+\|$', r)]
+        if len(data_rows) >= 2:
+            ap_items = data_rows[1:]
+    
+    if len(ap_items) < 2:
+        return {"passed": False,
+                "detail": f"references/antipatterns.md 反模式条目不足（当前 {len(ap_items)} 条，要求 ≥2 条）",
                 "fix": {"key": "antipattern_count", "value": "add_examples",
-                         "location": f"{filepath} ## {title} 章节",
-                         "operation": "添加至少 2 条具体反模式示例（须含具体错误描述和正确做法）",
+                         "location": f"{antipattern_file}",
+                         "operation": "添加至少 2 条具体反模式示例（须含 **错误做法：**、**正确做法：** 标记），支持列表/表格/### 标题格式",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-
-    min_len = 20
-    vague_items = []
-    for item in items:
-        text = re.sub(r'^[-*\d\.]\s*', '', item).strip()
-        if set(text) <= {'-', '—', '–'}:
-            continue
-        if len(text) < min_len:
-            vague_items.append(text)
-
-    if vague_items:
+    
+    # 检查是否有具体描述（错误做法/正确做法标记）
+    has_detail = bool(re.search(r'\*\*错误做法[:\uff1a]\*\*|\*\*正确做法[:\uff1a]\*\*|\*\*深层原因[:\uff1a]\*\*', ap_content))
+    
+    if not has_detail:
         return {"passed": False,
-                "detail": f"反模式描述过于宽泛（{len(vague_items)} 条不足 {min_len} 字）：{', '.join(vague_items[:3])}",
-                "fix": {"key": "antipattern_vague", "value": "add_detail",
-                         "location": f"{filepath} ## {title} 章节",
-                         "operation": "细化反模式描述，每条须说明具体错误现象和正确做法（≥20字）",
+                "detail": "references/antipatterns.md 缺少具体描述（须含 **错误做法：**、**正确做法：** 标记）",
+                "fix": {"key": "antipattern_detail", "value": "add_detail",
+                         "location": f"{antipattern_file}",
+                         "operation": "为每个反模式添加 **错误做法：**、**正确做法：** 和 **深层原因：** 标记",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-
+    
     return {"passed": True,
-            "detail": f"反模式章节具体性合格（{len(items)} 条具体示例）"}
-
-
-# ─────────────────────────────────────────────────────────────
-# R-19: FAQ 有意义性检查
-# ─────────────────────────────────────────────────────────────
+            "detail": f"反模式在 references/antipatterns.md 中（{len(ap_items)} 条具体示例，含错误做法/正确做法标记）"}
 
 def body_has_faq_section(filepath, content, fm, body, **kw):
-    """R-19: FAQ/常见问题章节有意义性检查（v2.22.0 支持渐进式文件）"""
+    """R-19: FAQ/常见问题章节有意义性检查（必须渐进式，v2.24.7 重构）"""
     faq_keywords = ["FAQ", "常见问题", "Q&A", "Questions", "问答"]
-
+    
+    # 1. 检查 SKILL.md 是否直接包含 FAQ 章节（这是错的，必须用渐进式）
     found, title, section_text = _section_text(body, faq_keywords)
-    if not found:
-        # R-19 渐进式：SKILL.md 无 FAQ 章节时，尝试在 references/faq.md 中查找
-        skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
-        faq_file = os.path.join(skill_dir, 'references', 'faq.md')
-        if os.path.isfile(faq_file):
-            with open(faq_file, 'r', encoding='utf-8') as f:
-                faq_content = f.read()
-            faq_qa = _extract_qa_pairs(faq_content)
-            if faq_qa:
-                bad = []
-                for q, a in faq_qa:
-                    q_t = q.strip()
-                    a_t = a.strip()
-                    if len(q_t) < 10 or any(t in q_t.lower() for t in ["如何工作", "怎么用", "what is"]):
-                        bad.append(f"Q: {q_t[:30]}")
-                    if len(a_t) < 15 or a_t in ("请参考文档", "见上文", "see above"):
-                        bad.append(f"A: {a_t[:30]}")
-                if not bad:
-                    return {"passed": True,
-                            "detail": f"FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A）"}
-        # 无章节且无渐进式文件（或文件质量不足），返回原 FAIL
+    
+    if found:
         return {"passed": False,
-                "detail": f"未找到[{', '.join(faq_keywords)}]章节（建议添加，或引用 references/faq.md）",
-                "fix": {"key": "section_faq", "value": True,
-                         "location": f"{filepath} 正文",
-                         "operation": "添加 ## FAQ 或 ## 常见问题 章节，列出 3-5 个真实用户问题，或在 SKILL.md 中引用 references/faq.md",
-                         "verification": "重新运行 audit_skill()，确认 R-19 passed"},
-                "skipped": True}
-
-    # 检查 Q&A 格式：须有 Q 和 A（或 ###/#### 子标题）
-    has_q = bool(re.search(r'[Qq]\s*[:：]|问\s*[:：]|\*\*Q\b|\d+\.\s*[Qq]', section_text))
-    has_a = bool(re.search(r'[Aa]\s*[:：]|答\s*[:：]|\*\*A\b|\d+\.\s*[Aa]', section_text))
-    has_subhead = bool(re.search(r'^### |^#### ', section_text, re.MULTILINE))
-
-    if not (has_q and has_a) and not has_subhead:
-        return {"passed": False,
-                "detail": "FAQ 格式不规范（须含 Q/A 标记或 ### 子标题分隔问题与答案）",
-                "fix": {"key": "faq_format", "value": "add_qa_marks",
+                "detail": f"FAQ 不应直接写在 SKILL.md 的 ## {title} 章节里，须改用渐进式（移到 references/faq.md）",
+                "fix": {"key": "faq_progressive", "value": True,
                          "location": f"{filepath} ## {title} 章节",
-                         "operation": "用 Q: / A: 或 ### 问题标题 格式组织 FAQ，确保每对有问有答",
+                         "operation": "将 FAQ 内容移到 references/faq.md，在 SKILL.md 中添加引用 `→ 详见 references/faq.md`",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-
-    qa_pairs = _extract_qa_pairs(section_text)
-    if not qa_pairs:
+    
+    # 2. 检查 SKILL.md 是否有引用 references/faq.md
+    has_ref = bool(re.search(r'references/faq\.md', body))
+    if not has_ref:
         return {"passed": False,
-                "detail": "无法解析 FAQ 内容（请确保使用 Q:/A: 或 ### 子标题格式）",
+                "detail": "未找到对 references/faq.md 的引用（FAQ 须用渐进式）",
+                "fix": {"key": "faq_reference", "value": True,
+                         "location": f"{filepath} 正文",
+                         "operation": "创建 references/faq.md，并在 SKILL.md 中添加引用 `→ 详见 references/faq.md`",
+                         "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
+    
+    # 3. 检查 references/faq.md 是否存在
+    skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+    faq_file = os.path.join(skill_dir, 'references', 'faq.md')
+    
+    if not os.path.isfile(faq_file):
+        return {"passed": False,
+                "detail": "SKILL.md 引用了 references/faq.md 但该文件不存在",
+                "fix": {"key": "faq_file_missing", "value": True,
+                         "location": f"{faq_file}",
+                         "operation": "创建 references/faq.md，包含至少 3 对 Q&A（问题 ≥10 字，答案 ≥15 字）",
+                         "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
+    
+    # 4. 检查 references/faq.md 内容质量
+    with open(faq_file, 'r', encoding='utf-8') as f:
+        faq_content = f.read()
+    
+    # 提取 Q&A 对
+    faq_qa = _extract_qa_pairs(faq_content)
+    
+    if not faq_qa:
+        return {"passed": False,
+                "detail": "references/faq.md 无法解析 Q&A 内容（请确保使用 Q:/A: 或 ### 子标题格式）",
                 "fix": {"key": "faq_unparsable", "value": "reformat",
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{faq_file}",
                          "operation": "用 Q: 问题\n\nA: 答案\n\n 格式重写 FAQ",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-
+    
+    # 检查 Q&A 质量
     trivial_questions = ["如何工作", "怎么用", "what is", "how to", "帮助"]
     bad_pairs = []
-    for q, a in qa_pairs:
+    for q, a in faq_qa:
         q_trim = q.strip()
         a_trim = a.strip()
         if len(q_trim) < 10 or any(t in q_trim.lower() for t in trivial_questions):
             bad_pairs.append(f"Q: {q_trim[:30]}")
         if len(a_trim) < 15 or a_trim in ("请参考文档", "见上文", "see above"):
             bad_pairs.append(f"A: {a_trim[:30]}")
-
+    
     if bad_pairs:
         return {"passed": False,
                 "detail": f"FAQ 包含低质量条目（{len(bad_pairs)} 条）：{', '.join(bad_pairs[:3])}",
                 "fix": {"key": "faq_quality", "value": "improve_qa",
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{faq_file}",
                          "operation": "改进 FAQ 质量：问题须具体（≥10字），答案须有实质内容（≥15字），避免万能回答",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-
+    
     return {"passed": True,
-            "detail": f"FAQ 有意义性合格（{len(qa_pairs)} 对 Q&A）"}
+            "detail": f"FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A）"}
 
 
 def _extract_qa_pairs(section_text):
