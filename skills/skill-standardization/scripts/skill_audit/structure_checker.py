@@ -370,7 +370,7 @@ def _check_writing_standards_text(text, filename=""):
     # ── 检查1：术语一致性（🔴 必须修）───────────────────
     term_groups = [
         (["创建", "建立", "新建"], "创建"),
-        (["更新", "修改", "编辑", "变更"], "更新"),
+        (["更新", "修改", "变更"], "更新"),
         (["删除", "移除", "去掉"], "删除"),
         (["配置", "设置", "设定"], "配置"),
     ]
@@ -397,8 +397,17 @@ def _check_writing_standards_text(text, filename=""):
     cleaned = re.sub(r'`[^`]+?`', '', cleaned)
     for word, suggestion in forbidden:
         if word in cleaned:
-            prefix = f"{filename}：" if filename else ""
-            issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
+            # v2.24.2 误判排除：如果模糊词出现在"修复"、"删除"等动词后面，说明是在描述修复动作，不是实际模糊表述
+            lines = cleaned.splitlines()
+            is_false_positive = False
+            for line in lines:
+                if word in line:
+                    if any(verb in line for verb in ["修复", "删除", "统一", "修改", "更新", "移除", "去掉"]):
+                        is_false_positive = True
+                        break
+            if not is_false_positive:
+                prefix = f"{filename}：" if filename else ""
+                issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
 
     # ── 检查3：中英文混排空格（🟡 建议修）───────────────────
     mingled = re.findall(r'[一-鿿][A-Za-z]{2,}|[A-Za-z]{2,}[一-鿿]', text)
@@ -475,48 +484,50 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
 
 def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
     """
-    R-21: 渐进式加载显式说明检查 (v2.24.0 新增)
-    检查 SKILL.md 是否在显眼位置（核心能力/工作流程章节）显式说明渐进式加载。
+    R-21: 渐进式加载显式说明检查 (v2.24.2 固定模板)
+    检查 SKILL.md 是否在显眼位置（核心能力/工作流程章节）包含固定模板句。
+    ✅ v2.24.2：固定模板句必须原封不动包含，可后面接其他说明。
     """
-    # 关键词：用于检测是否显式说明了渐进式加载
-    prog_keywords = [
-        "渐进式加载", "渐进式 MD", "progressive loading",
-        "SKILL.md 为入口", "SKILL.md 为入口文件",
-        "按需加载", "拆分到 references",
-    ]
-
-    # ── 检查1：## 核心能力 章节 ──────────────────────────────
     from .utils import CORE_KEYWORDS, WORKFLOW_KEYWORDS
-    import re
-
-    # 收集所有显眼位置的文本（核心能力 + 工作流程章节）
+    
+    # v2.24.2 固定模板句子（所有技能必须原封不动包含此句，可在后面接其他说明）
+    FIXED_TEMPLATE = "> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。"
+    
+    # v2.24.2 硬编码章节名：只检查 ## 核心能力 和 ## 工作流程（不用 CORE_KEYWORDS，避免匹配到 ## 核心概念）
     prominent_texts = []
-    for keywords, section_name in [(CORE_KEYWORDS, "核心能力"), (WORKFLOW_KEYWORDS, "工作流程")]:
-        found, title, section_text = _section_text(body, keywords)
-        if found:
-            prominent_texts.append((section_name, title, section_text))
-
+    # 硬编码检查 ## 核心能力
+    found, title, section_text = _section_text(body, ["核心能力", "核心功能", "概述", "Overview", "技能概述"])
+    if found:
+        prominent_texts.append(("核心能力", title, section_text))
+    # 硬编码检查 ## 工作流程
+    found, title, section_text = _section_text(body, ["工作流程", "使用方式", "Workflow", "完整执行流程", "核心指令", "完整工作流"])
+    if found:
+        prominent_texts.append(("工作流程", title, section_text))
+    
     if not prominent_texts:
         return {"passed": False,
                 "detail": "未找到核心能力/工作流程章节，无法检查渐进式加载显式说明",
                 "fix": {"key": "progressive_loading_explicit", "value": True,
                          "location": f"{filepath} ## 核心能力 或 ## 工作流程 章节",
-                         "operation": "在 ## 核心能力 章节添加渐进式加载说明：\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。",
+                         "operation": f"在 ## 核心能力 章节添加固定模板句：{FIXED_TEMPLATE}",
                          "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
-
-    # ── 检查2：显眼位置是否包含渐进式加载关键词 ─────────────────
+    
+    # v2.24.2：直接搜固定模板句子（原封不动，可后面接其他内容）
     for section_name, title, section_text in prominent_texts:
-        for kw in prog_keywords:
-            if kw in section_text:
+        for line in section_text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(FIXED_TEMPLATE) or stripped == FIXED_TEMPLATE:
                 return {"passed": True,
-                        "detail": f"在 ## {title} 章节发现渐进式加载显式说明（关键词：{kw}）"}
-
-    # ── 未找到关键词 ─────────────────────────────────────────────
-    # 获取第一个显眼章节的名称，用于 fix 建议
+                        "detail": f"在 ## {title} 章节发现渐进式加载固定模板句"}
+    
+    # 未找到固定模板句
     first_section = prominent_texts[0][0]
+    first_title   = prominent_texts[0][1]
     return {"passed": False,
-            "detail": f"在 ## {prominent_texts[0][1]} 等显眼章节未找到渐进式加载显式说明（须含「渐进式加载」或「progressive」等关键词）",
+            "detail": f"在 ## {first_title} 等显眼章节未找到渐进式加载固定模板句",
             "fix": {"key": "progressive_loading_explicit", "value": True,
                      "location": f"{filepath} ## {first_section} 章节",
-                     "operation": f"在 ## {first_section} 章节添加渐进式加载说明：\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。\n（用本技能创建/更新/改造的技能均遵循此规范）",
+                     "operation": f"在 ## {first_section} 章节添加固定模板句：{FIXED_TEMPLATE}（必须原封不动，可在后面接其他说明）",
                      "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
+
+

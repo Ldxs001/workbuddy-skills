@@ -189,7 +189,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | `--json` | flag | ❌ | `False` | 以 JSON 格式输出结果 |
 | `--strict` | flag | ❌ | `False` | 严格模式（ERROR 级 exit(1)） |
 
-**审查规则一览（共 17 条）：**
+**审查规则一览（共 21 条）：**
 
 | ID | 级别 | 名称 | 检查内容 |
 |----|------|------|----------|
