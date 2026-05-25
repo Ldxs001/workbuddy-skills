@@ -7,9 +7,13 @@ set -eo pipefail
 # ── 0. 参数解析 ─────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 从 scripts/ 往上 4 级确定 skills 目录: skills/.standardization/<name>/data/<bak>/scripts/ → skills/
-SKILLS_DIR="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
-WORKSPACE_ROOT="$(cd "$SKILLS_DIR/.." && pwd)"
+	# 使用 pwd -W 获取 Windows 风格路径（Python 可识别）
+	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -W)"
+	
+	# 从 scripts/ 往上 2 级确定 skills 目录: skills/git-sync/scripts/ → skills/
+	# 使用 pwd -W 获取 Windows 风格路径（Python 可识别）
+	SKILLS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd -W)"
+WORKSPACE_ROOT="$(cd "$SKILLS_DIR/.." && pwd -W)"
 SKILL_NAME="${1:-}"
 VERSION="${2:-}"
 SKIP_SCAN=false
@@ -24,7 +28,9 @@ fi
 if [ -z "$VERSION" ]; then
     META_FILE="$SKILLS_DIR/$SKILL_NAME/_meta.json"
     if [ -f "$META_FILE" ]; then
-        VERSION=$(python -c "import json; f=open('$META_FILE'); meta=json.load(f); print(meta.get('version',''))" 2>/dev/null || echo "")
+        # 转换路径为 Windows 格式（Python 无法识别 /c/ 前缀）
+        META_FILE_WIN=$(cygpath -w "$META_FILE" 2>/dev/null || echo "$META_FILE")
+        VERSION=$(python -c "import json; f=open(r'$META_FILE_WIN', encoding='utf-8'); meta=json.load(f); print(meta.get('version',''))" 2>/dev/null || echo "")
     fi
     if [ -z "$VERSION" ]; then
         echo "❌ 无法读取版本号，请手动指定"; exit 1

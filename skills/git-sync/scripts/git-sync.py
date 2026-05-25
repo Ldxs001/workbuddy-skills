@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v1.0.0 - 完整 Python 版 git-sync
+git-sync.py v1.0.2 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -75,11 +75,14 @@ def step_manifest(skill_name: str, version: str, repo_name="workbuddy-skills"):
     if not manifest_py.exists():
         log(1, 8, "manifest.py 不存在，跳过", "skip")
         return
-    r = run_python(manifest_py, "check", repo_name, skill_name, capture=True)
+    # manifest.py 用 exit code 2 表示 NOT_FOUND，不能用 check=True
+    r = run_python(manifest_py, "check", repo_name, skill_name,
+                   capture=True, check=False)
     status = r.stdout.strip()
     if status == "NOT_FOUND":
         log(1, 8, "不在清单中，自动添加...", "warn")
-        run_python(manifest_py, "add", repo_name, skill_name, version)
+        run_python(manifest_py, "add", repo_name, skill_name,
+                   check=False)
     elif status == "FOUND:not-uploaded":
         log(1, 8, "在清单中，未上传（正常）", "ok")
     else:
@@ -102,8 +105,8 @@ def step_version_compare(skill_name: str, local_ver: str) -> str:
         log(2, 8, "仓库无版本记录，正常同步", "ok")
         return "normal"
     if repo_ver == local_ver:
-        log(2, 8, f"版本相同 ({local_ver})，跳过同步", "skip")
-        sys.exit(0)
+        log(2, 8, f"版本相同 ({local_ver})，跳过文件同步", "skip")
+        return "skip_sync"
     # 简单版本比较
     def ver_lt(a, b):
         na = [int(x) for x in a.split(".")]
@@ -280,33 +283,49 @@ def _detect_remote(url_pattern: str) -> str:
 
 
 def _get_cred_url(host: str) -> str:
-    """从 ~/.git-credentials 读取含凭证的 URL，匹配 host"""
+    """从 ~/.git-credentials 读取含凭证的 URL，精确匹配 host"""
     cred_file = Path.home() / ".git-credentials"
     if not cred_file.exists():
         return ""
+    best = ""
     for line in cred_file.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line and host in line:
-            return line
-    return ""
+        if not line:
+            continue
+        # 精确匹配：解析凭证 URL 的 host，与 target host 对比
+        from urllib.parse import urlparse
+        try:
+            line_host = urlparse(line).hostname or ""
+        except Exception:
+            continue
+        if line_host == host:
+            best = line
+            break  # 精确匹配，直接用
+    return best
 
 
-def _push_with_cred_url(remote_name: str, branch: str = "main") -> bool:
-    """用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector"""
-    # 读取当前 remote URL（不含凭证）
+def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
+    """
+    用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector。
+    返回 (success: bool, error_msg: str)
+    """
     r = subprocess.run(
         ["git", "remote", "get-url", remote_name],
         cwd=str(WORK_REPO), capture_output=True,
         encoding="utf-8", check=False
     )
     if r.returncode != 0:
-        return False
+        return False, f"获取 remote URL 失败: {r.stderr.strip()}"
     raw_url = r.stdout.strip()
 
-    # 构造含凭证的 URL
-    cred_url = _get_cred_url(raw_url)
+    # 从 raw_url 提取 host（如 github.com）
+    from urllib.parse import urlparse
+    parsed = urlparse(raw_url)
+    host = parsed.hostname or ""
+    
+    cred_url = _get_cred_url(host)
     if not cred_url:
-        return False  # 找不到凭证，fallback 失败
+        return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
 
     # 临时覆盖 remote URL（含凭证），push 完立刻恢复
     subprocess.run(
@@ -315,16 +334,17 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> bool:
     )
     try:
         r = run_git("push", remote_name, branch, check=False)
-        return r.returncode == 0
+        if r.returncode == 0:
+            return True, ""
+        return False, r.stderr.strip() or r.stdout.strip()
     finally:
-        # 无论成功失败，恢复原始 URL（不含凭证，保护安全）
         subprocess.run(
             ["git", "remote", "set-url", remote_name, raw_url],
             cwd=str(WORK_REPO), capture_output=True, check=False
         )
 
 
-def _pull_with_cred_url(remote_name: str, branch: str = "main") -> bool:
+def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """用凭证嵌入 URL 直接 pull，完全绕开 CredentialHelperSelector"""
     r = subprocess.run(
         ["git", "remote", "get-url", remote_name],
@@ -332,12 +352,16 @@ def _pull_with_cred_url(remote_name: str, branch: str = "main") -> bool:
         encoding="utf-8", check=False
     )
     if r.returncode != 0:
-        return False
+        return False, f"获取 remote URL 失败: {r.stderr.strip()}"
     raw_url = r.stdout.strip()
 
-    cred_url = _get_cred_url(raw_url)
+    from urllib.parse import urlparse
+    parsed = urlparse(raw_url)
+    host = parsed.hostname or ""
+
+    cred_url = _get_cred_url(host)
     if not cred_url:
-        return False
+        return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
 
     subprocess.run(
         ["git", "remote", "set-url", remote_name, cred_url],
@@ -345,7 +369,7 @@ def _pull_with_cred_url(remote_name: str, branch: str = "main") -> bool:
     )
     try:
         r = run_git("pull", remote_name, branch, "--rebase", check=False)
-        return True  # pull 失败不阻断
+        return True, ""  # pull 失败不阻断
     finally:
         subprocess.run(
             ["git", "remote", "set-url", remote_name, raw_url],
@@ -385,12 +409,13 @@ def step_commit_and_push(skill_name: str, version: str):
     gitee_ok = False
     if remote_gitee:
         log(6, 8, f"推送到码云 (remote: {remote_gitee})...", "info")
-        _pull_with_cred_url(remote_gitee, "main")
-        if _push_with_cred_url(remote_gitee, "main"):
+        _pull_with_cred_url(remote_gitee, "main")  # pull 失败不阻断
+        ok, err = _push_with_cred_url(remote_gitee, "main")
+        if ok:
             log(6, 8, "码云推送成功", "ok")
             gitee_ok = True
         else:
-            log(6, 8, "码云推送失败", "err")
+            log(6, 8, f"码云推送失败: {err}", "err")
     else:
         log(6, 8, "未找到码云远程，跳过", "warn")
 
@@ -399,11 +424,12 @@ def step_commit_and_push(skill_name: str, version: str):
     if remote_github:
         log(6, 8, f"推送到 GitHub (remote: {remote_github})...", "info")
         _pull_with_cred_url(remote_github, "main")
-        if _push_with_cred_url(remote_github, "main"):
+        ok, err = _push_with_cred_url(remote_github, "main")
+        if ok:
             log(6, 8, "GitHub 推送成功", "ok")
             github_ok = True
         else:
-            log(6, 8, "GitHub 推送失败", "err")
+            log(6, 8, f"GitHub 推送失败: {err}", "err")
     else:
         log(6, 8, "未找到 GitHub 远程，跳过", "warn")
 
@@ -498,8 +524,8 @@ def step_pack_zip(skill_name: str, version: str, skills_dir: Path,
                     zf.write(f, arcname)
     log(7, 8, f"ZIP 已生成: {zip_file}", "ok")
 
-    # 清理临时目录
-    if "tmp_dir" in dir() and tmp_dir.exists():
+    # 清理临时目录（仅在定义了 tmp_dir 时）
+    if 'tmp_dir' in locals() and tmp_dir.exists():
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return zip_file
@@ -547,8 +573,6 @@ def main():
             _cred.write_text("", encoding="utf-8")
         except Exception:
             pass
-    # 同时设置环境变量（Git 官方支持 GIT_CREDENTIAL_HELPER 覆盖配置）
-    os.environ["GIT_CREDENTIAL_HELPER"] = "store"
     # ────────────────────────────────────────────────────────────────────────
 
     parser = argparse.ArgumentParser(description="git-sync.py v1.0.0")
@@ -586,13 +610,17 @@ def main():
 
     # 执行各步骤
     step_manifest(skill_name, version)
-    step_version_compare(skill_name, version)
+    compare_result = step_version_compare(skill_name, version)
     step_normalize_meta(meta_file, skill_name, version)
     step_skill_audit(skill_name, SKILLS_DIR, MANIFEST_FILE)
 
-    # 步骤 4：同步文件
-    log(4, 8, "同步文件到工作仓库...")
-    repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
+    # 步骤 4：同步文件（版本相同时跳过）
+    if compare_result == "skip_sync":
+        log(4, 8, "跳过文件同步（版本相同）", "skip")
+        repo_skill_dir = WORK_REPO / "skills" / skill_name
+    else:
+        log(4, 8, "同步文件到工作仓库...")
+        repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
 
     step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
     step_update_readme()
