@@ -2,13 +2,26 @@
 
 ---
 
+## v2.6.2（2026-05-25）
+
+> 发布日期：2026-05-25
+
+### 修复
+- **触发条件** — 添加否定条件（R-07 修复）
+- **渐进式加载说明** — 在 ## 核心能力 章节添加固定模板句（R-21 修复）
+- **反模式章节** — 添加反模式章节，引用 references/antipatterns.md（R-18 修复）
+- **写作规范** — 修复术语不一致（移除→删除、修改→更新）、中英文混排缺少空格、模糊表述（可能→常见原因包括）（R-20 修复）
+- **版本号一致性** — 修复 SKILL.md 正文版本号与 _meta.json 不一致问题
+
+---
+
 ## v2.6.1（2026-05-24）
 
 > 发布日期：2026-05-24
 
 ### 修复
-- **6个脚本移除外部授权脚本依赖** — `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py`、`sync_with_exclude.py`、`build_index.py`、`clean_dist.py` 不再调用 `skill-standardization/scripts/authorization_manager.py`，消除跨包外部依赖风险
-- **修正动态导入** — 全部 `__import__("subprocess")` 动态导入已移除
+- **6个脚本删除外部授权脚本依赖** — `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py`、`sync_with_exclude.py`、`build_index.py`、`clean_dist.py` 不再调用 `skill-standardization/scripts/authorization_manager.py`，消除跨包外部依赖风险
+- **修正动态导入** — 全部 `__import__("subprocess")` 动态导入已删除
 - **修复重复 `main()` 调用** — 修复脚本 bug 导致的 `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py` 末尾重复 `main()` 问题
 - **SKILL.md 版本号不一致** — 顶部/底部版本号已统一
 
@@ -24,8 +37,8 @@
 > 发布日期：2026-05-24
 
 ### 修复
-- **6个脚本移除外部授权脚本依赖** — `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py`、`sync_with_exclude.py`、`build_index.py`、`clean_dist.py` 不再调用 `skill-standardization/scripts/authorization_manager.py`，消除跨包外部依赖风险
-- **修正动态导入** — 全部 `__import__("subprocess")` 动态导入已移除，改为标准 `import subprocess`（或直接删除无需使用的导入）
+- **6个脚本删除外部授权脚本依赖** — `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py`、`sync_with_exclude.py`、`build_index.py`、`clean_dist.py` 不再调用 `skill-standardization/scripts/authorization_manager.py`，消除跨包外部依赖风险
+- **修正动态导入** — 全部 `__import__("subprocess")` 动态导入已删除，改为标准 `import subprocess`（或直接删除无需使用的导入）
 - **修复重复 `main()` 调用** — 修复脚本 bug 导致的 `clean_zip_source.py`、`manifest.py`、`sensitive_scan.py` 末尾重复 `main()` 问题
 - **SKILL.md 版本号不一致** — 顶部 `version: 2.5.0` 与底部 `当前版本：2.4.0` 已统一为 `2.5.1`
 
@@ -44,8 +57,8 @@
 - **`references/permissions.md`** — 权限类型、风险等级、行为对照表（按需加载）
 - **SKILL.md 渐进式加载引用表** — 符合 skill-standardization v2.15.0 规范
 
-### 变更
-- **SKILL.md 快速开始章节** — 移除硬编码路径，改为相对路径引用
+### 更新
+- **SKILL.md 快速开始章节** — 删除硬编码路径，改为相对路径引用
 - **`scripts/git-sync.sh` 第38行** — `$WORKSPACE_ROOT/$REPO_NAME` 变量化，避免铁律4路径违规
 - **版本号**：2.4.0 → 2.5.0（SKILL.md + _meta.json + changelog.md）
 
@@ -55,7 +68,7 @@
 
 ### 审计结果
 - R-01~R-17：14/16 通过（2条跳过，实际通过率 100% ≥ 95%）
-- 保全检查：通过（结构完整性 + Python语法 + Shell语法）
+- 保全检查：通过（结构完整性 + Python 语法 + Shell 语法）
 
 ---
 
@@ -63,7 +76,7 @@
 
 **产出物路径迁移至 standardization 铁律4 结构**
 
-### 变更内容
+### 更新内容
 - `config.json` + `manifest.json` 路径：`~/.workbuddy/git-sync/` → `<workspace>/.standardization/git-sync/data`
 - 5 个脚本新增 `_find_workspace_root()`：manifest.py, normalize_meta.py, sensitive_scan.py, update_readme.py, git-sync.sh
 - 工作区根目录检测：基于目录结构 `<workspace>/skills/<name>/scripts/` 往上推导，不硬编码 `.workbuddy`
@@ -80,13 +93,13 @@
 
 ## v2.1.0（2026-05-23）
 
-**修复：版本相等时默认跳过逻辑（回退错误修改）**
+**修复：版本相等时默认跳过逻辑（回退错误更新）**
 
-### 变更内容
+### 更新内容
 - `scripts/git-sync.sh` L79-88：版本相等时恢复原版跳过逻辑
   - 交互环境：`⏭️ 仓库版本 = 本地版本，跳过同步`，可选强制
   - 非交互环境：直接跳过，输出 `⏭️ 非交互环境，已跳过（版本相同 vX.Y.Z）`
-  - 移除之前错误引入的"非交互环境默认强制更新"逻辑
+  - 删除之前错误引入的"非交互环境默认强制更新"逻辑
 - 版本号：2.0.4 → 2.1.0（SKILL.md + _meta.json + git-sync.sh）
 
 ---
@@ -95,7 +108,7 @@
 
 **改写类型：补充"工作流程"章节（R-09 合规）**
 
-### 变更内容
+### 更新内容
 - SKILL.md 新增 `## 工作流程` 章节，含 AI 执行节奏流程图 + 步骤概览表（步骤 0→6）
 - 版本号：2.0.3 → 2.0.4（SKILL.md + _meta.json）
 
@@ -105,7 +118,7 @@
 
 **改写类型：skill-standardization update 自动补充 _meta.json 字段**
 
-### 变更内容
+### 更新内容
 - `_meta.json` 补充缺失标签字段（`tags` 等），通过 skill-standardization v2.10.0 `update --fix` 自动完成
 
 ---
@@ -119,7 +132,7 @@
 - `sync_with_exclude.py` 的 `should_exclude()` 用 `"/" not in p` 判断根目录，但 `rel_path` 带了 `git-sync/` 前缀，导致 `config.json` / `manifest.json` 根目录文件未被排除
 - `pack_zip.py` 的 `pack_skill()` 传给 `should_exclude` 的 `rel_path` 也带了 `skill_name/` 前缀，同样误判
 
-### 变更内容
+### 更新内容
 
 #### `scripts/sync_with_exclude.py` — `should_exclude()` 修复
 - 改用 `os.path.dirname(p) == ""` 判断真正根目录
@@ -129,7 +142,7 @@
 - 同上的根目录判断修复
 - `pack_skill()` 中 `rel_path` 计算修正
 
-#### 文件变更
+#### 文件更新
 - 删除 `scripts/2.3.0`（zip 碎片垃圾文件）
 
 ---
@@ -143,7 +156,7 @@
 - 排除规则只作用于 `pack_zip.py`（ZIP 打包），`git-sync.sh` 的 `rsync` 步骤排除规则不完整
 - `rsync` fallback（rm -rf + cp）完全没有排除逻辑，存在安全隐患
 
-### 变更内容
+### 更新内容
 
 #### 新增文件
 
@@ -157,7 +170,7 @@
 - **新增 `RSYNC_OPTS` 数组**：与 `pack_zip.py` / `.git-sync-exclude.txt` 规则完全一致
 - **白名单优先**：`--include=settings.html` + `--include=preview.html` 在排除参数之前
 - **rsync fallback 重写**：不再用 `rm -rf` + 裸 `cp`，改为调用 `sync_with_exclude.py`
-- 移除原 fallback 中重复的 `references/` 复制块（逻辑错误）
+- 删除原 fallback 中重复的 `references/` 复制块（逻辑错误）
 
 #### `pack_zip.py` 排除规则（已有，本次补充文档）
 
@@ -170,7 +183,7 @@
 
 #### 规则维护约定
 
-- 修改排除规则时，需同步更新 3 个位置：
+- 更新排除规则时，需同步更新 3 个位置：
   1. `scripts/.git-sync-exclude.txt`（配置文件）
   2. `scripts/pack_zip.py`（Python 规则变量）
   3. `scripts/git-sync.sh`（RSYNC_OPTS 数组）
@@ -182,7 +195,7 @@
 
 **改写类型：pack_zip.py 排除规则体系重构**
 
-### 变更内容
+### 更新内容
 
 #### 问题
 - 原 `default_exclude` 使用 `*.html` blanket 排除，导致 `settings.html` 等功能文件被错误排除
@@ -198,13 +211,13 @@
 | glob 模式 | `EXCLUDE_FILES_GLOB` | `*.pyc`、`*.log`、`*.zip`、`*.bak` 等 |
 | 功能性白名单 | `FUNCTIONAL_FILE_WHITELIST` | `settings.html`、`preview.html` 不受 `*.html` 规则影响 |
 
-#### 关键变更
-- **移除 `*.html` blanket 排除**（不再需要，`index.html` 不在 skill 目录中）
+#### 关键更新
+- **删除 `*.html` blanket 排除**（不再需要，`index.html` 不在 skill 目录中）
 - **新增 `FUNCTIONAL_FILE_WHITELIST`**：`settings.html`、`preview.html`
 - `config.json` / `manifest.json` 精确匹配**仅排除根目录**，子目录的同名文件保留
 - `should_exclude()` 函数重写，支持白名单优先逻辑
 
-#### 文件变更
+#### 文件更新
 - `scripts/pack_zip.py`：整体重写，版本逻辑不变（v1.10.0 为 skill 级别版本）
 
 ---
@@ -246,7 +259,7 @@
 
 ## v1.6 — 按需同步 + 版本号对比
 
-- 【按需同步】不在全量模式下只同步用户指定的技能（默认行为变更）
+- 【按需同步】不在全量模式下只同步用户指定的技能（默认行为更新）
 - 【版本号三方对比】manifest 清单 version vs 待更新 version，决定跳过/更新/报异常
 - `manifest.py` 新增 `version` 子命令（查询/更新条目版本号）
 - 支持分平台版本号更新（`--platform gitee/github`）
@@ -254,7 +267,7 @@
 ## v1.5 — 统一输出目录 + HTML 索引页
 
 - 所有 ZIP 统一输出到 `~/.workbuddy/skills/.dist/`
-- 自动生成 `index.html` 索引页（含 `file://` 超链接、文件大小、修改时间）
+- 自动生成 `index.html` 索引页（含 `file://` 超链接、文件大小、更新时间）
 - 打包后自动打开 dist/ 目录（Windows explorer / macOS open / Linux xdg-open）
 - 修正三单一致原则描述：manifest.json ≥ 仓库实际文件 = README.md
 

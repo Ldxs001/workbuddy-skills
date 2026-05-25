@@ -38,13 +38,13 @@
 # ── 查询类 ──
 python manifest.py list                              # 列出所有条目
 python manifest.py list workbuddy-skills             # 按仓库过滤
-python manifest.py check workbuddy-skills my-skill    # 是否在清单内（退出码: 0=双ok, 1=部分, 2=未找到）
+python manifest.py check workbuddy-skills my-skill    # 是否在清单内（退出码: 0=双 ok, 1=部分, 2=未找到）
 python manifest.py version workbuddy-skills my-skill  # 查询版本号
 
-# ── 修改类 ──
+# ── 更新类 ──
 python manifest.py add workbuddy-skills my-skill --type skill              # 加入（默认 uploaded=false）
 python manifest.py add workbuddy-skills my-skill --type skill --uploaded   # 加入并标记已上传
-python manifest.py remove workbuddy-skills my-skill                       # 从清单移除
+python manifest.py remove workbuddy-skills my-skill                       # 从清单删除
 python manifest.py version workbuddy-skills my-skill 1.9.0                # 更新版本号（双平台）
 python manifest.py version workbuddy-skills my-skill 1.9.0 --platform gitee  # 仅更新码云
 python manifest.py set-uploaded workbuddy-skills my-skill --platform gitee   # 标记平台已上传
@@ -138,9 +138,9 @@ README.md（技能列表 + 目录树）
 
 通过环境变量 `GIT_SYNC_SENSITIVE_MODE` 或 `--skip-scan` 参数控制：
 
-| 模式 | 设置方式 | 行为 |
+| 模式 | 配置方式 | 行为 |
 |------|---------|------|
-| **交互提示**（默认） | 不设置或 `prompt` | 扫描后按文件粒度交互确认 |
+| **交互提示**（默认） | 不配置或 `prompt` | 扫描后按文件粒度交互确认 |
 | **总是脱敏** | `GIT_SYNC_SENSITIVE_MODE=always-sanitize` | 自动全部脱敏（非交互） |
 | **保持不变** | `GIT_SYNC_SENSITIVE_MODE=keep-as-is` 或 `--skip-scan` | 跳过扫描，源文件不动 |
 

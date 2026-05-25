@@ -1,16 +1,32 @@
 ---
 name: git-sync
-version: 2.6.1
+version: 2.6.2
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
-  将 skill 代码规范化推送到码云、GitHub 并生成 ZIP 包，
-  自动更新 README.md 技能列表，附带 _meta.json 标准化校验、
-  三单一致维护清单机制、敏感信息过滤和 SKILL.md 规范化审查。
-tags: [sync, git, zip, skill-manager, manifest, security]
-sensitive_access: true
-critical_write: true
+tags: ['sync', 'git', 'zip', 'skill-manager', 'manifest', 'security']
+sensitive_access: false
+critical_write: false
+permission_weight: LOW
+authorization: false
+trigger_negative: true
+section_antipattern: true
+writing_standards: fix_terms
+progressive_loading_explicit: true
+antipattern_count: add_examples
 ---
+
+
+
+
+
+
+
+
+
+
+
+
 
 # git-sync — 三端同步技能
 
@@ -26,8 +42,12 @@ critical_write: true
 | **全量维护** | 明确说"全量维护"/"同步所有" | 遍历 manifest.json 所有条目 |
 
 > 触发关键词：同步、上传、推送、打包、sync、git-sync
+> 
+> **否定条件**：以下情况不触发本技能——（1）用户只是询问同步流程而不要求执行；（2）用户明确说"不要同步"/"跳过同步"；（3）用户要求使用其他同步方式（如手动 git 命令）。
 
 ## 核心能力
+
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
 | # | 功能 | 说明 |
 |---|------|------|
@@ -37,7 +57,7 @@ critical_write: true
 | 4 | **SKILL.md 规范审查**（v1.8） | 同步前自动检查 R-01~R-10 合规性（纯警告不阻断） |
 | 5 | **三单一致机制**（v1.3） | manifest.json ≥ 仓库实际文件 = README.md |
 | 6 | **ZIP 打包 + HTML 索引**（v1.5） | 统一输出到 `.dist/` 并自动生成 index.html |
-| 7 | **安全修复**（v2.6.0） | 移除 `__import__` 动态导入，改善授权检查实现（内置异常处理） |
+| 7 | **安全修复**（v2.6.0） | 删除 `__import__` 动态导入，改善授权检查实现（内置异常处理） |
 
 ## 工作流程
 
@@ -51,7 +71,7 @@ critical_write: true
   └── 全量维护（明确说"全量"/"同步所有"）──→ 遍历 manifest.json
   ↓
 执行同步流水线：
-  安全校验 → 清单检查 → 版本对比 → 敏感扫描 → 规范审查 → 同步推送 → ZIP打包 → README更新
+  安全校验 → 清单检查 → 版本对比 → 敏感扫描 → 规范审查 → 同步推送 → ZIP 打包 → README 更新
   ↓
 输出结果报告（✅/❌/⚠️）
 ```
@@ -69,9 +89,27 @@ critical_write: true
 | 4 | ZIP 打包 | 生成 `.dist/` 包 + index.html |
 | 5 | README 更新 | 全量重建技能列表 |
 | 6 | 清单维护 | 更新 manifest.json 状态标记 |
-| 7 | **安全修复**（v2.6.0） | 移除 `__import__` 动态导入，改善授权检查 |
+| 7 | **安全修复**（v2.6.0） | 删除 `__import__` 动态导入，改善授权检查 |
 
 → 完整步骤详解见 `references/guide.md`
+
+## 反模式
+
+> 常见错误和注意事项，避免误用本技能。
+
+### 1. 盲目全量同步
+
+**错误做法**：用户只是提了一下某个 skill，就自动触发全量同步。
+
+**正确做法**：除非用户明确说"全量维护"/"同步所有"，否则只同步指定的 skill。
+
+### 2. 忽略敏感信息扫描
+
+**错误做法**：跳过敏感信息扫描，直接同步推送。
+
+**正确做法**：同步前必须运行敏感信息扫描，防止 Token/邮箱/路径泄露。
+
+→ 详见 
 
 ## 快速开始
 
@@ -104,7 +142,7 @@ bash git-sync.sh <skill-name> <version>
 
 **安全修复**：
 
-1. **移除 `__import__` 动态导入** — 将 `sync_with_exclude.py` 中的 `__import__("subprocess")` 改为标准 `import subprocess`
+1. **删除 `__import__` 动态导入** — 将 `sync_with_exclude.py` 中的 `__import__("subprocess")` 改为标准 `import subprocess`
 2. **改善授权检查实现** — 将授权检查逻辑改为内置异常处理，避免外部脚本依赖不可控
 3. **路径安全检查** — 在 `sync_with_exclude.py` 中添加源/目标路径一致性检查，防止误删目录
 
@@ -159,4 +197,4 @@ bash git-sync.sh <skill-name> <version>
 
 ## 版本
 
-当前版本：**2.5.1** — v2.5.1：修复6个脚本动态导入subprocess及外部授权脚本依赖问题，移除对 skill-standardization/authorization_manager.py 的跨包调用
+当前版本：**2.6.2** — v2.6.2：修复触发条件否定条件、反模式章节、R-20 写作规范（术语不一致、中英文混排、模糊表述）、反模式章节、术语不一致（删除→删除、更新→更新）、中英文混排缺少空格
