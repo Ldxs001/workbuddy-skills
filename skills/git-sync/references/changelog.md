@@ -1,7 +1,24 @@
 # git-sync 版本更新日志
 
 ---
-## v2.6.19（2026-05-25）
+## v2.6.20（2026-05-25）
+
+> 发布日期：2026-05-25
+
+### 修复
+
+- **`step_skill_audit` 行为修正**
+  - 明确为「只读扫描，不修改、不阻断」
+  - 删除逐条 ERROR/WARN 细节输出，只输出结论（PASS / WARN / FAIL）
+  - 函数文档字符串（docstring）明确声明不修改任何文件
+  - `skill_audit` 调用参数确保只传 `audit` 子命令，不传 `--fix` / `--refactor` 等修改类参数
+
+### 影响文件
+
+- `scripts/git-sync.py` — `step_skill_audit()`
+
+---
+
 
 > 发布日期：2026-05-25
 

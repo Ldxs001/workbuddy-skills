@@ -148,14 +148,18 @@ def step_normalize_meta(meta_file: Path, skill_name: str, version: str):
     desc = get_meta_desc(meta_file)
     run_python(normalize_py, str(meta_file), skill_name, version, desc)
 
-# ── 步骤 3.5：SKILL.md 规范化审查 ────────────────────────────────────────
+# ── 步骤 3.5：SKILL.md 规范化审查（只读扫描，不修改、不阻断） ────────────────────────────────────────
 def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
-    log("3.5", 8, "SKILL.md 规范审查...")
+    """
+    只读扫描 SKILL.md 规范性，不修改任何文件，不阻断同步流程。
+    仅输出审计结论，不展开逐条细节。
+    """
+    log("3.5", 8, "SKILL.md 规范审查（只读扫描）...")
     skill_md = skills_dir / skill_name / "SKILL.md"
     if not skill_md.exists():
         log("3.5", 8, "SKILL.md 不存在，跳过审查", "skip")
         return
-    # 读取清单中的版本号
+    # 读取清单中的版本号（用于审计参考，不影响流程）
     manifest_ver = ""
     try:
         m = json.load(open(manifest_file, encoding="utf-8"))
@@ -165,6 +169,7 @@ def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
         pass
     audit_out = SCRIPT_DIR / f".audit_{skill_name}.json"
     # 调用本地 bundled skill_audit 包（python -m skill_audit）
+    # 注意：只传 audit 子命令，不传任何 --fix / --refactor 等修改类参数
     env = _git_env()
     env["PYTHONUTF8"] = "1"
     cmd = [
@@ -179,22 +184,26 @@ def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
         check=False, env=env,
         stdin=subprocess.DEVNULL,
     )
+    # skill_audit --json 输出到 stdout，需要手动写入 audit_out
+    if r.stdout and r.returncode == 0:
+        try:
+            import json as _json
+            _d = _json.loads(r.stdout)
+            audit_out.write_text(r.stdout, encoding="utf-8")
+        except Exception:
+            pass
     if audit_out.exists():
         d = json.load(open(audit_out, encoding="utf-8"))
         errors = d["summary"]["errors"]
         warns  = d["summary"]["warns"]
         verdict = d["verdict"]
-        print(f"  审查结果: {verdict} (ERROR={errors}, WARN={warns})")
-        if errors > 0:
-            print("  ⚠️  发现 ERROR 级问题（纯警告，不阻断同步）：")
-            for r in d["results"]:
-                if not r["passed"] and r.get("severity") == "ERROR":
-                    print(f"    {r['rule_id']} {r['rule_name']}: {r['detail']}")
-        if warns > 0:
-            print("  💡 WARN 级建议：")
-            for r in d["results"]:
-                if not r["passed"] and r.get("severity") == "WARN":
-                    print(f"    {r['rule_id']} {r['rule_name']}: {r['detail']}")
+        # 只输出结论，不展开细节
+        if verdict == "pass":
+            print(f"  ✅ 审查结论：PASS（ERROR={errors}, WARN={warns}）")
+        elif verdict == "warn":
+            print(f"  💡 审查结论：WARN（ERROR={errors}, WARN={warns}）—— 建议优化，不阻断同步")
+        else:
+            print(f"  ⚠️  审查结论：{verdict}（ERROR={errors}, WARN={warns}）—— 仅记录，不阻断同步")
         audit_out.unlink(missing_ok=True)
     else:
         log("3.5", 8, "审查执行失败，跳过", "warn")
@@ -268,11 +277,11 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
     total_findings = sum(len(e.get("findings", [])) for e in d)
     print(f"  ⚠️  发现敏感信息：共 {len(d)} 个文件，{total_findings} 处")
     for e in d:
-        rel = Path(e["file"]).relative_to(repo_skill_dir)
+        file_rel = e["file"]       # 已是相对路径，如 "references/faq.md"
         finds = e.get("findings", [])
         if not finds:
             continue
-        print(f"  📄 {rel}（{len(finds)} 处）")
+        print(f"  📄 {file_rel}（{len(finds)} 处）")
         for f in finds[:5]:          # 每文件最多显示 5 条
             label = f.get("label", "敏感信息")
             severity = f.get("severity", "")
@@ -295,7 +304,7 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
         # 先备份脱敏前的文件哈希（用于对比）
         sanitized_files = set()
         for e in d:
-            sanitized_files.add(Path(e["file"]))
+            sanitized_files.add(repo_skill_dir / e["file"])
 
         run_python(scan_py, "apply", str(repo_skill_dir),
                    "--decisions", str(decisions),
@@ -305,7 +314,7 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
         print(f"  ✅ 脱敏完成，涉及 {len(sanitized_files)} 个文件：")
         for fp in sorted(sanitized_files):
             rel = fp.relative_to(repo_skill_dir)
-            print(f"      - {rel}")
+            print(f"      - {file_rel}")
     else:
         log("4.5", 8, "无脱敏决策文件，跳过脱敏", "warn")
 

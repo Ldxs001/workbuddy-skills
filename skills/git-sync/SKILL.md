@@ -5,16 +5,24 @@ author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
 tags: ['sync', 'git', 'zip', 'skill-manager', 'manifest', 'security']
-sensitive_access: false
+sensitive_access: true
 critical_write: false
-permission_weight: LOW
+permission_weight: CRITICAL
 authorization: false
 trigger_negative: true
 section_antipattern: true
 writing_standards: fix_terms
 progressive_loading_explicit: true
 antipattern_count: add_examples
+antipattern_progressive: true
 ---
+
+
+
+
+
+
+
 
 # git-sync v2.6.6 — 三端同步技能
 
