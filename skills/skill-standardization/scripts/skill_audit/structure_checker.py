@@ -431,51 +431,57 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
     for k in all_issues:
         all_issues[k] += issues[k]
 
-    # ── 新增：功能贴合性检查（v2.24.2）────────────────────
+    # ── 新增：脚本调用验证检查（v2.24.4）────────────────────
+    # 检查 SKILL.md 里提到的脚本是否真实存在、能否正常运行（--help 验证）
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     if skill_dir and os.path.isdir(skill_dir):
-        # 检查 1：功能列表存在性（🟡 建议修）
-        # 在 ## 核心能力 章节查找功能列表（表格格式 | # | 功能 | 说明 |）
-        import re
-        core_section = _section_text(body, ["核心能力", "核心功能", "概述", "Overview", "技能概述"])
-        if core_section[0]:  # found
-            # 检查章节内是否有表格
-            has_table = False
-            for line in core_section[2].splitlines():
-                if line.strip().startswith('|') and '功能' in line:
-                    has_table = True
-                    break
-            if not has_table:
-                all_issues["suggest"].append("## 核心能力 章节建议添加功能列表（表格格式：| # | 功能 | 说明 |）")
+        import re, subprocess
         
-        # 检查 2：参数说明（🟡 建议修）
-        # 如果 scripts/*.py 里有 argparse/sys.argv，检查是否有 ## 参数 或 ## 使用方法 章节
-        scripts_dir = os.path.join(skill_dir, 'scripts')
-        has_argparse = False
-        if os.path.isdir(scripts_dir):
-            for fname in os.listdir(scripts_dir):
-                if not fname.endswith('.py'):
+        # 1. 解析 SKILL.md 里的代码块（```bash ... ```）和行内代码（`...`）
+        code_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', body, re.DOTALL)
+        inline_codes = re.findall(r'`([^`]+?)`', body)
+        
+        all_commands = []
+        for block in code_blocks:
+            for line in block.splitlines():
+                line = line.strip()
+                if line.startswith('#'):
                     continue
-                fpath = os.path.join(scripts_dir, fname)
+                all_commands.append(line)
+        all_commands.extend(inline_codes)
+        
+        # 2. 提取脚本路径（如 python scripts/xxx.py --list）
+        script_paths = set()
+        for cmd in all_commands:
+            match = re.search(r'(?:python3?)\s+([^\s]+\.py)', cmd)
+            if match:
+                script_path = match.group(1)
+                # v2.24.4 修复：跳过包含变量的路径（如 {SKILL_DIR}/scripts/...）
+                if '{' in script_path or '}' in script_path:
+                    continue
+                script_paths.add(script_path)
+        
+        # 3. 检查脚本文件是否存在、能否运行 --help
+        for script_path in script_paths:
+            full_path = os.path.join(skill_dir, script_path)
+            if not os.path.isfile(full_path):
+                all_issues["suggest"].append(f"SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望路径：{full_path}）")
+            else:
+                # 尝试运行 --help 验证脚本可调用
                 try:
-                    with open(fpath, 'r', encoding='utf-8') as sf:
-                        code = sf.read()
-                        if 'argparse' in code or 'sys.argv' in code:
-                            has_argparse = True
-                            break
-                except Exception:
-                    continue
-        if has_argparse:
-            # 检查 SKILL.md 是否有 ## 参数 或 ## 使用方法 章节
-            param_kws = ["参数", "使用方法", "参数说明", "命令行参数", "使用说明"]
-            found_param = False
-            for kws in param_kws:
-                if kws in body:
-                    found_param = True
-                    break
-            if not found_param:
-                all_issues["suggest"].append("scripts/*.py 含 argparse/sys.argv，建议在 SKILL.md 添加 ## 参数 或 ## 使用方法 章节")
-
+                    result = subprocess.run(
+                        ['python', full_path, '--help'],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode != 0:
+                        all_issues["suggest"].append(f"脚本 `{script_path}` --help 返回非零退出码（{result.returncode}），可能参数定义有误")
+                except subprocess.TimeoutExpired:
+                    all_issues["suggest"].append(f"脚本 `{script_path}` --help 超时（>5秒），可能有问题")
+                except FileNotFoundError:
+                    all_issues["suggest"].append(f"脚本 `{script_path}` 无法运行（python 命令不存在？）")
+                except Exception as e:
+                    all_issues["suggest"].append(f"脚本 `{script_path}` 运行出错：{str(e)[:100]}")
+    
         # ── 检查渐进式文件 references/*.md ────────────────
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     refs_dir = os.path.join(skill_dir, 'references')
