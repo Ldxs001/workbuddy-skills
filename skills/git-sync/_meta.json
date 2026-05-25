@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.6.7",
-  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查。v2.6.7：修复 git-sync.py 完全静默推送（CredentialHelperSelector 弹出问题）、修复所有 json.load(open(...)) 编码问题、新增 _get_git_env() 智能凭证环境检测",
+  "version": "2.6.8",
+  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查。v2.6.8：彻底修复 CredentialHelperSelector 弹出问题（删除无效的 GIT_CREDENTIAL_HELPER 环境变量设置，改为显式配置 credential.helper=store；修复 GitHub 推送失败根源——远程名自动检测替代硬编码 origin；修复 json.load(open(...)) 编码问题",
   "author": "wUwproject",
   "tags": [
     "sync",

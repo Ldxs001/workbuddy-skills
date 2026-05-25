@@ -51,12 +51,10 @@ def run_python(script: Path, *args, capture=False, check=True):
                         check=check, env=env,
                         stdin=subprocess.DEVNULL)
 
-def run_git(*args, workdir=None, check=True, env_extra=None):
+def run_git(*args, workdir=None, check=True):
     """运行 git 命令，完全静默不弹 UI"""
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    if env_extra:
-        env.update(env_extra)
     cmd = ["git", *[str(a) for a in args]]
     return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
                         capture_output=True, encoding="utf-8",
@@ -260,23 +258,18 @@ def step_update_readme(repo_name="workbuddy-skills"):
     log(5, 8, "README.md 已更新", "ok")
 
 # ── 步骤 6：提交并推送到双平台 ────────────────────────────────────────────
-def _get_git_env():
-    """获取 git 环境变量字典，阻止 CredentialHelperSelector 弹出"""
-    env_extra = {}
+def _detect_remote(url_pattern: str) -> str:
+    """根据 URL 关键字检测远程名，找不到返回空字符串"""
     r = subprocess.run(
-        ["git", "config", "--get", "credential.helper"],
+        ["git", "remote", "-v"],
         cwd=str(WORK_REPO), capture_output=True,
         encoding="utf-8", check=False
     )
-    if r.returncode != 0 or not r.stdout.strip():
-        # 未配置：设为空字符串禁用助手，依赖已缓存凭证（完全静默）
-        env_extra["GIT_CREDENTIAL_HELPER"] = ""
-        log(6, 8, "凭证助手未配置，已禁用（使用缓存凭证）", "warn")
-    else:
-        configured = r.stdout.strip()
-        env_extra["GIT_CREDENTIAL_HELPER"] = configured
-        log(6, 8, f"凭证助手已配置: {configured}", "ok")
-    return env_extra
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and url_pattern in parts[1]:
+            return parts[0]
+    return ""
 
 
 def step_commit_and_push(skill_name: str, version: str):
@@ -285,47 +278,59 @@ def step_commit_and_push(skill_name: str, version: str):
         log(6, 8, f"工作仓库不存在: {WORK_REPO}", "err")
         return False, False
 
-    env_extra = _get_git_env()
+    # 显式配置 credential.helper，阻止 CredentialHelperSelector 弹出
+    run_git("config", "credential.helper", "store")
+    log(6, 8, "凭证助手已显式配置: store", "ok")
 
     # git config
-    run_git("config", "user.email", "workbuddy@local", check=False, env_extra=env_extra)
-    run_git("config", "user.name",  "WorkBuddy",  check=False, env_extra=env_extra)
+    run_git("config", "user.email", "workbuddy@local", check=False)
+    run_git("config", "user.name",  "WorkBuddy",  check=False)
 
     # add
-    run_git("add", f"skills/{skill_name}/", env_extra=env_extra)
-    run_git("add", "README.md", check=False, env_extra=env_extra)
+    run_git("add", f"skills/{skill_name}/")
+    run_git("add", "README.md", check=False)
 
     # commit
-    r = run_git("diff", "--cached", "--quiet", check=False, env_extra=env_extra)
+    r = run_git("diff", "--cached", "--quiet", check=False)
     if r.returncode == 0:
         log(6, 8, "没有变更需要提交", "skip")
-        return True, True  # 无变更也算成功
+        return True, True
 
     msg = f"feat: sync {skill_name} v{version}"
-    run_git("commit", "-m", msg, env_extra=env_extra)
+    run_git("commit", "-m", msg)
     log(6, 8, f"已提交: {msg}", "ok")
+
+    # 自动检测远程名
+    remote_gitee  = _detect_remote("gitee.com")
+    remote_github = _detect_remote("github.com")
 
     # push to Gitee
     gitee_ok = False
-    log(6, 8, "推送到码云...", "info")
-    r = run_git("pull", "gitee", "main", "--rebase", check=False, env_extra=env_extra)
-    r = run_git("push", "gitee", "main", check=False, env_extra=env_extra)
-    if r.returncode == 0:
-        log(6, 8, "码云推送成功", "ok")
-        gitee_ok = True
+    if remote_gitee:
+        log(6, 8, f"推送到码云 (remote: {remote_gitee})...", "info")
+        run_git("pull", remote_gitee, "main", "--rebase", check=False)
+        r = run_git("push", remote_gitee, "main", check=False)
+        if r.returncode == 0:
+            log(6, 8, "码云推送成功", "ok")
+            gitee_ok = True
+        else:
+            log(6, 8, f"码云推送失败: {r.stderr.strip()}", "err")
     else:
-        log(6, 8, f"码云推送失败: {r.stderr.strip()}", "err")
+        log(6, 8, "未找到码云远程，跳过", "warn")
 
     # push to GitHub
     github_ok = False
-    log(6, 8, "推送到 GitHub...", "info")
-    r = run_git("pull", "origin", "main", "--rebase", check=False, env_extra=env_extra)
-    r = run_git("push", "origin", "main", check=False, env_extra=env_extra)
-    if r.returncode == 0:
-        log(6, 8, "GitHub 推送成功", "ok")
-        github_ok = True
+    if remote_github:
+        log(6, 8, f"推送到 GitHub (remote: {remote_github})...", "info")
+        run_git("pull", remote_github, "main", "--rebase", check=False)
+        r = run_git("push", remote_github, "main", check=False)
+        if r.returncode == 0:
+            log(6, 8, "GitHub 推送成功", "ok")
+            github_ok = True
+        else:
+            log(6, 8, f"GitHub 推送失败: {r.stderr.strip()}", "err")
     else:
-        log(6, 8, f"GitHub 推送失败: {r.stderr.strip()}", "err")
+        log(6, 8, "未找到 GitHub 远程，跳过", "warn")
 
     return gitee_ok, github_ok
 
