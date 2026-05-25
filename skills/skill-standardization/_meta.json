@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.24.2",
-  "description": "Skill 标准化规范引擎 v2.24.2。R-21 改为固定模板句检测（v2.24.2）；R-20 一次性扫描所有问题并分级；修复 skill-sub 的渐进式加载说明误用。",
+  "version": "2.24.3",
+  "description": "Skill 标准化规范引擎 v2.24.3。新增：R-20 功能贴合性检查（功能列表存在性、参数说明）；R-21 固定模板句检测（v2.24.2）；R-20 一次性扫描所有问题并分级。",
   "author": "wUwproject",
   "tags": [
     "standardization",

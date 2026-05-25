@@ -431,7 +431,52 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
     for k in all_issues:
         all_issues[k] += issues[k]
 
-    # ── 检查渐进式文件 references/*.md ────────────────
+    # ── 新增：功能贴合性检查（v2.24.2）────────────────────
+    skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+    if skill_dir and os.path.isdir(skill_dir):
+        # 检查 1：功能列表存在性（🟡 建议修）
+        # 在 ## 核心能力 章节查找功能列表（表格格式 | # | 功能 | 说明 |）
+        import re
+        core_section = _section_text(body, ["核心能力", "核心功能", "概述", "Overview", "技能概述"])
+        if core_section[0]:  # found
+            # 检查章节内是否有表格
+            has_table = False
+            for line in core_section[2].splitlines():
+                if line.strip().startswith('|') and '功能' in line:
+                    has_table = True
+                    break
+            if not has_table:
+                all_issues["suggest"].append("## 核心能力 章节建议添加功能列表（表格格式：| # | 功能 | 说明 |）")
+        
+        # 检查 2：参数说明（🟡 建议修）
+        # 如果 scripts/*.py 里有 argparse/sys.argv，检查是否有 ## 参数 或 ## 使用方法 章节
+        scripts_dir = os.path.join(skill_dir, 'scripts')
+        has_argparse = False
+        if os.path.isdir(scripts_dir):
+            for fname in os.listdir(scripts_dir):
+                if not fname.endswith('.py'):
+                    continue
+                fpath = os.path.join(scripts_dir, fname)
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as sf:
+                        code = sf.read()
+                        if 'argparse' in code or 'sys.argv' in code:
+                            has_argparse = True
+                            break
+                except Exception:
+                    continue
+        if has_argparse:
+            # 检查 SKILL.md 是否有 ## 参数 或 ## 使用方法 章节
+            param_kws = ["参数", "使用方法", "参数说明", "命令行参数", "使用说明"]
+            found_param = False
+            for kws in param_kws:
+                if kws in body:
+                    found_param = True
+                    break
+            if not found_param:
+                all_issues["suggest"].append("scripts/*.py 含 argparse/sys.argv，建议在 SKILL.md 添加 ## 参数 或 ## 使用方法 章节")
+
+        # ── 检查渐进式文件 references/*.md ────────────────
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     refs_dir = os.path.join(skill_dir, 'references')
     if os.path.isdir(refs_dir):
