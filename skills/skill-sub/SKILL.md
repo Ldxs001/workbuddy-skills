@@ -37,6 +37,8 @@ progressive_loading_explicit: true
 
 
 
+
+
 # skill-sub v1.13.0
 
 > 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
@@ -54,6 +56,21 @@ progressive_loading_explicit: true
 | 1 | **调用链编排** | 理解用户意图 → 规划 Skill 参与顺序 → 创建/更新/保存/推荐调用链 → 拼接为调用链 |
 | 2 | **三种角色** | 规划器（理解意图）、编辑器（管理调用链）、推荐器（推荐 Skill 组合） |
 | 3 | **渐进式加载** | `SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载 |
+
+---
+
+## 参数
+
+本技能通过 `scripts/*.py` 提供命令行参数（使用 `argparse` 解析）：
+
+| 脚本 | 参数 | 说明 |
+|---|------|------|
+| `scripts/chain_manager.py` | `--list`, `--create`, `--update`, `--delete`, `--save` | 调用链管理（创建/更新/删除/保存） |
+| `scripts/chain_executor.py` | `--chain`, `--execute`, `--dry-run` | 调用链执行（指定链/执行/干跑） |
+| `scripts/settings.py` | `--get`, `--set`, `--list` | 配置管理（读取/配置/列出） |
+| `scripts/skill_extractor.py` | `--skill-dir`, `--output` | 调用链提取（指定技能目录/输出路径） |
+
+> 💡 可直接 `python scripts/chain_manager.py --list` 查看所有调用链，或 `python scripts/chain_executor.py --chain <name> --dry-run` 干跑某条链。
 
 ---
 
