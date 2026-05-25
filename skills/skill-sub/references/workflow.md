@@ -13,11 +13,11 @@ AI 执行 6 步流程：
 1. **分析意图**：理解用户想串联哪些技能、达成什么目的
 2. **读取技能信息**：对每个涉及技能，运行 `skill_extractor.py scan` 提取关键步骤和指令
 3. **规划步骤**：确定步骤顺序、依赖关系、并行机会
-4. **设置策略**：根据里程碑规则自动判断 + 用户确认调整
+4. **配置策略**：根据里程碑规则自动判断 + 用户确认调整
 5. **展示确认**：展示完整调用链供用户确认（包括里程碑标记和判断依据）
-6. **命名保存**：根据设置决定自动命名或询问用户
+6. **命名保存**：根据配置决定自动命名或询问用户
 
-> **记忆参考（设置启用时）**：在步骤2后，读取 MEMORY.md 和近期日志，提取用户偏好和习惯，用于增强步骤描述的个性化。
+> **记忆参考（配置启用时）**：在步骤2后，读取 MEMORY.md 和近期日志，提取用户偏好和习惯，用于增强步骤描述的个性化。
 
 ### 预生成（suggest）
 
@@ -107,9 +107,9 @@ backup、restore、build、compile、install
 
 ### 里程碑行为
 
-- **里程碑步骤失败** → 无论 `on_exhaust` 设置如何，**强制中止整条链**
+- **里程碑步骤失败** → 无论 `on_exhaust` 配置如何，**强制中止整条链**
 - **里程碑步骤的 on_exhaust** → 建议设为 `abort`（validate 时会发出警告）
-- **非里程碑步骤失败** → 按 `on_exhaust` 设置处理（ask/skip/abort）
+- **非里程碑步骤失败** → 按 `on_exhaust` 配置处理（ask/skip/abort）
 
 ---
 
@@ -133,7 +133,7 @@ backup、restore、build、compile、install
 | auth_error | - | 认证/权限错误，直接询问用户 |
 | other | 2 秒 | 其他错误 |
 
-重试次数从设置读取（默认3次），耗尽后按 `on_exhaust` 处理。
+重试次数从配置读取（默认3次），耗尽后按 `on_exhaust` 处理。
 
 ---
 
@@ -144,15 +144,15 @@ backup、restore、build、compile、install
 3. **里程碑步骤失败立即中止**：不继续后续步骤
 4. **非里程碑步骤失败按 on_exhaust 处理**：ask（询问）/ skip（跳过）/ abort（中止）
 5. **记录变量传递**：步骤输出变量作为后续步骤输入
-6. **命名遵循设置**：`naming_mode=auto` 时 AI 自动命名，`manual` 时询问用户
+6. **命名遵循配置**：`naming_mode=auto` 时 AI 自动命名，`manual` 时询问用户
 
 ---
 
-## 设置界面
+## 配置界面
 
-### 设置项说明
+### 配置项说明
 
-| 设置项 | 选项 | 说明 |
+| 配置项 | 选项 | 说明 |
 |--------|------|------|
 | **记忆参考** | 是 / 否 | 创建/执行调用链时，是否读取用户记忆文件增强步骤描述 |
 | **命名方式** | 自动 / 人工 | 创建调用链时，由 AI 自动命名还是询问用户 |
@@ -163,7 +163,7 @@ backup、restore、build、compile、install
 > **配置路径**：`~/.workbuddy/skill-sub/config.json`
 > **默认配置**：`{skill_dir}/assets/default_config.json`
 
-**方式 1：HTML 设置界面（推荐）**
+**方式 1：HTML 配置界面（推荐）**
 
 Agent 执行：
 1. 运行 `python {SKILL_DIR}/scripts/settings.py --serve-only`
@@ -184,9 +184,9 @@ python {SKILL_DIR}/scripts/settings.py --get-config
 python {SKILL_DIR}/scripts/settings.py --save-config '{"use_memory_reference": true, "naming_mode": "auto", "default_max_retries": 5}'
 ```
 
-**方式 4：对话式设置（回退方案）**
+**方式 4：对话式配置（回退方案）**
 
-当 HTML 设置界面无法打开时，通过对话方式收集配置：
+当 HTML 配置界面无法打开时，通过对话方式收集配置：
 
 ```
 步骤 1：记忆参考

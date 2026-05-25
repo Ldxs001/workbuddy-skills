@@ -16,7 +16,19 @@ section_antipattern: true
 section_faq: true
 trigger_danger: remove_dangerous
 external_data_dir: true
+progressive_loading_explicit: true
 ---
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -30,6 +42,18 @@ external_data_dir: true
 > 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
 
 调用链编排器，兼具**编辑器**和**粗粒度规划器**双重角色，将多个 Skill 编排为调用链。
+
+---
+
+## 核心能力
+
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+
+| # | 功能 | 说明 |
+|---|------|------|
+| 1 | **调用链编排** | 理解用户意图 → 规划 Skill 参与顺序 → 创建/更新/保存/推荐调用链 → 拼接为调用链 |
+| 2 | **三种角色** | 规划器（理解意图）、编辑器（管理调用链）、推荐器（推荐 Skill 组合） |
+| 3 | **渐进式加载** | `SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载 |
 
 ---
 
@@ -175,7 +199,7 @@ python {SKILL_DIR}/scripts/chain_executor.py plan --name "链名"
 python {SKILL_DIR}/scripts/chain_manager.py list
 python {SKILL_DIR}/scripts/chain_manager.py delete --name "链名"
 
-# HTML 设置界面
+# HTML 配置界面
 python {SKILL_DIR}/scripts/settings.py
 ```
 
@@ -214,7 +238,7 @@ python {SKILL_DIR}/scripts/settings.py
 1. **skill-sub 本身不参与调用链** — 它是编辑器/规划器/编排器，不是链的执行环节
 2. **生成的调用链是可复用的** — 不绑定单次任务，可复用于同类任务
 3. **三阶段缺一不可**：不理解→摘取不全；不摘取→链内容空洞；不拼接→无产出
-4. **里程碑步骤失败强制中止** — 无论 `on_exhaust` 设置
+4. **里程碑步骤失败强制中止** — 无论 `on_exhaust` 配置
 5. **本文件 ≤200 行** — 超出部分拆分到 `references/`
 
 ---

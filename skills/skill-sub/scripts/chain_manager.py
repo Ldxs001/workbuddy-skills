@@ -4,7 +4,7 @@ chain_manager.py - Skill Sub Manager v1.2.1
 调用链管理核心脚本：创建、查询、更新、删除、执行调用链。
 
 v1.1.0: retry_policy、failure_mode、skill_instruction 字段支持。
-v1.2.0: 设置功能集成（记忆参考、命名方式、重试次数）、里程碑通用逻辑规则。
+v1.2.0: 配置功能集成（记忆参考、命名方式、重试次数）、里程碑通用逻辑规则。
 v1.2.1: 修复 --tags 参数解析 bug：支持 JSON 数组字符串输入，兼容逗号分隔回退。
 
 零外部依赖，仅使用 Python 标准库。
@@ -358,7 +358,7 @@ def cmd_init(args):
     if not CONFIG_FILE.exists():
         # 从默认配置生成
         config = load_user_config()
-        # 移除内部字段
+        # 删除内部字段
         config.pop("_saved", None)
         config.pop("_skill_sub_home", None)
         # 确保基础字段存在
@@ -369,12 +369,12 @@ def cmd_init(args):
     print(f"   数据目录: {CHAIN_HOME}")
     print(f"   调用链目录: {CHAINS_DIR}")
 
-    # 输出当前设置
+    # 输出当前配置
     config = load_user_config()
     mem_ref = config.get("use_memory_reference", False)
     naming = config.get("naming_mode", "manual")
     retries = config.get("default_max_retries", 3)
-    print(f"   设置: 记忆参考={'是' if mem_ref else '否'} | 命名={'自动' if naming == 'auto' else '人工'} | 重试={retries}次")
+    print(f"   配置: 记忆参考={'是' if mem_ref else '否'} | 命名={'自动' if naming == 'auto' else '人工'} | 重试={retries}次")
     return 0
 
 
@@ -434,7 +434,7 @@ def cmd_create(args):
     # 检查重名
     index = load_index()
     if args.name in index:
-        print(f"⚠️ 调用链 '{args.name}' 已存在。使用 update-step 或 rename 修改。")
+        print(f"⚠️ 调用链 '{args.name}' 已存在。使用 update-step 或 rename 更新。")
         return 1
 
     # 里程碑分类（在首次保存前完成，合并为一次保存）
@@ -443,7 +443,7 @@ def cmd_create(args):
         for r in ms_results:
             if r["is_milestone"]:
                 step_obj = steps[r["step_index"] - 1]
-                # 不是显式标记才自动设置（显式标记的用户意图已保留）
+                # 不是显式标记才自动配置（显式标记的用户意图已保留）
                 if step_obj.get("failure_mode", {}).get("is_milestone") is not True:
                     step_obj.setdefault("failure_mode", {})
                     step_obj["failure_mode"]["is_milestone"] = True
@@ -620,7 +620,7 @@ def cmd_run(args):
         if not skill_found and skill_name:
             missing_skills.append(skill_name)
 
-    # 读取设置
+    # 读取配置
     config = load_user_config()
     use_memory = config.get("use_memory_reference", False)
 
@@ -723,7 +723,7 @@ def cmd_run(args):
     print(f"     执行超时(timeout): 间隔5秒")
     print(f"     认证错误(auth_error): 直接询问用户")
     print(f"     其他错误: 间隔2秒")
-    print(f"     耗尽后按 on_exhaust 设置处理（ask/skip/abort）")
+    print(f"     耗尽后按 on_exhaust 配置处理（ask/skip/abort）")
 
     if args.verbose:
         print(f"\n{'─'*70}")
@@ -997,7 +997,7 @@ def cmd_delete(args):
 def cmd_config(args):
     """查看当前配置"""
     config = load_user_config()
-    # 移除内部字段
+    # 删除内部字段
     for k in ("_saved", "_skill_sub_home"):
         config.pop(k, None)
     print(json.dumps(config, ensure_ascii=False, indent=2))

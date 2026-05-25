@@ -5,7 +5,7 @@ chain_executor.py - Chain Executor v1.2.0
 识别依赖关系、并行机会，输出 AI 可直接执行的指令序列。
 
 v1.1.0: 三层回退执行规则、分级重试策略、retry_policy/failure_mode 信息输出。
-v1.2.0: 里程碑通用逻辑规则、配置集成（重试次数从设置读取）。
+v1.2.0: 里程碑通用逻辑规则、配置集成（重试次数从配置读取）。
 
 注意：本脚本不直接执行技能（技能执行由 AI 完成），
 而是生成详细的执行计划，供 AI 按步骤执行。
@@ -498,7 +498,7 @@ def generate_ai_instructions(plan, verbose=False):
     lines.append(f"  └─────────────────┴──────────┴────────────────────────────┘")
     lines.append(f"  默认最多重试 {plan.get('default_max_retries', 3)} 次")
     lines.append(f"  重试耗尽后 → 按 on_exhaust 处理（ask: 询问 / skip: 跳过 / abort: 中止）")
-    lines.append(f"  里程碑步骤(★)失败 → 无论 on_exhaust 设置，强制中止整条链")
+    lines.append(f"  里程碑步骤(★)失败 → 无论 on_exhaust 配置，强制中止整条链")
 
     return "\n".join(lines)
 
@@ -699,7 +699,7 @@ def cmd_validate(args):
             auto_names = [f"步骤{r['step_index']}({steps[r['step_index']-1].get('step_name', '')})" for r in milestones]
             warnings.append(f"未手动标记里程碑。建议确认以下自动判断: {', '.join(auto_names)}")
         else:
-            warnings.append("没有里程碑步骤。建议为关键步骤设置 is_milestone=true")
+            warnings.append("没有里程碑步骤。建议为关键步骤配置 is_milestone=true")
 
     # 检查里程碑 on_exhaust 是否为 abort
     for step in steps:

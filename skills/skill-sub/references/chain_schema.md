@@ -50,7 +50,7 @@
 
 ```json
 {
-  "max_retries": 3,              // 最大重试次数（默认从设置读取，默认3）
+  "max_retries": 3,              // 最大重试次数（默认从配置读取，默认3）
   "error_types": ["file_locked", "network_error", "timeout", "auth_error"]
 }
 ```
@@ -85,6 +85,6 @@
 | `abort` | 中止整条调用链 |
 
 **里程碑行为：**
-- **里程碑步骤失败** → 无论 `on_exhaust` 设置如何，**强制中止整条链**
+- **里程碑步骤失败** → 无论 `on_exhaust` 配置如何，**强制中止整条链**
 - **里程碑步骤的 on_exhaust** → 建议设为 `abort`（validate 时会发出警告）
-- **非里程碑步骤失败** → 按 `on_exhaust` 设置处理（ask/skip/abort）
+- **非里程碑步骤失败** → 按 `on_exhaust` 配置处理（ask/skip/abort）

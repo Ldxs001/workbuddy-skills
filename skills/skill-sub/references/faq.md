@@ -96,13 +96,13 @@
 
 ### Q3：调用链失败后怎么恢复？
 
-1. 查看失败步骤的 `on_exhaust` 设置
+1. 查看失败步骤的 `on_exhaust` 配置
 2. 非里程碑 + `on_exhaust: ask` → AI 会询问你
 3. 非里程碑 + `on_exhaust: skip` → 已自动跳过
 4. 里程碑失败 → 链已中止，需修复后重新执行整条链
 5. 用 `chain_executor.py plan` 重新生成执行计划
 
-### Q4：设置里的"记忆参考"开启后有什么用？
+### Q4：配置里的"记忆参考"开启后有什么用？
 
 创建调用链时，AI 会额外读取 MEMORY.md 和近期日志，用于：
 - 个性化步骤描述（匹配你的命名习惯）
@@ -113,16 +113,16 @@
 ### Q5：为什么我的调用链执行时每一步都要问我？
 
 两个常见原因：
-1. 所有步骤设置了 `on_exhaust: ask` — 改为 `skip` 或 `abort` 减少交互
+1. 所有步骤配置了 `on_exhaust: ask` — 改为 `skip` 或 `abort` 减少交互
 2. 第1层 action 描述不够精确 — 执行时 AI 无法确定怎么做，只能问
 
 解决：创建链时确保每个 action 包含具体的动词+对象+产出。
 
 ### Q6：skill-sub 的数据存在哪？更新会丢吗？
 
-数据存储在 `~/.workbuddy/skill-sub/`（可通过 `SKILL_SUB_HOME` 环境变量修改）：
+数据存储在 `~/.workbuddy/skill-sub/`（可通过 `SKILL_SUB_HOME` 环境变量更新）：
 - `chains/` — 调用链 JSON 文件
-- `config.json` — 用户设置
+- `config.json` — 用户配置
 
 更新 skill-sub 本身（覆盖 SKILL.md + scripts/）**不会影响**数据目录。但注意这个路径不符合铁律4（产出物应在 `skills/.standardization/` 下），后续版本会迁移。
 

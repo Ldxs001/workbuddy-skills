@@ -11,21 +11,21 @@
 - **R-07 E**：添加 `## 触发方式` 否定条件章节（明确不触发场景）
 - **R-15 E**：创建 `references/permissions.md`（权限风险说明）
 - **R-18 W**：创建 `references/antipatterns.md`（5 条反模式），SKILL.md 添加 `## 反模式` 章节引用
-- **R-20 W**：统一术语（编辑→更新）、修复中英文混排空格、移除模糊表述（"可能"）
+- **R-20 W**：统一术语（编辑→更新）、修复中英文混排空格、删除模糊表述（"可能"）
 - **Frontmatter 格式修复**：`description: >` 格式错误 → 修正为完整字段
 - **版本号统一**：SKILL.md / `_meta.json`：`1.12.0` → `1.13.0`
 - **权限权重修正**：`permission_weight: HIGH` → `MEDIUM`（实际风险等级）
 
-### 变更文件
+### 更新文件
 
-| 文件 | 变更 |
+| 文件 | 更新 |
 |------|------|
 | `SKILL.md` | 添加否定条件、添加 `## 反模式` 章节、修复术语和格式、版本 1.12.0→1.13.0（223 行，≤230）|
 | `_meta.json` | version 1.12.0→1.13.0、`permission_weight: HIGH` → `MEDIUM` |
-| `references/permissions.md` | **新建**（风险等级 MEDIUM，含文件操作+网络访问说明）|
-| `references/antipatterns.md` | **新建**（5 条反模式，从 faq.md 提取）|
+| `references/permissions.md` | **创建**（风险等级 MEDIUM，含文件操作+网络访问说明）|
+| `references/antipatterns.md` | **创建**（5 条反模式，从 faq.md 提取）|
 | `references/changelog.md` | 本条记录 |
-| `references/faq.md` | 修复中英文混排、移除模糊表述 |
+| `references/faq.md` | 修复中英文混排、删除模糊表述 |
 | `references/workflow.md` | 修复模糊表述（"可能" → "常用或相关"）|
 
 ### 影响
@@ -60,7 +60,7 @@
 ### 新增
 
 - `references/faq.md` — 5条反模式（附正确做法）+ 6个 FAQ + 使用技巧
-- `references/examples.md` 末尾追加「使用技巧」章节（命名建议、里程碑设置经验、生命周期管理）
+- `references/examples.md` 末尾追加「使用技巧」章节（命名建议、里程碑配置经验、生命周期管理）
 
 ### 优化
 
@@ -68,9 +68,9 @@
 - SKILL.md「触发方式」精确化：自动推荐改为表格（3种触发条件+示例）
 - 渐进式加载表：新增 faq.md 映射行
 
-### 变更文件
+### 更新文件
 
-| 文件 | 变更 |
+| 文件 | 更新 |
 |------|------|
 | `SKILL.md` | 能力边界重构、触发条件表格化、FAQ 引用行、版本 1.10.1→1.11.0（197行，≤200）|
 | `_meta.json` | version 1.10.1→1.11.0 |
@@ -89,7 +89,7 @@
 - `chain_manager.py` `classify_milestones()` 中 `depends_on: null`（JSON null）导致 `TypeError: 'NoneType' object is not iterable`。修复：所有 `step.get("depends_on", [])` 改为 `(step.get("depends_on") or [])`，覆盖7处调用
 - `SKILL.md` 第12行标题 `v1.9.0` 与 frontmatter `version: 1.10.0` 不一致，修正为 `v1.10.1`
 
-### 变更
+### 更新
 
 - `chain_manager.py` — 7处 `depends_on` 取值逻辑修复
 - `SKILL.md` v1.10.0 → v1.10.1
@@ -101,7 +101,7 @@
 
 **改写类型：配合 skill-standardization v2.12.0 路径规范升级**
 
-### 变更内容
+### 更新内容
 
 - 产出物路径统一至 `skills/.standardization/skill-sub/` 下
 - 配合 skill-standardization v2.12.0 路径规范升级，同步版本号
@@ -112,7 +112,7 @@
 
 **改写类型：修正 _meta.json tags 残留**
 
-### 变更内容
+### 更新内容
 
 - `_meta.json` tags 中残留 `"reusable-template"`，修正为 `"reusable"`
 - `SKILL.md` 大标题 `v1.7.0` 残留，修正为 `v1.9.1`
@@ -123,7 +123,7 @@
 
 **改写类型：修复 cmd_create 双次保存问题**
 
-### 变更内容
+### 更新内容
 
 #### `scripts/chain_manager.py` — `cmd_create` 逻辑修复
 - **问题**：原逻辑先 `save_chain`（含默认 `is_milestone=False`），再做里程碑分类，然后第二次 `save_chain` 覆盖
@@ -142,7 +142,7 @@
 
 **改写类型：修正"模板"错误描述 + 调用链真正保存**
 
-### 变更内容
+### 更新内容
 
 #### SKILL.md 描述修正
 - 删除所有"模板"错误描述（调用链就是调用链，不是模板）
@@ -175,11 +175,11 @@
 
 **改写类型：修正 SKILL.md 标题/副标题描述**
 
-### 变更内容
+### 更新内容
 
 #### SKILL.md 标题修正
 - 一级标题：`# skill-sub v1.6.0（渐进式加载示范）` → `# skill-sub v1.7.0`
-- 副标题：移除"本文档示范渐进式 MD……"示范用语
+- 副标题：删除"本文档示范渐进式 MD……"示范用语
 - 副标题改为真实描述（从 `description` 字段提炼）
 
 #### 版本号同步
@@ -192,7 +192,7 @@
 
 **改写类型：补充 skill-sub 三角色定位 + 完善原有功能描述**
 
-### 变更内容
+### 更新内容
 
 1. **补充「三个角色」核心定位**（之前缺失）
    - **调用链编辑器** — 创建、编辑、保存、删除、列出调用链
@@ -224,7 +224,7 @@
 
 **改写类型：补充阶段1「两个理解」逻辑**
 
-### 变更内容
+### 更新内容
 
 1. **阶段1 重写：明确「两个理解」缺一不可**
    - **理解①：用户要做什么** — 提取任务类型、预期产物、关键约束；判断是一次性的还是可复用的
@@ -250,7 +250,7 @@
 
 **改写类型：补充调用链生成逻辑三阶段定义**
 
-### 变更内容
+### 更新内容
 
 1. **明确定义调用链生成三阶段**（核心补充）
    - **阶段1：理解** — AI 理解用户自然语言描述，识别涉及 Skill、执行顺序、依赖关系、里程碑步骤
@@ -277,7 +277,7 @@
 
 **改写类型：结构标准化 + 渐进式加载改造**
 
-### 变更内容
+### 更新内容
 
 1. **补写 YAML frontmatter**（R-01~R-04 修复）
    - 新增 `name: skill-sub`
@@ -289,8 +289,8 @@
 
 2. **SKILL.md 从 509行压缩到 152行**（R-06 规范，≤200行）
 
-3. **建立渐进式 MD 文件体系**
-  - 创建 `references/workflow.md` — 详细执行流程、里程碑规则、设置界面
+3. **创建渐进式 MD 文件体系**
+  - 创建 `references/workflow.md` — 详细执行流程、里程碑规则、配置界面
   - 创建 `references/reference.md` — 完整 CLI 速查、脚本清单、存储格式、流程图
   - 创建 `references/chain_schema.md` — Chain/Step/retry_policy/failure_mode 结构定义
   - 创建 `references/examples.md` — 完整使用示例集合
@@ -314,7 +314,7 @@
 
 ## v1.2.1（2026-05-21）
 
-- 新增 HTML 设置界面（settings.py）
+- 新增 HTML 配置界面（settings.py）
 - 新增 `config.json` 用户配置支持
 - 完善 CLI 速查表
 - 修复里程碑判断逻辑

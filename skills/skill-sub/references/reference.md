@@ -10,8 +10,8 @@
 # 初始化数据目录
 python chain_manager.py init
 
-# 设置
-python settings.py                          # 交互式设置（打开浏览器）
+# 配置
+python settings.py                          # 交互式配置（打开浏览器）
 python settings.py --serve-only             # Agent 模式
 python settings.py --get-config             # 查看配置
 python settings.py --save-config '<json>'   # 保存配置
@@ -48,7 +48,7 @@ python chain_manager.py delete --name "链名" --force
 | `chain_manager.py` | 调用链 CRUD（init/create/list/show/run/add-step/remove-step/update-step/rename/delete/config） |
 | `chain_executor.py` | 执行引擎（plan/quick/validate）+ 里程碑分类 + 配置集成 |
 | `skill_extractor.py` | 从 SKILL.md 提取关键步骤和指令名称（extract/scan） |
-| `settings.py` | HTML 设置界面 + CLI 配置管理 |
+| `settings.py` | HTML 配置界面 + CLI 配置管理 |
 
 ---
 
@@ -58,7 +58,7 @@ python chain_manager.py delete --name "链名" --force
 
 ```
 ~/.workbuddy/skill-sub/
-├── config.json           # 用户配置（设置界面写入）
+├── config.json           # 用户配置（配置界面写入）
 └── chains/               # 调用链数据
     ├── index.json        # 调用链索引
     ├── 发布流水线.json    # 每条链一个文件
@@ -129,9 +129,9 @@ python chain_manager.py delete --name "链名" --force
   ├─ 分析意图 → 确定需要哪些技能
   │
   ├─ 读取技能信息（skill_extractor.py scan）
-  │   └─ [设置: 记忆参考=是] → 额外读取 MEMORY.md + 日志
+  │   └─ [配置: 记忆参考=是] → 额外读取 MEMORY.md + 日志
   │
-  ├─ 规划步骤（提取关键步骤 → 排列顺序 → 设置依赖）
+  ├─ 规划步骤（提取关键步骤 → 排列顺序 → 配置依赖）
   │
   ├─ 里程碑判断（classify_milestones 自动判断）
   │   ├─ 关键词匹配
@@ -142,8 +142,8 @@ python chain_manager.py delete --name "链名" --force
   ├─ 展示完整调用链 → 用户确认
   │
   └─ 命名保存
-      ├─ [设置: naming_mode=auto] → AI 自动命名
-      └─ [设置: naming_mode=manual] → 询问用户
+      ├─ [配置: naming_mode=auto] → AI 自动命名
+      └─ [配置: naming_mode=manual] → 询问用户
 ```
 
 ```
@@ -153,7 +153,7 @@ python chain_manager.py delete --name "链名" --force
   │
   ├─ 逐步骤执行
   │   ├─ 第一层：用 action 直接执行
-  │   ├─ 失败 → 分级重试（最多 N 次，N 从设置读取）
+  │   ├─ 失败 → 分级重试（最多 N 次，N 从配置读取）
   │   ├─ 仍失败 → 按 on_exhaust 处理
   │   │   ├─ ask → 询问用户
   │   │   ├─ skip → 跳过，继续下一步
@@ -182,12 +182,12 @@ python chain_manager.py delete --name "链名" --force
 ### 授权方式
 
 - **低权重操作**（如查看调用链列表）：静默执行，无需授权
-- **中权重操作**（如创建/修改调用链）：统一授权（批量展示风险列表）
+- **中权重操作**（如创建/更新调用链）：统一授权（批量展示风险列表）
 - **高权重操作**（如删除调用链）：即时授权（执行前单独确认）
 
 ### 风险缓解
 
 - 调用链数据存储在 `~/.workbuddy/skill-sub/chains/`，非技能核心目录
 - `chain_executor.py` 调用其他 skill 时，通过标准 `Skill` 工具调用，不执行任意命令
-- 配置文件中不含敏感信息（仅用户偏好设置）
+- 配置文件中不含敏感信息（仅用户偏好配置）
 
