@@ -17,6 +17,7 @@ EXCLUDE_DIRS = {
 EXCLUDE_FILES_EXACT = {
     ".gitignore", ".ds_store", "thumbs.db",
     "config.json", "manifest.json", "pack_zip.py",
+    ".gitkeep",  # 占位空文件，不应同步到仓库
 }
 EXCLUDE_FILES_GLOB = {
     "*.pyc", "*.pyo", "*.log", "*.zip", "*.bak*",
@@ -28,11 +29,15 @@ EXCLUDE_FILES_GLOB = {
 }
 FUNCTIONAL_FILE_WHITELIST = {"settings.html", "preview.html"}
 
+# 空文件白名单（这些空文件需要保留）
+EMPTY_FILE_WHITELIST = {".gitkeep", ".keep", ".gitignore", "readme"}
 
-def should_exclude(rel_path):
+
+def should_exclude(rel_path, file_path=None):
     """判断相对路径是否应被排除。
 
     rel_path: 相对于技能源目录的路径（正反斜杠均可），如 "config.json" 或 "scripts/foo.py"
+    file_path: 可选，真实文件路径，用于检查文件大小
     returns: True 表示排除，False 表示保留
     """
     import fnmatch
@@ -71,6 +76,16 @@ def should_exclude(rel_path):
         if fnmatch.fnmatch(p, pat):
             return True
 
+    # 5. 空文件排除（0 KB）- .gitkeep 等占位文件
+    if file_path and os.path.exists(file_path):
+        try:
+            if os.path.getsize(file_path) == 0:
+                # 白名单检查：少数空文件需要保留
+                if name.lower() not in {w.lower() for w in EMPTY_FILE_WHITELIST}:
+                    return True
+        except OSError:
+            pass
+
     return False
 
 
@@ -99,6 +114,7 @@ def sync_with_exclude(src, dst):
     os.makedirs(dst, exist_ok=True)
 
     copy_count = 0
+    skipped_empty = 0
     for root, dirs, files in os.walk(src):
         # rel_root: 相对于 src 根目录的路径（"" 表示根目录本身）
         rel_root = os.path.relpath(root, src)
@@ -112,15 +128,23 @@ def sync_with_exclude(src, dst):
 
         for fname in files:
             rel_path = os.path.join(rel_root, fname) if rel_root else fname
-            if should_exclude(rel_path):
+            file_path = os.path.join(root, fname)
+            if should_exclude(rel_path, file_path):
+                # 统计跳过的空文件数
+                try:
+                    if os.path.getsize(file_path) == 0:
+                        skipped_empty += 1
+                except OSError:
+                    pass
                 continue
-            src_file = os.path.join(root, fname)
             dst_file = os.path.join(dst, rel_path)
             os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-            shutil.copy2(src_file, dst_file)
+            shutil.copy2(file_path, dst_file)
             copy_count += 1
 
     print(f"  ✅ Python 排除复制完成: {copy_count} 个文件")
+    if skipped_empty > 0:
+        print(f"  ℹ️  跳过 {skipped_empty} 个空文件（0 KB）")
     return copy_count
 
 

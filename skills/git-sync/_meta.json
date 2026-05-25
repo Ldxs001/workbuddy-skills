@@ -1,13 +1,14 @@
 {
   "name": "git-sync",
-  "version": "2.6.4",
-  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查（R-01~R-10）及渐进式文档体系。v2.6.4 修复排除规则误删合法工具脚本fix_r20.py（移除fix_*.py通配符）",
+  "version": "2.6.5",
+  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查。v2.6.5：打包排除空文件（0 KB）+ .gitkeep；增加--skip-scan安全警告",
   "author": "wUwproject",
   "tags": [
     "sync",
     "git",
     "zip",
     "skill-manager",
-    "manifest"
+    "manifest",
+    "security"
   ]
 }

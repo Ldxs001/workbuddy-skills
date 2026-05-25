@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.6.4
+version: 2.6.5
 author: 由 config.json 的 author 字段决定
 license: MIT
 description: >
@@ -16,19 +16,7 @@ progressive_loading_explicit: true
 antipattern_count: add_examples
 ---
 
-
-
-
-
-
-
-
-
-
-
-
-
-# git-sync v2.6.4 — 三端同步技能
+# git-sync v2.6.5 — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
 
@@ -42,7 +30,7 @@ antipattern_count: add_examples
 | **全量维护** | 明确说"全量维护"/"同步所有" | 遍历 manifest.json 所有条目 |
 
 > 触发关键词：同步、上传、推送、打包、sync、git-sync
-> 
+>
 > **否定条件**：以下情况不触发本技能——（1）用户只是询问同步流程而不要求执行；（2）用户明确说"不要同步"/"跳过同步"；（3）用户要求使用其他同步方式（如手动 git 命令）。
 
 ## 核心能力
@@ -58,6 +46,7 @@ antipattern_count: add_examples
 | 5 | **三单一致机制**（v1.3） | manifest.json ≥ 仓库实际文件 = README.md |
 | 6 | **ZIP 打包 + HTML 索引**（v1.5） | 统一输出到 `.dist/` 并自动生成 index.html |
 | 7 | **安全修复**（v2.6.0） | 删除 `__import__` 动态导入，改善授权检查实现（内置异常处理） |
+| 8 | **空文件排除**（v2.6.5） | ZIP 打包和同步时自动排除 0 KB 空文件（如 .gitkeep） |
 
 ## 工作流程
 
@@ -86,7 +75,7 @@ antipattern_count: add_examples
 | 1 | 敏感扫描 | Token/邮箱/路径检测与脱敏 |
 | 2 | 规范审查 | R-01~R-12 audit（纯警告） |
 | 3 | 同步推送 | Git 双端推送（Gitee + GitHub） |
-| 4 | ZIP 打包 | 生成 `.dist/` 包 + index.html |
+| 4 | ZIP 打包 | 生成 `.dist/` 包 + index.html（自动排除空文件） |
 | 5 | README 更新 | 全量重建技能列表 |
 | 6 | 清单维护 | 更新 manifest.json 状态标记 |
 | 7 | **安全修复**（v2.6.0） | 删除 `__import__` 动态导入，改善授权检查 |
@@ -109,7 +98,13 @@ antipattern_count: add_examples
 
 **正确做法**：同步前必须运行敏感信息扫描，防止 Token/邮箱/路径泄露。
 
-→ 详见 
+### 3. 滥用 `--skip-scan`
+
+**错误做法**：对私有仓库直接使用 `--skip-scan` 跳过扫描，不考虑后续分享风险。
+
+**正确做法**：私有内容经常被后续镜像、打包分享、或推送到其他 remote。`--skip-scan` 仅限完全确认无敏感信息时使用。
+
+→ 详见 `references/antipatterns.md`
 
 ## 快速开始
 
@@ -123,7 +118,7 @@ bash git-sync.sh <skill-name> <version>
 
 - `<skill-name>`：技能目录名（如 `color-toolkit`）
 - `<version>`：版本号（如 `1.0.0`）
-- 可选：`--skip-scan` 跳过敏感信息扫描
+- 可选：`--skip-scan` 跳过敏感信息扫描（⚠️ 仅限确认无敏感信息时）
 
 ## 安装后配置
 
@@ -137,6 +132,18 @@ bash git-sync.sh <skill-name> <version>
 → 详见 `references/guide.md` 完整执行流程（步骤 0 → 6 详解）
 
 ## 修复记录
+
+### v2.6.5 (2026-05-25)
+
+**打包优化**：
+
+1. **排除空文件（0 KB）** — `pack_zip.py` 和 `sync_with_exclude.py` 新增空文件排除逻辑，自动跳过 `.gitkeep` 等占位文件
+2. **增加 `--skip-scan` 安全警告** — FAQ Q11 增加安全提示：私有内容经常被镜像/分享，跳过扫描会增加敏感信息泄露风险
+
+**影响文件**：
+- `scripts/pack_zip.py` — 新增空文件排除 + `.gitkeep` 精确排除
+- `scripts/sync_with_exclude.py` — 新增空文件排除 + `.gitkeep` 精确排除
+- `references/faq.md` — Q11 增加安全警告
 
 ### v2.6.0 (2026-05-24)
 
@@ -174,6 +181,7 @@ bash git-sync.sh <skill-name> <version>
 4. ✅ 自动更新 README 技能列表（全量生成）
 5. ✅ 维护清单优先 — 未确认是否加入清单前，不盲目同步
 6. ✅ ZIP 与仓库结构一致
+7. ✅ **ZIP 自动排除空文件（0 KB）** — 防止 `.gitkeep` 等占位文件被打入包
 
 → [FAQ](references/faq.md) · [版本日志](references/changelog.md) · [完整参考](references/reference.md)
 
@@ -197,4 +205,6 @@ bash git-sync.sh <skill-name> <version>
 
 ## 版本
 
-当前版本：**2.6.2** — v2.6.2：修复触发条件否定条件、反模式章节、R-20 写作规范（术语不一致、中英文混排、模糊表述）、反模式章节、术语不一致（删除→删除、更新→更新）、中英文混排缺少空格
+当前版本：**2.6.5** — v2.6.5：打包排除空文件（0 KB）+ .gitkeep；增加--skip-scan安全警告
+
+→ [更新日志](references/changelog.md) · [完整参考](references/reference.md)

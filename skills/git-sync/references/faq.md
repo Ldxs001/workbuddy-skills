@@ -125,7 +125,9 @@ python manifest.py sync-readme workbuddy-skills
 | 类似 Token 字符串 | UUID 格式的 ID 被 Token 规则命中 | 同上，交互式跳过 |
 | 用户名匹配 | 配置中的用户名出现在代码注释中 | 这是 low 级别，可保留 |
 
-对于私有仓库场景，直接用 `--skip-scan` 跳过扫描即可。
+对于私有仓库场景，可以直接用 `--skip-scan` 跳过扫描。
+
+⚠️ **安全警告**：私有内容经常被后续镜像、打包分享、或推送到其他 remote（如 GitHub fork、团队成员 clone 后外传）。跳过扫描会削弱安全控制，增加凭证、Token 或其他敏感信息被传播的风险。仅在完全确认无敏感信息时使用 `--skip-scan`。
 
 ### Q12: 脱敏后的文件能恢复吗？
 
