@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.27.0
+version: 2.27.1
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.26.0。修复审查规则数不一致（SKILL.md/reference.md/utils.py/__init__.py 统一为 R-01~R-21、补充 R-21 到审查规则表）。
@@ -17,7 +17,8 @@ section_antipattern: true
 progressive_loading_explicit: true
 ---
 
-# skill-standardization v2.27.1
+
+# skill-standardization v2.28.0
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
 

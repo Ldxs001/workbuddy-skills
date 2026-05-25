@@ -5,6 +5,75 @@
 
 ---
 
+## v2.28.0（当前版本）
+
+2026-05-25
+
+**改写类型：Minor — Frontmatter 规范化增强 + 权限说明文件**
+
+### 更新内容
+
+- ✅ **新增 `permission_weight` frontmatter 字段**：支持 HIGH/MEDIUM/LOW 三档权限权重声明
+- ✅ **新增 `antipattern_count` frontmatter 字段**：强制 antipattern 条目含具体示例（`add_examples`）
+- ✅ **新增 `section_faq` frontmatter 字段**：强制 SKILL.md 含 FAQ 章节或渐进式引用
+- ✅ **新增 `writing_standards` frontmatter 字段**：强制术语一致性检查（`fix_terms`）
+- ✅ **新增 `antipattern_vague` frontmatter 字段**：强制 antipattern 描述具体（`add_detail`）
+- ✅ **新增 `section_antipattern` frontmatter 字段**：强制 antipattern 章节存在且有实质内容
+- ✅ **新增 `progressive_loading_explicit` frontmatter 字段**：强制 SKILL.md 显式说明渐进式加载
+- ✅ **新增 `references/permissions.md`**：权限扫描结果说明文件，供 `create` 模式自动生成
+- 📝 更新 `SKILL.md` 版本号到 v2.28.0
+- 📝 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- skill-standardization 自身声明 `permission_weight: HIGH`，与 `permission_checker.py` 实际风险等级一致
+- 新创建的 skill 自动获得 `references/permissions.md` 模板
+- AI 审查 skill 时，frontmatter 字段缺失会触发对应 WARN
+
+---
+
+## v2.27.1
+
+2026-05-25
+
+**改写类型：Patch — 审查规则 R-18/R-19 内容质量检查增强**
+
+### 更新内容
+
+- ✅ **R-18 内容质量检查**：antipattern 条目必须 ≥2 条且含具体错误做法/正确做法标记
+- ✅ **R-19 内容质量检查**：FAQ 必须 ≥3 对且问题 ≥10 字、答案 ≥15 字
+- ✅ **修复 R-18/R-19 审查输出**：PASS/FAIL 均输出详细理由
+- 📝 更新 `SKILL.md` 版本号到 v2.27.1
+- 📝 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- R-18/R-19 从"引用存在性检查"升级为"内容质量检查"
+- 空壳 `references/antipatterns.md` / `references/faq.md` 不再 PASS
+
+---
+
+## v2.27.0
+
+2026-05-25
+
+**改写类型：Patch — `references/architecture.md` 新增 + 规范加载优化**
+
+### 更新内容
+
+- ✅ **新增 `references/architecture.md`**：架构设计文档，描述模块关系和数据流
+- ✅ **优化渐进式加载逻辑**：`json_loader.py` 支持按 frontmatter 字段按需加载 references 文件
+- ✅ **修复 `skill_audit` 对 v2.27+ frontmatter 字段的识别**
+- 📝 更新 `SKILL.md` 版本号到 v2.27.0
+- 📝 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- 大型 skill 可通过 `references/architecture.md` 描述整体架构
+- `json_loader.py` 加载效率提升（按需加载）
+
+---
+
 ## v2.26.0（当前版本）
 
 2026-05-25
