@@ -1,18 +1,33 @@
 ---
 name: skill-sub
-version: 1.12.0
+version: 1.13.0
 author: wUwproject
 license: MIT
-description: >
-  调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。
-  理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为调用链。
-tags: ["chain", "orchestration", "reusable", "skill-builder", "progressive-loading", "planner", "editor"]
+description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
+tags: ['chain', 'orchestration', 'reusable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
 sensitive_access: true
+trigger_negative: true
+critical_write: false
+create_permissions_md: true
+permission_weight: HIGH
+antipattern_count: add_examples
+writing_standards: fix_terms
+section_antipattern: true
+section_faq: true
+trigger_danger: remove_dangerous
+external_data_dir: true
 ---
 
-# skill-sub v1.11.0
 
-> 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 编辑/保存/推荐调用链 → 拼接为调用链。
+
+
+
+
+
+
+# skill-sub v1.13.0
+
+> 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
 
 调用链编排器，兼具**编辑器**和**粗粒度规划器**双重角色，将多个 Skill 编排为调用链。
 
@@ -26,13 +41,13 @@ sensitive_access: true
 
 ### skill-sub 的三个角色（重要）
 
-- ✅ **调用链编辑器** — 创建、编辑、保存、删除、列出调用链（`chain_manager.py`）
+- ✅ **调用链编辑器** — 创建、更新、保存、删除、列出调用链（`chain_manager.py`）
 - ✅ **粗粒度规划器** — 理解用户意图，规划哪些 Skill 参与、执行顺序、依赖关系
 - ✅ **编排器** — 将规划结果拼接为调用链 JSON，本身不参与调用链执行
 
 ### 能力边界
 
-- ✅ **能做**：创建/编辑/管理调用链、规划 Skill 参与顺序和依赖关系
+- ✅ **能做**：创建/更新/管理调用链、规划 Skill 参与顺序和依赖关系
 - ❌ **不能做**：执行链中步骤（只编排不干活）、代替被编排 Skill（只读取能力描述）
 - ⚠️ **不适合**：一次性任务 → 直接用 Skill；单 Skill → 不需要编排；高度定制临时流程 → 复用价值低
 
@@ -96,7 +111,7 @@ sensitive_access: true
 
 触发示例：
 - "创建一条发布流水线的调用链"
-- "执行发布流水线"
+- "管理发布流水线调用链"
 - "列出所有调用链"
 - "用 skill-sub 管理调用链"
 
@@ -108,7 +123,12 @@ sensitive_access: true
 | 流程/模式词 | 「流水线」「一键」「端到端」「流程」 |
 | 已有链匹配 | tags/description 重合 > 50% |
 
-被推荐后用户可选择**执行**或**编辑**。匹配逻辑详见 `references/workflow.md`。
+被推荐后用户可选择**执行**或**更新**。匹配逻辑详见 `references/workflow.md`。
+
+**否定条件**：以下情况不触发本技能（改用对应 Skill 或直接调用）
+- 用户只是想执行单个 Skill → 直接用该 Skill
+- 用户只是想询问/了解 → 不需要编排
+- 任务一次性、无复用价值 → 直接用 Skill 完成
 
 ---
 
@@ -122,9 +142,9 @@ sensitive_access: true
   ├── 理解②：Skill 能做什么（用户指定→直接用；未指定→遍历本地库挑选）
   └── 输出：有序 Skill 列表 + 依赖关系 + 里程碑 + 各 Skill 能力摘要
   ↓
-【编辑器角色】创建 / 编辑调用链
-  ├── 新建：执行三阶段（理解→摘取→拼接）→ chain_manager.py create
-  ├── 编辑：add-step / remove-step / update-step / rename
+【编辑器角色】创建 / 更新调用链
+  ├── 创建：执行三阶段（理解→摘取→拼接）→ chain_manager.py create
+  ├── 更新：add-step / remove-step / update-step / rename
   └── 管理：list / show / delete
   ↓
 【编排器角色】拼接为调用链 → 保存到 chains/*.json
@@ -146,7 +166,7 @@ python {SKILL_DIR}/scripts/chain_manager.py init
 # 创建调用链（AI 自动执行三阶段）
 python {SKILL_DIR}/scripts/chain_manager.py create --name "链名" --description "描述"
 
-# 编辑调用链步骤
+# 更新调用链步骤
 python {SKILL_DIR}/scripts/chain_manager.py add-step --name "链名" --step-json '{...}'
 python {SKILL_DIR}/scripts/chain_manager.py remove-step --name "链名" --index 2
 
@@ -171,7 +191,7 @@ python {SKILL_DIR}/scripts/settings.py
 | ✅ 核心概念（三角色定位） | 📄 `workflow.md` — 详细执行流程、里程碑规则、意图匹配逻辑 |
 | ✅ 三阶段生成逻辑 | 📄 `reference.md` — 完整 CLI 速查、脚本 API |
 | ✅ 触发方式（含推荐逻辑） | 📄 `chain_schema.md` — Chain/Step 结构定义 |
-| ✅ 工作流程概述 | 📄 `examples.md` — 完整使用示例（含编辑、推荐场景） |
+| ✅ 工作流程概述 | 📄 `examples.md` — 完整使用示例（含更新、推荐场景） |
 | ✅ 快速开始（核心命令） | 📄 `changelog.md` — 版本更新日志 |
 | ✅ 审查规则自查 | 📄 `faq.md` — 反模式、常见错误、使用技巧 |
 
@@ -180,6 +200,12 @@ python {SKILL_DIR}/scripts/settings.py
 ## 规范自查（R-01~R-10）
 
 本 skill 自身遵循 skill-standardization v2 规范，自查结果见 `references/changelog.md`。
+
+---
+
+## 反模式
+
+> 常见错误与正确做法 → `references/antipatterns.md`
 
 ---
 
@@ -195,4 +221,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**1.11.0** — 文档质量优化：能力边界精确化、触发条件表格化、新增 references/faq.md 反模式指南
+当前版本：**1.13.0** — 修复 R-07/R-15/R-18/R-20：添加否定条件、创建 permissions.md、增加反模式条目、统一术语

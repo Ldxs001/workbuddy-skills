@@ -2,6 +2,39 @@
 
 ---
 
+## v1.13.0（2026-05-25）
+
+**发布日期：2026-05-25**
+**类型：Patch（修复 R-07/R-15/R-18/R-20 + 版本 bump）**
+
+### 修复
+- **R-07 E**：添加 `## 触发方式` 否定条件章节（明确不触发场景）
+- **R-15 E**：创建 `references/permissions.md`（权限风险说明）
+- **R-18 W**：创建 `references/antipatterns.md`（5 条反模式），SKILL.md 添加 `## 反模式` 章节引用
+- **R-20 W**：统一术语（编辑→更新）、修复中英文混排空格、移除模糊表述（"可能"）
+- **Frontmatter 格式修复**：`description: >` 格式错误 → 修正为完整字段
+- **版本号统一**：SKILL.md / `_meta.json`：`1.12.0` → `1.13.0`
+- **权限权重修正**：`permission_weight: HIGH` → `MEDIUM`（实际风险等级）
+
+### 变更文件
+
+| 文件 | 变更 |
+|------|------|
+| `SKILL.md` | 添加否定条件、添加 `## 反模式` 章节、修复术语和格式、版本 1.12.0→1.13.0（223 行，≤230）|
+| `_meta.json` | version 1.12.0→1.13.0、`permission_weight: HIGH` → `MEDIUM` |
+| `references/permissions.md` | **新建**（风险等级 MEDIUM，含文件操作+网络访问说明）|
+| `references/antipatterns.md` | **新建**（5 条反模式，从 faq.md 提取）|
+| `references/changelog.md` | 本条记录 |
+| `references/faq.md` | 修复中英文混排、移除模糊表述 |
+| `references/workflow.md` | 修复模糊表述（"可能" → "常用或相关"）|
+
+### 影响
+- `skill_audit` 审查 `skill-sub` 时 R-07/R-15/R-18/R-20 将通过 ✅
+- 否定条件明确，减少误触发
+- 权限风险透明化，便于安全审查
+
+---
+
 ## v1.12.0（2026-05-24）
 
 **发布日期：2026-05-24**
@@ -26,7 +59,7 @@
 
 ### 新增
 
-- `references/faq.md` — 5条反模式（附正确做法）+ 6个FAQ + 使用技巧
+- `references/faq.md` — 5条反模式（附正确做法）+ 6个 FAQ + 使用技巧
 - `references/examples.md` 末尾追加「使用技巧」章节（命名建议、里程碑设置经验、生命周期管理）
 
 ### 优化
@@ -39,9 +72,9 @@
 
 | 文件 | 变更 |
 |------|------|
-| `SKILL.md` | 能力边界重构、触发条件表格化、FAQ引用行、版本 1.10.1→1.11.0（197行，≤200）|
+| `SKILL.md` | 能力边界重构、触发条件表格化、FAQ 引用行、版本 1.10.1→1.11.0（197行，≤200）|
 | `_meta.json` | version 1.10.1→1.11.0 |
-| `references/faq.md` | **新建**（~130行）|
+| `references/faq.md` | **创建**（~130行）|
 | `references/examples.md` | 末尾追加使用技巧（+28行）|
 | `references/changelog.md` | 本条记录 |
 
@@ -49,7 +82,7 @@
 
 ## v1.10.1（2026-05-23）
 
-**改写类型：Bug修复 + 版本号同步**
+**改写类型：Bug 修复 + 版本号同步**
 
 ### 修复
 
@@ -171,7 +204,7 @@
      匹配后行为（推荐给用户选择执行或编辑）
 
 3. **完善工作流程 — 补全调用链管理操作**
-   - 新增「编辑器角色」段落：新建（三阶段）→ 编辑（`add-step`/`remove-step`/`update-step`/`rename`）→ 管理（`list`/`show`/`delete`）
+   - 新增「编辑器角色」段落：创建（三阶段）→ 编辑（`add-step`/`remove-step`/`update-step`/`rename`）→ 管理（`list`/`show`/`delete`）
    - 之前这些 CLI 命令只在「快速开始」里列了，工作流程图里完全没体现
 
 4. **升级版本号**
@@ -257,11 +290,11 @@
 2. **SKILL.md 从 509行压缩到 152行**（R-06 规范，≤200行）
 
 3. **建立渐进式 MD 文件体系**
-   - 新建 `references/workflow.md` — 详细执行流程、里程碑规则、设置界面
-   - 新建 `references/reference.md` — 完整 CLI 速查、脚本清单、存储格式、流程图
-   - 新建 `references/chain_schema.md` — Chain/Step/retry_policy/failure_mode 结构定义
-   - 新建 `references/examples.md` — 完整使用示例集合
-   - 新建 `references/changelog.md` — 本文件
+  - 创建 `references/workflow.md` — 详细执行流程、里程碑规则、设置界面
+  - 创建 `references/reference.md` — 完整 CLI 速查、脚本清单、存储格式、流程图
+  - 创建 `references/chain_schema.md` — Chain/Step/retry_policy/failure_mode 结构定义
+  - 创建 `references/examples.md` — 完整使用示例集合
+  - 创建 `references/changelog.md` — 本文件
 
 4. **明确定位**（核心修正）
    - 在 SKILL.md 中新增「skill-sub 的定位」章节

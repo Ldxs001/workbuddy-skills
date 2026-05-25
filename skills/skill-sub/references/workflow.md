@@ -21,7 +21,7 @@ AI 执行 6 步流程：
 
 ### 预生成（suggest）
 
-扫描已安装技能，推荐可能的技能组合：
+扫描已安装技能，推荐常用或相关的技能组合：
 
 ```bash
 python {SKILL_DIR}/scripts/skill_extractor.py scan
