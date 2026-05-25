@@ -1,0 +1,16 @@
+{
+  "name": "universal-file-ops",
+  "version": "0.1.0",
+  "description": "通用文件操作技能：支持常用文件（txt/py/html/md/docx/xlsx）增删查改，以及文件拷贝、移动、删除、重命名。含标准化 IO 接口、统一调度器、容灾回溯机制。",
+  "author": "[username-redacted]",
+  "tags": [
+    "file",
+    "operations",
+    "crud",
+    "copy",
+    "move",
+    "delete",
+    "rename",
+    "robust"
+  ]
+}
