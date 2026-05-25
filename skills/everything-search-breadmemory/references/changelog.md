@@ -4,7 +4,7 @@
 
 **改写类型：skill-standardization 标准化改造**
 
-### 变更内容
+### 更新内容
 
 #### 结构改造（R-01~R-10 合规）
 - 新增 `references/` 目录（渐进式 MD 体系）
