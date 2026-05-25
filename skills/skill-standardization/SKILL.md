@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.25.0
+version: 2.26.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.25.0。R-12 新增推荐代码模式（双变量法），并更新 guide.md 规范化文档。
+description: Skill 标准化规范引擎 v2.26.0。修复审查规则数不一致（SKILL.md/reference.md/utils.py/__init__.py 统一为 R-01~R-21、补充 R-21 到审查规则表）。
 tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
 sensitive_access: true
 critical_write: false
@@ -19,7 +19,7 @@ progressive_loading_explicit: true
 
 # skill-standardization v2.25.0
 
-> Skill 标准化规范引擎（安全增强版），支持 R-01~R-20 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
+> Skill 标准化规范引擎（安全增强版），支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
 提供 Skill 全生命周期标准化管理：
 **create**（创建）→ **update**（更新）→ **refactor**（改造）→ **audit**（审查）→ **规范加载**
@@ -43,7 +43,7 @@ progressive_loading_explicit: true
 | # | 功能 | 说明 |
 |---|------|------|
 | 1 | **三种执行模式** | create / update / refactor |
-| 2 | **20 条审查规则** | R-01~R-20（含安全规则、渐进式文件质量检查） |
+| 2 | **21 条审查规则** | R-01~R-21（含安全规则、渐进式文件质量检查） |
 | 3 | **标准目录结构** | 根目录仅 SKILL.md + _meta.json，三级复杂度 |
 | 4 | **渐进式 MD 体系** | 主文件 ≤230 行，辅助内容拆分 references/ 按需加载 |
 | 5 | **零依赖 Python 工具** | 仅标准库，跨平台兼容 |
@@ -147,7 +147,7 @@ python scripts/authorization_manager.py request --type immediate --reason "需�
 
 ---
 
-## 审查规则（R-01 ~ R-20 概述）
+## 审查规则（R-01 ~ R-21 概述）
 
 | ID | 严重度 | 检查内容 |
 |----|---------|----------|
@@ -171,6 +171,7 @@ python scripts/authorization_manager.py request --type immediate --reason "需�
 | R-18 | WARN | 反模式具体性（引用 `references/antipatterns.md` 且内容具体） |
 | R-19 | WARN | FAQ 有意义性（引用 `references/faq.md` 且 Q&A 对有意义） |
 | R-20 | WARN | 写作规范（术语一致/无模糊表述/中英文混排） |
+| R-21 | WARN | 渐进式加载显式说明（SKILL.md 显眼位置含「渐进式加载」或「progressive」关键词） |
 
 > ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
 

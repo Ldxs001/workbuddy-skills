@@ -3,7 +3,7 @@
 """
 skill_audit package — SKILL.md 规范化审查工具 v2.25.0
 
-支持 R-01~R-17 规则审查，集成到 git-sync 流程。
+支持 R-01~R-21 规则审查，集成到 git-sync 流程。
 
 用法:
     python -m skill_audit audit <skill_dir> [--json] [--manifest-version VER]

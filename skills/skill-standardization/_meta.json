@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.25.0",
-  "description": "Skill 标准化规范引擎 v2.25.0。R-12 新增推荐代码模式（双变量法），并更新 guide.md 规范化文档。",
+  "version": "2.26.0",
+  "description": "Skill 标准化规范引擎 v2.26.0。修复审查规则数不一致（SKILL.md/reference.md/utils.py/__init__.py 统一为 R-01~R-21）、补充 R-21 到审查规则表。",
   "author": "wUwproject",
   "tags": [
     "standardization",
