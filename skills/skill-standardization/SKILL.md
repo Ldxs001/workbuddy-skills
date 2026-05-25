@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.24.7
+version: 2.25.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.24.6。R-20 修复疑问句误报 bug（v2.24.6）：添加疑问句排除逻辑（「应该」在疑问句里是询问建议，不是模糊表述）。
+description: Skill 标准化规范引擎 v2.25.0。R-12 新增推荐代码模式（双变量法），并更新 guide.md 规范化文档。
 tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
 sensitive_access: true
 critical_write: false
@@ -17,24 +17,7 @@ section_antipattern: true
 progressive_loading_explicit: true
 ---
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# skill-standardization v2.24.7
+# skill-standardization v2.25.0
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-20 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
@@ -73,15 +56,15 @@ progressive_loading_explicit: true
 ## 快速开始
 
 ```bash
-# ═══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 # 调用指引（非常重要！）
-# ═══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 #
 # 本 skill 的 scripts/ 下有两种结构：
 #   1. 包结构（需 python -m 调用）：skill_builder、skill_audit
 #   2. 单文件（直接 python 调用）：permission_checker.py、authorization_manager.py
 #
-# ═══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 
 # 创建（包结构，必须用 python -m）
 cd ~/.workbuddy/skills/skill-standardization/scripts

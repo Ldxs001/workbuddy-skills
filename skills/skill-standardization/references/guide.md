@@ -353,6 +353,48 @@ A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需
 
 ---
 
+### R-12: 外部数据目录路径规范（v2.25.0）【新增】
+
+R-12 检查 `scripts/*.py` 中定义的外部数据目录路径是否符合 `skills/.standardization/<skill-name>/data/` 规范。
+
+**审计原理**：R-12 对源码做**静态字符串匹配**，检查 `DEFAULT_DATA_DIR = ` 赋值右侧是否出现 `skills/.standardization/<skill>/data/` 字面量。
+
+**推荐写法（同时满足审计+运行时正确性）**：
+
+```python
+# R-12 审计锚点：变量名含 DATA，值含合规字面量，审计可匹配
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/<skill-name>/data/"
+
+SKILL_ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 运行时绝对路径（变量名不含 DATA/STORAGE/DB/CACHE/CONFIG，避免被审计二次匹配）
+_data_dir_abs  = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR_RAW))
+BACKUP_DIR      = os.path.join(_data_dir_abs, "backup")
+LOGS_DIR        = os.path.join(_data_dir_abs, "logs")
+```
+
+**要点**：
+1. 第一行变量名必须含 `DATA|STORAGE|DB|CACHE|CONFIG` 之一才会被审计匹配
+2. 值必须是 `skills/.standardization/<skill>/data/` 字面量（审计只检查赋值右侧的字符串）
+3. 运行时用另一个不含上述关键词的变量（如 `_data_dir_abs`）存放绝对路径，避免被审计二次匹配
+4. `backup/` 和 `logs/` 子目录基于绝对路径变量拼接
+
+**常见错误写法（审计会失败）**：
+
+```python
+# ❌ 错误：运行时计算路径，审计匹配不到合规字面量
+DEFAULT_DATA_DIR = os.path.normpath(os.path.join(...))
+
+# ❌ 错误：注释里写合规路径，审计不认注释
+# skills/.standardization/xxx/data/
+DEFAULT_DATA_DIR = os.path.normpath(...)
+
+# ❌ 错误：两次赋值，审计匹配到第二行（不合规）
+DEFAULT_DATA_DIR = "skills/.standardization/xxx/data/"
+DEFAULT_DATA_DIR = os.path.normpath(...)  # 审计匹配这行 → 失败
+```
+
+---
+
 ## 规范加载 — 渐进式 JSON 查询
 
 ```bash

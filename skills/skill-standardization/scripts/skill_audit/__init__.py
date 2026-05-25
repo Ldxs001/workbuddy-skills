@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit package — SKILL.md 规范化审查工具 v2.13.0
+skill_audit package — SKILL.md 规范化审查工具 v2.25.0
 
 支持 R-01~R-17 规则审查，集成到 git-sync 流程。
 

@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.24.7",
-  "description": "Skill 标准化规范引擎 v2.24.7。R-18 支持反模式渐进式引用审查（支持列表/表格/### 标题三种格式）。",
+  "version": "2.25.0",
+  "description": "Skill 标准化规范引擎 v2.25.0。R-12 新增推荐代码模式（双变量法），并更新 guide.md 规范化文档。",
   "author": "wUwproject",
   "tags": [
     "standardization",
