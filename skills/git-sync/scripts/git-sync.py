@@ -55,7 +55,8 @@ def run_git(*args, workdir=None, check=True):
     """运行 git 命令，完全静默不弹 UI"""
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    cmd = ["git", *[str(a) for a in args]]
+    # 每个 git 命令都显式指定 credential.helper，彻底阻止 CredentialHelperSelector 弹出
+    cmd = ["git", "-c", "credential.helper=store", *[str(a) for a in args]]
     return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
                         capture_output=True, encoding="utf-8",
                         check=check, env=env,
@@ -277,10 +278,6 @@ def step_commit_and_push(skill_name: str, version: str):
     if not WORK_REPO.exists():
         log(6, 8, f"工作仓库不存在: {WORK_REPO}", "err")
         return False, False
-
-    # 显式配置 credential.helper，阻止 CredentialHelperSelector 弹出
-    run_git("config", "credential.helper", "store")
-    log(6, 8, "凭证助手已显式配置: store", "ok")
 
     # git config
     run_git("config", "user.email", "workbuddy@local", check=False)
