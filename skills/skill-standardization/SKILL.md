@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.27.1
+version: 2.28.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.26.0。修复审查规则数不一致（SKILL.md/reference.md/utils.py/__init__.py 统一为 R-01~R-21、补充 R-21 到审查规则表）。
+description: Skill 标准化规范引擎 v2.29.2。修复 R-20 中英文混排误报、新增标准化 IO 工具（safe_io/skill_rollback/op_logger）、审查出错时建议修正方式输出、create-template 命令。
 tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
 sensitive_access: true
 critical_write: false
@@ -18,9 +18,99 @@ progressive_loading_explicit: true
 ---
 
 
-# skill-standardization v2.28.0
 
-> Skill 标准化规范引擎（安全增强版），支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
+
+## 标准化 IO 工具（新增 v2.29.2）
+
+> 📌 **何时使用**：当 AI 需要更新技能文件时（update/refactor 模式），**优先使用 `safe_io.py` 替代 `Edit` 工具**，原因：
+> - `Edit` 工具对空白符/不可见字符敏感，反复失败
+> - `safe_io.py` 支持正则替换（`safe_patch_regex()`），模糊匹配更鲁棒
+> - 所有写操作**自动备份**到 `data/backup/`，可回滚
+> - 原子写入（临时文件 + `os.replace()`），防止半写文件
+
+### safe_io.py 快速参考
+
+| 函数 | 用途 | 替代对象 |
+|---|------|----------|
+| `safe_read(path)` | 编码容错读取（utf-8 → gbk → latin-1 兜底） | `Read` 工具 / 直接 `open()` |
+| `safe_write(path, content)` | 原子覆写，自动备份 | `Write` 工具 |
+| `safe_patch_by_line(path, line_num, new_str)` | 按行号替换（不依赖精确字符串匹配） | `Edit` 工具 |
+| `safe_patch_regex(path, pattern, replacement)` | 正则替换（支持模糊匹配、空白符容错） | `Edit` 工具 |
+| `safe_insert_after(path, after_line, content)` | 在指定行后插入多行 | `Edit` 工具 |
+
+### CLI 用法（AI 可直接调用）
+
+```bash
+# 读取文件（编码容错）
+python scripts/safe_io.py read --file path/to/file.md
+
+# 正则替换（推荐替代 Edit 工具）
+python scripts/safe_io.py patch-regex \
+  --file path/to/file.md \
+  --pattern "旧内容（支持正则）" \
+  --replacement "新内容"
+
+# 按行号替换（不依赖精确字符串）
+python scripts/safe_io.py patch-line \
+  --file path/to/file.md \
+  --line 42 \
+  --content "新的一行内容"
+
+# 写入文件（自动备份）
+echo "内容" | python scripts/safe_io.py write --file path/to/file.md --stdin
+```
+
+### skill_rollback.py 快速参考
+
+```bash
+# 列出所有备份
+python scripts/skill_rollback.py list
+
+# 回滚最近 3 次操作
+python scripts/skill_rollback.py rollback --latest 3
+
+# 查看备份与当前文件的差异
+python scripts/skill_rollback.py show <backup_id>
+
+# 清理旧备份（保留最近 10 个）
+python scripts/skill_rollback.py purge 10
+```
+
+### op_logger.py 快速参考
+
+```bash
+# 查看最近 20 条操作日志
+python scripts/op_logger.py recent 20
+```
+
+> 📚 **完整 API 参考、使用场景、反模式** 详见 `references/guide.md`（按需加载）
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# skill-standardization v2.29.2
+
+> Skill 标准化规范引擎 v2.29.2，支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系、**审查出错时建议修正方式输出**、**create-template 命令输出创建模板**、**标准化 IO 工具（safe_io / skill_rollback / op_logger）**。
 
 提供 Skill 全生命周期标准化管理：
 **create**（创建）→ **update**（更新）→ **refactor**（改造）→ **audit**（审查）→ **规范加载**
@@ -51,6 +141,9 @@ progressive_loading_explicit: true
 | 6 | **信息完整性保障** | refactor 强制备份 + 全量扫描 + 映射报告 |
 | 7 | **权限检查器** | `scripts/permission_checker.py` 扫描脚本权限、计算权重、生成风险报告 |
 | 8 | **授权管理器** | `scripts/authorization_manager.py` 统一审批 + 即时审批，防止未授权高风险操作 |
+| 9  | **标准化 IO 工具**   | `scripts/safe_io.py` 替代直接文件读写，自动备份 + 原子写入 |
+| 10 | **技能回滚工具**   | `scripts/skill_rollback.py` 备份清单管理、按 ID 回滚、差异对比 |
+| 11 | **操作日志工具**   | `scripts/op_logger.py` 结构化 JSON Lines 日志，审计追溯 |
 
 ---
 
@@ -63,7 +156,7 @@ progressive_loading_explicit: true
 #
 # 本 skill 的 scripts/ 下有两种结构：
 #   1. 包结构（需 python -m 调用）：skill_builder、skill_audit
-#   2. 单文件（直接 python 调用）：permission_checker.py、authorization_manager.py
+#   2. 单文件（直接 python 调用）：scripts/permission_checker.py、scripts/authorization_manager.py
 #
 # ══════════════════════════════════════════════════════════
 
@@ -86,6 +179,27 @@ python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
 
 # 授权请求（单文件，直接调用）
 python scripts/authorization_manager.py request --type immediate --reason "需要删除临时文件"
+
+# ── 新增 v2.29.2：标准化 IO 工具 ──
+
+# 安全读取（编码容错）
+python scripts/safe_io.py read --file SKILL.md
+
+# 正则替换（替代 Edit 工具，鲁棒性更强）
+python scripts/safe_io.py patch-regex \
+  --file SKILL.md \
+  --pattern "旧内容（支持正则）" \
+  --replacement "新内容"
+
+# 按行号替换（不依赖精确字符串匹配）
+python scripts/safe_io.py patch-line \
+  --file SKILL.md --line 42 --content "新内容"
+
+# 回滚最近 3 次操作
+python scripts/skill_rollback.py rollback --latest 3
+
+# 查看最近操作日志
+python scripts/op_logger.py recent 20
 ```
 
 → 完整命令参考见 `references/reference.md`

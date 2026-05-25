@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.28.0",
-  "description": "Skill 标准化规范引擎 v2.28.0。新增 frontmatter 权限字段规范、反模式计数检查、FAQ 章节质量检查、写作规范术语一致性检查、渐进式加载显式说明强制。",
+  "version": "2.29.2",
+  "description": "Skill 标准化规范引擎 v2.29.2。新增标准化 IO 工具（safe_io/skill_rollback/op_logger）、修复 R-20 中英文混排误报。",
   "author": "wUwproject",
   "tags": [
     "standardization",

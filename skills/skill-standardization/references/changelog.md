@@ -5,6 +5,90 @@
 
 ---
 
+## v2.29.2
+
+2026-05-26
+
+**改写类型：Minor — 新增标准化 IO 工具，提升创建/更新效率及稳定性**
+
+### 更新内容
+
+- 📌 **新增 `scripts/safe_io.py`**：标准化文件 IO 接口，替代直接 `open()`
+  - `safe_read(path)`：编码容错读取（utf-8 → gbk → latin-1 兜底）
+  - `safe_write(path, content)`：原子写入（临时文件 + `os.replace()`），自动备份
+  - `safe_patch_regex(path, pattern, replacement)`：正则替换，比 `Edit` 工具更鲁棒
+  - `safe_patch_by_line(path, line_num, new_str)`：按行号替换，不依赖精确字符串匹配
+  - 所有写操作自动备份到 `data/backup/`，返回 `rollback_id`
+- 📌 **新增 `scripts/skill_rollback.py`**：技能文件专用容灾回滚
+  - `list`：列出所有备份（从 `manifest.txt` 读取）
+  - `rollback <id>`：按 ID 恢复文件
+  - `rollback --latest N`：回滚最近 N 次操作
+  - `show <id>`：查看备份与当前文件的差异（ unified diff）
+  - `purge [--keep N]`：清理旧备份，保留最近 N 个
+- 📌 **新增 `scripts/op_logger.py`**：结构化操作日志
+  - `log_op(operation, file_path, success, rollback_id, detail)`：记录 JSON Lines 到 `data/logs/ops.log`
+  - `log_audit_result(audit_result)`：从审计结果自动记录日志
+  - `recent [N]`：查看最近 N 条日志
+- 📝 更新 `SKILL.md`：新增「标准化 IO 工具」章节，文档化新工具使用方式
+- 📝 更新 `SKILL.md` 版本号到 v2.29.2
+- 📝 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- AI 更新技能文件时，优先使用 `safe_io.py` 替代 `Edit` 工具，避免空白符/不可见字符导致的反复失败
+- 所有写操作自动备份，失败时可通过 `skill_rollback.py` 一键回滚
+- 操作日志结构化，便于审计追溯
+- skill-standardization v2.29.2 21/21 PASS
+
+---
+
+## v2.29.1
+
+2026-05-25
+
+**改写类型：Patch — R-20 中英文混排误报修复**
+
+### 更新内容
+
+- 🐛 **修复 R-20 中英文混排误报**：预清理阶段增加文件名（`SKILL.md`、`reference.md`）和目录路径（`scripts/`、`references/`）剔除，避免误判
+- 🐛 **修复 `subprocess等` 缺空格**：`permissions.md` 表格中 `subprocess等` → `subprocess 等`
+- 🐛 **修复 `渐进式MD体系` 缺空格**：`reference.md` 中 `渐进式MD体系` → `渐进式 MD 体系`
+- 🐛 **修复模糊表述误报**：`reference.md` 规则表格中 `(可能/应该/大概)` 描述改为 `禁止模糊表述`
+- 📝 更新 `SKILL.md` 版本号到 v2.29.1
+- 📝 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- R-20 写作规范检查 now passes (0 误报)
+- skill-standardization v2.29.1 21/21 PASS
+
+---
+
+## v2.29.0
+
+2026-05-25
+
+**改写类型：Minor — 审查出错时建议修正方式输出 + create-template 命令**
+
+### 更新内容
+
+- ✅ **`audit_skill()` 返回增强**：`entry` 新增 `fix` 和 `suggestion` 字段，JSON 报告包含完整修正建议
+- ✅ **`format_report()` 增强**：详细输出模式显示每条 FAIL 规则的修正建议（`fix.operation` / `fix.location` / `fix.reason`）
+- ✅ **新增 `create-template` 命令**：输出所有 21 条规则的创建模板（供 LLM 创建技能时参考）
+  - `python -m skill_audit create-template` — 人类可读格式
+  - `python -m skill_audit create-template --json` — JSON 格式
+- ✅ **`RULES` 定义增强**：`create_template` 字段统一格式，包含所有规则的创建骨架
+- 📝 更新 `SKILL.md` 版本号到 v2.29.0
+- 📝 更新 `_meta.json` 版本号和描述
+
+### 影响
+
+- AI 审查技能时，FAIL 输出包含具体修正建议，减少反复试错
+- 创建新技能时，AI 可先运行 `create-template` 获取正确骨架和写作方式
+- JSON 格式报告现在包含完整 `fix` 信息，便于程序化解析和自动修正
+
+---
+
 ## v2.28.0（当前版本）
 
 2026-05-25
@@ -93,7 +177,7 @@
 ### 影响
 
 - 全技能文档一致确认：**共 21 条规则（R-01 ~ R-21）**，全部在 `METHOD_MAP` 中有对应实现，无缺失
-- `reference.md` 规则表（L192~L216）本身已完整含 R-21，无需修改
+- `reference.md` 规则表（L192~L216）本身已完整含 R-21，无需更新
 - AI 加载技能时不再因文档不一致而产生困惑
 
 ---

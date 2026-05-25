@@ -18,11 +18,11 @@
 
 | # | 文件 | 行号 | 匹配内容 | 风险等级 | 授权方式 | 说明 |
 |---|------|------|----------|----------|----------|------|
-| 1 | `scripts\permission_checker.py` | 74 | `SUBPROCESS` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess等） |
-| 2 | `scripts\permission_checker.py` | 86 | `Subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess等） |
-| 3 | `scripts\permission_checker.py` | 248 | `subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess等） |
-| 4 | `scripts\permission_checker.py` | 598 | `subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess等） |
-| 5 | `scripts\permission_checker.py` | 606 | `SUBPROCESS` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess等） |
+| 1 | `scripts\permission_checker.py` | 74 | `SUBPROCESS` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
+| 2 | `scripts\permission_checker.py` | 86 | `Subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
+| 3 | `scripts\permission_checker.py` | 248 | `subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
+| 4 | `scripts\permission_checker.py` | 598 | `subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
+| 5 | `scripts\permission_checker.py` | 606 | `SUBPROCESS` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
 
 ## 授权方式说明
 

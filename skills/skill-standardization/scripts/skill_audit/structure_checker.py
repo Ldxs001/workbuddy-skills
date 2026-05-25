@@ -361,6 +361,16 @@ def _check_writing_standards_text(text, filename=""):
     """
     issues = {"must": [], "suggest": [], "optional": []}
 
+    # ── 预清理：剔除代码块、行内代码、文件名、目录路径（供所有检查复用）──
+    cleaned = re.sub(r"```.*?```", '', text, flags=re.DOTALL)
+    # v2.29.0 修复：用 Unicode 转义代替反引号，避免正则失效
+    tick = '\u0060'
+    cleaned = re.sub(f'{tick}[^{tick}]+?{tick}', '', cleaned)
+    # v2.29.1 修复：剔除文件名（如 SKILL.md、reference.md），避免中英文混排误报
+    cleaned = re.sub(r'[A-Za-z]+\.[a-zA-Z]+', ' ', cleaned)
+    # v2.29.1 新增：剔除目录路径（如 scripts/、references/），避免中英文混排误报
+    cleaned = re.sub(r'[A-Za-z]+/', ' ', cleaned)
+
     # ── 检查1：术语一致性（🔴 必须修）───────────────────
     term_groups = [
         (["创建", "建立", "新建"], "创建"),
@@ -368,7 +378,7 @@ def _check_writing_standards_text(text, filename=""):
         (["删除", "移除", "去掉"], "删除"),
         (["配置", "设置", "设定"], "配置"),
     ]
-    lines = text.split("\n")
+    lines = cleaned.split("\n")
     for group, preferred in term_groups:
         found_terms = {}
         for line in lines:
@@ -387,8 +397,6 @@ def _check_writing_standards_text(text, filename=""):
         ("大概", "避免模糊表述"),
         ("差不多", "避免模糊表述"),
     ]
-    cleaned = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
-    cleaned = re.sub(r'`[^`]+?`', '', cleaned)
     for word, suggestion in forbidden:
         if word in cleaned:
             # v2.24.2 误判排除：如果模糊词出现在"修复"、"删除"等动词后面，说明是在描述修复动作，不是实际模糊表述
@@ -418,7 +426,7 @@ def _check_writing_standards_text(text, filename=""):
                 issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
 
     # ── 检查3：中英文混排空格（🟡 建议修）───────────────────
-    mingled = re.findall(r'[一-鿿][A-Za-z]{2,}|[A-Za-z]{2,}[一-鿿]', text)
+    mingled = re.findall(r'[一-鿿][A-Za-z]{2,}|[A-Za-z]{2,}[一-鿿]', cleaned)
     mingled = [m for m in mingled if not re.match(r'v\d|SKILL|MD|JSON|YAML', m)]
     if mingled:
         prefix = f"{filename}：" if filename else ""
@@ -464,6 +472,9 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
             match = re.search(r'(?:python3?)\s+([^\s]+\.py)', cmd)
             if match:
                 script_path = match.group(1)
+                # v2.29.0 修复：脚本路径不应包含中文/全角字符（排除误报）
+                if re.search(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', script_path):
+                    continue
                 # v2.24.4 修复：跳过包含变量的路径（如 {SKILL_DIR}/scripts/...）
                 if '{' in script_path or '}' in script_path:
                     continue

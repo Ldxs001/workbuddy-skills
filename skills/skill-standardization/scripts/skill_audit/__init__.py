@@ -167,6 +167,12 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
             "skipped": skipped,
             "detail": result.get("detail", ""),
         }
+        # 新增：附带修正建议（供 LLM 参考）
+        if not passed and not skipped:
+            if result.get("fix"):
+                entry["fix"] = result["fix"]
+            if result.get("suggestion"):
+                entry["suggestion"] = result["suggestion"]
         results.append(entry)
 
         # 收集 fix 建议
@@ -266,8 +272,51 @@ def format_report(audit_result, verbose=True):
             status = "✅" if res["passed"] else ("⏭️" if res["skipped"] else ("🔴" if res["severity"]=="ERROR" else "🟡"))
             sev = res["severity"][0] if res["severity"] else "?"
             lines.append(f"{res['rule_id']:<8} {sev:<7} {status:<6} {res['detail']}")
+            # 新增：输出修正建议（供 LLM 参考）
+            if not res["passed"] and not res["skipped"] and res.get("fix"):
+                fix = res["fix"]
+                if fix.get("operation"):
+                    lines.append(f"    💡 建议修正：{fix['operation']}")
+                if fix.get("location"):
+                    lines.append(f"    📍 位置：{fix['location']}")
+                if fix.get("reason"):
+                    lines.append(f"    💬 原因：{fix['reason']}")
 
     return "\n".join(lines)
+
+
+def cmd_create_template():
+    """
+    输出所有规则的创建模板（供 LLM 创建技能时参考）。
+    包含：规则 ID、严重度、检查内容、是否可自动修正、创建模板。
+    """
+    print(f"\n{'='*70}")
+    print("  skill-standardization 创建模板（供 LLM 参考）")
+    print(f"{'='*70}\n")
+
+    for rule in RULES:
+        sev_mark = "🔴" if rule["severity"] == "ERROR" else "🟡"
+        fixable_mark = "✅ 可自动修正" if rule.get("fixable") else "❌ 需手动修正"
+        print(f"{'─'*70}")
+        print(f"  {rule['id']} {sev_mark} [{rule['severity']}] {rule['name']}")
+        print(f"  检查：{rule['check']}")
+        print(f"  修正：{fixable_mark}")
+        tmpl = rule.get("create_template", "")
+        if tmpl:
+            # 把 \n 转换成实际换行，并缩进
+            tmpl_lines = tmpl.split("\\n")
+            print(f"  创建模板：")
+            for ln in tmpl_lines:
+                print(f"    {ln}")
+        print()
+
+    print(f"{'='*70}")
+    print(f"  共 {len(RULES)} 条规则")
+    print(f"{'='*70}\n")
+    print("用法：")
+    print("  python -m skill_audit create-template")
+    print("  python -m skill_audit create-template --json  （JSON 格式）")
+    print()
 
 
 def cmd_rules():
@@ -282,6 +331,12 @@ def cmd_rules():
 
 def cmd_audit(args):
     """审查单个 skill 目录"""
+    # 强制 UTF-8 输出（Windows 终端兼容）
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     skill_dir = args.skill_dir
     if not os.path.isdir(skill_dir):
         print(f"❌ 目录不存在: {skill_dir}", file=sys.stderr)
@@ -390,6 +445,11 @@ def main():
     # rules 子命令
     subparsers.add_parser("rules", help="列出所有审查规则")
 
+    # create-template 子命令（v2.29.0 新增）
+    p_template = subparsers.add_parser("create-template", aliases=["template"],
+                                      help="输出所有规则的创建模板（供 LLM 创建技能时参考）")
+    p_template.add_argument("--json", action="store_true", help="JSON 格式输出")
+
     args = parser.parse_args()
 
     if args.command == "audit":
@@ -398,6 +458,22 @@ def main():
         cmd_audit_all(args)
     elif args.command == "rules":
         cmd_rules()
+    elif args.command in ("create-template", "template"):
+        if hasattr(args, "json") and args.json:
+            import json
+            output = []
+            for rule in RULES:
+                output.append({
+                    "id": rule["id"],
+                    "name": rule["name"],
+                    "severity": rule["severity"],
+                    "check": rule["check"],
+                    "fixable": rule.get("fixable", False),
+                    "create_template": rule.get("create_template", ""),
+                })
+            print(json.dumps(output, ensure_ascii=False, indent=2))
+        else:
+            cmd_create_template()
     else:
         parser.print_help()
         sys.exit(1)

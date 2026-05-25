@@ -212,7 +212,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-17 | ERROR | 渐进加载引用（强制） | SKILL.md > 200 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用 |
 | R-18 | WARN | 反模式具体性 | 正文含 ## 反模式/常见错误 章节，且每条反模式含具体描述（≥20字）或代码示例 |
 | R-19 | WARN | FAQ 有意义性 | 正文含 ## FAQ/常见问题 章节，且 Q&A 对有意义（Q≥10字，A≥15字） |
-| R-20 | WARN | 写作规范（术语一致/无模糊表述/中英文混排） | 正文术语一致、无模糊表述（可能/应该/大概）、中英文混排有空格 |
+| R-20 | WARN | 写作规范（术语一致/禁止模糊表述/中英文混排） | 正文术语一致、无模糊表述、中英文混排有空格 |
 | R-21 | WARN | 渐进式加载显式说明 | SKILL.md 在显眼位置（核心能力/工作流程章节）显式说明渐进式加载（含「渐进式加载」或「progressive」关键词） |
 
 **JSON 输出格式：**
@@ -254,7 +254,7 @@ python -m json_loader load <module_name>
 | `body` | `spec/body.json` | 正文章节规范（5必须+4推荐+N可选） |
 | `rules` | `spec/rules.json` | 审查规则 R-01~R-10 完整定义 |
 | `structure` | `spec/structure.json` | 目录结构规范（三级复杂度+迁移规则） |
-| `progressive_md` | `spec/progressive_md.json` | 渐进式MD体系（拆分边界+加载协议+文件映射） |
+| `progressive_md` | `spec/progressive_md.json` | 渐进式 MD 体系（拆分边界+加载协议+文件映射） |
 | `all` | *全部* | 加载所有模块的合并视图 |
 
 ### list 子命令
