@@ -33,6 +33,8 @@ from .frontmatter_checker import (
 from .structure_checker import (
     body_has_h1, body_has_trigger_section, body_has_core_section,
     body_has_workflow_section,
+    body_has_antipattern_section, body_has_faq_section,
+    body_check_writing_standards,
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
@@ -62,6 +64,9 @@ METHOD_MAP = {
     "check_authorization_present": check_authorization_present,
     "check_permission_weight_explained": check_permission_weight_explained,
     "check_progressive_loading_forced": check_progressive_loading_forced,
+    "body_has_antipattern_section": body_has_antipattern_section,
+    "body_has_faq_section": body_has_faq_section,
+    "body_check_writing_standards": body_check_writing_standards,
 }
 
 
@@ -104,8 +109,12 @@ def _apply_fixes(skill_md, fixes):
     return applied
 
 
-def audit_skill(skill_dir, manifest_version=None, _fix_applied=False):
-    """审查单个 skill 目录中的 SKILL.md。_fix_applied 防止无限递归。"""
+def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_file=None):
+    """
+    审查单个 skill 目录中的 SKILL.md。_fix_applied 防止无限递归。
+
+    如果传了 _progress_file，审计结束后自动更新 .progress.md。
+    """
     skill_md = os.path.join(skill_dir, "SKILL.md")
     dirname = os.path.basename(os.path.normpath(skill_dir))
 
@@ -210,6 +219,14 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False):
     }
     if fixed:
         r["fixed"] = fixed
+    # 更新 .progress.md（如果传了 _progress_file）
+    if progress_file:
+        try:
+            from .progress_manager import update_progress_from_audit, finalize_progress
+            update_progress_from_audit(progress_file, r)
+            finalize_progress(progress_file, r)
+        except Exception as e:
+            print(f"[!] 更新 .progress.md 失败: {e}", file=sys.stderr)
     return r
 
 
@@ -268,7 +285,8 @@ def cmd_audit(args):
         print(f"❌ 目录不存在: {skill_dir}", file=sys.stderr)
         sys.exit(1)
 
-    result = audit_skill(skill_dir, manifest_version=args.manifest_version)
+    result = audit_skill(skill_dir, manifest_version=args.manifest_version,
+                        progress_file=args.progress_file)
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -359,6 +377,7 @@ def main():
     p_audit.add_argument("skill_dir", help="skill 目录路径")
     p_audit.add_argument("--json", action="store_true", help="JSON 格式输出")
     p_audit.add_argument("--manifest-version", metavar="VER", help="manifest 中记录的版本号（用于 R-10）")
+    p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
 
     # audit-all 子命令
     p_all = subparsers.add_parser("audit-all", help="批量审查所有 skill")

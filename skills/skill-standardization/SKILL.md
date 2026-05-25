@@ -3,11 +3,27 @@ name: skill-standardization
 version: 2.21.0
 author: wUwproject
 license: MIT
-description: "Skill 标准化规范引擎 v2.21.0。修复：1) parse_simple_yaml_frontmatter() 布尔值解析（true/false → Python bool）；2) 增强 R-13~R-16 自动修正（字段缺失时返回 fix 建议）；3) 修复 R-15 字段缺失检查。"
-tags: ["standardization", "skill-builder", "skill-audit", "json-loader", "refactor", "progressive-loading", "security", "permission-check"]
-sensitive_access: false
+description: Skill 标准化规范引擎 v2.21.0。修复：1) parse_simple_yaml_frontmatter() 布尔值解析（true/false → Python bool）；2) 增强 R-13~R-16 自动修正（字段缺失时返回 fix 建议）；3) 修复 R-15 字段缺失检查。
+tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
+sensitive_access: true
 critical_write: false
+create_permissions_md: true
+permission_weight: HIGH
+antipattern_count: add_examples
+section_faq: true
+writing_standards: fix_terms
+antipattern_vague: add_detail
 ---
+
+
+
+
+
+
+
+
+
+
 
 # skill-standardization v2.21.0
 
@@ -105,7 +121,7 @@ python scripts/json_loader.py load progressive_md
 
 | 模式 | 用途 | 关键参数 |
 |------|------|----------|
-| `create` | 从模板新建标准 skill | `--desc`, `--tags` |
+| `create` | 从模板创建标准 skill | `--desc`, `--tags` |
 | `update` | 增量检查/修复 | `--fix`, `--backup` |
 | `refactor` | 整体结构改造 | `--dry-run`, `--no-backup` |
 
@@ -140,12 +156,12 @@ python scripts/json_loader.py load progressive_md
 
 ### 增量更新记录规范
 
-**核心规则：** update/refactor 模式下产生的更新记录（变更日志、差异报告、迁移映射等）必须写入 `references/changelog.md`，**禁止写入主 SKILL.md**。
+**核心规则：** update/refactor 模式下产生的更新记录（更新日志、差异报告、迁移映射等）必须写入 `references/changelog.md`，**禁止写入主 SKILL.md**。
 
 | 规则 | 说明 |
 |------|------|
-| 主文件仅保留版本号 | SKILL.md frontmatter `version:` 是唯一的版本标识，不承载变更历史 |
-| 变更记录渐进式加载 | 每次 update/refactor 操作产出的记录追加至 `references/changelog.md` |
+| 主文件仅保留版本号 | SKILL.md frontmatter `version:` 是唯一的版本标识，不承载更新历史 |
+| 更新记录渐进式加载 | 每次 update/refactor 操作产出的记录追加至 `references/changelog.md` |
 | 主文件行数可控 | 详细历史信息不占主文件篇幅，确保 SKILL.md ≤200 行 |
 
 ---
@@ -203,7 +219,7 @@ python scripts/json_loader.py load progressive_md
 
 ---
 
-## 注意事项
+## 重要说明
 
 → 详见 `references/guide.md`（按需加载）
 
@@ -218,7 +234,25 @@ python scripts/json_loader.py load progressive_md
 - `scripts/` 下的 `.py` 文件头版本注释为辅助信息，不强制同步
 - 使用 `python -m skill_builder update .` 可自动检测并提示版本不一致
 
-**自修改禁止**：`skill_builder.py` 的 `_bump_version` 函数只更新目标 skill 的版本号，不修改自身源代码。
+**自更新禁止**：`skill_builder.py` 的 `_bump_version` 函数只更新目标 skill 的版本号，不更新自身源代码。
+
+---
+
+## 反模式
+
+- **在 SKILL.md 正文中写大量详细教程** — 正确做法：教程类内容拆分到 `references/guide.md`，主文件只留摘要 + 引用。详细教程超过50行时必须拆分，避免主文件超过200行限制。
+- **触发词过于宽泛导致误触发** — 正确做法：触发词须含具体动作或对象（如"生成峰图"而非"画图"），并加否定条件缩小范围。
+
+→ 更多反模式详见 `references/antipatterns.md`
+
+---
+
+## FAQ
+
+Q: 什么时候用 create，什么时候用 update？
+A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需增量检查/修复时用 update。不确定时先跑 update 看报告再决定。
+
+→ 更多常见问题详见 `references/faq.md`
 
 ---
 

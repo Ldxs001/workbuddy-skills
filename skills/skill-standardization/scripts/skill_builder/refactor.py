@@ -60,8 +60,12 @@ class Refactor:
 
         # ★ 新增：注入授权要求章节
         if getattr(args, "inject_auth", False):
-            report = self._run_permissionchecker(skill_dir)
+            report = self._run_permission_checker(skill_dir)
             self._inject_auth_section(skill_dir, report)
+
+        # ★ 新增：版本号 bump + 进度管理
+        self._bump_version(skill_dir, "patch", {})
+        self._audit_and_update_progress(skill_dir, mode="refactor")
 
         print(f"\n✅ refactor 完成！")
         print(f"   备份位置: {backup_dir}")
@@ -190,40 +194,108 @@ class Refactor:
                 with open(out, "r", encoding="utf-8") as f:
                     report = json.load(f)
                 os.unlink(out)
-                # 自动写入权限说明到 references/permission.md
+                # 自动写入权限说明到 references/permissions.md
                 self._write_permission_md(skill_dir, report)
                 return report
             return None
         except Exception as e:
-            print(f"[!] 运行 permissionchecker.py 失败: {e}")
+            print(f"[!] 运行 permission_checker.py 失败: {e}")
             return None
 
     def _write_permission_md(self, skill_dir, report):
-        """将权限扫描报告写入 references/permission.md"""
-        if not report:
-            return
+        """将权限扫描报告自动写入 references/permissions.md（详细格式）"""
+        from pathlib import Path as Path2
+        import json as json2
+
+        skill_dir = Path(skill_dir)
+        pm = skill_dir / "references" / "permissions.md"
         issues = report.get("issues", [])
+        risk_level = report.get("risk_level", "unknown")
+
         if not issues:
+            print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")
             return
 
-        refs_dir = skill_dir / "references"
-        refs_dir.mkdir(exist_ok=True)
-        perm_file = refs_dir / "permission.md"
+        lines = []
+        lines.append("# 权限说明\n")
+        lines.append(f"权限扫描风险等级：**{risk_level}**\n")
+        lines.append("## 权限总览\n")
+        lines.append(f"共 {len(issues)} 项权限风险，按类别分组如下：\n")
 
-        lines = ["# 权限说明\n", "\n", "> 由 permissionchecker.py 自动扫描生成，请勿手动编辑。\n", "\n"]
-        lines.append("| 文件 | 行号 | 操作 | 风险 | 建议授权 |\n")
-        lines.append("|------|------|------|------|------------|\n")
+        # 按类别分组（使用 type 字段）
+        categories = {}
         for iss in issues:
-            lines.append(f"| {iss.get('file', '')} | {iss.get('line', '')} | {iss.get('operation', '')} | {iss.get('risk', '')} | {iss.get('suggested_auth', '')} |\n")
-        perm_file.write_text("".join(lines), encoding="utf-8")
-        print(f"[*] 已生成权限说明: {perm_file}")
+            cat = iss.get("type", "other")
+            categories.setdefault(cat, []).append(iss)
+
+        # 类型中文映射
+        type_cn = {
+            "sensitive_access": "敏感信息访问",
+            "critical_write": "关键位置写入",
+            "network_access": "网络访问",
+            "file_delete": "文件删除",
+            "subprocess_call": "子进程调用",
+            "missing_declaration": "缺少声明",
+        }
+        cat_desc = {
+            "sensitive_access": "读取内存文件、凭证、Token 等敏感数据",
+            "critical_write": "向系统关键目录或 skills/ 安装目录写入文件",
+            "network_access": "通过 HTTP/HTTPS 向外发送请求或接收数据",
+            "file_delete": "删除文件或目录（可能不可逆）",
+            "subprocess_call": "调用系统命令或其他可执行文件",
+            "missing_declaration": "SKILL.md frontmatter 未声明对应权限字段",
+        }
+
+        for cat, items in categories.items():
+            cat_name = type_cn.get(cat, cat)
+            cat_action = cat_desc.get(cat, "未知权限作用")
+            lines.append(f"### {cat_name}（{len(items)} 项）")
+            lines.append(f"> **权限作用**：{cat_action}")
+            lines.append("")
+            lines.append("| # | 文件 | 行号 | 匹配内容 | 风险等级 | 授权方式 | 说明 |")
+            lines.append("|---|------|------|----------|----------|----------|------|")
+            for i, iss in enumerate(items, 1):
+                sev = iss.get("severity", "?")
+                sev_cn = {"HIGH": "🔴 高", "MEDIUM": "🟡 中", "LOW": "✅ 低", "ERROR": "🔴 高"}.get(sev, sev)
+                file = iss.get("file", "")
+                line = iss.get("line", "")
+                match = iss.get("match", iss.get("pattern", ""))[:50]
+                method = iss.get("authorization_method", "immediate")
+                method_cn = {"immediate": "即时授权", "unified": "统一授权", "silent": "静默"}.get(method, method)
+                reason = iss.get("reason", "")
+                desc = iss.get("description", "")
+                lines.append(f"| {i} | `{file}` | {line} | `{match}` | {sev_cn} | {method_cn} | {desc} |")
+            lines.append("")
+
+        lines.append("## 授权方式说明\n")
+        lines.append("- **即时授权**：每次执行前需获得用户批准")
+        lines.append("- **统一授权**：首次执行前获得用户批准，后续不再询问")
+        lines.append("- **静默授权**：无需用户交互，自动执行并记录")
+        lines.append("")
+        lines.append("## 详细风险列表\n")
+        for i, iss in enumerate(issues, 1):
+            sev = iss.get("severity", "?")
+            sev_cn = {"HIGH": "高", "MEDIUM": "中", "LOW": "低", "ERROR": "高"}.get(sev, sev)
+            desc = iss.get("description", "")
+            file = iss.get("file", "")
+            line = iss.get("line", "")
+            reason = iss.get("reason", "")
+            lines.append(f"{i}. **[{sev_cn}] {desc}**")
+            lines.append(f"   - 位置：`{file}` 第 {line} 行")
+            if reason:
+                lines.append(f"   - 原因：{reason}")
+            lines.append("")
+
+        pm.parent.mkdir(parents=True, exist_ok=True)
+        pm.write_text("\n".join(lines), encoding="utf-8")
+        print(f"[✅] 权限扫描结果已自动写入 {pm}")
 
     def _inject_auth_section(self, skill_dir, report):
         """
         根据权限检查报告，为 SKILL.md 注入「## 授权要求」章节。
 
         授权方式直接读取 report 中每项的 authorization_method 字段
-        （由 permissionchecker.py 的 suggest_authorization_methods() 生成，
+        （由 permission_checker.py 的 suggest_authorization_methods() 生成，
          已根据技能工作性质（自动化/交互式）智能判断）。
         """
         if not report:
@@ -269,6 +341,100 @@ class Refactor:
         # 注入到 SKILL.md 末尾
         skill_md.write_text(content + "".join(auth_section), encoding="utf-8")
         print(f"[*] 已注入「授权要求」章节（{sum(len(v) for v in groups.values())} 项操作）")
+
+    # ── 版本号 bump ────────────────────────────────────────────────────────
+
+    def _bump_version(self, skill_dir, bump_type, results):
+        """自动升级版本号（SemVer）"""
+        from pathlib import Path as Path2
+        import re, json as json2
+
+        skill_md = Path(skill_dir) / "SKILL.md"
+        meta_file = Path(skill_dir) / "_meta.json"
+        if not skill_md.exists():
+            print("[!] SKILL.md 不存在，无法升级版本号")
+            return
+
+        # 读取当前版本
+        content = skill_md.read_text(encoding="utf-8")
+        m = re.search(r"^version:\s*([\d\.]+)", content, re.MULTILINE)
+        if not m:
+            print("[!] SKILL.md frontmatter 中未找到 version 字段")
+            return
+
+        old_ver = m.group(1)
+        parts = list(map(int, old_ver.split(".")))
+        while len(parts) < 3:
+            parts.append(0)
+
+        # 升级
+        bt = (bump_type or "patch").lower()
+        if bt == "major":
+            parts[0] += 1
+            parts[1] = 0
+            parts[2] = 0
+        elif bt == "minor":
+            parts[1] += 1
+            parts[2] = 0
+        else:  # patch
+            parts[2] += 1
+
+        new_ver = ".".join(map(str, parts))
+
+        # 写入 SKILL.md
+        new_content = content[:m.start(1)] + new_ver + content[m.end(1):]
+        skill_md.write_text(new_content, encoding="utf-8")
+
+        # 写入 _meta.json
+        if meta_file.exists():
+            try:
+                meta = json2.loads(meta_file.read_text(encoding="utf-8"))
+                meta["version"] = new_ver
+                meta_file.write_text(
+                    json2.dumps(meta, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8"
+                )
+            except Exception as e:
+                print(f"[!] 更新 _meta.json 版本号失败: {e}")
+
+        print(f"[✅] 版本号升级: {old_ver} → {new_ver} ({bt})")
+
+    # ── 审计 + 进度管理 ────────────────────────────────────────────────────
+
+    def _audit_and_update_progress(self, skill_dir, mode="refactor"):
+        """审计 skill 并更新 .progress.md"""
+        import subprocess, json as json2
+        from pathlib import Path as Path2
+
+        skill_dir = Path(skill_dir).resolve()
+        progress_file = skill_dir / ".progress.md"
+
+        # 1. 创建 .progress.md
+        from skill_audit.progress_manager import create_progress
+        create_progress(str(skill_dir), mode)
+
+        # 2. 运行审计（通过 subprocess 调用 python -m skill_audit）
+        try:
+            result = subprocess.run(
+                ["python", "-m", "skill_audit", "audit", str(skill_dir), "--json"],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                print(f"[!] 审计失败: {result.stderr}")
+                return
+            audit_result = json2.loads(result.stdout)
+        except Exception as e:
+            print(f"[!] 审计执行失败: {e}")
+            return
+
+        # 3. 更新 .progress.md
+        from skill_audit.progress_manager import update_progress_from_audit, finalize_progress
+        update_progress_from_audit(str(skill_dir), audit_result)
+        finalize_progress(str(skill_dir), audit_result)
+
+        # 4. 打印报告
+        from skill_audit import format_report
+        print(format_report(audit_result, verbose=True))
 
 
 def _create_backup(skill_dir, operation, workspace):

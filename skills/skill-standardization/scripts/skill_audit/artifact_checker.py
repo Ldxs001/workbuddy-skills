@@ -74,6 +74,10 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
             "violations": [{"source": v["source"], "path": v["path_literal"],
                            "suggestion": v["suggestion"], "cross_refs": v.get("cross_refs", [])}
                           for v in violations],
+            "fix": {"key": "artifact_paths", "value": True,
+                     "location": f"{skill_dir} (scripts/ 及根目录)",
+                     "operation": "将所有违规产出物路径迁移至 skills/.standardization/<skill>/{outputs,data,cache,temp}/ 目录，并更新所有交叉引用",
+                     "verification": "重新运行 audit_skill()，确认 R-11 passed"},
         }
     else:
         return {"passed": True, "detail": "未发现产出物路径违规（scripts/ + 根目录 + 子目录均通过）"}
@@ -544,6 +548,10 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
             "passed": False,
             "detail": "\n".join(detail_lines),
             "violations": violations,
+            "fix": {"key": "external_data_dir", "value": True,
+                     "location": f"{skill_dir}/_meta.json 及 scripts/ 中的数据目录变量",
+                     "operation": "在 _meta.json 中添加 data_dir 字段，确保 scripts/ 中数据目录路径符合 skills/.standardization/<skill>/data/ 规范",
+                     "verification": "重新运行 audit_skill()，确认 R-12 passed"},
         }
     else:
         if data_dir_vars:

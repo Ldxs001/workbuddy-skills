@@ -210,6 +210,9 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-15 | ERROR | 高权限操作授权检查 | 脚本含文件删除/网络请求/subprocess 调用时，执行前须调用 authorization_manager.py 请求用户授权 |
 | R-16 | WARN | 权限权重说明 | 建议在 SKILL.md 或 references/ 中说明各操作的权限权重，便于审查时评估风险 |
 | R-17 | ERROR | 渐进加载引用（强制） | SKILL.md > 200 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用 |
+| R-18 | WARN | 反模式具体性 | 正文含 ## 反模式/常见错误 章节，且每条反模式含具体描述（≥20字）或代码示例 |
+| R-19 | WARN | FAQ 有意义性 | 正文含 ## FAQ/常见问题 章节，且 Q&A 对有意义（Q≥10字，A≥15字） |
+| R-20 | WARN | 写作规范（术语一致/无模糊表述/中英文混排） | 正文术语一致、无模糊表述（可能/应该/大概）、中英文混排有空格 |
 
 **JSON 输出格式：**
 ```json

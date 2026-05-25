@@ -107,10 +107,44 @@ tags: [{tags}]
         print(f"   2. 如需脚本，放入 scripts/")
         print(f"   3. 如需辅助文档，放入 references/")
 
-        # 权限扫描（自动写入 references/permissions.md）
-        self._check_permissions(skill_dir)
-
+        # 审计 + 进度管理
+        self._audit_and_update_progress(skill_dir, mode="create")
         return True
+
+    def _audit_and_update_progress(self, skill_dir, mode="create"):
+        """审计 skill 并更新 .progress.md"""
+        import subprocess, json
+        from pathlib import Path
+
+        skill_dir = Path(skill_dir).resolve()
+        progress_file = skill_dir / ".progress.md"
+
+        # 1. 创建 .progress.md
+        from skill_audit.progress_manager import create_progress
+        create_progress(str(skill_dir), mode)
+
+        # 2. 运行审计（通过 subprocess 调用 python -m skill_audit）
+        try:
+            result = subprocess.run(
+                ["python", "-m", "skill_audit", "audit", str(skill_dir), "--json"],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                print(f"[!] 审计失败: {result.stderr}")
+                return
+            audit_result = json.loads(result.stdout)
+        except Exception as e:
+            print(f"[!] 审计执行失败: {e}")
+            return
+
+        # 3. 更新 .progress.md
+        from skill_audit.progress_manager import update_progress_from_audit, finalize_progress
+        update_progress_from_audit(str(skill_dir), audit_result)
+        finalize_progress(str(skill_dir), audit_result)
+
+        # 4. 打印报告
+        from skill_audit import format_report
+        print(format_report(audit_result, verbose=True))
 
     # ── 权限扫描结果自动写入 references/permissions.md ──────────────────
 
@@ -134,26 +168,49 @@ tags: [{tags}]
         lines.append("## 权限总览\n")
         lines.append(f"共 {len(issues)} 项权限风险，按类别分组如下：\n")
 
-        # 按类别分组
+        # 按类别分组（使用 type 字段，而非 category）
         categories = {}
         for iss in issues:
-            cat = iss.get("category", "other")
+            cat = iss.get("type", "other")
             categories.setdefault(cat, []).append(iss)
 
+        # 类型中文映射
+        type_cn = {
+            "sensitive_access": "敏感信息访问",
+            "critical_write": "关键位置写入",
+            "network_access": "网络访问",
+            "file_delete": "文件删除",
+            "subprocess_call": "子进程调用",
+            "missing_declaration": "缺少声明",
+        }
+        cat_desc = {
+            "sensitive_access": "读取内存文件、凭证、Token 等敏感数据",
+            "critical_write": "向系统关键目录或 skills/ 安装目录写入文件",
+            "network_access": "通过 HTTP/HTTPS 向外发送请求或接收数据",
+            "file_delete": "删除文件或目录（可能不可逆）",
+            "subprocess_call": "调用系统命令或其他可执行文件",
+            "missing_declaration": "SKILL.md frontmatter 未声明对应权限字段",
+        }
+
         for cat, items in categories.items():
-            lines.append(f"### {cat}（{len(items)} 项）\n")
-            lines.append("| # | 权限名称 | 风险等级 | 功能解释 | 具体位置 | 授权方式 |")
-            lines.append("|---|----------|----------|----------|----------|----------|")
+            cat_name = type_cn.get(cat, cat)
+            cat_action = cat_desc.get(cat, "未知权限作用")
+            lines.append(f"### {cat_name}（{len(items)} 项）")
+            lines.append(f"> **权限作用**：{cat_action}")
+            lines.append("")
+            lines.append("| # | 文件 | 行号 | 匹配内容 | 风险等级 | 授权方式 | 说明 |")
+            lines.append("|---|------|------|----------|----------|----------|------|")
             for i, iss in enumerate(items, 1):
                 sev = iss.get("severity", "?")
-                sev_cn = {"HIGH": "高", "MEDIUM": "中", "LOW": "低", "ERROR": "高"}.get(sev, sev)
-                desc = iss.get("description", "")
+                sev_cn = {"HIGH": "🔴 高", "MEDIUM": "🟡 中", "LOW": "✅ 低", "ERROR": "🔴 高"}.get(sev, sev)
                 file = iss.get("file", "")
                 line = iss.get("line", "")
+                match = iss.get("match", iss.get("pattern", ""))[:50]
                 method = iss.get("authorization_method", "immediate")
-                method_cn = {"immediate": "即时授权", "unified": "统一授权", "silent": "静默授权"}.get(method, method)
-                location = f"`{file}` 第 {line} 行" if file else "未知"
-                lines.append(f"| {i} | {desc} | {sev_cn} | {desc} | {location} | {method_cn} |")
+                method_cn = {"immediate": "即时授权", "unified": "统一授权", "silent": "静默"}.get(method, method)
+                reason = iss.get("reason", "")
+                desc = iss.get("description", "")
+                lines.append(f"| {i} | `{file}` | {line} | `{match}` | {sev_cn} | {method_cn} | {desc} |")
             lines.append("")
 
         lines.append("## 授权方式说明\n")

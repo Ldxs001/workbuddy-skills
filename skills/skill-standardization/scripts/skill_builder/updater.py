@@ -106,18 +106,58 @@ class SkillUpdater:
 
     def _bump_version(self, skill_dir, bump_type, results):
         """自动升级版本号（SemVer）"""
-        # 只更新 SKILL.md 和 _meta.json，不自修改
+        from pathlib import Path
+        import re, json
+
         skill_md = skill_dir / "SKILL.md"
+        meta_file = skill_dir / "_meta.json"
         if not skill_md.exists():
             results["warnings"].append("⚠️ SKILL.md 不存在，无法升级版本号")
             return
 
+        # 读取当前版本
         content = skill_md.read_text(encoding="utf-8")
-        # 版本号更新逻辑（简化版）
-        results["fixes"].append(f"版本号升级: {bump_type}")
+        m = re.search(r"^version:\s*([\d\.]+)", content, re.MULTILINE)
+        if not m:
+            results["warnings"].append("⚠️ SKILL.md frontmatter 中未找到 version 字段")
+            return
 
-        # 实际实现需要解析当前版本并升级
-        # 这里省略详细实现...
+        old_ver = m.group(1)
+        parts = list(map(int, old_ver.split(".")))
+        while len(parts) < 3:
+            parts.append(0)
+
+        # 升级
+        bt = (bump_type or "patch").lower()
+        if bt == "major":
+            parts[0] += 1
+            parts[1] = 0
+            parts[2] = 0
+        elif bt == "minor":
+            parts[1] += 1
+            parts[2] = 0
+        else:  # patch
+            parts[2] += 1
+
+        new_ver = ".".join(map(str, parts))
+
+        # 写入 SKILL.md
+        new_content = content[:m.start(1)] + new_ver + content[m.end(1):]
+        skill_md.write_text(new_content, encoding="utf-8")
+
+        # 写入 _meta.json
+        if meta_file.exists():
+            try:
+                meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                meta["version"] = new_ver
+                meta_file.write_text(
+                    json.dumps(meta, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8"
+                )
+            except Exception as e:
+                results["warnings"].append(f"⚠️ 更新 _meta.json 版本号失败: {e}")
+
+        results["fixes"].append(f"✅ 版本号升级: {old_ver} → {new_ver} ({bt})")
 
     def _print_report(self, skill_dir, results):
         """输出检查报告"""
@@ -306,10 +346,10 @@ class SkillUpdater:
         lines.append("## 权限总览\n")
         lines.append(f"共 {len(issues)} 项权限风险，按类别分组如下：\n")
 
-        # 按类别分组
+        # 按类别分组（使用 type 字段，而非 category）
         categories = {}
         for iss in issues:
-            cat = iss.get("category", "other")
+            cat = iss.get("type", "other")
             categories.setdefault(cat, []).append(iss)
 
         for cat, items in categories.items():
@@ -325,7 +365,7 @@ class SkillUpdater:
                 method = iss.get("authorization_method", "immediate")
                 method_cn = {"immediate": "即时授权", "unified": "统一授权", "silent": "静默授权"}.get(method, method)
                 location = f"`{file}` 第 {line} 行" if file else "未知"
-                lines.append(f"| {i} | {desc} | {sev_cn} | {desc} | {location} | {method_cn} |")
+                lines.append(f"| {i} | {desc} | {sev_cn} | `{iss.get('match', '')[:50]}` | {location} | {method_cn} |")
             lines.append("")
 
         lines.append("## 授权方式说明\n")

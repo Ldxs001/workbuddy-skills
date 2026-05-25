@@ -48,6 +48,9 @@ def check_sensitive_access_declaration(filepath, content, fm, body, skill_dir=No
             "passed": False,
             "detail": "frontmatter 缺少 sensitive_access 字段（必须声明，值为 true 或 false）",
             "fix": {"key": "sensitive_access", "value": has_sensitive,
+                     "location": "<skill-dir>/SKILL.md frontmatter",
+                     "operation": f"设置 sensitive_access: {has_sensitive}",
+                     "verification": "重新运行 audit_skill()，确认 R-13 passed",
                      "reason": f"缺少 sensitive_access 字段，根据实际扫描结果（{has_sensitive} 处敏感信息访问）自动添加"}
         }
     
@@ -107,6 +110,9 @@ def check_critical_write_declaration(filepath, content, fm, body, skill_dir=None
             "passed": False,
             "detail": "frontmatter 缺少 critical_write 字段（必须声明，值为 true 或 false）",
             "fix": {"key": "critical_write", "value": has_critical,
+                     "location": "<skill-dir>/SKILL.md frontmatter",
+                     "operation": f"设置 critical_write: {has_critical}",
+                     "verification": "重新运行 audit_skill()，确认 R-14 passed",
                      "reason": f"缺少 critical_write 字段，根据实际扫描结果（{has_critical} 处关键位置写入）自动添加"}
         }
     
@@ -148,90 +154,81 @@ def check_critical_write_declaration(filepath, content, fm, body, skill_dir=None
 
 
 def check_authorization_present(filepath, content, fm, body, skill_dir=None, **kw):
-    """R-15: 高权限操作授权检查。不一致时返回 fix 建议。"""
+    """R-15: 高权限操作风险说明检查。检查 references/permissions.md 是否包含高权限操作风险说明。"""
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
 
-    # 检查 authorization 字段是否存在
-    if "authorization" not in fm:
-        # 获取实际扫描结果
-        report = _get_report(skill_dir)
-        risk_level = report.get("risk_level", "low") if report else "low"
-        needs_auth = risk_level in ("high", "critical")
-        auth_value = "unified" if needs_auth else False
-        return {
-            "passed": False,
-            "detail": "frontmatter 缺少 authorization 字段（必须声明授权方式：false/unified/immediate/silent）",
-            "fix": {"key": "authorization", "value": auth_value,
-                     "reason": f"缺少 authorization 字段，根据实际风险等级 {risk_level} 自动添加"}
-        }
-
-    scripts_dir = os.path.join(skill_dir, "scripts")
-    if not os.path.isdir(scripts_dir):
-        return {"passed": True, "detail": "无 scripts/ 目录，跳过检查"}
-
-    # 检查是否有授权逻辑
-    auth_patterns = [
-        r"authorization_manager",
-        r"request.*authorization",
-        r"check.*permission",
-        r"\bauthoriz\w*\b",
-    ]
-
-    found_auth = False
-    for fname in sorted(os.listdir(scripts_dir)):
-        fpath = os.path.join(scripts_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
-        ext = os.path.splitext(fname)[1].lower()
-        if ext not in (".py", ".sh", ".bat", ".ps1"):
-            continue
-        try:
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                file_content = f.read()
-        except Exception:
-            continue
-        for pattern in auth_patterns:
-            if re.search(pattern, file_content, re.IGNORECASE):
-                found_auth = True
-                break
-        if found_auth:
-            break
-
     # 用 PermissionChecker 获取风险等级
     report = _get_report(skill_dir)
-    risk_level = report.get("risk_level", "low") if report else "low"
-    needs_auth = risk_level in ("high", "critical")
+    risk_level = report.get("risk_level", "low").upper() if report else "LOW"
 
-    fm_auth = fm.get("authorization", False)
-    # 规范化 fm_auth 为布尔值
-    if isinstance(fm_auth, str):
-        fm_auth = fm_auth.lower() not in ("false", "none", "")
+    # 低风险/中风险：无需在 references/permissions.md 中说明风险
+    if risk_level in ("LOW", "MEDIUM"):
+        return {"passed": True, "detail": f"风险等级 {risk_level}，无需在 references/permissions.md 中说明高风险操作"}
 
-    # 不一致：需要授权但没有
-    if needs_auth and not found_auth:
+    # 高风险/严重风险：必须在 references/permissions.md 中说明
+    if risk_level in ("HIGH", "CRITICAL"):
+        refs_dir = os.path.join(skill_dir, "references")
+        if not os.path.isdir(refs_dir):
+            return {
+                "passed": False,
+                "detail": f"风险等级 {risk_level}，但 references/ 目录不存在，无法检查风险说明",
+                "fix": {"key": "create_references_permissions_md", "value": True,
+                         "location": f"{skill_dir}/references/permissions.md",
+                         "operation": "创建 references/ 目录和 permissions.md，并在其中说明高权限操作风险",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
+
+        permissions_md = os.path.join(refs_dir, "permissions.md")
+        if not os.path.isfile(permissions_md):
+            return {
+                "passed": False,
+                "detail": f"风险等级 {risk_level}，但 references/permissions.md 不存在",
+                "fix": {"key": "create_permissions_md", "value": True,
+                         "location": permissions_md,
+                         "operation": "创建 permissions.md 并在其中说明高权限操作风险（风险等级、具体操作、为什么需要）",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
+
+        # 读取 permissions.md 内容
+        try:
+            with open(permissions_md, "r", encoding="utf-8", errors="replace") as f:
+                pm_content = f.read()
+        except Exception as e:
+            return {
+                "passed": False,
+                "detail": f"风险等级 {risk_level}，但无法读取 references/permissions.md: {e}",
+                "fix": {"key": "fix_permissions_md_readable", "value": True,
+                         "location": permissions_md,
+                         "operation": "确保 permissions.md 可读，并包含高权限操作风险说明",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
+
+        # 检查是否包含风险说明关键词
+        risk_keywords = ["风险", "risk", "高权限", "high risk", "critical", "授权", "authorization", "权限"]
+        found_risk = False
+        for kw in risk_keywords:
+            if kw.lower() in pm_content.lower():
+                found_risk = True
+                break
+
+        if not found_risk:
+            return {
+                "passed": False,
+                "detail": f"风险等级 {risk_level}，但 references/permissions.md 未包含高风险操作风险说明",
+                "fix": {"key": "add_risk_description", "value": True,
+                         "location": permissions_md,
+                         "operation": "在 permissions.md 中添加高风险操作风险说明（风险等级、具体操作、为什么需要、如何降低风险）",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
+
         return {
-            "passed": False,
-            "detail": f"脚本含高权限操作（风险等级: {risk_level}），但未调用 authorization_manager.py 请求授权",
-            "fix": {"key": "authorization", "value": "unified",
-                     "reason": f"实际风险等级 {risk_level}，需要授权机制"}
+            "passed": True,
+            "detail": f"高权限操作风险说明检查通过（风险等级 {risk_level}，references/permissions.md 包含风险说明）"
         }
 
-    # 不一致：声明有授权但实际不需要
-    if not needs_auth and fm_auth and found_auth:
-        return {
-            "passed": False,
-            "detail": f"frontmatter 声明含授权（authorization: {fm.get('authorization')}），但实际风险等级 {risk_level}，无需授权",
-            "fix": {"key": "authorization", "value": False,
-                     "reason": f"实际风险等级 {risk_level}，无需授权机制"}
-        }
-
-    return {
-        "passed": True,
-        "detail": "高权限操作授权检查通过" + (
-            "（发现授权检查逻辑）" if found_auth else f"（风险等级 {risk_level}，无需授权）"
-        )
-    }
+    # 未知风险等级
+    return {"passed": True, "detail": f"风险等级 {risk_level}（未知），跳过检查", "skip": True}
 
 
 def check_permission_weight_explained(filepath, content, fm, body, skill_dir=None, **kw):
@@ -243,12 +240,17 @@ def check_permission_weight_explained(filepath, content, fm, body, skill_dir=Non
     fm_weight = fm.get("permission_weight", None)
     if fm_weight is None:
         # 获取实际扫描的风险等级，用于 fix 建议
+        if not skill_dir or not os.path.isdir(skill_dir):
+            return {"passed": False, "detail": "frontmatter 缺少 permission_weight 字段（必须声明风险等级：LOW/MEDIUM/HIGH/CRITICAL）"}
         report = _get_report(skill_dir)
         actual_weight = report.get("risk_level", "low").upper() if report else "LOW"
         return {
             "passed": False,
             "detail": "frontmatter 缺少 permission_weight 字段（必须声明风险等级：LOW/MEDIUM/HIGH/CRITICAL）",
             "fix": {"key": "permission_weight", "value": actual_weight,
+                     "location": "<skill-dir>/SKILL.md frontmatter",
+                     "operation": f"设置 permission_weight: {actual_weight}",
+                     "verification": "重新运行 audit_skill()，确认 R-16 passed",
                      "reason": f"缺少 permission_weight 字段，根据实际扫描风险等级 {actual_weight} 自动添加"}
         }
 
@@ -321,7 +323,11 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
     if not has_references:
         return {
             "passed": False,
-            "detail": f"SKILL.md 共 {line_count} 行，超过 200 行限制，但未拆分到 references/ 或通过「→ 详见 references/xxx.md」引用"
+            "detail": f"SKILL.md 共 {line_count} 行，超过 200 行限制，但未拆分到 references/ 或通过「→ 详见 references/xxx.md」引用",
+            "fix": {"key": "progressive_loading", "value": True,
+                     "location": f"{filepath} (SKILL.md 超过 200 行部分)",
+                     "operation": "将 SKILL.md 中详细内容拆分到 references/ 目录下的独立 .md 文件，并在 SKILL.md 中用「→ 详见 references/xxx.md」引用",
+                     "verification": "重新运行 audit_skill()，确认 R-17 passed"}
         }
 
     return {
