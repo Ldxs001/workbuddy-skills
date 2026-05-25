@@ -326,7 +326,15 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     cred_url = _get_cred_url(host)
     if not cred_url:
         return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
-
+    
+    # 如果 cred_url 缺少路径（只有主机名），从 raw_url 补全
+    from urllib.parse import urlparse, urlunparse
+    parsed_cred = urlparse(cred_url)
+    if not parsed_cred.path or parsed_cred.path == '/':
+        parsed_raw = urlparse(raw_url)
+        # 重建 URL：scheme + netloc(含凭证) + raw_url 的 path
+        cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
+    
     # 临时覆盖 remote URL（含凭证），push 完立刻恢复
     subprocess.run(
         ["git", "remote", "set-url", remote_name, cred_url],
