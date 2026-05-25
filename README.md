@@ -23,7 +23,7 @@
 | `skill-standardization` | Skill 标准化规范引擎 v2.24.6。R-20 修复疑问句误报 bug（v2.24.6）：添加疑问句排除逻辑（「应该」在疑问句里是询问建议，不是模糊表述）。 |
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
-| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架，附带结构化问题日志、风险手册和经验教训登记册 |
+| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。 |
 | `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
 | `workday-calendar` | 智能周历系统 - 法定假日管理、工作日计算、周历生成、日程管理，含.bat容灾备份 |
 

@@ -7,7 +7,7 @@
 ## 示例：多步任务（标准完整流程）
 
 ```
-用户：请帮我修复登录接口Bug
+用户：请帮我修复登录接口 Bug
 
 [triphasic] skill loaded — 执行顺序：语义拆分 → 任务规划 → 执行/审查/推进
 
@@ -20,7 +20,7 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【原始输入】
-请帮我修复登录接口Bug
+请帮我修复登录接口 Bug
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -43,12 +43,12 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [拆分完成，进入任务规划]
 
-【任务规划】修复登录接口Bug
+【任务规划】修复登录接口 Bug
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📌 任务目的：修复登录接口 Token 验证缺失导致的认证绕过漏洞
 📋 具体要求：添加 Token 验证逻辑，确保未携带有效 Token 的请求被拒绝
-⚠️ 潜在风险：修改可能影响正常登录流程
+⚠️ 潜在风险：更新可能影响正常登录流程
 
 **执行步骤**：
   步骤 1: 读取登录接口代码
@@ -62,8 +62,8 @@
     - 任务目的：添加缺失的 Token 验证逻辑
     - 工具/命令：`Edit`
     - 操作说明：在指定位置添加验证逻辑
-    - 预期结果：代码修改成功，无语法错误
-    - 潜在风险：语法错误、引入新bug
+    - 预期结果：代码更新成功，无语法错误
+    - 潜在风险：语法错误、引入新 bug
 
   步骤 3: 测试验证
     - 任务目的：验证修复有效且未影响正常功能
@@ -90,9 +90,9 @@
 
 → [MANDATORY-F-03] 创建进度文件：
 python {SKILL_DIR}/scripts/task_progress.py init \
-  --task "修复登录Bug" \
-  --purpose "修复Token验证缺失导致的认证绕过漏洞" \
-  --requirements "添加Token验证逻辑" \
+  --task "修复登录 Bug" \
+  --purpose "修复 Token 验证缺失导致的认证绕过漏洞" \
+  --requirements "添加 Token 验证逻辑" \
   --risks "可能影响正常登录" \
   --steps '[{"description":"读取代码","purpose":"理解认证逻辑","tool":"Read"},{"description":"修复代码","purpose":"添加验证","tool":"Edit"},{"description":"测试验证","purpose":"确认修复有效","tool":"Bash"}]'
 
@@ -105,7 +105,7 @@ python {SKILL_DIR}/scripts/task_progress.py init \
 
 ### 📍 [ADVANCE] - 步骤 1
 推进：继续步骤 2
-→ 更新进度文件：python {SKILL_DIR}/scripts/task_progress.py update --task "修复登录Bug" --step 1 --status success --review "发现Token验证缺失" --advance "继续步骤2"
+→ 更新进度文件：python {SKILL_DIR}/scripts/task_progress.py update --task "修复登录 Bug" --step 1 --status success --review "发现 Token 验证缺失" --advance "继续步骤2"
 
 **进度更新**：
   ┌──────┬────────┬────────┬────────────┬────────────┐
@@ -120,8 +120,8 @@ python {SKILL_DIR}/scripts/task_progress.py init \
 ...（继续步骤 2-3）
 
 【任务完成】
-- 目标：修复登录接口Bug
-- 结果：✅成功 -- Token验证已添加
+- 目标：修复登录接口 Bug
+- 结果：✅成功 -- Token 验证已添加
 - 进度：3/3（100%）
-→ [MANDATORY-F-09] python {SKILL_DIR}/scripts/task_progress.py complete --task "修复登录Bug"
+→ [MANDATORY-F-09] python {SKILL_DIR}/scripts/task_progress.py complete --task "修复登录 Bug"
 ```

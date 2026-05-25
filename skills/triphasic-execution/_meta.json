@@ -1,7 +1,7 @@
 {
   "name": "triphasic-execution",
-  "version": "5.14.0",
-  "description": "Execute→Review→Advance 三步循环执行框架，附带结构化问题日志、风险手册和经验教训登记册",
+  "version": "5.15.0",
+  "description": "Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。",
   "author": "wUwproject",
   "tags": [
     "execution",

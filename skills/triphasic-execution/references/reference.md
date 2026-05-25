@@ -14,8 +14,8 @@
 任务规划确认
   └─→ [MANDATORY] 创建临时进度文件（init）
          │
-         ├─ 步骤1 ADVANCE后 → [MANDATORY] 更新文件（update）
-         ├─ 步骤2 ADVANCE后 → [MANDATORY] 更新文件（update）
+         ├─ 步骤1 ADVANCE 后 → [MANDATORY] 更新文件（update）
+         ├─ 步骤2 ADVANCE 后 → [MANDATORY] 更新文件（update）
          │   ...
          └─ 任务完成 → [MANDATORY] 删除进度文件（complete）
              中断/异常 → 保留文件，下次 resume 恢复
@@ -72,7 +72,7 @@ python {SKILL_DIR}/scripts/task_progress.py clean
 
 ### [MANDATORY] 强制记录规则
 
-> 每次任务执行完成后，**[MANDATORY]** AI必须执行以下步骤（除非用户明确选择"2.跳过记录"）：
+> 每次任务执行完成后，**[MANDATORY]** AI 必须执行以下步骤（除非用户明确选择"2.跳过记录"）：
 > 1. 回顾执行过程，识别问题 → 调用 `add`
 > 2. 回顾执行过程，识别风险 → 调用 `add-risk`
 > 3. 执行完成后 → 调用 `merge-to-lessons`
@@ -81,7 +81,7 @@ python {SKILL_DIR}/scripts/task_progress.py clean
 
 ```bash
 python {SKILL_DIR}/scripts/problem_logger.py add \
-  --scene "API测试" \
+  --scene "API 测试" \
   --symptom "HTTP 503" \
   --cause "服务端限流" \
   --solution "增加重试机制" \
@@ -92,7 +92,7 @@ python {SKILL_DIR}/scripts/problem_logger.py add \
 
 ```bash
 python {SKILL_DIR}/scripts/problem_logger.py add-risk \
-  --description "网络不稳定可能导致API调用失败" \
+  --description "网络不稳定可能导致 API 调用失败" \
   --impact "用户体验下降" \
   --mitigation "增加重试机制和降级策略" \
   --task "用户头像接口"
@@ -106,11 +106,11 @@ python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 
 ---
 
-## 设置界面
+## 配置界面
 
-安装技能后首次运行 `install.py` 时，会自动弹出 HTML 设置界面（系统默认浏览器），引导用户完成初始配置。
+安装技能后首次运行 `install.py` 时，会自动弹出 HTML 配置界面（系统默认浏览器），引导用户完成初始配置。
 
-| 设置项 | 选项 | 说明 |
+| 配置项 | 选项 | 说明 |
 |---|---|---|
 | **默认调用方式** | 调用模式（按需） / 全局模式 | 控制技能激活方式 |
 | **记录文件路径** | TRIPHASIC_HOME 等 | 未自定义时使用默认值 |
@@ -121,7 +121,7 @@ python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 > **数据目录**：`skills/.standardization/triphasic-execution/data/`
 > **任务规划确认**：询问确认后再执行
 
-呼出设置界面：向 Agent 发送"打开 triphasic 设置"，或运行 `python {SKILL_DIR}/scripts/settings.py`
+呼出配置界面：向 Agent 发送"打开 triphasic 配置"，或运行 `python {SKILL_DIR}/scripts/settings.py`
 
 ---
 
@@ -167,7 +167,7 @@ python install.py --uninstall              # 卸载
 | 脚本 | 功能 |
 |------|------|
 | `install.py` | 安装/卸载 |
-| `settings.py` | HTML 设置界面 |
+| `settings.py` | HTML 配置界面 |
 | `problem_logger.py` | 问题/风险 CRUD + 合并登记册 |
 | `exec_wrapper.py` | 命令执行拦截器 |
 | `problem_daemon.py` | 后台监控守护进程（仅全局模式） |
@@ -190,7 +190,7 @@ python install.py --uninstall              # 卸载
 | `settings.py` | 读/写 `config.json`，启动 HTTP 服务 | 中 | 🟡 | 本地配置读写，HTTP 仅本地 `localhost` |
 | `install.py` | 创建目录、写配置文件、注册守护进程 | 中高 | 🟠 | 涉及目录创建和配置写入，无系统级操作 |
 | `problem_daemon.py` | 后台守护进程，监控任务执行 | 中 | 🟡 | 仅本地监控，无外部访问 |
-| `exec_wrapper.py` | 拦截命令执行，记录问题 | 中高 | 🟠 | 涉及命令执行拦截，但仅记录不修改 |
+| `exec_wrapper.py` | 拦截命令执行，记录问题 | 中高 | 🟠 | 涉及命令执行拦截，但仅记录不更新 |
 | `lessons_register.py` | 读写 `LESSONS_REGISTER.md` | 低 | 🟢 | 仅本地文件读写 |
 | `cron_helper.py` | 定时任务钩子 | 中低 | 🟡 | 仅本地定时任务管理 |
 
@@ -199,4 +199,4 @@ python install.py --uninstall              # 卸载
 **关键位置写入**：否（仅写入技能自身 `data/` 和 `.active_tasks/` 目录）
 **高权限操作**：无（无需授权）
 
-> 本技能整体风险等级：**低至中等**。所有写入操作仅限于本地用户目录，不涉及系统目录、敏感位置或网络传输。命令行拦截器（`exec_wrapper.py`）仅做记录和监控，不修改原始命令。
+> 本技能整体风险等级：**低至中等**。所有写入操作仅限于本地用户目录，不涉及系统目录、敏感位置或网络传输。命令行拦截器（`exec_wrapper.py`）仅做记录和监控，不更新原始命令。

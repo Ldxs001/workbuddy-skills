@@ -1,16 +1,34 @@
 ---
 name: triphasic-execution
-version: 5.14.0
+version: 5.15.0
 author: wUwproject
 license: MIT
-description: >
-  Execute→Review→Advance 三步循环执行框架。所有任务按此节奏推进，
-  防止无限死循环或单步骤卡住。附带结构化问题日志、风险手册和经验教训登记册。
-tags: [framework, execution, debugging, problem-tracking, risk-tracking, lessons-learned, cross-platform, settings, configuration, config-ui]
+description: Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。
+tags: ['framework', 'execution', 'debugging', 'problem-tracking', 'risk-tracking', 'lessons-learned', 'cross-platform', 'configuration', 'config-ui']
 category: workflow
+trigger_negative: true
+sensitive_access: true
+critical_write: false
+create_permissions_md: true
+permission_weight: CRITICAL
+section_antipattern: true
+section_faq: true
+writing_standards: fix_terms
+progressive_loading_explicit: true
 ---
 
-# Triphasic Execution Framework v5.13.0
+
+
+
+
+
+
+
+
+
+
+
+# Triphasic Execution Framework v5.15.0
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
 
@@ -18,17 +36,26 @@ category: workflow
 
 ## 触发条件
 
-当用户出现以下意图时，加载本技能：
+**正向触发（满足以下任意一条）：**
 
 - 说出"三步执行"、"执行审查推进"、"triphasic"
 - 说出"问题记录"、"经验教训"、"problem logger"
-- 说出"打开 triphasic 设置"、"triphasic settings"
+- 说出"打开 triphasic 配置"、"triphasic config"
 - 需要结构化执行框架防止死循环或跳步
 - 复杂多步骤任务，需要强制进度追踪和中断恢复
+
+**否定条件（满足以下任意一条，不触发）：**
+
+- 简单问答、闲聊、问候（不需要结构化执行）
+- 单步任务（如"查看文件"、"运行命令"等一步完成的操作）
+- 用户明确说"不要使用 triphasic"或"关闭 triphasic"
+- 纯信息查询（不需要执行-审查-推进循环）
 
 ---
 
 ## 核心能力
+
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
 | # | 能力 | 说明 |
 |---|------|------|
@@ -39,7 +66,7 @@ category: workflow
 | 5 | **问题/风险/经验记录** | 任务完成后强制记录（复杂任务 Python 侧校验），积累 PROBLEMS.md / RISKS.md / LESSONS_REGISTER.md |
 | 6 | **最多 3 次重试（F-08）** | 同一步骤失败 3 次必须换方案，禁止第 4 次重试 |
 | 7 | **双模式支持** | 按需调用模式（默认）/ 全局自动模式 |
-| 8 | **HTML 设置界面** | `settings.py` 可视化配置技能参数 |
+| 8 | **HTML 配置界面** | `settings.py` 可视化配置技能参数 |
 | 9 | **complete 强制校验（v5.12）** | `complete` 时 Python 侧校验步骤完成率、记录文件、总结文件；`--force` 只跳过步骤检查，`--no-enforce` 关闭记录校验 |
 
 ---
@@ -163,7 +190,7 @@ python {SKILL_DIR}/scripts/problem_logger.py add --scene "场景" --symptom "症
 python {SKILL_DIR}/scripts/problem_logger.py add-risk --description "风险" --impact "影响" --mitigation "缓解" --task "任务"
 python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 
-# 设置界面
+# 配置界面
 python {SKILL_DIR}/scripts/settings.py
 ```
 
@@ -176,9 +203,11 @@ python {SKILL_DIR}/scripts/settings.py
 | ✅ 触发条件、核心能力、强制约束总表 | 📄 `mandatory.md` — Phase 0~4 详细规则、模板、禁止行为 |
 | ✅ 工作流程概述、循环规则 | 📄 `examples.md` — 完整执行示例 |
 | ✅ 快速命令 | 📄 `reference.md` — 进度文件机制、问题记录、安装、数据目录 |
+| | 📄 `antipatterns.md` — 反模式收录（AP-01~AP-06） |
+| | 📄 `faq.md` — 常见问题（Q&A 1~10） |
 
 ---
 
 ## 版本
 
-当前版本：**5.13.0** — v5.13.0：补充权限权重说明（R-16），references/reference.md 追加权限权重表格及风险等级评估
+当前版本：**5.14.0** — v5.14.0：遵循 skill-standardization v2.24.4 规范，修复触发条件否定条件、渐进式加载显式说明、术语一致性等问题。
