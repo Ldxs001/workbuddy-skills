@@ -44,7 +44,7 @@ python scripts/skill_builder.py create <skill-name> --desc "技能描述"
 
 ### create 后的后续步骤
 
-1. **编辑 SKILL.md**：将 TODO 占位符替换为实际内容
+1. **更新 SKILL.md**：将 TODO 占位符替换为实际内容
 2. **补充脚本**：在 `scripts/` 中添加实际功能代码
 3. **补充文档**：按需在 `references/` 中创建渐进式 MD
 4. **运行 update**：`python scripts/skill_builder.py update <skill-dir>` 验证合规性
@@ -55,9 +55,9 @@ python scripts/skill_builder.py create <skill-name> --desc "技能描述"
 # 1. 创建骨架
 python scripts/skill_builder.py create color-toolkit --desc "颜色工具集" --tags color,design,ui
 
-# 2. 进入目录编辑
+# 2. 进入目录更新
 cd color-toolkit
-# 编辑 SKILL.md 填写触发场景、核心能力等章节
+# 更新 SKILL.md 填写触发场景、核心能力等章节
 
 # 3. 添加脚本
 # 在 scripts/ 下放入实际 .py 文件
@@ -154,7 +154,7 @@ Suggestion: 运行 refactor 清理根目录散落文件
 python scripts/skill_builder.py refactor <skill-dir> --dry-run
 ```
 
-dry-run 输出完整的迁移计划但不做任何修改：
+dry-run 输出完整的迁移计划但不做任何更新：
 
 ```
 === refactor DRY-RUN plan ===
@@ -273,7 +273,7 @@ A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需
 
 | 检查项 | 通过条件 | 失败建议 |
 |--------|----------|----------|
-| 术语一致性 | 同一概念不混用多种表述（如 `创建/新建`、`更新/修改/变更`） | 统一为首选术语（`创建`、`更新`、`删除`、`配置`） |
+| 术语一致性 | 同一概念不混用多种表述（如 `创建/创建`、`更新/更新/更新`） | 统一为首选术语（`创建`、`更新`、`删除`、`配置`） |
 | 禁止模糊表述 | 不含 `可能`、`应该`、`大概`、`差不多` 等 | 改用确定性描述，或明确标注「建议」 |
 | 中英文混排空格 | 中文与英文/数字之间应有空格（例外：版本号、类名） | 在中文与英文/数字之间加空格 |
 
@@ -402,4 +402,4 @@ skill_builder.py update <skill-dir>
 2. **备份是 refactor 默认行为**：不要用 `--no-backup` 除非明确知道风险
 3. **本文件控制在 200 行以内**：超过部分已拆分到 `references/`
 4. **审查是纯警告模式**：不会阻止 git-sync 同步
-5. **版本号三方一致**：修改后按上表同步
+5. **版本号三方一致**：更新后按上表同步

@@ -1,6 +1,6 @@
 # 更新日志（Changelog）
 
-> 本文件记录 skill-standardization 的版本变更历史。
+> 本文件记录 skill-standardization 的版本更新历史。
 > 遵循 [Keep a Changelog](https://keepachangelog.com/) 格式，基于 SemVer 版本管理。
 
 ---
@@ -10,7 +10,7 @@
 
 **改写类型：Bug 修复 — R-11 路径提取 & R-12 误报修复**
 
-### 变更内容
+### 更新内容
 
 > **修正（2026-05-25 00:15）**：删除错误的  函数。
 > 该函数错误地试图把整个技能目录搬到  下，违背了规范架构
@@ -19,8 +19,8 @@
 
 - ✅ 修复 R-11 路径提取正则：排除全角右括号 `）`，不再误收 docstring 标点
 - ✅ 修复 R-12 references 扫描误报：`changelog.md` 历史路径描述不再触发违规
-- 📦 更新 `SKILL.md` frontmatter 版本号到 2.17.0（description 改为普通字符串，移除折叠块 `>`）
-- 📦 更新 `_meta.json` 版本号和描述（移除重复 description 字段）
+- 📦 更新 `SKILL.md` frontmatter 版本号到 2.17.0（description 改为普通字符串，删除折叠块 `>`）
+- 📦 更新 `_meta.json` 版本号和描述（删除重复 description 字段）
 
 ### 影响
 
@@ -35,13 +35,13 @@
 
 **改写类型：Bug 修复 — 调用方式错误 & 变量名错误修复**
 
-### 变更内容
+### 更新内容
 
 - ✅ 修复 reference.md 中的调用方式错误（多处 `python scripts/` → `python -m `）
 - ✅ 修复 refactor.py 中的变量名错误（`_checker` → `checker`）
 - ✅ 修复 SKILL.md 版本号不一致（frontmatter 2.19.0，正文标题 v2.18.0）
 - ✅ 修复 _meta.json 版本号不一致（2.18.0 → 2.19.0）
-- ✅ 修复 reference.md 错误码总表中的工具名称（`.py` 后缀移除）
+- ✅ 修复 reference.md 错误码总表中的工具名称（`.py` 后缀删除）
 
 ### 影响
 
@@ -56,7 +56,7 @@
 
 **改写类型：Bug 修复 + 新功能 — refactor 子目录处理 & 自动搬迁**
 
-### 变更内容
+### 更新内容
 
 - ✅ 修复 `_build_migration_plan()` 不处理子目录的 bug（原代码第102行只判断 `item.is_file()`，跳过所有目录）
 - ✅ 修复 `refactor()` 方法重复定义问题（原第30行和第264行两个定义，后者覆盖前者）
@@ -78,7 +78,7 @@
 
 **改写类型：架构修正 — 权限检查内嵌**
 
-### 变更内容
+### 更新内容
 - 🔧 架构修正：`permission_checks.py` 直接内嵌 `PermissionChecker` 类，不再 `subprocess.run()` 调外部脚本
 - ✅ 修复 R-11 method 名称不匹配 bug（`check_artifact_paths_secure` → `check_artifact_paths`）
 - ✅ 审计现在正确覆盖 R-01~R-17 全部 17 条规则
@@ -86,7 +86,7 @@
 - 📦 更新 `SKILL.md` frontmatter 版本号到 2.16.0
 
 ### 安全性提升
-- 移除 `_run_permission_checker()` 中间层（不再 shell out）
+- 删除 `_run_permission_checker()` 中间层（不再 shell out）
 - 权限扫描逻辑直接 Python import，无 subprocess 开销
 - 路径计算错误彻底修复
 
@@ -192,7 +192,7 @@
 - **哈希不匹配警告**：检测到 `permission_checker.py` 被篡改时输出警告
 
 ### 修复
-- **重复 import os**：移除 `_run_permission_checker()` 函数内的重复 `import os`
+- **重复 import os**：删除 `_run_permission_checker()` 函数内的重复 `import os`
 
 ---
 
@@ -204,7 +204,7 @@
 ### 修复
 
 - **SENSITIVE_PATTERNS**：为所有凭证相关正则添加单词边界（），避免误匹配错误处理代码中的关键词列表（如 unauthorized、token、credential）
-- **DELETE_PATTERNS**：移除 r"del "（误匹配 Python del 变量删除语句），保留 os.remove/os.rmdir/shutil.rmtree/unlink/rm/rmdir 等真实文件删除检测
+- **DELETE_PATTERNS**：删除 r"del "（误匹配 Python del 变量删除语句），保留 os.remove/os.rmdir/shutil.rmtree/unlink/rm/rmdir 等真实文件删除检测
 - **permission_checker.py v1.0.1**：降低 skill-sub 等 skill 的假阳性风险等级
 
 ---
@@ -233,7 +233,7 @@
 - **`authorization_manager.py` v1.0.0**：授权管理器，统一审批 + 即时审批，防止未授权高风险操作
 - **`skill_audit.py` R-13~R-17 检查方法**：调用 `permission_checker.py` CLI 进行权限检查
 
-### 变更
+### 更新
 
 - `skill_audit.py` v2.12.2 → v2.13.0
 - `skill_builder.py` v2.12.2 → v2.13.0（update 模式调用 `permission_checker.py`）
@@ -257,7 +257,7 @@
   - `utils.py`：常量定义和工具函数
   - `__init__.py`：主入口 + `audit_skill()` + `format_report()` + CLI 命令
   - `__main__.py`：支持 `python -m skill_audit` 执行
-- **版本号管理改进**：`_bump_version` 移除自我修改行为，版本号权威来源改为 `_meta.json`
+- **版本号管理改进**：`_bump_version` 删除自我更新行为，版本号权威来源改为 `_meta.json`
 - **触发条件精确化**：SKILL.md 增加精确触发词 + 否定条件，避免误触发
 - `_meta.json` v2.12.2 → v2.13.0
 - `references/guide.md` 新增"安全增强功能（v2.13.0）"章节
@@ -281,7 +281,7 @@
 - **R-12 检测盲区**：`references/*.md` 中硬编码的数据目录路径（如 `~/.workbuddy/semantic-split/data/`）未被检测。原 R-12 只扫描 `scripts/*.py` 中的 `DATA_DIR` 变量，不扫描 md 文件中的路径文字。新增「阶段6：references/*.md 数据目录路径检查」，对不含 `.standardization/` 的数据目录路径报违规
 - 同步修复 `skill_builder.py` 的 R-12 检测，新增同样的阶段6
 
-### 变更
+### 更新
 
 - `skill_audit.py` v2.12.1 → v2.12.2
 - `skill_builder.py` v2.12.1 → v2.12.2
@@ -301,7 +301,7 @@
 - **R-12 路径分隔符假阳性**: `os.path.normpath()` 在 Windows 下将 `/` 转为 `\`，但 `expected_pattern` 保留 `/` → `expected_pattern not in norm` 在 Windows 上误报。修复：`expected_pattern` 同样通过 `os.path.normpath()` 规范化。
 - **R-11 中文标点误收**: 路径提取正则 `[^"\')\s,]+` 不排除中文标点 `。，；：！？、…—` → docstring 末尾 `。` 被收入路径 `standardization/semantic-split/data/。`。修复：扩展排除字符集。
 
-### 变更
+### 更新
 
 - `skill_audit.py` v2.10.0 → v2.10.1（2 处修复）
 - `skill_builder.py` v2.10.0 → v2.10.1（2 处修复）
@@ -324,7 +324,7 @@
 - **R-12 `_meta.json` data_dir 末尾斜杠误报**: `_meta.json` 的 `data_dir` 值为 `.standardization/semantic-split/data/`（带末尾 `/`），而代码 `DATA_DIR` 由 `Path` 对象转字符串后无末尾 `/`，`os.path.normpath` 归一化后仍不一致。修复：比较前统一 `rstrip(os.sep)` 去除末尾分隔符。
 - **skill_builder.py R-12 同源误报**: `skill_builder.py` 的 `_check_external_data_dir()` 中，`meta_abs` 拼接了 `ws_check` 前缀但 `code_norm` 未拼接，且归一化方式不一致（`replace` vs `normpath`）。修复：两边统一 `os.path.normpath` + `rstrip(os.sep)` + `replace("\\", "/")` + `lower()`。
 
-### 变更
+### 更新
 
 - `skill_audit.py` v2.12.0 → v2.12.1
 - `skill_builder.py` v2.12.0 → v2.12.1
@@ -335,7 +335,7 @@
 
 ## v2.12.0
 
-> 变更记录未单独追加（从 v2.10.1 直接跳至 v2.12.0，含 R-12 磁盘存在性检查增强等）
+> 更新记录未单独追加（从 v2.10.1 直接跳至 v2.12.0，含 R-12 磁盘存在性检查增强等）
 
 ---
 
@@ -361,7 +361,7 @@
 - **P3**: `skill_audit.py` 版本描述修正（"R-01~R-11" → "R-01~R-12"）
   - 文件头注释、CLI epilog、CLI description 三处同步
 
-### 变更
+### 更新
 
 - `skill_builder.py` v2.9.0 → v2.10.0
 - `skill_audit.py` v2.9.0 → v2.10.0
@@ -386,7 +386,7 @@
   - 更新 `_meta.json` `"version"`
   - 更新 `skill_builder.py` `__version__` + 文件头版本注释
   - 更新 `skill_audit.py` 文件头版本注释
-- **`--changelog` 参数**：与 `--version-bump` 联动，自动追加变更记录到 `references/changelog.md`
+- **`--changelog` 参数**：与 `--version-bump` 联动，自动追加更新记录到 `references/changelog.md`
   - 遵循 Keep a Changelog 格式
   - 自动写入发布日期和版本号
 
@@ -451,7 +451,7 @@
   - update 模式新增 `data_dir` 到 required_meta_keys（默认值 `standardization/<name>/data/`）
   - fix 模式下自动补充缺失的 `data_dir` 字段
 
-### 变更
+### 更新
 
 - `skill_audit.py` v2.7.0 → v2.8.0
 - `skill_builder.py` v2.7.0 → v2.8.0
@@ -470,7 +470,7 @@
 **发布日期：2026-05-23**
 **类型：Patch（修正 changelog 路径引用 + 规范内版本号对齐）**
 
-### 变更
+### 更新
 
 - `references/changelog.md`：`spec/rules.json` 路径修正为 `scripts/spec/rules.json`
 - `references/changelog.md`：footer 版本号 v2.7.0 → v2.7.3
@@ -521,7 +521,7 @@
   - `outputs/` — 输出产物：`.html`/`.pdf`/`.png`/`.xlsx`/`.log` 等
   - `temp/` — 临时文件：`.tmp`/`.bak`/`.swp`/`.lock`/`.pid` 等
 
-### 变更
+### 更新
 
 - `skill_audit.py` v2.6.0 → v2.7.0
 - `skill_builder.py` v2.6.0 → v2.7.0
@@ -539,7 +539,7 @@
 - **R-10 版本一致性检查**：SKILL.md `version:` 与 `manifest.json` 记录对比
 - **铁律 2 完善**：规范内明确定义的文件/字段 — 直接更新，无需询问
 
-### 变更
+### 更新
 
 - R-09 名称从"工作流程/使用方式章节"简化为"工作流程章节"
 - R-09/R-10 从 ERROR 降为 WARN（不阻断 git-sync）
@@ -560,10 +560,10 @@
 ### 新增
 
 - **铁律 2 决策树**：规范内明确定义 vs 未覆盖 → 直接更新 vs 必须询问
-- **版本号更新映射表**：6 种修改类型 × 对应文件 × 升级类型
+- **版本号更新映射表**：6 种更新类型 × 对应文件 × 升级类型
 - **`--workspace` 参数**：指定工作区根目录（用于铁律 4 路径建议）
 
-### 变更
+### 更新
 
 - SKILL.md 新增"版本号更新文件映射表"章节
 - `skill_audit.py` / `skill_builder.py` 帮助信息更新
@@ -581,7 +581,7 @@
 - **R-10 版本一致性**（WARN）：SKILL.md version 与 `_meta.json` version 对比
 - **铁律 4 细化**：目录分类表（data/cache/outputs/temp 四类的典型文件示例）
 
-### 变更
+### 更新
 
 - _total_rules: 8 → 10，_warn_count: 4 → 6
 - `scripts/spec/rules.json` v2.2.0 → v2.3.0
@@ -601,7 +601,7 @@
 - **铁律 4**：产出物路径管理规范（`<workspace>/standardization/<skill>/` 四分类）
 - **`references/architecture.md`**：架构设计文档（按需加载）
 
-### 变更
+### 更新
 
 - SKILL.md 正文从 ~80 行拆分为 ~60 行 + `references/` 下 6 个 MD
 - 触发场景描述更精准
@@ -626,7 +626,7 @@
 - **R-08 核心能力**（WARN）：同义关键词映射（`CORE_KEYWORDS`）
 - **`skill_audit.py`**：独立 CLI 工具 + `--json` 输出模式（供 git-sync 调用）
 
-### 变更
+### 更新
 
 - _total_rules: 4 → 8，_warn_count: 0 → 4
 - `scripts/spec/rules.json` v2.0.0 → v2.1.0
@@ -658,7 +658,7 @@
 - **`scripts/spec/rules.json`**：规则持久化定义（独立维护）
 - **`scripts/json_loader.py`**：按需加载规范模块
 
-### 变更
+### 更新
 
 - 从 v1.x 单文件模式重构为三文件体系（`skill_audit.py` + `skill_builder.py` + `spec/rules.json`）
 - SKILL.md 从操作指南转型为"技能本身就是规范的示范"

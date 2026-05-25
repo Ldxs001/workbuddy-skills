@@ -81,18 +81,18 @@ git-sync 负责将 skill 推送到远程仓库，在推送前调用 skill-standa
 
 - `0.x.y` 表示初始开发阶段，API 可能不稳定
 - 首次正式发布时应升级到 `1.0.0`
-- create 模板的 `0.1.0` 是起点，后续由开发者根据实际变更升级
+- create 模板的 `0.1.0` 是起点，后续由开发者根据实际更新升级
 
 ### Q6: 可以自定义 create 模板吗？
 
-**A:** 当前版本的模板硬编码在 `skill_builder.py` 的 `SKILL_TEMPLATE` 和 `META_TEMPLATE` 变量中。要修改模板：
+**A:** 当前版本的模板硬编码在 `skill_builder.py` 的 `SKILL_TEMPLATE` 和 `META_TEMPLATE` 变量中。要更新模板：
 
-1. 编辑 `scripts/skill_builder.py`
+1. 更新 `scripts/skill_builder.py`
 2. 找到第 ~34 行的 `SKILL_TEMPLATE` 字符串
-3. 修改占位符或新增字段
+3. 更新占位符或新增字段
 4. 保存后下次 create 即生效
 
-> 未来版本可能支持外部模板文件。
+> 未来版本计划支持外部模板文件。
 
 ---
 
@@ -110,7 +110,7 @@ git-sync 负责将 skill 推送到远程仓库，在推送前调用 skill-standa
 
 update 是**轻量检查**（只读+可选修复），refactor 是**重量改造**（移动文件+重组目录）。
 
-### Q8: update --fix 会修改哪些内容？
+### Q8: update --fix 会更新哪些内容？
 
 **A:** 当前 --fix 仅自动修复以下项目：
 
@@ -119,7 +119,7 @@ update 是**轻量检查**（只读+可选修复），refactor 是**重量改造
 | `_meta.json` 缺失 | 创建新的 _meta.json（含默认值） |
 | `_meta.json` 缺少字段 | 补充空值（tags 为空数组） |
 
-**不会自动修改的：**
+**不会自动更新的：**
 - SKILL.md frontmatter（需手动添加）
 - 缺失的正文章节（仅提示）
 - 根目录散落文件（仅建议）
@@ -152,7 +152,7 @@ update 是**轻量检查**（只读+可选修复），refactor 是**重量改造
 
 如果验证发现文件总大小差异超过 1%，会输出警告提示可能丢失。
 
-### Q11: 什么时候应该用 --dry-run？
+### Q11: 何时使用 --dry-run？
 
 **A:** **几乎每次 refactor 都应先用 --dry-run！**
 
@@ -161,7 +161,7 @@ dry-run 会输出完整的迁移计划但不执行任何实际操作，让你确
 - 哪些文件会保留在原位及原因
 - 是否有意外情况
 
-确认计划无误后再去掉 `--dry-run` 正式执行。
+确认计划无误后再删除 `--dry-run` 正式执行。
 
 ### Q12: refactor 后如何回滚？
 
@@ -213,11 +213,11 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 **A:** 当前版本规则定义在 `spec/rules.json` 中，是静态 JSON 配置。要自定义规则：
 
-1. 编辑 `spec/rules.json`
-2. 添加/修改规则条目
+1. 更新 `spec/rules.json`
+2. 添加/更新规则条目
 3. 对应更新 `spec/_index.json` 的模块注册
 
-> 未来版本可能支持外部规则文件加载。
+> 未来版本计划支持外部规则文件加载。
 
 ---
 
@@ -285,19 +285,19 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 **A:** 按照 SemVer 规范：
 
-| 变更类型 | 示例 | 说明 |
+| 更新类型 | 示例 | 说明 |
 |---------|------|------|
 | Patch（补丁） | `2.0.0` → `2.0.1` | Bug 修复，无功能变化 |
 | Minor（次版） | `2.0.0` → `2.1.0` | 新增向后兼容的功能 |
-| Major（主版） | `2.0.0` → `3.0.0` | 不兼容的重大变更 |
+| Major（主版） | `2.0.0` → `3.0.0` | 不兼容的重大更新 |
 
 升级步骤：
-1. 修改 `SKILL.md` frontmatter 中的 version
-2. 同步修改 `_meta.json` 中的 version
-3. 如有 manifest.json，同步修改
+1. 更新 `SKILL.md` frontmatter 中的 version
+2. 同步更新 `_meta.json` 中的 version
+3. 如有 manifest.json，同步更新
 4. 更新 spec/*.json 的 `_version`（如规范本身有变化）
 5. 更新各脚本的自述字符串
-6. 在 changelog.md 中记录变更内容
+6. 在 changelog.md 中记录更新内容
 
 ---
 
@@ -323,7 +323,7 @@ from skill_builder import cmd_create, cmd_update, cmd_refactor
 
 **A:** 如果要扩展规范体系（例如新增一种检查维度），需要：
 
-1. 在 `scripts/spec/` 下新建 `.json` 文件
+1. 在 `scripts/spec/` 下创建 `.json` 文件
 2. 在 `spec/_index.json` 的 `modules` 数组中注册
 3. 在 `json_loader.py` 中确保能被 load 命令发现
 

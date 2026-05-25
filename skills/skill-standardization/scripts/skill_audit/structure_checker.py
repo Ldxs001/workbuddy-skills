@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-20)
-v2.17.0: 细化 R-07 触发词质量；新增 R-18 反模式具体性、R-19 FAQ 有意义性、R-20 写作规范
+v2.22.0: R-18/R-19/R-20 新增渐进式文件（references/*.md）审查支持
 """
-
 import re
 import os
 
@@ -65,23 +64,21 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
                          "operation": "添加 ## 触发场景 章节，包含正向触发词≥3个、否定条件≥1个，无「自动执行」等危险表述",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
-    # ── 质量检查 1：正向触发词 ≥3 个 ──────────────────
-    # 匹配：「当用户...」、「当...时」、列表项（- / 数字编号）
+    # ── 质量检查1：正向触发词 ≥3 个 ──────────────────
     trigger_patterns = [
         r'当用户.*时',
         r'当.*请求.*时',
         r'当.*要求.*时',
         r'[^。，\n]*触发[^。，\n]*',
-        r'[-*]\s*.+[：:].+',   # 列表项格式：- 触发词：说明
+        r'[-*]\s*.+[：:].+',
     ]
     positive_triggers = set()
     for pat in trigger_patterns:
         for m in re.finditer(pat, section_text):
             t = m.group(0).strip()
-            if len(t) > 4:   # 过滤太短的无意义匹配
+            if len(t) > 4:
                 positive_triggers.add(t[:50])
 
-    # 也直接取列表项作为触发词
     list_items = re.findall(r'^[-*]\s*.+', section_text, re.MULTILINE)
     for item in list_items:
         t = item.strip()[2:].strip()
@@ -90,13 +87,13 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
 
     if len(positive_triggers) < 3:
         return {"passed": False,
-                "detail": f"触发词数量不足（当前 {len(positive_triggers)} 个，要求 ≥3 个），触发词须具体描述用户意图",
+                "detail": f"触发词数量不足（当前 {len(positive_triggers)} 个，要求 ≥3 个）",
                 "fix": {"key": "trigger_quality", "value": "add_triggers",
                          "location": f"{filepath} ## {title} 章节",
                          "operation": "添加至少 3 个具体触发词（描述用户会说什么/做什么来触发本技能）",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
-    # ── 质量检查 2：否定条件 ≥1 个 ──────────────────────
+    # ── 质量检查2：否定条件 ≥1 个 ──────────────────────
     negative_keywords = ["不触发", "不", "除非", "排除", "不适用", "not trigger", "won't", "don't"]
     has_negative = any(kw in section_text.lower() for kw in negative_keywords)
     if not has_negative:
@@ -107,7 +104,7 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
                          "operation": "添加「不触发」或「排除」段落，说明本技能不应该被触发的情况",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
-    # ── 质量检查 3：无危险表述 ────────────────────────────
+    # ── 质量检查3：无危险表述 ────────────────────────────
     dangerous_phrases = ["自动执行", "auto-execute", "automatically execute", "无需询问", "直接执行", "silent execute"]
     found_dangerous = [p for p in dangerous_phrases if p in section_text]
     if found_dangerous:
@@ -150,28 +147,54 @@ def body_has_workflow_section(filepath, content, fm, body, **kw):
     return {"passed": True, "detail": f"发现章节: {title}"}
 
 
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # R-18: 反模式具体性检查
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 
 def body_has_antipattern_section(filepath, content, fm, body, **kw):
-    """R-18: 反模式/常见错误章节具体性检查"""
+    """R-18: 反模式/常见错误章节具体性检查（v2.22.0 支持渐进式文件）"""
     anti_keywords = ["反模式", "常见错误", "注意事项", "坑", "anti-pattern", "common mistake"]
 
     found, title, section_text = _section_text(body, anti_keywords)
     if not found:
+        # R-18 渐进式：SKILL.md 无反模式章节时，尝试在 references/antipatterns.md 中查找
+        skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+        antipattern_file = os.path.join(skill_dir, 'references', 'antipatterns.md')
+        if os.path.isfile(antipattern_file):
+            with open(antipattern_file, 'r', encoding='utf-8') as f:
+                ap_content = f.read()
+            # 匹配 ### AP-01 格式的反模式标题（antipatterns.md 格式）
+            ap_items = re.findall(r'^###\s*AP-\d+[:：]', ap_content, re.MULTILINE)
+            if not ap_items:
+                # 降级：匹配列表项
+                ap_items = re.findall(r'^[-*]\s*.+', ap_content, re.MULTILINE)
+            if not ap_items:
+                ap_items = re.findall(r'^\d+\.\s*.+', ap_content, re.MULTILINE)
+            if len(ap_items) >= 2:
+                # 检查是否有具体描述（错误做法/正确做法标记）
+                has_detail = bool(re.search(r'错误做法[:：]|正确做法[:：]|深层原因[:：]', ap_content))
+                if has_detail:
+                    return {"passed": True,
+                            "detail": f"反模式在 references/antipatterns.md 中（{len(ap_items)} 条具体示例）"}
+                else:
+                    return {"passed": False,
+                            "detail": f"references/antipatterns.md 缺少具体描述（须含 **错误做法：**、**正确做法：** 标记）",
+                            "fix": {"key": "antipattern_detail", "value": "add_detail",
+                                     "location": f"{antipattern_file}",
+                                     "operation": "为每个反模式添加 **错误做法：**、**正确做法：** 和 **深层原因：** 标记",
+                                     "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
+        # 无章节且无渐进式文件（或文件质量不足），返回原 FAIL
         return {"passed": False,
-                "detail": f"未找到[{', '.join(anti_keywords)}]章节（建议添加，帮助用户避坑）",
+                "detail": f"未找到[{', '.join(anti_keywords)}]章节（建议添加，或引用 references/antipatterns.md）",
                 "fix": {"key": "section_antipattern", "value": True,
                          "location": f"{filepath} 正文",
-                         "operation": "添加 ## 反模式 或 ## 常见错误 章节，列出 2-3 个具体错误示例",
+                         "operation": "添加 ## 反模式 或 ## 常见错误 章节，列出 2-3 个具体错误示例，或在 SKILL.md 中引用 references/antipatterns.md",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"},
-                "skipped": True}   # 非强制，可跳过
+                "skipped": True}
 
     # 检查具体性：每条反模式须包含具体描述（≥20字）或代码示例
     items = re.findall(r'^[-*]\s*.+', section_text, re.MULTILINE)
     if not items:
-        # 可能用了数字编号
         items = re.findall(r'^\d+\.\s*.+', section_text, re.MULTILINE)
 
     if len(items) < 2:
@@ -182,13 +205,10 @@ def body_has_antipattern_section(filepath, content, fm, body, **kw):
                          "operation": "添加至少 2 条具体反模式示例（须含具体错误描述和正确做法）",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
 
-    # 检查是否包含具体描述（每条至少 20 个非空白字符）
     min_len = 20
     vague_items = []
     for item in items:
-        # 去掉列表标记
         text = re.sub(r'^[-*\d\.]\s*', '', item).strip()
-        # 跳过水平线（全为 - 字符）
         if set(text) <= {'-', '—', '–'}:
             continue
         if len(text) < min_len:
@@ -206,23 +226,43 @@ def body_has_antipattern_section(filepath, content, fm, body, **kw):
             "detail": f"反模式章节具体性合格（{len(items)} 条具体示例）"}
 
 
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # R-19: FAQ 有意义性检查
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 
 def body_has_faq_section(filepath, content, fm, body, **kw):
-    """R-19: FAQ/常见问题章节有意义性检查"""
+    """R-19: FAQ/常见问题章节有意义性检查（v2.22.0 支持渐进式文件）"""
     faq_keywords = ["FAQ", "常见问题", "Q&A", "Questions", "问答"]
 
     found, title, section_text = _section_text(body, faq_keywords)
     if not found:
+        # R-19 渐进式：SKILL.md 无 FAQ 章节时，尝试在 references/faq.md 中查找
+        skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+        faq_file = os.path.join(skill_dir, 'references', 'faq.md')
+        if os.path.isfile(faq_file):
+            with open(faq_file, 'r', encoding='utf-8') as f:
+                faq_content = f.read()
+            faq_qa = _extract_qa_pairs(faq_content)
+            if faq_qa:
+                bad = []
+                for q, a in faq_qa:
+                    q_t = q.strip()
+                    a_t = a.strip()
+                    if len(q_t) < 10 or any(t in q_t.lower() for t in ["如何工作", "怎么用", "what is"]):
+                        bad.append(f"Q: {q_t[:30]}")
+                    if len(a_t) < 15 or a_t in ("请参考文档", "见上文", "see above"):
+                        bad.append(f"A: {a_t[:30]}")
+                if not bad:
+                    return {"passed": True,
+                            "detail": f"FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A）"}
+        # 无章节且无渐进式文件（或文件质量不足），返回原 FAIL
         return {"passed": False,
-                "detail": f"未找到[{', '.join(faq_keywords)}]章节（建议添加，降低重复提问）",
+                "detail": f"未找到[{', '.join(faq_keywords)}]章节（建议添加，或引用 references/faq.md）",
                 "fix": {"key": "section_faq", "value": True,
                          "location": f"{filepath} 正文",
-                         "operation": "添加 ## FAQ 或 ## 常见问题 章节，列出 3-5 个真实用户问题",
+                         "operation": "添加 ## FAQ 或 ## 常见问题 章节，列出 3-5 个真实用户问题，或在 SKILL.md 中引用 references/faq.md",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"},
-                "skipped": True}   # 非强制，可跳过
+                "skipped": True}
 
     # 检查 Q&A 格式：须有 Q 和 A（或 ###/#### 子标题）
     has_q = bool(re.search(r'[Qq]\s*[:：]|问\s*[:：]|\*\*Q\b|\d+\.\s*[Qq]', section_text))
@@ -237,8 +277,6 @@ def body_has_faq_section(filepath, content, fm, body, **kw):
                          "operation": "用 Q: / A: 或 ### 问题标题 格式组织 FAQ，确保每对有问有答",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
 
-    # 检查问题有意义性：问题须具体（≥10字），答案须实质（≥15字）
-    # 提取所有 Q/A 对
     qa_pairs = _extract_qa_pairs(section_text)
     if not qa_pairs:
         return {"passed": False,
@@ -253,10 +291,8 @@ def body_has_faq_section(filepath, content, fm, body, **kw):
     for q, a in qa_pairs:
         q_trim = q.strip()
         a_trim = a.strip()
-        # 问题太短或无意义
         if len(q_trim) < 10 or any(t in q_trim.lower() for t in trivial_questions):
             bad_pairs.append(f"Q: {q_trim[:30]}")
-        # 答案太短或无实质
         if len(a_trim) < 15 or a_trim in ("请参考文档", "见上文", "see above"):
             bad_pairs.append(f"A: {a_trim[:30]}")
 
@@ -313,23 +349,32 @@ def _extract_qa_pairs(section_text):
     return pairs
 
 
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 # R-20: 写作规范检查
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
 
-def body_check_writing_standards(filepath, content, fm, body, **kw):
-    """R-20: 写作规范检查（术语一致性、禁止表述、中英文混排）"""
-    issues = []
+def _check_writing_standards_text(text, filename=""):
+    """
+    检查文本的写作规范，返回分级 issues 字典。
+    供 body_check_writing_standards() 和渐进式文件检查复用。
 
-    # ── 检查1：术语一致性 ──────────────────────────────────
-    # 同一概念不应混用多种表述
+    返回格式：
+    {
+        "must": [],    # 🔴 必须修：术语不一致、事实错误
+        "suggest": [], # 🟡 建议修：模糊表述、缺少空格
+        "optional": []  # ⚪ 可选择修：风格偏好
+    }
+    """
+    issues = {"must": [], "suggest": [], "optional": []}
+
+    # ── 检查1：术语一致性（🔴 必须修）───────────────────
     term_groups = [
         (["创建", "建立", "新建"], "创建"),
         (["更新", "修改", "编辑", "变更"], "更新"),
         (["删除", "移除", "去掉"], "删除"),
         (["配置", "设置", "设定"], "配置"),
     ]
-    lines = body.split("\n")
+    lines = text.split("\n")
     for group, preferred in term_groups:
         found_terms = {}
         for line in lines:
@@ -338,38 +383,92 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                     found_terms.setdefault(term, []).append(line[:50])
         if len(found_terms) > 1:
             terms_str = ", ".join(found_terms.keys())
-            issues.append(f"术语不一致：混用 {terms_str}，建议统一为「{preferred}」")
+            prefix = f"{filename}：" if filename else ""
+            issues["must"].append(f"{prefix}术语不一致：混用 {terms_str}，建议统一为「{preferred}」")
 
-    # ── 检查2：禁止表述 ────────────────────────────────────
+    # ── 检查2：禁止表述（🟡 建议修）────────────────────
     forbidden = [
         ("可能", "避免模糊表述，改用确定性描述"),
         ("应该", "避免建议性表述，改用确定性描述或明确标注「建议」"),
         ("大概", "避免模糊表述"),
         ("差不多", "避免模糊表述"),
     ]
+    cleaned = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    cleaned = re.sub(r'`[^`]+?`', '', cleaned)
     for word, suggestion in forbidden:
-        # 只在正文中检查（排除代码块）
-        cleaned = re.sub(r'```.*?```', '', body, flags=re.DOTALL)
-        cleaned = re.sub(r'`[^`]+`', '', cleaned)
         if word in cleaned:
-            issues.append(f"含模糊表述「{word}」：{suggestion}")
+            prefix = f"{filename}：" if filename else ""
+            issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
 
-    # ── 检查3：中英文混排空格 ────────────────────────────
-    # 中文与英文/数字之间应有空格（例外：版本号、类名）
-    # 简单检查：中文后直接跟英文单词（无空格）
-    mingled = re.findall(r'[\u4e00-\u9fff][A-Za-z]{2,}|[A-Za-z]{2,}[\u4e00-\u9fff]', body)
+    # ── 检查3：中英文混排空格（🟡 建议修）───────────────────
+    mingled = re.findall(r'[一-鿿][A-Za-z]{2,}|[A-Za-z]{2,}[一-鿿]', text)
     mingled = [m for m in mingled if not re.match(r'v\d|SKILL|MD|JSON|YAML', m)]
     if mingled:
-        issues.append(f"中英文混排缺少空格：{', '.join(mingled[:5])}")
+        prefix = f"{filename}：" if filename else ""
+        issues["suggest"].append(f"{prefix}中英文混排缺少空格：{', '.join(mingled[:5])}")
 
-    if issues:
-        detail = "；".join(issues[:3])
-        return {"passed": False,
-                "detail": f"写作规范问题：{detail}",
-                "fix": {"key": "writing_standards", "value": "fix_terms",
-                         "location": f"{filepath} 正文",
-                         "operation": "统一术语表述、移除模糊用词、修正中英文混排空格",
-                         "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
+    return issues
 
-    return {"passed": True,
-            "detail": "写作规范检查通过（术语一致、无禁止表述、中英文混排规范）"}
+
+def body_check_writing_standards(filepath, content, fm, body, **kw):
+    """R-20: 写作规范检查（术语一致性、禁止表述、中英文混排）
+    ✅ v2.22.0：同时检查 references/*.md 渐进式文件
+    ✅ v2.23.0：分级输出（必须修/建议修/可选择修）
+    """
+    all_issues = {"must": [], "suggest": [], "optional": []}
+
+    # ── 检查 SKILL.md 正文 ─────────────────────────
+    issues = _check_writing_standards_text(body, "SKILL.md")
+    for k in all_issues:
+        all_issues[k] += issues[k]
+
+    # ── 检查渐进式文件 references/*.md ────────────────
+    skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+    refs_dir = os.path.join(skill_dir, 'references')
+    if os.path.isdir(refs_dir):
+        for fname in sorted(os.listdir(refs_dir)):
+            if not fname.endswith('.md'):
+                continue
+            fpath = os.path.join(refs_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    ref_content = f.read()
+            except Exception:
+                continue
+            issues = _check_writing_standards_text(ref_content, fname)
+            for k in all_issues:
+                all_issues[k] += issues[k]
+
+    # ── 分级格式化输出 ──────────────────────────────
+    must_count = len(all_issues["must"])
+    suggest_count = len(all_issues["suggest"])
+    optional_count = len(all_issues["optional"])
+
+    if must_count == 0 and suggest_count == 0 and optional_count == 0:
+        return {"passed": True,
+                "detail": "写作规范检查通过（SKILL.md + references/*.md 术语一致、无禁止表述、中英文混排规范）"}
+
+    # 格式化输出
+    parts = []
+    if must_count > 0:
+        parts.append(f"🔴 必须修（{must_count} 条）：{all_issues['must'][0]}")
+        if must_count > 1:
+            parts[0] += f" 等（共 {must_count} 条）"
+    if suggest_count > 0:
+        parts.append(f"🟡 建议修（{suggest_count} 条）：{all_issues['suggest'][0]}")
+        if suggest_count > 1:
+            parts[-1] += f" 等（共 {suggest_count} 条）"
+    if optional_count > 0:
+        parts.append(f"⚪ 可选择修（{optional_count} 条）：{all_issues['optional'][0]}")
+        if optional_count > 1:
+            parts[-1] += f" 等（共 {optional_count} 条）"
+
+    detail = "；".join(parts)
+    return {"passed": False,
+            "detail": f"写作规范问题：{detail}",
+            "fix": {"key": "writing_standards", "value": "fix_terms",
+                     "location": f"{filepath} 正文 + references/*.md",
+                     "operation": "优先修复🔴必须修问题，建议修复🟡建议修问题（含渐进式文件）",
+                     "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
+
+

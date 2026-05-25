@@ -70,7 +70,7 @@ python -m skill_builder update <skill_dir> [--fix] [--backup]
 |------|------|------|--------|------|
 | `skill_dir` | positional | ✅ | — | Skill 目录的绝对或相对路径 |
 | `--fix` | flag | ❌ | `False` | 自动修复可修复的问题 |
-| `--backup` | flag | ❌ | `False` | 修改前自动备份 |
+| `--backup` | flag | ❌ | `False` | 更新前自动备份 |
 
 **检查项目（共 6 项）：**
 
@@ -78,7 +78,7 @@ python -m skill_builder update <skill_dir> [--fix] [--backup]
 |---|--------|-----------|------|
 | 1 | `_meta.json` 存在性 + 五字段完整 | ✅ --fix | 缺失字段自动补充空值 |
 | 2 | `_meta.json` JSON 合法性 | ❌ | 格式错误仅警告 |
-| 3 | `SKILL.md` 存在性 + frontmatter | ❌ | 需手动编辑 |
+| 3 | `SKILL.md` 存在性 + frontmatter | ❌ | 需手动更新 |
 | 4 | 必填章节完整性（3个） | ❌ | 模糊匹配关键词 |
 | 5 | 文件大小 + 根目录规范性 | 💡 | 建议性提示 |
 | 6 | scripts/ + 根目录 产出物路径规范性 | 💡 | 扫描铁律4违规 + 交叉引用追踪（v2.7.2 增强） |
@@ -446,7 +446,7 @@ else:
 
 ## 版本号更新文件映射表
 
-| 修改类型 | 需同步版本号的文件位置 | 升级类型 |
+| 更新类型 | 需同步版本号的文件位置 | 升级类型 |
 |---------|----------------------|---------|
 | 修正错别字/排版（仅 SKILL.md） | SKILL.md `version` + `_meta.json` `"version"` | PATCH（2.1.0→2.1.1） |
 | 修改 `scripts/spec/*.json` 规范 | 对应 `.json` 的 `"_version"` + SKILL.md + `_meta.json` | PATCH 或 MINOR（视变更范围） |
