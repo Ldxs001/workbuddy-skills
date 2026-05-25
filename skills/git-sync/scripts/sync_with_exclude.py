@@ -23,6 +23,8 @@ EXCLUDE_FILES_GLOB = {
     "*.tmp", "._*", ".decisions.json",
     "*.sensitive_scan_*.json", "zip_out", "preview_server.py",
     "*_fixed.py", "stderr.txt", "stdout.txt",
+    "*.bat",  # Windows 批处理文件
+    "fix_*.py", "test_*.py",  # 临时修复脚本和测试脚本
 }
 FUNCTIONAL_FILE_WHITELIST = {"settings.html", "preview.html"}
 

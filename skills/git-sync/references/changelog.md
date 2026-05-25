@@ -1,6 +1,23 @@
 # git-sync 版本更新日志
 
 ---
+## v2.6.3（2026-05-25）
+
+> 发布日期：2026-05-25
+
+### 修复
+- **打包排除规则完善** — pack_zip.py 添加 .bak/.tmp 扩展到排除列表，添加 .bat 到排除文件列表
+- **同步排除规则完善** — sync_with_exclude.py 添加 *.bat/fix_*.py/test_*.py 到 EXCLUDE_FILES_GLOB
+- **Shell 排除规则完善** — git-sync.sh 添加 --exclude="*.bat"/--exclude="fix_*.py"/--exclude="test_*.py"
+- **版本号更新** — SKILL.md v2.6.2 → v2.6.3，_meta.json 同步更新
+
+### 影响
+- 打包后的 ZIP 不再包含 .bak/.bat/fix_*.py/test_*.py 等临时文件
+- 同步到仓库的目录也不再包含这些临时文件
+- 符合用户要求的打包清理规范
+
+---
+
 
 ## v2.6.2（2026-05-25）
 

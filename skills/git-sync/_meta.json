@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.6.2",
-  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查（R-01~R-10）及渐进式文档体系",
+  "version": "2.6.3",
+  "description": "将skill代码规范化推送到码云、GitHub并生成ZIP包，自动更新README.md技能列表，附带_meta.json标准化校验、三单一致维护清单机制、敏感信息过滤和SKILL.md规范化审查（R-01~R-10）及渐进式文档体系。v2.6.3 修复打包排除规则（添加.bak/.bat/fix_*.py/test_*.py排除）",
   "author": "wUwproject",
   "tags": [
     "sync",
