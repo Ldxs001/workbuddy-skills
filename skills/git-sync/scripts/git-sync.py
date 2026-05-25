@@ -155,10 +155,6 @@ def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
     if not skill_md.exists():
         log("3.5", 8, "SKILL.md 不存在，跳过审查", "skip")
         return
-    audit_py = SCRIPT_DIR / "skill_audit.py"
-    if not audit_py.exists():
-        log("3.5", 8, "skill_audit.py 不存在，跳过", "skip")
-        return
     # 读取清单中的版本号
     manifest_ver = ""
     try:
@@ -168,11 +164,23 @@ def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
     except Exception:
         pass
     audit_out = SCRIPT_DIR / f".audit_{skill_name}.json"
-    run_python(audit_py, "audit", str(skills_dir / skill_name),
-               "--json", f"--manifest-version={manifest_ver}",
-               capture=True)
+    # 调用本地 bundled skill_audit 包（python -m skill_audit）
+    env = _git_env()
+    env["PYTHONUTF8"] = "1"
+    cmd = [
+        sys.executable, "-m", "skill_audit",
+        "audit", str(skills_dir / skill_name),
+        "--json", f"--manifest-version={manifest_ver}",
+    ]
+    r = subprocess.run(
+        cmd,
+        cwd=str(SCRIPT_DIR),   # skill_audit/ 包在 SCRIPT_DIR 下
+        capture_output=True, encoding="utf-8",
+        check=False, env=env,
+        stdin=subprocess.DEVNULL,
+    )
     if audit_out.exists():
-        d = json.load(open(audit_out))
+        d = json.load(open(audit_out, encoding="utf-8"))
         errors = d["summary"]["errors"]
         warns  = d["summary"]["warns"]
         verdict = d["verdict"]
@@ -245,31 +253,64 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
     if not scan_py.exists():
         log("4.5", 8, "sensitive_scan.py 不存在，跳过", "skip")
         return
+
     scan_out = SCRIPT_DIR / f".sensitive_scan_{skill_name}.json"
     run_python(scan_py, "scan", str(repo_skill_dir),
                "--output", str(scan_out))
-    if scan_out.exists() and scan_out.stat().st_size > 0:
-        print(f"  ⚠️  发现敏感信息：")
-        d = json.load(scan_out.open(encoding='utf-8'))
-        for e in d[:5]:
-            print(f"  - {e['file']}: {len(e['findings'])} 处")
-        # 默认全部脱敏
-        decisions = SCRIPT_DIR / f".sensitive_scan_{skill_name}.json.decisions.json"
-        make_py = SCRIPT_DIR / "make_all_sanitize.py"
-        if make_py.exists():
-            r = run_python(make_py, str(scan_out), capture=True)
-            if r and r.stdout:
-                Path(decisions).write_text(r.stdout, encoding="utf-8")
-        if decisions.exists():
-            log("4.5", 8, "对工作仓库中的文件执行脱敏...", "ok")
-            run_python(scan_py, "apply", str(repo_skill_dir),
-                       "--decisions", str(decisions),
-                       "--scan-result", str(scan_out))
-        scan_out.unlink(missing_ok=True)
-        decisions.unlink(missing_ok=True)
-    else:
+
+    if not scan_out.exists() or scan_out.stat().st_size == 0:
         log("4.5", 8, "未发现敏感信息", "ok")
         scan_out.unlink(missing_ok=True)
+        return
+
+    # ── 打印扫描结果详情 ──────────────────────────────────────────────────
+    d = json.load(scan_out.open(encoding="utf-8"))
+    total_findings = sum(len(e.get("findings", [])) for e in d)
+    print(f"  ⚠️  发现敏感信息：共 {len(d)} 个文件，{total_findings} 处")
+    for e in d:
+        rel = Path(e["file"]).relative_to(repo_skill_dir)
+        finds = e.get("findings", [])
+        if not finds:
+            continue
+        print(f"  📄 {rel}（{len(finds)} 处）")
+        for f in finds[:5]:          # 每文件最多显示 5 条
+            label = f.get("label", "敏感信息")
+            severity = f.get("severity", "")
+            line = f.get("line", "?")
+            replace = f.get("replace", "[redacted]")
+            print(f"      [{severity}] 第 {line} 行 {label} → 替换为：{replace}")
+        if len(finds) > 5:
+            print(f"      ... 还有 {len(finds) - 5} 处未显示")
+
+    # ── 默认全部脱敏 ──────────────────────────────────────────────────────
+    decisions = SCRIPT_DIR / f".sensitive_scan_{skill_name}.json.decisions.json"
+    make_py = SCRIPT_DIR / "make_all_sanitize.py"
+    if make_py.exists():
+        r = run_python(make_py, str(scan_out), capture=True)
+        if r and r.stdout:
+            Path(decisions).write_text(r.stdout, encoding="utf-8")
+
+    if decisions.exists():
+        log("4.5", 8, "正在执行脱敏...", "info")
+        # 先备份脱敏前的文件哈希（用于对比）
+        sanitized_files = set()
+        for e in d:
+            sanitized_files.add(Path(e["file"]))
+
+        run_python(scan_py, "apply", str(repo_skill_dir),
+                   "--decisions", str(decisions),
+                   "--scan-result", str(scan_out))
+
+        # 脱敏后：显示脱敏结果
+        print(f"  ✅ 脱敏完成，涉及 {len(sanitized_files)} 个文件：")
+        for fp in sorted(sanitized_files):
+            rel = fp.relative_to(repo_skill_dir)
+            print(f"      - {rel}")
+    else:
+        log("4.5", 8, "无脱敏决策文件，跳过脱敏", "warn")
+
+    scan_out.unlink(missing_ok=True)
+    decisions.unlink(missing_ok=True)
 
 # ── 步骤 5：更新 README.md ─────────────────────────────────────────────────
 def step_update_readme(repo_name="workbuddy-skills"):

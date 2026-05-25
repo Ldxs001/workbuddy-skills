@@ -1,6 +1,30 @@
 # git-sync 版本更新日志
 
 ---
+## v2.6.19（2026-05-25）
+
+> 发布日期：2026-05-25
+
+### 修复
+
+- **`step_skill_audit` 调用方式修正**
+  - 将 `skill-standardization/scripts/skill_audit/` 包复制进 `git-sync/scripts/skill_audit/`（本地化依赖，不再跨技能调用）
+  - 删除旧的 `scripts/skill_audit.py`（单文件版，已过时）
+  - `step_skill_audit` 改为 `python -m skill_audit`，以 `cwd=SCRIPT_DIR` 调用本地包
+
+- **`step_sensitive_scan` 日志增强**
+  - 扫描结果：显示每个涉事文件的具体类型、行号、替换目标（不再只显示计数）
+  - 脱敏结果：显示哪些文件被脱敏、各条目的替换动作
+  - 不再打印原始匹配内容（避免敏感信息泄露到终端）
+
+### 影响文件
+
+- `scripts/git-sync.py` — `step_skill_audit()`、`step_sensitive_scan()`
+- `scripts/skill_audit/` — 新增，从 `skill-standardization` 复制
+- `scripts/skill_audit.py` — 删除
+
+---
+
 ## v2.6.18（2026-05-25）
 
 > 发布日期：2026-05-25
