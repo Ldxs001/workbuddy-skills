@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """同步目录，应用与 pack_zip.py 一致的排除规则。
 用法: python sync_with_exclude.py <src_dir> <dst_dir>
-设计：替代 rsync 的排除同步，确保仓库文件与打包排除规则一致。
+设计: 替代 rsync 的排除同步，确保仓库文件与打包排除规则一致。
 """
 import os
 import sys
@@ -46,7 +46,7 @@ def should_exclude(rel_path, file_path=None):
     name = os.path.basename(p)
     parent_dir = os.path.dirname(p)  # "" 表示根目录
 
-    # 1. 白名单检查（最先）：功能性文件跳过所有排除规则
+    # 1. 白名单检查（最先）: 功能性文件跳过所有排除规则
     lower_name = name.lower()
     for w in FUNCTIONAL_FILE_WHITELIST:
         if lower_name == w.lower():
@@ -80,7 +80,7 @@ def should_exclude(rel_path, file_path=None):
     if file_path and os.path.exists(file_path):
         try:
             if os.path.getsize(file_path) == 0:
-                # 白名单检查：少数空文件需要保留
+                # 白名单检查: 少数空文件需要保留
                 if name.lower() not in {w.lower() for w in EMPTY_FILE_WHITELIST}:
                     return True
         except OSError:
@@ -95,20 +95,20 @@ def sync_with_exclude(src, dst):
     dst = os.path.normpath(dst)
 
     if not os.path.isdir(src):
-        print(f"❌ 源目录不存在: {src}")
+        print(f"[X] Source dir not found: {src}")
         sys.exit(1)
 
-    # 安全检查：src 和 dst 不能相同，dst 不能是 src 的父目录
+    # 安全检查: src 和 dst 不能相同，dst 不能是 src 的父目录
     src_resolved = os.path.realpath(src)
     dst_resolved = os.path.realpath(dst)
     if src_resolved == dst_resolved:
-        print(f"❌ 拒绝操作：源目录和目标目录相同（{src_resolved}）")
+        print(f"[X] Operation refused: Source and destination are the same（{src_resolved}）")
         sys.exit(1)
     if dst_resolved.startswith(src_resolved + os.sep):
-        print(f"❌ 拒绝操作：目标目录在源目录内（{dst_resolved}）")
+        print(f"[X] Operation refused: Destination is inside source（{dst_resolved}）")
         sys.exit(1)
 
-    # 清空目标目录（安全：已通过 git-sync.sh 路径校验）
+    # 清空目标目录（安全: 已通过 git-sync.sh 路径校验）
     if os.path.isdir(dst):
         shutil.rmtree(dst)
     os.makedirs(dst, exist_ok=True)
@@ -142,7 +142,7 @@ def sync_with_exclude(src, dst):
             shutil.copy2(file_path, dst_file)
             copy_count += 1
 
-    print(f"  ✅ Python 排除复制完成: {copy_count} 个文件")
+    print(f"  [OK] Python exclude copy completed: {copy_count}  files")
     if skipped_empty > 0:
         print(f"  ℹ️  跳过 {skipped_empty} 个空文件（0 KB）")
     return copy_count

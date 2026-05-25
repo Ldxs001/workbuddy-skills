@@ -1,0 +1,49 @@
+[
+  {
+    "file": "references/changelog.md",
+    "description": "Markdown 文档",
+    "findings": [
+      {
+        "label": "用户名（来自配置）",
+        "severity": "low",
+        "line": 283,
+        "match": "[username-redacted]",
+        "replace": "[username-redacted]",
+        "span": [
+          7532,
+          7542
+        ]
+      }
+    ],
+    "severity": "low"
+  },
+  {
+    "file": "references/faq.md",
+    "description": "Markdown 文档",
+    "findings": [
+      {
+        "label": "邮箱地址",
+        "severity": "high",
+        "line": 17,
+        "match": "[email-redacted]",
+        "replace": "[email-redacted]",
+        "span": [
+          187,
+          201
+        ]
+      },
+      {
+        "label": "邮箱地址",
+        "severity": "high",
+        "line": 124,
+        "match": "[email-redacted]",
+        "replace": "[email-redacted]",
+        "span": [
+          2043,
+          2059
+        ]
+      }
+    ],
+    "severity": "high"
+  }
+]

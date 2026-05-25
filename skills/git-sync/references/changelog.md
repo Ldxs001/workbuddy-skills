@@ -1,6 +1,24 @@
 # git-sync 版本更新日志
 
 ---
+## v2.6.6（2026-05-25）
+
+> 发布日期：2026-05-25
+
+### 新增
+- **跨平台环境适配说明** — `references/guide.md` 新增「跨平台环境适配」章节
+  - 环境矩阵（Linux/macOS/Windows PortableGit/Cygwin/MSYS2/WSL）
+  - Windows 下 Python 路径转换问题根因说明
+  - 各平台安装 rsync 方法（apt/yum/pacman/brew/winget/手动下载）
+  - 故障排除表（含 `c:\\c\\Users\\...` 路径 bug 的解决方案）
+  - 正确调用方式说明（`cd` 到脚本目录再执行）
+
+### 影响
+- 任何环境下遇到 rsync 不可用，都有明确的解决方案
+- Windows PortableGit 环境首次使用时有明确指引
+- 路径转换问题有明确根因说明和修复方案
+
+---
 ## v2.6.4（2026-05-25）
 
 > 发布日期：2026-05-25

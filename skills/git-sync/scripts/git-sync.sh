@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# git-sync v2.4.0
+# git-sync v2.6.6
 # 将 skill 代码规范化推送到码云/GitHub 并生成 ZIP 包
 # 用法: bash git-sync.sh <skill-name> [version] [--skip-scan]
 set -eo pipefail
@@ -7,14 +7,13 @@ set -eo pipefail
 # ── 0. 参数解析 ─────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/
-SKILLS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# 从 scripts/ 往上 4 级确定 skills 目录: skills/.standardization/<name>/data/<bak>/scripts/ → skills/
+SKILLS_DIR="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "$SKILLS_DIR/.." && pwd)"
 SKILL_NAME="${1:-}"
 VERSION="${2:-}"
 SKIP_SCAN=false
-FORCE=false
-for arg in "$@"; do [ "$arg" = "--skip-scan" ] && SKIP_SCAN=true; [ "$arg" = "--force" ] && FORCE=true; done
+for arg in "$@"; do [ "$arg" = "--skip-scan" ] && SKIP_SCAN=true; done
 
 if [ -z "$SKILL_NAME" ]; then
     echo "用法: bash git-sync.sh <skill-name> [version] [--skip-scan]"
@@ -32,15 +31,28 @@ if [ -z "$VERSION" ]; then
     fi
 fi
 
+# ── 0.5 检测 rsync，不可用则切换到 Python 完整流程 ─────────────────────
+if ! command -v rsync >/dev/null 2>&1; then
+    echo "⚠️  rsync 不可用，切换到 Python 完整流程 (git-sync.py)..."
+    if [ -f "$SCRIPT_DIR/git-sync.py" ]; then
+        python "$SCRIPT_DIR/git-sync.py" "$@"
+        exit $?
+    else
+        echo "❌ git-sync.py 不存在: $SCRIPT_DIR/git-sync.py"
+        echo "   请先创建 git-sync.py，或安装 rsync"
+        exit 1
+    fi
+fi
+
 # 路径配置
 SKILL_MD="$SKILLS_DIR/$SKILL_NAME/SKILL.md"
 META_FILE="$SKILLS_DIR/$SKILL_NAME/_meta.json"
+WORK_REPO="/c/Users/sm001/.workbuddy/workbuddy-skills"
 REPO_NAME="workbuddy-skills"
-WORK_REPO="$WORKSPACE_ROOT/$REPO_NAME"
 DIST_DIR="$SKILLS_DIR/.dist"
 ZIP_NAME="${SKILL_NAME}-v${VERSION}.zip"
 ZIP_FILE="$DIST_DIR/$ZIP_NAME"
-MANIFEST_FILE="$SKILLS_DIR/.standardization/git-sync/data/manifest.json"
+MANIFEST_FILE="/c/Users/sm001/.workbuddy/skills/.standardization/git-sync/data/manifest.json"
 README_FILE="$WORK_REPO/README.md"
 
 # 读取 description（用于 README.md）
@@ -82,17 +94,13 @@ if [ -z "$REPO_VER" ]; then
     echo "  → 仓库无版本记录，正常同步"
 elif [ "$REPO_VER" = "$LOCAL_VER" ]; then
     echo "  ⏭️  仓库版本 = 本地版本（$REPO_VER），跳过同步"
+    # 交互环境询问是否强制；非交互环境直接跳过
     if [ -t 0 ]; then
-        read -p "  是否强制更新（含重新打包）？（y=强制 / n=跳过）[N/n]: " FORCE_CHOICE
-        case "$FORCE_CHOICE" in y|Y) echo "  🔄 强制重新同步..."; VER_ACTION="force" ;; *) echo "  ⏭️  已跳过（版本相同 $LOCAL_VER）"; exit 0 ;; esac
+        read -p "  是否强制更新？（y=强制 / n=跳过）[Y/n]: " FORCE_CHOICE
+        case "$FORCE_CHOICE" in y|Y) VER_ACTION="normal" ;; *) echo "  ⏭️  已跳过（版本相同 $LOCAL_VER）"; exit 0 ;; esac
     else
-        if [ "$FORCE" = true ]; then
-            echo "  🔄 强制重新同步..."
-            VER_ACTION="force"
-        else
-            echo "  ⏭️  非交互环境，版本一致已跳过（如需重新打包请加 --force 或交互运行）"
-            exit 0
-        fi
+        echo "  ⏭️  非交互环境，已跳过（版本相同 $LOCAL_VER）"
+        exit 0
     fi
 elif ver_lt "$REPO_VER" "$LOCAL_VER"; then
     echo "  ✅ 仓库版本 < 本地版本，正常升级"
@@ -200,32 +208,26 @@ RSYNC_OPTS=(
     --exclude="*.pyo"
     --exclude="*.log"
     --exclude="*.zip"
-    --exclude="*.bak*"
+    --exclude="*.bak"
     --exclude="*.tmp"
     --exclude="._*"
     --exclude=".decisions.json"
     --exclude=".sensitive_scan_*.json"
     --exclude="zip_out"
     --exclude="preview_server.py"
-    --exclude="*_fixed.py"
-    --exclude="stderr.txt"
-    --exclude="stdout.txt"
-    --exclude="*.bat"          # Windows 批处理文件
-    --exclude="test_*.py"      # 测试脚本
-    --exclude=".standardization"
 )
 
 if [ -d "$DST" ]; then
     # 使用统一排除规则的 rsync
     rsync "${RSYNC_OPTS[@]}" "$SKILLS_DIR/$SKILL_NAME/" "$DST/" 2>/dev/null || {
         echo "  ⚠️  rsync 不可用，使用 Python 排除复制（已通过路径校验）"
-        python "$SCRIPT_DIR/sync_with_exclude.py" "$SKILLS_DIR/$SKILL_NAME" "$DST"
+        python "$SCRIPT_DIR/sync_with_exclude.py" "$(cygpath -w "$SKILLS_DIR/$SKILL_NAME")" "$(cygpath -w "$DST")"
     }
 else
     mkdir -p "$DST"
     rsync "${RSYNC_OPTS[@]}" "$SKILLS_DIR/$SKILL_NAME/" "$DST/" 2>/dev/null || {
         echo "  ⚠️  rsync 不可用，使用 Python 排除复制"
-        python "$SCRIPT_DIR/sync_with_exclude.py" "$SKILLS_DIR/$SKILL_NAME" "$DST"
+        python "$SCRIPT_DIR/sync_with_exclude.py" "$(cygpath -w "$SKILLS_DIR/$SKILL_NAME")" "$(cygpath -w "$DST")"
     }
 fi
 
@@ -317,8 +319,8 @@ else
 fi
 
 echo "  → 推送到 GitHub..."
-git pull github main --rebase 2>/dev/null || echo "  ⚠️  GitHub pull失败，继续..."
-if git push github main 2>&1; then
+git pull origin main --rebase 2>/dev/null || echo "  ⚠️  GitHub pull失败，继续..."
+if git push origin main 2>&1; then
     echo "  ✅ GitHub推送成功"
     GITHUB_OK=true
 else

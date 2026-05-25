@@ -144,3 +144,109 @@ git add → git commit → git pull --rebase → git push
 | `gitee.user` / `github.user` | 生成的查看链接和 README 安装命令中的用户名占位符 |
 | `gitee.repo` / `github.repo` | 工作仓库名称（通常两个平台相同） |
 | `branch` | 推送目标分支（通常为 main） |
+
+---
+
+## 跨平台环境适配
+
+> 本技能依赖 `rsync` 做本地文件同步。不同平台/安装方式下 `rsync` 可用性不同，需提前确认。
+
+### 环境矩阵
+
+| 环境 | rsync 是否可用 | 说明 |
+|------|----------------|------|
+| Linux / macOS | ✅ 自带 | 无需额外操作 |
+| Git for Windows 完整版 | ✅ 自带 | `C:\Program Files\Git\usr\bin\rsync.exe` |
+| **WorkBuddy PortableGit** | ❌ 不含 | 需手动安装（见下方） |
+| Cygwin / MSYS2 | ✅ 自带 | 通过包管理器安装 |
+| WSL | ✅ 自带 | 无需额外操作 |
+
+### Windows 下 Python 路径转换问题（重要）
+
+当 `rsync` 不可用时，脚本会 fallback 到 `sync_with_exclude.py`（Python 方案）。
+
+**问题根因：**
+- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`/c/Users/...` → `C:\Users\...`）
+- 如果 `python` 是 **Windows 原生 exe**（如 `.workbuddy\binaries\...`），路径不会被转换
+- Python 收到 `/c/Users/...` 会误解为 `C:\c\Users\...`，导致文件找不到
+
+**症状：**
+```
+C:\Users\sm001\.workbuddy\binaries\python\...\python.exe: can't open file 'c:\\c\\Users\\...'
+```
+
+**解决方案（任选其一）：**
+
+| 方案 | 操作 | 推荐度 |
+|------|------|--------|
+| **A. 安装 rsync** | 见下方「各平台安装 rsync」| ⭐⭐⭐ 最推荐 |
+| **B. 用 MSYS2 版 Python** | `pacman -S python`（MSYS2 内）| ⭐⭐ |
+| **C. 手动调用 Python 时传 Windows 路径** | `python sync_with_exclude.py "C:\..." "C:\..."` | ⭐ 临时 |
+
+### 各平台安装 rsync
+
+#### Windows（WorkBuddy PortableGit 环境）
+
+**方式一：下载独立 rsync.exe 放到 PortableGit**
+
+```bash
+# 在 Git Bash 中执行，下载 rsync.exe 到 PortableGit/usr/bin/
+cd /c/Users/sm001/.workbuddy/vendor/PortableGit/usr/bin/
+curl -L -o rsync.exe "https://github.com/git-for-windows/git/releases/download/v2.45.0.windows.1/rsync.exe"
+# 验证
+rsync --version
+```
+
+> ⚠️ 如果上述 URL 无效，从 [Git for Windows Releases](https://github.com/git-for-windows/git/releases) 下载完整版，从压缩包中提取 `usr/bin/rsync.exe`。
+
+**方式二：安装完整版 Git for Windows**
+
+从 [git-scm.com](https://git-scm.com/download/win) 下载安装，**安装时勾选「Use Unix tools from the Command Prompt」**，安装后 `rsync` 可用。
+
+#### Linux
+
+```bash
+# Debian/Ubuntu
+sudo apt install rsync
+
+# RHEL/CentOS
+sudo yum install rsync
+
+# Arch
+sudo pacman -S rsync
+```
+
+#### macOS
+
+```bash
+# 自带 rsync，如缺失：
+brew install rsync
+```
+
+#### MSYS2 / Cygwin
+
+```bash
+# MSYS2
+pacman -S rsync
+
+# Cygwin（通过安装程序添加 rsync 包）
+```
+
+### 故障排除
+
+| 错误信息 | 原因 | 解决方法 |
+|---------|------|---------|
+| `rsync: command not found` | rsync 未安装或未在 PATH | 按上方对应平台安装 |
+| `can't open file 'c:\\c\\Users\\...'` | Python fallback 路径转换失败 | 安装 rsync，或传 Windows 路径调用 Python |
+| `SCRIPT_DIR` 路径计算错误 | 用绝对路径调用 `bash git-sync.sh` | **先 `cd` 到脚本目录再执行**（见下方正确调用方式）|
+
+### 正确调用方式
+
+```bash
+# ✅ 推荐：先 cd 到脚本目录，再执行
+cd ~/.workbuddy/skills/git-sync/scripts
+bash git-sync.sh <skill-name> <version>
+
+# ❌ 避免：直接从其他目录用绝对路径调用
+bash "C:/Users/sm001/.workbuddy/skills/git-sync/scripts/git-sync.sh" <skill-name> <version>
+```
