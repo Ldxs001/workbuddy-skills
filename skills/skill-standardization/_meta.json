@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.27.0",
+  "version": "2.27.1",
   "description": "Skill 标准化规范引擎 v2.26.0。修复审查规则数不一致（SKILL.md/reference.md/utils.py/__init__.py 统一为 R-01~R-21）、补充 R-21 到审查规则表。",
   "author": "wUwproject",
   "tags": [

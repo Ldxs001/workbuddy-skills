@@ -17,7 +17,7 @@ section_antipattern: true
 progressive_loading_explicit: true
 ---
 
-# skill-standardization v2.25.0
+# skill-standardization v2.27.1
 
 > Skill 标准化规范引擎（安全增强版），支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系。
 
