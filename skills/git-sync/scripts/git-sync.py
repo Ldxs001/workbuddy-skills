@@ -55,12 +55,18 @@ def run_git(*args, workdir=None, check=True):
     """运行 git 命令，完全静默不弹 UI"""
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    # 每个 git 命令都显式指定 credential.helper，彻底阻止 CredentialHelperSelector 弹出
-    cmd = ["git", "-c", "credential.helper=store", *[str(a) for a in args]]
+    # Windows：隐藏子进程所有窗口，彻底阻止 CredentialHelperSelector 弹窗
+    si = None
+    if os.name == "nt":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0  # SW_HIDE
+    cmd = ["git", *[str(a) for a in args]]
     return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
                         capture_output=True, encoding="utf-8",
                         check=check, env=env,
-                        stdin=subprocess.DEVNULL)
+                        stdin=subprocess.DEVNULL,
+                        startupinfo=si)
 
 # ── 步骤 1：检查维护清单 ─────────────────────────────────────────────────────
 def step_manifest(skill_name: str, version: str, repo_name="workbuddy-skills"):
@@ -446,6 +452,33 @@ def get_meta_desc(meta_file: Path) -> str:
 
 # ── 主流程 ────────────────────────────────────────────────────────────────────
 def main():
+    # ── 0. 彻底阻止 CredentialHelperSelector 弹窗 ──────────────────────
+    # 方案：在最早时机固化 credential.helper 配置，所有后续 git 命令直接继承
+    # 同时用 GIT_CREDENTIAL_HELPER 环境变量双重保险
+    import subprocess as _sp
+    _env = os.environ.copy()
+    _env["GIT_TERMINAL_PROMPT"] = "0"
+    # 写入 repo 级配置（最高优先级，覆盖全局）
+    _sp.run(
+        ["git", "config", "credential.helper", "store"],
+        cwd=str(WORK_REPO), capture_output=True, check=False, env=_env
+    )
+    # 写入全局配置（防止 repo 级失败）
+    _sp.run(
+        ["git", "config", "--global", "credential.helper", "store"],
+        capture_output=True, check=False, env=_env
+    )
+    # 确保 .git-credentials 文件存在（避免 store helper 报错）
+    _cred = Path.home() / ".git-credentials"
+    if not _cred.exists():
+        try:
+            _cred.write_text("", encoding="utf-8")
+        except Exception:
+            pass
+    # 同时设置环境变量（Git 官方支持 GIT_CREDENTIAL_HELPER 覆盖配置）
+    os.environ["GIT_CREDENTIAL_HELPER"] = "store"
+    # ────────────────────────────────────────────────────────────────────────
+
     parser = argparse.ArgumentParser(description="git-sync.py v1.0.0")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
