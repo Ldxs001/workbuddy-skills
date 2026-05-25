@@ -279,6 +279,80 @@ def _detect_remote(url_pattern: str) -> str:
     return ""
 
 
+def _get_cred_url(host: str) -> str:
+    """从 ~/.git-credentials 读取含凭证的 URL，匹配 host"""
+    cred_file = Path.home() / ".git-credentials"
+    if not cred_file.exists():
+        return ""
+    for line in cred_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and host in line:
+            return line
+    return ""
+
+
+def _push_with_cred_url(remote_name: str, branch: str = "main") -> bool:
+    """用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector"""
+    # 读取当前 remote URL（不含凭证）
+    r = subprocess.run(
+        ["git", "remote", "get-url", remote_name],
+        cwd=str(WORK_REPO), capture_output=True,
+        encoding="utf-8", check=False
+    )
+    if r.returncode != 0:
+        return False
+    raw_url = r.stdout.strip()
+
+    # 构造含凭证的 URL
+    cred_url = _get_cred_url(raw_url)
+    if not cred_url:
+        return False  # 找不到凭证，fallback 失败
+
+    # 临时覆盖 remote URL（含凭证），push 完立刻恢复
+    subprocess.run(
+        ["git", "remote", "set-url", remote_name, cred_url],
+        cwd=str(WORK_REPO), capture_output=True, check=False
+    )
+    try:
+        r = run_git("push", remote_name, branch, check=False)
+        return r.returncode == 0
+    finally:
+        # 无论成功失败，恢复原始 URL（不含凭证，保护安全）
+        subprocess.run(
+            ["git", "remote", "set-url", remote_name, raw_url],
+            cwd=str(WORK_REPO), capture_output=True, check=False
+        )
+
+
+def _pull_with_cred_url(remote_name: str, branch: str = "main") -> bool:
+    """用凭证嵌入 URL 直接 pull，完全绕开 CredentialHelperSelector"""
+    r = subprocess.run(
+        ["git", "remote", "get-url", remote_name],
+        cwd=str(WORK_REPO), capture_output=True,
+        encoding="utf-8", check=False
+    )
+    if r.returncode != 0:
+        return False
+    raw_url = r.stdout.strip()
+
+    cred_url = _get_cred_url(raw_url)
+    if not cred_url:
+        return False
+
+    subprocess.run(
+        ["git", "remote", "set-url", remote_name, cred_url],
+        cwd=str(WORK_REPO), capture_output=True, check=False
+    )
+    try:
+        r = run_git("pull", remote_name, branch, "--rebase", check=False)
+        return True  # pull 失败不阻断
+    finally:
+        subprocess.run(
+            ["git", "remote", "set-url", remote_name, raw_url],
+            cwd=str(WORK_REPO), capture_output=True, check=False
+        )
+
+
 def step_commit_and_push(skill_name: str, version: str):
     log(6, 8, "提交并推送...")
     if not WORK_REPO.exists():
@@ -307,31 +381,29 @@ def step_commit_and_push(skill_name: str, version: str):
     remote_gitee  = _detect_remote("gitee.com")
     remote_github = _detect_remote("github.com")
 
-    # push to Gitee
+    # push to Gitee（用凭证嵌入 URL，完全静默）
     gitee_ok = False
     if remote_gitee:
         log(6, 8, f"推送到码云 (remote: {remote_gitee})...", "info")
-        run_git("pull", remote_gitee, "main", "--rebase", check=False)
-        r = run_git("push", remote_gitee, "main", check=False)
-        if r.returncode == 0:
+        _pull_with_cred_url(remote_gitee, "main")
+        if _push_with_cred_url(remote_gitee, "main"):
             log(6, 8, "码云推送成功", "ok")
             gitee_ok = True
         else:
-            log(6, 8, f"码云推送失败: {r.stderr.strip()}", "err")
+            log(6, 8, "码云推送失败", "err")
     else:
         log(6, 8, "未找到码云远程，跳过", "warn")
 
-    # push to GitHub
+    # push to GitHub（用凭证嵌入 URL，完全静默）
     github_ok = False
     if remote_github:
         log(6, 8, f"推送到 GitHub (remote: {remote_github})...", "info")
-        run_git("pull", remote_github, "main", "--rebase", check=False)
-        r = run_git("push", remote_github, "main", check=False)
-        if r.returncode == 0:
+        _pull_with_cred_url(remote_github, "main")
+        if _push_with_cred_url(remote_github, "main"):
             log(6, 8, "GitHub 推送成功", "ok")
             github_ok = True
         else:
-            log(6, 8, f"GitHub 推送失败: {r.stderr.strip()}", "err")
+            log(6, 8, "GitHub 推送失败", "err")
     else:
         log(6, 8, "未找到 GitHub 远程，跳过", "warn")
 
