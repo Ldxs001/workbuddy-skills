@@ -9,6 +9,34 @@
 
 ---
 
+## v2.34.2
+
+2026-05-26
+
+**改写类型：Patch — 恢复误删的通用修复工具**
+
+### 修复
+
+- 🔄 **恢复 `scripts/fix_r20.py`**：通用 R-20 修复工具（术语映射、中英文混排空格、拼写修复、模糊表述修复），非一次性脚本，误删导致 R-20 自动修复功能缺失
+- 🔄 **恢复 `scripts/fix_r06_r20.py`**：R-06（一级标题缺失）+ R-20（术语不一致）修复工具，非一次性脚本，误删导致功能缺失
+- 🐛 **确认其余删除正确**：`fix_utils_if_bug.py`（utils.py if/elif bug 已在 L408 修复）、`fix_progressive_loading.py`（SKILL.md L69 已正确）、`merge_changelog_and_add_constraints.py`（一次性，已完成）、`add_constraint_to_guide.py`（一次性，已完成）均为一次性脚本，删除正确
+
+### 新增
+
+- （无）
+
+### 更新
+
+- （无）
+
+### 删除
+
+- （无）
+
+---
+
+
+
 ## v2.34.1
 
 2026-05-26

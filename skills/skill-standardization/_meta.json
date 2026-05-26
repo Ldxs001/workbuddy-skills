@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.34.1",
+  "version": "2.34.2",
   "description": "Skill 标准化规范引擎 v2.33.0。R-22 数据目录规范检查（含 fix 模式、备份/回滚、dry-run）、refactor 模式增强（加入 R-22 检查步骤）、fix 格式统一。",
   "author": "wUwproject",
   "tags": [

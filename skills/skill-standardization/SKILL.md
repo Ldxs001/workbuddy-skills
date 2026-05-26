@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.34.0
+version: 2.34.1
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.1。清理残留调试脚本（debug_parse.py 等 8 个），修复敏感信息扫描误报根因。
+description: Skill 标准化规范引擎 v2.34.2。恢复误删的 fix_r20.py/fix_r06_r20.py（通用修复工具），确认其余一次性脚本删除正确。
 data_dir: ../.standardization/skill-standardization/
 sensitive_access: true
 critical_write: false
@@ -11,6 +11,7 @@ permission_weight: HIGH
 artifact_paths: references/, scripts/skill_audit/, scripts/skill_builder/
 writing_standards: fix_terms
 ---
+
 
 
 
