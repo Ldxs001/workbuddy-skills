@@ -1,16 +1,19 @@
 ---
 name: skill-standardization
-version: 2.34.11
+version: 2.35.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.35.0。注册 R-23 到审计流程；修复 _apply_fixes() 容错处理；更新规则范围 R-01~R-23
+description: Skill 标准化规范引擎 v2.35.0。注册 R-23 到审计流程；修复 _apply_fixes() 容错处理；修复 R-11 误报（匹配查找路径当产出物路径）；更新规则范围 R-01~R-23
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
-artifact_paths: []
-writing_standards: fix_terms
 data_dir: ../.standardization/skill-standardization/
+writing_standards: fix_terms
 ---
+
+
+
+
 
 
 

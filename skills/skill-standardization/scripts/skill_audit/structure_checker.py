@@ -732,8 +732,6 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
         msgs.extend(issues[k])
     return {"passed": False,
             "detail": f"R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
-            "fix": {"key": "doc_code_consistency", "value": msgs,
-                     "location": f"{filepath} 正文 + 代码示例",
-                     "operation": "修正 SKILL.md 中的文件引用/调用方式，使其与实际代码一致",
-                     "verification": "重新运行 audit_skill()，确认 R-23 passed"}}
+            # R-23 只检查，不自动修复——需要人工判断
+            "fix": None}
 

@@ -5,23 +5,32 @@
 
 ---
 ---
-## v2.35.0 (2026-05-26)
 
-**改写类型：Minor — 注册 R-23 到审计流程 + 修复 _apply_fixes() bug**
+## v2.35.1
+
+- **修复**：`changelog.md` 术语不一致（`移除`/`删除` 混用），R-20 审查触发 WARN，统一为 `删除`（1 处）
+- **流程**：版本 bump 触发强制同步，确保码云/GitHub 文件内容一致
+
+## v2.35.0 (2026-05-27)
+
+**改写类型：Minor — 修复 _AUDIT_CONTROL_FIELDS bug + 修复 R-11 误报 + 注册 R-23**
 
 ### 新增
 - R-23 正式接入审计流程：`METHOD_MAP` 注册 `check_doc_code_consistency`，`__init__.py` 导入
 - `audit_skill()` 自动审计 R-23（文档-代码一致性检查）
 
 ### 修复
-- `_apply_fixes()` 容错处理：`fix` 字典缺少 `key` 字段时跳过而非崩溃（`KeyError` 根因修复）
-- `SKILL.md` 描述更新：`R-01~R-22` → `R-01~R-23`
-- `utils.py` L11 注释更新：`R-01 ~ R-21` → `R-01 ~ R-23`
+- **`_AUDIT_CONTROL_FIELDS` bug**：包含 `sensitive_access`/`critical_write`/`permission_weight`，导致 `_apply_fixes()` 每次运行都 `pop()` 掉这些字段；从列表中删除这三个字段
+- **R-11 误报 bug**：`artifact_checker.py` 的 `_check_python_artifact_paths_v2()` 匹配查找路径当产出物路径；增加误报跳过逻辑（有足够证据确认是误报时可跳过）
+- **`_apply_fixes()` 容错处理**：`fix` 字典缺少 `key` 字段时跳过而非崩溃（`KeyError` 根因修复）
+- **`SKILL.md` 描述更新**：`R-01~R-22` → `R-01~R-23`
 
 ### 更新
 - `SKILL.md` frontmatter 版本号更新为 v2.35.0
 - `_meta.json` 版本号和描述更新
+- `utils.py` RULES 列表语法修复（R-23 正确注册）
 
+---
 ---
 ## v2.34.11 (2026-05-26)
 

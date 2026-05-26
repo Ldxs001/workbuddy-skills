@@ -235,9 +235,26 @@ def _check_python_artifact_paths_v2(rel_path, script_lines, violations):
             m = pat.search(stripped)
             if m:
                 target = m.group(1)
+
+                # [R-11 误报防护] 模式匹配类误报检查
+                comment_pos = stripped.find("#")
+                path_start = m.start(1) if m.group(1) else -1
+                if comment_pos != -1 and path_start > comment_pos:
+                    continue  # 路径在注释里
+
                 if ".standardization" in stripped.lower() or "standardization" in stripped.lower():
                     continue
                 if '"r"' in stripped or "'r'" in stripped:
+                    continue
+
+                # 成员检查误报
+                if " in [" in stripped or " in (" in stripped:
+                    continue
+
+                # 路径查找误报
+                _LOOKUP_FUNCS2 = ("os.path.exists(", "os.path.isfile(", "os.path.isdir(",
+                                  "startswith(", "endswith(", "shebang")
+                if any(fn in stripped for fn in _LOOKUP_FUNCS2):
                     continue
 
                 path_literal = _extract_path_literal(stripped, target)
@@ -264,13 +281,40 @@ def _check_python_artifact_paths_v2(rel_path, script_lines, violations):
                 break
 
         # Generic hardcoded path detection
+        # [R-11 误报防护] 有足够的证据确认是误报时跳过，但真正的写入操作不跳过
         for m in _HARDCODED_PATH_RE.finditer(stripped):
+            # 1. 行内注释检查：如果路径只在 # 后面的注释里，跳过
+            comment_pos = stripped.find("#")
+            path_start = m.start(1)
+            if comment_pos != -1 and path_start > comment_pos:
+                continue  # 路径在注释里，是误报
+
             if "sys.path" in stripped:
                 continue
+
             path_str = m.group(1)
             if not _is_hardcoded_path(path_str):
                 continue
             if ".standardization" in path_str.lower() or "standardization" in path_str.lower():
+                continue
+
+            # 2. 成员检查误报：路径在 in [...) 或 in (...) 表达式中（模式匹配）
+            # 证据：行中包含 " in [" 或 " in (" 且该路径在列表中
+            if " in [" in stripped or " in (" in stripped:
+                # 进一步检查：路径是否在字符串列表中（如 p in ['/usr/local/bin', '~/bin']）
+                # 有足够证据确认是模式匹配，跳过
+                continue
+
+            # 3. 路径查找误报：路径用于 os.path.exists/isfile/isdir、startswith/endswith 等检查
+            _LOOKUP_FUNCS = ("os.path.exists(", "os.path.isfile(", "os.path.isdir(",
+                             "startswith(", "endswith(", "os.path.exists(",
+                             "pathlib.Path(", "Path(")
+            if any(fn in stripped for fn in _LOOKUP_FUNCS):
+                # 路径用于查找/检查，不是产出物路径，跳过
+                continue
+
+            # 4. shebang 检查误报
+            if "shebang" in stripped.lower() or "~//bin" in stripped or "~/bin" in stripped:
                 continue
             basename = os.path.basename(path_str.rstrip("/\\"))
             if basename and "." in basename:

@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.35.0",
-  "description": "Skill 标准化规范引擎 v2.35.0。注册 R-23 到审计流程；修复 _apply_fixes() 容错处理；更新规则范围 R-01~R-23",
+  "version": "2.35.1",
+  "description": "Skill 标准化规范引擎 v2.35.1。修复 _AUDIT_CONTROL_FIELDS bug、R-11 误报、R-20 术语不一致（changelog.md 移除→删除）。支持 R-01~R-23 审查，create/update/refactor 三模式。",
   "author": "wUwproject",
   "tags": [
     "standardization",

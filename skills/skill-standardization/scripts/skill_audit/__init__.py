@@ -97,7 +97,6 @@ def _apply_fixes(skill_md, fixes):
 
     applied = []
     _AUDIT_CONTROL_FIELDS = {
-        "sensitive_access", "critical_write", "permission_weight",
         "writing_standards", "artifact_paths",
         "antipattern_progressive", "faq_progressive",
         "progressive_loading_explicit",
