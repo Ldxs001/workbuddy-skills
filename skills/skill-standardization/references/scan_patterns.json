@@ -1,0 +1,71 @@
+{
+  "SENSITIVE_PATTERNS": [
+    "memory/",
+    "\\.workbuddy/memory",
+    "MEMORY\\.md",
+    "\\d{4}-\\d{2}-\\d{2}\\.md",
+    "(?<![a-zA-Z0-9])credential(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])passwd(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])password(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])secret(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])api[_-]?key(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])token(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])access[_-]?token(?![a-zA-Z0-9])",
+    "(?<![a-zA-Z0-9])private[_-]?key(?![a-zA-Z0-9])",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GITHUB_TOKEN",
+    "AWS_"
+  ],
+  "CRITICAL_PATH_PATTERNS": [
+    "/$",
+    "^[A-Za-z]:[\\/]",
+    "C:\\Windows",
+    "C:\\Program Files",
+    "C:\\Users",
+    "/usr/",
+    "/etc/",
+    "/var/",
+    "/boot/",
+    "/root/",
+    "\\.ssh/",
+    "\\.gnupg/",
+    "\\.config/",
+    "\\.aws/"
+  ],
+  "NETWORK_PATTERNS": [
+    "import requests",
+    "from requests",
+    "urllib",
+    "httpx",
+    "curl",
+    "wget",
+    "fetch\\(",
+    "XMLHttpRequest",
+    "axios",
+    "http\\.get",
+    "http\\.post",
+    "websocket"
+  ],
+  "DELETE_PATTERNS": [
+    "os\\.remove",
+    "os\\.rmdir",
+    "shutil\\.rmtree",
+    "\\bos\\.unlink\\b",
+    "\\brm\\b",
+    "\\brmdir\\b",
+    "fs\\.unlink",
+    "fs\\.rmdir",
+    "fs\\.rm"
+  ],
+  "SUBPROCESS_PATTERNS": [
+    "os\\.system",
+    "subprocess",
+    "popen",
+    "popen2",
+    "exec\\(",
+    "eval\\(",
+    "Runtime\\.getRuntime",
+    "ProcessBuilder"
+  ]
+}

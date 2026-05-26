@@ -1,15 +1,15 @@
 ---
 name: skill-standardization
-version: 2.34.2
+version: 2.34.3
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.3。repair_r20.py/repair_r06_r20.py 重命名（避免被误判为一次性脚本），统一 repair_ 前缀。
-data_dir: ../.standardization/skill-standardization/
+description: Skill 标准化规范引擎 v2.34.4。将 SENSITIVE_PATTERNS 等检测模式外置到 references/scan_patterns.json，消除市场静态扫描误报。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
 artifact_paths: references/, scripts/skill_audit/, scripts/skill_builder/
 writing_standards: fix_terms
+data_dir: ../.standardization/skill-standardization/
 ---
 
 
@@ -35,7 +35,13 @@ writing_standards: fix_terms
 
 
 
-# skill-standardization v2.34.3
+
+
+
+
+
+
+# skill-standardization v2.34.4
 
 ## ⚠️ 文件更新约束
 

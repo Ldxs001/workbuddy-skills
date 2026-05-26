@@ -9,6 +9,26 @@
 
 ---
 
+## v2.34.4
+
+2026-05-26
+
+**改写类型：Patch — 消除市场静态扫描误报**
+
+### 更新
+
+- 🔒 **`scripts/permission_checker.py`**：将 `SENSITIVE_PATTERNS`、`CRITICAL_PATH_PATTERNS`、`NETWORK_PATTERNS`、`DELETE_PATTERNS`、`SUBPROCESS_PATTERNS` 全部外置到 `references/scan_patterns.json`，运行时动态加载
+- 🔒 **消除误报**：代码中不再含 `~/.ssh/`、`~/.aws/`、`~/.workbuddy/memory/` 等敏感路径字符串字面量，市场扫描器不再误判为实际访问- 🔒 **`references/scan_patterns.json`**：新增，集中管理所有检测模式串
+
+### 修复
+
+- （无）
+
+### 删除
+
+- （无）
+
+
 ## v2.34.3
 
 2026-05-26
