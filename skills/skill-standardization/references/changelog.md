@@ -5,6 +5,165 @@
 
 ---
 
+
+
+---
+
+## v2.34.0
+
+2026-05-26
+
+**改写类型：Patch — 根因修复（SKILL.md frontmatter 被残留脚本覆盖）+ CRLF bug 修复**
+
+### 新增
+
+- （无）
+
+### 更新
+
+- `SKILL.md` 新增 `## ⚠️ 文件更新约束` 章节（禁止 Write/Edit 工具直接修改 .md 文件，必须用 Python 脚本原子写入）
+
+### 修复
+
+- 🐛 **修复 `utils.py` CRLF bug**：`parse_simple_yaml_frontmatter()` 加入 `text.replace('\r\n', '\n')` 预处理，`SKILL.md` 为 Windows 换行符时不再截断 frontmatter
+- 🐛 **修复 `creator.py` SKILL_TEMPLATE 字段缺失**：从 10 字段补全到 11 字段（新增 `data_dir:`），新建 skill 的 SKILL.md frontmatter 不再缺失字段
+- 🐛 **修复 `SKILL.md` frontmatter 被残留脚本覆盖的根因**：删除 7 个残留修复脚本（`fix_encoding.py`、`fix_missing_fm_fields.py`、`fix_fm_fields_v2.py`、`fix_fm_definitive.py`、`fix_r20_terminology.py`、`fix_r20_final.py`、`one_shot_fix_and_sync.py`、`rebuild_skill_md.py`），这些脚本含不完整 frontmatter 模板（6-7 字段），若被执行会覆盖 SKILL.md
+- 🐛 **修复审计报表误报**：重写 `references/permissions.md`（区分"检测规则"与"实际行为"），`permission_checker.py` 头部和关键变量添加注释说明 `~/.ssh/`、`~/.aws/` 等均为检测规则而非实际访问
+
+### 删除
+
+- 删除 `scripts/fix_encoding.py`（硬编码本地路径，一次性脚本）
+- 删除 `scripts/fix_missing_fm_fields.py`（残留修复脚本，含不完整 frontmatter 模板）
+- 删除 `scripts/fix_fm_fields_v2.py`（残留修复脚本）
+- 删除 `scripts/fix_fm_definitive.py`（残留修复脚本）
+- 删除 `scripts/fix_r20_terminology.py`（残留修复脚本）
+- 删除 `scripts/fix_r20_final.py`（残留修复脚本）
+- 删除 `scripts/one_shot_fix_and_sync.py`（残留修复脚本）
+- 删除 `scripts/rebuild_skill_md.py`（残留修复脚本）
+
+---
+
+
+
+## v2.33.0
+
+2026-05-26
+
+### 新增
+
+- **R-22 fix 模式实测**：`fix_data_dir_compliance()` 加入备份（`skills/.standardization/skill-standardization/data/backup/`）、操作日志（`skills/.standardization/skill-standardization/data/logs/`）、回滚能力，参考 `universal-file-ops` 设计
+- **R-22 dry-run 支持**：`fix_data_dir_compliance(skill_dir, dry_run=True)` 预览迁移计划而不执行
+- **`refactor` 模式增强**：`references/guide.md` 执行流程加入 R-22 数据目录规范检查步骤
+
+### 更新
+
+- `check_data_dir_compliance()` 不再返回 `fix` 字段（避免与 `_apply_fixes()` 格式不兼容），R-22 修复通过 `fix_data_dir_compliance()` 单独调用
+- `refactor` 模式描述更新（`SKILL.md` 核心能力章节加入「R-22 数据目录合规检查」）
+
+### 修复
+
+- （无）
+
+### 删除
+
+- （无）
+
+---
+
+
+---
+
+## v2.32.0
+
+2026-05-26
+
+### 新增
+
+- **R-22 数据目录规范检查**：自动识别安装目录越位数据文件（构建产物/缓存/日志），`--fix` 模式自动迁移到 `data_dir:` 声明的数据目录
+- **`data_dir_checker.py` 模块**：分类/检查/修复数据目录合规性
+
+### 更新
+
+- `skill_audit` 支持 R-22 规则（WARN 级别，fixable）
+- `audit --fix` 模式加入 `fix_data_dir_compliance()` 调用
+- `utils.py` RULES 新增 R-22 定义
+
+### 修复
+
+- （无）
+
+### 删除
+
+- （无）
+
+---
+
+
+---
+
+## v2.31.0
+
+2026-05-26
+
+### 修复
+
+- 删除 skill-standardization/ 下 `nul` 非法文件（Windows 保留字，导致 ZIP 打包失败）
+- `CHANGELOG.md` 白名单补充（`utils.py` `_KNOWN_ROOT_FILES`）
+- 自我审计 R-18/R-19/R-20 完全通过（PASS）
+
+### 新增
+
+- （无）
+
+### 更新
+
+- （无）
+
+### 删除
+
+- （无）
+
+---
+
+
+---
+
+## v2.30.0
+
+2026-05-26
+
+### 新增
+
+- **Plan 1**：`refactor --fix-code` 自动修复 `scripts/` 中硬编码的数据目录路径引用（新增 `_fix_code_references()` 方法）
+- **Plan 2**：`audit --fix` 自动修复 R-11/R-12 路径问题（新增 `fix_artifact_paths()` 和 `fix_external_data_dir()` 函数）
+- **Plan 4**：`create` 模式完整模板（含 R-07~R-09 权限/错误处理/IO 规范，R-18~R-21 文档/测试/更新日志/回滚章节）
+- **Plan 5**：`migrate-data` 命令（新增 `SkillMigrator` 类，支持迁移技能数据目录到 `skills/.standardization/<skill>/` 规范路径）
+- `references/guide.md`、`references/permissions.md`、`references/examples.md` 模板自动生成
+
+### 更新
+
+- **Plan 3**：统一 `spec/rules.json`（整合 R-01~R-21 规则定义，含 severity、fixable、description、check_method、fix_guidance）
+- `creator.py` 的 `META_TEMPLATE` 新增 `data_dir`、`install_dir`、`created_by`、`spec_version` 字段
+- `refactor.py` 新增 `--fix-code` 参数，stage 3.5 代码引用修复
+- `artifact_checker.py` 新增 `--fix` 参数支持
+
+### 修复
+
+- 修复 Windows GBK 终端 emoji 编码错误（所有脚本输出改为 ASCII 等价符号）
+- 修复 `migrator.py` 语法错误（`for py_file =` → `for py_file in`）
+- 修复 `skill_builder/__init__.py` 多次编辑导致乱码（重写文件）
+- 清理 `skill_builder/__init__.py` 死代码（`SKILL_TEMPLATE` 和 `META_TEMPLATE` 常量）
+- 修复 `utils.py` `_KNOWN_ROOT_FILES` 白名单缺失 `CHANGELOG.md` / `.progress.md`（导致 R-11 误报）
+
+### 删除
+
+- （无）
+
+---
+
+
+---
+
 ## v2.29.2
 
 2026-05-26
@@ -227,4 +386,3 @@
 - skill-standardization 自身审计 20/20 PASS（0 ERROR, 0 WARN）
 
 ---
-

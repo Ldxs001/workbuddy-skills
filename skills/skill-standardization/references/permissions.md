@@ -1,57 +1,45 @@
 # 权限说明
 
-权限扫描风险等级：**HIGH**
+权限扫描风险等级：**CRITICAL**
 
 ## 权限总览
 
-共 6 项权限风险，按类别分组如下：
+本技能（skill-standardization）的核心行为是**扫描其他 skill 的权限风险**，以下列出的项目均为**检测规则**（即：本技能扫描其他 skill 时检查这些模式），不是本技能自身的行为。
 
-### 敏感信息访问（1 项）
-> **权限作用**：读取内存文件、凭证、Token 等敏感数据
+共 2 类检测规则，说明如下：
 
-| # | 文件 | 行号 | 匹配内容 | 风险等级 | 授权方式 | 说明 |
-|---|------|------|----------|----------|----------|------|
-| 1 | `scripts\permission_checker.py` | 439 | `credential` | 🔴 高 | 即时授权 | 检测到敏感信息访问（字符串常量含敏感关键词） |
+### 检测规则：敏感信息访问模式（1 项）
+> **规则作用**：扫描其他 skill 的代码是否访问 `~/.ssh/`、`~/.aws/`、密钥文件等敏感路径
 
-### 子进程调用（5 项）
-> **权限作用**：调用系统命令或其他可执行文件
+| # | 检测模式位置（本技能内部） | 说明 |
+|---|--------------------------|------|
+| 1 | `scripts/skill_audit/permission_checks.py` | 字符串常量匹配敏感关键词（`credential`、`secret`、`password` 等），用于判断被审 skill 是否访问敏感信息 |
 
-| # | 文件 | 行号 | 匹配内容 | 风险等级 | 授权方式 | 说明 |
-|---|------|------|----------|----------|----------|------|
-| 1 | `scripts\permission_checker.py` | 74 | `SUBPROCESS` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
-| 2 | `scripts\permission_checker.py` | 86 | `Subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
-| 3 | `scripts\permission_checker.py` | 248 | `subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
-| 4 | `scripts\permission_checker.py` | 598 | `subprocess` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
-| 5 | `scripts\permission_checker.py` | 606 | `SUBPROCESS` | 🔴 高 | 即时授权 | 检测到 subprocess 调用（os.system/subprocess 等） |
+### 检测规则：子进程调用模式（5 项）
+> **规则作用**：扫描其他 skill 的代码是否调用 `subprocess`、`os.system` 等子进程
+
+| # | 检测模式位置（本技能内部） | 说明 |
+|---|--------------------------|------|
+| 1 | `scripts/skill_audit/permission_checks.py` | 定义 `_check_subprocess_call()` 检测函数 |
+| 2 | `scripts/skill_audit/permission_checks.py` | 扫描 `import subprocess` 语句 |
+| 3 | `scripts/skill_audit/permission_checks.py` | 扫描 `subprocess.run()` / `subprocess.Popen()` 调用 |
+| 4 | `scripts/skill_audit/permission_checks.py` | 扫描 `os.system()` / `os.popen()` 调用 |
+| 5 | `scripts/skill_audit/permission_checks.py` | 扫描 `subprocess` 字符串常量（拼接命令） |
+
+## 本技能自身的实际权限行为
+
+| 行为 | 说明 | 对应 frontmatter 声明 |
+|------|------|----------------------|
+| 读取其他 skill 的 `.py`/`.md` 文件 | 审计时读取被审 skill 的源码和文档 | `sensitive_access: true` |
+| 修正被审 skill 的 `SKILL.md` frontmatter | `_apply_fixes()` 自动补全/修正字段 | `critical_write: true` |
+| 执行 Python 脚本（`python scripts/...`） | 通过 Bash 工具调用自身子脚本 | `permission_weight: CRITICAL` |
 
 ## 授权方式说明
 
-- **即时授权**：每次执行前需获得用户批准
+- **即时授权**：每次执行前需获得用户批准（用于子进程调用）
 - **统一授权**：首次执行前获得用户批准，后续不再询问
 - **静默授权**：无需用户交互，自动执行并记录
 
-## 详细风险列表
+## 注意事项
 
-1. **[高] 检测到敏感信息访问（字符串常量含敏感关键词）**
-   - 位置：`scripts\permission_checker.py` 第 439 行
-   - 原因：高风险操作，每次执行前需用户确认
-
-2. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
-   - 位置：`scripts\permission_checker.py` 第 74 行
-   - 原因：高风险操作，每次执行前需用户确认
-
-3. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
-   - 位置：`scripts\permission_checker.py` 第 86 行
-   - 原因：高风险操作，每次执行前需用户确认
-
-4. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
-   - 位置：`scripts\permission_checker.py` 第 248 行
-   - 原因：高风险操作，每次执行前需用户确认
-
-5. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
-   - 位置：`scripts\permission_checker.py` 第 598 行
-   - 原因：高风险操作，每次执行前需用户确认
-
-6. **[高] 检测到 subprocess 调用（os.system/subprocess 等）**
-   - 位置：`scripts\permission_checker.py` 第 606 行
-   - 原因：高风险操作，每次执行前需用户确认
+本技能的 `sensitive_access: true` 和 `critical_write: true` 是指**对被审 skill 的文件有读取/修正权限**，不是指本技能自身访问用户敏感文件。

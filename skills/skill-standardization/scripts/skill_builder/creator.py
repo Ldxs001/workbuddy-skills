@@ -22,25 +22,14 @@ author: your-name-here
 license: MIT
 description: >
   {description}
-tags: [{tags}]
-# R-07 权限声明（必须显式声明所有权限）
-permissions:
-  - tool: Read
-    access: read-only
-    description: 读取技能配置文件和参考数据
-  - tool: Write
-    access: write
-    description: 写入输出文件和日志
-  - tool: Bash
-    access: restricted
-    description: 仅用于运行内部脚本，不经过用户 Shell 配置
----
+sensitive_access: false
+critical_write: false
+permission_weight: LOW
+artifact_paths: []
+writing_standards: []
+data_dir: ../.standardization/{name}/
 
-# {name} — {title}
-
-{description}
-
-> [R-06 渐进式加载] 本文 ≤230 行，详细内容见 `references/` 目录按需加载。
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
 ## 触发场景
 
@@ -102,7 +91,7 @@ skill-sub {name} --input <input-file> --output <output-dir>
 ## FAQ
 
 Q: 本技能支持哪些输入格式？
-A: 支持 `.txt`、`.json`、`.csv` 格式的输入文件。如需其他格式，请在 `references/guide.md` 中查看扩展方法。
+A: 支持 `.txt`、`.json`、`*.csv` 格式的输入文件。如需其他格式，请在 `references/guide.md` 中查看扩展方法。
 
 Q: 输出文件存放在哪里？
 A: 默认输出到 `skills/.standardization/{name}/data/output/`，可通过 `--output` 参数指定。
@@ -136,7 +125,7 @@ A: 默认输出到 `skills/.standardization/{name}/data/output/`，可通过 `--
 | `references/permissions.md` | 权限扫描报告和风险说明 |
 | `references/examples.md` | 使用示例和输出样例 |
 
-> 本文档由 `skill-standardization v2.29.2` 生成，遵循 R-01~R-21 规范。
+> 本文档由 `skill-standardization v2.33.0` 生成，遵循 R-01~R-22 规范。
 """
 
     META_TEMPLATE = """{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "skills/.standardization/{name}/data/", "install_dir": "skills/{name}/", "created_by": "skill-standardization", "spec_version": "2.29.2"}"""

@@ -4,12 +4,18 @@
 permission_checker.py v1.0.0
 权限检查器：扫描 skill 脚本，提取文件操作，计算权限权重，生成风险报告。
 
+⚠️ 重要说明：
+    本文件中定义的所有 *_PATTERNS（SENSITIVE_PATTERNS、CRITICAL_PATH_PATTERNS 等）
+    均为**检测规则**，用于扫描「其他 skill」的代码中是否出现敏感操作。
+    本文件本身**不会**访问 ~/.ssh/、~/.aws/ 等敏感路径，
+    也不会执行 subprocess 调用——它只是定义模式让 PermissionChecker 去匹配被审 skill 的代码。
+
 检查维度：
-1. 敏感信息访问（memory/、credentials、token、password）
-2. 关键位置写入（skills/、.workbuddy/、系统目录）
-3. 网络访问（requests、urllib、httpx、curl）
-4. 文件删除（os.remove、os.rmdir、shutil.rmtree、del、rm）
-5. Subprocess 调用（os.system、subprocess、popen）
+1. 敏感信息访问（memory/、credentials、token、password）—— 检测其他 skill 是否访问
+2. 关键位置写入（skills/、.workbuddy/、系统目录）—— 检测其他 skill 是否写入
+3. 网络访问（requests、urllib、httpx、curl）—— 检测其他 skill 是否调用
+4. 文件删除（os.remove、os.rmdir、shutil.rmtree）—— 检测其他 skill 是否删除
+5. Subprocess 调用（os.system、subprocess、popen）—— 检测其他 skill 是否调用
 
 权重模型：
 - 敏感信息访问：40%
@@ -33,9 +39,9 @@ from typing import Dict, List, Set, Tuple, Optional, Any
 # ── 常量定义 ────────────────────────────────────────────────────────────────────
 
 SENSITIVE_PATTERNS = [
-    # 记忆文件路径
+    # 记忆文件路径（检测其他 skill 是否读取用户记忆文件）
     r"memory/", r"\.workbuddy/memory", r"MEMORY\.md", r"\d{4}-\d{2}-\d{2}\.md",
-    # 凭证相关：前导允许 _ 禁止字母数字，尾部允许 _- 禁止字母数字
+    # 凭证相关关键词（检测其他 skill 代码中是否出现这些敏感词）
     r"(?<![a-zA-Z0-9])credential(?![a-zA-Z0-9])",
     r"(?<![a-zA-Z0-9])passwd(?![a-zA-Z0-9])",
     r"(?<![a-zA-Z0-9])password(?![a-zA-Z0-9])",
@@ -44,12 +50,12 @@ SENSITIVE_PATTERNS = [
     r"(?<![a-zA-Z0-9])token(?![a-zA-Z0-9])",
     r"(?<![a-zA-Z0-9])access[_-]?token(?![a-zA-Z0-9])",
     r"(?<![a-zA-Z0-9])private[_-]?key(?![a-zA-Z0-9])",
-    # 环境变量敏感词（精确匹配）
+    # 环境变量敏感词（检测其他 skill 是否硬编码 API Key）
     r"OPENAI_API_KEY", r"ANTHROPIC_API_KEY", r"GITHUB_TOKEN", r"AWS_",
 ]
 
 CRITICAL_PATH_PATTERNS = [
-    # 系统关键目录（真正危险的写入位置）
+    # 系统关键目录（检测其他 skill 是否写入这些危险位置）
     r"/$", r"^[A-Za-z]:[\\/]$",  # 根目录
     r"C:\\Windows", r"C:\\Program Files", r"C:\\Users",
     r"/usr/", r"/etc/", r"/var/", r"/boot/", r"/root/",
@@ -72,6 +78,7 @@ DELETE_PATTERNS = [
 ]
 
 SUBPROCESS_PATTERNS = [
+    # 以下均为【检测规则】，检测其他 skill 是否调用子进程
     r"os\.system", r"subprocess", r"popen", r"popen2",
     r"exec\(", r"eval\(", r"Runtime\.getRuntime", r"ProcessBuilder",
 ]

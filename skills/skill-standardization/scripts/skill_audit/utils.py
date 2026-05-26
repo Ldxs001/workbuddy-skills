@@ -361,6 +361,9 @@ def parse_simple_yaml_frontmatter(text):
     if not text.startswith("---"):
         return None, text
 
+    # 规范化换行符（CRLF 兼容：SKILL.md 可能是 Windows 换行符）
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
     lines = text.split("\n", 1)
     rest = lines[1] if len(lines) > 1 else ""
 
@@ -402,7 +405,7 @@ def parse_simple_yaml_frontmatter(text):
                     result[key] = [item.strip().strip("'\"") for item in inner.split(",")]
                 else:
                     result[key] = []
-            if val:
+            elif val:
                 # 转换 true/false 为布尔值（YAML 兼容）
                 if val.lower() == "true":
                     result[key] = True

@@ -15,6 +15,16 @@
 
 ---
 
+
+> **⚠️ 文件更新约束**：更新 `SKILL.md` 或 `references/*.md` 时，**严禁使用 Write/Edit 工具**（会损坏 UTF-8 编码）。必须使用 `scripts/` 下的 Python 脚本原子写入（`open(tmp)+os.replace()`）。更新后必须自审 0 ERROR 0 WARN。
+
+| 文件 | 更新方式 | 脚本 |
+|------|----------|------|
+| `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_skill_frontmatter.py` |
+| `SKILL.md` 正文 | Python 正则替换 | `scripts/fix_progressive_loading.py` |
+| `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
+| 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
+
 ## 模式 A：create — 创建新 Skill
 
 ### 基础用法
