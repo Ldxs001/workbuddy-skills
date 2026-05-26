@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v1.0.2 - 完整 Python 版 git-sync
+git-sync.py v2.6.22 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -470,12 +470,16 @@ def step_commit_and_push(skill_name: str, version: str):
     remote_gitee  = _detect_remote("gitee.com")
     remote_github = _detect_remote("github.com")
 
-    # push to Gitee（用凭证嵌入 URL，完全静默）
+    # push to Gitee（不再提前 pull，避免远程旧版本覆盖本地修改）
     gitee_ok = False
     if remote_gitee:
         log(6, 8, f"推送到码云 (remote: {remote_gitee})...", "info")
-        _pull_with_cred_url(remote_gitee, "main")  # pull 失败不阻断
         ok, err = _push_with_cred_url(remote_gitee, "main")
+        # push 失败时：pull --rebase 再重试一次
+        if not ok:
+            log(6, 8, f"首次推送失败，尝试 pull --rebase 后重试：{err}", "warn")
+            _pull_with_cred_url(remote_gitee, "main")
+            ok, err = _push_with_cred_url(remote_gitee, "main")
         if ok:
             log(6, 8, "码云推送成功", "ok")
             gitee_ok = True
@@ -484,12 +488,16 @@ def step_commit_and_push(skill_name: str, version: str):
     else:
         log(6, 8, "未找到码云远程，跳过", "warn")
 
-    # push to GitHub（用凭证嵌入 URL，完全静默）
+    # push to GitHub（不再提前 pull，避免远程旧版本覆盖本地修改）
     github_ok = False
     if remote_github:
         log(6, 8, f"推送到 GitHub (remote: {remote_github})...", "info")
-        _pull_with_cred_url(remote_github, "main")
         ok, err = _push_with_cred_url(remote_github, "main")
+        # push 失败时：pull --rebase 再重试一次
+        if not ok:
+            log(6, 8, f"首次推送失败，尝试 pull --rebase 后重试：{err}", "warn")
+            _pull_with_cred_url(remote_github, "main")
+            ok, err = _push_with_cred_url(remote_github, "main")
         if ok:
             log(6, 8, "GitHub 推送成功", "ok")
             github_ok = True
@@ -640,7 +648,7 @@ def main():
             pass
     # ────────────────────────────────────────────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="git-sync.py v1.0.0")
+    parser = argparse.ArgumentParser(description="git-sync.py v2.6.22")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
     parser.add_argument("version", nargs="?", default="",

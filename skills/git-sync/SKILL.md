@@ -1,198 +1,78 @@
 ---
 name: git-sync
-version: 2.6.20
-author: 由 config.json 的 author 字段决定
+version: 2.6.21
+author: wUwproject
 license: MIT
-description: >
-tags: ['sync', 'git', 'zip', 'skill-manager', 'manifest', 'security']
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复push前提前pull导致的本地修改被覆盖问题。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL
-authorization: false
-trigger_negative: true
-section_antipattern: true
+artifact_paths: []
 writing_standards: fix_terms
-progressive_loading_explicit: true
-antipattern_count: add_examples
-antipattern_progressive: true
+data_dir: ../.standardization/git-sync/
 antipattern_reference: true
-antipattern_detail: add_detail
+faq_reference: true
 ---
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# git-sync v2.6.6 — 三端同步技能
+# git-sync v2.6.21 — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
 
 ## 触发场景
 
-当用户提到「同步、上传、推送、打包」某个 skill 时触发。
+当用户提出以下类型请求时，应触发本技能：
 
-| 模式 | 触发条件 | 行为 |
-|------|---------|------|
-| **按需同步**（默认） | 用户指定 skill 名称 | 只同步指定的 skill |
-| **全量维护** | 明确说"全量维护"/"同步所有" | 遍历 manifest.json 所有条目 |
+- 「同步/上传/推送/发布某个 skill」
+- 「打包某个 skill」
+- 「更新 README.md 的技能列表」
+- 「检查某个 skill 的版本号」
 
-> 触发关键词：同步、上传、推送、打包、sync、git-sync
->
-> **否定条件**：以下情况不触发本技能——（1）用户只是询问同步流程而不要求执行；（2）用户明确说"不要同步"/"跳过同步"；（3）用户要求使用其他同步方式（如手动 git 命令）。
+**不触发**（以下情况不应触发本技能）：
+
+- 用户只是说「帮我看看这个文件」——没有同步/打包意图
+- 用户要求「用 git 提交代码」——这是通用 git 操作，不是 skill 同步
+- 用户提到「同步」但指的是文件同步（如「同步到云端」）——不是 skill 仓库同步
 
 ## 核心能力
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-| # | 功能 | 说明 |
-|---|------|------|
-| 1 | **按需同步** | 用户指定哪个就同步哪个；只有明确说"全量维护"才遍历所有技能 |
-| 2 | **版本号三方对比**（v1.6） | 清单版本 vs 待更新版本，决定跳过/更新/报异常 |
-| 3 | **敏感信息过滤**（v1.7） | 扫描并脱敏用户名/邮箱/Token/路径等敏感信息 |
-| 4 | **SKILL.md 规范审查**（v1.8） | 同步前自动检查 R-01~R-10 合规性（纯警告不阻断） |
-| 5 | **三单一致机制**（v1.3） | manifest.json ≥ 仓库实际文件 = README.md |
-| 6 | **ZIP 打包 + HTML 索引**（v1.5） | 统一输出到 `.dist/` 并自动生成 index.html |
-| 7 | **安全修复**（v2.6.0） | 删除 `__import__` 动态导入，改善授权检查实现（内置异常处理） |
-| 8 | **空文件排除**（v2.6.5） | ZIP 打包和同步时自动排除 0 KB 空文件（如 .gitkeep） |
+- **三端同步** —— 码云、GitHub、本地 `.dist/` 目录
+- **版本号三方对比** —— `_meta.json` / `SKILL.md` frontmatter / `references/changelog.md`
+- **敏感信息过滤** —— 自动扫描并脱敏 `secrets/regex/telemetry`
+- **SKILL.md 规范审查** —— 调用 `skill-standardization` 进行审计
+- **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页
 
 ## 工作流程
 
-### AI 执行节奏
-
-```
-用户请求同步 → 加载本 SKILL.md
-  ↓
-确定同步模式
-  ├── 按需同步（指定 skill 名）──→ 单 skill 流水线
-  └── 全量维护（明确说"全量"/"同步所有"）──→ 遍历 manifest.json
-  ↓
-执行同步流水线：
-  安全校验 → 清单检查 → 版本对比 → 敏感扫描 → 规范审查 → 同步推送 → ZIP 打包 → README 更新
-  ↓
-输出结果报告（✅/❌/⚠️）
+```workflow
+1. 读取目标 skill 的 _meta.json + SKILL.md
+2. 三方版本号对比（不一致则中断）
+3. 调用 skill-standardization 审查 SKILL.md 规范性
+4. 敏感信息扫描（.gitignore + regex + telemetry）
+5. 脱敏处理（副本中替换，原文件不动）
+6. 三端同步（Git 推送 + ZIP 打包 + README 更新）
+7. 生成 HTML 索引（.dist/index.html）
 ```
 
-### 步骤概览
+## 渐进式加载说明
 
-| 步骤 | 名称 | 说明 |
-|------|------|------|
-| 0 | 安全校验 | 路径穿越防护、目标范围检查 |
-| 0.5 | 清单检查 | manifest.json 状态验证 |
-| 0.7 | 版本对比 | 清单版本 vs 待更新版本 |
-| 1 | 敏感扫描 | Token/邮箱/路径检测与脱敏 |
-| 2 | 规范审查 | R-01~R-12 audit（纯警告） |
-| 3 | 同步推送 | Git 双端推送（Gitee + GitHub） |
-| 4 | ZIP 打包 | 生成 `.dist/` 包 + index.html（自动排除空文件） |
-| 5 | README 更新 | 全量重建技能列表 |
-| 6 | 清单维护 | 更新 manifest.json 状态标记 |
-| 7 | **安全修复**（v2.6.0） | 删除 `__import__` 动态导入，改善授权检查 |
+本技能采用渐进式 MD 体系，`SKILL.md` 为轻量入口，详细规范拆分到 `references/` 按需加载：
 
-→ 完整步骤详解见 `references/guide.md`
+- `references/reference.md` — 完整参考手册（命令、配置、故障排查）
+- `references/changelog.md` — 版本更新记录
+- `references/architecture.md` — 内部架构（脚本映射、目录结构）
 
-## 快速开始
+> 💡 阅读时先看本章节，按需让 AI 加载 `references/*.md`。
 
-> 详细命令和参数说明见 `references/guide.md`（按需加载）
-> 
-> **配置存放位置**：`config.json` 按规范存放在数据目录 `skills/.standardization/git-sync/data/config.json`，脚本自动读取，无需手动创建。
-> 
+## 数据目录说明
 
+本技能的数据文件（扫描结果、临时副本、ZIP 包等）存放在：
 
-**核心命令：**
-
-```bash
-bash git-sync.sh <skill-name> <version>
+```
+skills/.standardization/git-sync/
 ```
 
-- `<skill-name>`：技能目录名（如 `color-toolkit`）
-- `<version>`：版本号（如 `1.0.0`）
-- 可选：`--skip-scan` 跳过敏感信息扫描（⚠️ 仅限确认无敏感信息时）
-
-## 修复记录
-
-### v2.6.5 (2026-05-25)
-
-**打包优化**：
-
-1. **排除空文件（0 KB）** — `pack_zip.py` 和 `sync_with_exclude.py` 新增空文件排除逻辑，自动跳过 `.gitkeep` 等占位文件
-2. **增加 `--skip-scan` 安全警告** — FAQ Q11 增加安全提示：私有内容经常被镜像/分享，跳过扫描会增加敏感信息泄露风险
-
-**影响文件**：
-- `scripts/pack_zip.py` — 新增空文件排除 + `.gitkeep` 精确排除
-- `scripts/sync_with_exclude.py` — 新增空文件排除 + `.gitkeep` 精确排除
-- `references/faq.md` — Q11 增加安全警告
-
-### v2.6.0 (2026-05-24)
-
-**安全修复**：
-
-1. **删除 `__import__` 动态导入** — 将 `sync_with_exclude.py` 中的 `__import__("subprocess")` 改为标准 `import subprocess`
-2. **改善授权检查实现** — 将授权检查逻辑改为内置异常处理，避免外部脚本依赖不可控
-3. **路径安全检查** — 在 `sync_with_exclude.py` 中添加源/目标路径一致性检查，防止误删目录
-
-**影响文件**：
-- `scripts/sync_with_exclude.py` — 修复 `__import__` + 添加路径安全检查
-- `scripts/sensitive_scan.py` — 验证无 `__import__` 动态导入
-
----
-
-## 敏感信息过滤
-
-同步前自动扫描并按**文件粒度交互确认**：
-
-| 类型 | 示例 | 严重度 |
-|------|------|--------|
-| 邮箱地址 | `xxx@xxx.com` | 🔴 critical |
-| Token / API Key | `token=xxx` | 🔴 critical |
-| 本地路径 | `C:\Users\...` | 🟡 medium |
-
-三种模式：`prompt`（默认交互）/ `always-sanitize`（自动脱敏）/ `keep-as-is`（跳过）
-
-→ 详见 `references/reference.md` 完整检测规则 + manifest.py CLI 速查
-
-## 代码管理铁律
-
-1. ✅ 先检查仓库现有状态
-2. ✅ 保持标准目录结构（SKILL.md + _meta.json 在根目录）
-3. ✅ 排除缓存/测试/临时文件
-4. ✅ 自动更新 README 技能列表（全量生成）
-5. ✅ 维护清单优先 — 未确认是否加入清单前，不盲目同步
-6. ✅ ZIP 与仓库结构一致
-7. ✅ **ZIP 自动排除空文件（0 KB）** — 防止 `.gitkeep` 等占位文件被打入包
-
-→ [FAQ](references/faq.md) · [版本日志](references/changelog.md) · [完整参考](references/reference.md)
-
----
-
-## 渐进式加载引用表
-
-> 本表声明渐进式加载结构：SKILL.md 主文件含核心触发 + 引用表，详细内容拆分至 references/ 按需加载。
-
-| 本文件（SKILL.md）包含 | 拆分到 references/ |
-|----------------------------|---------------------------|
-| ✅ 触发场景、核心能力、快速开始、工作流程（渐进式加载） | 📄 `references/guide.md` — 步骤详解 + 敏感信息过滤规则 |
-| ✅ 版本记录 | 📄 `references/changelog.md` — 版本更新历史 |
-| ✅ 权限说明 | 📄 `references/permissions.md` — 权限类型、风险等级、行为对照表 |
-| ✅ 详细参考 | 📄 `references/reference.md` — API/命令参考 |
-| ✅ 反模式收录 | 📄 `references/antipatterns.md` — 反模式示例与禁忌 |
-| ✅ 常见问题 | 📄 `references/faq.md` — FAQ |
-
-→ 详见 `references/guide.md`（按需加载）
-
----
-
-## 版本
-
-当前版本：**2.6.21** — v2.6.21：Git 操作 Python 调用规范（彻底阻止 CredentialHelperSelector 弹窗）
-
-→ [更新日志](references/changelog.md) · [完整参考](references/reference.md)
+通过 frontmatter 的 `data_dir: ../.standardization/git-sync/` 声明。安装目录 `skills/git-sync/` 只保留 SKILL.md 和 scripts/。
