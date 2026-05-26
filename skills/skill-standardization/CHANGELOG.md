@@ -1,5 +1,13 @@
 # CHANGELOG — skill-standardization
 
+## v2.34.9 (2026-05-26)
+
+### 修复
+- `SKILL.md` frontmatter 字段补全（11 字段完整：sensitive_access/critical_write/permission_weight 等）
+- 彻底修复 `SKILL.md` 写入后字段丢失问题（改用直接重建 frontmatter 方式）
+- `update_skill_frontmatter.py` 文件创建（SKILL.md 表格中引用，之前缺失）
+
+---
 ## v2.34.8 (2026-05-26)
 
 ### 新增

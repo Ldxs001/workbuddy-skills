@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.34.7
+version: 2.34.8
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.34.8。新增 R-23 文档-代码一致性检查；彻底消除市场扫描误报
@@ -11,6 +11,11 @@ artifact_paths: true
 writing_standards: fix_terms
 data_dir: ../.standardization/skill-standardization/
 ---
+
+
+
+
+
 
 
 
