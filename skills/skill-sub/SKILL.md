@@ -1,17 +1,19 @@
 ---
 name: skill-sub
-version: 
 author: wUwproject
 license: MIT
-description: 调用链编排技能 v1.19.2 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
+description: 调用链编排技能 v1.22.0 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
 tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
 data_dir: ../.standardization/skill-sub/
 external_data_dir: true
-sensitive_access: true
+sensitive_access: false
 critical_write: false
-permission_weight: CRITICAL
+permission_weight: MEDIUM
 artifact_paths: true
+version: 1.19.2
 ---
+
+
 
 
 
@@ -43,8 +45,9 @@ artifact_paths: true
 | 1 | **调用链管理** | 创建、查询、更新、删除调用链 |
 | 2 | **执行计划生成** | 生成结构化执行计划，含并行/串行标记 |
 | 3 | **条件执行** | 支持条件步骤，按条件判断是否执行 |
-| 4 | **Dry-Run 模式** | 模拟执行，不实际调用技能 |
-| 5 | **链备份与版本管理** | 自动备份，支持版本恢复 |
+| 4 | **循环与分支编排** | 支持 for-each/while 循环和 if-else 分支 |
+| 5 | **Dry-Run 模式** | 模拟执行，不实际调用技能 |
+| 6 | **链备份与版本管理** | 自动备份，支持版本恢复 |
 
 ---
 
@@ -53,7 +56,7 @@ artifact_paths: true
 
 
 
-# skill-sub v1.19.1
+# skill-sub v1.21.0
 
 调用链编排技能。**既是调用链编辑器，也是粗粒度规划器。**
 
@@ -95,6 +98,67 @@ python {SKILL_DIR}/scripts/chain_manager.py list
 # 删除（自动备份）
 python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --force
 ```
+
+---
+
+## 循环与分支编排（v1.20.0 新增）
+
+### for-each 循环
+
+在调用链 JSON 中，将某步骤的 `type` 设为 `"loop"`，并定义 `loop` 对象：
+
+```json
+{
+  "type": "loop",
+  "step_name": "批量处理文件",
+  "loop": {
+    "mode": "for_each",
+    "items": "{{file_list}}",
+    "loop_variable": "f",
+    "max_iterations": 10,
+    "steps": [
+      {"type": "skill", "skill_name": "file-ops", "step_name": "处理单个文件", "action": "处理 {{f}}"}
+    ]
+  }
+}
+```
+
+### while 循环
+
+```json
+{
+  "type": "loop",
+  "step_name": "重试直到成功",
+  "loop": {
+    "mode": "while",
+    "while_condition": "{{retry_count}} < 3 and {{last_result}} != 'success'",
+    "max_iterations": 3,
+    "steps": [
+      {"type": "skill", "skill_name": "api-call", "step_name": "调用接口", "action": "重试第 {{retry_count}} 次"}
+    ]
+  }
+}
+```
+
+### if-else 分支
+
+```json
+{
+  "type": "branch",
+  "step_name": "按环境部署",
+  "branch": {
+    "condition": "{{env}} == 'prod'",
+    "if_steps": [
+      {"type": "skill", "skill_name": "deploy", "step_name": "生产部署", "action": "部署到生产环境"}
+    ],
+    "else_steps": [
+      {"type": "skill", "skill_name": "deploy", "step_name": "预发部署", "action": "部署到预发环境"}
+    ]
+  }
+}
+```
+
+> 📚 完整 schema 参见 `references/chain_schema.md`
 
 ---
 
@@ -161,51 +225,7 @@ python {SKILL_DIR}/scripts/skill_extractor.py extract --skill "triphasic-executi
 
 ---
 
-## 剩余扩展点（待实现）
 
-以下扩展点将在后续版本中逐步实现：
-
-### 执行流程增强
-- [x] ✅ 断点续执行（Breakpoint Resume）— v1.18.0 DONE
-- [x] ✅ 执行预览（Execution Preview）— v1.17.0 DONE
-- [x] ✅ 条件执行（Conditional Execution）— v1.17.0 DONE
-- [x] ✅ 执行沙箱模式（Dry-Run）— v1.17.0 DONE
-
-### 调用链编辑器增强
-- [x] ✅ 链版本管理（Chain Version Management）— v1.17.0 DONE
-- [x] ✅ 链标签系统增强（Chain Tag System Enhancement）— v1.19.0 DONE
-- [x] ✅ 链导入/导出（Chain Import/Export）— v1.19.0 DONE
-- [x] ✅ 链备份机制（Chain Backup Mechanism）— v1.17.0 DONE
-
-### 粗粒度规划器增强
-- [x] ✅ 智能依赖推断（Smart Dependency Inference）— v1.18.0 DONE
-- [x] ✅ 历史链推荐（Historical Chain Recommendation）— v1.18.0 DONE
-- [x] ✅ 链优化建议（Chain Optimization Suggestions）— v1.18.0 DONE
-- [x] ✅ 参数推断（Parameter Inference）— v1.18.0 DONE
-
-### 步骤摘取器增强
-- [x] ✅ 摘取缓存（Extraction Cache）— v1.17.0 DONE
-- [x] ✅ 参数提取（Parameter Extraction）— v1.19.0 DONE
-- [x] ✅ 兼容性检查（Compatibility Check）— v1.19.0 DONE
-
-### 执行计划生成器增强
-- [x] ✅ 资源分析（Resource Analysis）— v1.19.0 DONE
-- [x] ✅ Plan B 生成（Plan B Generation）— v1.19.0 DONE
-
-### 里程碑管理者增强
-- [x] ✅ 里程碑影响分析（Milestone Impact Analysis）— v1.19.0 DONE
-- [x] ✅ 动态里程碑（Dynamic Milestone）— v1.19.0 DONE
-- [x] ✅ 里程碑统计（Milestone Statistics）— v1.19.0 DONE
-
-### 体验提升
-- [x] ✅ 链健康度评分（Chain Health Score）— v1.19.0 DONE
-
-### 稳定性增强
-- [x] ✅ 链静态检查增强（Chain Static Check Enhancement）— v1.18.0 DONE
-- [x] ✅ 链备份机制（Chain Backup Mechanism）— v1.17.0 DONE
-- [x] ✅ 错误分类优化（Error Classification Optimization）— v1.19.0 DONE
-
----
 
 ## 详细文档
 

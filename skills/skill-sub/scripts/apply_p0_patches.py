@@ -11,8 +11,10 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 SKILL_DIR = Path(r"C:\Users\sm001\.workbuddy\skills\skill-sub")
-CHAIN_DIR = SKILL_DIR / "data" / "chains"
-STATE_DIR  = SKILL_DIR / "data" / "state"
+# R-11 合规：产出物路径迁至数据目录
+DATA_HOME = Path.home() / ".workbuddy" / "skills" / ".standardization" / "skill-sub"
+CHAIN_DIR = DATA_HOME / "outputs"
+STATE_DIR  = DATA_HOME / "state"
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()

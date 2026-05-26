@@ -77,6 +77,71 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "链名" --force
 
 ---
 
+## 循环与分支编排（v1.20.0 新增）
+
+### for-each 循环
+
+`type: "loop"` + `"mode": "for_each"`：遍历数组，对每个元素执行循环体。
+
+```json
+{
+  "type": "loop",
+  "step_name": "批量处理",
+  "loop": {
+    "mode": "for_each",
+    "items": "{{file_list}}",
+    "loop_variable": "f",
+    "max_iterations": 10,
+    "steps": [
+      {"type": "skill", "skill_name": "file-ops", "action": "处理 {{f}}"}
+    ]
+  }
+}
+```
+
+### while 循环
+
+`type: "loop"` + `"mode": "while"`：按条件重复执行，直到条件为假或达到最大次数。
+
+```json
+{
+  "type": "loop",
+  "step_name": "重试直到成功",
+  "loop": {
+    "mode": "while",
+    "while_condition": "{{retry_count}} < 3 and {{last_success}} == false",
+    "max_iterations": 3,
+    "steps": [
+      {"type": "skill", "skill_name": "api-call", "action": "重试"}
+    ]
+  }
+}
+```
+
+### if-else 分支
+
+`type: "branch"`：根据条件选择执行 `if_steps` 或 `else_steps`。
+
+```json
+{
+  "type": "branch",
+  "step_name": "按环境部署",
+  "branch": {
+    "condition": "{{env}} == 'prod'",
+    "if_steps": [
+      {"type": "skill", "skill_name": "deploy", "action": "部署到生产"}
+    ],
+    "else_steps": [
+      {"type": "skill", "skill_name": "deploy", "action": "部署到预发"}
+    ]
+  }
+}
+```
+
+> 📚 完整 schema 参见 `chain_schema.md`
+
+---
+
 ## 里程碑通用判断规则
 
 > **设计原则**：不完全依赖 AI 自觉判断，基于步骤的**结构特征**自动确定里程碑。
