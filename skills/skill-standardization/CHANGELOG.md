@@ -2,9 +2,22 @@
 
 本文档记录 `skill-standardization` 的版本变更，遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范。
 
-## [未发布]
+## [2.33.0] - 2026-05-26
 
-（本版本号对应下次发布内容，发布时替换为具体版本号和日期）
+### 新增
+- **R-22 fix 模式实测**：`fix_data_dir_compliance()` 加入备份（`skills/.standardization/skill-standardization/data/backup/`）、操作日志（`skills/.standardization/skill-standardization/data/logs/`）、回滚能力，参考 `universal-file-ops` 设计
+- **R-22 dry-run 支持**：`fix_data_dir_compliance(skill_dir, dry_run=True)` 预览迁移计划而不执行
+- **`refactor` 模式增强**：`references/guide.md` 执行流程加入 R-22 数据目录规范检查步骤
+
+### 修改
+- `check_data_dir_compliance()` 不再返回 `fix` 字段（避免与 `_apply_fixes()` 格式不兼容），R-22 修复通过 `fix_data_dir_compliance()` 单独调用
+- `refactor` 模式描述更新（`SKILL.md` 核心能力章节加入「R-22 数据目录合规检查」）
+
+### 修复
+- （无）
+
+### 移除
+- （无）
 
 ---
 

@@ -90,19 +90,32 @@ def _apply_fixes(skill_md, fixes):
         return []  # 无 frontmatter，无法修正
 
     applied = []
+    _AUDIT_CONTROL_FIELDS = {
+        "sensitive_access", "critical_write", "permission_weight",
+        "writing_standards", "artifact_paths",
+        "antipattern_progressive", "faq_progressive",
+        "progressive_loading_explicit",
+        "h1", "section_trigger", "section_core", "section_workflow",
+        "antipattern_reference", "faq_reference",
+    }
     for fix in fixes:
         key = fix["key"]
+        if key in _AUDIT_CONTROL_FIELDS:
+            continue
         val = fix["value"]
         fm[key] = val
         applied.append(f"{key}: {val} ({fix.get('reason', '')})")
 
-    # 重新组装 frontmatter + body
+    # 重新组装 frontmatter + body（过滤审计控制字段）
     import io
     buf = io.StringIO()
     buf.write("---\n")
+    for k in _AUDIT_CONTROL_FIELDS:
+        fm.pop(k, None)
     for k, v in fm.items():
         if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
+            val_str = 'true' if v else 'false'
+            buf.write(f"{k}: {val_str}\n")
         elif isinstance(v, (int, float)):
             buf.write(f"{k}: {v}\n")
         else:
@@ -122,6 +135,8 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
 
     如果传了 _progress_file，审计结束后自动更新 .progress.md。
     """
+    # 先把 skill_dir 转成绝对路径，防止 '.' 等相对路径导致 dirname 异常
+    skill_dir = os.path.abspath(skill_dir)
     skill_md = os.path.join(skill_dir, "SKILL.md")
     dirname = os.path.basename(os.path.normpath(skill_dir))
 

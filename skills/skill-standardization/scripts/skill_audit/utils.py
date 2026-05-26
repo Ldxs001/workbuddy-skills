@@ -402,7 +402,7 @@ def parse_simple_yaml_frontmatter(text):
                     result[key] = [item.strip().strip("'\"") for item in inner.split(",")]
                 else:
                     result[key] = []
-            elif val:
+            if val:
                 # 转换 true/false 为布尔值（YAML 兼容）
                 if val.lower() == "true":
                     result[key] = True
@@ -410,7 +410,8 @@ def parse_simple_yaml_frontmatter(text):
                     result[key] = False
                 else:
                     result[key] = val
-                current_key = key
+            # 无论 val 是否为空，都更新 current_key（修复 bug：移到 if/elif 外面）
+            current_key = key
         # 调试输出（正式版关闭）
         # print(f"DEBUG L{line_no+1}: key={key!r} val={val!r} → result has {len(result)} keys")
 
