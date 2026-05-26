@@ -57,7 +57,7 @@ python chain_manager.py delete --name "链名" --force
 ### 数据目录
 
 ```
-~/.workbuddy/skill-sub/
+~/.workbuddy/skills/.standardization/skill-sub/
 ├── config.json           # 用户配置（配置界面写入）
 └── chains/               # 调用链数据
     ├── index.json        # 调用链索引
@@ -116,7 +116,7 @@ python chain_manager.py delete --name "链名" --force
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `SKILL_SUB_HOME` / `SKILL_CHAIN_HOME` | 数据目录 | `~/.workbuddy/skill-sub/` |
+| `SKILL_SUB_HOME` / `SKILL_CHAIN_HOME` | 数据目录 | `~/.workbuddy/skills/.standardization/skill-sub/` |
 | `WORKBUDDY_SKILLS_DIR` | 技能安装目录 | `~/.workbuddy/skills/` |
 
 ---
@@ -187,7 +187,7 @@ python chain_manager.py delete --name "链名" --force
 
 ### 风险缓解
 
-- 调用链数据存储在 `~/.workbuddy/skill-sub/chains/`，非技能核心目录
+- 调用链数据存储在 `~/.workbuddy/skills/.standardization/skill-sub/chains/`，非技能核心目录
 - `chain_executor.py` 调用其他 skill 时，通过标准 `Skill` 工具调用，不执行任意命令
 - 配置文件中不含敏感信息（仅用户偏好配置）
 

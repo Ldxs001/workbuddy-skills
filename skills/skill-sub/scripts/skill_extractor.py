@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-skill_extractor.py - Skill Step Extractor v1.1.0
+skill_extractor.py - Skill Step Extractor v1.19.0
 从 SKILL.md 中自动提取关键执行步骤，供调用链编排使用。
 
-v1.1.0 新增：提取指令名称填入 skill_instruction 字段。
+v1.19.0 新增：提取指令名称填入 skill_instruction 字段。
 
 零外部依赖，仅使用 Python 标准库。
 跨平台支持 Windows/Linux/macOS。
@@ -16,6 +16,10 @@ import re
 import sys
 from pathlib import Path
 
+# ============================================================
+# 缓存配置
+# ============================================================
+_cache_dir = Path.home() / ".workbuddy" / "skills" / ".standardization" / "skill-sub" / "data" / "cache"
 
 # ============================================================
 # 路径配置
@@ -242,10 +246,58 @@ def extract_cli_usage(content):
                 cli_info.append(line)
 
     return cli_info[:20]  # 限制数量
+    return cli_info[:20]  # 限制数量
 
 
-def extract_all(skill_name, skill_path=None):
+
+def extract_parameters(content):
+    """提取技能可调用的参数列表（从 SKILL.md 的 trigger/参数表中）"""
+    params = []
+    # 从表格中提取参数（| 参数 | 类型 | 说明 |）
+    table_header = None
+    in_table = False
+    for ln in content.split(chr(10)):
+        stripped = ln.strip()
+        if stripped.startswith('|'):
+            if not in_table:
+                in_table = True
+                if '参数' in stripped or 'param' in stripped.lower():
+                    table_header = [h.strip() for h in stripped.split('|')[1:-1]]
+                    continue
+            if table_header and stripped != stripped.replace('-', ' ').replace('|', '-'):
+                cells = [c.strip() for c in stripped.split('|')[1:-1]]
+                if len(cells) >= 1:
+                    params.append({
+                        'name': cells[0],
+                        'type': cells[1] if len(cells) > 1 else 'string',
+                        'description': cells[2] if len(cells) > 2 else ''
+                    })
+        else:
+            if in_table and table_header:
+                break
+            in_table = False
+
+    # 从 argparse / CLI 定义中提取参数
+    import re
+    arg_pattern = r'--(\w[-\w]*)'
+    for m in re.finditer(arg_pattern, content):
+        param_name = m.group(1)
+        if not any(p['name'] == param_name for p in params):
+            params.append({'name': param_name, 'type': 'string', 'description': ''})
+
+    return params[:20]
+
+
+
+
+def extract_all(skill_name, skill_path=None, use_cache=True):
     """提取技能的所有关键信息"""
+    # 检查缓存
+    if use_cache:
+        cached = get_cached_extraction(skill_name)
+        if cached:
+            return cached
+
     if skill_path is None:
         skill_dir = find_skill_dir(skill_name)
         if not skill_dir:
@@ -272,7 +324,7 @@ def extract_all(skill_name, skill_path=None):
         with open(meta_file, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
-    return {
+    result = {
         "skill_name": skill_name,
         "dir_name": skill_dir.name,
         "slug": frontmatter.get("slug", meta.get("slug", "")),
@@ -287,11 +339,61 @@ def extract_all(skill_name, skill_path=None):
         "has_scripts": (skill_dir / "scripts").is_dir(),
         "script_files": [f.name for f in (skill_dir / "scripts").glob("*.py")] if (skill_dir / "scripts").is_dir() else []
     }
+    # 缓存结果
+    if use_cache:
+        cache_extraction(skill_name, result)
+
+    return result
+
 
 
 # ============================================================
 # 命令实现
 # ============================================================
+
+def load_cache():
+    """加载缓存数据"""
+    cf = _cache_dir / "extraction_cache.json"
+    if cf.exists():
+        try:
+            with open(cf, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_cache(cache_data):
+    """保存缓存数据"""
+    cf = _cache_dir / "extraction_cache.json"
+    cf.parent.mkdir(parents=True, exist_ok=True)
+    with open(cf, "w", encoding="utf-8") as f:
+        json.dump(cache_data, f, ensure_ascii=False, indent=2)
+
+
+def get_cached_extraction(skill_name):
+    """获取缓存的提取结果（检查时效性：缓存有效期 1 小时）"""
+    cache = load_cache()
+    if skill_name not in cache:
+        return None
+    entry = cache[skill_name]
+    import time
+    if time.time() - entry.get("cached_at", 0) > 3600:
+        return None
+    return entry.get("data")
+
+
+def cache_extraction(skill_name, data):
+    """缓存提取结果"""
+    cache = load_cache()
+    import time
+    cache[skill_name] = {
+        "data": data,
+        "cached_at": time.time()
+    }
+    save_cache(cache)
+
+
 
 def cmd_extract(args):
     """提取单个技能的关键信息"""
@@ -320,7 +422,7 @@ def cmd_extract(args):
             cmd_str = f" ({c['command']})" if c.get("command") and c["command"] != c["name"] else ""
             print(f"     - {c['name']}{cmd_str}")
 
-    # v1.1.0: 显示可用的 skill_instruction 候选
+    # v1.19.0: 显示可用的 skill_instruction 候选
     if result.get("skill_instructions"):
         print(f"\n  🏷️ 可用指令（skill_instruction 候选）:")
         for si in result["skill_instructions"]:
@@ -342,6 +444,77 @@ def cmd_extract(args):
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
     return 0
+
+
+
+
+
+
+def cmd_extract_params(args):
+
+    """提取指定技能的参数列表"""
+    result = extract_all(args.skill, args.path)
+
+    if "error" in result:
+
+        print(f"❌ {result['error']}")
+
+        return 1
+
+
+
+    params = []
+
+    skill_dir = find_skill_dir(args.skill)
+
+    if skill_dir:
+
+        md = read_skill_md(skill_dir)
+
+        if md:
+
+            params = extract_parameters(md)
+
+
+
+    if not params:
+
+        print(f"未找到参数：{args.skill}")
+
+        return 0
+
+
+
+    print(f"📋 技能参数：{args.skill}")
+
+    print(f"{'='*60}")
+
+    for p in params:
+
+        name = p.get('name', '')
+
+        typ = p.get('type', 'string')
+
+        desc = p.get('description', '')
+
+        print(f"  - {name} ({typ})：{desc}")
+
+
+
+    if args.json:
+
+        print(json.dumps(params, ensure_ascii=False, indent=2))
+
+
+
+    return 0
+
+
+
+
+
+
+
 
 
 def cmd_scan(args):
@@ -408,9 +581,38 @@ def cmd_scan(args):
 # CLI 入口
 # ============================================================
 
+
+
+
+
+def cmd_clear_cache(args):
+
+    """清空提取缓存"""
+    cf = _cache_dir / "extraction_cache.json"
+
+    if cf.exists():
+
+        cf.unlink()
+
+        print("✅ 缓存已清空")
+
+    else:
+
+        print("ℹ️ 无缓存可清空")
+
+    return 0
+
+
+
+
+
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Skill Extractor v1.1.0 - 技能关键步骤提取工具",
+        description="Skill Extractor v1.19.0 - 技能关键步骤提取工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
@@ -419,7 +621,7 @@ def main():
   python skill_extractor.py scan
   python skill_extractor.py scan --tag "搜索"
   python skill_extractor.py scan --json
-"""
+        """
     )
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
@@ -433,6 +635,15 @@ def main():
     p_scan = subparsers.add_parser("scan", help="扫描所有已安装技能")
     p_scan.add_argument("--tag", default=None, help="按关键词过滤")
     p_scan.add_argument("--json", action="store_true", help="JSON 格式输出")
+    # extract-params
+    p_params = subparsers.add_parser("extract-params", help="提取技能参数列表")
+    p_params.add_argument("--skill", required=True, help="技能名称")
+    p_params.add_argument("--path", default=None, help="技能目录路径（可选）")
+    p_params.add_argument("--json", action="store_true", help="JSON 格式输出")
+    p_params.add_argument("--no-cache", action="store_true", help="跳过缓存")
+
+    # clear-cache
+    p_clear = subparsers.add_parser("clear-cache", help="清空提取缓存")
 
     args = parser.parse_args()
 
@@ -443,6 +654,8 @@ def main():
     commands = {
         "extract": cmd_extract,
         "scan": cmd_scan,
+        "extract-params": cmd_extract_params,
+        "clear-cache": cmd_clear_cache,
     }
 
     cmd_func = commands.get(args.command)

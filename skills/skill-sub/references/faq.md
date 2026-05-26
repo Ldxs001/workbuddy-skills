@@ -120,7 +120,7 @@
 
 ### Q6：skill-sub 的数据存在哪？更新会丢吗？
 
-数据存储在 `~/.workbuddy/skill-sub/`（可通过 `SKILL_SUB_HOME` 环境变量更新）：
+数据存储在 `~/.workbuddy/skills/.standardization/skill-sub/`（可通过 `SKILL_SUB_HOME` 环境变量更新）：
 - `chains/` — 调用链 JSON 文件
 - `config.json` — 用户配置
 

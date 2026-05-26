@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-chain_manager.py - Skill Sub Manager v1.19.1
+chain_manager.py - Skill Sub Manager v1.2.1
 调用链管理核心脚本：创建、查询、更新、删除、执行调用链。
 
 v1.1.0: retry_policy、failure_mode、skill_instruction 字段支持。
@@ -14,19 +14,9 @@ v1.2.1: 修复 --tags 参数解析 bug：支持 JSON 数组字符串输入，兼
 import argparse
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from collections import defaultdict
-
-# Windows 控制台 GBK 编码兼容：重配置 stdout/stderr 为 utf-8
-try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
 
 
 # ============================================================
@@ -61,8 +51,6 @@ CHAINS_DIR = CHAIN_HOME / "chains"
 INDEX_FILE = CHAINS_DIR / "index.json"
 CONFIG_FILE = CHAIN_HOME / "config.json"
 SKILL_DIR = get_skill_dir()
-STATE_DIR = CHAIN_HOME / "state"
-LOGS_DIR = CHAIN_HOME / "logs"
 
 
 # ============================================================
@@ -280,10 +268,6 @@ def list_backups(name):
 
 def restore_backup(name, version):
     """从指定版本恢复调用链。"""
-    # 支持 "v001" 格式或纯数字
-    if isinstance(version, str) and version.startswith("v"):
-        version = version[1:]
-    version = int(version)
     backup_dir = CHAIN_HOME / "backups" / name
     versions_file = backup_dir / "versions.json"
     if not versions_file.exists():
@@ -788,8 +772,6 @@ def cmd_optimize(args):
     print(f"🔧 链优化建议: {chain['name']}")
     print(f"{'='*70}")
 
-    from collections import defaultdict
-
     suggestions = []
 
     # 1. 冗余步骤检查（action 完全相同）
@@ -867,7 +849,7 @@ def cmd_recommend(args):
         print("❌ 请提供意图描述（--intent 参数）")
         return 1
 
-    chains_dir = CHAINS_DIR
+    chains_dir = CHAIN_DIR
     if not chains_dir.exists():
         print("❌ chains 目录不存在")
         return 1
@@ -890,23 +872,15 @@ def cmd_recommend(args):
 
     # 简单相似度计算（基于关键词重叠）
     def calc_intent_similarity(intent_str, chain_obj):
-        # 提取 intent 中的词（含中文）
-        intent_words = set(re.findall(r"[\w\u4e00-\u9fff]+", intent_str.lower()))
+        intent_words = set(re.findall(r"\w+", intent_str.lower()))
         chain_words = set()
 
-        # 从链的名称、描述、用户意图、步骤名、action 中提取词
-        text_fields = [
-            chain_obj.get("name", ""),
-            chain_obj.get("description", ""),
-            chain_obj.get("user_intent", ""),
-        ]
+        # 从链的名称、描述、步骤名中提取关键词
+        chain_words.add(chain_obj.get("name", "").lower())
+        chain_words.add(chain_obj.get("description", "").lower())
         for step in chain_obj.get("steps", []):
-            text_fields.append(step.get("step_name", ""))
-            text_fields.append(step.get("action", ""))
-
-        for text in text_fields:
-            words = re.findall(r"[\w\u4e00-\u9fff]+", text.lower())
-            chain_words.update(words)
+            chain_words.add(step.get("step_name", "").lower())
+            chain_words.add(step.get("action", "").lower())
 
         overlap = intent_words & chain_words
         return len(overlap) / max(len(intent_words), 1)
@@ -1157,6 +1131,7 @@ def cmd_run(args):
     print(f"  ★ = 里程碑步骤（失败时强制中止）")
 
     # 并行机会识别
+    from collections import defaultdict
 
     step_map = {s.get("index", 0): s for s in exec_order}
     depth_cache = {}
@@ -1281,8 +1256,8 @@ def cmd_add_step(args):
         "index": new_index,
         "skill_name": args.skill,
         "step_name": args.step_name,
-        "action": args.step_name or "",
-        "skill_instruction": args.skill_instruction or "",
+        "action": args.action,
+        "skill_instruction": "",
         "detail": args.detail or "",
         "depends_on": args.depends_on.split(",") if args.depends_on else [new_index - 1] if new_index > 1 else [],
         "condition": args.condition or "",
@@ -1371,13 +1346,14 @@ def cmd_update_step(args):
         return 1
 
     step = steps[target - 1]
+    if args.action:
+        step["action"] = args.action
     if args.detail is not None:
         step["detail"] = args.detail
     if args.skill:
         step["skill_name"] = args.skill
     if args.step_name:
         step["step_name"] = args.step_name
-        step["action"] = args.step_name
     if args.condition is not None:
         step["condition"] = args.condition
     if args.depends_on is not None:
@@ -1511,20 +1487,20 @@ def cmd_list_backups(args):
 
 def cmd_restore(args):
     """从备份恢复调用链"""
-    chain_data, err = restore_backup(args.name, args.backup)
+    chain_data, err = restore_backup(args.name, args.version)
     if err:
         print(f"❌ {err}")
         return 1
 
     if not args.force:
-        print(f"⚠️  即将恢复 '{args.name}' 到版本 {args.backup}")
+        print(f"⚠️  即将恢复 '{args.name}' 到版本 {args.version}")
         print(f"   描述: {chain_data.get('description', '(无)')}")
         print(f"   步骤数: {len(chain_data.get('steps', []))}")
         print(f"   使用 --force 确认恢复")
         return 0
 
     save_chain(chain_data)
-    print(f"✅ 已恢复 '{args.name}' 到版本 {args.backup}")
+    print(f"✅ 已恢复 '{args.name}' 到版本 {args.version}")
     return 0
 
 
@@ -1561,7 +1537,7 @@ def main():
     # create
     p_create = subparsers.add_parser("create", help="交互式创建新调用链")
     p_create.add_argument("--name", help="调用链名称")
-    p_create.add_argument("--description", help="描述")
+    p_create.add_argument("--desc", help="描述")
     p_create.add_argument("--steps", default=None, help="初始步骤 JSON 数组")
     p_create.add_argument("--purpose", default=None, help="调用链用途")
     p_create.add_argument("--user-intent", default=None, help="用户意图描述")
@@ -1585,7 +1561,6 @@ def main():
     p_run.add_argument("--name", required=True, help="调用链名称")
     p_run.add_argument("--step", type=int, help="从指定步骤开始（1-based）")
     p_run.add_argument("--dry-run", action="store_true", help="Dry Run 模拟执行")
-    p_run.add_argument("--verbose", action="store_true", help="详细输出")
     p_run.add_argument("--no-confirm", action="store_true", help="跳过确认")
     p_run.set_defaults(func=cmd_run)
 
@@ -1596,9 +1571,6 @@ def main():
     p_add.add_argument("--skill", required=True, help="技能名称")
     p_add.add_argument("--after", type=int, help="在第N步后插入")
     p_add.add_argument("--condition", help="条件执行表达式")
-    p_add.add_argument("--detail", help="步骤详细说明")
-    p_add.add_argument("--depends-on", help="依赖步骤列表（逗号分隔，如 1,3）")
-    p_add.add_argument("--skill-instruction", help="技能指令")
     p_add.set_defaults(func=cmd_add_step)
 
     # remove-step
@@ -1611,22 +1583,15 @@ def main():
     p_up = subparsers.add_parser("update-step", help="修改步骤")
     p_up.add_argument("--name", required=True, help="调用链名称")
     p_up.add_argument("--step", type=int, required=True, help="步骤编号（1-based）")
-    p_up.add_argument("--step-name", help="新步骤名称")
-    p_up.add_argument("--skill", help="新技能名称")
-    p_up.add_argument("--condition", help="新条件执行表达式")
-    p_up.add_argument("--detail", help="新步骤详细说明")
-    p_up.add_argument("--depends-on", help="新依赖步骤列表（逗号分隔，如 1,3）")
-    p_up.add_argument("--skill-instruction", help="新技能指令")
-    p_up.add_argument("--retry-max", type=int, help="新重试次数上限")
-    p_up.add_argument("--retry-types", help="新重试错误类型列表（逗号分隔）")
-    p_up.add_argument("--on-exhaust", choices=["ask", "abort", "skip"], help="重试耗尽后的失败处理（ask/abort/skip）")
-    p_up.add_argument("--milestone", type=lambda x: x.lower() in ("true", "1", "yes"), help="是否设为里程碑步骤（true/false）")
+    p_up.add_argument("--new-name", help="新名称")
+    p_up.add_argument("--new-skill", help="新技能")
+    p_up.add_argument("--new-condition", help="新条件")
     p_up.set_defaults(func=cmd_update_step)
 
     # rename
     p_ren = subparsers.add_parser("rename", help="重命名调用链")
-    p_ren.add_argument("--name", required=True, help="当前名称")
-    p_ren.add_argument("--new-name", required=True, help="新名称")
+    p_ren.add_argument("--old", required=True, help="旧名称")
+    p_ren.add_argument("--new", required=True, help="新名称")
     p_ren.set_defaults(func=cmd_rename)
 
     # delete
@@ -1644,7 +1609,6 @@ def main():
     p_res = subparsers.add_parser("restore", help="从备份恢复调用链")
     p_res.add_argument("--name", required=True, help="调用链名称")
     p_res.add_argument("--backup", required=True, help="备份时间戳")
-    p_res.add_argument("--force", action="store_true", help="强制恢复不确认")
     p_res.set_defaults(func=cmd_restore)
 
     # infer-deps
@@ -1683,7 +1647,6 @@ def main():
     # resume
     p_resume = subparsers.add_parser("resume", help="断点续执行")
     p_resume.add_argument("--name", required=True, help="调用链名称")
-    p_resume.add_argument("--verbose", action="store_true", help="详细输出")
     p_resume.set_defaults(func=cmd_resume)
 
     # P3: import
@@ -1709,34 +1672,6 @@ def main():
     p_es.add_argument("--name", required=True, help="调用链名称")
     p_es.add_argument("--days", type=int, default=7, help="统计最近N天")
     p_es.set_defaults(func=cmd_error_stats)
-
-    # P2: list-tags - 链标签系统增强
-    p_lt = subparsers.add_parser("list-tags", help="列出所有标签及使用统计")
-    p_lt.add_argument("--min-count", type=int, default=1, help="最少使用次数（过滤）")
-    p_lt.add_argument("--sort", choices=["count", "name"], default="count", help="排序方式")
-    p_lt.set_defaults(func=cmd_list_tags)
-
-    # P2: tag-enhance - 标签管理（函数已存在，补注册）
-    p_tage = subparsers.add_parser("tag-enhance", help="管理调用链标签（add/remove/list）")
-    p_tage.add_argument("--name", required=True, help="调用链名称")
-    p_tage.add_argument("--subcmd", choices=["add", "remove", "list"], required=True, help="操作")
-    p_tage.add_argument("--tag", help="标签名称（add/remove 时必填）")
-    p_tage.set_defaults(func=cmd_tag_enhance)
-
-    # P2: milestones - 里程碑影响分析
-    p_ms = subparsers.add_parser("milestones", help="里程碑影响分析")
-    p_ms.add_argument("--name", required=True, help="调用链名称")
-    p_ms.add_argument("--dynamic", action="store_true", help="启用动态里程碑（基于执行历史调整）")
-    p_ms.add_argument("--impact", action="store_true", help="输出影响分析报告")
-    p_ms.set_defaults(func=cmd_milestones)
-
-    # P2: milestone-stats - 里程碑统计
-    p_mss = subparsers.add_parser("milestone-stats", help="里程碑统计分析")
-    p_mss.add_argument("--name", required=True, help="调用链名称")
-    p_mss.add_argument("--history", action="store_true", help="包含执行历史统计")
-    p_mss.add_argument("--format", choices=["text", "json"], default="text", help="输出格式")
-    p_mss.set_defaults(func=cmd_milestone_stats)
-
 
     args = parser.parse_args()
 
@@ -2000,8 +1935,10 @@ def cmd_error_stats(args):
         print(f"❌ 调用链不存在: {args.name}")
         return 1
 
-    log_dir = LOGS_DIR
-    if not log_dir.exists():
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logs")
+    log_dir = os.path.abspath(log_dir)
+    
+    if not os.path.exists(log_dir):
         print(f"⚠️  日志目录不存在: {log_dir}")
         return 1
 
@@ -2051,75 +1988,13 @@ def cmd_error_stats(args):
     return 0
 
 
-
-
-def cmd_list_tags(args):
-    """列出所有标签及使用统计"""
-    import os
-    chain_dir = CHAINS_DIR
-    if not chain_dir.exists():
-        print("❌ chains 目录不存在")
-        return 1
-
-    tag_counter = {}      # tag -> count
-    tag_chains = {}       # tag -> [chain_names]
-    tag_last_used = {}    # tag -> latest usage timestamp
-
-    for fpath in chain_dir.glob("*.json"):
-        if fpath.name == "index.json":
-            continue
-        try:
-            data = json.loads(fpath.read_text(encoding="utf-8"))
-            chain_name = data.get("name", fpath.stem)
-            for t in data.get("tags", []):
-                tag_counter[t] = tag_counter.get(t, 0) + 1
-                if t not in tag_chains:
-                    tag_chains[t] = []
-                tag_chains[t].append(chain_name)
-                # 取最新执行时间
-                last = data.get("last_executed")
-                if last:
-                    cur = tag_last_used.get(t)
-                    if not cur or last > cur:
-                        tag_last_used[t] = last
-        except Exception as e:
-            continue
-
-    if not tag_counter:
-        print("📭  没有找到任何标签")
-        return 0
-
-    # 排序
-    reverse = (args.sort == "count")
-    sorted_tags = sorted(tag_counter.items(), key=lambda x: -x[1] if reverse else x[0])
-
-    # 过滤
-    filtered = [(t, c) for t, c in sorted_tags if c >= args.min_count]
-
-    if not filtered:
-        print(f"📭  没有标签满足 min-count={args.min_count}")
-        return 0
-
-    print(f"🏷️  标签统计 (共 {len(filtered)} 个标签，按{'使用次数' if args.sort=='count' else '名称'}排序)")
-    print("=" * 60)
-    for tag, cnt in filtered:
-        chains_str = "、".join(tag_chains.get(tag, [])[:3])
-        if len(tag_chains.get(tag, [])) > 3:
-            chains_str += f" 等 {len(tag_chains[tag])} 个"
-        last_str = ""
-        if tag in tag_last_used:
-            last_str = f" | 最近使用: {tag_last_used[tag]}"
-        print(f"  {tag:<20} {cnt:>3} 次  [{chains_str}]{last_str}")
-
-    return 0
-
 def cmd_tag_enhance(args):
     """标签系统增强 - 列出/添加/删除标签"""
     import json, os
 
     if not hasattr(args, "subcmd") or not args.subcmd:
         # 列出所有标签
-        chain_dir = str(CHAINS_DIR)
+        chain_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "chains")
         chain_dir = os.path.abspath(chain_dir)
         tag_counter = {}
         for fname in os.listdir(chain_dir):
@@ -2152,7 +2027,7 @@ def cmd_tag_enhance(args):
         if args.tag not in tags:
             tags.append(args.tag)
             chain["tags"] = tags
-            save_chain(chain)
+            save_chain(args.name, chain)
             print(f"✅ 已添加标签: {args.tag}")
         else:
             print(f"⚠️  标签已存在: {args.tag}")
@@ -2161,27 +2036,13 @@ def cmd_tag_enhance(args):
         if args.tag in tags:
             tags.remove(args.tag)
             chain["tags"] = tags
-            save_chain(chain)
+            save_chain(args.name, chain)
             print(f"✅ 已删除标签: {args.tag}")
         else:
             print(f"⚠️  标签不存在: {args.tag}")
 
     return 0
 
-
-
-def find_skill_path(skill_name):
-    """查找技能路径，返回 Path 或 None"""
-    skill_dir = Path(os.path.expanduser("skills/.standardization/skill-sub"))
-    # 先在用户技能目录查找
-    p = skill_dir / skill_name / "SKILL.md"
-    if p.exists():
-        return p.parent
-    # 再在标准化目录查找
-    std_dir = skill_dir / ".standardization" / skill_name
-    if std_dir.exists():
-        return std_dir
-    return None
 
 def check_compatibility(chain_name):
     """检查调用链中技能的版本兼容性"""
@@ -2223,194 +2084,6 @@ def check_compatibility(chain_name):
 
     return issues, None
 
-
-
-
-
-
-def cmd_milestone_stats(args):
-    """里程碑统计分析"""
-    import os
-    chain = load_chain(args.name)
-    if not chain:
-        print(f"❌ 调用链不存在: {args.name}")
-        return 1
-
-    steps = chain.get("steps", [])
-    ms_results = classify_milestones(steps)
-
-    # 基本统计
-    total = len(steps)
-    ms_count = sum(1 for r in ms_results if r["is_milestone"])
-    non_ms_count = total - ms_count
-
-    # 原因分布
-    reason_dist = {}
-    for r in ms_results:
-        reason = r["reason"].split("（")[0]  # 取原因主体（去掉括号详情）
-        reason_dist[reason] = reason_dist.get(reason, 0) + 1
-
-    if args.format == "json":
-        result = {
-            "chain_name": args.name,
-            "total_steps": total,
-            "milestone_count": ms_count,
-            "non_milestone_count": non_ms_count,
-            "milestone_ratio": round(ms_count / max(total, 1), 2),
-            "reason_distribution": reason_dist,
-            "milestones": [r for r in ms_results if r["is_milestone"]],
-        }
-        # 历史统计
-        if args.history:
-            history = chain.get("execution_history", [])
-            result["execution_history_count"] = len(history)
-            if history:
-                total_dur = sum(r.get("total_duration", 0) for r in history)
-                result["avg_duration"] = round(total_dur / len(history), 2)
-                # 里程碑步骤的平均耗时
-                ms_indices = set(r["step_index"] for r in ms_results if r["is_milestone"])
-                ms_durs = []
-                for rec in history:
-                    for sr in rec.get("step_results", []):
-                        if sr.get("step_index") in ms_indices:
-                            ms_durs.append(sr.get("duration", 0))
-                if ms_durs:
-                    result["milestone_avg_duration"] = round(sum(ms_durs) / len(ms_durs), 2)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 0
-
-    # 文本输出
-    print(f"📊 里程碑统计: {args.name}")
-    print("=" * 60)
-    print(f"  总步骤数:       {total}")
-    print(f"  里程碑步骤:     {ms_count} ({ms_count/max(total,1)*100:.0f}%)")
-    print(f"  非里程碑步骤:   {non_ms_count} ({non_ms_count/max(total,1)*100:.0f}%)")
-    print()
-    print("  【原因分布】")
-    for reason, cnt in sorted(reason_dist.items(), key=lambda x: -x[1]):
-        print(f"    {reason}: {cnt} 步")
-    print()
-
-    # 里程碑详情
-    print("  【里程碑步骤】")
-    for r in ms_results:
-        if r["is_milestone"]:
-            step = next((s for s in steps if s.get("index", 0) == r["step_index"]), None)
-            name = step.get("step_name", "?") if step else "?"
-            print(f"    ★ 步骤{r['step_index']}: {name}")
-            print(f"       原因: {r['reason']}")
-    print()
-
-    # 历史统计
-    if args.history:
-        history = chain.get("execution_history", [])
-        print(f"  【执行历史】({len(history)} 条记录)")
-        if history:
-            total_dur = sum(r.get("total_duration", 0) for r in history)
-            avg_dur = total_dur / len(history)
-            print(f"    平均总耗时: {avg_dur:.1f}s")
-            # 里程碑步骤耗时
-            ms_indices = set(r["step_index"] for r in ms_results if r["is_milestone"])
-            ms_durs = []
-            for rec in history:
-                for sr in rec.get("step_results", []):
-                    if sr.get("step_index") in ms_indices:
-                        ms_durs.append(sr.get("duration", 0))
-            if ms_durs:
-                print(f"    里程碑平均耗时: {sum(ms_durs)/len(ms_durs):.1f}s")
-        else:
-            print("    （无执行历史）")
-
-    return 0
-
-def cmd_milestones(args):
-    """里程碑影响分析 + 动态里程碑"""
-    import os
-    chain = load_chain(args.name)
-    if not chain:
-        print(f"❌ 调用链不存在: {args.name}")
-        return 1
-
-    steps = chain.get("steps", [])
-    if not steps:
-        print(f"❌ 调用链 {args.name} 没有步骤")
-        return 1
-
-    ms_results = classify_milestones(steps)
-    milestone_steps = [r for r in ms_results if r["is_milestone"]]
-
-    print(f"📊 里程碑影响分析: {args.name}")
-    print("=" * 60)
-    print(f"  总步骤: {len(steps)}  |  里程碑: {len(milestone_steps)} 步")
-    print()
-
-    # 影响分析
-    if args.impact or True:  # 默认也输出基本信息
-        print("  【里程碑列表】")
-        for r in ms_results:
-            icon = "★" if r["is_milestone"] else "○"
-            step = next((s for s in steps if s.get("index", 0) == r["step_index"]), None)
-            name = step.get("step_name", "?") if step else "?"
-            print(f"    {icon} 步骤{r['step_index']}: {name}")
-            print(f"       原因: {r['reason']}")
-            if step:
-                deps = step.get("depends_on", [])
-                if deps:
-                    print(f"       依赖: {deps}")
-                # 找出哪些步骤依赖此步骤
-                downstream = [s.get("index") for s in steps if r["step_index"] in s.get("depends_on", [])]
-                if downstream:
-                    print(f"       被依赖: {downstream}")
-            print()
-
-    # 动态里程碑（基于执行历史调整）
-    if args.dynamic:
-        print("  【动态里程碑调整】")
-        history = chain.get("execution_history", [])
-        if not history:
-            print("    ⚠️  没有执行历史，无法动态调整")
-            print("    提示: 执行链后 retry 信息会被记录到 execution_history")
-        else:
-            # 统计每个步骤的失败/重试次数
-            step_stats = {}
-            for record in history:
-                for step_r in record.get("step_results", []):
-                    idx = step_r.get("step_index")
-                    if idx not in step_stats:
-                        step_stats[idx] = {"attempts": 0, "failures": 0, "retries": 0}
-                    step_stats[idx]["attempts"] += 1
-                    if not step_r.get("success"):
-                        step_stats[idx]["failures"] += 1
-                    step_stats[idx]["retries"] += step_r.get("retries", 0)
-
-            print("    基于执行历史，以下步骤建议设为里程碑（高频失败/重试）:")
-            suggestions = []
-            for idx, stats in step_stats.items():
-                fail_rate = stats["failures"] / max(stats["attempts"], 1)
-                if fail_rate > 0.3 or stats["retries"] > 2:
-                    suggestions.append((idx, fail_rate, stats["retries"]))
-            if suggestions:
-                for idx, fr, retries in sorted(suggestions, key=lambda x: -x[1]):
-                    step = next((s for s in steps if s.get("index") == idx), None)
-                    name = step.get("step_name", "?") if step else "?"
-                    print(f"      ★ 步骤{idx}: {name}  (失败率 {fr*100:.0f}%, 重试 {retries} 次)")
-            else:
-                print("    ✅ 所有步骤执行稳定，无需新增里程碑")
-
-        print()
-
-    # 风险分析
-    print("  【风险分析】")
-    if len(milestone_steps) == 0:
-        print("    ⚠️  没有里程碑！建议至少将最后一步设为里程碑")
-    elif len(milestone_steps) == len(steps):
-        print("    ⚠️  所有步骤都是里程碑，可能过于保守")
-    else:
-        non_ms = [r for r in ms_results if not r["is_milestone"]]
-        print(f"    非里程碑步骤: {len(non_ms)} 个（允许跳过/快速失败）")
-        print(f"    里程碑步骤: {len(milestone_steps)} 个（必须确认/不可跳过）")
-
-    return 0
 
 def cmd_check_compat(args):
     """命令行接口：检查兼容性"""

@@ -2,7 +2,7 @@
 
 """
 
-chain_executor.py - Chain Executor v1.19.1
+chain_executor.py - Chain Executor v1.2.0
 
 调用链执行引擎：根据调用链定义生成结构化执行计划，
 
@@ -39,14 +39,6 @@ import os
 import sys
 
 from pathlib import Path
-
-# Windows 控制台 GBK 编码兼容：重配置 stdout/stderr 为 utf-8
-try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
 
 
 
@@ -356,7 +348,7 @@ def cmd_execution_preview(args, format=None):
     import json, os
     plan = {}
     if hasattr(args, "name") and args.name:
-        chain_dir = os.path.expanduser("skills/.standardization/skill-sub/.chains")
+        chain_dir = os.path.expanduser("~/.workbuddy/skills/.chains")
         chain_file = os.path.join(chain_dir, f"{args.name}.json")
         if os.path.exists(chain_file):
             with open(chain_file, encoding="utf-8") as f:
@@ -2274,11 +2266,6 @@ def analyze_resources(chain):
     total_time = len(steps) * time_per_step
 
     analysis["estimated_time"] = f"{total_time}秒 ({total_time//60}分{total_time%60}秒)"
-    analysis["parallelizable_steps"] = []  # TODO: 实现并行分析
-    analysis["bottleneck_steps"] = []  # TODO: 实现瓶颈分析
-    analysis["resources"] = {}  # TODO: 实现资源清单
-    analysis["step_durations"] = []  # TODO: 实现步骤耗时预估
-    analysis["recommendations"] = []  # TODO: 实现建议生成
 
 
 

@@ -1,6 +1,6 @@
 {
   "version": "1.2.0",
-  "_skill_sub_home": "~/.workbuddy/skill-sub/",
+  "_skill_sub_home": "~/.workbuddy/skills/.standardization/skill-sub/",
 
   "use_memory_reference": false,
   "naming_mode": "manual",

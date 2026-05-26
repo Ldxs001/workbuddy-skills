@@ -1,27 +1,22 @@
 ---
 name: skill-sub
-version: 1.13.0
+version: 
 author: wUwproject
 license: MIT
-description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
-tags: ['chain', 'orchestration', 'reusable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
-sensitive_access: true
-trigger_negative: true
-critical_write: false
-create_permissions_md: true
-permission_weight: HIGH
-antipattern_count: add_examples
-writing_standards: fix_terms
-section_antipattern: true
-section_faq: true
-trigger_danger: remove_dangerous
+description: 调用链编排技能 v1.19.2 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
+tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
+data_dir: ../.standardization/skill-sub/
 external_data_dir: true
-progressive_loading_explicit: true
+sensitive_access: true
+critical_write: false
+permission_weight: CRITICAL
+artifact_paths: true
 ---
 
 
 
 
+> 反模式详见 [references/antipatterns.md](../references/antipatterns.md)
 
 
 
@@ -30,23 +25,14 @@ progressive_loading_explicit: true
 
 
 
+## 触发场景
 
+**当用户提出以下意图时触发本技能：**
+- 规划类：「帮我规划一下...」、「...的步骤是什么」
+- 顺序类：「依次执行 A、B、C」、「先...再...」
+- 链管理：「创建/查看/更新/删除调用链」
 
-
-
-
-
-
-
-
-
-# skill-sub v1.13.0
-
-> 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链。
-
-调用链编排器，兼具**编辑器**和**粗粒度规划器**双重角色，将多个 Skill 编排为调用链。
-
----
+**否定条件**：仅当用户明确要求「不使用调用链」或「手动逐步执行」时，不自动触发。
 
 ## 核心能力
 
@@ -54,213 +40,196 @@ progressive_loading_explicit: true
 
 | # | 功能 | 说明 |
 |---|------|------|
-| 1 | **调用链编排** | 理解用户意图 → 规划 Skill 参与顺序 → 创建/更新/保存/推荐调用链 → 拼接为调用链 |
-| 2 | **三种角色** | 规划器（理解意图）、编辑器（管理调用链）、推荐器（推荐 Skill 组合） |
-| 3 | **渐进式加载** | `SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载 |
+| 1 | **调用链管理** | 创建、查询、更新、删除调用链 |
+| 2 | **执行计划生成** | 生成结构化执行计划，含并行/串行标记 |
+| 3 | **条件执行** | 支持条件步骤，按条件判断是否执行 |
+| 4 | **Dry-Run 模式** | 模拟执行，不实际调用技能 |
+| 5 | **链备份与版本管理** | 自动备份，支持版本恢复 |
 
 ---
 
-## 参数
-
-本技能通过 `scripts/*.py` 提供命令行参数（使用 `argparse` 解析）：
-
-| 脚本 | 参数 | 说明 |
-|---|------|------|
-| `scripts/chain_manager.py` | `--list`, `--create`, `--update`, `--delete`, `--save` | 调用链管理（创建/更新/删除/保存） |
-| `scripts/chain_executor.py` | `--chain`, `--execute`, `--dry-run` | 调用链执行（指定链/执行/干跑） |
-| `scripts/settings.py` | `--get`, `--set`, `--list` | 配置管理（读取/配置/列出） |
-| `scripts/skill_extractor.py` | `--skill-dir`, `--output` | 调用链提取（指定技能目录/输出路径） |
-
-> 💡 可直接 `python scripts/chain_manager.py --list` 查看所有调用链，或 `python scripts/chain_executor.py --chain <name> --dry-run` 干跑某条链。
-
 ---
 
-## 核心概念
 
-### 什么是调用链
 
-调用链（Chain）是一条预定义的执行流水线，将多个 Skill 的关键步骤按依赖关系串联，形成可复用的调用链。
 
-### skill-sub 的三个角色（重要）
+# skill-sub v1.19.1
 
-- ✅ **调用链编辑器** — 创建、更新、保存、删除、列出调用链（`chain_manager.py`）
-- ✅ **粗粒度规划器** — 理解用户意图，规划哪些 Skill 参与、执行顺序、依赖关系
-- ✅ **编排器** — 将规划结果拼接为调用链 JSON，本身不参与调用链执行
+调用链编排技能。**既是调用链编辑器，也是粗粒度规划器。**
 
-### 能力边界
-
-- ✅ **能做**：创建/更新/管理调用链、规划 Skill 参与顺序和依赖关系
-- ❌ **不能做**：执行链中步骤（只编排不干活）、代替被编排 Skill（只读取能力描述）
-- ⚠️ **不适合**：一次性任务 → 直接用 Skill；单 Skill → 不需要编排；高度定制临时流程 → 复用价值低
-
-> 更多反模式与正确做法 → `references/faq.md`
-
----
-
-## 调用链生成逻辑（三阶段）
-
-> 生成调用链不是让 AI 自由发挥，而是按以下三阶段确定性地完成。
-> 详细表格和示例见 `references/workflow.md`。
-
-### 阶段1：理解（Understanding）
-
-> **两个理解缺一不可**：不理解用户要做什么 → 链的目标不清晰；不理解 skill 能做什么 → 链的节点不靠谱。
-
-**理解①：用户要做什么（任务目标）**
-- 从用户自然语言描述中提取：任务类型、预期产物、关键约束
-- 判断：这是"一次性执行"还是"可复用的通用流程"？
-
-**理解②：涉及的 Skill 能做什么（能力边界）**
-- **用户明确指定了 Skill** → 直接从用户给的列表操作，不额外遍历
-- **用户未指定 Skill** → 从本地 skill 库（`~/.workbuddy/skills/` + `{workspace}/.workbuddy/skills/`）遍历挑选，匹配依据：
-  - SKILL.md `description` 字段
-  - SKILL.md `tags` 字段
-  - 用户描述中的关键词
-- 对每个候选 Skill，读取其 SKILL.md 的「核心概念」/「工作流程」章节，确认它能做什么、不能做什么
-
-**输出**：有序 Skill 列表 + 依赖关系 + 里程碑标记 + 每个 Skill 的能力摘要（用于阶段2摘取时的精准定位）
-
----
-
-### 阶段2：摘取（Extraction）
-
-**目的**：按顺序从各 Skill 的 SKILL.md 中**摘取关键步骤描述**。
-
-**摘取方式（两种，择优使用）：**
-
-| 方式 | 适用场景 |
-|------|---------|
-| `skill_extractor.py extract --skill <name>` | 有标准化 SKILL.md 结构的 skill |
-| 直接读取 SKILL.md 的「核心指令」/「工作流程」章节 | 结构不标准，需人工判断 |
-
-**摘取内容**：步骤名称 → `step_name`；关键动作 → `action`；指令名 → `skill_instruction`。
-
----
-
-### 阶段3：拼接（Composition）
-
-**目的**：将摘取到的所有步骤，合成为**调用链 JSON**，保存到 `chains/*.json`。
-
-**拼接规则**：填充 Chain 级字段（`name`/`description`/`purpose`/`tags`）→ 填充每个 Step 字段（`index`/`skill_name`/`action`/`depends_on`/`failure_mode`）→ 调用 `chain_manager.py create` 保存。
-
-**详细字段映射表和 JSON 格式** → 见 `references/chain_schema.md`。
-
----
-
-## 触发方式
-
-### 1. 用户主动调用
-
-触发示例：
-- "创建一条发布流水线的调用链"
-- "管理发布流水线调用链"
-- "列出所有调用链"
-- "用 skill-sub 管理调用链"
-
-### 2. 自动推荐（满足任一条件即触发）
-
-| 条件 | 示例 |
-|------|------|
-| 多 Skill 协作意图 | 「先审查再打包推送」 |
-| 流程/模式词 | 「流水线」「一键」「端到端」「流程」 |
-| 已有链匹配 | tags/description 重合 > 50% |
-
-被推荐后用户可选择**执行**或**更新**。匹配逻辑详见 `references/workflow.md`。
-
-**否定条件**：以下情况不触发本技能（改用对应 Skill 或直接调用）
-- 用户只是想执行单个 Skill → 直接用该 Skill
-- 用户只是想询问/了解 → 不需要编排
-- 任务一次性、无复用价值 → 直接用 Skill 完成
+> 📢 **v1.19.1 修复**：里程碑影响分析（milestones）、动态里程碑（--dynamic）、里程碑统计（milestone-stats）、标签系统增强（list-tags）现已真正实现并注册到 parser。v1.19.0 仅标记 DONE 但未实现。
 
 ---
 
 ## 工作流程
 
-```
-用户请求（自然语言描述）
-  ↓
-【规划器角色】理解用户意图 + 规划 Skill 参与顺序
-  ├── 理解①：用户要做什么（任务目标、预期产物、约束）
-  ├── 理解②：Skill 能做什么（用户指定→直接用；未指定→遍历本地库挑选）
-  └── 输出：有序 Skill 列表 + 依赖关系 + 里程碑 + 各 Skill 能力摘要
-  ↓
-【编辑器角色】创建 / 更新调用链
-  ├── 创建：执行三阶段（理解→摘取→拼接）→ chain_manager.py create
-  ├── 更新：add-step / remove-step / update-step / rename
-  └── 管理：list / show / delete
-  ↓
-【编排器角色】拼接为调用链 → 保存到 chains/*.json
-  ↓
-输出：调用链已保存，可复用；或意图匹配推荐已有调用链
-```
-
-详细执行流程、里程碑判断规则、三层回退策略
-  详见 `references/workflow.md`（按需加载）
+1. **理解意图** → 分析用户输入，判断是否需要调用链
+2. **规划技能顺序** → 推荐参与的 Skill 及其顺序
+3. **生成调用链** → 创建 JSON 格式的调用链定义
+4. **生成执行计划** → 输出 AI 可直接执行的指令序列
+5. **（可选）实际执行** → 按执行计划逐步调用技能
 
 ---
 
 ## 快速开始
 
 ```bash
-# 初始化数据目录
+# 初始化
 python {SKILL_DIR}/scripts/chain_manager.py init
 
-# 创建调用链（AI 自动执行三阶段）
-python {SKILL_DIR}/scripts/chain_manager.py create --name "链名" --description "描述"
+# 创建调用链
+python {SKILL_DIR}/scripts/chain_manager.py create --name "发布流水线" --description "技能发布流程" --purpose "一键发布" --steps '[...]'
 
-# 更新调用链步骤
-python {SKILL_DIR}/scripts/chain_manager.py add-step --name "链名" --step-json '{...}'
-python {SKILL_DIR}/scripts/chain_manager.py remove-step --name "链名" --index 2
+# 生成执行计划（含执行预览）
+python {SKILL_DIR}/scripts/chain_executor.py plan --name "发布流水线" --verbose
 
-# 执行 / 列出 / 删除调用链
-python {SKILL_DIR}/scripts/chain_executor.py plan --name "链名"
+# Dry-Run 模拟执行（不实际调用技能）
+python {SKILL_DIR}/scripts/chain_executor.py plan --name "发布流水线" --dry-run
+
+# 查看调用链
+python {SKILL_DIR}/scripts/chain_manager.py show --name "发布流水线"
+
+# 列出所有调用链
 python {SKILL_DIR}/scripts/chain_manager.py list
-python {SKILL_DIR}/scripts/chain_manager.py delete --name "链名"
 
-# HTML 配置界面
-python {SKILL_DIR}/scripts/settings.py
+# 删除（自动备份）
+python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --force
 ```
 
-完整 CLI 速查、脚本清单、存储机制
-  详见 `references/reference.md`（按需加载）
+---
+
+## v1.17.0 新增功能
+
+### 1. 执行预览（Execution Preview）
+`chain_executor.py plan` 生成的执行计划现在包含**可视化执行路径图**：
+- 显示哪些步骤**并行**、哪些**串行**
+- 标记**里程碑位置**和判断依据
+- 显示**条件步骤**（有条件限制才执行）
+
+### 2. 条件执行（Conditional Execution）
+步骤支持 `condition` 字段，执行前先判断条件是否满足：
+- `step_N_success` — 步骤N成功才执行
+- `step_N_failed` — 步骤N失败才执行
+- `always` — 总是执行（默认）
+- `never` — 从不执行
+- `variable_X_exists` — 变量X存在才执行
+
+条件不满足时**跳过该步骤**，继续执行后续步骤。
+
+### 3. 执行沙箱模式（Dry-Run）
+新增 `--dry-run` 参数：
+```bash
+python {SKILL_DIR}/scripts/chain_executor.py plan --name "链名" --dry-run
+```
+- **不实际调用技能**，仅模拟执行
+- 输出每步会发生什么
+- 显示条件判断结果
+- 显示重试策略、失败处理方式
+
+### 4. 链备份机制（Chain Backup）
+在**覆盖/删除前自动备份**到 `chains/backups/<链名>/` 目录：
+```bash
+# 列出备份版本
+python {SKILL_DIR}/scripts/chain_manager.py list-backups --name "链名"
+
+# 从备份恢复
+python {SKILL_DIR}/scripts/chain_manager.py restore --name "链名" --version 1 --force
+```
+- 每次覆盖/删除前自动备份
+- 保留最近 **20 个版本索引**、**10 个备份文件**
+- 备份文件命名：`v<版本号>_<日期>.json`
+
+### 5. 链版本管理（Chain Version Management）
+备份机制同时维护**版本索引**（`versions.json`）：
+- 每次保存自动递增版本号
+- 记录备份原因（`overwrite` / `delete`）
+- 支持从任意版本恢复
+
+### 6. 摘取缓存（Extraction Cache）
+`{SKILL_DIR}/scripts/skill_extractor.py` 现在**缓存**技能摘取结果：
+```bash
+# 正常使用（自动命中缓存）
+python {SKILL_DIR}/scripts/skill_extractor.py extract --skill "triphasic-execution"
+
+# 跳过缓存，强制重新摘取
+python {SKILL_DIR}/scripts/skill_extractor.py extract --skill "triphasic-execution" --no-cache
+```
+- 缓存路径：`~/.workbuddy/skills/.standardization/skill-sub/cache/extraction_cache.json`
+- **自动失效**：技能 `SKILL.md` 文件更新时缓存自动失效
+- 保留最近 **200 个技能**的摘取结果
+- 输出时显示 `📁 命中摘取缓存` 提示
 
 ---
 
-## 渐进式 MD 文件体系
+## 剩余扩展点（待实现）
 
-| 本文件（SKILL.md）包含 | 拆分到 references/ |
-|----------------------------|---------------------------|
-| ✅ 核心概念（三角色定位） | 📄 `workflow.md` — 详细执行流程、里程碑规则、意图匹配逻辑 |
-| ✅ 三阶段生成逻辑 | 📄 `reference.md` — 完整 CLI 速查、脚本 API |
-| ✅ 触发方式（含推荐逻辑） | 📄 `chain_schema.md` — Chain/Step 结构定义 |
-| ✅ 工作流程概述 | 📄 `examples.md` — 完整使用示例（含更新、推荐场景） |
-| ✅ 快速开始（核心命令） | 📄 `changelog.md` — 版本更新日志 |
-| ✅ 审查规则自查 | 📄 `faq.md` — 反模式、常见错误、使用技巧 |
+以下扩展点将在后续版本中逐步实现：
+
+### 执行流程增强
+- [x] ✅ 断点续执行（Breakpoint Resume）— v1.18.0 DONE
+- [x] ✅ 执行预览（Execution Preview）— v1.17.0 DONE
+- [x] ✅ 条件执行（Conditional Execution）— v1.17.0 DONE
+- [x] ✅ 执行沙箱模式（Dry-Run）— v1.17.0 DONE
+
+### 调用链编辑器增强
+- [x] ✅ 链版本管理（Chain Version Management）— v1.17.0 DONE
+- [x] ✅ 链标签系统增强（Chain Tag System Enhancement）— v1.19.0 DONE
+- [x] ✅ 链导入/导出（Chain Import/Export）— v1.19.0 DONE
+- [x] ✅ 链备份机制（Chain Backup Mechanism）— v1.17.0 DONE
+
+### 粗粒度规划器增强
+- [x] ✅ 智能依赖推断（Smart Dependency Inference）— v1.18.0 DONE
+- [x] ✅ 历史链推荐（Historical Chain Recommendation）— v1.18.0 DONE
+- [x] ✅ 链优化建议（Chain Optimization Suggestions）— v1.18.0 DONE
+- [x] ✅ 参数推断（Parameter Inference）— v1.18.0 DONE
+
+### 步骤摘取器增强
+- [x] ✅ 摘取缓存（Extraction Cache）— v1.17.0 DONE
+- [x] ✅ 参数提取（Parameter Extraction）— v1.19.0 DONE
+- [x] ✅ 兼容性检查（Compatibility Check）— v1.19.0 DONE
+
+### 执行计划生成器增强
+- [x] ✅ 资源分析（Resource Analysis）— v1.19.0 DONE
+- [x] ✅ Plan B 生成（Plan B Generation）— v1.19.0 DONE
+
+### 里程碑管理者增强
+- [x] ✅ 里程碑影响分析（Milestone Impact Analysis）— v1.19.0 DONE
+- [x] ✅ 动态里程碑（Dynamic Milestone）— v1.19.0 DONE
+- [x] ✅ 里程碑统计（Milestone Statistics）— v1.19.0 DONE
+
+### 体验提升
+- [x] ✅ 链健康度评分（Chain Health Score）— v1.19.0 DONE
+
+### 稳定性增强
+- [x] ✅ 链静态检查增强（Chain Static Check Enhancement）— v1.18.0 DONE
+- [x] ✅ 链备份机制（Chain Backup Mechanism）— v1.17.0 DONE
+- [x] ✅ 错误分类优化（Error Classification Optimization）— v1.19.0 DONE
 
 ---
 
-## 规范自查（R-01~R-10）
+## 详细文档
 
-本 skill 自身遵循 skill-standardization v2 规范，自查结果见 `references/changelog.md`。
-
----
-
-## 反模式
-
-> 常见错误与正确做法 → `references/antipatterns.md`
-
----
-
-## 注意事项
-
-1. **skill-sub 本身不参与调用链** — 它是编辑器/规划器/编排器，不是链的执行环节
-2. **生成的调用链是可复用的** — 不绑定单次任务，可复用于同类任务
-3. **三阶段缺一不可**：不理解→摘取不全；不摘取→链内容空洞；不拼接→无产出
-4. **里程碑步骤失败强制中止** — 无论 `on_exhaust` 配置
-5. **本文件 ≤200 行** — 超出部分拆分到 `references/`
+完整工作流程、使用示例、反模式与常见问题 → 见 `references/` 目录：
+- `references/workflow.md` — 详细工作流程
+- `references/examples.md` — 使用示例
+- `references/faq.md` — 常见问题与反模式
+- `references/chain_schema.md` — 调用链数据结构定义
+- `references/permissions.md` — 权限说明
 
 ---
 
-## 版本
+## 配置
 
-当前版本：**1.13.0** — 修复 R-07/R-15/R-18/R-20：添加否定条件、创建 permissions.md、增加反模式条目、统一术语
+配置界面：`python {SKILL_DIR}/scripts/settings.py`
+
+| 配置项 | 选项 | 说明 |
+|--------|------|------|
+| **记忆参考** | 是 / 否 | 创建/执行调用链时，是否读取用户记忆文件增强步骤描述 |
+| **命名方式** | 自动 / 人工 | 创建调用链时，由 AI 自动命名还是询问用户 |
+| **默认重试次数** | 1-10（默认3） | 所有步骤的默认最大重试次数 |
+
+---
+
+
+
+**v1.17.0 — 执行预览 + 条件执行 + Dry-Run + 备份机制 + 版本管理 + 摘取缓存**

@@ -37,7 +37,7 @@ def get_home_dir():
     home = (
         os.environ.get("SKILL_SUB_HOME")
         or os.environ.get("SKILL_CHAIN_HOME")
-        or str(Path.home() / ".workbuddy" / "skill-sub")
+        or str(Path.home() / ".workbuddy" / "skills" / ".standardization" / "skill-sub")
     )
     return Path(home).expanduser()
 
