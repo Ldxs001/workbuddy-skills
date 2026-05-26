@@ -9,6 +9,41 @@
 
 ---
 
+## v2.34.1
+
+2026-05-26
+
+**改写类型：Patch — 清理残留调试脚本，修复敏感信息扫描误报根因**
+
+### 修复
+
+- 🧹 **删除 8 个残留一次性脚本**（均含硬编码本地路径或已无用）：
+  - `scripts/debug_parse.py` — 含 `C:\Users\sm001\...` 硬编码路径，触发敏感信息扫描误报
+  - `scripts/fix_progressive_loading.py` — 一次性 fix 脚本
+  - `scripts/fix_r06_r20.py` — 一次性 fix 脚本
+  - `scripts/fix_r20.py` — 一次性 fix 脚本
+  - `scripts/fix_utils_if_bug.py` — 一次性 fix 脚本
+  - `scripts/merge_changelog_and_add_constraints.py` — 一次性 fix 脚本
+  - `scripts/test_parse_debug.py` — 调试脚本
+  - `scripts/add_constraint_to_guide.py` — 一次性 fix 脚本
+- 🐛 **修复敏感扫描误报根因**：`debug_parse.py` 含开发者本地路径，随 ZIP 分发时触发敏感信息检测；彻底删除后 0 处敏感信息
+
+### 新增
+
+- （无）
+
+### 更新
+
+- （无）
+
+### 删除
+
+- 见「修复」章节，共 8 个残留脚本
+
+---
+
+
+
 ## v2.34.0
 
 2026-05-26

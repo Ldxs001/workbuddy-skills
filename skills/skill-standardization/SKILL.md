@@ -1,16 +1,17 @@
 ---
 name: skill-standardization
-version: 2.33.0
+version: 2.34.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.0。修复 CRLF 解析 bug、creator.py 模板字段缺失根因、残留脚本清理、permissions.md 检测规则澄清。
+description: Skill 标准化规范引擎 v2.34.1。清理残留调试脚本（debug_parse.py 等 8 个），修复敏感信息扫描误报根因。
 data_dir: ../.standardization/skill-standardization/
 sensitive_access: true
-critical_write: true
-permission_weight: CRITICAL
+critical_write: false
+permission_weight: HIGH
 artifact_paths: references/, scripts/skill_audit/, scripts/skill_builder/
 writing_standards: fix_terms
 ---
+
 
 
 
