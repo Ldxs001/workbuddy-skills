@@ -3,7 +3,30 @@
 ---
 ---
 
-## v2.6.22（2026-05-26）
+## v2.6.23（2026-05-26）
+
+> 发布日期：2026-05-26
+
+**改写类型：Patch — 修复 ZIP 打包混入垃圾文件**
+
+### 修复
+
+- **`pack_zip.py`：排除规则支持 fnmatch 通配符**
+  - `exclude_files`（精确匹配）→ `exclude_file_patterns`（fnmatch 通配符）
+  - 新增模式：`*.bak*`、`fix_*.py`、`force_*.py`、`patch_*.py`、`insert_*.py`、`*_fixed.py`
+  - 新增 UTF-8 输出配置（Windows 终端兼容）
+- **`clean_zip_source.py`：改为安全模式**
+  - 原实现会直接删除源目录文件，改为仅日志输出、不执行删除
+  - 仅 `TEMP_DIR` 内的临时文件可安全清理
+
+### 影响文件
+
+- `scripts/pack_zip.py`
+- `scripts/clean_zip_source.py`
+
+---
+
+
 
 > 发布日期：2026-05-26
 

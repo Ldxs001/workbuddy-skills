@@ -1,9 +1,9 @@
 ---
 name: git-sync
-version: 2.6.21
+version: 2.6.22
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复push前提前pull导致的本地修改被覆盖问题。
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复push前提前pull导致本地修改被覆盖；修复ZIP打包混入垃圾文件（fnmatch通配符排除）；clean_zip_source改为安全模式。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL
@@ -13,6 +13,7 @@ data_dir: ../.standardization/git-sync/
 antipattern_reference: true
 faq_reference: true
 ---
+
 
 
 

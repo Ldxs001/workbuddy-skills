@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.6.22",
-  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.22：修复push前提前pull导致的本地修改被覆盖问题（删除push前的_pull_with_cred_url调用，改为push失败时再pull --rebase重试）；修复SKILL.md frontmatter字段缺失（补全11字段，删除非标准字段tags）",
+  "version": "2.6.23",
+  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.23：ZIP打包排除通配符支持（*.bak*等）；clean_zip_source改为安全模式",
   "author": "wUwproject",
   "tags": [
     "sync",
