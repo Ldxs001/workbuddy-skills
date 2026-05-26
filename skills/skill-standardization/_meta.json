@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.29.2",
+  "version": "2.30.0",
   "description": "Skill 标准化规范引擎 v2.29.2。新增标准化 IO 工具（safe_io/skill_rollback/op_logger）、修复 R-20 中英文混排误报。",
   "author": "wUwproject",
   "tags": [

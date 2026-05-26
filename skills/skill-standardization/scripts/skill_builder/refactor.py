@@ -5,6 +5,8 @@ refactor.py — 对非标 skill 进行整体改造（标准化）
 - 技能安装目录：skills/<skill-name>/（不搬迁）
 - 数据/产出物路径：应指向 skills/.standardization/<skill-name>/
 - refactor 只整理技能内部文件结构，不搬迁整个目录
+
+v2.30.0: 增加 --fix-code 参数，支持阶段3.5代码引用重写
 """
 
 import sys
@@ -30,7 +32,7 @@ class Refactor:
             skill_dir = input_path
 
         if not skill_dir.exists():
-            print(f"❌ Skill 目录不存在: {skill_dir}")
+            print(f"[X] Skill 目录不存在: {skill_dir}")
             sys.exit(1)
 
         # 1. dry-run 模式：只输出计划，不创建备份
@@ -42,7 +44,7 @@ class Refactor:
         backup_dir = None
         if not args.no_backup:
             backup_dir = _create_backup(skill_dir, "refactor", args.workspace)
-            print(f"📦 备份已创建: {backup_dir}")
+            print(f"[file] 备份已创建: {backup_dir}")
 
         # 3. 执行迁移（整理技能内部文件结构）
         migration_plan = self._build_migration_plan(skill_dir)
@@ -54,6 +56,11 @@ class Refactor:
 
         # 4. 执行文件移动
         self._execute_migration(skill_dir, migration_plan)
+
+        # 3.5 代码引用重写（--fix-code）
+        if getattr(args, "fix_code", False):
+            fixed = self._fix_code_references(skill_dir)
+            print(f"  [fix] 代码引用重写: 修正了 {fixed} 处路径")
 
         # 5. 验证总字节一致性
         self._verify_migration(skill_dir, backup_dir, migration_plan)
@@ -67,7 +74,7 @@ class Refactor:
         self._bump_version(skill_dir, "patch", {})
         self._audit_and_update_progress(skill_dir, mode="refactor")
 
-        print(f"\n✅ refactor 完成！")
+        print(f"\n[OK] refactor 完成！")
         print(f"   备份位置: {backup_dir}")
         print(f"   迁移文件: {len(migration_plan)} 个")
 
@@ -121,7 +128,7 @@ class Refactor:
                     continue  # 不迁移
 
                 if dst.exists():
-                    print(f"⚠️  目标已存在，跳过: {dst}")
+                    print(f"[!]  目标已存在，跳过: {dst}")
                     continue
 
                 plan.append((rule_id, item, dst, size))
@@ -173,9 +180,66 @@ class Refactor:
         new_size = sum(p.stat().st_size for p in skill_dir.rglob("*") if p.is_file())
         diff = abs(orig_size - new_size)
         if diff > orig_size * 0.01:  # >1% 差异
-            print(f"⚠️  警告：迁移前后大小差异 {diff} bytes ({diff / orig_size:.1%})")
+            print(f"[!]  警告：迁移前后大小差异 {diff} bytes ({diff / orig_size:.1%})")
         else:
-            print(f"✅ 验证通过：大小差异 <1% ({diff} bytes)")
+            print(f"[OK] 验证通过：大小差异 <1% ({diff} bytes)")
+
+    def _fix_code_references(self, skill_dir):
+        """
+        阶段3.5：代码引用重写
+        扫描 scripts/*.py 中的硬编码数据目录路径，自动替换为
+        skills/.standardization/<skill>/ 规范路径。
+        只处理 get_*_home() 函数中的 default 赋值。
+        """
+        import re
+        skill_name = skill_dir.name
+        scripts_dir = skill_dir / "scripts"
+        if not scripts_dir.is_dir():
+            return 0
+
+        # 正确路径模板（赋值语句右侧）
+        correct_suffix = '".workbuddy" / "skills" / ".standardization" / "' + skill_name + '"'
+
+        fixed_count = 0
+
+        for py_file in sorted(scripts_dir.glob("*.py")):
+            content = py_file.read_text(encoding="utf-8", errors="replace")
+            lines = content.split("\n")
+            new_lines = []
+            in_get_home = False
+            modified = False
+
+            for idx, line in enumerate(lines):
+                # 检测进入 get_*_home 函数
+                if re.match(r"\s*def get_\w+_home\(", line):
+                    in_get_home = True
+                    new_lines.append(line)
+                    continue
+
+                # 在 get_*_home 函数内，处理 default = 行
+                if in_get_home and re.match(r"\s*default\s*=\s*Path\.home\(", line):
+                    # 检查当前路径是否合规（包含 .standardization）
+                    rest = "\n".join(lines[idx:])
+                    if ".standardization" not in rest or skill_name not in rest:
+                        # 不合规，需要修复
+                        indent = line[:len(line) - len(line.lstrip())]
+                        new_line = indent + "default = Path.home() / " + correct_suffix
+                        new_lines.append(new_line)
+                        modified = True
+                        fixed_count += 1
+                        continue
+
+                # 退出函数检测：遇到 return 或下一个 def
+                if in_get_home and line.strip().startswith("return "):
+                    in_get_home = False
+
+                new_lines.append(line)
+
+            if modified:
+                py_file.write_text("\n".join(new_lines), encoding="utf-8")
+                print(f"    [OK] 修正 {py_file.name}: default 路径 → skills/.standardization/{skill_name}/")
+
+        return fixed_count
 
     def _run_permission_checker(self, skill_dir):
         """运行 permission_checker.py 扫描权限"""
@@ -256,7 +320,7 @@ class Refactor:
             lines.append("|---|------|------|----------|----------|----------|------|")
             for i, iss in enumerate(items, 1):
                 sev = iss.get("severity", "?")
-                sev_cn = {"HIGH": "🔴 高", "MEDIUM": "🟡 中", "LOW": "✅ 低", "ERROR": "🔴 高"}.get(sev, sev)
+                sev_cn = {"HIGH": "[ERROR] 高", "MEDIUM": "[WARN] 中", "LOW": "[OK] 低", "ERROR": "[ERROR] 高"}.get(sev, sev)
                 file = iss.get("file", "")
                 line = iss.get("line", "")
                 match = iss.get("match", iss.get("pattern", ""))[:50]
@@ -288,7 +352,7 @@ class Refactor:
 
         pm.parent.mkdir(parents=True, exist_ok=True)
         pm.write_text("\n".join(lines), encoding="utf-8")
-        print(f"[✅] 权限扫描结果已自动写入 {pm}")
+        print(f"[[OK]] 权限扫描结果已自动写入 {pm}")
 
     def _inject_auth_section(self, skill_dir, report):
         """
@@ -397,7 +461,7 @@ class Refactor:
             except Exception as e:
                 print(f"[!] 更新 _meta.json 版本号失败: {e}")
 
-        print(f"[✅] 版本号升级: {old_ver} → {new_ver} ({bt})")
+        print(f"[[OK]] 版本号升级: {old_ver} → {new_ver} ({bt})")
 
     # ── 审计 + 进度管理 ────────────────────────────────────────────────────
 

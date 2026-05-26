@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 SkillCreator — 负责 create 模式（创建新 Skill）
+模板严格遵循 R-01~R-21 规范
 """
 
 import json
@@ -22,37 +23,123 @@ license: MIT
 description: >
   {description}
 tags: [{tags}]
+# R-07 权限声明（必须显式声明所有权限）
+permissions:
+  - tool: Read
+    access: read-only
+    description: 读取技能配置文件和参考数据
+  - tool: Write
+    access: write
+    description: 写入输出文件和日志
+  - tool: Bash
+    access: restricted
+    description: 仅用于运行内部脚本，不经过用户 Shell 配置
 ---
 
 # {name} — {title}
 
 {description}
 
+> [R-06 渐进式加载] 本文 ≤230 行，详细内容见 `references/` 目录按需加载。
+
 ## 触发场景
 
 当用户提到以下意图时触发本技能：
-- <!-- TODO: 填写触发条件 -->
+- `"/{name}"` 直接调用
+- 用户描述任务包含：<!-- 填写核心触发动词，如"生成XX"、"分析XX" -->
+- 用户要求输出格式为：<!-- 填写预期输出类型 -->
+
+**不触发**：
+- 用户仅询问概念、定义，不要求执行操作
+- 用户明确要求使用其他指定技能
 
 ## 核心能力
 
 | # | 功能 | 说明 |
 |---|------|------|
-| 1 | <!-- TODO --> | <!-- TODO --> |
+| 1 | 主功能名称 | <!-- 一句话描述核心功能 --> |
+| 2 | 辅助功能 | <!-- 可选 --> |
+| 3 | 输出格式 | <!-- Markdown / HTML / JSON 等 --> |
 
 ## 快速开始
 
 ```bash
-# 最简用法示例
+# 最简用法
+skill-sub {name} --input <input-file> --output <output-dir>
 ```
+
+## 工作流程
+
+1. **解析输入** — 读取用户输入文件或参数，验证格式
+2. **执行核心逻辑** — 调用 `scripts/` 目录下的脚本进行处理
+3. **输出结果** — 将结果写入输出目录，并生成摘要报告
+
+> [R-06 渐进式加载] 详细工作流程见 `references/guide.md`
+
+## 权限说明
+
+本技能需要以下权限才能正常工作：
+
+| 工具 | 访问级别 | 用途 |
+|------|----------|------|
+| Read | read-only | 读取输入文件和配置 |
+| Write | write | 写入输出结果 |
+| Bash | restricted | 运行内部处理脚本（仅限 `scripts/` 目录） |
+
+- **不会**访问 `~/.ssh/`、`~/.aws/`、`*.key`、`*.pem` 等敏感文件
+- **不会**向外部网络发送数据
+- **不会**执行用户 Shell 配置文件（`.bashrc` / `.zshrc`）
+
+## 反模式
+
+- **错误**：在 SKILL.md 中粘贴大段代码（>10 行）
+  - 正确做法：将代码移入 `scripts/` 目录，在 SKILL.md 中描述调用方式
+- **错误**：使用相对路径 `./scripts/foo.py`
+  - 正确做法：使用 `skill_pkg_dir / "scripts" / "foo.py"` 基于安装目录拼接路径
+- **错误**：在 `SKILL.md` 中写 "详见脚本注释"
+  - 正确做法：在 `references/guide.md` 中写详细文档，SKILL.md 只写必要信息
+
+## FAQ
+
+Q: 本技能支持哪些输入格式？
+A: 支持 `.txt`、`.json`、`.csv` 格式的输入文件。如需其他格式，请在 `references/guide.md` 中查看扩展方法。
+
+Q: 输出文件存放在哪里？
+A: 默认输出到 `skills/.standardization/{name}/data/output/`，可通过 `--output` 参数指定。
 
 ## 主要流程
 
-<!-- 在此描述主要工作流程 -->
+本技能采用三阶段执行框架（Execute → Review → Advance）：
 
-→ 详见 `references/guide.md` 完整教程（按需创建）
+### 阶段 1：Execute（执行）
+- 读取输入参数
+- 调用核心脚本进行处理
+- 捕获执行结果和错误
+
+### 阶段 2：Review（审查）
+- 验证输出文件是否生成
+- 检查输出格式是否符合预期
+- 记录执行日志到 `skills/.standardization/{name}/data/logs/`
+
+### 阶段 3：Advance（推进）
+- 输出最终结果给用户
+- 更新 `.progress.md` 进度文件
+- 如有错误，进入错误处理流程
+
+---
+
+## 附录：详细文档索引
+
+| 文档 | 内容 |
+|------|------|
+| `references/guide.md` | 完整使用教程和参数说明 |
+| `references/permissions.md` | 权限扫描报告和风险说明 |
+| `references/examples.md` | 使用示例和输出样例 |
+
+> 本文档由 `skill-standardization v2.29.2` 生成，遵循 R-01~R-21 规范。
 """
 
-    META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "skills/.standardization/{name}/data/"}}'
+    META_TEMPLATE = """{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "skills/.standardization/{name}/data/", "install_dir": "skills/{name}/", "created_by": "skill-standardization", "spec_version": "2.29.2"}"""
 
     def create(self, args):
         """创建新的标准 skill 目录结构"""
@@ -65,13 +152,17 @@ tags: [{tags}]
 
         # 检查是否已存在
         if skill_dir.exists():
-            print(f"❌ 目录已存在: {skill_dir}")
+            print(f"[X] 目录已存在: {skill_dir}")
             return False
 
         # 创建目录结构
         skill_dir.mkdir(parents=True)
         (skill_dir / "references").mkdir(exist_ok=True)
         (skill_dir / "scripts").mkdir(exist_ok=True)
+        (skill_dir / "data").mkdir(exist_ok=True)
+        (skill_dir / "data" / "output").mkdir(exist_ok=True)
+        (skill_dir / "data" / "logs").mkdir(exist_ok=True)
+        (skill_dir / "data" / "cache").mkdir(exist_ok=True)
 
         # 写入 SKILL.md
         tags_str = ", ".join(f'"{t}"' for t in tags) if tags else '"todo"'
@@ -97,19 +188,513 @@ tags: [{tags}]
         (skill_dir / "references" / ".gitkeep").write_text("", encoding="utf-8")
         (skill_dir / "scripts" / ".gitkeep").write_text("", encoding="utf-8")
 
-        print(f"✅ Skill 已创建: {skill_dir}")
-        print(f"   ├── SKILL.md      (主文件)")
-        print(f"   ├── _meta.json    (元数据)")
-        print(f"   ├── references/         (渐进式 MD)")
-        print(f"   └── scripts/      (脚本目录)")
+        # 创建 references/guide.md 详细文档模板
+        guide_content = self._generate_guide_template(name, description)
+        (skill_dir / "references" / "guide.md").write_text(guide_content, encoding="utf-8")
+
+        # 创建 references/permissions.md 模板
+        perm_content = self._generate_permissions_template(name)
+        (skill_dir / "references" / "permissions.md").write_text(perm_content, encoding="utf-8")
+
+        # 创建 references/examples.md 模板
+        examples_content = self._generate_examples_template(name)
+        (skill_dir / "references" / "examples.md").write_text(examples_content, encoding="utf-8")
+
+        # 创建 .progress.md
+        progress_content = self._generate_progress_template(name)
+        (skill_dir / ".progress.md").write_text(progress_content, encoding="utf-8")
+
+        # 创建 CHANGELOG.md
+        changelog_content = self._generate_changelog_template(name)
+        (skill_dir / "CHANGELOG.md").write_text(changelog_content, encoding="utf-8")
+
+        print(f"[OK] Skill 已创建: {skill_dir}")
+        print(f"   ├── SKILL.md           (主文件, ≤230行)")
+        print(f"   ├── _meta.json         (元数据 + 数据目录声明)")
+        print(f"   ├── CHANGELOG.md       (版本变更记录)")
+        print(f"   ├── .progress.md       (审计进度跟踪)")
+        print(f"   ├── references/")
+        print(f"   │   ├── guide.md       (完整使用教程)")
+        print(f"   │   ├── permissions.md  (权限说明)")
+        print(f"   │   └── examples.md    (使用示例)")
+        print(f"   ├── scripts/           (可执行脚本)")
+        print(f"   └── data/              (数据目录)")
+        print(f"       ├── output/        (输出文件)")
+        print(f"       ├── logs/          (执行日志)")
+        print(f"       └── cache/         (缓存文件)")
         print(f"\n下一步:")
-        print(f"   1. 编辑 SKILL.md 填写 TODO 占位符")
-        print(f"   2. 如需脚本，放入 scripts/")
-        print(f"   3. 如需辅助文档，放入 references/")
+        print(f"   1. 编辑 SKILL.md 填写触发词和核心能力")
+        print(f"   2. 编辑 references/guide.md 填写详细教程")
+        print(f"   3. 如需脚本，放入 scripts/")
+        print(f"   4. 运行审计: python -m skill_audit audit {skill_dir}")
+        print(f"   5. 修复问题: python -m skill_audit audit {skill_dir} --fix")
 
         # 审计 + 进度管理
         self._audit_and_update_progress(skill_dir, mode="create")
         return True
+
+    def _generate_guide_template(self, name, description):
+        """生成 references/guide.md 模板"""
+        return f"""# {name} — 完整使用教程
+
+{description}
+
+## 目录
+
+1. [安装与依赖](#安装与依赖)
+2. [快速开始](#快速开始)
+3. [参数说明](#参数说明)
+4. [工作流程详解](#工作流程详解)
+5. [输出格式](#输出格式)
+6. [常见问题](#常见问题)
+7. [错误处理](#错误处理)
+
+---
+
+## 安装与依赖
+
+### 依赖项
+
+| 依赖 | 版本要求 | 用途 |
+|------|----------|------|
+| Python | >=3.8 | 运行脚本 |
+| <!-- 其他依赖 --> | <!-- 版本 --> | <!-- 用途 --> |
+
+### 安装步骤
+
+1. 确保本技能已通过 `skill-standardization` 创建
+2. 安装依赖：`pip install -r requirements.txt`（如有）
+3. 验证安装：运行 `python scripts/{name}_main.py --help`
+
+## 快速开始
+
+```bash
+# 最简用法
+python scripts/{name}_main.py --input input.txt --output output/
+
+# 带可选参数
+python scripts/{name}_main.py --input input.txt --output output/ --verbose
+```
+
+## 参数说明
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `--input` | path | 是 | - | 输入文件路径 |
+| `--output` | path | 否 | `data/output/` | 输出目录 |
+| `--verbose` | flag | 否 | `False` | 输出详细日志 |
+| `--config` | path | 否 | `references/config.json` | 配置文件路径 |
+
+## 工作流程详解
+
+### 阶段 1：输入解析
+
+- 读取 `--input` 指定的文件
+- 验证文件格式和内容完整性
+- 解析参数为内部数据结构
+
+### 阶段 2：核心处理
+
+- 调用核心算法/逻辑进行处理
+- 支持的处理模式：
+  - 模式 A：<!-- 描述 -->
+  - 模式 B：<!-- 描述 -->
+
+### 阶段 3：输出生成
+
+- 将处理结果写入 `--output` 目录
+- 生成摘要报告 `summary.md`
+- 记录执行日志到 `data/logs/`
+
+## 输出格式
+
+### 输出文件列表
+
+| 文件 | 格式 | 说明 |
+|------|------|------|
+| `summary.md` | Markdown | 处理摘要 |
+| `result.json` | JSON | 结构化结果 |
+| `details.csv` | CSV | 详细数据（可选） |
+
+### 输出示例
+
+```json
+{{
+  "status": "success",
+  "input_file": "input.txt",
+  "output_dir": "output/",
+  "processed_items": 42,
+  "errors": []
+}}
+```
+
+## 常见问题
+
+### Q: 输入文件格式不正确怎么办？
+A: 技能会输出明确的错误信息，指出格式问题和期望的格式。请参考本文档"输入格式"章节。
+
+### Q: 如何处理大文件？
+A: 对于超过 10MB 的文件，建议使用流式处理模式，添加 `--stream` 参数。
+
+## 错误处理
+
+### 错误代码
+
+| 代码 | 含义 | 处理方式 |
+|------|------|----------|
+| E001 | 输入文件不存在 | 检查文件路径 |
+| E002 | 输入格式错误 | 参考"输入格式"章节 |
+| E003 | 输出目录不可写 | 检查权限或换用 `--output` |
+| E004 | 依赖缺失 | 运行 `pip install -r requirements.txt` |
+
+### 错误恢复
+
+- 所有错误都会记录到 `data/logs/error.log`
+- 支持 `--retry` 参数进行自动重试（最多 3 次）
+- 严重错误会生成 `data/rollback/` 目录用于回滚
+
+---
+
+> 本文档遵循 R-06 渐进式加载规范，由 `skill-standardization` 生成。
+"""
+
+    def _generate_permissions_template(self, name):
+        """生成 references/permissions.md 模板"""
+        return f"""# {name} — 权限说明
+
+本文档由 `skill-standardization` 权限扫描器自动生成，描述本技能运行所需的权限及其风险等级。
+
+## 权限总览
+
+| 工具 | 访问级别 | 风险等级 | 授权方式 | 说明 |
+|------|----------|----------|----------|------|
+| Read | read-only | 低 | 静默 | 读取输入文件和配置 |
+| Write | write | 中 | 即时 | 写入输出结果到 `data/output/` |
+| Bash | restricted | 中 | 统一 | 运行 `scripts/` 目录下的内部脚本 |
+
+## 权限详细说明
+
+### Read（读取）
+
+- **用途**：读取用户输入文件、配置文件、参考数据
+- **范围限制**：仅读取技能安装目录和指定输入文件，不访问系统敏感路径
+- **不会读取**：`~/.ssh/`、`~/.aws/`、`*.key`、`*.pem`、`~/.workbuddy/memory/`
+
+### Write（写入）
+
+- **用途**：将处理结果写入输出目录
+- **范围限制**：仅写入 `data/output/` 目录，不写入安装目录或其他系统目录
+- **文件覆盖策略**：默认不覆盖现有文件，添加 `--force` 参数可覆盖
+
+### Bash（命令执行）
+
+- **用途**：运行内部处理脚本
+- **范围限制**：仅执行 `scripts/` 目录下的脚本，不执行用户 Shell 配置
+- **不会执行**：`rm -rf /`、`curl` 外部 URL、`git` 远程操作等危险命令
+
+## 风险缓解措施
+
+1. **输入验证**：所有用户输入都经过格式和范围验证
+2. **输出隔离**：输出文件限制在 `data/output/` 目录内
+3. **错误隔离**：单个文件处理失败不影响整体流程
+4. **审计日志**：所有操作记录到 `data/logs/audit.log`
+
+## 授权方式说明
+
+- **即时授权**：每次执行前需获得用户批准（用于 Write 操作）
+- **统一授权**：首次执行前获得用户批准，后续不再询问（用于 Bash 操作）
+- **静默授权**：无需用户交互，自动执行并记录（用于 Read 操作）
+
+---
+
+> 本文档会在每次运行 `python -m skill_audit audit . --fix` 后自动更新。
+"""
+
+    def _generate_examples_template(self, name):
+        """生成 references/examples.md 模板"""
+        return f"""# {name} — 使用示例
+
+本文档提供本技能的常见使用场景和完整示例。
+
+## 目录
+
+1. [示例 1：基本用法](#示例-1基本用法)
+2. [示例 2：批量处理](#示例-2批量处理)
+3. [示例 3：自定义配置](#示例-3自定义配置)
+4. [示例 4：错误处理](#示例-4错误处理)
+
+---
+
+## 示例 1：基本用法
+
+### 场景描述
+
+<!-- 描述一个简单的使用场景 -->
+
+### 输入
+
+`input.txt`:
+```
+<!-- 示例输入内容 -->
+```
+
+### 执行命令
+
+```bash
+python scripts/{name}_main.py --input input.txt --output output/
+```
+
+### 预期输出
+
+`output/summary.md`:
+```markdown
+<!-- 示例输出内容 -->
+```
+
+---
+
+## 示例 2：批量处理
+
+### 场景描述
+
+<!-- 描述批量处理多个文件的场景 -->
+
+### 输入
+
+`inputs/` 目录包含多个文件：
+```
+inputs/
+  ├── file1.txt
+  ├── file2.txt
+  └── file3.txt
+```
+
+### 执行命令
+
+```bash
+for file in inputs/*.txt; do
+  python scripts/{name}_main.py --input "$file" --output output/
+done
+```
+
+### 预期输出
+
+```
+output/
+  ├── file1_summary.md
+  ├── file2_summary.md
+  └── file3_summary.md
+```
+
+---
+
+## 示例 3：自定义配置
+
+### 场景描述
+
+<!-- 描述使用自定义配置文件的场景 -->
+
+### 配置文件
+
+`references/config.json`:
+```json
+{{
+  "param1": "value1",
+  "param2": 42,
+  "enabled": true
+}}
+```
+
+### 执行命令
+
+```bash
+python scripts/{name}_main.py --input input.txt --config references/config.json
+```
+
+---
+
+## 示例 4：错误处理
+
+### 场景描述
+
+输入文件格式错误，查看错误处理和恢复流程。
+
+### 输入（错误格式）
+
+`bad_input.txt`:
+```
+<!-- 错误格式的内容 -->
+```
+
+### 执行命令
+
+```bash
+python scripts/{name}_main.py --input bad_input.txt --output output/
+```
+
+### 预期错误输出
+
+```
+[ERROR] E002: 输入格式错误
+  期望格式: <!-- 正确格式描述 -->
+  实际内容: <!-- 错误内容描述 -->
+  
+建议: 请参考 `references/guide.md` 的"输入格式"章节
+```
+
+### 修复后重试
+
+```bash
+# 修复输入文件后重试
+python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
+```
+
+---
+
+## 输出样例
+
+### 样例 1：成功结果
+
+```json
+{{
+  "status": "success",
+  "input_file": "input.txt",
+  "output_dir": "output/",
+  "result": {{
+    // 结果数据
+  }}
+}}
+```
+
+### 样例 2：部分成功（有警告）
+
+```json
+{{
+  "status": "partial_success",
+  "input_file": "input.txt",
+  "warnings": [
+    "第 42 行数据格式异常，已跳过"
+  ],
+  "result": {{
+    // 部分结果数据
+  }}
+}}
+```
+
+---
+
+> 更多示例欢迎通过 PR 贡献到本文件的后续章节。
+"""
+
+    def _generate_progress_template(self, name):
+        """生成 .progress.md 模板"""
+        return f"""# {name} — 审计进度跟踪
+
+本文档记录本技能通过 `skill-standardization` 审计的进度。
+
+## 审计状态
+
+- **技能名称**：`{name}`
+- **当前版本**：`0.1.0`
+- **审计工具版本**：`skill-standardization v2.29.2`
+- **最后审计时间**：待首次审计
+- **通过规则数**：0 / 21
+- **待修复问题数**：0
+
+## 规则检查进度
+
+| 规则 | 状态 | 问题数 | 最后检查 |
+|------|------|--------|----------|
+| R-01 | [待检查] | 0 | - |
+| R-02 | [待检查] | 0 | - |
+| R-03 | [待检查] | 0 | - |
+| R-04 | [待检查] | 0 | - |
+| R-05 | [待检查] | 0 | - |
+| R-06 | [待检查] | 0 | - |
+| R-07 | [待检查] | 0 | - |
+| R-08 | [待检查] | 0 | - |
+| R-09 | [待检查] | 0 | - |
+| R-10 | [待检查] | 0 | - |
+| R-11 | [待检查] | 0 | - |
+| R-12 | [待检查] | 0 | - |
+| R-13 | [待检查] | 0 | - |
+| R-14 | [待检查] | 0 | - |
+| R-15 | [待检查] | 0 | - |
+| R-16 | [待检查] | 0 | - |
+| R-17 | [待检查] | 0 | - |
+| R-18 | [待检查] | 0 | - |
+| R-19 | [待检查] | 0 | - |
+| R-20 | [待检查] | 0 | - |
+| R-21 | [待检查] | 0 | - |
+
+## 修复历史
+
+| 日期 | 修复内容 | 修复者 |
+|------|----------|--------|
+| - | 待首次审计 | - |
+
+## 待办事项
+
+- [ ] 运行首次审计：`python -m skill_audit audit .`
+- [ ] 修复所有 ERROR 级别问题
+- [ ] 确认所有 WARN 级别问题已 Review
+- [ ] 提交首次版本并通过审计
+
+---
+
+> 本文档会在每次运行 `python -m skill_audit audit . --fix` 后自动更新。
+"""
+
+    def _generate_changelog_template(self, name):
+        """生成 CHANGELOG.md 模板"""
+        return f"""# {name} — 变更日志
+
+本文档记录 `{name}` 技能的版本变更，遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范。
+
+## [未发布]
+
+### 新增
+- （待添加）
+
+### 修改
+- （待添加）
+
+### 修复
+- （待添加）
+
+### 移除
+- （待添加）
+
+---
+
+## [0.1.0] - 2026-05-26
+
+### 新增
+- 初始版本，由 `skill-standardization v2.29.2` 创建
+- 基础目录结构：`SKILL.md`、`references/`、`scripts/`、`data/`
+- 支持基本输入处理和结果输出
+- 包含权限声明（R-07 合规）
+- 包含渐进式加载文档体系（R-06 合规）
+
+### 已知限制
+- 暂不支持流式处理大文件
+- 暂未实现缓存机制
+- 错误处理仅支持基本错误类型
+
+---
+
+## 版本号说明
+
+本技能遵循 **语义化版本 2.0.0**（Semantic Versioning）：
+
+- **主版本号**：不兼容的 API 修改
+- **次版本号**：向下兼容的功能性新增
+- **修订号**：向下兼容的问题修正
+
+---
+
+> 变更日志由 `skill-standardization` 维护，每次版本发布时更新本节。
+"""
 
     def _audit_and_update_progress(self, skill_dir, mode="create"):
         """审计 skill 并更新 .progress.md"""
@@ -159,7 +744,7 @@ tags: [{tags}]
         risk_level = report.get("risk_level", "unknown")
 
         if not issues:
-            print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")
+            print("[!] 权限扫描无风险项，跳过 permissions.md 写入")
             return
 
         lines = []
@@ -199,10 +784,10 @@ tags: [{tags}]
             lines.append(f"> **权限作用**：{cat_action}")
             lines.append("")
             lines.append("| # | 文件 | 行号 | 匹配内容 | 风险等级 | 授权方式 | 说明 |")
-            lines.append("|---|------|------|----------|----------|----------|------|")
+            lines.append("|---|------|----------|----------|----------|------|")
             for i, iss in enumerate(items, 1):
                 sev = iss.get("severity", "?")
-                sev_cn = {"HIGH": "🔴 高", "MEDIUM": "🟡 中", "LOW": "✅ 低", "ERROR": "🔴 高"}.get(sev, sev)
+                sev_cn = {"HIGH": "[高]", "MEDIUM": "[中]", "LOW": "[低]", "ERROR": "[高]"}.get(sev, sev)
                 file = iss.get("file", "")
                 line = iss.get("line", "")
                 match = iss.get("match", iss.get("pattern", ""))[:50]
@@ -234,7 +819,7 @@ tags: [{tags}]
 
         pm.parent.mkdir(parents=True, exist_ok=True)
         pm.write_text("\n".join(lines), encoding="utf-8")
-        print(f"[✅] 权限扫描结果已自动写入 {pm}")
+        print(f"[OK] 权限扫描结果已自动写入 {pm}")
 
     def _get_category_description(self, category):
         """返回权限类别的中文描述"""
@@ -261,4 +846,3 @@ tags: [{tags}]
             "silent": "静默授权（无需用户交互，自动执行并记录）",
         }
         return methods.get(method, "未知授权方式")
-

@@ -106,7 +106,8 @@ RULES = [
         "severity": "ERROR",
         "check": "产出物路径符合 skills/.standardization/<skill>/ 规范，且无路径遍历、跨目录写入、敏感信息泄露风险",
         "method": "check_artifact_paths",
-        "fixable": False,
+        "fixable": True,
+        "fix_action": "fix_artifact_paths(skill_dir) — 自动修正 scripts/*.py 中的产出物路径，将硬编码路径替换为 skills/.standardization/<skill>/ 规范",
         "create_template": "scripts/ 中产出物路径统一使用 Path(__file__).parent.parent / '.standardization' / '<skill>' / 'data'",
     },
     {
@@ -115,7 +116,8 @@ RULES = [
         "severity": "ERROR",
         "check": "外部数据目录路径符合 skills/.standardization/<skill-name>/ 约定，_meta.json 含 data_dir 字段且一致，且无数据泄露风险",
         "method": "check_external_data_dir",
-        "fixable": False,
+        "fixable": True,
+        "fix_action": "fix_external_data_dir(skill_dir) — 自动修正 _meta.json 和 scripts/*.py 中的数据目录变量，确保符合 skills/.standardization/<skill>/data/ 规范",
         "create_template": "如需持久化数据，_meta.json 添加 data_dir: skills/.standardization/<skill-name>/data",
     },
     # ── 新增规则 R-13 ~ R-17 (v2.13.0) ────────────────────────────────
@@ -290,7 +292,7 @@ _ARTIFACT_EXTS_COMPREHENSIVE = {
 }
 
 # 根目录已知白名单文件（非产出物）
-_KNOWN_ROOT_FILES = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep"}
+_KNOWN_ROOT_FILES = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep", "CHANGELOG.md", ".progress.md"}
 
 # 旧版兼容：产出物扩展名集合（用于根目录文件扫描）
 _ROOT_ARTIFACT_EXTS = set(_ARTIFACT_EXTS_COMPREHENSIVE.keys())

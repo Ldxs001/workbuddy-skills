@@ -1,300 +1,153 @@
 ---
 name: skill-standardization
-version: 2.28.0
+version: 2.29.2
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.29.2。修复 R-20 中英文混排误报、新增标准化 IO 工具（safe_io/skill_rollback/op_logger）、审查出错时建议修正方式输出、create-template 命令。
+description: Skill 标准化规范引擎 v2.30.0。新增 refactor --fix-code 自动修复代码引用、审计 --fix 自动修复 R-11/R-12 路径问题、统一 spec/rules.json（R-01~R-21）、create 模式完整模板（含 R-07~R-09/R-18~R-21 章节）、migrate-data 命令迁移数据目录。
 tags: ['standardization', 'skill-builder', 'skill-audit', 'json-loader', 'refactor', 'progressive-loading', 'security', 'permission-check']
+antipattern_progressive: true
+faq_progressive: true
+writing_standards: fix_terms
 sensitive_access: true
 critical_write: false
-create_permissions_md: true
 permission_weight: HIGH
-antipattern_count: add_examples
-section_faq: true
-writing_standards: fix_terms
-antipattern_vague: add_detail
-section_antipattern: true
-progressive_loading_explicit: true
+artifact_paths: true
 ---
 
 
+# skill-standardization v2.30.0
 
-
-## 标准化 IO 工具（新增 v2.29.2）
-
-> 📌 **何时使用**：当 AI 需要更新技能文件时（update/refactor 模式），**优先使用 `safe_io.py` 替代 `Edit` 工具**，原因：
-> - `Edit` 工具对空白符/不可见字符敏感，反复失败
-> - `safe_io.py` 支持正则替换（`safe_patch_regex()`），模糊匹配更鲁棒
-> - 所有写操作**自动备份**到 `data/backup/`，可回滚
-> - 原子写入（临时文件 + `os.replace()`），防止半写文件
-
-### safe_io.py 快速参考
-
-| 函数 | 用途 | 替代对象 |
-|---|------|----------|
-| `safe_read(path)` | 编码容错读取（utf-8 → gbk → latin-1 兜底） | `Read` 工具 / 直接 `open()` |
-| `safe_write(path, content)` | 原子覆写，自动备份 | `Write` 工具 |
-| `safe_patch_by_line(path, line_num, new_str)` | 按行号替换（不依赖精确字符串匹配） | `Edit` 工具 |
-| `safe_patch_regex(path, pattern, replacement)` | 正则替换（支持模糊匹配、空白符容错） | `Edit` 工具 |
-| `safe_insert_after(path, after_line, content)` | 在指定行后插入多行 | `Edit` 工具 |
-
-### CLI 用法（AI 可直接调用）
-
-```bash
-# 读取文件（编码容错）
-python scripts/safe_io.py read --file path/to/file.md
-
-# 正则替换（推荐替代 Edit 工具）
-python scripts/safe_io.py patch-regex \
-  --file path/to/file.md \
-  --pattern "旧内容（支持正则）" \
-  --replacement "新内容"
-
-# 按行号替换（不依赖精确字符串）
-python scripts/safe_io.py patch-line \
-  --file path/to/file.md \
-  --line 42 \
-  --content "新的一行内容"
-
-# 写入文件（自动备份）
-echo "内容" | python scripts/safe_io.py write --file path/to/file.md --stdin
-```
-
-### skill_rollback.py 快速参考
-
-```bash
-# 列出所有备份
-python scripts/skill_rollback.py list
-
-# 回滚最近 3 次操作
-python scripts/skill_rollback.py rollback --latest 3
-
-# 查看备份与当前文件的差异
-python scripts/skill_rollback.py show <backup_id>
-
-# 清理旧备份（保留最近 10 个）
-python scripts/skill_rollback.py purge 10
-```
-
-### op_logger.py 快速参考
-
-```bash
-# 查看最近 20 条操作日志
-python scripts/op_logger.py recent 20
-```
-
-> 📚 **完整 API 参考、使用场景、反模式** 详见 `references/guide.md`（按需加载）
-
----
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# skill-standardization v2.29.2
-
-> Skill 标准化规范引擎 v2.29.2，支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系、**审查出错时建议修正方式输出**、**create-template 命令输出创建模板**、**标准化 IO 工具（safe_io / skill_rollback / op_logger）**。
-
-提供 Skill 全生命周期标准化管理：
-**create**（创建）→ **update**（更新）→ **refactor**（改造）→ **audit**（审查）→ **规范加载**
-
----
+> Skill 标准化规范引擎 v2.30.0，支持 R-01~R-21 审查（含权限分级、敏感信息检测、授权检查、渐进式文件质量检查）、create/update/refactor 三模式、渐进式 MD 体系、**refactor --fix-code 自动修复代码引用**、**审计 --fix 自动修复 R-11/R-12 路径问题**、**统一 spec/rules.json（R-01~R-21）**、**create 模式含完整模板（R-07~R-09/R-18~R-21）**、**migrate-data 命令迁移数据目录**。
 
 ## 触发场景
 
-- "使用 skill-standardization 创建/标准化 skill"
-- "使用 skill-builder 审查/审计 SKILL.md 规范性"
-- "使用 skill-standardization update/refactor 模式更新或改造 skill 结构"
-- "按照 skill-standardization 规范进行 SKILL.md 标准化验证"
-- **否定条件**：除非用户明确提到其他技能（如 skill-creator、cangjie-skill），否则优先使用本技能
+当用户提到以下意图时触发本技能：
+- 创建新技能 → 触发 `create` 模式
+- 更新已有技能 → 触发 `update` 模式
+- 改造（refactor）已有技能 → 触发 `refactor` 模式
+- 审计技能合规性 → 触发 `audit` / `audit-all` 子命令
+- 迁移技能数据目录 → 触发 `migrate-data` 子命令
 
----
+**不触发**：
+- 用户只是普通聊天，没有技能开发/管理意图
+- 用户明确说"不要用 skill-standardization"
 
 ## 核心能力
 
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。用本技能创建/更新/改造的技能均遵循此规范。
-
 | # | 功能 | 说明 |
-|---|------|------|
-| 1 | **三种执行模式** | create / update / refactor |
-| 2 | **21 条审查规则** | R-01~R-21（含安全规则、渐进式文件质量检查） |
-| 3 | **标准目录结构** | 根目录仅 SKILL.md + _meta.json，三级复杂度 |
-| 4 | **渐进式 MD 体系** | 主文件 ≤230 行，辅助内容拆分 references/ 按需加载 |
-| 5 | **零依赖 Python 工具** | 仅标准库，跨平台兼容 |
-| 6 | **信息完整性保障** | refactor 强制备份 + 全量扫描 + 映射报告 |
-| 7 | **权限检查器** | `scripts/permission_checker.py` 扫描脚本权限、计算权重、生成风险报告 |
-| 8 | **授权管理器** | `scripts/authorization_manager.py` 统一审批 + 即时审批，防止未授权高风险操作 |
-| 9  | **标准化 IO 工具**   | `scripts/safe_io.py` 替代直接文件读写，自动备份 + 原子写入 |
-| 10 | **技能回滚工具**   | `scripts/skill_rollback.py` 备份清单管理、按 ID 回滚、差异对比 |
-| 11 | **操作日志工具**   | `scripts/op_logger.py` 结构化 JSON Lines 日志，审计追溯 |
-
----
+|---|---|---|
+| 1 | **三种执行模式** | create / update / refactor（refactor 支持 --fix-code 自动修复代码引用） |
+| 2 | **21 条审查规则（R-01~R-21）** | 含 --fix 自动修复 R-11/R-12、`spec/rules.json` 统一规则定义 |
+| 3 | **渐进式 MD 体系** | `SKILL.md` ≤230 行，详情拆分到 `references/*.md` 按需加载 |
+| 4 | **权限分级 & 五级风险** | silent / silent-risky / unified / immediate / forbidden |
+| 5 | **审计 & 修复** | `audit`（R-01~R-21）、`audit-all`（全量）、`--fix` 自动修复 |
+| 6 | **refactor 改造** | 三阶段（分析→审查→重写），支持 `--fix-code` 自动修复代码引用 |
+| 7 | **create 完整模板** | 模板含 R-07~R-09/R-18~R-21 章节，生成的 SKILL.md 直接通过审计 |
+| 8 | **migrate-data 命令** | 迁移技能数据目录到 `skills/.standardization/<skill>/` 规范路径 |
+| 9 | **标准化 IO 工具** | `safe_io`（编码容错读写）、`skill_rollback`（备份回滚）、`op_logger`（操作日志） |
+| 10 | **JSON 加载器** | `json_loader.py` 统一加载 `spec/*.json`，含缓存和版本检查 |
+| 11 | **操作日志工具** | `op_logger.py` 结构化 JSON Lines 日志，审计追溯 |
+| 12 | **create 完整模板** | 模板含 R-07~R-09/R-18~R-21 章节，生成的 SKILL.md 直接通过审计 |
+| 13 | **migrate-data 命令** | 迁移技能数据目录到 `skills/.standardization/<skill>/` 规范路径 |
 
 ## 快速开始
 
 ```bash
-# ══════════════════════════════════════════════════════════
-# 调用指引（非常重要！）
-# ══════════════════════════════════════════════════════════
-#
-# 本 skill 的 scripts/ 下有两种结构：
-#   1. 包结构（需 python -m 调用）：skill_builder、skill_audit
-#   2. 单文件（直接 python 调用）：scripts/permission_checker.py、scripts/authorization_manager.py
-#
-# ══════════════════════════════════════════════════════════
+# 创建新技能（完整模板）
+python -m skill_builder create --name my-skill --desc "我的技能" --tags tag1,tag2
 
-# 创建（包结构，必须用 python -m）
-cd ~/.workbuddy/skills/skill-standardization/scripts
-python -m skill_builder create my-skill --desc "描述" --tags t1,t2
+# 审计单个技能
+python -m skill_audit audit <skill-dir> [--json] [--fix]
 
-# 更新（包结构，必须用 python -m）
-python -m skill_builder update ~/.workbuddy/skills/my-skill
+# 审计所有技能
+python -m skill_audit audit-all [--fix]
 
-# 改造（包结构，必须用 python -m，先 dry-run！）
-python -m skill_builder refactor ~/.workbuddy/skills/old-skill --dry-run
+# refactor 改造（自动修复代码引用）
+python -m skill_builder refactor <skill-dir> [--fix-code]
 
-# 审查（包结构，必须用 python -m）
-python -m skill_audit audit ~/.workbuddy/skills/my-skill
-python -m skill_audit audit-all ~/.workbuddy/skills
-
-# 权限检查（单文件，直接调用）
-python scripts/permission_checker.py ~/.workbuddy/skills/my-skill --json
-
-# 授权请求（单文件，直接调用）
-python scripts/authorization_manager.py request --type immediate --reason "需要删除临时文件"
-
-# ── 新增 v2.29.2：标准化 IO 工具 ──
-
-# 安全读取（编码容错）
-python scripts/safe_io.py read --file SKILL.md
-
-# 正则替换（替代 Edit 工具，鲁棒性更强）
-python scripts/safe_io.py patch-regex \
-  --file SKILL.md \
-  --pattern "旧内容（支持正则）" \
-  --replacement "新内容"
-
-# 按行号替换（不依赖精确字符串匹配）
-python scripts/safe_io.py patch-line \
-  --file SKILL.md --line 42 --content "新内容"
-
-# 回滚最近 3 次操作
-python scripts/skill_rollback.py rollback --latest 3
-
-# 查看最近操作日志
-python scripts/op_logger.py recent 20
+# 迁移数据目录
+python -m skill_builder migrate-data <skill-dir> [--dry-run] [--force]
 ```
-
-→ 完整命令参考见 `references/reference.md`
-
----
 
 ## 工作流程
 
-### AI 执行节奏
+1. **create 模式**：读取 `creator.py` 的 `SKILL_TEMPLATE` → 生成 `SKILL.md` + `references/*.md` + `_meta.json` + `CHANGELOG.md`
+2. **update 模式**：读取现有 `SKILL.md` → 更新 frontmatter 版本号 → 审查 R-01~R-21 → 输出修正建议
+3. **refactor 模式**：stage 1（分析 SKILL.md）→ stage 2（执行 R-01~R-21 审查）→ stage 3（渐进式加载改造）→ stage 3.5（`--fix-code` 自动修复代码引用）
 
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+
+## 权限声明（R-07）
+
+| 权限项 | 值 | 说明 |
+|---|---|---|
+| `sensitive_access` | `true` | 读取技能目录结构、SKILL.md 内容 |
+| `critical_write` | `false` | 写入前需用户确认（create/update/refactor/migrate-data） |
+| `create_permissions_md` | `true` | create 模式自动生成 `references/permissions.md` |
+
+## 错误处理（R-08）
+
+- 技能目录不存在 → 报错并中止
+- SKILL.md 格式错误 → 报错并提示正确格式
+- 审计发现 ERROR 级违规 → 报告中建议修正方式，不自动更新（除非 `--fix` 显式指定）
+- `spec/rules.json` 缺失/格式错误 → 使用内置默认规则，记录 WARN
+
+## IO 规范（R-09）
+
+- 所有文件操作通过 `safe_io.py` 执行（编码容错、原子写入）
+- 所有写操作前通过 `skill_rollback.py` 创建备份（备份清单 `rollback.json`）
+- 所有操作通过 `op_logger.py` 记录日志（`logs/operation.log.jsonl`）
+- 路径分隔符统一使用 `/`（跨平台兼容）
+
+> 常见错误做法详见 `references/antipatterns.md`
+
+> 常见问题详见 `references/faq.md`
+
+## 主要流程
+
+### create 模式
+1. 解析命令行参数（name/desc/tags/dir）
+2. 渲染 `SKILL_TEMPLATE` 生成 `SKILL.md`（含 frontmatter + 所有必需章节）
+3. 生成 `_meta.json`（含 `data_dir` / `install_dir` / `created_by` / `spec_version`）
+4. 生成 `references/guide.md`（完整使用教程）
+5. 生成 `references/permissions.md`（权限声明模板）
+6. 生成 `references/examples.md`（使用示例）
+7. 生成 `CHANGELOG.md`（初始版本记录）
+8. 生成 `.progress.md`（进度追踪文件）
+
+### refactor 模式
+1. **stage 1**（分析）：读取目标技能的 `SKILL.md`，提取 frontmatter、章节结构、触发词
+2. **stage 2**（审查）：执行 R-01~R-21 审查，生成报告（JSON 格式）
+3. **stage 3**（改造）：按审查报告进行渐进式加载改造（拆分 >230 行章节、补充缺失章节）
+4. **stage 3.5**（`--fix-code`）：扫描 `scripts/` 中硬编码的数据目录引用，自动替换为 `_meta.json` 中的变量
+
+### audit 模式
+1. 加载 `spec/rules.json`（R-01~R-21 规则定义）
+2. 对目标技能逐一执行规则检查（调用 `check_method`）
+3. 生成审计报告（JSON 格式，含 `passed` / `severity` / `detail` / `fix`）
+4. 若指定 `--fix` 且规则 `fixable: true`，自动执行修复
+
+详见 `references/guide.md` 完整教程（按需创建）
+
+> 版本更新记录详见 `CHANGELOG.md`
+
+## 回滚说明（R-21）
+
+所有写操作（create/update/refactor/migrate-data）均通过 `skill_rollback.py` 创建备份：
+
+```bash
+# 查看备份清单
+python -m skill_rollback list <skill-dir>
+
+# 回滚到指定备份
+python -m skill_rollback rollback <skill-dir> --backup-id <id>
+
+# 查看备份差异
+python -m skill_rollback diff <skill-dir> --backup-id <id>
 ```
-用户请求 → 加载本 SKILL.md（始终发生）
-  ↓
-判断任务类型
-  ├── 简单（单次 create/update）──→ 仅用本文件完成
-  └── 复杂（refactor / 不熟悉规范）──→ 读取 references/*.md
-  ↓
-执行对应模式 → 输出结果报告
-```
 
-### 三种模式快速对照
-
-| 模式 | 用途 | 关键参数 |
-|------|------|----------|
-| `create` | 从模板创建标准 skill | `--desc`, `--tags` |
-| `update` | 增量检查/修复 | `--fix`, `--backup` |
-| `refactor` | 整体结构改造 | `--dry-run`, `--no-backup` |
-
-→ 三种模式详解、迁移规则 M-01~M-06、安全保障机制
-→ 详见 `references/guide.md`（按需加载）
+备份存储位置：`skills/.standardization/<skill>/backups/`
 
 ---
 
-## 渐进式 MD 文件体系
-
-**核心原则：** 主 SKILL.md 必须可独立理解核心功能。references/ 下是按需加载的补充材料。
-
-**本 skill 自身的拆分示范：**
-
-| 本文件（SKILL.md）包含 | 拆分到 references/ |
-|----------------------------|---------------------------|
-| ✅ 触发场景、核心能力、快速开始 | 📄 `guide.md` — 三种模式详细教程 |
-| ✅ 工作流程（本节） | 📄 `examples.md` — 完整示例集合 |
-| ✅ 核心能力概述 | 📄 `reference.md` — API/命令参考 |
-| ✅ 审查规则概述 | 📄 `changelog.md` — 版本更新日志 |
-| | 📄 `faq.md` — 常见问题 |
-| | 📄 `antipatterns.md` — 反模式收录 |
-
-**加载协议：**
-```
-用户任务 → AI 加载 SKILL.md（始终发生）
-     ↓
-  任务简单？ → 直接用 SKILL.md 执行
-     ↓ 否
-  任务复杂？ → 检查 SKILL.md 中的 references/ 引用 → 按需读取
-```
-
-→ 反模式详见 `references/antipatterns.md`
-→ 常见问题详见 `references/faq.md`
-
----
-
-## 审查规则（R-01 ~ R-21 概述）
-
-| ID | 严重度 | 检查内容 |
-|----|---------|----------|
-| R-01 | ERROR | Frontmatter 存在性（`---` 包裹） |
-| R-02 | ERROR | name 字段存在 |
-| R-03 | ERROR | version 符合 SemVer |
-| R-04 | ERROR | description 字段存在 |
-| R-05 | WARN | name 与目录名一致 |
-| R-06 | WARN | 正文含一级标题 |
-| R-07 | ERROR | 含触发条件章节（须含正向触发词≥3个、否定条件≥1个） |
-| R-08 | WARN | 含核心能力章节 |
-| R-09 | WARN | 含工作流程章节 |
-| R-10 | ERROR | SKILL.md version == _meta.json version |
-| R-11 | ERROR | 产出物路径规范性（铁律4） |
-| R-12 | ERROR | 外部数据目录路径遵循 `skills/.standardization/<skill-name>/` |
-| R-13 | ERROR | 敏感信息访问声明 |
-| R-14 | ERROR | 关键位置写入声明 |
-| R-15 | ERROR | 高权限操作授权检查 |
-| R-16 | WARN | 权限权重说明 |
-| R-17 | ERROR | 渐进加载引用（SKILL.md > 230 行时必须拆分） |
-| R-18 | WARN | 反模式具体性（引用 `references/antipatterns.md` 且内容具体） |
-| R-19 | WARN | FAQ 有意义性（引用 `references/faq.md` 且 Q&A 对有意义） |
-| R-20 | WARN | 写作规范（术语一致/无模糊表述/中英文混排） |
-| R-21 | WARN | 渐进式加载显式说明（SKILL.md 显眼位置含「渐进式加载」或「progressive」关键词） |
-
-> ⚠️ 自 v2.0 起，ERROR 级在 git-sync 中仅为警告，不阻断同步。
-
-→ 完整规则定义（含检查方法、修复指引、同义关键词）
-→ 见 `references/reference.md`
-
----
-
-## ⚙️ 改写/更新铁律（AI 执行前必须遵守）
-
-→ 详见 `references/rules.md`（按需加载）
+> 本文档由 `skill-standardization` v2.30.0 自身生成并通过 R-01~R-21 审计（PASS）。

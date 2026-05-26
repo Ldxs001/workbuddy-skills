@@ -66,7 +66,7 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
         for v in violations:
             line = f"  {v['source']}  产出 \"{v['path_literal']}\" — 应迁至 {v['suggestion']}"
             if v.get("cross_refs"):
-                line += f"\n    ⚠️ 关联引用 ({len(v['cross_refs'])}处): {', '.join(v['cross_refs'])}"
+                line += f"\n    [!] 关联引用 ({len(v['cross_refs'])}处): {', '.join(v['cross_refs'])}"
             detail_lines.append(line)
         return {
             "passed": False,
@@ -615,3 +615,166 @@ def _find_skills_dir(skill_dir):
             break
         p = parent
     return os.path.dirname(os.path.abspath(skill_dir))
+
+
+def fix_artifact_paths(skill_dir):
+    """
+    R-11 自动修复：将 scripts/*.py 中的硬编码产出物路径
+    替换为 skills/.standardization/<skill>/ 规范路径。
+    返回修复数量。
+    """
+    import re, os
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return 0
+
+    skill_name = os.path.basename(os.path.abspath(skill_dir))
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return 0
+
+    # 调用检查函数获取违规列表
+    from .artifact_checker import check_artifact_paths
+    import tempfile, json
+    tmp = tempfile.mktemp(suffix=".json")
+    result = check_artifact_paths(
+        os.path.join(skill_dir, "SKILL.md"),
+        open(os.path.join(skill_dir, "SKILL.md"), "r", encoding="utf-8").read(),
+        {}, "", skill_dir=skill_dir
+    )
+    if result.get("passed"):
+        return 0
+
+    violations = result.get("violations", [])
+    fixed = 0
+
+    for v in violations:
+        src = v.get("source", "")
+        # src 格式： "scripts/foo.py:42" 或 "ROOT/foo.html"
+        if not src.startswith("scripts/"):
+            continue
+        parts = src.split(":")
+        if len(parts) != 2:
+            continue
+        fname = parts[0].replace("scripts/", "", 1)
+        try:
+            lineno = int(parts[1]) - 1  # 0-based
+        except ValueError:
+            continue
+
+        fpath = os.path.join(scripts_dir, fname)
+        if not os.path.isfile(fpath):
+            continue
+
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+        except Exception:
+            continue
+
+        if lineno < 0 or lineno >= len(lines):
+            continue
+
+        old_line = lines[lineno]
+        suggestion = v.get("suggestion", "")
+        # suggestion 格式： "skills/.standardization/<skill>/outputs/foo.html"
+        if not suggestion:
+            continue
+
+        # 提取规范路径的组件
+        sug_parts = suggestion.replace("skills/.standardization/", "").split("/")
+        if len(sug_parts) < 2:
+            continue
+
+        category = sug_parts[1]  # outputs / data / cache / temp
+        filename = sug_parts[-1] if "/" in suggestion else ""
+
+        # 构造替换行：将路径替换为 Path 拼接形式
+        # 旧：".../outputs/foo.html" 或 Path.home() / "..."
+        # 新：SKILL_ROOT / ".standardization" / skill_name / category / filename
+        # 在 get_*_home() 函数中：default = Path.home() / ".workbuddy" / "skills" / ".standardization" / skill_name / category
+        if "default" in old_line and "Path.home()" in old_line:
+            indent = old_line[:len(old_line) - len(old_line.lstrip())]
+            new_line = indent + 'default = Path.home() / ".workbuddy" / "skills" / ".standardization" / "' + skill_name + '" / "' + category + '"\n'
+            if filename:
+                new_line = indent + 'default = Path.home() / ".workbuddy" / "skills" / ".standardization" / "' + skill_name + '" / "' + category + '"\n'
+            lines[lineno] = new_line
+            with open(fpath, "w", encoding="utf-8") as f:
+                f.writelines(lines)
+            fixed += 1
+
+    return fixed
+
+
+def fix_external_data_dir(skill_dir):
+    """
+    R-12 自动修复：
+    1. 更新 _meta.json 添加 data_dir 字段
+    2. 更新 scripts/*.py 中的数据目录变量
+    返回修复数量。
+    """
+    import re, os, json
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return 0
+
+    skill_name = os.path.basename(os.path.abspath(skill_dir))
+    fixed = 0
+
+    # 1. 更新 _meta.json
+    meta_file = os.path.join(skill_dir, "_meta.json")
+    meta = {}
+    if os.path.isfile(meta_file):
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception:
+            meta = {}
+    expected = "skills/.standardization/" + skill_name + "/data/"
+    if meta.get("data_dir") != expected:
+        meta["data_dir"] = expected
+        with open(meta_file, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        fixed += 1
+        print("    [OK] 更新 _meta.json: data_dir = " + expected)
+
+    # 2. 更新 scripts/*.py 中的数据目录变量
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return fixed
+
+    for fname in sorted(os.listdir(scripts_dir)):
+        fpath = os.path.join(scripts_dir, fname)
+        if not os.path.isfile(fpath) or not fname.endswith(".py"):
+            continue
+
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except Exception:
+            continue
+
+        original = content
+        # 匹配：VAR_NAME = Path.home() / "..." / "..."
+        pattern = re.compile(
+            r'^(s*)([A-Za-z_]+w*(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*)(s*=\s*Path\.home(s*)((?:\s*/\s*"[^"]+")+))',
+            re.MULTILINE
+        )
+        for m in pattern.finditer(content):
+            indent = m.group(1)
+            var_name = m.group(2)
+            path_parts = re.findall(r'["\']([^"\']*)["\']', m.group(4))
+            if not path_parts:
+                continue
+            # 替换为标准路径
+            new_value = 'Path.home() / ".workbuddy" / "skills" / ".standardization" / "' + skill_name + '" / "data"'
+            new_line = indent + var_name + " = " + new_value
+            content = content[:m.start()] + new_line + content[m.end():]
+            fixed += 1
+            print("    [OK] 更新 " + fname + ": " + var_name + " → 标准路径")
+            break  # 每个文件只修第一个匹配
+
+        if content != original:
+            with open(fpath, "w", encoding="utf-8") as f:
+                f.write(content)
+
+    return fixed

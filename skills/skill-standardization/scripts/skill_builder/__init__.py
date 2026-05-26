@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder package — Skill 标准化构建器 v2.25.0
+skill_builder package — Skill 标准化构建器 v2.30.0
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -20,15 +20,16 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# ── 导入子模块 ──────────────────────────────────────────────
+# ── 导入子模块 ─────────────────────────────────────────────
 from .creator import SkillCreator
 from .updater import SkillUpdater
 from .refactor import Refactor
+from .migrator import SkillMigrator
 from .version_manager import VersionManager
 from .utils import *
 
-# ── 常量 ──────────────────────────────────────────────
-__version__ = "2.17.0"
+# ── 常量 ─────────────────────────────────────────────
+__version__ = "2.30.0"
 
 # R-12: 外部数据目录变量检测模式（通用化，非框架绑定）
 _DATA_VAR_RE = re.compile(
@@ -36,45 +37,6 @@ _DATA_VAR_RE = re.compile(
 )
 
 SPEC_DIR = Path(__file__).parent / "spec"
-SKILL_TEMPLATE = """---
-name: {name}
-version: 0.1.0
-author: your-name-here
-license: MIT
-description: >
-  {description}
-tags: [{tags}]
----
-
-# {name} — {title}
-
-{description}
-
-## 触发场景
-
-当用户提到以下意图时触发本技能：
-- <!-- TODO: 填写触发条件 -->
-
-## 核心能力
-
-| # | 功能 | 说明 |
-|---|------|------|
-| 1 | <!-- TODO --> | <!-- TODO --> |
-
-## 快速开始
-
-```bash
-# 最简用法示例
-```
-
-## 主要流程
-
-<!-- 在此描述主要工作流程 -->
-
-→ 详见 `references/guide.md` 完整教程（按需创建）
-"""
-
-META_TEMPLATE = '{{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "skills/.standardization/{name}/data/"}}'
 
 # 主 SKILL.md 必须包含的章节（用于 update/refactor 检查）
 REQUIRED_SECTIONS = [
@@ -96,7 +58,7 @@ SPLITTABLE_KEYWORDS = {
 
 def main():
     """主入口函数"""
-    parser = argparse.ArgumentParser(description="Skill 标准化构建器 v2.15.2")
+    parser = argparse.ArgumentParser(description="Skill 标准化构建器 v2.30.0")
     subparsers = parser.add_subparsers(dest="command", help="执行模式")
 
     # create 子命令
@@ -124,6 +86,15 @@ def main():
     refactor_parser.add_argument("--workspace", default=".", help="工作区根目录")
     refactor_parser.add_argument("--inject-auth", action="store_true",
                              help="扫描风险操作并注入授权要求章节到 SKILL.md")
+    refactor_parser.add_argument("--fix-code", action="store_true",
+                             help="自动修复 scripts/ 中硬编码的数据目录路径（阶段3.5）")
+
+    # migrate-data 子命令（v2.30.0 新增）
+    migrate_parser = subparsers.add_parser("migrate-data", aliases=["migrate"],
+                                      help="迁移技能数据目录到新规范路径")
+    migrate_parser.add_argument("skill_dir", help="技能目录路径")
+    migrate_parser.add_argument("--dry-run", action="store_true", help="仅输出计划，不执行")
+    migrate_parser.add_argument("--force", action="store_true", help="强制覆盖已存在的目标目录")
 
     args = parser.parse_args()
 
@@ -136,6 +107,9 @@ def main():
     elif args.command == "refactor":
         refactor = Refactor()
         refactor.refactor(args)
+    elif args.command in ("migrate-data", "migrate"):
+        migrator = SkillMigrator()
+        migrator.migrate(args)
     else:
         parser.print_help()
 

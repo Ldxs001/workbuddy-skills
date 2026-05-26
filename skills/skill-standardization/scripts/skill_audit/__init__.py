@@ -39,6 +39,7 @@ from .structure_checker import (
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
+    fix_artifact_paths, fix_external_data_dir,
 )
 from .permission_checks import (
     check_sensitive_access_declaration, check_critical_write_declaration,
@@ -244,7 +245,7 @@ def format_report(audit_result, verbose=True):
     r = audit_result
 
     if "error" in r:
-        lines.append(f"❌ {r['skill']}: {r['error']}")
+        lines.append(f"[X] {r['skill']}: {r['error']}")
         return "\n".join(lines)
 
     lines.append(f"{'='*55}")
@@ -257,7 +258,7 @@ def format_report(audit_result, verbose=True):
     # 显示自动修正信息
     if r.get("fixed"):
         lines.append(f"\n{'─'*55}")
-        lines.append("  ⚠️  已自动修正以下 frontmatter 字段：")
+        lines.append("  [!]  已自动修正以下 frontmatter 字段：")
         for fix_desc in r["fixed"]:
             lines.append(f"    • {fix_desc}")
         if r.get("re_audit"):
@@ -269,7 +270,7 @@ def format_report(audit_result, verbose=True):
         lines.append(f"{'规则ID':<8} {'严重度':<7} {'状态':<6} 详情")
         lines.append(f"{'-'*8}-{'-'*7}-{'-'*6}-{'-'*30}")
         for res in r["results"]:
-            status = "✅" if res["passed"] else ("⏭️" if res["skipped"] else ("🔴" if res["severity"]=="ERROR" else "🟡"))
+            status = "[OK]" if res["passed"] else ("⏭️" if res["skipped"] else ("[ERROR]" if res["severity"]=="ERROR" else "[WARN]"))
             sev = res["severity"][0] if res["severity"] else "?"
             lines.append(f"{res['rule_id']:<8} {sev:<7} {status:<6} {res['detail']}")
             # 新增：输出修正建议（供 LLM 参考）
@@ -278,7 +279,7 @@ def format_report(audit_result, verbose=True):
                 if fix.get("operation"):
                     lines.append(f"    💡 建议修正：{fix['operation']}")
                 if fix.get("location"):
-                    lines.append(f"    📍 位置：{fix['location']}")
+                    lines.append(f"    [search] 位置：{fix['location']}")
                 if fix.get("reason"):
                     lines.append(f"    💬 原因：{fix['reason']}")
 
@@ -295,8 +296,8 @@ def cmd_create_template():
     print(f"{'='*70}\n")
 
     for rule in RULES:
-        sev_mark = "🔴" if rule["severity"] == "ERROR" else "🟡"
-        fixable_mark = "✅ 可自动修正" if rule.get("fixable") else "❌ 需手动修正"
+        sev_mark = "[ERROR]" if rule["severity"] == "ERROR" else "[WARN]"
+        fixable_mark = "[OK] 可自动修正" if rule.get("fixable") else "[X] 需手动修正"
         print(f"{'─'*70}")
         print(f"  {rule['id']} {sev_mark} [{rule['severity']}] {rule['name']}")
         print(f"  检查：{rule['check']}")
@@ -324,7 +325,7 @@ def cmd_rules():
     print(f"\n{'ID':<8} {'严重度':<8} 名称  检查内容")
     print("-" * 65)
     for rule in RULES:
-        sev_mark = "🔴" if rule["severity"] == "ERROR" else "🟡"
+        sev_mark = "[ERROR]" if rule["severity"] == "ERROR" else "[WARN]"
         print(f"  {rule['id']:<6} {sev_mark} {rule['severity']:<6} {rule['name']: <20} {rule['check']}")
     print(f"\n共 {len(RULES)} 条规则")
 
@@ -339,11 +340,25 @@ def cmd_audit(args):
             pass
     skill_dir = args.skill_dir
     if not os.path.isdir(skill_dir):
-        print(f"❌ 目录不存在: {skill_dir}", file=sys.stderr)
+        print(f"[X] 目录不存在: {skill_dir}", file=sys.stderr)
         sys.exit(1)
 
     result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                         progress_file=args.progress_file)
+
+    # --fix 模式：自动修正 R-11/R-12 违规
+    if args.fix:
+        print(f"\n=== 自动修正模式 ===")
+        fixed1 = fix_external_data_dir(skill_dir)
+        fixed2 = fix_artifact_paths(skill_dir)
+        total_fixed = fixed1 + fixed2
+        if total_fixed > 0:
+            print(f"[OK] 共修正 {total_fixed} 处")
+            # 重新审计
+            result = audit_skill(skill_dir, manifest_version=args.manifest_version,
+                                progress_file=args.progress_file, _fix_applied=True)
+        else:
+            print(f"ℹ️  无需修正")
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -367,7 +382,7 @@ def cmd_audit_all(args):
                 if isinstance(info, dict) and "version" in info:
                     version_map[name] = info["version"]
         except Exception as e:
-            print(f"⚠️  读取 manifest 失败: {e}", file=sys.stderr)
+            print(f"[!]  读取 manifest 失败: {e}", file=sys.stderr)
 
     # 发现所有 skill 目录
     entries = []
@@ -435,6 +450,7 @@ def main():
     p_audit.add_argument("--json", action="store_true", help="JSON 格式输出")
     p_audit.add_argument("--manifest-version", metavar="VER", help="manifest 中记录的版本号（用于 R-10）")
     p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
+    p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
 
     # audit-all 子命令
     p_all = subparsers.add_parser("audit-all", help="批量审查所有 skill")
