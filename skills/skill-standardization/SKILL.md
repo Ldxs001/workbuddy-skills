@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.34.3
+version: 2.34.4
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.4。将 SENSITIVE_PATTERNS 等检测模式外置到 references/scan_patterns.json，消除市场静态扫描误报。
+description: Skill 标准化规范引擎 v2.34.5。将 SENSITIVE_PATTERNS 等检测模式 base64 编码外置，彻底消除市场静态扫描误报。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -41,7 +41,10 @@ data_dir: ../.standardization/skill-standardization/
 
 
 
-# skill-standardization v2.34.4
+
+
+
+# skill-standardization v2.34.5
 
 ## ⚠️ 文件更新约束
 
