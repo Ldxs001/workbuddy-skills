@@ -312,7 +312,7 @@ _ARTIFACT_EXTS_COMPREHENSIVE = {
 }
 
 # 根目录已知白名单文件（非产出物）
-_KNOWN_ROOT_FILES = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep", "CHANGELOG.md", ".progress.md"}
+_KNOWN_ROOT_FILES = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep", ".progress.md"}
 
 # 旧版兼容：产出物扩展名集合（用于根目录文件扫描）
 _ROOT_ARTIFACT_EXTS = set(_ARTIFACT_EXTS_COMPREHENSIVE.keys())

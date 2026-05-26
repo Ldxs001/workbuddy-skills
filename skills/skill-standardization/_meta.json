@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.34.9",
-  "description": "Skill 标准化规范引擎 v2.34.4。将 SENSITIVE_PATTERNS 等检测模式外置到 references/scan_patterns.json，消除市场静态扫描误报。",
+  "version": "2.34.10",
+  "description": "Skill 标准化规范引擎 v2.34.10。修复 SKILL.md frontmatter 字段残留 bug（11 字段完整写入）",
   "author": "wUwproject",
   "tags": [
     "standardization",

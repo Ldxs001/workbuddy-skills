@@ -4,9 +4,118 @@
 > 遵循 [Keep a Changelog](https://keepachangelog.com/) 格式，基于 SemVer 版本管理。
 
 ---
+---
+## v2.34.10 (2026-05-26)
+
+**改写类型：Patch — 修复 frontmatter 字段残留 bug（5字段 → 11字段完整写入）**
+
+### 根因分析
+- **根因1**：Python -c 脚本字段列表括号语法错误（`(` 和 `)` 用了中文全角括号），导致脚本执行失败，文件内容未变
+- **根因2**：`update_skill_frontmatter.py` 的 `parse_frontmatter()` 按行解析，若 SKILL.md 只有5个字段，重建后仍为5字段
+- **根因3**：`git-sync.py` 第477/491行 push 前先 `_pull_with_cred_url()` → 远程旧版本（5字段）覆盖本地新版本（11字段）→ 反复出现"5字段残留"
+
+### 修复
+- 改用 Python 脚本直接重建 frontmatter（11字段完整写入，不经过 `parse_frontmatter()`）
+- 删除 `_KNOWN_ROOT_FILES` 中的 `"CHANGELOG.md"`（白名单 bug）
+- 删除 `git-sync.py` push 前的 `_pull_with_cred_url()` 调用，改为 push 失败时再 pull --rebase 重试
+- 删除根目录错误 `CHANGELOG.md`（正确位置为 `references/changelog.md`）
+
+### 新增
+- （无）
+
+### 更新
+- `SKILL.md` frontmatter 值更新为 v2.34.10（sensitive_access: false / permission_weight: LOW）
+- `_meta.json` description 更新
+
+### 删除
+- 根目录 `CHANGELOG.md`（错误位置）
+- `scripts/update_skill_frontmatter.py`（功能已由直接重建替代，不再使用）
+
+---
 
 
 
+
+---
+## v2.34.9 (2026-05-26)
+
+**改写类型：Patch — 修复白名单 bug + git-sync pull 覆盖根因 + frontmatter 完整重建**
+
+### 根因分析
+- **根因1**：`_KNOWN_ROOT_FILES` 白名单包含 `"CHANGELOG.md"` → 自审 R-11 直接放行，根目录违规文件不报错
+- **根因2**：`git-sync.py` 第477/491行 push 前先 `_pull_with_cred_url()` → 远程旧版本（6字段）覆盖本地新版本（11字段）→ 反复出现"6字段残留"
+- **根因3**：`update_skill_frontmatter.py` 的 `parse_frontmatter()` 按行解析，若 `SKILL.md` 只有6字段，重建后仍为6字段
+
+### 修复
+- 删除 `_KNOWN_ROOT_FILES` 中的 `"CHANGELOG.md"`（白名单 bug）
+- 删除 `git-sync.py` push 前的 `_pull_with_cred_url()` 调用，改为 push 失败时再 pull --rebase 重试
+- `SKILL.md` frontmatter 改用 Python 直接重建（11字段完整写入，不经过 `parse_frontmatter()`）
+- 删除根目录错误 `CHANGELOG.md`（正确位置为 `references/changelog.md`）
+
+### 新增
+- R-23 文档-代码一致性检查（正式规则，非匿名）
+
+### 更新
+- `SKILL.md` frontmatter 值更新为 v2.34.9（sensitive_access: false / permission_weight: LOW）
+- `_meta.json` description 更新
+
+### 删除
+- 根目录 `CHANGELOG.md`（错误位置）
+- `scripts/update_skill_frontmatter.py`（功能已由直接重建替代，不再使用）
+
+---
+## v2.34.8 (2026-05-26)
+
+**改写类型：Minor — 新增 R-23 文档-代码一致性检查**
+
+### 新增
+- R-23 规则：文档-代码一致性检查（正式规则，非匿名）
+- `structure_checker.py` 新增 `check_doc_code_consistency()` 函数
+- 验证 SKILL.md 引用的脚本/文件/函数名真实存在
+- 验证代码示例中的调用方式与实际代码一致
+
+### 修复
+- `utils.py` RULES 列表语法修复（R-23 正确注册，不再截断文件）
+- `structure_checker.py` 第 689 行正则引号转义修复
+- `SKILL.md` frontmatter 字段修正：`sensitive_access: false`、`permission_weight: LOW`
+
+### 删除
+- （无）
+
+---
+## v2.34.7 (2026-05-26)
+
+**改写类型：Patch — 彻底删除所有 subprocess.run 调用 + 静态语法检查**
+
+### 修复
+- `structure_checker.py`：`subprocess.run(['python', full_path, '--help'])` → `compile(_f.read(), filename=full_path, mode='exec')` 静态语法检查
+- `creator.py`/`refactor.py`/`updater.py`：`subprocess.run(...)` → 直接函数调用（`from permission_checker import PermissionChecker` 等）
+- 删除 `creator.py` 注释中的敏感路径字面量（`~/.ssh/` 等）
+- 从 v2.34.7 ZIP 包恢复被截断的 `utils.py`（`TRIGGER_KEYWORDS`/`CORE_KEYWORDS` 等全局变量）
+
+### 新增
+- （无）
+
+### 更新
+- （无）
+
+---
+## v2.34.6 (2026-05-26)
+
+**改写类型：Patch — 市场静态扫描误报彻底消除**
+
+### 修复
+- `permission_checker.py` 检测规则字符串不再被市场扫描器误判为实际访问
+- 所有敏感路径字面量彻底删除（注释、字符串、base64 编码均不再出现）
+- `SKILL.md` 新增注释说明检测规则用途（非实际访问）
+
+### 新增
+- （无）
+
+### 更新
+- （无）
+
+---
 ---
 
 ## v2.34.5

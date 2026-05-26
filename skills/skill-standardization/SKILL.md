@@ -1,13 +1,13 @@
 ---
 name: skill-standardization
-version: 2.34.8
+version: 2.34.9
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.8。新增 R-23 文档-代码一致性检查；彻底消除市场扫描误报
+description: Skill 标准化规范引擎 v2.34.10。修复 frontmatter 字段缺失 bug（11 字段完整写入）
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
-artifact_paths: true
+artifact_paths: []
 writing_standards: fix_terms
 data_dir: ../.standardization/skill-standardization/
 ---
@@ -61,7 +61,21 @@ data_dir: ../.standardization/skill-standardization/
 
 
 
-# skill-standardization v2.34.8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# skill-standardization v2.34.9
 
 ## ⚠️ 文件更新约束
 
@@ -71,7 +85,7 @@ data_dir: ../.standardization/skill-standardization/
 | 文件 | 更新方式 | 脚本 |
 |------|----------|------|
 | `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_skill_frontmatter.py` |
-| `SKILL.md` 正文 | Python 正则替换 | `scripts/repair_r20.py` |
+| `SKILL.md` 正文 | Python 直接重建 | `scripts/safe_io.py` 的 `safe_write()` |
 | `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
 
