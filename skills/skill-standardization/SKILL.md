@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.29.2
+version: 2.30.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.30.0。新增 refactor --fix-code 自动修复代码引用、审计 --fix 自动修复 R-11/R-12 路径问题、统一 spec/rules.json（R-01~R-21）、create 模式完整模板（含 R-07~R-09/R-18~R-21 章节）、migrate-data 命令迁移数据目录。
@@ -13,6 +13,8 @@ critical_write: false
 permission_weight: HIGH
 artifact_paths: true
 ---
+
+
 
 
 # skill-standardization v2.30.0
