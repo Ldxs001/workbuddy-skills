@@ -4,11 +4,34 @@
 
 ## [未发布]
 
-（本版本号对应下次发布内容## [2.31.0] - 2026-05-26
+（本版本号对应下次发布内容，发布时替换为具体版本号和日期）
+
+---
+
+## [2.32.0] - 2026-05-26
+
+### 新增
+- **R-22 数据目录规范检查**：自动识别安装目录越位数据文件（构建产物/缓存/日志），`--fix` 模式自动迁移到 `data_dir:` 声明的数据目录
+- **`data_dir_checker.py` 模块**：分类/检查/修复数据目录合规性
+
+### 修改
+- `skill_audit` 支持 R-22 规则（WARN 级别，fixable）
+- `audit --fix` 模式加入 `fix_data_dir_compliance()` 调用
+- `utils.py` RULES 新增 R-22 定义
 
 ### 修复
-- 删除 skill-standardization/ 下 nul 非法文件（Windows 保留字，导致 ZIP 打包失败）
-- CHANGELOG.md 白名单补充（`utils.py` _KNOWN_ROOT_FILES）
+- （无）
+
+### 移除
+- （无）
+
+---
+
+## [2.31.0] - 2026-05-26
+
+### 修复
+- 删除 skill-standardization/ 下 `nul` 非法文件（Windows 保留字，导致 ZIP 打包失败）
+- `CHANGELOG.md` 白名单补充（`utils.py` `_KNOWN_ROOT_FILES`）
 - 自我审计 R-18/R-19/R-20 完全通过（PASS）
 
 ### 新增
@@ -19,10 +42,6 @@
 
 ### 移除
 - （无）
-
----
-
-，发布时替换为具体版本号和日期）
 
 ---
 

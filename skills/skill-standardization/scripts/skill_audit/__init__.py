@@ -46,6 +46,9 @@ from .permission_checks import (
     check_authorization_present, check_permission_weight_explained,
     check_progressive_loading_forced,
 )
+from .data_dir_checker import (
+    check_data_dir_compliance, fix_data_dir_compliance,
+)
 
 # ── 方法分派表 ─────────────────────────────────────────────
 METHOD_MAP = {
@@ -70,6 +73,7 @@ METHOD_MAP = {
     "body_has_faq_section": body_has_faq_section,
     "body_check_writing_standards": body_check_writing_standards,
     "body_has_progressive_loading_explicit": body_has_progressive_loading_explicit,
+    "check_data_dir_compliance": check_data_dir_compliance,
 }
 
 
@@ -346,12 +350,13 @@ def cmd_audit(args):
     result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                         progress_file=args.progress_file)
 
-    # --fix 模式：自动修正 R-11/R-12 违规
+    # --fix 模式：自动修正 R-11/R-12/R-22 违规
     if args.fix:
         print(f"\n=== 自动修正模式 ===")
         fixed1 = fix_external_data_dir(skill_dir)
         fixed2 = fix_artifact_paths(skill_dir)
-        total_fixed = fixed1 + fixed2
+        fixed3 = fix_data_dir_compliance(skill_dir)
+        total_fixed = fixed1 + fixed2 + fixed3
         if total_fixed > 0:
             print(f"[OK] 共修正 {total_fixed} 处")
             # 重新审计

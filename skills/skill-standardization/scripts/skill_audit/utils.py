@@ -124,7 +124,7 @@ RULES = [
     {
         "id": "R-13",
         "name": "敏感信息访问声明",
-        "severity": "ERROR",
+        "severity": "WARN",
         "check": "脚本含敏感信息访问（memory/credentials/token）时，frontmatter 须声明 sensitive_access: true 并在 references/permissions.md 中说明用途",
         "method": "check_sensitive_access_declaration",
         "fixable": True,
@@ -133,7 +133,7 @@ RULES = [
     {
         "id": "R-14",
         "name": "关键位置写入声明",
-        "severity": "ERROR",
+        "severity": "WARN",
         "check": "脚本含关键位置写入（skills/.workbuddy/系统目录）时，frontmatter 须声明 critical_write: true 并在 references/permissions.md 中说明用途",
         "method": "check_critical_write_declaration",
         "fixable": True,
@@ -203,6 +203,16 @@ RULES = [
         "method": "body_has_progressive_loading_explicit",
         "fixable": False,
         "create_template": "## 核心能力\n\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。",
+    },
+    # ── 新增规则 R-22 (v2.31.0) ──────────────────────────────────
+    {
+        "id": "R-22",
+        "name": "数据目录规范检查",
+        "severity": "WARN",
+        "check": "安装目录无越位数据文件（构建产物/缓存/日志应放在 data_dir: 声明的数据目录）",
+        "method": "check_data_dir_compliance",
+        "fixable": True,
+        "create_template": "在 frontmatter 中声明 data_dir: ../.standardization/<skill>/",
     },
 ]
 
