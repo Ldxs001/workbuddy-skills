@@ -161,6 +161,191 @@ python scripts/rollback.py --id "20260525_164457_file.txt_abcdef01.bak"
 
 ---
 
+### py_tools.py — Python 代码工具链
+
+提供四个子命令：`normalize`、`review`、`oo-ify`、`gen-test`。
+所有子命令遵循标准化 JSON IO（同其他脚本一致）。
+
+| 子命令 | 必填参数 | 可选参数 | 说明 |
+|---------|------------|------------|------|
+| `normalize` | `--file` | `--fix`（修复模式） | 检查/修复 py 文件常见问题 |
+| `review` | `--file` | — | 代码审查（语法/风格/bug/行数） |
+| `oo-ify` | `--file` | — | >600 行文件给出 OO 化建议（不更新文件） |
+| `gen-test` | `--file` | `--output`（输出路径） | 生成 pytest 测试框架 |
+
+#### normalize — 规范化
+
+检查项（对应 `references/py_standards.md`）：
+
+| # | 检查项 | `--fix` 可修复 |
+|---|--------|----------------|
+| 1 | UTF-8 BOM | ✅ 删除 |
+| 2 | 编码声明缺失/非 utf-8 | ✅ 插入/修正 |
+| 3 | Tab 缩进 | ✅ 替换为 4 空格 |
+| 4 | 行尾空白 | ✅ 去除 |
+| 5 | 文件末尾无换行 | ✅ 追加 `\n` |
+| 6 | CRLF 换行符 | ✅ 替换为 `\n` |
+| 7 | 代码区中文符号 `（），；：！？""【】` | ✅ 替换为英文半角 |
+| 8 | 行长度 >120 | ❌ 需人工处理 |
+
+**使用建议：**
+- 先运行**检查模式**（`--fix` 不指定）查看问题清单
+- 确认后运行**修复模式**（`--fix`），会自动备份原文件
+- 修复后运行 `review` 确认无新引入问题
+
+#### review — 代码审查
+
+执行以下检查：
+1. **语法检查** — `ast.parse`，失败直接返回 error
+2. **docstring 检查** — 公共函数/类缺少 docstring → warning
+3. **行数检查** — >600 行 → info（并建议 OO 化）
+4. **未使用 import** — 简化启发式检查
+5. **函数过长** — >50 行 → info
+
+**使用建议：**
+- 每次更新 py 文件后运行 `review` 确认无新引入问题
+- `suggest_oo: true` 时，运行 `py_tools.py oo-ify` 查看具体建议
+
+#### oo-ify — OO 化建议
+
+仅当文件 >600 行时输出建议（**不更新原文件**）：
+- 按函数名前缀分组，建议封装为类
+- 全局变量 ≥3 个，建议提升为类属性
+- >1000 行，建议按功能拆分为多个模块
+
+**输出：** JSON 包含 `suggestions` 数组，每项有 `type`、`description`、`example`。
+
+#### gen-test — 生成测试
+
+分析目标文件的公开函数和类，生成 pytest 测试框架（模板代码）。
+- 自动推导函数参数示例值（基于参数名启发式）
+- 可选 `--output` 直接写入测试文件
+- 私有函数（前缀 `_`）自动跳过
+
+**使用建议：**
+- 生成后需人工补充断言逻辑（生成的是框架/模板）
+- 建议将生成的测试文件保存为 `test_<module>.py`
+
+---
+
+### python_env.py — Python 环境管理
+
+提供 8 个子命令：`setup` / `install` / `uninstall` / `update` / `list` / `switch` / `remove` / `clean-reinstall` / `detect`。
+
+所有子命令遵循标准化 JSON IO（同其他脚本一致）。
+
+| 子命令 | 必填参数 | 可选参数 | 说明 |
+|---------|------------|------------|------|
+| `setup` | — | `--venv`、`--python-version`、`--install-common` | 创建 venv（默认 Python 3.11） |
+| `install` | `--packages` | `--venv` | 安装包（自动更新 requirements.txt） |
+| `uninstall` | `--packages` | `--venv` | 卸载包 |
+| `update` | — | `--packages`、`--venv` | 更新包（不指定包名则更新所有过期包） |
+| `list` | — | `--venv`、`--format` | 列出已安装包（json / table） |
+| `switch` | `--python-version` | `--venv` | 切换 Python 版本（重建 venv，保留 requirements.txt） |
+| `remove` | — | `--venv` | 删除 venv |
+| `clean-reinstall` | — | `--venv`、`--python-version`、`--install-common` | 干净重装（删除并重建 venv） |
+| `detect` | — | — | 检测已安装的 Python 版本 |
+
+#### setup — 创建 venv
+
+```bash
+# 默认 Python 3.11
+python scripts/python_env.py setup
+
+# 指定 Python 版本
+python scripts/python_env.py setup --python-version 3.11
+
+# 创建 venv 并安装常用包
+python scripts/python_env.py setup --install-common
+
+# 指定 venv 路径
+python scripts/python_env.py setup --venv /path/to/venv
+```
+
+**默认偏好版本：** Python 3.11（稳定版，兼容性最好）。
+
+**常用包（`--install-common`）：** `requests`、`pyyaml`、`python-dotenv`、`pytest`。
+
+#### install / uninstall / update — 包管理
+
+```bash
+# 安装包
+python scripts/python_env.py install --packages requests pyyaml
+
+# 卸载包
+python scripts/python_env.py uninstall --packages requests
+
+# 更新指定包
+python scripts/python_env.py update --packages requests
+
+# 更新所有过期包
+python scripts/python_env.py update
+```
+
+**注意：** 所有包操作自动更新 `requirements.txt`。
+
+#### list — 列出已安装包
+
+```bash
+# JSON 格式（默认）
+python scripts/python_env.py list
+
+# 表格格式
+python scripts/python_env.py list --format table
+```
+
+#### switch — 切换 Python 版本
+
+```bash
+# 切换到 Python 3.11（会重建 venv）
+python scripts/python_env.py switch --python-version 3.11
+```
+
+**行为：**
+1. 备份当前 venv（重命名为 `<venv>_backup_<timestamp>`）
+2. 用指定 Python 版本重建 venv
+3. 如果 `requirements.txt` 存在，自动重新安装所有包
+
+#### clean-reinstall — 干净重装
+
+```bash
+# 删除 venv 并重新创建（默认 Python 3.11）
+python scripts/python_env.py clean-reinstall
+
+# 指定 Python 版本并安装常用包
+python scripts/python_env.py clean-reinstall --python-version 3.11 --install-common
+```
+
+#### detect — 检测已安装版本
+
+```bash
+python scripts/python_env.py detect
+```
+
+**输出示例：**
+```json
+{
+  "status": "success",
+  "installed_versions": [
+    {"version": "3.11.8", "executable": "C:\\Python311\\python.exe", "source": "filesystem"},
+    {"version": "3.13.12", "executable": "C:\\Users\\sm001\\AppData\\Local\\Programs\\Python\\Python313\\python.exe", "source": "py_launcher"}
+  ],
+  "preferred_version": {"version": "3.11.8", "executable": "...", "source": "filesystem"},
+  "default_prefer": "3.11",
+  "code": 0
+}
+```
+
+#### LLM 使用建议
+
+1. **任务需要 Python 环境时** → 先运行 `python_env.py detect` 确认可用版本
+2. **需要安装依赖时** → 运行 `python_env.py setup --install-common` 创建干净环境
+3. **安装项目依赖时** → 运行 `python_env.py install --packages <包列表>`
+4. **Python 版本不匹配时** → 运行 `python_env.py switch --python-version <版本>`
+5. **环境损坏时** → 运行 `python_env.py clean-reinstall` 干净重装
+
+---
+
 ## 批量配置格式（batch.json）
 
 ```json

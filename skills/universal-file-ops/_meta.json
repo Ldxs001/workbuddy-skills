@@ -1,7 +1,7 @@
 {
   "name": "universal-file-ops",
-  "version": "0.1.0",
-  "description": "通用文件操作技能：支持常用文件（txt/py/html/md/docx/xlsx）增删查改，以及文件拷贝、移动、删除、重命名。含标准化 IO 接口、统一调度器、容灾回溯机制。",
+  "version": "1.1.0",
+  "description": "为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。\nv1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。\n支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。",
   "author": "[username-redacted]",
   "tags": [
     "file",
@@ -11,6 +11,18 @@
     "move",
     "delete",
     "rename",
-    "robust"
+    "robust",
+    "python",
+    "normalize",
+    "review",
+    "oo-ify",
+    "test-generation",
+    "python-environment",
+    "venv",
+    "package-management",
+    "sandbox-testing",
+    "error-codes",
+    "network-retry",
+    "llm-agent"
   ]
 }

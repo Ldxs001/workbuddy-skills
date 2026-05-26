@@ -1,7 +1,7 @@
 # WorkBuddy Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-05-26
+> 最后更新：2026-05-27
 
 本仓库存放 WorkBuddy 用户技能，支持码云（Gitee）和 GitHub 双平台同步。
 
@@ -24,7 +24,9 @@
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。 |
-| `universal-file-ops` | 通用文件操作技能：支持常用文件（txt/py/html/md/docx/xlsx）增删查改，以及文件拷贝、移动、删除、重命名。含标准化 IO 接口、统一调度器、容灾回溯机制。 |
+| `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。
+v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。
+支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
 | `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
 | `workday-calendar` | 智能周历系统 - 法定假日管理、工作日计算、周历生成、日程管理，含.bat容灾备份 |
 

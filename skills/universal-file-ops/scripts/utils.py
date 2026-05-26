@@ -17,6 +17,7 @@ DEFAULT_DATA_DIR_RAW = "skills/.standardization/universal-file-ops/data/"
 
 SKILL_ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _data_dir_abs   = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR_RAW))
+VENV_DIR   = os.path.join(_data_dir_abs, "venv")  # venv 存放目录
 BACKUP_DIR = os.path.join(_data_dir_abs, "backup")
 LOGS_DIR  = os.path.join(_data_dir_abs, "logs")
 OPS_LOG    = os.path.join(LOGS_DIR, "ops.log")

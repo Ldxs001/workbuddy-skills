@@ -59,3 +59,107 @@ A: 当前 v0.1.0 的 `office_crud.py` 采用简化实现（docx 清空所有段�
 3. 再用 `--action create` 全覆盖写入
 
 后续版本计划支持基于段落索引的局部更新。
+
+---
+
+**Q: 如何对 py 文件进行规范化和审查？**
+
+A: 使用 `py_tools.py`：
+1. **检查模式**（不更新文件）：`python scripts/py_tools.py normalize --file script.py`
+2. **修复模式**（自动备份+修复）：`python scripts/py_tools.py normalize --file script.py --fix`
+3. **代码审查**：`python scripts/py_tools.py review --file script.py`
+
+建议在更新 py 文件前先运行 normalize（检查模式），确认无问题后再更新；更新后运行 review 确认无新引入问题。
+
+---
+
+**Q: 如何用 `py_tools.py` 生成测试？**
+
+A: 使用 `gen-test` 子命令：
+```bash
+# 输出到 stdout
+python scripts/py_tools.py gen-test --file script.py
+
+# 直接写入测试文件
+python scripts/py_tools.py gen-test --file script.py --output test_script.py
+```
+
+生成的测试是 **pytest 风格框架**，包含目标文件的所有公开函数和类的实例化测试。需人工补充断言逻辑（生成脚本无法推断预期行为）。
+
+---
+
+**Q: `py_tools.py oo-ify` 会自动重构我的代码吗？**
+
+A: **不会**。`oo-ify` 只输出建议和示例，**不更新原文件**。你需要根据建议手动重构（或借助其他工具/LLM 辅助重构）。这样设计是为了安全——自动 OO 化可能改变代码语义。
+
+---
+
+**Q: 临时脚本和正式工具的区别是什么？何时豁免 600 行 OO 化限制？**
+
+A: 根据 `references/py_standards.md` 第 7.5 节：
+
+| 类型 | 定义 | 600 行 OO 化限制 |
+|------|------|---------------------|
+| **临时脚本** | 一次性任务、临时数据处理、临时测试 | **豁免**（不需要 OO 化） |
+| **正式工具** | skill 脚本、长期维护的工具类脚本 | **必须 OO 化** |
+
+**判断标准：**
+- 文件路径在 `skills/` 下 → 正式工具
+- 文件头部有 `# 临时脚本` 注释 → 临时脚本
+- 文件有 shebang 且放在系统路径 → 正式工具
+- 文件在 `/tmp`、`/temp`、用户临时目录 → 临时脚本
+- 默认保守判断为**正式工具**
+
+---
+
+**Q: 如何用 `python_env.py` 安装指定版本的 Python？**
+
+A: `python_env.py` 本身不安装 Python（需要系统管理员权限），但它可以：
+1. **检测已安装版本**：`python scripts/python_env.py detect`
+2. **创建 venv（使用指定版本）**：`python scripts/python_env.py setup --python-version 3.11`
+3. **切换 venv 的 Python 版本**：`python scripts/python_env.py switch --python-version 3.11`
+
+如果需要安装新的 Python 版本，请：
+- Windows：从 [python.org](https://www.python.org/downloads/) 下载安装
+- Linux：使用 `apt install python3.11` 或 `pyenv`
+- macOS：使用 `brew install python@3.11` 或 `pyenv`
+
+---
+
+**Q: 如何用 `python_env.py` 干净重装 Python 环境？**
+
+A: 使用 `clean-reinstall` 子命令：
+
+```bash
+# 删除当前 venv 并重新创建（默认 Python 3.11）
+python scripts/python_env.py clean-reinstall
+
+# 指定 Python 版本并安装常用包
+python scripts/python_env.py clean-reinstall --python-version 3.11 --install-common
+```
+
+**行为：**
+1. 删除当前 venv（如果存在）
+2. 使用指定 Python 版本重建 venv
+3. 如果 `requirements.txt` 存在，自动重新安装所有包
+
+---
+
+**Q: `python_env.py` 和 `venv` 有什么区别？**
+
+A: `python_env.py` 是 **venv 的管理工具**，提供比原生 `venv` 更完整的 CLI 接口：
+
+| 功能 | 原生 venv | python_env.py |
+|------|-----------|----------------|
+| 创建 venv | `python -m venv` | `python python_env.py setup` |
+| 安装包 | 手动 `pip install` | `python python_env.py install --packages ...` |
+| 更新包 | 手动 `pip install -U` | `python python_env.py update` |
+| 列出包 | `pip list` | `python python_env.py list` |
+| 切换 Python 版本 | 不支持 | `python python_env.py switch --python-version 3.11` |
+| 干净重装 | 手动删除+重建 | `python python_env.py clean-reinstall` |
+| 检测已安装版本 | 不支持 | `python python_env.py detect` |
+| 自动更新 requirements.txt | 不支持 | 支持 |
+
+**推荐使用 `python_env.py`**，因为它提供标准化的 JSON IO，更适合 LLM 调用和自动化流程。
+
+---

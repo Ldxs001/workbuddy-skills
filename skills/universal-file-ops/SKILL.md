@@ -1,108 +1,78 @@
 ---
 name: universal-file-ops
-version: 0.1.0
-author: ['username-redacted']
+author: ['eniuswei']
+version: 
+description: 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。
+tags: ['file', 'operations', 'crud', 'copy', 'move', 'delete', 'rename', 'robust', 'python', 'code-quality', 'sandbox-testing', 'error-codes', 'network-retry', 'llm-agent']
+data_dir: ../.standardization/universal-file-ops/
 license: MIT
-description: 通用文件操作技能：支持常用文件（txt/py/html/md/docx/xlsx）增删查改，以及文件拷贝、移动、删除、重命名。含标准化 IO 接口、统一调度器、容灾回溯机制。
-tags: ['file', 'operations', 'crud', 'copy', 'move', 'delete', 'rename', 'robust']
 trigger_negative: true
-section_workflow: true
-artifact_paths: true
 external_data_dir: true
+audience: llm-agent
 sensitive_access: false
 critical_write: false
 permission_weight: MEDIUM
-antipattern_reference: true
-faq_reference: true
 writing_standards: fix_terms
-progressive_loading_explicit: true
-antipattern_progressive: true
-faq_progressive: true
 ---
+
+
+
+
+
+
+
 
 # universal-file-ops
 
-通用文件操作技能：支持常用文件增删查改与文件管理操作，标准化 IO 接口，统一调度，鲁棒可回溯。
+> **受众**：本技能专为**普通大模型/智能体用户**设计，非专业开发者。目标是让智能体能规范地使用 Python 创造工具脚本，输出即正确，无需反复调试。
 
 ## 触发场景
 
-当用户提出以下意图时触发本技能：
-- 创建/读取/更新/删除文件（txt、py、html、md、docx、xlsx 等）
-- 拷贝、移动、重命名、删除文件或目录
-- 批量文件操作（多文件同时处理）
-- 要求对文件操作具备容灾回溯能力
+**正向触发词**（满足任一即触发）：
+- 「帮我规范地处理文件…」「检查 Python 脚本规范」「生成测试」
+- 「帮我搭建 Python 环境」「安装 Python 包」「切换 Python 版本」
+- 「这个脚本有什么问题」「帮我 OO 化这个 Python 文件」
 
-**否定条件**（以下情况不触发）：
-- 仅询问文件操作理论知识，不实际执行
-- 涉及敏感路径（系统目录、凭证文件）的操作
-- 用户明确说「不要使用 universal-file-ops」
+**否定条件**（满足任一项即不触发）：
+- 用户明确说「只用系统 Python，不用技能」
+- 任务仅需单次文件读取，无需规范化/质量保证
 
 ## 核心能力
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-| # | 功能 | 说明 |
-|---|------|------|
-| 1 | **文件 CRUD** | 支持 txt/py/html/md/docx/xlsx 增删查改，标准化 JSON IO 接口 |
-| 2 | **文件管理操作** | 拷贝、移动、重命名、删除，支持单文件与批量 |
-| 3 | **统一调度器** | `scripts/orchestrator.py` 支持串行/并行多任务编排 |
-| 4 | **容灾回溯** | 操作前自动备份、支持回滚、操作日志审计 |
-| 5 | **鲁棒性设计** | 重复执行稳定、异常自动恢复、幂等性保证 |
+1. **通用文件操作** — 标准化 IO、原子写入、自动备份、错误码输出
+2. **Python 代码质量保障** — 规范化（`scripts/py_tools.py normalize`）、代码审查（`review`）、OO 化建议（`oo-ify`）、测试生成（`gen-test`）
+3. **Python 环境管理** — 版本安装/切换/包管理/干净重装（`scripts/python_env.py`，含网络重试）
+4. **脚本类型区分** — 自动识别临时脚本 vs 正式工具，临时脚本豁免 600 行 OO 化限制
+5. **沙箱测试** — 生成的测试在临时 venv 中自动执行验证，确保可用
 
-## 快速开始
-
-```bash
-# 查看所有可用操作
-python scripts/orchestrator.py --list
-
-# 读取文件内容
-python scripts/text_crud.py --action read --file path/to/file.txt
-
-# 写入文件内容（自动备份原文件）
-python scripts/text_crud.py --action create --file path/to/file.txt --content "Hello"
-
-# 拷贝文件（支持批量）
-python scripts/file_ops.py --action copy --src path/to/src --dst path/to/dst
-
-# 多操作串行执行（通过 orchestrator）
-python scripts/orchestrator.py --batch batch_config.json
-
-# batch_config.json 格式示例：
-# {
-#   "tasks": [
-#     {"op": "text_crud", "args": {"action": "create", "file": "a.txt", "content": "Hello"}},
-#     {"op": "file_ops",  "args": {"action": "copy",  "src": "a.txt",  "dst": "b.txt"}}
-#   ],
-#   "parallel": false,
-#   "stop_on_error": true
-# }
-```
-
-→ 完整 API 参考详见 `references/guide.md`
+→ 详见 [references/guide.md](references/guide.md) 完整使用指南  
+→ 反模式参见 [references/antipatterns.md](references/antipatterns.md)  
+→ 常见问题参见 [references/faq.md](references/faq.md)
 
 ## 工作流程
 
-1. **解析请求** → 识别操作类型（CRUD/管理）、目标文件、参数
-2. **预检查** → 验证文件存在性、权限、路径合法性
-3. **备份（如需要）** → 对写操作自动创建备份至 `skills/.standardization/universal-file-ops/data/backup/`
-4. **执行操作** → 调用对应 `scripts/*.py`，标准化 JSON IO
-5. **验证结果** → 检查操作是否成功、输出标准化结果
-6. **记录日志** → 写入 `skills/.standardization/universal-file-ops/data/logs/ops.log`，支持审计回溯
+1. **理解需求** — 读取用户输入，判断是文件操作还是 Python 代码任务
+2. **选择工具** — 文件操作使用内置函数；Python 任务调用 `scripts/py_tools.py` 或 `scripts/python_env.py`
+3. **执行前检查** — 检查路径合法性、Python 环境就绪状态、脚本类型
+4. **执行操作** — 调用对应脚本，捕获标准化错误码（UFO-XXXX）
+5. **输出结果** — 成功返回结构化数据；失败返回通俗易懂错误提示（含脚本名称、行号、错误码）
+6. **沙箱验证**（Python 任务）— 测试生成后在沙箱内执行验证，确保可用
 
-**异常处理**：任何步骤失败 → 自动回滚（如已备份）→ 返回标准化错误 JSON
+## 错误输出规范
 
-→ 详细工作流程详见 `references/guide.md`
+所有错误均返回标准化 JSON 格式：
 
-→ 更多反模式详见 `references/antipatterns.md`
+```json
+{
+  "error_code": "UFO-2001",
+  "script": "scripts/py_tools.py",
+  "line": 173,
+  "message": "这个 Python 文件用了 Tab 缩进，标准写法是用 4 个空格",
+  "suggestion": "运行 scripts/py_tools.py normalize 自动修复，或把 Tab 改成 4 个空格"
+}
+```
 
-→ 更多常见问题详见 `references/faq.md`
-
-## 权限说明
-
-本技能权限权重：**MEDIUM**
-- 仅操作用户明确指定的文件路径
-- 不访问网络、不读取凭证/Token
-- 备份目录限于 `skills/.standardization/universal-file-ops/data/backup/`
-- 所有高风险操作（删除、覆盖）需显式确认
-
-→ 详细权限说明详见 `references/permissions.md`
+→ 完整错误码手册参见 [references/error_codes.md](references/error_codes.md)  
+→ Python 编码规范参见 [references/py_standards.md](references/py_standards.md)
