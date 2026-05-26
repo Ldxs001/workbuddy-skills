@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fix_r20.py - 稳定 R-20 修复脚本（最终版 v2.2）
-用法：python fix_r20.py <skill_dir> [--dry-run] [-v]
+repair_r20.py - 稳定 R-20 修复脚本（最终版 v2.2）
+用法：python repair_r20.py <skill_dir> [--dry-run] [-v]
 
 改进：
   - 移除 COMMON_ABBREVS 排除逻辑（所有中英文混排一律修复）
@@ -128,7 +128,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         description='修复 R-20 问题（术语不一致、中英文混排、拼写错误）',
-        epilog='示例：python fix_r20.py ~/.workbuddy/skills/triphasic-execution'
+        epilog='示例：python repair_r20.py ~/.workbuddy/skills/triphasic-execution'
     )
     parser.add_argument('skill_dir', help='技能目录路径')
     parser.add_argument('--dry-run', action='store_true', help='检测模式（不修复，只输出报告）')

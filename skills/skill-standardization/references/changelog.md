@@ -9,6 +9,32 @@
 
 ---
 
+## v2.34.3
+
+2026-05-26
+
+**改写类型：Patch — 重命名修复工具，避免被误判为一次性脚本**
+
+### 更新
+
+- 🔄 **`scripts/repair_r20.py`**（原名 `fix_r20.py`）：重命名，表明是通用修复工具而非一次性脚本
+- 🔄 **`scripts/repair_r06_r20.py`**（原名 `fix_r06_r20.py`）：重命名，同上
+- 更新 `SKILL.md` description 和 `references/changelog.md` 中所有历史引用
+
+### 新增
+
+- （无）
+
+### 修复
+
+- （无）
+
+### 删除
+
+- （无）
+
+---
+
 ## v2.34.2
 
 2026-05-26
@@ -17,8 +43,8 @@
 
 ### 修复
 
-- 🔄 **恢复 `scripts/fix_r20.py`**：通用 R-20 修复工具（术语映射、中英文混排空格、拼写修复、模糊表述修复），非一次性脚本，误删导致 R-20 自动修复功能缺失
-- 🔄 **恢复 `scripts/fix_r06_r20.py`**：R-06（一级标题缺失）+ R-20（术语不一致）修复工具，非一次性脚本，误删导致功能缺失
+- 🔄 **恢复 `scripts/repair_r20.py`**：通用 R-20 修复工具（术语映射、中英文混排空格、拼写修复、模糊表述修复），非一次性脚本，误删导致 R-20 自动修复功能缺失
+- 🔄 **恢复 `scripts/repair_r06_r20.py`**：R-06（一级标题缺失）+ R-20（术语不一致）修复工具，非一次性脚本，误删导致功能缺失
 - 🐛 **确认其余删除正确**：`fix_utils_if_bug.py`（utils.py if/elif bug 已在 L408 修复）、`fix_progressive_loading.py`（SKILL.md L69 已正确）、`merge_changelog_and_add_constraints.py`（一次性，已完成）、`add_constraint_to_guide.py`（一次性，已完成）均为一次性脚本，删除正确
 
 ### 新增
@@ -48,8 +74,8 @@
 - 🧹 **删除 8 个残留一次性脚本**（均含硬编码本地路径或已无用）：
   - `scripts/debug_parse.py` — 含 `C:\Users\sm001\...` 硬编码路径，触发敏感信息扫描误报
   - `scripts/fix_progressive_loading.py` — 一次性 fix 脚本
-  - `scripts/fix_r06_r20.py` — 一次性 fix 脚本
-  - `scripts/fix_r20.py` — 一次性 fix 脚本
+  - `scripts/repair_r06_r20.py` — 一次性 fix 脚本
+  - `scripts/repair_r20.py` — 一次性 fix 脚本
   - `scripts/fix_utils_if_bug.py` — 一次性 fix 脚本
   - `scripts/merge_changelog_and_add_constraints.py` — 一次性 fix 脚本
   - `scripts/test_parse_debug.py` — 调试脚本
@@ -84,12 +110,12 @@
 
 ### 更新
 
-- `SKILL.md` 新增 `## ⚠️ 文件更新约束` 章节（禁止 Write/Edit 工具直接修改 .md 文件，必须用 Python 脚本原子写入）
+- `SKILL.md` 新增 `## ⚠️ 文件更新约束` 章节（禁止 Write/Edit 工具直接编辑 .md 文件，必须用 Python 脚本原子写入）
 
 ### 修复
 
 - 🐛 **修复 `utils.py` CRLF bug**：`parse_simple_yaml_frontmatter()` 加入 `text.replace('\r\n', '\n')` 预处理，`SKILL.md` 为 Windows 换行符时不再截断 frontmatter
-- 🐛 **修复 `creator.py` SKILL_TEMPLATE 字段缺失**：从 10 字段补全到 11 字段（新增 `data_dir:`），新建 skill 的 SKILL.md frontmatter 不再缺失字段
+- 🐛 **修复 `creator.py` SKILL_TEMPLATE 字段缺失**：从 10 字段补全到 11 字段（新增 `data_dir:`），创建 skill 的 SKILL.md frontmatter 不再缺失字段
 - 🐛 **修复 `SKILL.md` frontmatter 被残留脚本覆盖的根因**：删除 7 个残留修复脚本（`fix_encoding.py`、`fix_missing_fm_fields.py`、`fix_fm_fields_v2.py`、`fix_fm_definitive.py`、`fix_r20_terminology.py`、`fix_r20_final.py`、`one_shot_fix_and_sync.py`、`rebuild_skill_md.py`），这些脚本含不完整 frontmatter 模板（6-7 字段），若被执行会覆盖 SKILL.md
 - 🐛 **修复审计报表误报**：重写 `references/permissions.md`（区分"检测规则"与"实际行为"），`permission_checker.py` 头部和关键变量添加注释说明 `~/.ssh/`、`~/.aws/` 等均为检测规则而非实际访问
 

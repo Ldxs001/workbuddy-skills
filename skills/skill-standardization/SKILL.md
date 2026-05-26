@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.34.1
+version: 2.34.2
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.2。恢复误删的 fix_r20.py/fix_r06_r20.py（通用修复工具），确认其余一次性脚本删除正确。
+description: Skill 标准化规范引擎 v2.34.3。repair_r20.py/repair_r06_r20.py 重命名（避免被误判为一次性脚本），统一 repair_ 前缀。
 data_dir: ../.standardization/skill-standardization/
 sensitive_access: true
 critical_write: false
@@ -30,7 +30,12 @@ writing_standards: fix_terms
 
 
 
-# skill-standardization v2.33.0
+
+
+
+
+
+# skill-standardization v2.34.3
 
 ## ⚠️ 文件更新约束
 
@@ -40,7 +45,7 @@ writing_standards: fix_terms
 | 文件 | 更新方式 | 脚本 |
 |------|----------|------|
 | `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_skill_frontmatter.py` |
-| `SKILL.md` 正文 | Python 正则替换 | `scripts/fix_progressive_loading.py` |
+| `SKILL.md` 正文 | Python 正则替换 | `scripts/repair_r20.py` |
 | `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
 
