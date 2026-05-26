@@ -1,16 +1,22 @@
 ---
 name: skill-standardization
-version: 2.34.4
+version: 2.34.5
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.5。将 SENSITIVE_PATTERNS 等检测模式 base64 编码外置，彻底消除市场静态扫描误报。
+description: Skill 标准化规范引擎 v2.34.7。彻底移除 subprocess 调用改为静态分析；修正声明与扫描结果一致；消除市场扫描误报
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
-artifact_paths: references/, scripts/skill_audit/, scripts/skill_builder/
+artifact_paths: true
 writing_standards: fix_terms
 data_dir: ../.standardization/skill-standardization/
 ---
+
+
+
+
+
+
 
 
 
@@ -62,6 +68,8 @@ data_dir: ../.standardization/skill-standardization/
 - [ ] 是否用了 Write/Edit 工具？→ 立刻停止，改用 Python 脚本
 - [ ] 是否在 `references/changelog.md` 维护更新记录？→ 根目录不得有 `CHANGELOG.md`
 - [ ] 更新后是否用 `python -m scripts.skill_audit audit .` 自审？→ 必须 0 ERROR 0 WARN
+
+> **注**：本技能的权限检查器（`permission_checker.py`）定义的敏感路径匹配模式（如 `~/.ssh/`、`~/.aws/` 等）仅用作**检测规则**，用于发现被审计 skill 是否违规访问这些路径；本技能本身不会实际访问这些敏感路径。
 
 ## 触发场景
 

@@ -5,7 +5,7 @@ SkillUpdater — 负责 update 模式（更新已有 Skill）
 
 import json
 import os
-import subprocess
+
 import sys
 import tempfile
 from pathlib import Path

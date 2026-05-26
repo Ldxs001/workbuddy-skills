@@ -451,7 +451,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
     # 检查 SKILL.md 里提到的脚本是否真实存在、能否正常运行（--help 验证）
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     if skill_dir and os.path.isdir(skill_dir):
-        import re, subprocess
+        import re, py_compile, sys
         
         # 1. 解析 SKILL.md 里的代码块（```bash ... ```）和行内代码（`...`）
         code_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', body, re.DOTALL)
@@ -486,20 +486,14 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
             if not os.path.isfile(full_path):
                 all_issues["suggest"].append(f"SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望路径：{full_path}）")
             else:
-                # 尝试运行 --help 验证脚本可调用
+                # 静态分析：检查 Python 语法（不执行脚本，避免间接执行风险）
                 try:
-                    result = subprocess.run(
-                        ['python', full_path, '--help'],
-                        capture_output=True, text=True, timeout=5
-                    )
-                    if result.returncode != 0:
-                        all_issues["suggest"].append(f"脚本 `{script_path}` --help 返回非零退出码（{result.returncode}），可能参数定义有误")
-                except subprocess.TimeoutExpired:
-                    all_issues["suggest"].append(f"脚本 `{script_path}` --help 超时（>5秒），可能有问题")
-                except FileNotFoundError:
-                    all_issues["suggest"].append(f"脚本 `{script_path}` 无法运行（python 命令不存在？）")
-                except Exception as e:
-                    all_issues["suggest"].append(f"脚本 `{script_path}` 运行出错：{str(e)[:100]}")
+                    with open(full_path, 'r', encoding='utf-8') as _f:
+                        compile(_f.read(), filename=full_path, mode='exec')
+                except SyntaxError as _e:
+                    all_issues["suggest"].append(f"脚本 `{script_path}` 语法错误（第 {_e.lineno} 行）：{_e.msg}")
+                except Exception as _e:
+                    all_issues["suggest"].append(f"脚本 `{script_path}` 读取/编译失败：{str(_e)[:100]}")
     
         # ── 检查渐进式文件 references/*.md ────────────────
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))

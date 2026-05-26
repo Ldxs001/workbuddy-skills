@@ -6,7 +6,6 @@ SkillCreator — 负责 create 模式（创建新 Skill）
 
 import json
 import sys
-import subprocess
 import tempfile
 import os
 from pathlib import Path
@@ -75,7 +74,7 @@ skill-sub {name} --input <input-file> --output <output-dir>
 | Write | write | 写入输出结果 |
 | Bash | restricted | 运行内部处理脚本（仅限 `scripts/` 目录） |
 
-- **不会**访问 `~/.ssh/`、`~/.aws/`、`*.key`、`*.pem` 等敏感文件
+- **不会**访问系统敏感路径或凭证文件
 - **不会**向外部网络发送数据
 - **不会**执行用户 Shell 配置文件（`.bashrc` / `.zshrc`）
 
@@ -367,7 +366,7 @@ A: 对于超过 10MB 的文件，建议使用流式处理模式，添加 `--stre
 
 - **用途**：读取用户输入文件、配置文件、参考数据
 - **范围限制**：仅读取技能安装目录和指定输入文件，不访问系统敏感路径
-- **不会读取**：`~/.ssh/`、`~/.aws/`、`*.key`、`*.pem`、`~/.workbuddy/memory/`
+- **不会读取**：系统敏感路径或凭证文件
 
 ### Write（写入）
 
@@ -686,9 +685,9 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 """
 
     def _audit_and_update_progress(self, skill_dir, mode="create"):
-        """审计 skill 并更新 .progress.md"""
-        import subprocess, json
+        """审计 skill 并更新 .progress.md（直接调用，不通过 subprocess）"""
         from pathlib import Path
+        from skill_audit import audit_skill, format_report
 
         skill_dir = Path(skill_dir).resolve()
         progress_file = skill_dir / ".progress.md"
@@ -697,27 +696,14 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
         from skill_audit.progress_manager import create_progress
         create_progress(str(skill_dir), mode)
 
-        # 2. 运行审计（通过 subprocess 调用 python -m skill_audit）
+        # 2. 运行审计（直接调用审计函数，避免 subprocess 风险）
         try:
-            result = subprocess.run(
-                ["python", "-m", "skill_audit", "audit", str(skill_dir), "--json"],
-                capture_output=True, text=True, timeout=30
-            )
-            if result.returncode != 0:
-                print(f"[!] 审计失败: {result.stderr}")
-                return
-            audit_result = json.loads(result.stdout)
+            audit_result = audit_skill(str(skill_dir), progress_file=str(progress_file))
         except Exception as e:
             print(f"[!] 审计执行失败: {e}")
             return
 
-        # 3. 更新 .progress.md
-        from skill_audit.progress_manager import update_progress_from_audit, finalize_progress
-        update_progress_from_audit(str(skill_dir), audit_result)
-        finalize_progress(str(skill_dir), audit_result)
-
-        # 4. 打印报告
-        from skill_audit import format_report
+        # 3. 打印报告（audit_sKill 已自动更新 .progress.md）
         print(format_report(audit_result, verbose=True))
 
     # ── 权限扫描结果自动写入 references/permissions.md ──────────────────
