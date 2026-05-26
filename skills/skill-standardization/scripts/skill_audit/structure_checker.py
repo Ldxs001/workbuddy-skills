@@ -442,6 +442,14 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
     """
     all_issues = {"must": [], "suggest": [], "optional": []}
 
+    # ── R-23: 文档-代码一致性检查 (v2.34.8) ──────────────────────
+    r23_result = check_doc_code_consistency(filepath, content, fm, body, **kw)
+    if not r23_result.get("passed", True):
+        for k in ["must", "suggest", "optional"]:
+            if f"R-23" in r23_result.get("detail", ""):
+                all_issues["suggest"].append(r23_result["detail"])
+
+
     # ── 检查 SKILL.md 正文 ─────────────────────────
     issues = _check_writing_standards_text(body, "SKILL.md")
     for k in all_issues:
@@ -594,4 +602,138 @@ def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
                      "operation": f"在 ## {first_section} 章节添加固定模板句：{FIXED_TEMPLATE}（必须原封不动，可在后面接其他说明）",
                      "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
 
+def check_doc_code_consistency(filepath, content, fm, body, **kw):
+    """
+    R-23: 文档-代码一致性检查 (v2.34.8)
+    验证 SKILL.md 中引用的脚本/文件/函数名真实存在。
+    """
+    import re, ast, os
+    from pathlib import Path
+    
+    skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+    issues = {"must": [], "suggest": [], "optional": []}
+    
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return {"passed": True, "detail": "R-23: 无法访问技能目录，跳过检查"}
+    
+    # 1. 解析 SKILL.md 里的代码块和行内代码
+    code_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', body, re.DOTALL)
+    inline_codes = re.findall(r'`([^`]+?)`', body)
+    
+    all_commands = []
+    for block in code_blocks:
+        for line in block.splitlines():
+            line = line.strip()
+            if line.startswith('#'):
+                continue
+            all_commands.append(line)
+    all_commands.extend(inline_codes)
+    
+    # 2. 提取脚本路径（如 python scripts/xxx.py --list）
+    script_paths = set()
+    py_file_refs = set()  # 所有 .py 文件引用
+    
+    for cmd in all_commands:
+        # 匹配 python scripts/xxx.py 或 `scripts/xxx.py`
+        match = re.search(r'(?:python3?\s+)?([^\s`]+\.py)', cmd)
+        if match:
+            script_path = match.group(1).strip()
+            # 排除含变量/中文的路径
+            if re.search(r'[{\u4e00-\u9fff\u3000-〿\uff00-￯]', script_path):
+                continue
+            if '{' in script_path or '}' in script_path:
+                continue
+            script_paths.add(script_path)
+        # 也匹配行内代码中的 .py 引用
+        for m2 in re.finditer(r'([^\s`]*\.py)', cmd):
+            py_file_refs.add(m2.group(1))
+    
+    script_paths.update(py_file_refs)
+    
+    # 3. 检查脚本文件是否存在
+    for script_path in script_paths:
+        full_path = os.path.join(skill_dir, script_path)
+        if not os.path.isfile(full_path):
+            # 尝试在 scripts/ 子目录找
+            alt_path = os.path.join(skill_dir, 'scripts', os.path.basename(script_path))
+            if os.path.isfile(alt_path):
+                continue
+            issues["suggest"].append(
+                f"R-23: SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望：{full_path}）"
+            )
+        else:
+            # 静态语法检查
+            try:
+                with open(full_path, 'r', encoding='utf-8') as _f:
+                    ast.parse(_f.read())
+            except SyntaxError as _e:
+                issues["suggest"].append(
+                    f"R-23: 脚本 `{script_path}` 语法错误（第 {_e.lineno} 行）：{_e.msg}"
+                )
+            except Exception as _e:
+                issues["suggest"].append(
+                    f"R-23: 脚本 `{script_path}` 读取失败：{str(_e)[:80]}"
+                )
+            
+            # 4. 检查 SKILL.md 中的调用方式是否与实际代码一致
+            # 检查 --help / --list 等 flag 是否真实存在
+            if '--' in ' '.join(all_commands):
+                # 提取文档中提到的 --flags
+                doc_flags = set(re.findall(r'--([a-z][-a-z]*)', ' '.join(all_commands)))
+                if doc_flags and script_path.endswith('.py'):
+                    # 尝试从脚本源码中提取实际的 argparse flags
+                    try:
+                        with open(full_path, 'r', encoding='utf-8') as _f:
+                            src = _f.read()
+                        # 简单匹配 add_argument('--xxx') 模式
+                        actual_flags = set(re.findall(r"add_argument\(\s*['\"]--([a-z][-a-z]*)['\"]", src))
+                        for flag in doc_flags:
+                            if flag not in actual_flags and flag not in ('help', 'version'):
+                                issues["optional"].append(
+                                    f"R-23: SKILL.md 示例中含 `--{flag}` 但 `{script_path}` 未定义此参数（实际定义：{', '.join(sorted(actual_flags)[:5])}）"
+                                )
+                    except Exception:
+                        pass
+    
+    # 5. 检查 SKILL.md 正文提到的函数/类名是否在实际代码中存
+    # 匹配中文描述后的代码引用，如 "调用 XXXFunction" 或 "`XXXClass`"
+    func_refs = re.findall(r'`([A-Z][a-zA-Z0-9_]*)`', body)
+    func_refs += re.findall(r'调用\s+([a-zA-Z_][a-zA-Z0-9_]*)', body)
+    func_refs += re.findall(r'函数\s+([a-zA-Z_][a-zA-Z0-9_]*)', body)
+    
+    if func_refs and skill_dir:
+        # 收集技能目录中所有 .py 文件定义的函数/类名
+        all_defs = set()
+        for py_file in Path(skill_dir).rglob('*.py'):
+            try:
+                with open(py_file, 'r', encoding='utf-8') as _f:
+                    src = _f.read()
+                for m in re.finditer(r'^(?:def |class )([a-zA-Z_][a-zA-Z0-9_]*)', src, re.MULTILINE):
+                    all_defs.add(m.group(1))
+            except Exception:
+                continue
+        
+        for ref in set(func_refs):
+            if ref not in all_defs:
+                # 模糊匹配（前缀匹配）
+                matched = [d for d in all_defs if d.startswith(ref) or ref.startswith(d)]
+                if not matched:
+                    issues["suggest"].append(
+                        f"R-23: SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
+                    )
+    
+    # 汇总
+    total = sum(len(issues[k]) for k in issues)
+    if total == 0:
+        return {"passed": True, "detail": "R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}
+    
+    msgs = []
+    for k in ["must", "suggest", "optional"]:
+        msgs.extend(issues[k])
+    return {"passed": False,
+            "detail": f"R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
+            "fix": {"key": "doc_code_consistency", "value": msgs,
+                     "location": f"{filepath} 正文 + 代码示例",
+                     "operation": "修正 SKILL.md 中的文件引用/调用方式，使其与实际代码一致",
+                     "verification": "重新运行 audit_skill()，确认 R-23 passed"}}
 

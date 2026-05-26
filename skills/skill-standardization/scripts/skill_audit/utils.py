@@ -214,6 +214,16 @@ RULES = [
         "fixable": True,
         "create_template": "在 frontmatter 中声明 data_dir: ../.standardization/<skill>/",
     },
+    # ── 新增规则 R-23 (v2.34.8) ──────────────────────────
+    {
+        "id": "R-23",
+        "name": "文档-代码一致性检查",
+        "severity": "WARN",
+        "check": "SKILL.md 中引用的脚本/文件/函数名真实存在，代码示例中的调用方式与实际代码一致",
+        "method": "check_doc_code_consistency",
+        "fixable": False,
+        "create_template": "确保 SKILL.md 引用的所有 .py 文件存在于技能目录中，代码示例中的调用方式与实际 argparse/函数签名一致",
+    },
 ]
 
 # 同义章节关键词映射

@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.34.5
+version: 2.34.7
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.7。彻底移除 subprocess 调用改为静态分析；修正声明与扫描结果一致；消除市场扫描误报
+description: Skill 标准化规范引擎 v2.34.8。新增 R-23 文档-代码一致性检查；彻底消除市场扫描误报
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -50,7 +50,13 @@ data_dir: ../.standardization/skill-standardization/
 
 
 
-# skill-standardization v2.34.5
+
+
+
+
+
+
+# skill-standardization v2.34.8
 
 ## ⚠️ 文件更新约束
 

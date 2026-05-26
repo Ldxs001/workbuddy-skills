@@ -1,5 +1,19 @@
 # CHANGELOG — skill-standardization
 
+## v2.34.8 (2026-05-26)
+
+### 新增
+- R-23 规则：文档-代码一致性检查（正式规则，非匿名）
+- `structure_checker.py` 新增 `check_doc_code_consistency()` 函数
+- 验证 SKILL.md 引用的脚本/文件/函数名真实存在
+- 验证代码示例中的调用方式与实际代码一致
+
+### 修复
+- `utils.py` RULES 列表语法修复（R-23 正确注册，不再截断文件）
+- `structure_checker.py` 第 689 行正则引号转义修复
+- `SKILL.md` frontmatter 字段修正：`sensitive_access: false`、`permission_weight: LOW`
+
+---
 ## v2.34.7 (2026-05-26)
 
 ### 修复
