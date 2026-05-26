@@ -5,6 +5,19 @@
 
 ---
 ---
+## v2.34.11 (2026-05-26)
+
+**改写类型：Patch — 调查并移除 \Z SyntaxWarning 抑制**
+
+### 修复
+- 调查 `\Z` SyntaxWarning 来源：删除 `__pycache__` 后重新编译所有 `.py` 文件（`-W error::SyntaxWarning`），未复现警告
+- 移除 `__init__.py` 中的 `warnings.filterwarnings` 抑制代码
+- 若 Python 3.12+ 运行时出现 `SyntaxWarning: invalid escape sequence '\Z'`，请根据报错行号将对应字符串改为原始字符串 `r"..."`
+
+### 新增
+- （无）
+
+---
 ## v2.34.10 (2026-05-26)
 
 **改写类型：Patch — 修复 frontmatter 字段残留 bug（5字段 → 11字段完整写入）**

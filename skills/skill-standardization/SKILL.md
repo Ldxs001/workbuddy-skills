@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.34.9
+version: 2.34.10
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.10。修复 frontmatter 字段缺失 bug（11 字段完整写入）
+description: Skill 标准化规范引擎 v2.34.11。调查 \Z SyntaxWarning 根源并移除抑制代码；修复 frontmatter 字段缺失 bug（11 字段完整写入）
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -11,6 +11,7 @@ artifact_paths: []
 writing_standards: fix_terms
 data_dir: ../.standardization/skill-standardization/
 ---
+
 
 
 

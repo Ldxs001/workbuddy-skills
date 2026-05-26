@@ -11,6 +11,10 @@ skill_audit package — SKILL.md 规范化审查工具 v2.25.0
     python -m skill_audit rules
 """
 
+import warnings
+# 临时移除过滤，捕获 SyntaxWarning 来源
+# warnings.filterwarnings("ignore", category=SyntaxWarning, message=r'.*invalid escape sequence.*')
+
 import os
 import sys
 import json

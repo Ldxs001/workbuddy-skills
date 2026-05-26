@@ -90,6 +90,18 @@ def _check_root_artifact_files(skill_dir, violations):
     except OSError:
         return
 
+    # 渐进式 MD 文件名（应迁到 references/，不是 outputs/）
+    _PROGRESSIVE_MD_NAMES = {
+        "CHANGELOG", "CHANGELOG.md",
+        "FAQ", "FAQ.MD",
+        "GUIDE", "GUIDE.MD",
+        "EXAMPLES", "EXAMPLES.MD",
+        "REFERENCE", "REFERENCE.MD",
+        "ANTI-PATTERNS", "ANTI-PATTERNS.MD",
+        "CHANGELOG.MD", "FAQ.MD", "GUIDE.MD",
+        "EXAMPLES.MD", "REFERENCE.MD", "ANTI-PATTERNS.MD",
+    }
+
     for fname in sorted(root_entries):
         fpath = os.path.join(skill_dir, fname)
         if not os.path.isfile(fpath):
@@ -101,7 +113,11 @@ def _check_root_artifact_files(skill_dir, violations):
         if ext not in _ROOT_ARTIFACT_EXTS:
             continue
 
-        cat = _classify_artifact_by_ext(fname)
+        # 渐进式 MD：建议迁到 references/；其余迁到 outputs/
+        if ext == ".md" and fname.upper() in _PROGRESSIVE_MD_NAMES:
+            cat = "references"
+        else:
+            cat = _classify_artifact_by_ext(fname)
 
         violations.append({
             "source": f"ROOT/{fname}",
