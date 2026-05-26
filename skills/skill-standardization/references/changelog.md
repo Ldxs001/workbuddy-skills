@@ -5,13 +5,31 @@
 
 ---
 ---
+## v2.35.0 (2026-05-26)
+
+**改写类型：Minor — 注册 R-23 到审计流程 + 修复 _apply_fixes() bug**
+
+### 新增
+- R-23 正式接入审计流程：`METHOD_MAP` 注册 `check_doc_code_consistency`，`__init__.py` 导入
+- `audit_skill()` 自动审计 R-23（文档-代码一致性检查）
+
+### 修复
+- `_apply_fixes()` 容错处理：`fix` 字典缺少 `key` 字段时跳过而非崩溃（`KeyError` 根因修复）
+- `SKILL.md` 描述更新：`R-01~R-22` → `R-01~R-23`
+- `utils.py` L11 注释更新：`R-01 ~ R-21` → `R-01 ~ R-23`
+
+### 更新
+- `SKILL.md` frontmatter 版本号更新为 v2.35.0
+- `_meta.json` 版本号和描述更新
+
+---
 ## v2.34.11 (2026-05-26)
 
-**改写类型：Patch — 调查并移除 \Z SyntaxWarning 抑制**
+**改写类型：Patch — 调查并删除 \Z SyntaxWarning 抑制**
 
 ### 修复
 - 调查 `\Z` SyntaxWarning 来源：删除 `__pycache__` 后重新编译所有 `.py` 文件（`-W error::SyntaxWarning`），未复现警告
-- 移除 `__init__.py` 中的 `warnings.filterwarnings` 抑制代码
+- 删除 `__init__.py` 中的 `warnings.filterwarnings` 抑制代码
 - 若 Python 3.12+ 运行时出现 `SyntaxWarning: invalid escape sequence '\Z'`，请根据报错行号将对应字符串改为原始字符串 `r"..."`
 
 ### 新增

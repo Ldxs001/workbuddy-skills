@@ -3,7 +3,7 @@
 """
 skill_audit package — SKILL.md 规范化审查工具 v2.25.0
 
-支持 R-01~R-21 规则审查，集成到 git-sync 流程。
+支持 R-01~R-23 规则审查，集成到 git-sync 流程。
 
 用法:
     python -m skill_audit audit <skill_dir> [--json] [--manifest-version VER]
@@ -40,6 +40,7 @@ from .structure_checker import (
     body_has_antipattern_section, body_has_faq_section,
     body_check_writing_standards,
     body_has_progressive_loading_explicit,
+    check_doc_code_consistency,
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
@@ -78,6 +79,7 @@ METHOD_MAP = {
     "body_check_writing_standards": body_check_writing_standards,
     "body_has_progressive_loading_explicit": body_has_progressive_loading_explicit,
     "check_data_dir_compliance": check_data_dir_compliance,
+    "check_doc_code_consistency": check_doc_code_consistency,
 }
 
 
@@ -103,6 +105,8 @@ def _apply_fixes(skill_md, fixes):
         "antipattern_reference", "faq_reference",
     }
     for fix in fixes:
+        if "key" not in fix:
+            continue
         key = fix["key"]
         if key in _AUDIT_CONTROL_FIELDS:
             continue

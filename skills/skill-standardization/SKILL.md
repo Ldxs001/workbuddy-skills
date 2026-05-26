@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.34.10
+version: 2.34.11
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.34.11。调查 \Z SyntaxWarning 根源并移除抑制代码；修复 frontmatter 字段缺失 bug（11 字段完整写入）
+description: Skill 标准化规范引擎 v2.35.0。注册 R-23 到审计流程；修复 _apply_fixes() 容错处理；更新规则范围 R-01~R-23
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -11,6 +11,11 @@ artifact_paths: []
 writing_standards: fix_terms
 data_dir: ../.standardization/skill-standardization/
 ---
+
+
+
+
+
 
 
 
@@ -117,14 +122,14 @@ data_dir: ../.standardization/skill-standardization/
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-- **audit 模式** — 对指定 skill 目录执行 R-01~R-22 规范审查，输出通过/失败/跳过统计
+- **audit 模式** — 对指定 skill 目录执行 R-01~R-23 规范审查，输出通过/失败/跳过统计
 - **refactor 模式** — 改造现有技能（修复 frontmatter、迁移更新记录、统一术语、规范数据目录、R-22 数据目录合规检查）
 - **create 模式** — 基于标准化模板创建新 skill，自动注入 R-07~R-09/R-18~R-22 章节引用
 
 ## 工作流程
 
 1. 读取目标 skill 的 SKILL.md
-2. 执行 R-01~R-22 规则检查
+2. 执行 R-01~R-23 规则检查
 3. 输出审查报告（通过/失败/跳过）
 4. 若传了 --fix，自动修正 R-11/R-12/R-22 违规
 
