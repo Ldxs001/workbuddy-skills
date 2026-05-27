@@ -10,8 +10,9 @@ data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
 writing_standards: fix_terms
 artifact_paths: true
-version: 1.0.0
+version: 2.38.2
 ---
+
 
 
 
