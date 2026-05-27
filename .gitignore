@@ -27,3 +27,20 @@ Thumbs.db
 *.bak
 *.tmp
 .standardization/
+skills/.standardization/
+
+# 防止根目录错误提交技能目录（正确位置：skills/）
+skill-standardization/**
+drawiodo/**
+color-toolkit/**
+everything-search-breadmemory/**
+git-sync/**
+round-robin-allocator/**
+semantic-split/**
+simulated-peak-plot/**
+skill-sub/**
+svg-composer/**
+triphasic-execution/**
+universal-file-ops/**
+workbuddy-fs-manager/**
+workday-calendar/**
