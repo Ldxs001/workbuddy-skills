@@ -26,3 +26,4 @@ Thumbs.db
 # Temp files
 *.bak
 *.tmp
+.standardization/
