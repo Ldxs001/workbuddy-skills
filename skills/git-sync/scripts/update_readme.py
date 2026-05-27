@@ -45,7 +45,7 @@ def get_clone_urls(config):
 
 
 def extract_desc(skill_dir):
-    """从 _meta.json 或 SKILL.md 提取描述"""
+    """从 _meta.json 或 SKILL.md 提取描述（单行，去除换行）"""
     # 优先 _meta.json
     meta_path = os.path.join(skill_dir, "_meta.json")
     if os.path.exists(meta_path):
@@ -54,7 +54,9 @@ def extract_desc(skill_dir):
                 d = json.load(f)
                 desc = d.get("description", "")
                 if desc:
-                    return desc.strip()
+                    # 关键：把换行符替换成空格，压缩连续空格，防止 Markdown 表格断裂
+                    desc = " ".join(desc.strip().split())
+                    return desc
         except Exception:
             pass
 
