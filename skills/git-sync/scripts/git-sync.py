@@ -56,10 +56,13 @@ def _git_env(base_env: dict = None) -> dict:
 
 
 def run_python(script: Path, *args, capture=False, check=True):
-    """运行 scripts/ 下的 Python 辅助脚本"""
+    """运行 scripts/ 下的 Python 辅助脚本（固定使用托管 Python，避免 sys.executable 指向错误版本）"""
     env = _git_env()
     env["PYTHONUTF8"] = "1"
-    cmd = [sys.executable, str(script), *[str(a) for a in args]]
+    python_exe = Path.home() / ".workbuddy" / "binaries" / "python" / "versions" / "3.13.12" / "python.exe"
+    if not python_exe.exists():
+        python_exe = Path(sys.executable)
+    cmd = [str(python_exe), str(script), *[str(a) for a in args]]
     return subprocess.run(cmd, capture_output=capture, encoding="utf-8",
                          check=check, env=env,
                          stdin=subprocess.DEVNULL)
