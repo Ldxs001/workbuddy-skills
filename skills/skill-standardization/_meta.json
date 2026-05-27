@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.38.0",
-  "description": "Skill 标准化规范引擎 v2.38.0。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。",
+  "version": "2.38.2",
+  "description": "Skill 标准化规范引擎 v2.38.2。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。",
   "author": "wUwproject",
   "tags": [
     "standardization",

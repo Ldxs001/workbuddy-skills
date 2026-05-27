@@ -2,7 +2,7 @@
 name: skill-standardization
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.38.0。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。
+description: Skill 标准化规范引擎 v2.38.2。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -10,8 +10,9 @@ data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
 writing_standards: fix_terms
 artifact_paths: true
-version: 
+version: 1.0.0
 ---
+
 
 
 
