@@ -36,18 +36,23 @@ def _ensure_logs_dir():
 # ── 核心接口 ──────────────────────────────────────────────────────
 
 def log_op(operation: str, file_path: str, success: bool,
-            rollback_id: str = "", detail: str = "") -> None:
+            rollback_id: str = "", detail: str = "",
+            temp_files: list = None, backup_files: list = None) -> None:
     """
     记录一条操作日志到 ops.log（JSON Lines 格式）。
+    temp_files: 本次操作产生的临时文件路径列表
+    backup_files: 本次操作产生的备份文件路径列表
     """
     _ensure_logs_dir()
     entry = {
-        "ts":           datetime.datetime.now().isoformat(),
-        "operation":    operation,
-        "file":         os.path.abspath(file_path) if file_path else "",
-        "success":      success,
-        "rollback_id":  rollback_id or "",
-        "detail":        detail or "",
+        "ts":            datetime.datetime.now().isoformat(),
+        "operation":     operation,
+        "file":          os.path.abspath(file_path) if file_path else "",
+        "success":       success,
+        "rollback_id":   rollback_id or "",
+        "temp_files":    temp_files or [],
+        "backup_files":  backup_files or [],
+        "detail":         detail or "",
     }
     try:
         with open(OPS_LOG, "a", encoding="utf-8") as f:

@@ -44,7 +44,7 @@ from .structure_checker import (
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
-    fix_artifact_paths, fix_external_data_dir,
+    fix_external_data_dir,
 )
 from .permission_checks import (
     check_sensitive_access_declaration, check_critical_write_declaration,
@@ -54,6 +54,7 @@ from .permission_checks import (
 from .data_dir_checker import (
     check_data_dir_compliance, fix_data_dir_compliance,
 )
+from .fix import apply_fix, list_fixable
 
 # ── 方法分派表 ─────────────────────────────────────────────
 METHOD_MAP = {
@@ -174,15 +175,20 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
         if not method_fn:
             continue
 
-        result = method_fn(
-            filepath=skill_md,
-            content=content,
-            fm=fm,
-            body=body,
-            dirname=dirname,
-            skill_dir=skill_dir,
-            manifest_version=manifest_version,
-        )
+        try:
+            result = method_fn(
+                filepath=skill_md,
+                content=content,
+                fm=fm,
+                body=body,
+                dirname=dirname,
+                skill_dir=skill_dir,
+                manifest_version=manifest_version,
+            )
+        except Exception as _e:
+            import traceback
+            traceback.print_exc()
+            result = {"passed": False, "detail": f"规则 {rule['id']} 执行异常: {_e}"}
         passed = result.get("passed", False)
         skipped = result.get("skip", False)
 
@@ -372,20 +378,28 @@ def cmd_audit(args):
     result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                         progress_file=args.progress_file)
 
-    # --fix 模式：自动修正 R-11/R-12/R-22 违规
+    # --fix 模式：自动修正所有失败规则的违规
     if args.fix:
         print(f"\n=== 自动修正模式 ===")
-        fixed1 = fix_external_data_dir(skill_dir)
-        fixed2 = fix_artifact_paths(skill_dir)
-        fixed3 = fix_data_dir_compliance(skill_dir)
-        total_fixed = fixed1 + fixed2 + fixed3
-        if total_fixed > 0:
-            print(f"[OK] 共修正 {total_fixed} 处")
+        # 收集所有失败规则的 fix key
+        fixes_applied = 0
+        for res in result.get("results", []):
+            if not res.get("passed") and res.get("fix"):
+                fix_key = res["fix"].get("key")
+                if fix_key:
+                    try:
+                        n = apply_fix(skill_dir, fix_key, **res["fix"])
+                        fixes_applied += n
+                        print(f"[OK] R-{fix_key}：修正 {n} 处")
+                    except Exception as e:
+                        print(f"[ERROR] R-{fix_key} 修正失败: {e}")
+        if fixes_applied > 0:
+            print(f"[OK] 共修正 {fixes_applied} 处")
             # 重新审计
             result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                                 progress_file=args.progress_file, _fix_applied=True)
         else:
-            print(f"ℹ️  无需修正")
+            print(f"ℹ️  无需修正或所有失败规则暂无自动修复工具")
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -456,10 +470,56 @@ def cmd_audit_all(args):
                 print()
 
 
+def cmd_fix(args):
+    """针对性修复工具（按 fix key 分发）"""
+    skill_dir = args.skill_dir
+    if not os.path.isdir(skill_dir):
+        print(f"[X] 目录不存在: {skill_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    keys = args.key if args.key else None
+    dry_run = args.dry_run
+
+    if not keys:
+        # 列出所有可用的 fix key
+        print("可用修复 key（对应审计规则 R-01~R-23）:")
+        for k in list_fixable():
+            print(f"  {k}")
+        print("\n用法: python -m skill_audit fix <skill_dir> --key <key> [--dry-run]")
+        print("      python -m skill_audit fix <skill_dir> --key <key1> <key2> ...")
+        return
+
+    total_fixed = 0
+    for key in keys:
+        try:
+            params = {}
+            if hasattr(args, 'value') and args.value:
+                # 尝试解析 value 为 JSON 或字符串
+                try:
+                    params["value"] = json.loads(args.value)
+                except json.JSONDecodeError:
+                    params["value"] = args.value
+            if dry_run:
+                print(f"[DRY-RUN] R-{key}: 模拟修复...")
+                n = apply_fix(skill_dir, key, dry_run=True, **params)
+            else:
+                n = apply_fix(skill_dir, key, **params)
+            total_fixed += n
+            print(f"[OK] R-{key}: 修复 {n} 处")
+        except Exception as e:
+            print(f"[ERROR] R-{key}: {e}")
+
+    if not dry_run and total_fixed > 0:
+        # 重新审计
+        print(f"\n=== 重新审计 ===")
+        result = audit_skill(skill_dir)
+        print(format_report(result))
+
+
 def main():
     """主入口函数"""
     parser = argparse.ArgumentParser(
-        description="SKILL.md 规范化审查工具 (R-01~R-17)",
+    description="SKILL.md 规范化审查工具 (R-01~R-23)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
@@ -493,6 +553,13 @@ def main():
                                       help="输出所有规则的创建模板（供 LLM 创建技能时参考）")
     p_template.add_argument("--json", action="store_true", help="JSON 格式输出")
 
+    # fix 子命令（v2.37.0 新增）
+    p_fix = subparsers.add_parser("fix", help="针对性修复工具（按 fix key 分发）")
+    p_fix.add_argument("skill_dir", help="skill 目录路径")
+    p_fix.add_argument("--key", help="修复 key（如 name、section_trigger 等，可多次指定或留空列出所有可用 key）", nargs="*")
+    p_fix.add_argument("--value", help="修复参数值（如 value=true）")
+    p_fix.add_argument("--dry-run", action="store_true", help="仅模拟，不实际修改")
+
     args = parser.parse_args()
 
     if args.command == "audit":
@@ -501,6 +568,8 @@ def main():
         cmd_audit_all(args)
     elif args.command == "rules":
         cmd_rules()
+    elif args.command == "fix":
+        cmd_fix(args)
     elif args.command in ("create-template", "template"):
         if hasattr(args, "json") and args.json:
             import json

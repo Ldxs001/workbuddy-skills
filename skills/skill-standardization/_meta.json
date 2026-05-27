@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.35.1",
-  "description": "Skill 标准化规范引擎 v2.35.1。修复 _AUDIT_CONTROL_FIELDS bug、R-11 误报、R-20 术语不一致（changelog.md 移除→删除）。支持 R-01~R-23 审查，create/update/refactor 三模式。",
+  "version": "2.37.0",
+  "description": "Skill 标准化规范引擎 v2.37.0。审计输出添加行号（filepath:line#）；新增fix.py统一修复工具（23条规则全覆盖）；修复cmd_fix参数解析bug。",
   "author": "wUwproject",
   "tags": [
     "standardization",

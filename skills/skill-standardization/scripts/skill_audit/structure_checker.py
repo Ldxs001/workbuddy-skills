@@ -1,11 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-20)
+skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-21, R-23)
 v2.22.0: R-18/R-19/R-20 新增渐进式文件（references/*.md）审查支持
+v2.37.0: 所有 detail/location 添加绝对行号（filepath:line# 格式）
 """
+
 import re
 import os
+
+
+def _abs_line(body, content, m_or_pos):
+    """
+    计算 body 中匹配位置在 content（全文）中的绝对行号（1-indexed）。
+    m_or_pos: re.Match 对象（在 body 中匹配），或 int 位置（body 内字符偏移）。
+    body: 正文（不含 frontmatter）
+    content: 全文（含 frontmatter）
+    """
+    if hasattr(m_or_pos, 'start'):
+        pos_in_body = m_or_pos.start()
+    else:
+        pos_in_body = m_or_pos
+    fm_text = content[:len(content) - len(body)] if body else ""
+    fm_lines = fm_text.count('\n')
+    line_in_body = body[:pos_in_body].count('\n') if body else 0
+    return fm_lines + line_in_body + 1
 
 
 def body_has_h1(filepath, content, fm, body, **kw):
@@ -13,33 +32,38 @@ def body_has_h1(filepath, content, fm, body, **kw):
     m = re.search(r'^# .+', body, re.MULTILINE)
     if m is None:
         name = fm.get("name", "<技能名>") if fm else "<技能名>"
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": "未找到一级标题 (# )",
+                "detail": f"{filepath}:{line} - 未找到一级标题 (# )",
                 "fix": {"key": "h1", "value": name,
-                         "location": f"{filepath} 正文开头",
+                         "location": f"{filepath}:{line}",
                          "operation": f"添加一级标题: # {name}",
                          "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
+    line = _abs_line(body, content, m)
     return {"passed": True,
-            "detail": f"发现一级标题: {m.group(0).strip()}"}
+            "detail": f"{filepath}:{line} - 发现一级标题: {m.group(0).strip()}"}
 
 
 def _section_text(body, keywords):
     """
     提取 ## 章节的完整文本（到下个 ## 或文件末尾）。
-    返回 (found: bool, title: str, text: str)。
+    返回 (found: bool, title: str, text: str, line_no: int)。
+    line_no: 章节标题在 body 中的 1-indexed 行号（用于计算绝对行号）。
     """
     lines = body.split("\n")
     in_section = False
     section_lines = []
     found_title = ""
+    found_line_no = 0
 
-    for line in lines:
+    for i, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("## "):
             title = stripped[3:].strip()
             if any(kw.lower() in title.lower() for kw in keywords):
                 in_section = True
                 found_title = title
+                found_line_no = i + 1
                 continue
             elif in_section:
                 break
@@ -47,22 +71,26 @@ def _section_text(body, keywords):
             section_lines.append(line)
 
     if not found_title:
-        return False, "", ""
-    return True, found_title, "\n".join(section_lines)
+        return False, "", "", 0
+    return True, found_title, "\n".join(section_lines), found_line_no
 
 
 def body_has_trigger_section(filepath, content, fm, body, **kw):
     """R-07: 触发条件章节质量检查（细化 v2.17.0）"""
     from .utils import TRIGGER_KEYWORDS
 
-    found, title, section_text = _section_text(body, TRIGGER_KEYWORDS)
+    found, title, section_text, line_no = _section_text(body, TRIGGER_KEYWORDS)
     if not found:
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": f"未找到[{', '.join(TRIGGER_KEYWORDS)}]章节",
+                "detail": f"{filepath}:{line} - 未找到[{', '.join(TRIGGER_KEYWORDS)}]章节",
                 "fix": {"key": "section_trigger", "value": True,
-                         "location": f"{filepath} 正文",
+                         "location": f"{filepath}:{line}",
                          "operation": "添加 ## 触发场景 章节，包含正向触发词≥3个、否定条件≥1个，无「自动执行」等危险表述",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
+
+    # 章节起始绝对行号
+    base_line = _abs_line(body, content, line_no - 1)  # line_no 是 1-indexed
 
     # ── 质量检查1：正向触发词 ≥3 个 ──────────────────
     trigger_patterns = [
@@ -87,9 +115,9 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
 
     if len(positive_triggers) < 3:
         return {"passed": False,
-                "detail": f"触发词数量不足（当前 {len(positive_triggers)} 个，要求 ≥3 个）",
+                "detail": f"{filepath}:{base_line} - 触发词数量不足（当前 {len(positive_triggers)} 个，要求 ≥3 个）",
                 "fix": {"key": "trigger_quality", "value": "add_triggers",
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{filepath}:{base_line}",
                          "operation": "添加至少 3 个具体触发词（描述用户会说什么/做什么来触发本技能）",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
@@ -98,9 +126,9 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
     has_negative = any(kw in section_text.lower() for kw in negative_keywords)
     if not has_negative:
         return {"passed": False,
-                "detail": "缺少否定条件（须说明什么情况下不触发本技能）",
+                "detail": f"{filepath}:{base_line} - 缺少否定条件（须说明什么情况下不触发本技能）",
                 "fix": {"key": "trigger_negative", "value": True,
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{filepath}:{base_line}",
                          "operation": "添加「不触发」或「排除」段落，说明本技能不应该被触发的情况",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
@@ -109,89 +137,95 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
     found_dangerous = [p for p in dangerous_phrases if p in section_text]
     if found_dangerous:
         return {"passed": False,
-                "detail": f"包含危险表述：{', '.join(found_dangerous)}",
+                "detail": f"{filepath}:{base_line} - 包含危险表述：{', '.join(found_dangerous)}",
                 "fix": {"key": "trigger_danger", "value": "remove_dangerous",
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{filepath}:{base_line}",
                          "operation": f"移除或改写危险表述：{', '.join(found_dangerous)}",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
     return {"passed": True,
-            "detail": f"触发条件章节质量合格（{len(positive_triggers)} 个触发词，含否定条件）"}
+            "detail": f"{filepath}:{base_line} - 触发条件章节质量合格（{len(positive_triggers)} 个触发词，含否定条件）"}
 
 
 def body_has_core_section(filepath, content, fm, body, **kw):
     """R-08: 核心能力章节检查"""
     from .utils import CORE_KEYWORDS
-    found, title, _ = _section_text(body, CORE_KEYWORDS)
+    found, title, _, line_no = _section_text(body, CORE_KEYWORDS)
     if not found:
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": f"未找到[{', '.join(CORE_KEYWORDS)}]章节",
+                "detail": f"{filepath}:{line} - 未找到[{', '.join(CORE_KEYWORDS)}]章节",
                 "fix": {"key": "section_core", "value": True,
-                         "location": f"{filepath} 正文",
+                         "location": f"{filepath}:{line}",
                          "operation": "添加 ## 核心能力 章节，列出 3-5 条核心功能",
                          "verification": "重新运行 audit_skill()，确认 R-08 passed"}}
-    return {"passed": True, "detail": f"发现章节: {title}"}
+    abs_line = _abs_line(body, content, line_no - 1)
+    return {"passed": True, "detail": f"{filepath}:{abs_line} - 发现章节: {title}"}
 
 
 def body_has_workflow_section(filepath, content, fm, body, **kw):
     """R-09: 工作流程/使用方式章节检查"""
     from .utils import WORKFLOW_KEYWORDS
-    found, title, _ = _section_text(body, WORKFLOW_KEYWORDS)
+    found, title, _, line_no = _section_text(body, WORKFLOW_KEYWORDS)
     if not found:
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": f"未找到[{', '.join(WORKFLOW_KEYWORDS)}]章节",
+                "detail": f"{filepath}:{line} - 未找到[{', '.join(WORKFLOW_KEYWORDS)}]章节",
                 "fix": {"key": "section_workflow", "value": True,
-                         "location": f"{filepath} 正文",
+                         "location": f"{filepath}:{line}",
                          "operation": "添加 ## 工作流程 章节，用步骤列表描述执行流程",
                          "verification": "重新运行 audit_skill()，确认 R-09 passed"}}
-    return {"passed": True, "detail": f"发现章节: {title}"}
+    abs_line = _abs_line(body, content, line_no - 1)
+    return {"passed": True, "detail": f"{filepath}:{abs_line} - 发现章节: {title}"}
 
 
-# ─────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────
 # R-18: 反模式具体性检查
-# ─────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────
 
 def body_has_antipattern_section(filepath, content, fm, body, **kw):
     """R-18: 反模式/常见错误章节具体性检查（必须渐进式，v2.24.7 重构）"""
     antipattern_keywords = ["反模式", "常见错误", "注意事项", "坑", "anti-pattern", "common mistake"]
-    
+
     # 1. 检查 SKILL.md 是否直接包含反模式章节（这是错的，必须用渐进式）
-    found, title, section_text = _section_text(body, antipattern_keywords)
-    
+    found, title, section_text, line_no = _section_text(body, antipattern_keywords)
+
     if found:
+        abs_line = _abs_line(body, content, line_no - 1)
         return {"passed": False,
-                "detail": f"反模式不应直接写在 SKILL.md 的 ## {title} 章节里，须改用渐进式（移到 references/antipatterns.md）",
+                "detail": f"{filepath}:{abs_line} - 反模式不应直接写在 SKILL.md 的 ## {title} 章节里，须改用渐进式（移到 references/antipatterns.md）",
                 "fix": {"key": "antipattern_progressive", "value": True,
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{filepath}:{abs_line}",
                          "operation": "将反模式内容移到 references/antipatterns.md，在 SKILL.md 中添加引用 `→ 详见 references/antipatterns.md`",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-    
+
     # 2. 检查 SKILL.md 是否有引用 references/antipatterns.md
     has_ref = bool(re.search(r'references/antipatterns\.md', body))
     if not has_ref:
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": "未找到对 references/antipatterns.md 的引用（反模式须用渐进式）",
+                "detail": f"{filepath}:{line} - 未找到对 references/antipatterns.md 的引用（反模式须用渐进式）",
                 "fix": {"key": "antipattern_reference", "value": True,
-                         "location": f"{filepath} 正文",
+                         "location": f"{filepath}:{line}",
                          "operation": "创建 references/antipatterns.md，并在 SKILL.md 中添加引用 `→ 详见 references/antipatterns.md`",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-    
+
     # 3. 检查 references/antipatterns.md 是否存在
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     antipattern_file = os.path.join(skill_dir, 'references', 'antipatterns.md')
-    
+
     if not os.path.isfile(antipattern_file):
         return {"passed": False,
-                "detail": "SKILL.md 引用了 references/antipatterns.md 但该文件不存在",
+                "detail": f"{antipattern_file}:1 - SKILL.md 引用了 references/antipatterns.md 但该文件不存在",
                 "fix": {"key": "antipattern_file_missing", "value": True,
-                         "location": f"{antipattern_file}",
+                         "location": f"{antipattern_file}:1",
                          "operation": "创建 references/antipatterns.md，包含至少 2 条具体反模式示例（含 **错误做法：**、**正确做法：** 标记）",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-    
+
     # 4. 检查 references/antipatterns.md 内容质量
     with open(antipattern_file, 'r', encoding='utf-8') as f:
         ap_content = f.read()
-    
+
     # 匹配反模式条目（支持 ### AP-01 格式、列表项、表格）
     ap_items = re.findall(r'^###\s*AP-\d+[:\uff1a]', ap_content, re.MULTILINE)
     if not ap_items:
@@ -204,81 +238,84 @@ def body_has_antipattern_section(filepath, content, fm, body, **kw):
         data_rows = [r for r in table_rows if not re.match(r'^\|[\s\-:|]+\|$', r)]
         if len(data_rows) >= 2:
             ap_items = data_rows[1:]
-    
+
     if len(ap_items) < 2:
         return {"passed": False,
-                "detail": f"references/antipatterns.md 反模式条目不足（当前 {len(ap_items)} 条，要求 ≥2 条）",
+                "detail": f"{antipattern_file}:1 - references/antipatterns.md 反模式条目不足（当前 {len(ap_items)} 条，要求 ≥2 条）",
                 "fix": {"key": "antipattern_count", "value": "add_examples",
-                         "location": f"{antipattern_file}",
+                         "location": f"{antipattern_file}:1",
                          "operation": "添加至少 2 条具体反模式示例（须含 **错误做法：**、**正确做法：** 标记），支持列表/表格/### 标题格式",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-    
+
     # 检查是否有具体描述（错误做法/正确做法标记）
     has_detail = bool(re.search(r'\*\*错误做法[:\uff1a]\*\*|\*\*正确做法[:\uff1a]\*\*|\*\*深层原因[:\uff1a]\*\*', ap_content))
-    
+
     if not has_detail:
         return {"passed": False,
-                "detail": "references/antipatterns.md 缺少具体描述（须含 **错误做法：**、**正确做法：** 标记）",
+                "detail": f"{antipattern_file}:1 - references/antipatterns.md 缺少具体描述（须含 **错误做法：**、**正确做法：** 标记）",
                 "fix": {"key": "antipattern_detail", "value": "add_detail",
-                         "location": f"{antipattern_file}",
+                         "location": f"{antipattern_file}:1",
                          "operation": "为每个反模式添加 **错误做法：**、**正确做法：** 和 **深层原因：** 标记",
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
-    
+
     return {"passed": True,
-            "detail": f"反模式在 references/antipatterns.md 中（{len(ap_items)} 条具体示例，含错误做法/正确做法标记）"}
+            "detail": f"{antipattern_file}:1 - 反模式在 references/antipatterns.md 中（{len(ap_items)} 条具体示例，含错误做法/正确做法标记）"}
+
 
 def body_has_faq_section(filepath, content, fm, body, **kw):
     """R-19: FAQ/常见问题章节有意义性检查（必须渐进式，v2.24.7 重构）"""
     faq_keywords = ["FAQ", "常见问题", "Q&A", "Questions", "问答"]
-    
+
     # 1. 检查 SKILL.md 是否直接包含 FAQ 章节（这是错的，必须用渐进式）
-    found, title, section_text = _section_text(body, faq_keywords)
-    
+    found, title, section_text, line_no = _section_text(body, faq_keywords)
+
     if found:
+        abs_line = _abs_line(body, content, line_no - 1)
         return {"passed": False,
-                "detail": f"FAQ 不应直接写在 SKILL.md 的 ## {title} 章节里，须改用渐进式（移到 references/faq.md）",
+                "detail": f"{filepath}:{abs_line} - FAQ 不应直接写在 SKILL.md 的 ## {title} 章节里，须改用渐进式（移到 references/faq.md）",
                 "fix": {"key": "faq_progressive", "value": True,
-                         "location": f"{filepath} ## {title} 章节",
+                         "location": f"{filepath}:{abs_line}",
                          "operation": "将 FAQ 内容移到 references/faq.md，在 SKILL.md 中添加引用 `→ 详见 references/faq.md`",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-    
+
     # 2. 检查 SKILL.md 是否有引用 references/faq.md
     has_ref = bool(re.search(r'references/faq\.md', body))
     if not has_ref:
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": "未找到对 references/faq.md 的引用（FAQ 须用渐进式）",
+                "detail": f"{filepath}:{line} - 未找到对 references/faq.md 的引用（FAQ 须用渐进式）",
                 "fix": {"key": "faq_reference", "value": True,
-                         "location": f"{filepath} 正文",
+                         "location": f"{filepath}:{line}",
                          "operation": "创建 references/faq.md，并在 SKILL.md 中添加引用 `→ 详见 references/faq.md`",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-    
+
     # 3. 检查 references/faq.md 是否存在
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     faq_file = os.path.join(skill_dir, 'references', 'faq.md')
-    
+
     if not os.path.isfile(faq_file):
         return {"passed": False,
-                "detail": "SKILL.md 引用了 references/faq.md 但该文件不存在",
+                "detail": f"{faq_file}:1 - SKILL.md 引用了 references/faq.md 但该文件不存在",
                 "fix": {"key": "faq_file_missing", "value": True,
-                         "location": f"{faq_file}",
+                         "location": f"{faq_file}:1",
                          "operation": "创建 references/faq.md，包含至少 3 对 Q&A（问题 ≥10 字，答案 ≥15 字）",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-    
+
     # 4. 检查 references/faq.md 内容质量
     with open(faq_file, 'r', encoding='utf-8') as f:
         faq_content = f.read()
-    
+
     # 提取 Q&A 对
     faq_qa = _extract_qa_pairs(faq_content)
-    
+
     if not faq_qa:
         return {"passed": False,
-                "detail": "references/faq.md 无法解析 Q&A 内容（请确保使用 Q:/A: 或 ### 子标题格式）",
+                "detail": f"{faq_file}:1 - references/faq.md 无法解析 Q&A 内容（请确保使用 Q:/A: 或 ### 子标题格式）",
                 "fix": {"key": "faq_unparsable", "value": "reformat",
-                         "location": f"{faq_file}",
+                         "location": f"{faq_file}:1",
                          "operation": "用 Q: 问题\n\nA: 答案\n\n 格式重写 FAQ",
                          "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-    
+
     # 检查 Q&A 质量
     trivial_questions = ["如何工作", "怎么用", "what is", "how to", "帮助"]
     bad_pairs = []
@@ -289,17 +326,16 @@ def body_has_faq_section(filepath, content, fm, body, **kw):
             bad_pairs.append(f"Q: {q_trim[:30]}")
         if len(a_trim) < 15 or a_trim in ("请参考文档", "见上文", "see above"):
             bad_pairs.append(f"A: {a_trim[:30]}")
-    
-    if bad_pairs:
-        return {"passed": False,
-                "detail": f"FAQ 包含低质量条目（{len(bad_pairs)} 条）：{', '.join(bad_pairs[:3])}",
-                "fix": {"key": "faq_quality", "value": "improve_qa",
-                         "location": f"{faq_file}",
-                         "operation": "改进 FAQ 质量：问题须具体（≥10字），答案须有实质内容（≥15字），避免万能回答",
-                         "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
-    
+        if bad_pairs:
+            return {"passed": False,
+                    "detail": f"{faq}:1 - FAQ 包含低质量条目（{len(bad_pairs)} 条）：{', '.join(bad_pairs[:3])}",
+                    "fix": {"key": "faq_quality", "value": "improve_qa",
+                             "location": f"{faq_file}:1",
+                             "operation": "改进 FAQ 质量：问题须具体（≥10字），答案须有实质内容（≥15字），避免万能回答",
+                             "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
+
     return {"passed": True,
-            "detail": f"FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A）"}
+            "detail": f"{faq_file}:1 - FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A）"}
 
 
 def _extract_qa_pairs(section_text):
@@ -343,9 +379,9 @@ def _extract_qa_pairs(section_text):
     return pairs
 
 
-# ─────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────
 # R-20: 写作规范检查
-# ─────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────
 
 def _check_writing_standards_text(text, filename=""):
     """
@@ -449,22 +485,21 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
             if f"R-23" in r23_result.get("detail", ""):
                 all_issues["suggest"].append(r23_result["detail"])
 
-
-    # ── 检查 SKILL.md 正文 ─────────────────────────
+    # ── 检查 SKILL.md 正文 ────────────────────────
     issues = _check_writing_standards_text(body, "SKILL.md")
     for k in all_issues:
         all_issues[k] += issues[k]
 
-    # ── 新增：脚本调用验证检查（v2.24.4）────────────────────
+    # ── 新增：脚本调用验证检查（v2.24.4）─────────────────────
     # 检查 SKILL.md 里提到的脚本是否真实存在、能否正常运行（--help 验证）
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     if skill_dir and os.path.isdir(skill_dir):
         import re, py_compile, sys
-        
+
         # 1. 解析 SKILL.md 里的代码块（```bash ... ```）和行内代码（`...`）
         code_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', body, re.DOTALL)
         inline_codes = re.findall(r'`([^`]+?)`', body)
-        
+
         all_commands = []
         for block in code_blocks:
             for line in block.splitlines():
@@ -473,7 +508,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                     continue
                 all_commands.append(line)
         all_commands.extend(inline_codes)
-        
+
         # 2. 提取脚本路径（如 python scripts/xxx.py --list）
         script_paths = set()
         for cmd in all_commands:
@@ -487,7 +522,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                 if '{' in script_path or '}' in script_path:
                     continue
                 script_paths.add(script_path)
-        
+
         # 3. 检查脚本文件是否存在、能否运行 --help
         for script_path in script_paths:
             full_path = os.path.join(skill_dir, script_path)
@@ -502,8 +537,8 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                     all_issues["suggest"].append(f"脚本 `{script_path}` 语法错误（第 {_e.lineno} 行）：{_e.msg}")
                 except Exception as _e:
                     all_issues["suggest"].append(f"脚本 `{script_path}` 读取/编译失败：{str(_e)[:100]}")
-    
-        # ── 检查渐进式文件 references/*.md ────────────────
+
+    # ── 检查渐进式文件 references/*.md ────────────────
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     refs_dir = os.path.join(skill_dir, 'references')
     if os.path.isdir(refs_dir):
@@ -553,7 +588,6 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                      "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
 
 
-
 def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
     """
     R-21: 渐进式加载显式说明检查 (v2.24.2 固定模板)
@@ -561,46 +595,49 @@ def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
     ✅ v2.24.2：固定模板句必须原封不动包含，可后面接其他说明。
     """
     from .utils import CORE_KEYWORDS, WORKFLOW_KEYWORDS
-    
+
     # v2.24.2 固定模板句子（所有技能必须原封不动包含此句，可在后面接其他说明）
     FIXED_TEMPLATE = "> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。"
-    
+
     # v2.24.2 硬编码章节名：只检查 ## 核心能力 和 ## 工作流程（不用 CORE_KEYWORDS，避免匹配到 ## 核心概念）
     prominent_texts = []
     # 硬编码检查 ## 核心能力
-    found, title, section_text = _section_text(body, ["核心能力", "核心功能", "概述", "Overview", "技能概述"])
+    found, title, section_text, line_no = _section_text(body, ["核心能力", "核心功能", "概述", "Overview", "技能概述"])
     if found:
-        prominent_texts.append(("核心能力", title, section_text))
+        prominent_texts.append(("核心能力", title, section_text, line_no))
     # 硬编码检查 ## 工作流程
-    found, title, section_text = _section_text(body, ["工作流程", "使用方式", "Workflow", "完整执行流程", "核心指令", "完整工作流"])
+    found, title, section_text, line_no = _section_text(body, ["工作流程", "使用方式", "Workflow", "完整执行流程", "核心指令", "完整工作流"])
     if found:
-        prominent_texts.append(("工作流程", title, section_text))
-    
+        prominent_texts.append(("工作流程", title, section_text, line_no))
+
     if not prominent_texts:
+        line = _abs_line(body, content, 0)
         return {"passed": False,
-                "detail": "未找到核心能力/工作流程章节，无法检查渐进式加载显式说明",
+                "detail": f"{filepath}:{line} - 未找到核心能力/工作流程章节，无法检查渐进式加载显式说明",
                 "fix": {"key": "progressive_loading_explicit", "value": True,
-                         "location": f"{filepath} ## 核心能力 或 ## 工作流程 章节",
+                         "location": f"{filepath}:{line}",
                          "operation": f"在 ## 核心能力 章节添加固定模板句：{FIXED_TEMPLATE}",
                          "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
-    
+
     # v2.24.2：直接搜固定模板句子（原封不动，可后面接其他内容）
-    for section_name, title, section_text in prominent_texts:
+    for section_name, title, section_text, line_no in prominent_texts:
+        abs_line = _abs_line(body, content, line_no - 1)
         for line in section_text.splitlines():
             stripped = line.strip()
             if stripped.startswith(FIXED_TEMPLATE) or stripped == FIXED_TEMPLATE:
                 return {"passed": True,
-                        "detail": f"在 ## {title} 章节发现渐进式加载固定模板句"}
-    
+                        "detail": f"{filepath}:{abs_line} - 在 ## {title} 章节发现渐进式加载固定模板句"}
+
     # 未找到固定模板句
-    first_section = prominent_texts[0][0]
-    first_title   = prominent_texts[0][1]
+    first_section, first_title, _, first_line_no = prominent_texts[0]
+    first_abs_line = _abs_line(body, content, first_line_no - 1)
     return {"passed": False,
-            "detail": f"在 ## {first_title} 等显眼章节未找到渐进式加载固定模板句",
+            "detail": f"{filepath}:{first_abs_line} - 在 ## {first_title} 等显眼章节未找到渐进式加载固定模板句",
             "fix": {"key": "progressive_loading_explicit", "value": True,
-                     "location": f"{filepath} ## {first_section} 章节",
+                     "location": f"{filepath}:{first_abs_line}",
                      "operation": f"在 ## {first_section} 章节添加固定模板句：{FIXED_TEMPLATE}（必须原封不动，可在后面接其他说明）",
                      "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
+
 
 def check_doc_code_consistency(filepath, content, fm, body, **kw):
     """
@@ -609,17 +646,17 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
     """
     import re, ast, os
     from pathlib import Path
-    
+
     skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
     issues = {"must": [], "suggest": [], "optional": []}
-    
+
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "R-23: 无法访问技能目录，跳过检查"}
-    
+
     # 1. 解析 SKILL.md 里的代码块和行内代码
     code_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', body, re.DOTALL)
     inline_codes = re.findall(r'`([^`]+?)`', body)
-    
+
     all_commands = []
     for block in code_blocks:
         for line in block.splitlines():
@@ -628,18 +665,18 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
                 continue
             all_commands.append(line)
     all_commands.extend(inline_codes)
-    
+
     # 2. 提取脚本路径（如 python scripts/xxx.py --list）
     script_paths = set()
     py_file_refs = set()  # 所有 .py 文件引用
-    
+
     for cmd in all_commands:
         # 匹配 python scripts/xxx.py 或 `scripts/xxx.py`
         match = re.search(r'(?:python3?\s+)?([^\s`]+\.py)', cmd)
         if match:
             script_path = match.group(1).strip()
             # 排除含变量/中文的路径
-            if re.search(r'[{\u4e00-\u9fff\u3000-〿\uff00-￯]', script_path):
+            if re.search(r'[{\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', script_path):
                 continue
             if '{' in script_path or '}' in script_path:
                 continue
@@ -647,9 +684,9 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
         # 也匹配行内代码中的 .py 引用
         for m2 in re.finditer(r'([^\s`]*\.py)', cmd):
             py_file_refs.add(m2.group(1))
-    
+
     script_paths.update(py_file_refs)
-    
+
     # 3. 检查脚本文件是否存在
     for script_path in script_paths:
         full_path = os.path.join(skill_dir, script_path)
@@ -659,7 +696,7 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
             if os.path.isfile(alt_path):
                 continue
             issues["suggest"].append(
-                f"R-23: SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望：{full_path}）"
+                f"R-23: {filepath}:1 - SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望：{full_path}）"
             )
         else:
             # 静态语法检查
@@ -668,13 +705,13 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
                     ast.parse(_f.read())
             except SyntaxError as _e:
                 issues["suggest"].append(
-                    f"R-23: 脚本 `{script_path}` 语法错误（第 {_e.lineno} 行）：{_e.msg}"
+                    f"R-23: {script_path}:{_e.lineno} - 脚本 `{script_path}` 语法错误（第 {_e.lineno} 行）：{_e.msg}"
                 )
             except Exception as _e:
                 issues["suggest"].append(
-                    f"R-23: 脚本 `{script_path}` 读取失败：{str(_e)[:80]}"
+                    f"R-23: {script_path}:1 - 脚本 `{script_path}` 读取失败：{str(_e)[:80]}"
                 )
-            
+
             # 4. 检查 SKILL.md 中的调用方式是否与实际代码一致
             # 检查 --help / --list 等 flag 是否真实存在
             if '--' in ' '.join(all_commands):
@@ -690,17 +727,17 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
                         for flag in doc_flags:
                             if flag not in actual_flags and flag not in ('help', 'version'):
                                 issues["optional"].append(
-                                    f"R-23: SKILL.md 示例中含 `--{flag}` 但 `{script_path}` 未定义此参数（实际定义：{', '.join(sorted(actual_flags)[:5])}）"
+                                    f"R-23: {filepath}:1 - SKILL.md 示例中含 `--{flag}` 但 `{script_path}` 未定义此参数（实际定义：{', '.join(sorted(actual_flags)[:5])}）"
                                 )
                     except Exception:
                         pass
-    
+
     # 5. 检查 SKILL.md 正文提到的函数/类名是否在实际代码中存
     # 匹配中文描述后的代码引用，如 "调用 XXXFunction" 或 "`XXXClass`"
     func_refs = re.findall(r'`([A-Z][a-zA-Z0-9_]*)`', body)
     func_refs += re.findall(r'调用\s+([a-zA-Z_][a-zA-Z0-9_]*)', body)
     func_refs += re.findall(r'函数\s+([a-zA-Z_][a-zA-Z0-9_]*)', body)
-    
+
     if func_refs and skill_dir:
         # 收集技能目录中所有 .py 文件定义的函数/类名
         all_defs = set()
@@ -712,26 +749,25 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
                     all_defs.add(m.group(1))
             except Exception:
                 continue
-        
+
         for ref in set(func_refs):
             if ref not in all_defs:
                 # 模糊匹配（前缀匹配）
                 matched = [d for d in all_defs if d.startswith(ref) or ref.startswith(d)]
                 if not matched:
                     issues["suggest"].append(
-                        f"R-23: SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
+                        f"R-23: {filepath}:1 - SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
                     )
-    
+
     # 汇总
     total = sum(len(issues[k]) for k in issues)
     if total == 0:
-        return {"passed": True, "detail": "R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}
-    
+        return {"passed": True, "detail": f"{filepath}:1 - R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}
+
     msgs = []
     for k in ["must", "suggest", "optional"]:
         msgs.extend(issues[k])
     return {"passed": False,
-            "detail": f"R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
+            "detail": f"{filepath}:1 - R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
             # R-23 只检查，不自动修复——需要人工判断
             "fix": None}
-

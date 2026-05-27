@@ -206,7 +206,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-11 | ERROR | 产出物路径规范性 | 产出物路径符合 skills/.standardization/<skill>/ 规范，且无路径遍历、跨目录写入、敏感信息泄露风险 |
 | R-12 | ERROR | 外部数据目录规范性 | 外部数据目录路径符合 skills/.standardization/<skill-name>/ 约定，_meta.json 含 data_dir 字段且一致，且无数据泄露风险 |
 | R-13 | ERROR | 敏感信息访问声明 | 脚本含敏感信息访问（memory/credentials/token）时，frontmatter 须声明 sensitive_access: true 并说明用途 |
-| R-14 | ERROR | 关键位置写入声明 | 脚本含关键位置写入（skills/.workbuddy/系统目录）时，frontmatter 须声明 critical_write: true 并说明用途 |
+| R-14 | ERROR | 关键位置写入声明 | 脚本含关键位置写入（skills/技能数据目录/系统目录）时，frontmatter 须声明 critical_write: true 并说明用途 |
 | R-15 | ERROR | 高权限操作授权检查 | 脚本含文件删除/网络请求/subprocess 调用时，执行前须调用 authorization_manager.py 请求用户授权 |
 | R-16 | WARN | 权限权重说明 | 建议在 SKILL.md 或 references/ 中说明各操作的权限权重，便于审查时评估风险 |
 | R-17 | ERROR | 渐进加载引用（强制） | SKILL.md > 200 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用 |
@@ -335,7 +335,7 @@ python -m json_loader refs
 python -m permission_checker.py <skill-dir> [--json]
 
 # 输出 JSON 报告（供 AI 解析）
-python -m permission_checker.py ~/.workbuddy/skills/my-skill --json
+python -m permission_checker.py skills/my-skill --json
 ```
 
 ### 输出格式（JSON）
@@ -366,7 +366,7 @@ python -m permission_checker.py ~/.workbuddy/skills/my-skill --json
 | 维度 | 权重 | 说明 |
 |------|------|------|
 | 敏感信息访问 | 40% | 读取 memory/credentials/token 等 |
-| 关键位置写入 | 30% | 写入 skills/.workbuddy/系统目录 |
+| 关键位置写入 | 30% | 写入 skills/技能数据目录/系统目录 |
 | 网络访问 | 20% | 发起 HTTP 请求 |
 | 文件删除 | 10% | 删除文件或目录 |
 

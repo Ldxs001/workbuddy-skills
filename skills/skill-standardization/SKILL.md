@@ -1,13 +1,14 @@
 ---
 name: skill-standardization
-version: 2.35.0
+version: 2.35.1
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.35.0。注册 R-23 到审计流程；修复 _apply_fixes() 容错处理；修复 R-11 误报（匹配查找路径当产出物路径）；更新规则范围 R-01~R-23
+description: Skill 标准化规范引擎 v2.37.0。新增临时/备份文件管理机制（操作前强制整体备份、操作中记录临时/备份文件、操作后自动清理）；py工具删/改动作强制临时备份和回滚能力（safe_io.py已具备）；R-24临时文件规范管理。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
 data_dir: ../.standardization/skill-standardization/
+external_data_dir: true
 writing_standards: fix_terms
 ---
 
@@ -16,77 +17,9 @@ writing_standards: fix_terms
 
 
 
+# skill-standardization v2.37.0
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# skill-standardization v2.34.9
-
-## ⚠️ 文件更新约束
+## 文件更新约束
 
 > **本技能的所有 `.md` 文件禁止使用 Write/Edit 工具更新（会损坏 UTF-8 中文编码）。**
 > 必须用 `scripts/` 下的 Python 脚本原子写入（`tmp + os.replace()`）。
@@ -125,14 +58,14 @@ writing_standards: fix_terms
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-- **audit 模式** — 对指定 skill 目录执行 R-01~R-23 规范审查，输出通过/失败/跳过统计
+- **audit 模式** — 对指定 skill 目录执行 R-01~R-24 规范审查，输出通过/失败/跳过统计
 - **refactor 模式** — 改造现有技能（修复 frontmatter、迁移更新记录、统一术语、规范数据目录、R-22 数据目录合规检查）
 - **create 模式** — 基于标准化模板创建新 skill，自动注入 R-07~R-09/R-18~R-22 章节引用
 
 ## 工作流程
 
 1. 读取目标 skill 的 SKILL.md
-2. 执行 R-01~R-23 规则检查
+2. 执行 R-01~R-24 规则检查
 3. 输出审查报告（通过/失败/跳过）
 4. 若传了 --fix，自动修正 R-11/R-12/R-22 违规
 
@@ -148,12 +81,51 @@ writing_standards: fix_terms
 
 > 阅读时先看本章节，按需让 AI 加载 references/*.md。
 
+## 临时文件与备份管理
+
+> 本技能在创建、更新、改造过程中，对临时文件和备份文件进行全生命周期管理。
+
+### 管理规则
+
+1. **操作前整体备份**：对目标技能目录执行整体备份（时间戳命名），记录在案，确保可回滚。
+2. **操作中记录**：所有临时文件（`temp/`、`*.tmp`、脚本中间产物）和备份文件（`backup/`、`_bak_*` 目录）的产生路径、时间、操作类型均记录到 `op_logger` 日志。
+3. **操作后清理**：主体创建/更新/改造完成（审计通过 + 版本号更新 + 更新日志维护完毕）后，按规范清除临时文件和过期备份。
+4. **py 工具兜底能力**：`scripts/safe_io.py` 所有写操作（`safe_write`、`safe_patch_by_line`、`safe_patch_regex`、`safe_insert_after`）均内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚。
+
+### 清理规范
+
+| 文件类型 | 路径模式 | 保留时长 | 清理时机 |
+|-----------|-----------|----------|------------|
+| 临时文件 | `data/temp/*`、`*.tmp`、`draft_*` | 会话级（0天） | 每次操作完成后立即清除 |
+| 操作备份 | `data/backup/*` | 最近 10 个 | 每次操作完成后保留最新 10 个，其余清除 |
+| 整体备份 | `<skill-dir>_bak_*<timestamp>` | 操作完成确认后 | 操作完成并确认无异常后，提示用户是否清除 |
+| 日志文件 | `data/logs/ops.log` | 最近 200 条 | 超过 200 条时截断，保留最新 |
+
+### 记录格式
+
+每条临时/备份文件记录在 `op_logger` 日志中增加 `temp_files` 字段：
+
+```json
+{
+  ts: 2026-05-27T08:31:47,
+  operation: refactor,
+  file: skills/.standardization/skill-standardization/,
+  success: true,
+  rollback_id: 20260527_083147_...,
+  temp_files: [skills/.standardization/skill-standardization/data/temp/xxx.tmp],
+  backup_files: [skills/.standardization/skill-standardization/data/backup/20260527_...bak],
+  detail: ...
+}
+```
+
+> 本技能自身被更新时，同样遵守上述规则：更新前对 `skills/.standardization/skill-standardization/` 整体备份，操作中记录临时文件，更新完成后清理。
+
 ## 数据目录说明
 
-本技能的数据文件（审查缓存、进度文件等）存放在：
+本技能的数据文件（审查缓存、进度文件、备份、日志等）存放在：
 
 ```
 skills/.standardization/skill-standardization/
 ```
 
-> 安装目录 `skills/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。
+> 安装目录 `skills/.standardization/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。

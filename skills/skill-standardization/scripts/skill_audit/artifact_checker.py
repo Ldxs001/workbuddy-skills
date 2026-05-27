@@ -14,7 +14,7 @@ from .utils import (
     _ARTIFACT_EXTS_COMPREHENSIVE, _ROOT_ARTIFACT_EXTS, _ROOT_EXT_CLASSIFY,
     _ARTIFACT_WRITE_PATTERNS, _HARDCODED_PATH_RE, _PATH_EXCLUDE_RE,
     _is_hardcoded_path, _classify_artifact, _classify_artifact_by_ext,
-    _extract_path_literal,
+    _extract_path_literal, _find_skills_dir,
 )
 
 
@@ -561,14 +561,10 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                 "detail": "标准化数据目录不存在: " + expected_disk_path,
             })
 
-    # 6. [v2.12.2] references/*.md 中的数据目录路径检查
+        # 6. [v2.36.0] references/*.md 中的数据目录路径检查（仅扫 frontmatter）
+    #     .md 文件只检查 frontmatter 的 data_dir 字段，不扫正文（避免代码块示例路径误报）
     refs_dir = os.path.join(skill_dir, "references")
     if os.path.isdir(refs_dir):
-        _REFS_PATH_RE = re.compile(
-            r'(?:~|/home/\w+|/Users/\w+|C:\\Users\\\w+|/c/Users/\w+)?'
-            r'(?:/|\\)(?:\.?workbuddy(?:/|\\)(?:skills(?:/|\\))?)?'
-            r'([\w.-]+(?:/|\\)data(?:/|\\))'
-        )
         for fname in sorted(os.listdir(refs_dir)):
             if fname == "changelog.md":
                 continue
@@ -580,189 +576,45 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                 continue
             try:
                 with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                    for lineno, line in enumerate(f, 1):
-                        stripped = line.strip()
-                        if not stripped or stripped.startswith('#') or stripped.startswith('<!--'):
-                            continue
-                        if '.standardization/' in stripped:
-                            continue
-                        for m in _REFS_PATH_RE.finditer(stripped):
-                            matched_path = m.group(1)
-                            path_parts = matched_path.replace('\\', '/').rstrip('/').split('/')
-                            if len(path_parts) >= 2 and path_parts[-1] == 'data':
-                                skill_name_in_path = path_parts[-2]
+                    md_content = f.read()
+                # 只解析 frontmatter
+                fm_match = re.match(r'^---\s*\n(.*?)\n---\s*\n', md_content, re.DOTALL)
+                if fm_match:
+                    fm_text = fm_match.group(1)
+                    for fm_lineno, fm_line in enumerate(fm_text.split('\n'), 1):
+                        fm_line = fm_line.strip()
+                        if fm_line.startswith('data_dir:'):
+                            data_dir_val = fm_line[len('data_dir:'):].strip()
+                            # 去掉引号
+                            data_dir_val = data_dir_val.strip('"').strip("'") 
+                            if data_dir_val and '.standardization/' not in data_dir_val:
                                 violations.append({
-                                    "source": f"references/{fname}:{lineno}",
-                                    "var_name": "path_text",
-                                    "path_value": matched_path,
-                                    "expected": f".standardization/{dirname}/data/",
-                                    "detail": f"references/{fname}:{lineno} contains non-standard data path '{matched_path}' — should use .standardization/{dirname}/data/ (铁律4)",
+                                    "source": f"references/{fname}:frontmatter:data_dir",
+                                    "var_name": "data_dir",
+                                    "path_value": data_dir_val,
+                                    "expected": ".standardization/<skill-name>/data/",
+                                    "detail": f"references/{fname} frontmatter data_dir='{data_dir_val}' should use .standardization/<skill-name>/data/ convention",
                                 })
             except Exception:
                 continue
-
     if violations:
-        detail_lines = ["Found " + str(len(violations)) + " external data dir violations:"]
+        detail_lines = [f"发现 {len(violations)} 处数据目录路径违规："]
         for v in violations:
-            detail_lines.append("  " + v["source"] + ": " + v["detail"])
-            detail_lines.append("    suggestion: " + v["expected"])
+            line = f"  {v['source']}  {v['var_name']}={v['path_value']} — {v['detail']}"
+            detail_lines.append(line)
         return {
             "passed": False,
             "detail": "\n".join(detail_lines),
-            "violations": violations,
+            "violations": [{"source": v["source"], "var_name": v["var_name"],
+                           "path_value": v["path_value"], "detail": v["detail"]}
+                          for v in violations],
             "fix": {"key": "external_data_dir", "value": True,
-                     "location": f"{skill_dir}/_meta.json 及 scripts/ 中的数据目录变量",
-                     "operation": (
-                         "在 _meta.json 中添加 data_dir 字段，"
-                         "确保 scripts/ 中数据目录路径符合 skills/.standardization/<skill>/data/ 规范。\n"
-                         "【推荐写法】（同时满足审计静态检查和运行时正确性）:\n"
-                         "  # 审计锚点：存放合规字面量，变量名含 DATA 被审计匹配\n"
-                         '  DEFAULT_DATA_DIR_RAW = "skills/.standardization/<skill-name>/data/"\n'
-                         "  SKILL_ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n"
-                         "  _data_dir_abs   = os.path.normpath(os.path.join(SKILL_ROOT, '..', DEFAULT_DATA_DIR_RAW))\n"
-                         "  BACKUP_DIR = os.path.join(_data_dir_abs, 'backup')\n"
-                         "  LOGS_DIR  = os.path.join(_data_dir_abs, 'logs')\n"
-                         "要点：① 第一行变量名必须含 DATA/STORAGE/DB/CACHE/CONFIG 才会被审计匹配；"
-                         "② 值必须是 skills/.standardization/<skill>/data/ 字面量；"
-                         "③ 运行时用另一个不含上述关键词的变量（如 _data_dir_abs）存放绝对路径，避免被审计二次匹配。"
-                     ),
+                     "location": f"{skill_dir} (scripts/ 及 _meta.json)",
+                     "operation": "将数据目录统一至 skills/.standardization/<skill>/data/ 规范",
                      "verification": "重新运行 audit_skill()，确认 R-12 passed"},
         }
     else:
-        if data_dir_vars:
-            return {"passed": True,
-                    "detail": (
-                        "External data dir paths conform to standard, "
-                        "_meta.json data_dir declared and consistent.\n"
-                        "【推荐写法参考】（同时满足审计+运行时正确性）:\n"
-                        "  DEFAULT_DATA_DIR_RAW = 'skills/.standardization/<skill>/data/'\n"
-                        "  _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, '..', DEFAULT_DATA_DIR_RAW))\n"
-                        "  BACKUP_DIR = os.path.join(_data_dir_abs, 'backup')\n"
-                        "要点：① 变量名含 DATA 的行存合规字面量（审计匹配）；"
-                        "② 用另一个不含 DATA/STORAGE 等关键词的变量（如 _data_dir_abs）存绝对路径（运行时使用）。"
-                    )}
-        else:
-            return {"passed": True, "detail": "No external data dir variables defined in scripts/ (nothing to check)", "skip": True}
-
-
-def _extract_path_value(val_expr):
-    """Extract path string from Python assignment expression."""
-    if "SKILL_DIR" in val_expr and ".standardization" in val_expr:
-        frags = re.findall(r"""['"]([^'"]*)['"]""", val_expr)
-        if frags:
-            return "/".join(frags)
-    if "Path.home()" in val_expr or "Path(" in val_expr:
-        frags = re.findall(r"""['"]([^'"]*)['"]""", val_expr)
-        if not frags:
-            return val_expr
-        if "Path.home()" in val_expr:
-            return str(Path.home() / "/".join(frags))
-        return "/".join(frags)
-    m = re.match(r'''^['"](.+?)['"]$''', val_expr.strip())
-    if m:
-        return m.group(1)
-    return val_expr.strip()
-
-
-def _find_skills_dir(skill_dir):
-    """向上查找 skills 目录（最多 5 层）。"""
-    p = os.path.abspath(skill_dir)
-    for _ in range(5):
-        if os.path.basename(p) == "skills" and os.path.isdir(p):
-            return p
-        parent = os.path.dirname(p)
-        if parent == p:
-            break
-        p = parent
-    return os.path.dirname(os.path.abspath(skill_dir))
-
-
-def fix_artifact_paths(skill_dir):
-    """
-    R-11 自动修复：将 scripts/*.py 中的硬编码产出物路径
-    替换为 skills/.standardization/<skill>/ 规范路径。
-    返回修复数量。
-    """
-    import re, os
-    if not skill_dir or not os.path.isdir(skill_dir):
-        return 0
-
-    skill_name = os.path.basename(os.path.abspath(skill_dir))
-    scripts_dir = os.path.join(skill_dir, "scripts")
-    if not os.path.isdir(scripts_dir):
-        return 0
-
-    # 调用检查函数获取违规列表
-    from .artifact_checker import check_artifact_paths
-    import tempfile, json
-    tmp = tempfile.mktemp(suffix=".json")
-    result = check_artifact_paths(
-        os.path.join(skill_dir, "SKILL.md"),
-        open(os.path.join(skill_dir, "SKILL.md"), "r", encoding="utf-8").read(),
-        {}, "", skill_dir=skill_dir
-    )
-    if result.get("passed"):
-        return 0
-
-    violations = result.get("violations", [])
-    fixed = 0
-
-    for v in violations:
-        src = v.get("source", "")
-        # src 格式： "scripts/foo.py:42" 或 "ROOT/foo.html"
-        if not src.startswith("scripts/"):
-            continue
-        parts = src.split(":")
-        if len(parts) != 2:
-            continue
-        fname = parts[0].replace("scripts/", "", 1)
-        try:
-            lineno = int(parts[1]) - 1  # 0-based
-        except ValueError:
-            continue
-
-        fpath = os.path.join(scripts_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
-
-        try:
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                lines = f.readlines()
-        except Exception:
-            continue
-
-        if lineno < 0 or lineno >= len(lines):
-            continue
-
-        old_line = lines[lineno]
-        suggestion = v.get("suggestion", "")
-        # suggestion 格式： "skills/.standardization/<skill>/outputs/foo.html"
-        if not suggestion:
-            continue
-
-        # 提取规范路径的组件
-        sug_parts = suggestion.replace("skills/.standardization/", "").split("/")
-        if len(sug_parts) < 2:
-            continue
-
-        category = sug_parts[1]  # outputs / data / cache / temp
-        filename = sug_parts[-1] if "/" in suggestion else ""
-
-        # 构造替换行：将路径替换为 Path 拼接形式
-        # 旧：".../outputs/foo.html" 或 Path.home() / "..."
-        # 新：SKILL_ROOT / ".standardization" / skill_name / category / filename
-        # 在 get_*_home() 函数中：default = Path.home() / ".workbuddy" / "skills" / ".standardization" / skill_name / category
-        if "default" in old_line and "Path.home()" in old_line:
-            indent = old_line[:len(old_line) - len(old_line.lstrip())]
-            new_line = indent + 'default = Path.home() / ".workbuddy" / "skills" / ".standardization" / "' + skill_name + '" / "' + category + '"\n'
-            if filename:
-                new_line = indent + 'default = Path.home() / ".workbuddy" / "skills" / ".standardization" / "' + skill_name + '" / "' + category + '"\n'
-            lines[lineno] = new_line
-            with open(fpath, "w", encoding="utf-8") as f:
-                f.writelines(lines)
-            fixed += 1
-
-    return fixed
+        return {"passed": True, "detail": "数据目录路径符合规范（scripts/ + _meta.json 均通过）"}
 
 
 def fix_external_data_dir(skill_dir):

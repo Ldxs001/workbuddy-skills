@@ -6,6 +6,32 @@
 ---
 ---
 
+## v2.36.0（2026-05-27）
+
+### 新增
+- 临时/备份文件全生命周期管理机制
+- `skill_rollback.py` 新增 `backup_skill(skill_dir, operation)` — 操作前强制整体备份目标技能
+- `skill_rollback.py` 新增 `record_temp_file(temp_path, operation)` — 记录临时文件到 op_logger 日志
+- `skill_rollback.py` 新增 `cleanup(operation_id, keep_backups)` — 操作后自动清理临时文件和过期备份
+- `op_logger.py` `log_op()` 新增 `temp_files` 和 `backup_files` 字段
+- `SKILL.md` 新增 `## 临时文件与备份管理` 章节
+- `references/guide.md` 新增临时/备份管理规范章节
+- `references/rules.md` 新增 R-24 规则（临时文件与备份规范管理，ERROR 级）
+- `references/rules.md` 新增铁律 6（临时文件与备份必须记录并清理）
+
+### 更新
+- 版本号升至 v2.36.0
+- `SKILL.md` 修复正文版本号不一致 bug（正文曾显示 v2.34.9，与 frontmatter v2.35.0 不符）
+- `SKILL.md` 清除正文与 frontmatter 之间 74 行空白的格式化 bug
+- `references/guide.md` update/refactor 工作流嵌入：操作前备份 → 操作中记录 → 操作后清理
+
+### 兼容性
+- 完全向后兼容 v2.35.0，不影响现有功能
+- `safe_io.py` 所有写操作已内置 `backup_file()` 临时备份（无需更新）
+- 新增命令：`backup-skill`、`record-temp`、`cleanup`
+
+---
+
 ## v2.35.1
 
 - **修复**：`changelog.md` 术语不一致（`移除`/`删除` 混用），R-20 审查触发 WARN，统一为 `删除`（1 处）

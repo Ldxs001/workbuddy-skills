@@ -117,7 +117,7 @@ def check_data_dir_compliance(filepath=None, content=None, fm=None,
     if not skill_dir or not os.path.isdir(skill_dir):
         return {
             "passed": True, "skipped": True,
-            "detail": "R-22 跳过：无法确定技能目录",
+            "detail": f"{filepath}:1 - R-22 跳过：无法确定技能目录",
         }
 
     # 读取 data_dir 声明
@@ -126,7 +126,7 @@ def check_data_dir_compliance(filepath=None, content=None, fm=None,
         # 尝试从 SHELL.md 推断
         return {
             "passed": False, "skipped": False,
-            "detail": "R-22 FAIL — 未在 frontmatter 中声明 data_dir: "
+            "detail": f"{filepath}:1 - R-22 FAIL — 未在 frontmatter 中声明 data_dir: "
                       "(应声明数据目录，如 data_dir: ../.standardization/git-sync/)",
         }
 

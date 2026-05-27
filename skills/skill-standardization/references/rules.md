@@ -4,6 +4,26 @@
 
 ---
 
+
+### R-24：临时文件与备份规范管理（ERROR）
+
+**检查内容：**
+- 创建/更新/改造过程中，临时文件（`*.tmp`、`temp_*`、`draft_*`）和备份文件（`data/backup/*`、`_bak_*` 目录）必须记录到 `op_logger` 日志
+- 主体操作完成后（审计通过 + 版本号更新 + 更新日志完毕），必须按规范清除临时文件和过期备份
+- 更新/改造前必须对目标技能目录执行整体备份（`backup_skill()`）
+- `scripts/safe_io.py` 所有写操作（`safe_write`、`safe_patch_by_line`、`safe_patch_regex`、`safe_insert_after`）必须内置 `backup_file()` 临时备份，返回 `rollback_id`
+
+**修复方法：**
+1. 在操作前调用 `backup_skill(skill_dir, operation)` 执行整体备份
+2. 在操作中调用 `record_temp_file(temp_path, operation)` 记录临时文件
+3. 在操作后调用 `cleanup(operation_id)` 清除临时文件和过期备份
+4. 确保所有 py 工具的删/改动作调用 `backup_file()` 创建临时备份
+
+**检查方法：**
+- 检查 `op_logger` 日志是否包含 `temp_files` 和 `backup_files` 字段
+- 检查操作后是否调用 `cleanup()` 清理临时文件
+- 检查 `scripts/safe_io.py` 所有写操作是否调用 `backup_file()`
+
 ## 铁律 1：author 字段不可擅自替换
 
 - 技能是通用工具，author 默认值必须为 `your-name-here` 占位符
@@ -103,11 +123,21 @@ skills/
 
 ---
 
+## 铁律 6：临时文件与备份必须记录并清理
+
+- 所有创建、更新、改造过程中产生的临时文件和备份文件，**必须**记录到 `op_logger` 日志（`temp_files` 和 `backup_files` 字段）
+- 主体操作完成后（审计通过 + 版本号更新 + 更新日志维护完毕），**必须**按规范清除临时文件（会话级，立即清除）和过期备份（保留最新 10 个）
+- 更新/改造前**必须**对目标技能目录执行整体备份（`backup_skill()`），备份命名格式：`<skill-dir>_bak_<operation>_<YYYYMMDD_HHMMSS>`
+- `scripts/safe_io.py` 所有写操作**必须**内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚
+
+
+---
+
 ### R-14：关键位置写入声明
 
 **检查内容：**
 - 脚本含关键位置写入（`skills/`、`.workbuddy/`、`系统目录`）时，frontmatter 须声明 `critical_write: true` 并说明用途
-- 关键位置写入包括：写入 skills 目录、写入 .workbuddy 目录、写入系统目录等
+- 关键位置写入包括：写入 skills 目录、写入技能数据目录、写入系统目录等
 
 **修复方法：**
 1. 在 `SKILL.md` frontmatter 中添加 `critical_write: true`

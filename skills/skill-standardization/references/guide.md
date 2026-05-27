@@ -86,6 +86,22 @@ python ../skill-standardization/scripts/skill_builder.py update .
 python scripts/skill_builder.py update <skill-dir>
 ```
 
+### 工作流程（含临时/备份管理）
+
+1. **操作前整体备份**（默认执行）
+   ```bash
+   python scripts/skill_rollback.py backup_skill <skill-dir> update
+   ```
+2. **执行审查/修复**
+   ```bash
+   python scripts/skill_builder.py update <skill-dir> --fix
+   ```
+3. **操作中记录**：所有临时文件（`*.tmp`、`temp_*`）和备份文件记录到 `op_logger` 日志
+4. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
+   ```bash
+   python scripts/skill_rollback.py cleanup <operation_id>
+   ```
+
 ### 自动修复模式
 
 ```bash
@@ -158,6 +174,23 @@ Suggestion: 运行 refactor 清理根目录散落文件
 
 > ⚠️ refactor 会移动文件！务必先 `--dry-run`！
 
+### 工作流程（含临时/备份管理）
+
+1. **操作前整体备份**（默认执行，`--no-backup` 跳过）
+   ```bash
+   python scripts/skill_rollback.py backup_skill <skill-dir> refactor
+   ```
+2. **dry-run 预览**
+   ```bash
+   python scripts/skill_builder.py refactor <skill-dir> --dry-run
+   ```
+3. **执行改造**：`skill_builder.py refactor` 自动备份 + 迁移 + 验证
+4. **操作中记录**：临时文件、备份文件记录到 `op_logger` 日志
+5. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
+   ```bash
+   python scripts/skill_rollback.py cleanup <operation_id>
+   ```
+
 ### dry-run（推荐首选）
 
 ```bash
@@ -210,6 +243,72 @@ python scripts/skill_builder.py refactor <skill-dir> --no-backup
 rm -rf <skill-dir>
 mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 ```
+
+---
+
+
+---
+
+## 临时文件与备份管理规范
+
+> 本技能在创建、更新、改造目标技能的过程中，对临时文件和备份文件进行全生命周期管理。
+
+### 管理流程
+
+```
+操作前                              操作中                    操作后
+  │                                   │                        │
+  ▼                                   ▼                        ▼
+整体备份目标技能                    记录临时/备份文件        清理临时文件
+（timestamp 命名）                （op_logger 日志）      （保留最新 10 个备份）
+  │                                   │                        │
+  └───────────────────────────────────┴───────────────────────┘
+```
+
+### 操作前：整体备份
+
+- 更新/改造前，对目标技能目录执行整体备份
+- 备份命名格式：`skills/.standardization/<skill-name>/backup/<skill-dir>_bak_<operation>_<YYYYMMDD_HHMMSS>`
+- 备份路径记录在 `op_logger` 日志的 `rollback_id` 字段
+
+### 操作中：临时/备份文件记录
+
+- 所有临时文件（`*.tmp`、`temp_*`、`draft_*`）的产生路径、时间记录到 `op_logger` 日志的 `temp_files` 字段
+- 所有备份文件（`data/backup/*`、`_bak_*` 目录）记录到 `op_logger` 日志的 `backup_files` 字段
+- 日志格式（JSON Lines）：
+
+```json
+{
+  ts: 2026-05-27T08:31:47,
+  operation: update,
+  file: skills/.standardization/skill-standardization/,
+  success: true,
+  rollback_id: 20260527_083147_...,
+  temp_files: [skills/.standardization/skill-standardization/data/temp/xxx.tmp],
+  backup_files: [skills/.standardization/skill-standardization/data/backup/20260527_...bak],
+  detail: ...
+}
+```
+
+### 操作后：清理规范
+
+| 文件类型 | 路径模式 | 保留数量/时长 | 清理时机 |
+|-----------|-----------|----------------|------------|
+| 临时文件 | `data/temp/*`、`*.tmp`、`draft_*` | 0（会话级） | 每次操作完成后立即清除 |
+| 操作备份 | `data/backup/*` | 最近 10 个 | 每次操作完成后保留最新 10 个，其余清除 |
+| 整体备份 | `<skill-dir>_bak_*<timestamp>` | 操作完成确认后 | 操作完成并确认无异常后，提示用户是否清除 |
+| 日志文件 | `data/logs/ops.log` | 最近 200 条 | 超过 200 条时截断，保留最新 |
+
+### py 工具兜底能力
+
+`scripts/safe_io.py` 所有写操作（`safe_write`、`safe_patch_by_line`、`safe_patch_regex`、`safe_insert_after`）均内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚。
+
+`scripts/skill_rollback.py` 提供：
+- `backup_skill(skill_dir, operation)` — 整体备份目标技能目录
+- `record_temp_file(temp_path, operation)` — 记录临时文件
+- `cleanup(operation_id)` — 按 operation_id 清理临时文件和过期备份
+- `rollback(rollback_id)` — 单文件回滚
+- `rollback_latest(N)` — 回滚最近 N 次操作
 
 ---
 
@@ -504,7 +603,7 @@ skill_builder.py update <skill-dir>
 | 规则 | 严重度 | 检查内容 |
 |------|---------|----------|
 | R-13 | ERROR | 敏感信息访问声明（读取 memory/credentials/token 等须声明 `sensitive_access: true`） |
-| R-14 | ERROR | 关键位置写入声明（写入 skills/.workbuddy/系统目录须声明 `critical_write: true`） |
+| R-14 | ERROR | 关键位置写入声明（写入 skills/技能数据目录/系统目录须声明 `critical_write: true`） |
 | R-15 | ERROR | 高权限操作风险说明（脚本含高/严重风险操作时，`references/permissions.md` 须包含对应操作的风险说明、权限作用、执行步骤） |
 | R-16 | WARN | 权限权重说明（建议在 SKILL.md 或 references/ 中说明各操作的权限权重） |
 | R-17 | ERROR | 渐进加载引用（SKILL.md > 200 行时必须拆分到 references/ 并通过引用链接） |
