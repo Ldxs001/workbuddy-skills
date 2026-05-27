@@ -8,9 +8,8 @@ critical_write: false
 permission_weight: HIGH
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
-writing_standards: fix_terms
-artifact_paths: true
 version: 2.38.2
+writing_standards: fix_terms
 ---
 
 
@@ -26,7 +25,10 @@ version: 2.38.2
 
 
 
-# skill-standardization v2.38.0
+
+
+
+# skill-standardization v2.38.2
 
 ## 文件更新约束
 

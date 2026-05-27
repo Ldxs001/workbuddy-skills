@@ -84,48 +84,57 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
 
 
 def _check_root_artifact_files(skill_dir, violations):
-    """根目录产出物文件检测"""
+    """根目录白名单检查（R-11）
+    根目录只能包含：
+      - 文件：SKILL.md, _meta.json
+      - 目录：scripts/, references/
+      - 外部数据目录：.standardization/（当 external_data_dir: true 时）
+    其余一律报违规。
+    """
     try:
         root_entries = os.listdir(skill_dir)
     except OSError:
         return
 
-    # 渐进式 MD 文件名（应迁到 references/，不是 outputs/）
-    _PROGRESSIVE_MD_NAMES = {
-        "CHANGELOG", "CHANGELOG.md",
-        "FAQ", "FAQ.MD",
-        "GUIDE", "GUIDE.MD",
-        "EXAMPLES", "EXAMPLES.MD",
-        "REFERENCE", "REFERENCE.MD",
-        "ANTI-PATTERNS", "ANTI-PATTERNS.MD",
-        "CHANGELOG.MD", "FAQ.MD", "GUIDE.MD",
-        "EXAMPLES.MD", "REFERENCE.MD", "ANTI-PATTERNS.MD",
-    }
+    # 读取 external_data_dir 声明
+    _fm_external = False
+    _fm_path = os.path.join(skill_dir, "SKILL.md")
+    if os.path.isfile(_fm_path):
+        try:
+            from .utils import parse_simple_yaml_frontmatter
+            with open(_fm_path, "r", encoding="utf-8") as _f:
+                _content = _f.read()
+            _fm, _ = parse_simple_yaml_frontmatter(_content)
+            _fm_external = _fm.get("external_data_dir", False)
+        except Exception:
+            pass
 
-    for fname in sorted(root_entries):
-        fpath = os.path.join(skill_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
-        if fname in _KNOWN_ROOT_FILES:
-            continue
+    _ROOT_ALLOWED_FILES = {"SKILL.md", "_meta.json"}
+    _ROOT_ALLOWED_DIRS = {"scripts", "references"}
+    if _fm_external:
+        _ROOT_ALLOWED_DIRS = _ROOT_ALLOWED_DIRS | {".standardization"}
 
-        ext = os.path.splitext(fname)[1].lower()
-        if ext not in _ROOT_ARTIFACT_EXTS:
-            continue
-
-        # 渐进式 MD：建议迁到 references/；其余迁到 outputs/
-        if ext == ".md" and fname.upper() in _PROGRESSIVE_MD_NAMES:
-            cat = "references"
-        else:
-            cat = _classify_artifact_by_ext(fname)
-
-        violations.append({
-            "source": f"ROOT/{fname}",
-            "path_literal": fname,
-            "suggestion": f"skills/.standardization/<skill>/{cat}/{fname}",
-        })
-
-
+    for entry in sorted(root_entries):
+        fpath = os.path.join(skill_dir, entry)
+        if os.path.isfile(fpath):
+            if entry in _ROOT_ALLOWED_FILES:
+                continue
+            violations.append({
+                "source": f"ROOT/{entry}",
+                "path_literal": entry,
+                "suggestion": "删除此文件（根目录只允许 SKILL.md 和 _meta.json）",
+            })
+        elif os.path.isdir(fpath):
+            if entry in _ROOT_ALLOWED_DIRS:
+                continue
+            if entry.startswith("."):
+                continue  # 其他隐藏目录不报错，但不是允许的
+            violations.append({
+                "source": f"ROOT/{entry}/",
+                "path_literal": entry + "/",
+                "suggestion": "迁至 scripts/ 或数据目录，或删除",
+            })
+    return
 def _check_artifact_directories(skill_dir, violations):
     """非标准子目录扫描"""
     try:

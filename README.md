@@ -22,6 +22,7 @@
 | `simulated-peak-plot` | 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持自定义峰参数、噪声水平、基线设置、复合峰（N个子峰组合）、自定义坐标轴标题/单位、CSV完整数据导出、可点击的file:///路径输出、以及从设备导出数据导入CSV。 |
 | `skill-standardization` | Skill 标准化规范引擎 v2.38.2。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。 |
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
+| `skills` | 技能描述 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
@@ -46,6 +47,7 @@ workbuddy-skills/
 ├── simulated-peak-plot/
 ├── skill-standardization/
 ├── skill-sub/
+├── skills/
 ├── svg-composer/
 ├── triphasic-execution/
 ├── universal-file-ops/

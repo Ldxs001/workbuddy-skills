@@ -66,6 +66,13 @@ def _log_operation(log_path, operation, detail):
         f.write(f"[{ts}] {operation}: {detail}\n")
 
 
+# ── 应留在安装目录的目录（标准目录）────────────────────────────
+_KEEP_DIRS_IN_INSTALL = {
+    "scripts",
+    "references",
+}
+
+
 def _classify_files(install_dir: str, data_dir: str) -> dict:
     """
     分类安装目录中的文件：
@@ -81,8 +88,12 @@ def _classify_files(install_dir: str, data_dir: str) -> dict:
         if os.path.isdir(full) and entry == ".standardization":
             ok.append(entry)
             continue
-        # 明确应留在安装目录
-        if entry in _KEEP_IN_INSTALL:
+        # 标准目录（scripts/, references/）→ 允许留在安装目录
+        if os.path.isdir(full) and entry in _KEEP_DIRS_IN_INSTALL:
+            ok.append(entry)
+            continue
+        # 明确应留在安装目录（文件）
+        if os.path.isfile(full) and entry in _KEEP_IN_INSTALL:
             ok.append(entry)
             continue
         # .dist/ 构建产物 → 迁移
@@ -99,8 +110,9 @@ def _classify_files(install_dir: str, data_dir: str) -> dict:
         if ext.lower() in _MOVE_EXTS:
             to_migrate.append(("file", entry, f"扩展名 {ext} 属于构建产物/缓存"))
             continue
-        # 默认：留在安装目录
-        ok.append(entry)
+        # 默认：未知文件/目录 → 违规
+        kind = "dir" if os.path.isdir(full) else "file"
+        to_migrate.append((kind, entry, "未知项，不应出现在安装目录"))
 
     return {"to_migrate": to_migrate, "ok": ok}
 
