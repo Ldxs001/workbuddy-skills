@@ -27,6 +27,7 @@ antipattern_detail: add_detail
 
 
 
+
 ## 触发条件
 
 当用户出现以下意图时，加载本技能：
