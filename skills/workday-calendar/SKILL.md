@@ -1,6 +1,6 @@
 ---
 name: workday-calendar
-version: 1.4.0
+version: 1.5.0
 description: 智能周历系统 v1.5.0 - 新增2026年排班表生成（export_excel/generate_schedule）、Excel导出、HTML/Markdown/Excel格式排班输出
 sensitive_access: false
 critical_write: false
@@ -12,6 +12,7 @@ trigger_negative: true
 faq_unparsable: reformat
 antipattern_detail: add_detail
 ---
+
 
 
 
