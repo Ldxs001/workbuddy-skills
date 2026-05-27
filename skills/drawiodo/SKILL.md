@@ -1,6 +1,5 @@
 ---
 name: drawiodo
-version: 
 description: ['draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。', 'Bash', 'Read', 'Write', 'Edit']
 tags: ['diagram', 'drawio', 'flowchart', 'architecture', 'uml', 'er', 'visualization']
 trigger_negative: true
@@ -14,7 +13,9 @@ antipattern_reference: true
 faq_reference: true
 writing_standards: fix_terms
 progressive_loading_explicit: true
+version: 1.0.0
 ---
+
 
 
 # draw.io 自动做图 Skill
