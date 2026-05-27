@@ -1,3 +1,15 @@
+## v2.38.3（2026-05-27）
+
+### 修复
+- **fix.py `fix_artifact_paths()` 重写**：增加两步逻辑——先分辨文件性质（缓存/临时/0字节/乱码文件→删除；有意义文件→移到正确位置），再扫描并修正所有引用路径
+- **artifact_checker.py `_check_root_artifact_files()` 修复**：根目录白名单从宽松模式改为严格模式（仅允许 `SKILL.md`/`_meta.json`/`scripts/`/`references/`），此前逻辑只检查特定扩展名导致垃圾文件漏扫
+- **`run_audit.py` 移入 `scripts/`**：原为根目录启动脚本，修正 `SKILL_DIR` 路径计算（`dirname(dirname(__file__))`），并更新 `artifact_checker.py` 白名单逻辑（不再错误加白名单，正确做法是移动文件）
+
+### 流程改进
+- 文件移动/删除前必须先读文件确认用途，再搜引用，最后执行并修正引用
+
+---
+
 ## v2.38.0（2026-05-27）
 - 修复：git-sync 打包后根目录残留 .py 文件（违反 R-11），迁移至 scripts/ 并修正路径计算
 - 修复：update_version.py / update_all_versions.py 路径计算错误（SKILL_ROOT 计算少一级）

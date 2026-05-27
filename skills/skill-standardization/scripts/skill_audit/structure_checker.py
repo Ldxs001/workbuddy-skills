@@ -248,7 +248,10 @@ def body_has_antipattern_section(filepath, content, fm, body, **kw):
                          "verification": "重新运行 audit_skill()，确认 R-18 passed"}}
 
     # 检查是否有具体描述（错误做法/正确做法标记）
-    has_detail = bool(re.search(r'\*\*错误做法[:\uff1a]\*\*|\*\*正确做法[:\uff1a]\*\*|\*\*深层原因[:\uff1a]\*\*', ap_content))
+    # 修复 v2.38.1：放宽匹配，允许冒号在加粗符内或外，允许后面有空格/文本
+    has_detail = bool(re.search(r'\*\*错误做法\s*[:：\uff1a]?\s*\*\*?', ap_content) or
+                      re.search(r'\*\*正确做法\s*[:：\uff1a]?\s*\*\*?', ap_content) or
+                      re.search(r'\*\*深层原因\s*[:：\uff1a]?\s*\*\*?', ap_content))
 
     if not has_detail:
         return {"passed": False,
@@ -406,6 +409,18 @@ def _check_writing_standards_text(text, filename=""):
     cleaned = re.sub(r'[A-Za-z]+\.[a-zA-Z]+', ' ', cleaned)
     # v2.29.1 新增：剔除目录路径（如 scripts/、references/），避免中英文混排误报
     cleaned = re.sub(r'[A-Za-z]+/', ' ', cleaned)
+    # v2.38.1 新增：剔除大写变量名（如 CANVAS_W、MARGIN_X），避免中英文混排误报
+    cleaned = re.sub(r'[A-Z_]{2,}\s*=', ' ', cleaned)
+    cleaned = re.sub(r'[A-Z][A-Z_0-9]*', ' ', cleaned)
+    # v2.38.1 新增：剔除 camelCase/PascalCase 标识符（如 exitX、entryY、Header），避免误报
+    cleaned = re.sub(r'[a-z]+[A-Z][a-zA-Z0-9]*', ' ', cleaned)
+    # v2.38.1 新增：剔除英文代码术语紧跟中文的情况（如 id指、XML输、容器header），白名单常见术语
+    # 不用 \b 单词边界（中文+英文之间没有 \b），用 ASCII 边界
+    code_terms_pattern = r'(?<![a-zA-Z0-9_])(id|header|exit|entry|xml|json|url|http|https|api|ui|ux|db|io)(?![a-zA-Z0-9_])'
+    cleaned = re.sub(code_terms_pattern + r'[一-鿿]', ' ', cleaned, flags=re.IGNORECASE)
+    # v2.38.2 新增：剔除 snake_case 标识符（如 parent_id、my_variable），避免中英文混排误报
+    cleaned = re.sub(r"[a-zA-Z][a-zA-Z0-9]*_[a-zA-Z0-9_]+", " ", cleaned)
+    cleaned = re.sub(r'[一-鿿]' + code_terms_pattern, ' ', cleaned, flags=re.IGNORECASE)
 
     # ── 检查1：术语一致性（🔴 必须修）───────────────────
     term_groups = [

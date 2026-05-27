@@ -97,21 +97,20 @@ def _check_root_artifact_files(skill_dir, violations):
         return
 
     # 读取 external_data_dir 声明
-    _fm_external = False
-    _fm_path = os.path.join(skill_dir, "SKILL.md")
-    if os.path.isfile(_fm_path):
+    fm = {}
+    fm_path = os.path.join(skill_dir, "SKILL.md")
+    if os.path.isfile(fm_path):
         try:
             from .utils import parse_simple_yaml_frontmatter
-            with open(_fm_path, "r", encoding="utf-8") as _f:
-                _content = _f.read()
-            _fm, _ = parse_simple_yaml_frontmatter(_content)
-            _fm_external = _fm.get("external_data_dir", False)
+            content_fm = open(fm_path, "r", encoding="utf-8").read()
+            fm, _ = parse_simple_yaml_frontmatter(content_fm)
         except Exception:
-            pass
+            fm = {}
+    external_data = fm.get("external_data_dir", False)
 
     _ROOT_ALLOWED_FILES = {"SKILL.md", "_meta.json"}
     _ROOT_ALLOWED_DIRS = {"scripts", "references"}
-    if _fm_external:
+    if external_data:
         _ROOT_ALLOWED_DIRS = _ROOT_ALLOWED_DIRS | {".standardization"}
 
     for entry in sorted(root_entries):
@@ -127,14 +126,14 @@ def _check_root_artifact_files(skill_dir, violations):
         elif os.path.isdir(fpath):
             if entry in _ROOT_ALLOWED_DIRS:
                 continue
-            if entry.startswith("."):
+            if entry.startswith(".") and entry not in _ROOT_ALLOWED_DIRS:
                 continue  # 其他隐藏目录不报错，但不是允许的
             violations.append({
                 "source": f"ROOT/{entry}/",
                 "path_literal": entry + "/",
                 "suggestion": "迁至 scripts/ 或数据目录，或删除",
             })
-    return
+
 def _check_artifact_directories(skill_dir, violations):
     """非标准子目录扫描"""
     try:

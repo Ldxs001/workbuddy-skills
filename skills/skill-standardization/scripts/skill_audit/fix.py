@@ -365,33 +365,151 @@ def fix_home_url(skill_dir, **kw):
 
 def fix_artifact_paths(skill_dir, **kw):
     """
-    R-11 修复：将脚本中的产出物路径迁移到 skills/.standardization/<skill>/...
-    这是一个复杂修复，需要逐文件处理。
+    R-11 修复：将违规文件迁出根目录/脚本目录。
+    
+    两步逻辑：
+    1. 分辨文件性质：
+       - 缓存/临时/错误文件（*.tmp, *.bak, __pycache__/, .DS_Store等）→ 直接删除
+       - 有意义的文件（脚本、配置、数据）→ 移到正确位置（scripts/ 或 data/）
+    2. 修正引用：
+       - 移动/删除后，扫描所有文件中的引用路径并修正
+    
     返回：修复的文件数
     """
-    # 此修复较复杂，需要分析每个脚本文件并替换路径
-    # 这里提供一个基础实现，实际使用时可能需要人工审核
     fixed = 0
-    scripts_dir = os.path.join(skill_dir, "scripts")
-    if not os.path.isdir(scripts_dir):
-        return 0
-
     skill_name = os.path.basename(os.path.abspath(skill_dir))
     std_base = os.path.join(".standardization", skill_name)
-
-    for fname in sorted(os.listdir(scripts_dir)):
-        fpath = os.path.join(scripts_dir, fname)
-        if not fpath.endswith(".py"):
+    
+    # ── 第1步：分辨文件性质，决定删除还是移动 ──
+    # 应删除的垃圾文件模式（缓存、临时、错误文件）
+    _TRASH_PATTERNS = {
+        r'.*\.tmp$', r'.*\.bak$', r'.*\.swp$', r'.*\.swo$',
+        r'.*\.pyc$', r'.*\.pyo$', r'.*__pycache__.*',
+        r'.*\.DS_Store$', r'.*\.Thumbs\.db$', r'.*\~$',
+        r'^#.*#$', r'.*\.log$',  # 日志文件也删
+    }
+    import re
+    trash_re = re.compile('|'.join(_TRASH_PATTERNS))
+    
+    # 收集需要处理的违规文件（来自审计结果）
+    violations = kw.get("violations", [])
+    if not violations:
+        # 如果没有传 violations，自己跑一次审计
+        from .artifact_checker import check_artifact_paths
+        with open(os.path.join(skill_dir, "SKILL.md"), "r", encoding="utf-8") as f:
+            content = f.read()
+        fm, body = parse_simple_yaml_frontmatter(content)
+        result = check_artifact_paths(None, content, fm, body, skill_dir=skill_dir)
+        violations = result.get("violations", [])
+    
+    # 分类：删除 vs 移动
+    to_delete = []  # (path, reason)
+    to_move = []    # (src, dst_dir, reason)
+    
+    for v in violations:
+        src = v.get("source", "")
+        path_lit = v.get("path_literal", "")
+        suggestion = v.get("suggestion", "")
+        
+        if not path_lit or not os.path.exists(os.path.join(skill_dir, path_lit)):
             continue
-        content = _read_file(fpath)
-        original = content
-        # 替换产出物路径模式（简化版，实际可能需要更复杂的逻辑）
-        # 这里只做一个基础示例：将硬编码的输出文件路径替换
-        # 实际修复需要结合 AST 分析，这里省略
-        if content != original:
-            _write_file(fpath, content)
+        
+        full_path = os.path.join(skill_dir, path_lit)
+        
+        # 判断：垃圾文件 → 删除；其他 → 移动
+        is_trash = trash_re.search(path_lit) is not None
+        # 额外启发：0字节文件、乱码文件名 → 删除
+        try:
+            if os.path.getsize(full_path) == 0:
+                is_trash = True
+        except OSError:
+            pass
+        
+        if is_trash:
+            to_delete.append((full_path, f"垃圾文件: {suggestion}"))
+        else:
+            # 有意义文件：移到正确位置
+            # suggestion 格式：skills/.standardization/<skill>/<cat>/<fname>
+            # 提取目标目录
+            if "/" in suggestion:
+                parts = suggestion.replace("skills/.standardization/", "").split("/")
+                if len(parts) >= 2:
+                    cat = parts[1]  # outputs/data/cache/temp
+                    dst_dir = os.path.join(skill_dir, ".standardization", skill_name, cat)
+                    to_move.append((full_path, dst_dir, suggestion))
+    
+    # ── 执行删除 ──
+    deleted_files = []
+    for fpath, reason in to_delete:
+        try:
+            os.remove(fpath)
+            deleted_files.append(fpath)
             fixed += 1
-
+            print(f"  [删除] {os.path.relpath(fpath, skill_dir)} — {reason}")
+        except Exception as e:
+            print(f"  [删除失败] {fpath}: {e}")
+    
+    # ── 执行移动 ──
+    moved_files = []
+    for src, dst_dir, suggestion in to_move:
+        try:
+            os.makedirs(dst_dir, exist_ok=True)
+            dst = os.path.join(dst_dir, os.path.basename(src))
+            # 如果目标已存在，加后缀
+            if os.path.exists(dst):
+                base, ext = os.path.splitext(dst)
+                dst = f"{base}_moved{ext}"
+            shutil.move(src, dst)
+            moved_files.append((src, dst))
+            fixed += 1
+            print(f"  [移动] {os.path.relpath(src, skill_dir)} → {os.path.relpath(dst, skill_dir)}")
+        except Exception as e:
+            print(f"  [移动失败] {src}: {e}")
+    
+    # ── 第2步：修正引用 ──
+    # 收集所有被删除/移动的文件路径（相对 skill_dir）
+    affected = {}
+    for fpath in deleted_files:
+        rel = os.path.relpath(fpath, skill_dir)
+        affected[rel] = None  # None 表示已删除
+    for src, dst in moved_files:
+        src_rel = os.path.relpath(src, skill_dir)
+        dst_rel = os.path.relpath(dst, skill_dir)
+        affected[src_rel] = dst_rel
+    
+    if affected:
+        print(f"  扫描引用路径，共 {len(affected)} 个文件受影响...")
+        # 扫描所有文件，查找引用
+        for root, dirs, files in os.walk(skill_dir):
+            # 跳过 .standardization/ 数据目录
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    original = content
+                    # 替换所有受影响路径
+                    for old_rel, new_rel in affected.items():
+                        if new_rel is None:
+                            # 文件已删除：移除引用行或注释掉
+                            # 简单处理：替换文件名为警告注释
+                            old_name = os.path.basename(old_rel)
+                            content = content.replace(old_name, f"[DELETED:{old_name}]")
+                        else:
+                            # 文件已移动：更新路径
+                            content = content.replace(old_rel, new_rel)
+                            # 也试试 Unix 风格路径
+                            content = content.replace(old_rel.replace("\\", "/"), 
+                                                       new_rel.replace("\\", "/"))
+                    if content != original:
+                        with open(fpath, "w", encoding="utf-8") as f:
+                            f.write(content)
+                        print(f"  [修正引用] {os.path.relpath(fpath, skill_dir)}")
+                        fixed += 1
+                except Exception:
+                    continue
+    
     return fixed
 
 

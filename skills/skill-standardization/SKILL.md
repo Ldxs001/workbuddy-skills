@@ -1,14 +1,14 @@
 ---
 name: skill-standardization
+version: 2.38.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.38.2。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。
+description: Skill 标准化规范引擎 v2.38.3。fix.py 增加文件性质分辨+引用修正；artifact_checker.py 根目录白名单修复；run_audit.py 移入 scripts/。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
-version: 2.38.2
 writing_standards: fix_terms
 ---
 
@@ -22,13 +22,7 @@ writing_standards: fix_terms
 
 
 
-
-
-
-
-
-
-# skill-standardization v2.38.2
+# skill-standardization v2.38.3
 
 ## 文件更新约束
 
@@ -79,6 +73,11 @@ writing_standards: fix_terms
 2. 执行 R-01~R-24 规则检查
 3. 输出审查报告（通过/失败/跳过）
 4. 若传了 --fix，自动修正 R-11/R-12/R-22 违规
+
+> **R-20 两阶段检查协议**（v2.38.2 新增）：
+> - 第一阶段（正则粗筛）： 执行正则匹配，输出所有疑似中英文混排间距问题
+> - 第二阶段（LLM 精筛）：AI 对正则匹配结果逐条判断，过滤代码标识符误报（snake_case、camelCase、PascalCase、UPPER_CASE、文件名、路径），仅输出真实问题
+> - 若 R-20 仍有误报，优先增强  预清理逻辑，其次放宽 LLM 过滤阈值
 
 ## 渐进式加载说明
 
