@@ -1,9 +1,25 @@
 ---
 name: workday-calendar
-version: 1.3.0
-description: "智能周历系统 - 国家法定假日区间管理、年度工作日计算、周历生成、日程管理。数据路径统一到 skills/.standardization/<skill>/data/。"
+version: 
+description: 智能周历系统 - 国家法定假日区间管理、年度工作日计算、周历生成、日程管理。数据路径统一到 skills/.standardization/<skill>/data/。
 trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
+trigger_negative: true
+sensitive_access: false
+critical_write: false
+permission_weight: LOW
+data_dir: ../.standardization/workday-calendar/data/
+faq_unparsable: reformat
+antipattern_detail: add_detail
+writing_standards: fix_terms
 ---
+
+
+
+
+
+
+
+
 ## 触发条件
 
 当用户出现以下意图时，加载本技能：
@@ -12,16 +28,29 @@ trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年�
 - 计算**年度工作日**、**工作日统计**
 - 生成**周历**、**日程安排**
 - 查询某天的**空闲时间**、**日程安排**
-- 添加、修改、删除**日程事件**
+- 添加、更新、删除**日程事件**
 - 说出关键词："周历"、"工作日"、"假日区间"、"日程"、"安排"
 
 ---
+### 不触发（否定条件）
+
+本技能在以下情况**不触发**：
+
+- 用户只是询问日期（如"今天几号"），无假日/工作日/日程管理意图
+- 用户讨论日历 UI 组件设计（如"帮我画一个日历组件"），应触发 drawiodo 而非本技能
+- 用户要求操作其他日历应用（如 Google Calendar、Outlook 日历），本技能仅管理本地数据
+
 
 # 智能周历系统 (Workday Calendar)
 
 管理国家法定假日、补班日、自定义周末规则，计算年度工作日，生成周历，并支持个人日程管理。
 
 ## 核心能力
+
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+> 更多反模式详见 `references/antipatterns.md`
+> 更多 FAQ 详见 `references/faq.md`
+
 
 ### 📅 工作日计算
 - **法定假日区间管理** - 以区间形式存储节假日，支持AI批量导入
@@ -31,7 +60,7 @@ trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年�
 
 ### 📊 日程管理
 - **添加日程** - 指定日期、起止时间、标题、分类
-- **删除/修改日程** - 支持CRUD完整操作
+- **删除/更新日程** - 支持CRUD完整操作
 - **查询空闲时间** - 自动查找某日空闲时段
 - **日程列表生成** - 自动生成未来N天日程文本
 
@@ -45,7 +74,7 @@ trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年�
 
 ### 日程管理
 ```
-添加日程 → 查询/修改 → 查找空闲时间 → 生成日程列表
+添加日程 → 查询/更新 → 查找空闲时间 → 生成日程列表
 ```
 
 ---
@@ -179,22 +208,22 @@ schedule_text = generate_daily_schedule("2026-05-20", 14)
 
 ```bash
 # 规则确认（重要！初始化后必须执行，核对配置是否正确）
-python workday_calendar.py rules 2026           # 导出规则确认表
+python scripts/workday_calendar.py rules 2026           # 导出规则确认表
 
 # 工作日计算
-python workday_calendar.py calculate 2026       # 计算年度工日
-python workday_calendar.py calendar 2026        # 生成周历JSON
-python workday_calendar.py sync 2026 2025       # 同步数据
-python workday_calendar.py init 2026            # 初始化年度数据
+python scripts/workday_calendar.py calculate 2026       # 计算年度工日
+python scripts/workday_calendar.py calendar 2026        # 生成周历JSON
+python scripts/workday_calendar.py sync 2026 2025       # 同步数据
+python scripts/workday_calendar.py init 2026            # 初始化年度数据
 
 # 日程管理
-python workday_calendar.py add 2026-05-20 09:00 10:00 "晨会" "团队同步" 工作
-python workday_calendar.py list 2026-05-20
-python workday_calendar.py free 2026-05-20 09:00 18:00
-python workday_calendar.py delete <event_id>
-python workday_calendar.py update <event_id> --title="新标题" --status=completed
-python workday_calendar.py schedule 7            # 生成7天日程列表
-python workday_calendar.py today                 # 今天+7天日程
+python scripts/workday_calendar.py add 2026-05-20 09:00 10:00 "晨会" "团队同步" 工作
+python scripts/workday_calendar.py list 2026-05-20
+python scripts/workday_calendar.py free 2026-05-20 09:00 18:00
+python scripts/workday_calendar.py delete <event_id>
+python scripts/workday_calendar.py update <event_id> --title=新标题 --status=completed
+python scripts/workday_calendar.py schedule 7            # 生成7天日程列表
+python scripts/workday_calendar.py today                 # 今天+7天日程
 ```
 
 ### ⚠️ 重要：规则确认表
@@ -202,7 +231,7 @@ python workday_calendar.py today                 # 今天+7天日程
 初始化年度数据后，**强烈建议**执行 `rules` 命令查看规则确认表：
 
 ```
-python workday_calendar.py rules 2026
+python scripts/workday_calendar.py rules 2026
 ```
 
 该表会显示：
@@ -275,7 +304,7 @@ AI：调用 add_schedule_event("开会", tomorrow, "14:00", "15:00")
 AI：调用 generate_today_schedule()
 ```
 
-### 场景5：删除或修改日程
+### 场景5：删除或更新日程
 ```
 用户：取消明天的会议
 AI：先 list 找到ID，然后 delete <id>
@@ -285,9 +314,9 @@ AI：update <id> --start=15:00 --end=16:00
 ```
 
 ### 场景6：每天定时生成日程列表
-用户可以设置自动化任务：
+用户可以配置自动化任务：
 ```
-命令：python workday_calendar.py today
+命令：python scripts/workday_calendar.py today
 时间：每天早上 08:00
 ```
 

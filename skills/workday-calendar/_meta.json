@@ -1,7 +1,6 @@
 {
-  "version": "1.3.0",
-  "description": "智能周历系统 v1.3.0 - 数据路径统一到 skills/.standardization/workday-calendar/data/，含.bat 容灾备份",
-  "description": "智能周历系统 - 法定假日管理、工作日计算、周历生成、日程管理，含.bat容灾备份",
+  "version": "1.4.0",
+  "description": "智能周历系统 v1.4.0 - 经 skill-standardization 改造，结构规范化（scripts/references/归位）",
   "author": "wUwproject",
   "name": "workday-calendar",
   "tags": [

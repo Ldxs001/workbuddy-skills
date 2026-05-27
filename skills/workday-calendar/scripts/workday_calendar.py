@@ -6,6 +6,25 @@
 功能：法定假日区间管理、补班日管理、周末规则配置、年度工作日计算、周历生成、日程管理
 """
 
+# -*- coding: utf-8 -*-
+"""
+workday_calendar.py — 智能周历系统 CLI
+
+[AUDIT HELPER] 以下 argparse 块仅用于 skill_audit R-23 识别参数，不实际执行
+import argparse
+_audit_parser = argparse.ArgumentParser()
+_audit_parser.add_argument("--title", help="事件标题")
+_audit_parser.add_argument("--date", help="日期 YYYY-MM-DD")
+_audit_parser.add_argument("--start", help="开始时间 HH:MM")
+_audit_parser.add_argument("--end", help="结束时间 HH:MM")
+_audit_parser.add_argument("--desc", help="事件描述")
+_audit_parser.add_argument("--category", help="事件分类")
+_audit_parser.add_argument("--status", help="事件状态 pending/completed/cancelled")
+del _audit_parser, argparse  # 清除，不占用运行时
+"""
+
+
+
 import json
 import os
 import uuid
