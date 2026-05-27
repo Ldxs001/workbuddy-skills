@@ -7,7 +7,7 @@ import json, os, re
 # =====================
 # 1. universal-file-ops/_meta.json
 # =====================
-meta1 = os.path.join(os.path.dirname(__file__), "..", "universal-file-ops", "_meta.json")
+meta1 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "universal-file-ops", "_meta.json")
 with open(meta1, "r", encoding="utf-8") as f:
     m1 = json.load(f)
 
@@ -25,7 +25,7 @@ print("[OK] universal-file-ops/_meta.json -> 1.1.0")
 # =====================
 # 2. skill-standardization/_meta.json
 # =====================
-meta2 = os.path.join(os.path.dirname(__file__), "_meta.json")
+meta2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_meta.json")
 with open(meta2, "r", encoding="utf-8") as f:
     m2 = json.load(f)
 
@@ -44,7 +44,7 @@ print("[OK] skill-standardization/_meta.json -> 2.35.0")
 # =====================
 # 3. skill-standardization changelog.md v2.35.0 条目修正
 # =====================
-cl_path = os.path.join(os.path.dirname(__file__), "references", "changelog.md")
+cl_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "changelog.md")
 with open(cl_path, "r", encoding="utf-8") as f:
     cl = f.read()
 

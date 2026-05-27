@@ -1,3 +1,10 @@
+## v2.38.0（2026-05-27）
+- 修复：git-sync 打包后根目录残留 .py 文件（违反 R-11），迁移至 scripts/ 并修正路径计算
+- 修复：update_version.py / update_all_versions.py 路径计算错误（SKILL_ROOT 计算少一级）
+- 优化：insert_v2_34_10.py 过期脚本清理
+- 修复：fix.py 移除未使用的 write_frontmatter import
+- 修复：cmd_fix() --key 参数 nargs=? 导致字符串迭代 bug，改为 nargs=*
+
 # 更新日志（Changelog）
 
 > 本文件记录 skill-standardization 的版本更新历史。

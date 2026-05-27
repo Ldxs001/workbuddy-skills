@@ -4,8 +4,8 @@
 
 import os, re
 
-SKILL_MD = os.path.join(os.path.dirname(__file__), "SKILL.md")
-CHANGELOG = os.path.join(os.path.dirname(__file__), "references", "changelog.md")
+SKILL_MD = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SKILL.md")
+CHANGELOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "changelog.md")
 
 # 1. 更新 SKILL.md 版本号 2.34.11 -> 2.35.0
 with open(SKILL_MD, "r", encoding="utf-8") as f:

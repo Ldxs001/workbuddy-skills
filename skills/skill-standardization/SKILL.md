@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.35.1
+version: 2.37.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.37.0。新增临时/备份文件管理机制（操作前强制整体备份、操作中记录临时/备份文件、操作后自动清理）；py工具删/改动作强制临时备份和回滚能力（safe_io.py已具备）；R-24临时文件规范管理。
+description: Skill 标准化规范引擎 v2.38.0。审计输出含 filepath:line#；fix.py 统一修复工具；git-sync 后根目录 .py 清理。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -17,7 +17,9 @@ writing_standards: fix_terms
 
 
 
-# skill-standardization v2.37.0
+
+
+# skill-standardization v2.38.0
 
 ## 文件更新约束
 
