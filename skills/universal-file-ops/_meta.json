@@ -1,7 +1,7 @@
 {
   "name": "universal-file-ops",
   "version": "1.1.0",
-  "description": "为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。\nv1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。\n支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。",
+  "description": "为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。",
   "author": "[username-redacted]",
   "tags": [
     "file",

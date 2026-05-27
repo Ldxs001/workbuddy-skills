@@ -1,7 +1,6 @@
 ---
 name: universal-file-ops
 author: ['eniuswei']
-version: 
 description: 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。
 tags: ['file', 'operations', 'crud', 'copy', 'move', 'delete', 'rename', 'robust', 'python', 'code-quality', 'sandbox-testing', 'error-codes', 'network-retry', 'llm-agent']
 data_dir: ../.standardization/universal-file-ops/
@@ -13,7 +12,10 @@ sensitive_access: false
 critical_write: false
 permission_weight: MEDIUM
 writing_standards: fix_terms
+version: 1.0.0
+artifact_paths: true
 ---
+
 
 
 
