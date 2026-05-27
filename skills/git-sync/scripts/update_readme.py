@@ -85,9 +85,11 @@ def generate_readme(repo_path, readme_path):
         print(f"[ERROR] skills/ 目录不存在: {skills_dir}")
         sys.exit(1)
 
-    # 扫描实际技能目录
+    # 扫描实际技能目录（排除隐藏目录 .dist .standardization 等）
     actual_skills = []
     for entry in sorted(os.listdir(skills_dir)):
+        if entry.startswith('.'):
+            continue  # 排除 .dist、.standardization 等隐藏目录
         full = os.path.join(skills_dir, entry)
         if os.path.isdir(full):
             desc = extract_desc(full)
