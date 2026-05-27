@@ -24,7 +24,7 @@ from urllib.parse import urlparse, parse_qs
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
-ASSETS_DIR = SKILL_DIR / "assets"
+ASSETS_DIR = SKILL_DIR / "scripts"
 
 # Pre-compute skill_dir for HTTP handler (before forking / chdir)
 _SCRIPT_DIR_STR = str(SCRIPT_DIR)
@@ -42,8 +42,8 @@ def get_home_dir():
     return Path(home).expanduser()
 
 
-def get_default_config_path():
-    return ASSETS_DIR / "default_config.json"
+    def get_default_config_path():
+    return SCRIPT_DIR / "default_config.json"
 
 
 def get_user_config_path():
@@ -149,7 +149,7 @@ class SettingsHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         if path in ("", "/", "/index.html"):
-            html_path = Path(self.skill_dir) / "assets" / "settings.html"
+            html_path = Path(self.skill_dir) / "scripts" / "settings.html"
             if not html_path.exists():
                 self.send_response(404)
                 self.end_headers()

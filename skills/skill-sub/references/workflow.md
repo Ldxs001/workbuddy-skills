@@ -225,8 +225,8 @@ backup、restore、build、compile、install
 
 ### 当前配置
 
-> **配置路径**：`~/.workbuddy/skills/.standardization/skill-sub/config.json`
-> **默认配置**：`{skill_dir}/assets/default_config.json`
+> **配置路径**：`~/.workbuddy/skills/.standardization/skill-sub/scripts/default_config.json`
+> **默认配置**：`{skill_dir}/scripts/default_config.json`
 
 **方式 1：HTML 配置界面（推荐）**
 

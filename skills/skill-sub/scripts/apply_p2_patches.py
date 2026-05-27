@@ -42,7 +42,7 @@ def extract_parameters(skill_name):
         md_content = skill_md.read_text(encoding="utf-8")
         # 查找参数部分
         param_section = re.search(
-            r"## .*参数.*\n(.*?)(?=\n## |\Z)",
+            r"## .*参数.*\n(.*?)(?=\n## |$)",
             md_content, re.DOTALL | re.IGNORECASE
         )
         if param_section:
@@ -54,8 +54,8 @@ def extract_parameters(skill_name):
             py_content = py_file.read_text(encoding="utf-8")
             # 查找 add_argument 调用
             args_found = re.findall(
-                r"add_argument\(\s*[\"\\']([^\"\\']+)[\"\\']"
-                r"(?:.*?description=[\"\\']([^\"\\']*?)[\"\\'])?",
+                r"add_argument\s*\(\s*['\"]([^'\"]+)['\"]"
+                r"(?:.*?description=['\"]([^'\"]*?)['\"])?",
                 py_content, re.DOTALL
             )
             for arg_name, arg_desc in args_found:

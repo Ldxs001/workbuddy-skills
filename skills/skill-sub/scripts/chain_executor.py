@@ -38,7 +38,7 @@ class Config:
     
     def load(self):
         """加载用户配置（合并默认值 + 用户覆盖）"""
-        defaults_path = self.skill_dir / "assets" / "default_config.json"
+        defaults_path = self.skill_dir / "scripts" / "default_config.json"
         defaults = {}
         if defaults_path.exists():
             defaults = json.loads(defaults_path.read_text(encoding="utf-8"))

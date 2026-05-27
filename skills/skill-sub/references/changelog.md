@@ -1,3 +1,11 @@
+## v1.23.0 (2026-05-27)
+
+### 修复（R-11 路径规范）
+- **assets/ 目录迁移** — `assets/` 目录下的 `default_config.json` 和 `settings.html` 迁移到 `scripts/`
+- **路径引用修正** — `chain_manager.py`、`chain_executor.py`、`settings.py` 中的 `assets/` 路径统一改为 `scripts/`
+- **assets/ 目录删除** — 符合 R-11 规则（产出物必须在 `scripts/` 或根目录）
+
+---
 ## v1.22.0 (2026-05-26)
 
 ### 面向对象（OO）改造

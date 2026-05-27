@@ -1,17 +1,20 @@
 ---
 name: skill-sub
+version: 1.22.0
 author: wUwproject
 license: MIT
-description: 调用链编排技能 v1.22.0 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
+description: 调用链编排技能 v1.23.0 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
 tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
 data_dir: ../.standardization/skill-sub/
 external_data_dir: true
 sensitive_access: false
 critical_write: false
 permission_weight: MEDIUM
-artifact_paths: true
-version: 1.19.2
 ---
+
+
+
+
 
 
 

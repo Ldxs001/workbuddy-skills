@@ -30,7 +30,7 @@ class ConfigManager:
     
     def load(self):
         """加载用户配置"""
-        defaults_path = Path(__file__).resolve().parent.parent / "assets" / "default_config.json"
+        defaults_path = Path(__file__).resolve().parent / "default_config.json"
         defaults = {}
         if defaults_path.exists():
             defaults = json.loads(defaults_path.read_text(encoding="utf-8"))
