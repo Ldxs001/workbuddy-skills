@@ -1,17 +1,21 @@
 ---
 name: workday-calendar
-version: 
-description: 智能周历系统 - 国家法定假日区间管理、年度工作日计算、周历生成、日程管理。数据路径统一到 skills/.standardization/<skill>/data/。
-trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
-trigger_negative: true
+version: 1.4.0
+description: 智能周历系统 v1.5.0 - 新增2026年排班表生成（export_excel/generate_schedule）、Excel导出、HTML/Markdown/Excel格式排班输出
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
+writing_standards: fix_terms
 data_dir: ../.standardization/workday-calendar/data/
+trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
+trigger_negative: true
 faq_unparsable: reformat
 antipattern_detail: add_detail
-writing_standards: fix_terms
 ---
+
+
+
+
 
 
 

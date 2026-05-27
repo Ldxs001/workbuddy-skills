@@ -1,12 +1,13 @@
 {
-  "version": "1.4.0",
-  "description": "智能周历系统 v1.4.0 - 经 skill-standardization 改造，结构规范化（scripts/references/归位）",
+  "version": "1.5.0",
+  "description": "智能周历系统 v1.5.0 - 新增2026年排班表生成（export_excel/generate_schedule）、Excel导出、HTML/Markdown/Excel格式排班输出",
   "author": "wUwproject",
   "name": "workday-calendar",
   "tags": [
     "calendar",
     "workday",
     "holiday",
-    "schedule"
+    "schedule",
+    "excel-export"
   ]
 }
