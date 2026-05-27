@@ -1,16 +1,18 @@
 ---
 name: skill-standardization
-version: 2.38.0
+version: 2.38.3
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.38.3。fix.py 增加文件性质分辨+引用修正；artifact_checker.py 根目录白名单修复；run_audit.py 移入 scripts/。
+description: Skill 标准化规范引擎 v2.38.4。fix.py 增加文件性质分辨+引用修正；artifact_checker.py 根目录白名单修复；run_audit.py 移入 scripts/。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
 writing_standards: fix_terms
+artifact_paths: true
 ---
+
 
 
 
@@ -70,14 +72,25 @@ writing_standards: fix_terms
 ## 工作流程
 
 1. 读取目标 skill 的 SKILL.md
-2. 执行 R-01~R-24 规则检查
+2. 执行 R-01~R-23 规则检查
 3. 输出审查报告（通过/失败/跳过）
 4. 若传了 --fix，自动修正 R-11/R-12/R-22 违规
+5. **审计后自动修复（推荐）**：审计完成后，调用 `scripts/skill_audit/fix.py` 中的对应修复函数，批量修复 WARN/ERROR 项（详见 `references/guide.md` 审查模式章节）
+
 
 > **R-20 两阶段检查协议**（v2.38.2 新增）：
 > - 第一阶段（正则粗筛）： 执行正则匹配，输出所有疑似中英文混排间距问题
 > - 第二阶段（LLM 精筛）：AI 对正则匹配结果逐条判断，过滤代码标识符误报（snake_case、camelCase、PascalCase、UPPER_CASE、文件名、路径），仅输出真实问题
 > - 若 R-20 仍有误报，优先增强  预清理逻辑，其次放宽 LLM 过滤阈值
+
+> **🛑 强制执行：排错止损规则（v2.38.4 新增，必须遵守）**
+> 1. **区分警告来源**：审计输出中的 WARNING/ERROR，先判断是审计工具自身触发的（如 `structure_checker.py` 的 `compile()` 触发 `SyntaxWarning`），还是被审计技能的真实问题。前者修审计工具，后者修被审计技能。不分清来源就动手 → 必然修错。
+> 2. **同一操作失败 ≥2 次 → 强制停止换思路**：
+>    - Grep 搜不到 → 检查是否把特殊字符当成正则元字符（如 `\Z` 在正则里是字符串结尾，搜字面 `\Z` 必须用 `grep -F` 或 Python `open().read()`）
+>    - 工具调用报错 → 读完整 stderr，不要猜
+>    - 3 种不同思路都失败 → 向用户说明困境并请求指引，禁止继续重复
+> 3. **用户提示止损**：当用户说又停了/死循环/你在干什么时，立即停止当前操作，向用户说明当前状态和下一步计划，禁止继续原操作。
+> 4. **5 轮无实质进展 → 主动求助**：超过 5 轮对话还没有向前推进，必须向用户承认困境并请求指引。
 
 ## 渐进式加载说明
 

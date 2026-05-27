@@ -506,6 +506,65 @@ DEFAULT_DATA_DIR = os.path.normpath(...)  # 审计匹配这行 → 失败
 
 ---
 
+
+---
+
+## 审查后自动修复（fix.py）
+
+审计输出 WARN/ERROR 后，可直接调用 `scripts/skill_audit/fix.py` 中的修复函数自动修复，无需手写修复脚本。
+
+### 用法
+
+```bash
+# 方式一：在 skill-standardization 目录下调用
+cd "C:/Users/sm001/.workbuddy/skills/skill-standardization"
+python -c "
+from scripts.skill_audit.fix import apply_fix
+# 修复单条规则
+apply_fix('C:/Users/sm001/.workbuddy/skills/<skill-dir>', 'R-07')
+# 修复多条规则
+apply_fix('C:/Users/sm001/.workbuddy/skills/<skill-dir>', 'R-07', 'R-18', 'R-19')
+"
+
+# 方式二：直接调用修复函数
+python -c "
+import sys; sys.path.insert(0, 'scripts')
+from skill_audit.fix import fix_progressive_loading, fix_antipattern_progressive, fix_faq_progressive
+skill = 'C:/Users/sm001/.workbuddy/skills/<skill-dir>'
+fix_progressive_loading(skill)
+fix_antipattern_progressive(skill)
+fix_faq_progressive(skill)
+"
+```
+
+### 全部修复函数一览
+
+| 函数名 | 对应规则 | 说明 |
+|---------|---------|------|
+| `fix_name(skill_dir, value)` | R-01 | 修复 name 字段 |
+| `fix_description(skill_dir, value)` | R-04 | 修复 description 字段 |
+| `fix_version(skill_dir, value)` | R-03 | 修复 version 字段 |
+| `fix_author(skill_dir, value)` | R-02 | 修复 author 字段 |
+| `fix_h1(skill_dir)` | R-06 | 移除正文一级标题 |
+| `fix_section_trigger(skill_dir)` | R-07 | 添加触发条件章节 |
+| `fix_section_core(skill_dir)` | R-08 | 添加核心能力章节 |
+| `fix_section_workflow(skill_dir)` | R-09 | 添加工作流程章节 |
+| `fix_progressive_loading(skill_dir)` | R-21 | 添加渐进式加载模板句 |
+| `fix_antipattern_progressive(skill_dir)` | R-18 | 创建/更新 references/antipatterns.md |
+| `fix_faq_progressive(skill_dir)` | R-19 | 创建/更新 references/faq.md |
+| `fix_writing_standards(skill_dir)` | R-20 | 统一术语（配置/更新/删除） |
+| `fix_data_dir_compliance(skill_dir)` | R-22 | 添加 data_dir 声明 |
+| `fix_doc_code_consistency(skill_dir)` | R-23 | 修复文档-代码一致性 |
+| `fix_artifact_paths(skill_dir)` | R-11 | 修复产出物路径 |
+| `fix_external_data_dir(skill_dir)` | R-12 | 修复外部数据目录 |
+| `fix_sensitive_access(skill_dir)` | R-13 | 添加敏感信息访问声明 |
+| `fix_critical_write(skill_dir)` | R-14 | 添加关键位置写入声明 |
+| `fix_create_permissions_md(skill_dir)` | R-15 | 创建 references/permissions.md |
+| `fix_permission_weight(skill_dir)` | R-16 | 添加权限权重说明 |
+
+> **推荐工作流**：先运行审计 → 查看报告 → 调用 `apply_fix()` 批量修复 → 再次审计验证。
+
+
 ## 规范加载 — 渐进式 JSON 查询
 
 ```bash

@@ -1,3 +1,17 @@
+## v2.38.4（2026-05-27）
+
+### 修复
+- **structure_checker.py**：用 `ast.parse()` 替换 `compile()`，彻底修复审计被审计 .py 文件时触发的 `SyntaxWarning: invalid escape sequence` 警告
+- **SKILL.md 工作流程**：新增「🛑 强制执行：排错止损规则」，防止同一失败模式重复尝试导致死循环
+- **references/antipatterns.md**：新增 AP-12（把审计工具警告当被审计技能 bug）、AP-13（同一失败模式重复尝试不换思路）
+
+### 更新
+- SKILL.md frontmatter 版本号升至 v2.38.4
+- _meta.json 版本号和描述更新
+- 止损规则：同一操作失败 ≥2 次强制停止换思路；用户提示止损；5 轮无实质进展主动求助
+
+---
+
 ## v2.38.3（2026-05-27）
 
 ### 修复

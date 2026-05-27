@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.38.3",
-  "description": "Skill 标准化规范引擎 v2.38.3。fix.py 增加文件性质分辨+引用修正；artifact_checker.py 根目录白名单修复；run_audit.py 移入 scripts/。",
+  "version": "2.38.4",
+  "description": "Skill 标准化规范引擎 v2.38.4。structure_checker.py 用 ast.parse() 替换 compile() 修复 SyntaxWarning；SKILL.md 新增排错止损规则；antipatterns.md 新增 AP-12/AP-13。",
   "author": "wUwproject",
   "tags": [
     "standardization",

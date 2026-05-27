@@ -8,6 +8,7 @@ v2.37.0: 所有 detail/location 添加绝对行号（filepath:line# 格式）
 
 import re
 import os
+import warnings
 
 
 def _abs_line(body, content, m_or_pos):
@@ -547,7 +548,8 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                 # 静态分析：检查 Python 语法（不执行脚本，避免间接执行风险）
                 try:
                     with open(full_path, 'r', encoding='utf-8') as _f:
-                        compile(_f.read(), filename=full_path, mode='exec')
+                        import ast
+                        ast.parse(_f.read())
                 except SyntaxError as _e:
                     all_issues["suggest"].append(f"脚本 `{script_path}` 语法错误（第 {_e.lineno} 行）：{_e.msg}")
                 except Exception as _e:
