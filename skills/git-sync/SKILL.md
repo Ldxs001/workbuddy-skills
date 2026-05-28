@@ -10,6 +10,7 @@ permission_weight: CRITICAL
 artifact_paths: []
 writing_standards: fix_terms
 data_dir: ../.standardization/git-sync/
+external_data_dir: true
 antipattern_reference: true
 faq_reference: true
 ---
