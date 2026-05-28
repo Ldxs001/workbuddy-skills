@@ -19,7 +19,8 @@ def load_config():
 
 def normalize(meta_file, skill_name, version, description):
     """标准化 _meta.json：只保留 name/version/description/author/tags 5 个标准字段。"""
-    standard_fields = {'name', 'version', 'description', 'author', 'tags'}
+    standard_fields = {'name', 'version', 'description', 'author', 'tags',
+                       'triggers', 'created_at'}
 
     # 读取默认 author
     config = load_config()

@@ -1,4 +1,10 @@
 # changelog.md — git-sync 更新日志
+## v2.6.25 (2026-05-28)
+
+### 修复
+- 修复 `normalize_meta.py` 删除 `_meta.json` 中 `triggers` 和 `created_at` 字段的 bug（`standard_fields` 缺少扩展字段声明）
+
+---
 
 ## v2.6.24 (2026-06-10)
 

@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.6.24",
-  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.24：审计改为轻量内建（只查版本一致性+R-23），只读不修复；修复EXCLUDE_PATTERNS未定义、audit_result未初始化、返回值未接收三处bug；main()末尾增加固定格式报告输出（表格+审计结论+ZIP路径+HTML路径）。",
+  "version": "2.6.25",
+  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.25：修复 normalize_meta.py 删除 triggers/created_at 字段的bug（standard_fields 缺少扩展字段）。",
   "author": "wUwproject",
   "tags": [
     "sync",
