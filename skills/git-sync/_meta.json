@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.6.25",
-  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.25：修复 normalize_meta.py 删除 triggers/created_at 字段的bug（standard_fields 缺少扩展字段）。",
+  "version": "2.6.26",
+  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.26：SKILL.md新增显式AI输出指令；修复name字段；新增guide.md到渐进式加载列表。",
   "author": "wUwproject",
   "tags": [
     "sync",

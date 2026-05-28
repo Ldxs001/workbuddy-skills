@@ -1,9 +1,9 @@
 ---
-name: .
-version: 2.6.25
+name: git-sync
+version: 2.6.26
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.25：修复 normalize_meta.py 删除 triggers/created_at 字段的bug；（只查版本一致性+R-23），只读不修复；修复EXCLUDE_PATTERNS未定义、audit_result未初始化、返回值未接收三处bug；main()末尾增加固定格式报告输出（表格+审计结论+ZIP路径+HTML路径）。
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.26：SKILL.md新增显式AI输出指令（表格+deliver_attachments+preview_url）；修复name: .→git-sync；新增guide.md到渐进式加载必读列表。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL
@@ -50,25 +50,37 @@ faq_reference: true
 
 ## 工作流程
 
-```workflow
-1. 读取目标 skill 的 _meta.json + SKILL.md
-2. 三方版本号对比（不一致则中断）
-3. 调用 skill-standardization 审查 SKILL.md 规范性
-4. 敏感信息扫描（.gitignore + regex + telemetry）
-5. 脱敏处理（副本中替换，原文件不动）
-6. 三端同步（Git 推送 + ZIP 打包 + README 更新）
-7. 生成 HTML 索引（.dist/index.html）
+## 执行流程（AI 操作指南）
+
+> 🔴 **第一步必做**：加载 `references/guide.md` 获取完整执行流程和输出要求。
+
+### 脚本执行
+
+```bash
+cd ~/.workbuddy/skills/git-sync/scripts
+python git-sync.py <skill-name> [version] [--skip-scan]
 ```
+
+### AI 执行后必须输出（非可选）
+
+脚本运行完毕后，**AI 必须执行以下 3 步**：
+
+| # | 操作 | 工具 |
+|---|------|------|
+| 1 | 从终端输出提取推送结果，用表格呈现（平台 / 状态 / 版本） | 文本输出 |
+| 2 | 调用 `deliver_attachments` 交付 ZIP 包 | `deliver_attachments` |
+| 3 | 调用 `preview_url` 打开 `.dist/index.html` | `preview_url` |
 
 ## 渐进式加载说明
 
 本技能采用渐进式 MD 体系，`SKILL.md` 为轻量入口，详细规范拆分到 `references/` 按需加载：
 
-- `references/reference.md` — 完整参考手册（命令、配置、故障排查）
+- 🔴 `references/guide.md` — **必读**，完整执行流程 + AI 输出要求
+- `references/reference.md` — CLI 命令速查、Git 调用规范、路径变量
 - `references/changelog.md` — 版本更新记录
 - `references/architecture.md` — 内部架构（脚本映射、目录结构）
-
-> 💡 阅读时先看本章节，按需让 AI 加载 `references/*.md`。
+- `references/antipatterns.md` — 反模式（常见错误）
+- `references/faq.md` — 常见问题（443 超时、版本冲突等）
 
 ## 数据目录说明
 

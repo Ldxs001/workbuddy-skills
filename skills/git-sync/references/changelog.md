@@ -1,4 +1,17 @@
 # changelog.md — git-sync 更新日志
+## v2.6.26 (2026-05-29)
+
+### 修复
+- 修复 `SKILL.md` frontmatter `name: .` → `name: git-sync`（导致扫描列表显示为 `.`）
+- 修复 AI 执行后未按要求输出的问题：SKILL.md 缺少显式 AI 输出指令（表格 + deliver_attachments + preview_url）
+
+### 新增
+- `SKILL.md` 新增「AI 执行后必须输出」章节：明确 3 步必做操作
+- `SKILL.md` 渐进式加载列表新增 `guide.md`（标为必读）
+- `guide.md` 已有的 `preview_url` 指令现在被 SKILL.md 显式引用
+
+---
+
 ## v2.6.25 (2026-05-28)
 
 ### 修复
