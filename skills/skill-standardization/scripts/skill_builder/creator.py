@@ -78,43 +78,9 @@ skill-sub {name} --input <input-file> --output <output-dir>
 - **不会**向外部网络发送数据
 - **不会**执行用户 Shell 配置文件（`.bashrc` / `.zshrc`）
 
-## 反模式
-
-- **错误**：在 SKILL.md 中粘贴大段代码（>10 行）
-  - 正确做法：将代码移入 `scripts/` 目录，在 SKILL.md 中描述调用方式
-- **错误**：使用相对路径 `./scripts/foo.py`
-  - 正确做法：使用 `skill_pkg_dir / "scripts" / "foo.py"` 基于安装目录拼接路径
-- **错误**：在 `SKILL.md` 中写 "详见脚本注释"
-  - 正确做法：在 `references/guide.md` 中写详细文档，SKILL.md 只写必要信息
-
-## FAQ
-
-Q: 本技能支持哪些输入格式？
-A: 支持 `.txt`、`.json`、`*.csv` 格式的输入文件。如需其他格式，请在 `references/guide.md` 中查看扩展方法。
-
-Q: 输出文件存放在哪里？
-A: 默认输出到 `skills/.standardization/{name}/data/output/`，可通过 `--output` 参数指定。
-
-## 主要流程
-
-本技能采用三阶段执行框架（Execute → Review → Advance）：
-
-### 阶段 1：Execute（执行）
-- 读取输入参数
-- 调用核心脚本进行处理
-- 捕获执行结果和错误
-
-### 阶段 2：Review（审查）
-- 验证输出文件是否生成
-- 检查输出格式是否符合预期
-- 记录执行日志到 `skills/.standardization/{name}/data/logs/`
-
-### 阶段 3：Advance（推进）
-- 输出最终结果给用户
-- 更新 `.progress.md` 进度文件
-- 如有错误，进入错误处理流程
-
 ---
+
+> [R-06 渐进式加载] 反模式详见 `references/antipatterns.md`，常见问题详见 `references/faq.md`
 
 ## 附录：详细文档索引
 
@@ -123,11 +89,11 @@ A: 默认输出到 `skills/.standardization/{name}/data/output/`，可通过 `--
 | `references/guide.md` | 完整使用教程和参数说明 |
 | `references/permissions.md` | 权限扫描报告和风险说明 |
 | `references/examples.md` | 使用示例和输出样例 |
+| `references/antipatterns.md` | 反模式与禁忌做法 |
+| `references/faq.md` | 常见问题解答 |
 
-> 本文档由 `skill-standardization v2.33.0` 生成，遵循 R-01~R-22 规范。
+> 本文档由 `skill-standardization v2.38.6` 生成，遵循 R-01~R-24 规范。
 """
-
-    META_TEMPLATE = """{"name": "{name}", "version": "0.1.0", "description": "{description}", "author": "your-name-here", "tags": [{tags_json}], "data_dir": "skills/.standardization/{name}/data/", "install_dir": "skills/{name}/", "created_by": "skill-standardization", "spec_version": "2.29.2"}"""
 
     def create(self, args):
         """创建新的标准 skill 目录结构"""
@@ -158,9 +124,7 @@ A: 默认输出到 `skills/.standardization/{name}/data/output/`，可通过 `--
 
         skill_content = self.SKILL_TEMPLATE.format(
             name=name,
-            title=name.replace("-", " ").replace("_", " ").title(),
             description=description,
-            tags=tags_simple,
         )
         (skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
 

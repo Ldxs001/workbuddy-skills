@@ -1,14 +1,15 @@
 ---
 name: skill-standardization
-version: 2.38.4
+version: 2.38.6
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.38.6。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
+description: Skill 标准化规范引擎 v2.38.7。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
+artifact_paths: true
 writing_standards: fix_terms
 ---
 
@@ -41,7 +42,10 @@ writing_standards: fix_terms
 
 
 
-# skill-standardization v2.38.6
+
+
+
+# skill-standardization v2.38.7
 
 ## 文件更新约束
 

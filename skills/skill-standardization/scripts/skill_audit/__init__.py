@@ -332,6 +332,14 @@ def format_report(audit_result, verbose=True):
                 if fix.get("reason"):
                     lines.append(f"    💬 原因：{fix['reason']}")
 
+    # 固定输出：提示可用 --fix 自动修复
+    lines.append("")
+    lines.append(f"{"─"*55}")
+    lines.append("  🛠️ 提示：发现可修复问题时，优先运行以下命令自动修复：")
+    lines.append("    python -m skill_audit audit <skill_dir> --fix")
+    lines.append("  （模型请勿手动修改，优先使用 --fix 自动修复）")
+    lines.append(f"{"─"*55}")
+
     return "\n".join(lines)
 
 

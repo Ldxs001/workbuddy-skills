@@ -332,7 +332,7 @@ def body_has_faq_section(filepath, content, fm, body, **kw):
             bad_pairs.append(f"A: {a_trim[:30]}")
         if bad_pairs:
             return {"passed": False,
-                    "detail": f"{faq}:1 - FAQ 包含低质量条目（{len(bad_pairs)} 条）：{', '.join(bad_pairs[:3])}",
+                    "detail": f"{faq_file}:1 - FAQ 包含低质量条目（{len(bad_pairs)} 条）：{', '.join(bad_pairs[:3])}",
                     "fix": {"key": "faq_quality", "value": "improve_qa",
                              "location": f"{faq_file}:1",
                              "operation": "改进 FAQ 质量：问题须具体（≥10字），答案须有实质内容（≥15字），避免万能回答",
@@ -543,7 +543,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         for script_path in script_paths:
             full_path = os.path.join(skill_dir, script_path)
             if not os.path.isfile(full_path):
-                all_issues["suggest"].append(f"SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望路径：{full_path}）")
+                all_issues["suggest"].append(f"SKILL.md 提到脚本 `{script_path}` 但文件不存在（应使用相对路径如 `scripts/foo.py`）")
             else:
                 # 静态分析：检查 Python 语法（不执行脚本，避免间接执行风险）
                 try:
@@ -734,7 +734,7 @@ def check_doc_code_consistency(
             if os.path.isfile(alt_path):
                 continue
             issues["suggest"].append(
-                f"R-23: {filepath}:1 - SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望：{full_path}）"
+                f"R-23: {filepath}:1 - SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
             )
         else:
             # 静态语法检查
@@ -750,11 +750,24 @@ def check_doc_code_consistency(
                     f"R-23: {script_path}:1 - 脚本 `{script_path}` 读取失败：{str(_e)[:80]}"
                 )
 
-            # 4. 检查 SKILL.md 中的调用方式是否与实际代码一致
-            # 检查 --help / --list 等 flag 是否真实存在
-            if '--' in ' '.join(all_commands):
-                # 提取文档中提到的 --flags
-                doc_flags = set(re.findall(r'--([a-z][-a-z]*)', ' '.join(all_commands)))
+            # 4. 检查 SKILL.md 中【调用此脚本的命令】的参数是否与实际代码一致
+            # 只检查调用了当前 script_path 的命令，不检查全部 all_commands
+            script_basename = os.path.basename(script_path)  # e.g. "template_generator.py"
+            relevant_cmds = []
+            for cmd in all_commands:
+                # 命令中提及此脚本名（含路径）才检查
+                # 注意：cmd 可能是多行 bash 代码块，需按行拆分后逐行判断
+                if script_basename in cmd or script_path.replace('\\', '/') in cmd or script_path.replace('/', '\\') in cmd:
+                    # 按行拆分，只保留真正调用此脚本的命令行
+                    for _line in cmd.splitlines():
+                        _line = _line.strip()
+                        if _line.startswith('#'):
+                            continue
+                        if script_basename in _line or script_path.replace('\\', '/') in _line or script_path.replace('/', '\\') in _line:
+                            relevant_cmds.append(_line)
+            if relevant_cmds and '--' in ' '.join(relevant_cmds):
+                # 提取这些相关命令中提到的 --flags
+                doc_flags = set(re.findall(r'--([a-z][-a-z]*)', ' '.join(relevant_cmds)))
                 if doc_flags and script_path.endswith('.py'):
                     # 尝试从脚本源码中提取实际的 argparse flags
                     try:
