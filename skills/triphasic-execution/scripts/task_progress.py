@@ -41,8 +41,7 @@ import hashlib
 from datetime import datetime
 
 #  路径配置 
-SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_HOME = os.path.join(SKILL_DIR, "..", "temp_progress")
+DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".workbuddy", ".standardization", "triphasic-execution")
 TRIPHASIC_HOME = os.environ.get("TRIPHASIC_HOME", DEFAULT_HOME)
 
 
@@ -595,8 +594,7 @@ def cmd_complete(args):
 
     # 校验：记录文件（复杂任务）
     if data["total_steps"] >= 4:
-        context_dir = os.path.join(TRIPHASIC_HOME, "..", "context")
-        context_dir = os.path.normpath(context_dir)
+        context_dir = TRIPHASIC_HOME
         missing = []
         for fname in ("PROBLEMS.md", "RISKS.md", "LESSONS_REGISTER.md"):
             fpath_check = os.path.join(context_dir, fname)

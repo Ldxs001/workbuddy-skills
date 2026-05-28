@@ -31,7 +31,7 @@ import hashlib
 # ============================================================================
 # 路径配置（通用化）
 # ============================================================================
-_DEFAULT_HOME = Path.home() / ".workbuddy" / "triphasic"
+_DEFAULT_HOME = Path.home() / ".workbuddy" / ".standardization" / "triphasic-execution"
 _TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", _DEFAULT_HOME))
 
 
@@ -250,6 +250,26 @@ def cmd_add(args):
             return 0
 
     save_problem(problem)
+
+    # 同步更新 PROBLEMS.md
+    problems_file = get_problems_md()
+    problems_file.parent.mkdir(parents=True, exist_ok=True)
+
+    entry = f"""### [{problem['number']}] {problem['symptom'][:60]}
+
+- **记录时间**: {problem['timestamp']}
+- **场景**: {problem['scene']}
+- **现象**: {problem['symptom']}
+- **原因**: {problem['cause']}
+- **解决方案**: {problem['solution']}
+- **状态**: {problem['status']}
+- **关联任务**: {problem.get('related_task', 'N/A')}
+
+---
+"""
+    with open(problems_file, "a", encoding="utf-8") as f:
+        f.write(entry)
+
     print(f"✅ 问题已记录：{problem['number']} @ {problem['timestamp']}")
     print(f"   场景：{problem['scene']}")
     print(f"   现象：{problem['symptom']}")

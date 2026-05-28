@@ -1,9 +1,9 @@
 ---
 name: triphasic-execution
-version: 5.17.0
+version: 5.17.1
 author: wUwproject
 license: MIT
-description: Execute→Review→Advance 三步循环执行框架 v5.17.0。增强步骤规划能力（参考 skill-sub 逻辑）、增强语义理解（参考 semantic-split 逻辑）；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。
+description: Execute→Review→Advance 三步循环执行框架 v5.17.1。增强步骤规划能力（参考 skill-sub 逻辑）、增强语义理解（参考 semantic-split 逻辑）；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。v5.17.1：数据目录从 ~/.workbuddy/triphasic/ 迁移到 ~/.workbuddy/.standardization/triphasic-execution/（符合R-11/R-12）；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。
 tags: ['framework', 'execution', 'debugging', 'problem-tracking', 'risk-tracking', 'lessons-learned', 'cross-platform', 'configuration', 'config-ui']
 category: workflow
 trigger_negative: true
@@ -25,7 +25,7 @@ external_data_dir: true
 
 
 
-# Triphasic Execution Framework v5.17.0
+# Triphasic Execution Framework v5.17.1
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
 
@@ -167,6 +167,20 @@ task_progress.py init → 创建进度文件
   ↓ [MANDATORY] 问题/风险/经验记录
 ```
 
+### 🔴 任务完成后的强制输出协议（AI 必读）
+
+> **每完成一个任务后，AI 必须执行以下 3 步，不可跳过。**
+> 不管任务成败，只要有实际工作产出，就必须记录。
+
+| 步骤 | 命令 | 说明 |
+|------|------|------|
+| 1 | `task_progress.py complete --task "名称"` | 完成任务，强制校验记录文件 |
+| 2 | `problem_logger.py add --scene "场景" --symptom "现象" --cause "原因" --solution "方案" --task "任务"` | 每遇到一个非 trivial 问题都记录 |
+| 3 | `problem_logger.py merge-to-lessons` | 任务完全完成后，合并所有待合并条目到 LESSONS_REGISTER.md |
+
+→ 完整用法见下方「快速命令」章节
+→ 数据目录：`~/.workbuddy/.standardization/triphasic-execution/`（符合 R-11/R-12 规范）
+
 → 详细规则、模板、禁止行为清单见 `references/mandatory.md`
 → 完整示例见 `references/examples.md`
 → CLI 命令、进度文件、数据目录、安装见 `references/reference.md`
@@ -221,4 +235,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ## 版本
 
-当前版本：**5.16.0** — v5.17.0：增强步骤规划能力（参考 skill-sub 逻辑）、增强语义理解（参考 semantic-split 逻辑）；明确空转/重试/换思路/求助完整流转规则；新增 F-11（最多3次空转）、F-12（换思路走完整三步）、F-13（不倒回已画√步骤）强制约束。
+当前版本：**5.17.1** — v5.17.1：数据目录迁移到 .standardization/triphasic-execution/；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。
