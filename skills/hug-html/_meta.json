@@ -1,0 +1,13 @@
+{
+  "name": "hug-html",
+  "version": "1.0.1",
+  "description": "HTML template generator with visual editor, module library, and style presets. Supports template generation, WYSIWYG editing, batch content filling, and reusable code modules.",
+  "author": "Ldxs",
+  "tags": [
+    "html",
+    "template",
+    "visual-editor",
+    "module-library",
+    "style-presets"
+  ]
+}
