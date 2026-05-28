@@ -1,9 +1,9 @@
 ---
 name: git-sync
-version: 2.6.26
+version: 2.6.27
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.26：SKILL.md新增显式AI输出指令（表格+deliver_attachments+preview_url）；修复name: .→git-sync；新增guide.md到渐进式加载必读列表。
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.27：SKILL.md输出指令扩展为完整报告模板（推送表+审计+ZIP详情+HTML路径）；新增GitHub失败自动询问重试；修复输出信息不完整问题。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL
@@ -19,7 +19,7 @@ faq_reference: true
 
 
 
-# git-sync v2.6.24 — 三端同步技能
+# git-sync v2.6.27 — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
 
@@ -63,13 +63,35 @@ python git-sync.py <skill-name> [version] [--skip-scan]
 
 ### AI 执行后必须输出（非可选）
 
-脚本运行完毕后，**AI 必须执行以下 3 步**：
+脚本运行完毕后，**AI 必须执行以下 4 点**：
 
-| # | 操作 | 工具 |
-|---|------|------|
-| 1 | 从终端输出提取推送结果，用表格呈现（平台 / 状态 / 版本） | 文本输出 |
-| 2 | 调用 `deliver_attachments` 交付 ZIP 包 | `deliver_attachments` |
-| 3 | 调用 `preview_url` 打开 `.dist/index.html` | `preview_url` |
+#### 1. [文本] 完整推送报告
+
+从终端输出提取以下**全部**内容，结构化呈现：
+
+```
+📦 git-sync 执行报告：<skill-name> v<version>
+
+| 平台 | 状态 | 版本 |
+|------|------|------|
+| 码云 | ✅/❌ | x.x.x |
+| GitHub | ✅/❌ | x.x.x |
+
+─── 审计报告 ───
+  结论：pass/fail（ERROR=N, WARN=N）
+  [逐条列出审计结果]
+
+ZIP 包：<完整路径>（<大小> / <文件数> 文件）
+HTML 索引：<完整路径>
+```
+
+**必须包含**：推送状态表 + 审计结论 + ZIP 路径/大小/文件数 + HTML 索引路径。
+
+#### 2. [工具] deliver_attachments — 交付 ZIP 包
+
+#### 3. [工具] preview_url — 打开 `.dist/index.html`
+
+#### 4. [文本] 如果 GitHub 推送失败（443 超时），必须询问用户是否重试
 
 ## 渐进式加载说明
 
