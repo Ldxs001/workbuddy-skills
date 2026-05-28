@@ -109,11 +109,16 @@ def backup_file(path: str, operation: str = "unknown") -> str | None:
 
 
 def _record_backup(backup_id: str, original_path: str, operation: str):
+    """记录备份元数据到 manifest.txt（JSON Lines 格式）"""
     manifest_path = os.path.join(BACKUP_DIR, "manifest.txt")
-    ts = datetime.datetime.now().isoformat()
-    line = f"{backup_id}|{original_path}|{operation}|{ts}\n"
+    entry = {
+        "backup_fn": backup_id,
+        "original_path": os.path.abspath(original_path),
+        "operation": operation,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
     with open(manifest_path, "a", encoding="utf-8") as f:
-        f.write(line)
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 # ── 原子写入 ─────────────────────────────────────────────────────────────────

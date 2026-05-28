@@ -44,7 +44,7 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
             rel_path = os.path.join("scripts", fname)
 
             if fname in ("artifact_checker.py", "data_dir_checker.py"):
-                continue  # 检查器自身，跳过自检 (R-11 误报防护)
+                continue  # 检查器自身体，跳过自检 (R-11 误报防护)
             if ext == ".py":
                 _check_python_artifact_paths_v2(rel_path, script_lines, violations)
             elif ext in (".sh", ".bat", ".ps1"):

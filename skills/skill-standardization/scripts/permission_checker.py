@@ -120,6 +120,8 @@ class PermissionChecker:
             skill_dir: skill 根目录路径
             verbose: 是否输出详细日志
         """
+        if not os.path.isdir(skill_dir):
+            raise ValueError(f"skill_dir 不是有效目录: {skill_dir}")
         self.skill_dir = Path(skill_dir).resolve()
         self.verbose = verbose
         self.issues: List[Dict] = []
@@ -135,6 +137,16 @@ class PermissionChecker:
         self._current_string_ranges = []  # (start_char, end_char) for .py string literals
 
     # ── 公共接口 ────────────────────────────────────────────────────────────────
+
+    def generate_report(self) -> Dict:
+        """
+        公共方法：运行完整扫描并生成格式化报告。
+        等同于 scan()，但名称更直观，供外部调用。
+
+        Returns:
+            dict: 含权限权重、风险等级、问题列表的完整报告
+        """
+        return self.scan()
 
     def scan(self) -> Dict:
         """

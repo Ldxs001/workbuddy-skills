@@ -545,7 +545,7 @@ fix_faq_progressive(skill)
 | `fix_description(skill_dir, value)` | R-04 | 修复 description 字段 |
 | `fix_version(skill_dir, value)` | R-03 | 修复 version 字段 |
 | `fix_author(skill_dir, value)` | R-02 | 修复 author 字段 |
-| `fix_h1(skill_dir)` | R-06 | 移除正文一级标题 |
+| `fix_h1(skill_dir)` | R-06 | 删除正文一级标题 |
 | `fix_section_trigger(skill_dir)` | R-07 | 添加触发条件章节 |
 | `fix_section_core(skill_dir)` | R-08 | 添加核心能力章节 |
 | `fix_section_workflow(skill_dir)` | R-09 | 添加工作流程章节 |

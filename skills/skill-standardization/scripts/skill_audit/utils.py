@@ -234,6 +234,36 @@ RULES = [
         "fixable": False,
         "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
     },
+    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
+    {
+        "id": "R-24",
+        "name": "更新日志渐进加载",
+        "severity": "WARN",
+        "method": "check_changelog_progressive",
+        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
+        "fixable": False,
+        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
+    },
+    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
+    {
+        "id": "R-24",
+        "name": "更新日志渐进加载",
+        "severity": "WARN",
+        "method": "check_changelog_progressive",
+        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
+        "fixable": False,
+        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
+    },
+    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
+    {
+        "id": "R-24",
+        "name": "更新日志渐进加载",
+        "severity": "WARN",
+        "method": "check_changelog_progressive",
+        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
+        "fixable": False,
+        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
+    },
 ]
 
 

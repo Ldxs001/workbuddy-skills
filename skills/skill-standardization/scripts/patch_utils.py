@@ -5,7 +5,7 @@ import os
 
 UTILS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "scripts", "skill_audit", "utils.py"
+    "skill_audit", "utils.py"
 )
 
 with open(UTILS, "r", encoding="utf-8") as f:

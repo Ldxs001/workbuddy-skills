@@ -1,17 +1,47 @@
 ---
 name: skill-standardization
-version: 2.38.6
+version: 2.38.8
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.38.7。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
-sensitive_access: true
+description: Skill 标准化规范引擎 v2.38.8。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
+sensitive_access: false
 critical_write: false
-permission_weight: HIGH
+permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
-artifact_paths: true
-writing_standards: fix_terms
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -153,23 +183,23 @@ writing_standards: fix_terms
 {
   ts: 2026-05-27T08:31:47,
   operation: refactor,
-  file: skills/.standardization/skill-standardization/,
+  file: ../.standardization/skill-standardization/,
   success: true,
   rollback_id: 20260527_083147_...,
-  temp_files: [skills/.standardization/skill-standardization/data/temp/xxx.tmp],
-  backup_files: [skills/.standardization/skill-standardization/data/backup/20260527_...bak],
+  temp_files: [../.standardization/skill-standardization/data/temp/xxx.tmp],
+  backup_files: [../.standardization/skill-standardization/data/backup/20260527_...bak],
   detail: ...
 }
 ```
 
-> 本技能自身被更新时，同样遵守上述规则：更新前对 `skills/.standardization/skill-standardization/` 整体备份，操作中记录临时文件，更新完成后清理。
+> 本技能自身被更新时，同样遵守上述规则：更新前对 `../.standardization/skill-standardization/` 整体备份，操作中记录临时文件，更新完成后清理。
 
 ## 数据目录说明
 
 本技能的数据文件（审查缓存、进度文件、备份、日志等）存放在：
 
 ```
-skills/.standardization/skill-standardization/
+../.standardization/skill-standardization/
 ```
 
-> 安装目录 `skills/.standardization/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。
+> 安装目录 `skills/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。

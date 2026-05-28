@@ -66,7 +66,7 @@ def check_external_data_dir(skill_dir, verbose=False):
                 continue
             fpath = os.path.join(root, fname)
             if fname in ("data_dir_checker.py", "artifact_checker.py"):
-                continue  # 检查器自身，跳过自检 (R-11 误报防护)
+                continue  # 检查器自身体，跳过自检 (R-11 误报防护)
             if _is_fix_script(fpath):
                 continue  # 修复脚本允许写其他位置
             try:

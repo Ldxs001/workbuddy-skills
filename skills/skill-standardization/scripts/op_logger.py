@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import datetime
+import shutil
 
 # ── 路径常量（通用写法，适用于任何安装结构）───────────────────
 _SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,7 @@ _SKILLS_ROOT = os.path.dirname(_SKILL_DIR)
 SKILL_NAME    = os.path.basename(_SKILL_DIR)
 DATA_DIR      = os.path.join(_SKILLS_ROOT, ".standardization", SKILL_NAME)
 LOGS_DIR      = os.path.join(DATA_DIR, "logs")
+BACKUP_DIR    = os.path.join(DATA_DIR, "backup")
 OPS_LOG       = os.path.join(LOGS_DIR, "ops.log")
 
 
@@ -32,6 +34,60 @@ OPS_LOG       = os.path.join(LOGS_DIR, "ops.log")
 
 def _ensure_logs_dir():
     os.makedirs(LOGS_DIR, exist_ok=True)
+
+def _ensure_backup_dir():
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+
+# ── 备份功能 ───────────────────────────────────────────────────────
+
+def _backup_file(path, operation):
+    """创建真实备份文件，返回 backup_id"""
+    _ensure_backup_dir()
+    if not os.path.exists(path):
+        return None
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    orig = os.path.basename(path)
+    import hashlib
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+    except Exception:
+        pass
+    backup_id = f"{ts}_{orig}_{h.hexdigest()[:8]}.bak"
+    backup_path = os.path.join(BACKUP_DIR, backup_id)
+    shutil.copy2(path, backup_path)
+    manifest = os.path.join(BACKUP_DIR, "manifest.txt")
+    entry = {
+        "backup_fn": backup_id,
+        "original_path": os.path.abspath(path),
+        "operation": operation,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+    with open(manifest, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return backup_id
+
+
+def log_modify(path, operation, content_new=None, detail=None):
+    """记录修改操作并创建真实备份"""
+    _ensure_logs_dir()
+    backup_id = _backup_file(path, operation) if os.path.exists(path) else None
+    entry = {
+        "ts": datetime.datetime.now().isoformat(),
+        "operation": operation,
+        "file": path,
+        "success": True,
+    }
+    if backup_id:
+        entry["rollback_id"] = backup_id
+    if detail:
+        entry["detail"] = detail
+    with open(OPS_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return backup_id
 
 
 # ── 核心接口 ──────────────────────────────────────────────────────

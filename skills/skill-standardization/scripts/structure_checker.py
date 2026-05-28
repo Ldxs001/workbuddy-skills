@@ -672,13 +672,6 @@ def check_doc_code_consistency(
         "ImportError", "FileNotFoundError", "KeyError", "IndexError",
         "RuntimeError", "AttributeError", "NameError",
     }
-
-    # R-23: filter Python builtins falsely matched as skill-defined names
-    _BUILTINS = {
-        "SyntaxWarning", "Warning", "Exception", "TypeError", "ValueError",
-        "ImportError", "FileNotFoundError", "KeyError", "IndexError",
-        "RuntimeError", "AttributeError", "NameError",
-    }
     R-23: 文档-代码一致性检查 (v2.34.8)
     验证 SKILL.md 中引用的脚本/文件/函数名真实存在。
     """
@@ -763,13 +756,11 @@ def check_doc_code_consistency(
             relevant_cmds = []
             for cmd in all_commands:
                 # 命令中提及此脚本名（含路径）才检查
+                # 注意：cmd 可能是多行 bash 代码块，需按行拆分后逐行判断
                 if script_basename in cmd or script_path.replace('\\', '/') in cmd or script_path.replace('/', '\\') in cmd:
-                    # 按行拆分，只保留真正调用此脚本的命令行（避免整个代码块被当作一条命令）
+                    # 按行拆分，只保留真正调用此脚本的命令行
                     for _line in cmd.splitlines():
                         _line = _line.strip()
-                        if _line.startswith('#'): continue
-                        if script_basename in _line or script_path.replace('\\', '/') in _line or script_path.replace('/', '\\') in _line:
-                            relevant_cmds.append(_line)
                         if _line.startswith('#'):
                             continue
                         if script_basename in _line or script_path.replace('\\', '/') in _line or script_path.replace('/', '\\') in _line:
