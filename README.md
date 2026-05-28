@@ -27,7 +27,7 @@
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
 | `skills` | 技能描述 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
-| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。 |
+| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.16.0。增强步骤规划能力（参考skill-sub逻辑）、增强语义理解（参考semantic-split逻辑）；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束；ttask_progress.py 增加空转计数与执行验证。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
 | `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
 | `workday-calendar` | 智能周历系统 v1.5.0 - skill-standardization 改造（结构规范化、R-11/R-12 合规修复、trigger 字段补充） |

@@ -39,7 +39,7 @@
 | 文件 | 行号 | 匹配模式 | 授权方式 |
 |------|-------|----------|----------|
 | `scripts/install.py` | 76, 189 | `shutil.rmtree` | `immediate` |
-| `scripts/task_progress.py` | 439, 443, 496, 501 | `os.remove` | `immediate` |
+| `scripts/ttask_progress.py` | 439, 443, 496, 501 | `os.remove` | `immediate` |
 
 ### network_access（1 处，MEDIUM）
 

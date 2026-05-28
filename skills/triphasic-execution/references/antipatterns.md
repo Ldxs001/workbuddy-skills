@@ -63,12 +63,12 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 **错误做法：**
 ```
-任务规划 → [无 task_progress.py init] → 直接执行
+任务规划 → [无 ttask_progress.py init] → 直接执行
 ```
 
 **正确做法：**
 ```
-任务规划 → task_progress.py init → 执行（✅ 遵守 F-03）
+任务规划 → ttask_progress.py init → 执行（✅ 遵守 F-03）
 ```
 
 ---
@@ -77,12 +77,12 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 **错误做法：**
 ```
-任务执行完 → [无 task_progress.py complete] → 结束
+任务执行完 → [无 ttask_progress.py complete] → 结束
 ```
 
 **正确做法：**
 ```
-任务执行完 → task_progress.py complete → 输出总结（✅ 遵守 F-09）
+任务执行完 → ttask_progress.py complete → 输出总结（✅ 遵守 F-09）
 ```
 
 ---
@@ -103,6 +103,48 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 ---
 
+### ❌ AP-07：空转超过 3 次未截断（v5.16.0 新增）
+
+**错误做法：**
+```
+第 1 次空转 → 继续
+第 2 次空转 → 继续
+第 3 次空转 → 继续
+第 4 次空转 → 继续（❌ 违反 F-11）
+```
+
+**正确做法：**
+```
+第 1 次空转 → 重述规划，明确要求必须执行
+第 2 次空转 → 重述规划，明确要求必须执行
+第 3 次空转 → 主动截断，请求用户输入触发词（✅ 遵守 F-11）
+```
+
+---
+
+### ❌ AP-08：换思路时三步骤内部直接循环（v5.16.0 新增）
+
+**错误做法：**
+```
+换思路 → 直接执行新方案（❌ 跳过 REVIEW→ADVANCE）
+换思路 → 直接推进（❌ 跳过 EXECUTE→REVIEW）
+```
+
+**正确做法：**
+```
+换思路 → 原封不动推送到 REVIEW
+          ↓
+       REVIEW（记录换思路，不确认执行）
+          ↓
+       ADVANCE（推进换思路执行）
+          ↓
+       EXECUTE（执行新方案）
+          ↓
+       REVIEW → ADVANCE（完整三步循环）（✅ 遵守 F-12）
+```
+
+---
+
 ## 注意事项
 
 1. **语义拆分是强制的** — 收到任务第一个动作必须是语义拆分，不能跳过
@@ -110,6 +152,8 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 3. **三步循环不可跳过** — Execute→Review→Advance 缺一不可
 4. **进度文件必须创建** — F-03 强制要求 init，否则后续 update/complete 会报错
 5. **最多 3 次重试** — F-08 强制要求，第 4 次必须换方案
+6. **最多 3 次空转** — F-11 强制要求，第 4 次必须截断并请求触发词输入
+7. **换思路必须走完整三步** — F-12 强制要求，禁止三步骤内部直接循环
 
 ---
 
@@ -117,7 +161,7 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 | 问题 | 原因 | 解决方案 |
 |------|------|----------|
-| `task_progress.py update` 报错 | 未执行 `init` | 先执行 `task_progress.py init` |
+| `ttask_progress.py update` 报错 | 未执行 `init` | 先执行 `ttask_progress.py init` |
 | `complete` 校验失败 | 步骤完成率不足 | 检查哪些步骤未标记为 success |
 | 重试次数超限 | 同一方案失败 3 次 | 换方案，禁止第 4 次重试 |
 | 进度文件丢失 | 误删除或路径错误 | 重新执行 `init`，或手动创建进度文件 |

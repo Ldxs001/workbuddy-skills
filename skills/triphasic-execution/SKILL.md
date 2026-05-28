@@ -1,20 +1,20 @@
 ---
 name: triphasic-execution
-version: 5.15.0
+version: 5.17.0
 author: wUwproject
 license: MIT
-description: Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。
+description: Execute→Review→Advance 三步循环执行框架 v5.17.0。增强步骤规划能力（参考 skill-sub 逻辑）、增强语义理解（参考 semantic-split 逻辑）；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。
 tags: ['framework', 'execution', 'debugging', 'problem-tracking', 'risk-tracking', 'lessons-learned', 'cross-platform', 'configuration', 'config-ui']
 category: workflow
 trigger_negative: true
-sensitive_access: true
+sensitive_access: false
 critical_write: false
 create_permissions_md: true
-permission_weight: CRITICAL
+permission_weight: LOW
 section_antipattern: true
 section_faq: true
-writing_standards: fix_terms
-progressive_loading_explicit: true
+data_dir: ../.standardization/triphasic-execution/
+external_data_dir: true
 ---
 
 
@@ -25,10 +25,7 @@ progressive_loading_explicit: true
 
 
 
-
-
-
-# Triphasic Execution Framework v5.15.0
+# Triphasic Execution Framework v5.17.0
 
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
 
@@ -59,15 +56,22 @@ progressive_loading_explicit: true
 
 | # | 能力 | 说明 |
 |---|------|------|
-| 1 | **语义拆分前置（F-01）** | 任务开始前强制输出语义拆分，明确主语/目的/诉求/动机 |
-| 2 | **任务规划强制（F-02）** | 所有任务必须先输出规划，无论大小 |
+| 1 | **语义理解增强（F-01+）** | 参考 semantic-split 的 5W2H 维度提取与约束强度标注（🔴🟡⚪），增强第一步理解能力；详见 `references/mandatory.md` Phase 0 |
+| 2 | **步骤规划增强（F-02+）** | 参考 skill-sub 的规划逻辑（意图理解→步骤排序→执行计划生成），健壮步骤规划能力（非调用链，仅参考逻辑）；详见 `references/mandatory.md` Phase 1 |
 | 3 | **三步循环执行** | Execute→Review→Advance，每步必须完整，不可跳过 |
 | 4 | **进度文件持久化（F-03/F-07/F-09）** | init→update→complete，中断后可 resume 恢复；**complete 强制校验（v5.12）** |
 | 5 | **问题/风险/经验记录** | 任务完成后强制记录（复杂任务 Python 侧校验），积累 PROBLEMS.md / RISKS.md / LESSONS_REGISTER.md |
 | 6 | **最多 3 次重试（F-08）** | 同一步骤失败 3 次必须换方案，禁止第 4 次重试 |
-| 7 | **双模式支持** | 按需调用模式（默认）/ 全局自动模式 |
-| 8 | **HTML 配置界面** | `settings.py` 可视化配置技能参数 |
-| 9 | **complete 强制校验（v5.12）** | `complete` 时 Python 侧校验步骤完成率、记录文件、总结文件；`--force` 只跳过步骤检查，`--no-enforce` 关闭记录校验 |
+| 7 | **最多 3 次空转（F-11）** | 同一步骤空转（未实际执行）3 次必须截断并请求触发词输入，禁止第 4 次空转 |
+| 8 | **双模式支持** | 按需调用模式（默认）/ 全局自动模式 |
+| 9 | **HTML 配置界面** | `settings.py` 可视化配置技能参数 |
+
+---
+
+## 空转/重试/换思路/求助 流转规则
+
+> 详细规则见 `references/mandatory.md` Phase 2~4。
+> **核心原则：无任何三步骤内部直接循环，每一步都是最小单元。**
 
 ---
 
@@ -78,7 +82,7 @@ progressive_loading_explicit: true
 "使用 triphasic-execution 执行以下任务：..."
 
 # 全局自动模式 — 所有任务自动套用框架
-编辑 assets/default_config.json → "mode": "auto"
+编辑 data/default_config.json → "mode": "auto"
 
 # 可视化配置
 python {SKILL_DIR}/scripts/settings.py
@@ -118,6 +122,9 @@ skill 加载后，AI 输出以下状态标识：
 | **F-08** | 同一步骤失败 3 次后必须换方案，禁止第 4 次重试 | 重试计数达到 3 | ⚠️ 部分（update 记录重试次数）|
 | **F-09** | 任务完成后调用 `task_progress.py complete` | 任务完成时 | ✅ **v5.12 强制**：校验步骤完成率、记录文件、summary.json |
 | **F-10** | 任务完成后必须输出【任务完成】总结 | 任务结束时 | ⚠️ 部分（summary.json 自动生成）|
+| **F-11** | 同一步骤空转（未实际执行）3 次必须截断并请求触发词输入 | 空转计数达到 3 | ❌ AI 自觉（截断后等待用户输入触发词重新激发）|
+| **F-12** | 换思路必须经 ADVANCE→EXECUTE→REVIEW→ADVANCE 完整循环，禁止三步骤内部直接循环 | 换思路请求产生时 | ❌ AI 自觉（换思路也走完整三步）|
+| **F-13** | 推进阶段成功后，坚决不倒回已画√的步骤 | 推进决策时 | ❌ AI 自觉 |
 
 ### 自检指令
 
@@ -127,6 +134,8 @@ skill 加载后，AI 输出以下状态标识：
 - F-02 任务规划：[已完成/待执行]
 - F-03 进度文件创建：[已完成/待执行]
 - 当前步骤 N：[待执行/执行中/已完成]
+- 重试计数：[0/1/2/3/超次]
+- 空转计数：[0/1/2/3/超次]
 违规项：[无/F-XX 描述]
 ```
 
@@ -137,18 +146,18 @@ skill 加载后，AI 输出以下状态标识：
 ```
 用户任务
   ↓ [F-01 MANDATORY]
-语义拆分 → 输出块分析（主语/目的/诉求/动机）
+语义拆分 → 输出块分析（主语/目的/诉求/动机）[增强：5W2H + 约束标注]
   ↓ [F-02 MANDATORY]
-任务规划 → 明确目的/要求/工具/结果/风险 → 确认执行
+任务规划 → 明确目的/要求/工具/结果/风险 → 确认执行 [增强：参考 skill-sub 规划逻辑]
   ↓ [F-03 MANDATORY]
 task_progress.py init → 创建进度文件
   ↓
 执行循环（每步骤）：
-  🔧 EXECUTE（重述目的 → 执行）
+  🔧 EXECUTE（重述目的 → 执行）[空转计数]
     ↓ [F-05]
-  🔍 REVIEW（✅/❌/⚠️ + 证据）
+  🔍 REVIEW（✅/❌/⚠️ + 证据）[重试计数/空转计数]
     ↓ [F-06]
-  📍 ADVANCE（继续/换方案/完成）
+  📍 ADVANCE（继续/换方案/求助/完成）[截断/触发词重启]
     ↓ [F-07]
   task_progress.py update
   ↓
@@ -166,13 +175,15 @@ task_progress.py init → 创建进度文件
 
 ## 循环规则（摘要）
 
-1. **语义拆分先行** — 收到任务的第一个动作
-2. **规划先行** — 所有任务必须先输出任务规划
+1. **语义拆分先行** — 收到任务的第一个动作（增强：5W2H + 约束强度标注）
+2. **规划先行** — 所有任务必须先输出任务规划（增强：参考 skill-sub 规划逻辑）
 3. **临时文件持久化** — init → update（每步）→ complete
 4. **最小单元** — 单次工具调用，每步立即审查+推进
 5. **最多 3 次重试** — 3 次失败后必须换方案
-6. **大任务才拆分** — 3步以上输出步骤列表
-7. **中断可恢复** — 进度文件保留，重启后 resume
+6. **最多 3 次空转** — 3 次空转后必须截断并请求触发词输入
+7. **大任务才拆分** — 3步以上输出步骤列表
+8. **中断可恢复** — 进度文件保留，重启后 resume
+9. **换思路走完整三步** — 禁止三步骤内部直接循环
 
 ---
 
@@ -200,14 +211,14 @@ python {SKILL_DIR}/scripts/settings.py
 
 | 本文件（SKILL.md）包含 | 拆分到 references/ |
 |---|---|
-| ✅ 触发条件、核心能力、强制约束总表 | 📄 `mandatory.md` — Phase 0~4 详细规则、模板、禁止行为 |
-| ✅ 工作流程概述、循环规则 | 📄 `examples.md` — 完整执行示例 |
+| ✅ 触发条件、核心能力、强制约束总表 | 📄 `mandatory.md` — Phase 0~4 详细规则、模板、禁止行为、空转/重试/换思路流转 |
+| ✅ 工作流程概述、循环规则 | 📄 `examples.md` — 完整执行示例（含空转/重试/换思路场景） |
 | ✅ 快速命令 | 📄 `reference.md` — 进度文件机制、问题记录、安装、数据目录 |
-| | 📄 `antipatterns.md` — 反模式收录（AP-01~AP-06） |
-| | 📄 `faq.md` — 常见问题（Q&A 1~10） |
+| | 📄 `antipatterns.md` — 反模式收录（AP-01~AP-08） |
+| | 📄 `faq.md` — 常见问题（Q&A 1~12） |
 
 ---
 
 ## 版本
 
-当前版本：**5.14.0** — v5.14.0：遵循 skill-standardization v2.24.4 规范，修复触发条件否定条件、渐进式加载显式说明、术语一致性等问题。
+当前版本：**5.16.0** — v5.17.0：增强步骤规划能力（参考 skill-sub 逻辑）、增强语义理解（参考 semantic-split 逻辑）；明确空转/重试/换思路/求助完整流转规则；新增 F-11（最多3次空转）、F-12（换思路走完整三步）、F-13（不倒回已画√步骤）强制约束。
