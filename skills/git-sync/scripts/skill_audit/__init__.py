@@ -238,7 +238,7 @@ def format_report(audit_result, verbose=True):
     r = audit_result
 
     if "error" in r:
-        lines.append(f"[ERROR] {r['skill']}: {r['error']}")
+        lines.append(f"❌ {r['skill']}: {r['error']}")
         return "\n".join(lines)
 
     lines.append(f"{'='*55}")
@@ -251,7 +251,7 @@ def format_report(audit_result, verbose=True):
     # 显示自动修正信息
     if r.get("fixed"):
         lines.append(f"\n{'─'*55}")
-        lines.append("  [WARN]  已自动修正以下 frontmatter 字段：")
+        lines.append("  ⚠️  已自动修正以下 frontmatter 字段：")
         for fix_desc in r["fixed"]:
             lines.append(f"    • {fix_desc}")
         if r.get("re_audit"):
@@ -263,7 +263,7 @@ def format_report(audit_result, verbose=True):
         lines.append(f"{'规则ID':<8} {'严重度':<7} {'状态':<6} 详情")
         lines.append(f"{'-'*8}-{'-'*7}-{'-'*6}-{'-'*30}")
         for res in r["results"]:
-            status = "[OK]" if res["passed"] else ("[SKIP]" if res["skipped"] else ("[ERROR]" if res["severity"]=="ERROR" else "[WARN]"))
+            status = "✅" if res["passed"] else ("⏭️" if res["skipped"] else ("🔴" if res["severity"]=="ERROR" else "🟡"))
             sev = res["severity"][0] if res["severity"] else "?"
             lines.append(f"{res['rule_id']:<8} {sev:<7} {status:<6} {res['detail']}")
 
@@ -275,7 +275,7 @@ def cmd_rules():
     print(f"\n{'ID':<8} {'严重度':<8} 名称  检查内容")
     print("-" * 65)
     for rule in RULES:
-        sev_mark = "[ERROR]" if rule["severity"] == "ERROR" else "[WARN]"
+        sev_mark = "🔴" if rule["severity"] == "ERROR" else "🟡"
         print(f"  {rule['id']:<6} {sev_mark} {rule['severity']:<6} {rule['name']: <20} {rule['check']}")
     print(f"\n共 {len(RULES)} 条规则")
 
@@ -284,7 +284,7 @@ def cmd_audit(args):
     """审查单个 skill 目录"""
     skill_dir = args.skill_dir
     if not os.path.isdir(skill_dir):
-        print(f"[ERROR] 目录不存在: {skill_dir}", file=sys.stderr)
+        print(f"❌ 目录不存在: {skill_dir}", file=sys.stderr)
         sys.exit(1)
 
     result = audit_skill(skill_dir, manifest_version=args.manifest_version,
@@ -312,7 +312,7 @@ def cmd_audit_all(args):
                 if isinstance(info, dict) and "version" in info:
                     version_map[name] = info["version"]
         except Exception as e:
-            print(f"[WARN] 读取 manifest 失败: {e}", file=sys.stderr)
+            print(f"⚠️  读取 manifest 失败: {e}", file=sys.stderr)
 
     # 发现所有 skill 目录
     entries = []

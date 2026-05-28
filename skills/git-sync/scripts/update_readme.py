@@ -45,7 +45,7 @@ def get_clone_urls(config):
 
 
 def extract_desc(skill_dir):
-    """从 _meta.json 或 SKILL.md 提取描述（单行，去除换行）"""
+    """从 _meta.json 或 SKILL.md 提取描述"""
     # 优先 _meta.json
     meta_path = os.path.join(skill_dir, "_meta.json")
     if os.path.exists(meta_path):
@@ -54,9 +54,7 @@ def extract_desc(skill_dir):
                 d = json.load(f)
                 desc = d.get("description", "")
                 if desc:
-                    # 关键：把换行符替换成空格，压缩连续空格，防止 Markdown 表格断裂
-                    desc = " ".join(desc.strip().split())
-                    return desc
+                    return desc.strip()
         except Exception:
             pass
 
@@ -84,14 +82,12 @@ def generate_readme(repo_path, readme_path):
     today = date.today().isoformat()
 
     if not os.path.isdir(skills_dir):
-        print(f"[ERROR] skills/ 目录不存在: {skills_dir}")
+        print(f"❌ skills/ 目录不存在: {skills_dir}")
         sys.exit(1)
 
-    # 扫描实际技能目录（排除隐藏目录 .dist .standardization 等）
+    # 扫描实际技能目录
     actual_skills = []
     for entry in sorted(os.listdir(skills_dir)):
-        if entry.startswith('.'):
-            continue  # 排除 .dist、.standardization 等隐藏目录
         full = os.path.join(skills_dir, entry)
         if os.path.isdir(full):
             desc = extract_desc(full)
@@ -196,11 +192,11 @@ MIT License
     if os.path.exists(readme_path):
         import shutil
         shutil.copy2(readme_path, backup_path)
-        print(f"  [INFO] 已备份原 README.md → README.md.bak")
+        print(f"  ℹ️  已备份原 README.md → README.md.bak")
 
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(new_readme)
-    print(f"  [OK] README.md 已全量重新生成: {readme_path}")
+    print(f"  ✅ README.md 已全量重新生成: {readme_path}")
 
 
 if __name__ == "__main__":
@@ -217,7 +213,7 @@ if __name__ == "__main__":
     manifest_path = os.path.join(skills_dir, ".standardization", "git-sync", "data", "manifest.json")
 
     if not os.path.exists(manifest_path):
-        print(f"[ERROR] manifest.json 不存在: {manifest_path}")
+        print(f"❌ manifest.json 不存在: {manifest_path}")
         sys.exit(1)
 
     with open(manifest_path, "r", encoding="utf-8") as f:
@@ -225,12 +221,12 @@ if __name__ == "__main__":
 
     repos = data.get("repos", {})
     if repo_name not in repos:
-        print(f"[ERROR] 仓库 '{repo_name}' 不存在于 manifest.json")
+        print(f"❌ 仓库 '{repo_name}' 不存在于 manifest.json")
         sys.exit(1)
 
     repo_path = os.path.expanduser(repos[repo_name].get("path", ""))
     if not repo_path or not os.path.isdir(repo_path):
-        print(f"[ERROR] 仓库路径不存在: {repo_path}")
+        print(f"❌ 仓库路径不存在: {repo_path}")
         sys.exit(1)
 
     generate_readme(repo_path, readme_path)

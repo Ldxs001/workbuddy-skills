@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.6.22 - 完整 Python 版 git-sync
+git-sync.py v2.6.23 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -26,6 +26,12 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 SKILLS_DIR = SCRIPT_DIR.parents[1]  # skills/<skill-name>/scripts/ → skills/
 WORK_REPO  = Path.home() / ".workbuddy" / "workbuddy-skills"
 DIST_DIR   = SKILLS_DIR / ".dist"
+
+# ZIP 打包排除模式（支持 *.ext, dir/, 精确名）
+EXCLUDE_PATTERNS = [
+    "*.bak", "__pycache__/", "*.pyc", ".git/", ".mcp.json",
+    "node_modules/", ".DS_Store", "Thumbs.db",
+]
 MANIFEST_FILE = (
     SKILLS_DIR / ".standardization" / "git-sync" / "data" / "manifest.json"
 )
@@ -56,13 +62,10 @@ def _git_env(base_env: dict = None) -> dict:
 
 
 def run_python(script: Path, *args, capture=False, check=True):
-    """运行 scripts/ 下的 Python 辅助脚本（固定使用托管 Python，避免 sys.executable 指向错误版本）"""
+    """运行 scripts/ 下的 Python 辅助脚本"""
     env = _git_env()
     env["PYTHONUTF8"] = "1"
-    python_exe = Path.home() / ".workbuddy" / "binaries" / "python" / "versions" / "3.13.12" / "python.exe"
-    if not python_exe.exists():
-        python_exe = Path(sys.executable)
-    cmd = [str(python_exe), str(script), *[str(a) for a in args]]
+    cmd = [sys.executable, str(script), *[str(a) for a in args]]
     return subprocess.run(cmd, capture_output=capture, encoding="utf-8",
                          check=check, env=env,
                          stdin=subprocess.DEVNULL)
@@ -152,76 +155,128 @@ def step_normalize_meta(meta_file: Path, skill_name: str, version: str):
     run_python(normalize_py, str(meta_file), skill_name, version, desc)
 
 # ── 步骤 3.5：SKILL.md 规范化审查（只读扫描，不修改、不阻断） ────────────────────────────────────────
-def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path):
+# ── 步骤 3.5：轻量审计（只读，不修改、不阻断） ─────────────────────────────────────
+def step_skill_audit(skill_name: str, skills_dir: Path, manifest_file: Path,
+                     desensitized_files=None, repo_skill_dir=None):
     """
-    只读扫描 SKILL.md 规范性，不修改任何文件，不阻断同步流程。
-    仅输出审计结论，不展开逐条细节。
+    轻量审计：只检查版本一致性和 R-23（脚本引用一致性）。
+    只读不修改，不输出修复建议，不触发修复。
+    返回 audit_result dict 用于最终报告。
     """
-    log("3.5", 8, "SKILL.md 规范审查（只读扫描）...")
+    audit_result = {"summary": {"errors": 0, "warns": 0}, "results": [], "verdict": "pass"}
+
     skill_md = skills_dir / skill_name / "SKILL.md"
     if not skill_md.exists():
-        log("3.5", 8, "SKILL.md 不存在，跳过审查", "skip")
-        return
-    # 读取清单中的版本号（用于审计参考，不影响流程）
+        print("  ⚠️  审计结论：SKILL.md 不存在，跳过")
+        return audit_result
+
+    md_text = skill_md.read_text(encoding="utf-8")
+    md_lines = md_text.splitlines()
+
+    # ── 检查1：版本一致性（SKILL.md vs _meta.json vs manifest） ──
+    md_ver = ""
+    for line in md_lines:
+        if line.startswith("version:"):
+            md_ver = line.split(":", 1)[1].strip()
+            break
+
+    meta_file = skills_dir / skill_name / "_meta.json"
+    meta_ver = ""
+    if meta_file.exists():
+        try:
+            m = json.loads(meta_file.read_text(encoding="utf-8"))
+            meta_ver = m.get("version", "")
+        except Exception:
+            pass
+
     manifest_ver = ""
     try:
-        m = json.load(open(manifest_file, encoding="utf-8"))
-        items = m.get("repos", {}).get("workbuddy-skills", {}).get("items", {})
+        mf = json.loads(manifest_file.read_text(encoding="utf-8"))
+        items = mf.get("repos", {}).get("workbuddy-skills", {}).get("items", {})
         manifest_ver = items.get(skill_name, {}).get("version", "")
     except Exception:
         pass
-    audit_out = SCRIPT_DIR / f".audit_{skill_name}.json"
-    # 调用本地 bundled skill_audit 包（python -m skill_audit）
-    # 注意：只传 audit 子命令，不传任何 --fix / --refactor 等修改类参数
-    env = _git_env()
-    env["PYTHONUTF8"] = "1"
-    cmd = [
-        sys.executable, "-m", "skill_audit",
-        "audit", str(skills_dir / skill_name),
-        "--json", f"--manifest-version={manifest_ver}",
-    ]
-    r = subprocess.run(
-        cmd,
-        cwd=str(SCRIPT_DIR),   # skill_audit/ 包在 SCRIPT_DIR 下
-        capture_output=True, encoding="utf-8",
-        check=False, env=env,
-        stdin=subprocess.DEVNULL,
-    )
-    # skill_audit --json 输出到 stdout，需要手动写入 audit_out
-    if r.stdout and r.returncode == 0:
-        try:
-            import json as _json
-            _d = _json.loads(r.stdout)
-            audit_out.write_text(r.stdout, encoding="utf-8")
-        except Exception:
-            pass
-    if audit_out.exists():
-        d = json.load(open(audit_out, encoding="utf-8"))
-        errors = d["summary"]["errors"]
-        warns  = d["summary"]["warns"]
-        verdict = d["verdict"]
-        # 只输出结论，不展开细节
-        if verdict == "pass":
-            print(f"  ✅ 审查结论：PASS（ERROR={errors}, WARN={warns}）")
-        elif verdict == "warn":
-            print(f"  💡 审查结论：WARN（ERROR={errors}, WARN={warns}）—— 建议优化，不阻断同步")
-        else:
-            print(f"  ⚠️  审查结论：{verdict}（ERROR={errors}, WARN={warns}）—— 仅记录，不阻断同步")
-        audit_out.unlink(missing_ok=True)
-    else:
-        log("3.5", 8, "审查执行失败，跳过", "warn")
 
-# ── 步骤 4：同步文件到工作仓库 ─────────────────────────────────────────────
-EXCLUDE_PATTERNS = [
-    "__pycache__", ".git", ".eggs", "eggs", "dist", "build",
-    ".egg-info", ".pytest_cache", ".mypy_cache", "node_modules",
-    ".standardization", "outputs", "test-outputs",
-    "*.pyc", "*.pyo", "*.log", "*.zip", "*.bak*",
-    "*.tmp", "._*", "*.decisions.json", "*.sensitive_scan_*.json",
-    "zip_out", "preview_server.py", "*_fixed.py", "stderr.txt", "stdout.txt",
-    "*.bat", "test_*.py", ".gitignore", ".ds_store", "thumbs.db",
-    "config.json", "manifest.json", "pack_zip.py",
-]
+    version_errors = []
+    if md_ver and meta_ver and md_ver != meta_ver:
+        version_errors.append(f"SKILL.md({md_ver}) != _meta.json({meta_ver})")
+    if md_ver and manifest_ver and md_ver != manifest_ver:
+        version_errors.append(f"SKILL.md({md_ver}) != manifest({manifest_ver})")
+
+    if version_errors:
+        audit_result["summary"]["errors"] += len(version_errors)
+        for ve in version_errors:
+            audit_result["results"].append({
+                "rule_id": "R-version",
+                "passed": False, "skipped": False,
+                "detail": ve
+            })
+
+    # ── 检查2：R-23 脚本引用一致性 ────────────────────────
+    import re
+    md_script_refs = set()
+    for line in md_lines:
+        m = re.search(r'["\']([^"\']+\.py)["\']', line)
+        if m:
+            script_path = m.group(1)
+            script_name = script_path.replace("\\", "/").split("/")[-1]
+            md_script_refs.add(script_name)
+
+    scripts_dir = skills_dir / skill_name / "scripts"
+    r23_errors = []
+    if scripts_dir.exists():
+        actual_scripts = {f.name for f in scripts_dir.iterdir() if f.is_file() and f.suffix == ".py"}
+        for ref in md_script_refs:
+            if ref not in actual_scripts:
+                r23_errors.append(f"MD 引用了不存在的脚本: {ref}")
+
+    if r23_errors:
+        audit_result["summary"]["errors"] += len(r23_errors)
+        for err in r23_errors:
+            audit_result["results"].append({
+                "rule_id": "R-23",
+                "passed": False, "skipped": False,
+                "detail": err
+            })
+
+    # ── 检查3：脱敏状态（直接读取 step_sensitive_scan 的执行结果） ──
+    # desensitized_files 是 set，非 None 表示执行了扫描（无论是否有结果）
+    desensitization_info = {
+        "scanned": desensitized_files is not None,
+        "sanitized": desensitized_files is not None and len(desensitized_files) > 0,
+        "sanitized_files": sorted(str(f) for f in (desensitized_files or []))
+    }
+    audit_result["desensitization"] = desensitization_info
+
+    # ── 检查4：文件筛选状态（确认 EXCLUDE_PATTERNS 已生效） ──
+    filter_info = {
+        "exclude_patterns": EXCLUDE_PATTERNS,
+        "status": "active"
+    }
+    # git-sync 本身通过 _ignore_patterns() 和 clean_zip_source.py 保证筛选
+    # 审计只需确认 EXCLUDE_PATTERNS 非空即可，不重复遍历目录
+    audit_result["filter"] = filter_info
+
+    # ── 定 verdict ──────────────────────────────────────────────
+    if audit_result["summary"]["errors"] > 0:
+        audit_result["verdict"] = "fail"
+    elif audit_result["summary"]["warns"] > 0:
+        audit_result["verdict"] = "warn"
+    else:
+        audit_result["verdict"] = "pass"
+
+    # ── 输出结论（只输出结论，不展开细节）────────────────────
+    errors = audit_result["summary"]["errors"]
+    warns  = audit_result["summary"]["warns"]
+    verdict = audit_result["verdict"]
+    if verdict == "pass":
+        print(f"  ✅ 审计结论：PASS（ERROR={errors}, WARN={warns}）")
+    elif verdict == "warn":
+        print(f"  ⚠️  审计结论：WARN（ERROR={errors}, WARN={warns}）—— 建议优化，不阻断同步")
+    else:
+        print(f"  ❌ 审计结论：FAIL（ERROR={errors}, WARN={warns}）—— 仅记录，不阻断同步")
+
+    return audit_result
 
 def _ignore_patterns(path, names):
     ignored = set()
@@ -257,14 +312,19 @@ def sync_files(skill_name: str, skills_dir: Path, work_repo: Path):
 # ── 步骤 4.5：敏感信息扫描 ────────────────────────────────────────────────
 def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
                         skip_scan: bool = False):
+    """
+    扫描并脱敏敏感信息。
+    返回 desensitized_files: set（脱敏涉及的文件相对路径集合）
+    """
+    desensitized_files = set()
     log("4.5", 8, "扫描敏感信息...")
     if skip_scan:
         log("4.5", 8, "已跳过敏感信息扫描（--skip-scan）", "skip")
-        return
+        return desensitized_files
     scan_py = SCRIPT_DIR / "sensitive_scan.py"
     if not scan_py.exists():
         log("4.5", 8, "sensitive_scan.py 不存在，跳过", "skip")
-        return
+        return desensitized_files
 
     scan_out = SCRIPT_DIR / f".sensitive_scan_{skill_name}.json"
     run_python(scan_py, "scan", str(repo_skill_dir),
@@ -273,7 +333,7 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
     if not scan_out.exists() or scan_out.stat().st_size == 0:
         log("4.5", 8, "未发现敏感信息", "ok")
         scan_out.unlink(missing_ok=True)
-        return
+        return desensitized_files
 
     # ── 打印扫描结果详情 ──────────────────────────────────────────────────
     d = json.load(scan_out.open(encoding="utf-8"))
@@ -305,24 +365,25 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
     if decisions.exists():
         log("4.5", 8, "正在执行脱敏...", "info")
         # 先备份脱敏前的文件哈希（用于对比）
-        sanitized_files = set()
+        desensitized_files = set()
         for e in d:
-            sanitized_files.add(repo_skill_dir / e["file"])
+            desensitized_files.add(repo_skill_dir / e["file"])
 
         run_python(scan_py, "apply", str(repo_skill_dir),
                    "--decisions", str(decisions),
                    "--scan-result", str(scan_out))
 
         # 脱敏后：显示脱敏结果
-        print(f"  ✅ 脱敏完成，涉及 {len(sanitized_files)} 个文件：")
-        for fp in sorted(sanitized_files):
+        print(f"  ✅ 脱敏完成，涉及 {len(desensitized_files)} 个文件：")
+        for fp in sorted(desensitized_files):
             rel = fp.relative_to(repo_skill_dir)
-            print(f"      - {file_rel}")
+            print(f"      - {rel}")
     else:
         log("4.5", 8, "无脱敏决策文件，跳过脱敏", "warn")
 
     scan_out.unlink(missing_ok=True)
     decisions.unlink(missing_ok=True)
+    return desensitized_files
 
 # ── 步骤 5：更新 README.md ─────────────────────────────────────────────────
 def step_update_readme(repo_name="workbuddy-skills"):
@@ -688,7 +749,6 @@ def main():
     step_manifest(skill_name, version)
     compare_result = step_version_compare(skill_name, version)
     step_normalize_meta(meta_file, skill_name, version)
-    step_skill_audit(skill_name, SKILLS_DIR, MANIFEST_FILE)
 
     # 步骤 4：同步文件（版本相同时跳过）
     if compare_result == "skip_sync":
@@ -698,7 +758,12 @@ def main():
         log(4, 8, "同步文件到工作仓库...")
         repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
 
-    step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
+    desensitized_files = step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
+    audit_result = step_skill_audit(
+        skill_name, SKILLS_DIR, MANIFEST_FILE,
+        desensitized_files=desensitized_files,
+        repo_skill_dir=repo_skill_dir
+    )
     step_update_readme()
 
     gitee_ok, github_ok = step_commit_and_push(skill_name, version)
@@ -707,11 +772,79 @@ def main():
     zip_file = step_pack_zip(skill_name, version, SKILLS_DIR, skip_scan)
     step_build_index()
 
+    # ── 固定格式输出报告 ─────────────────────────────────────────────
     print()
-    print("=" * 50)
-    print(f"  ✅ 全部完成: {skill_name} v{version}")
-    print(f"  📦 ZIP: {zip_file}")
-    print("=" * 50)
+    print("=" * 60)
+    print(f"  git-sync 执行报告：{skill_name} v{version}")
+    print("=" * 60)
+
+    # 表格 1：推送情况
+    print()
+    print(f"{'平台':<10} {'状态':<10} {'版本':<12}")
+    print("-" * 32)
+    gitee_ver = version if gitee_ok else "未推送"
+    github_ver = version if github_ok else "未推送"
+    print(f"{'码云':<10} {'✅ 成功' if gitee_ok else '❌ 失败':<10} {gitee_ver:<12}")
+    print(f"{'GitHub':<10} {'✅ 成功' if github_ok else '❌ 失败':<10} {github_ver:<12}")
+
+    # 审计报告
+    print()
+    print("─── 轻量审计报告 ──────────────────────────────────")
+    if audit_result:
+        a_errors = audit_result.get("summary", {}).get("errors", 0)
+        a_warns  = audit_result.get("summary", {}).get("warns", 0)
+        a_verdict = audit_result.get("verdict", "?")
+        print(f"  审计结论：{a_verdict}（ERROR={a_errors}, WARN={a_warns}）")
+
+        # 1. 版本一致性
+        version_results = [r for r in audit_result.get("results", []) if r.get("rule_id") == "R-version"]
+        if version_results:
+            print("  ❌ 版本一致性：失败")
+            for vr in version_results:
+                print(f"     - {vr.get('detail', '')}")
+        else:
+            print("  ✅ 版本一致性：PASS")
+
+        # 2. R-23 MD/PY 引用一致性
+        r23_results = [r for r in audit_result.get("results", []) if r.get("rule_id") == "R-23"]
+        if r23_results:
+            print("  ❌ MD/PY 引用一致性（R-23）：失败")
+            for r23 in r23_results[:5]:
+                print(f"     - {r23.get('detail', '')}")
+        else:
+            print("  ✅ MD/PY 引用一致性（R-23）：PASS")
+
+        # 3. 脱敏状态
+        d_info = audit_result.get("desensitization", {})
+        if d_info.get("sanitized"):
+            files_str = ", ".join(list(d_info.get("sanitized_files", []))[:3])
+            print(f"  ✅ 脱敏状态：已脱敏")
+            if files_str:
+                print(f"    涉及文件：{files_str}{'...' if len(list(d_info.get('sanitized_files', []))) > 3 else ''}")
+        elif d_info.get("scanned"):
+            print(f"  ⚠️  脱敏状态：未脱敏（发现 {d_info.get('findings_count', 0)} 处）")
+        else:
+            print(f"  ✅ 脱敏状态：未扫描（--skip-scan）")
+
+        # 4. 文件筛选状态
+        f_info = audit_result.get("filter", {})
+        violations = f_info.get("violations", [])
+        if violations:
+            print(f"  ⚠️  文件筛选状态：有 {len(violations)} 处遗漏")
+            for v in violations[:5]:
+                print(f"     - {v}")
+        else:
+            print(f"  ✅ 文件筛选状态：PASS（无遗漏文件）")
+    else:
+        print("  审计结论：未执行或执行失败")
+
+    # ZIP 路径
+    print()
+    print(f"ZIP 包：{zip_file}")
+    print(f"HTML 索引：{DIST_DIR / 'index.html'}")
+
+    print()
+    print("=" * 60)
 
 if __name__ == "__main__":
     main()

@@ -1,16 +1,15 @@
 ---
-name: git-sync
-version: 
+name: .
+version: 2.6.24
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复push前提前pull导致本地修改被覆盖；修复ZIP打包混入垃圾文件（fnmatch通配符排除）；clean_zip_source改为安全模式。
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.24：审计改为轻量内建（只查版本一致性+R-23），只读不修复；修复EXCLUDE_PATTERNS未定义、audit_result未初始化、返回值未接收三处bug；main()末尾增加固定格式报告输出（表格+审计结论+ZIP路径+HTML路径）。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL
-artifact_paths: []
+artifact_paths: true
 writing_standards: fix_terms
 data_dir: ../.standardization/git-sync/
-external_data_dir: true
 antipattern_reference: true
 faq_reference: true
 ---
@@ -19,7 +18,8 @@ faq_reference: true
 
 
 
-# git-sync v2.6.21 — 三端同步技能
+
+# git-sync v2.6.24 — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
 

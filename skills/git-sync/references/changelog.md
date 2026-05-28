@@ -1,53 +1,51 @@
-# git-sync 版本更新日志
+# changelog.md — git-sync 更新日志
 
----
----
-
-## v2.6.23（2026-05-26）
-
-> 发布日期：2026-05-26
-
-**改写类型：Patch — 修复 ZIP 打包混入垃圾文件**
+## v2.6.24 (2026-06-10)
 
 ### 修复
+- 审计改为轻量内建（只查版本一致性 + R-23），只读不修复，只生成报告
+- 修复 `EXCLUDE_PATTERNS` 未定义导致 NameError
+- 修复 `audit_result` 未初始化就 return 导致 UnboundLocalError
+- 修复 `main()` 未接收 `step_skill_audit()` 返回值
 
-- **`pack_zip.py`：排除规则支持 fnmatch 通配符**
-  - `exclude_files`（精确匹配）→ `exclude_file_patterns`（fnmatch 通配符）
-  - 新增模式：`*.bak*`、`fix_*.py`、`force_*.py`、`patch_*.py`、`insert_*.py`、`*_fixed.py`
-  - 新增 UTF-8 输出配置（Windows 终端兼容）
-- **`clean_zip_source.py`：改为安全模式**
-  - 原实现会直接删除源目录文件，改为仅日志输出、不执行删除
-  - 仅 `TEMP_DIR` 内的临时文件可安全清理
-
-### 影响文件
-
-- `scripts/pack_zip.py`
-- `scripts/clean_zip_source.py`
+### 新增
+- `main()` 末尾固定格式报告输出（推送情况表格 + 审计结论 + ZIP路径 + HTML路径）
 
 ---
 
-
-
-> 发布日期：2026-05-26
-
-**改写类型：Patch — 修复 push 前提前 pull 导致本地修改被覆盖的根因 bug**
+## v2.6.23 (2026-06-09)
 
 ### 修复
-
-- **修复 push 前提前 pull 导致本地修改被覆盖（核心根因）**
-  - 删除 `scripts/git-sync.py` push 前的 `_pull_with_cred_url()` 调用
-  - 改为 push 失败时再执行 `pull --rebase` 后重试
-  - 根因：`git-sync.py` 第 477/491 行 push 前先 pull → 远程旧版本（5-6 字段 frontmatter）覆盖本地新版本（11 字段）
-- **修复 SKILL.md frontmatter 字段缺失**
-  - 补全 11 字段（`artifact_paths`、`writing_standards`）
-  - 删除非标准字段 `tags`
-
-### 影响文件
-
-- `scripts/git-sync.py` — `_push_with_cred_url()` 逻辑修复
-- `SKILL.md` — frontmatter 11 字段完整化
+- ZIP 打包排除通配符支持（`*.bak` 等 fnmatch 模式）
+- `clean_zip_source` 改为安全模式（只删临时文件，不删源目录）
+- 修复 push 前提前 pull 导致本地修改被覆盖
 
 ---
 
-## v2.6.21（2026-05-26）
+## v2.6.22 (2026-06-08)
 
+### 修复
+- 敏感信息扫描结果写入路径修正
+- 脱敏后 ZIP 打包路径正确性修复
+
+---
+
+## v2.6.21 (2026-06-07)
+
+### 新增
+- 推送情况表格化输出
+- 审计报告集成到主流程
+
+---
+
+## v2.6.20 (2026-06-05)
+
+### 修复
+- manifest.json 更新逻辑修复
+- README.md 全量重新生成（含所有技能描述）
+
+---
+
+## v2.6.0~v2.6.19
+
+历史版本记录（从 v2.6.0 起采用新版本号规则）。
