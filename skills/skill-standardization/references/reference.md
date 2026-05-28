@@ -189,7 +189,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | `--json` | flag | ❌ | `False` | 以 JSON 格式输出结果 |
 | `--strict` | flag | ❌ | `False` | 严格模式（ERROR 级 exit(1)） |
 
-**审查规则一览（共 21 条）：**
+**审查规则一览（共 24 条）：**
 
 | ID | 级别 | 名称 | 检查内容 |
 |----|------|------|----------|
@@ -214,6 +214,9 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-19 | WARN | FAQ 有意义性 | 正文含 ## FAQ/常见问题 章节，且 Q&A 对有意义（Q≥10字，A≥15字） |
 | R-20 | WARN | 写作规范（术语一致/禁止模糊表述/中英文混排） | 正文术语一致、无模糊表述、中英文混排有空格 |
 | R-21 | WARN | 渐进式加载显式说明 | SKILL.md 在显眼位置（核心能力/工作流程章节）显式说明渐进式加载（含「渐进式加载」或「progressive」关键词） |
+| R-22 | WARN | 数据目录规范检查 | 安装目录无越位数据文件（构建产物/缓存/日志应放在 data_dir: 声明的数据目录） |
+| R-23 | WARN | 文档-代码一致性检查 | SKILL.md 中引用的脚本/文件/函数名真实存在，代码示例中的调用方式与实际代码一致 |
+| R-24 | WARN | 更新日志渐进加载 | 更新日志必须放在 references/changelog.md，SKILL.md 只能有引用 |
 
 **JSON 输出格式：**
 ```json

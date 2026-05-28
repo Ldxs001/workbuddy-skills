@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-21, R-23)
-v2.22.0: R-18/R-19/R-20 新增渐进式文件（references/*.md）审查支持
+skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-24)
+v2.38.6: R-18/R-19/R-20 新增渐进式文件（references/*.md）审查支持
 v2.37.0: 所有 detail/location 添加绝对行号（filepath:line# 格式）
 """
 
@@ -656,11 +656,32 @@ def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
                      "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
 
 
-def check_doc_code_consistency(filepath, content, fm, body, **kw):
+def check_doc_code_consistency(
+    filepath, content, fm, body, **kw):
     """
+    # R-23: filter Python builtins falsely matched as skill-defined names
+    _BUILTINS = {
+        "SyntaxWarning", "Warning", "Exception", "TypeError", "ValueError",
+        "ImportError", "FileNotFoundError", "KeyError", "IndexError",
+        "RuntimeError", "AttributeError", "NameError",
+    }
+
+    # R-23: filter Python builtins falsely matched as skill-defined names
+    _BUILTINS = {
+        "SyntaxWarning", "Warning", "Exception", "TypeError", "ValueError",
+        "ImportError", "FileNotFoundError", "KeyError", "IndexError",
+        "RuntimeError", "AttributeError", "NameError",
+    }
     R-23: 文档-代码一致性检查 (v2.34.8)
     验证 SKILL.md 中引用的脚本/文件/函数名真实存在。
     """
+    # R-23: filter out Python builtins falsely matched as "functions/classes defined in skill"
+    _BUILTINS = {
+        "SyntaxWarning", "Warning", "Exception", "TypeError", "ValueError",
+        "ImportError", "FileNotFoundError", "KeyError", "IndexError",
+        "RuntimeError", "AttributeError", "NameError",
+    }
+
     import re, ast, os
     from pathlib import Path
 
@@ -768,6 +789,8 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
                 continue
 
         for ref in set(func_refs):
+            if ref in _BUILTINS:  # R-23: skip Python builtins
+                continue
             if ref not in all_defs:
                 # 模糊匹配（前缀匹配）
                 matched = [d for d in all_defs if d.startswith(ref) or ref.startswith(d)]
@@ -788,3 +811,74 @@ def check_doc_code_consistency(filepath, content, fm, body, **kw):
             "detail": f"{filepath}:1 - R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
             # R-23 只检查，不自动修复——需要人工判断
             "fix": None}
+
+def check_changelog_progressive(filepath, content, fm, body, **kw):
+    """
+    R-24: 更新日志（changelog）禁止直接在 SKILL.md。
+    必须在 references/changelog.md 中，SKILL.md 只保留引用。
+    """
+    import os
+    skill_dir = kw.get("skill_dir", "")
+    skill_md_dir = os.path.dirname(filepath) if filepath else ""
+
+    # 检查 SKILL.md 正文是否含有"更新日志" / "changelog" / "变更记录"章节
+    changelog_pattern = re.compile(
+        r'^##\s*(更新日志|changelog|变更记录|更新记录|版本历史)',
+        re.MULTILINE | re.IGNORECASE
+    )
+    m = changelog_pattern.search(body)
+    if m:
+        line_no = body[:m.start()].count('\n') + 1
+        # 找到绝对行号
+        fm_lines = content[:len(content) - len(body)].count('\n') if body else 0
+        abs_line = fm_lines + line_no
+        return {
+            "passed": False,
+            "detail": f"{filepath}:{abs_line} - R-24: 更新日志章节直接在 SKILL.md 中，必须移至 references/changelog.md",
+            "fix": {
+                "key": "changelog_progressive",
+                "location": f"{filepath}:{abs_line}",
+                "operation": "将更新日志章节移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
+                "verification": "重新运行 audit_skill()，确认 R-24 passed"
+            }
+        }
+
+    # 检查 SKILL.md 正文是否含有版本号+更新描述的混合段落（松散检测）
+    # 匹配如 "v2.3.0\n- 更新..." 或 "## v2.3.0" 等模式
+    loose_pattern = re.compile(
+        r'^(#\s+v\d+\.\d+\.\d+|[·•]\s*v\d+\.\d+\.\d+|-.+v\d+\.\d+\.\d+)',
+        re.MULTILINE
+    )
+    # 只检测 H2 及以上的版本号标题
+    h2_version = re.compile(r'^##\s+v?\d+\.\d+\.\d+', re.MULTILINE)
+    m2 = h2_version.search(body)
+    if m2:
+        line_no = body[:m2.start()].count('\n') + 1
+        fm_lines = content[:len(content) - len(body)].count('\n') if body else 0
+        abs_line = fm_lines + line_no
+        return {
+            "passed": False,
+            "detail": f"{filepath}:{abs_line} - R-24: SKILL.md 中含版本号标题（疑似更新日志），必须移至 references/changelog.md",
+            "fix": {
+                "key": "changelog_progressive",
+                "location": f"{filepath}:{abs_line}",
+                "operation": "将版本更新记录移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
+                "verification": "重新运行 audit_skill()，确认 R-24 passed"
+            }
+        }
+
+    # 检查 references/changelog.md 是否存在（推荐但不强制）
+    changelog_path = os.path.join(skill_md_dir, "references", "changelog.md")
+    if skill_dir:
+        changelog_path2 = os.path.join(skill_dir, "references", "changelog.md")
+        if os.path.isfile(changelog_path2):
+            changelog_path = changelog_path2
+
+    if not os.path.isfile(changelog_path):
+        return {
+            "passed": True,   # SKILL.md 中没有更新日志，通过
+            "detail": f"{filepath}:1 - R-24: SKILL.md 无更新日志章节（references/changelog.md 不存在，但 SKILL.md 也未含日志，通过）",
+        }
+
+    return {"passed": True,
+            "detail": f"{filepath}:1 - R-24: 更新日志在 references/changelog.md 中（SKILL.md 无内嵌日志，通过）"}

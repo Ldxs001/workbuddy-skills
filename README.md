@@ -1,7 +1,7 @@
 # WorkBuddy Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-05-27
+> 最后更新：2026-05-28
 
 本仓库存放 WorkBuddy 用户技能，支持码云（Gitee）和 GitHub 双平台同步。
 
@@ -22,14 +22,14 @@
 | `round-robin-allocator` | 将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。 |
 | `semantic-split` | 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于5W2H维度提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，支持自增强json沉淀机制。 |
 | `simulated-peak-plot` | 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持自定义峰参数、噪声水平、基线设置、复合峰（N个子峰组合）、自定义坐标轴标题/单位、CSV完整数据导出、可点击的file:///路径输出、以及从设备导出数据导入CSV。 |
-| `skill-standardization` | Skill 标准化规范引擎 v2.38.4。structure_checker.py 用 ast.parse() 替换 compile() 修复 SyntaxWarning；SKILL.md 新增排错止损规则；antipatterns.md 新增 AP-12/AP-13。 |
+| `skill-standardization` | Skill 标准化规范引擎 v2.38.6。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载。 |
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
 | `skills` | 技能描述 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.15.0。修复渐进式加载说明、触发条件否定条件、术语不一致（设置→配置）、中英文混排、拼写错误（tAsk_progress.py → task_progress.py）。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
 | `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
-| `workday-calendar` | 智能周历系统 v1.5.0 - 新增2026年排班表生成（export_excel/generate_schedule）、Excel导出、HTML/Markdown/Excel格式排班输出 |
+| `workday-calendar` | 智能周历系统 v1.5.0 - skill-standardization 改造（结构规范化、R-11/R-12 合规修复、trigger 字段补充） |
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "_module": "rules",
-  "_version": "2.29.2",
+  "_version": "2.38.6",
   "_description": "SKILL.md 审查规则 R-01 ~ R-21 完整定义（基于草案 v0.1 第八章，v2.7.0 扩展为四阶段扫描）",
   "_based_on": "SKILL.md 标准化规范草案 v0.1",
   "_total_rules": 21,
@@ -220,6 +220,33 @@
       "check_description": "SKILL.md 在显眼位置（核心能力/工作流程章节）显式说明渐进式加载（含「渐进式加载」或「progressive」关键词）",
       "method": "body_has_progressive_loading_explicit",
       "fix_guide": "在 ## 核心能力 或 ## 工作流程 章节开头添加渐进式加载说明，包含「渐进式加载」或「progressive」关键词"
+    },
+    {
+      "_id": "R-22",
+      "name": "数据目录规范检查",
+      "severity": "WARN",
+      "check": "安装目录无越位数据文件（构建产物/缓存/日志应放在 data_dir: 声明的数据目录）",
+      "method": "check_data_dir_compliance",
+      "fixable": true,
+      "create_template": "在 frontmatter 中声明 data_dir: ../.standardization/<skill>/"
+    },
+    {
+      "_id": "R-23",
+      "name": "文档-代码一致性检查",
+      "severity": "WARN",
+      "check": "SKILL.md 中引用的脚本/文件/函数名真实存在，代码示例中的调用方式与实际代码一致",
+      "method": "check_doc_code_consistency",
+      "fixable": false,
+      "create_template": "确保 SKILL.md 引用的所有 .py 文件存在于技能目录中，代码示例中的调用方式与实际 argparse/函数签名一致"
+    },
+    {
+      "_id": "R-24",
+      "name": "更新日志渐进加载",
+      "severity": "WARN",
+      "method": "check_changelog_progressive",
+      "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
+      "fixable": false,
+      "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」"
     }
   ],
   "verdict_logic": {

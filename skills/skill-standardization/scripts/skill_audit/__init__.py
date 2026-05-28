@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import warnings
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 """
 skill_audit package — SKILL.md 规范化审查工具 v2.25.0
 
@@ -41,6 +43,7 @@ from .structure_checker import (
     body_check_writing_standards,
     body_has_progressive_loading_explicit,
     check_doc_code_consistency,
+    check_changelog_progressive,
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
@@ -81,6 +84,7 @@ METHOD_MAP = {
     "body_has_progressive_loading_explicit": body_has_progressive_loading_explicit,
     "check_data_dir_compliance": check_data_dir_compliance,
     "check_doc_code_consistency": check_doc_code_consistency,
+    "check_changelog_progressive": check_changelog_progressive,
 }
 
 
@@ -189,8 +193,21 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
             import traceback
             traceback.print_exc()
             result = {"passed": False, "detail": f"规则 {rule['id']} 执行异常: {_e}"}
-        passed = result.get("passed", False)
-        skipped = result.get("skip", False)
+        # 兼容 dict 和 tuple 两种返回格式
+        if isinstance(result, dict):
+            passed = result.get("passed", False)
+            skipped = result.get("skip", False)
+        elif isinstance(result, (tuple, list)) and len(result) >= 1:
+            # 旧格式: (passed, details, fixable)
+            passed = bool(result[0]) if len(result) > 0 else False
+            skipped = result[2].get("skip", False) if len(result) > 2 and isinstance(result[2], dict) else False
+            # 将 tuple 转为 dict 以便后续处理
+            detail = result[1] if len(result) > 1 else ""
+            fix = result[2] if len(result) > 2 and isinstance(result[2], dict) else None
+            result = {"passed": passed, "detail": detail, "fix": fix}
+        else:
+            passed = False
+            skipped = False
 
         entry = {
             "rule_id": rule["id"],

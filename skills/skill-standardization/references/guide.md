@@ -509,7 +509,7 @@ DEFAULT_DATA_DIR = os.path.normpath(...)  # 审计匹配这行 → 失败
 
 ---
 
-## 审查后自动修复（fix.py）
+## 审查后自动更新（fix.py）
 
 审计输出 WARN/ERROR 后，可直接调用 `scripts/skill_audit/fix.py` 中的修复函数自动修复，无需手写修复脚本。
 

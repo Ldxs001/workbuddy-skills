@@ -5,25 +5,6 @@
 ---
 
 
-### R-24：临时文件与备份规范管理（ERROR）
-
-**检查内容：**
-- 创建/更新/改造过程中，临时文件（`*.tmp`、`temp_*`、`draft_*`）和备份文件（`data/backup/*`、`_bak_*` 目录）必须记录到 `op_logger` 日志
-- 主体操作完成后（审计通过 + 版本号更新 + 更新日志完毕），必须按规范清除临时文件和过期备份
-- 更新/改造前必须对目标技能目录执行整体备份（`backup_skill()`）
-- `scripts/safe_io.py` 所有写操作（`safe_write`、`safe_patch_by_line`、`safe_patch_regex`、`safe_insert_after`）必须内置 `backup_file()` 临时备份，返回 `rollback_id`
-
-**修复方法：**
-1. 在操作前调用 `backup_skill(skill_dir, operation)` 执行整体备份
-2. 在操作中调用 `record_temp_file(temp_path, operation)` 记录临时文件
-3. 在操作后调用 `cleanup(operation_id)` 清除临时文件和过期备份
-4. 确保所有 py 工具的删/改动作调用 `backup_file()` 创建临时备份
-
-**检查方法：**
-- 检查 `op_logger` 日志是否包含 `temp_files` 和 `backup_files` 字段
-- 检查操作后是否调用 `cleanup()` 清理临时文件
-- 检查 `scripts/safe_io.py` 所有写操作是否调用 `backup_file()`
-
 ## 铁律 1：author 字段不可擅自替换
 
 - 技能是通用工具，author 默认值必须为 `your-name-here` 占位符
@@ -201,3 +182,36 @@ skills/
 - 如果 > 200 行，检查是否有 `references/` 引用
 
 ---
+
+---
+
+## 铁律 7：更新日志渐进加载（R-24）
+
+> 自 v2.38.6 起，更新日志（changelog）**禁止**直接写在 `SKILL.md` 正文中。
+
+### 规则内容
+
+- `SKILL.md` **不得**含有 `## 更新日志` / `## Changelog` / `## 更新记录` 等章节
+- `SKILL.md` **不得**含有版本号标题（如 `## v2.3.0`）形式的更新记录
+- 更新日志必须放在 `references/changelog.md` 中
+- `SKILL.md` 中只能保留一行引用：
+  ```
+  → 详见 references/changelog.md
+  ```
+
+### 设计理由
+
+- `SKILL.md` 是**入口文件**，应当保持精简（≤230 行）
+- 更新日志会不断累积，直接写在 `SKILL.md` 会导致文件迅速膨胀
+- 渐进式加载是 skill-standardization 的核心规范之一（R-17~R-21）
+
+### 修复方法
+
+1. 将 `SKILL.md` 中的更新日志章节移至 `references/changelog.md`
+2. 在 `SKILL.md` 原位置替换为：`→ 详见 references/changelog.md`
+3. 确认 `references/changelog.md` 格式规范（每条含版本号、日期、更新说明）
+
+### 检查方法
+
+- `structure_checker.py` 的 `check_changelog_progressive()` 函数
+- 正则检测 `## 更新日志` / `## Changelog` / `## vX.Y.Z` 等模式

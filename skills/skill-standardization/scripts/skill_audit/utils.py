@@ -224,7 +224,19 @@ RULES = [
         "fixable": False,
         "create_template": "确保 SKILL.md 引用的所有 .py 文件存在于技能目录中，代码示例中的调用方式与实际 argparse/函数签名一致",
     },
+    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
+    {
+        "id": "R-24",
+        "name": "更新日志渐进加载",
+        "severity": "WARN",
+        "method": "check_changelog_progressive",
+        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
+        "fixable": False,
+        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
+    },
 ]
+
+
 
 # 同义章节关键词映射
 TRIGGER_KEYWORDS = ["触发条件", "触发场景", "适用场景", "触发"]

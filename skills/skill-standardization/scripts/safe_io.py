@@ -11,7 +11,7 @@ safe_io.py — skill-standardization 标准化文件 IO 接口
   - safe_patch_regex(path, pattern, replacement, backup=True) → 正则替换
   - safe_insert_after(path, after_line, content, backup=True) → 在指定行后插入
 
-所有写操作默认自动备份到 data/backup/，返回 rollback_id。
+所有写操作默认自动备份到 backup/，返回 rollback_id。
 """
 
 import os
@@ -21,12 +21,15 @@ import tempfile
 import datetime
 import json
 
-# ── 常量 ───────────────────────────────────────────────────────────────────
-SKILL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR_RAW = "skills/.standardization/skill-standardization/data/"
-_data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DATA_DIR_RAW))
-BACKUP_DIR = os.path.join(_data_dir_abs, "backup")
-OPS_LOG    = os.path.join(_data_dir_abs, "logs", "ops.log")
+# ── 常量 ───────────────────────────────────────────────────────────
+SKILL_ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+SKILL_DIR   = os.path.dirname(SCRIPT_DIR)
+SKILLS_ROOT = os.path.dirname(SKILL_DIR)
+SKILL_NAME   = os.path.basename(SKILL_DIR)
+DATA_DIR     = os.path.join(SKILLS_ROOT, ".standardization", SKILL_NAME)
+BACKUP_DIR  = os.path.join(DATA_DIR, "backup")
+OPS_LOG      = os.path.join(DATA_DIR, "logs", "ops.log")
 
 
 # ── 编码容错读取 ────────────────────────────────────────────────────────────
@@ -65,7 +68,7 @@ def safe_read_lines(path: str, encoding_fallback: list = None) -> list:
 
 def _ensure_data_dirs():
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    os.makedirs(os.path.join(_data_dir_abs, "logs"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "logs"), exist_ok=True)
 
 
 def _compute_file_hash(file_path: str, algo: str = "sha256") -> str:
@@ -82,7 +85,7 @@ def _compute_file_hash(file_path: str, algo: str = "sha256") -> str:
 
 def backup_file(path: str, operation: str = "unknown") -> str | None:
     """
-    备份文件到 data/backup/，返回 rollback_id。
+    备份文件到 backup/，返回 rollback_id。
     rollback_id 格式：<timestamp>_<orig_name>_<hash_short>.bak
     """
     _ensure_data_dirs()

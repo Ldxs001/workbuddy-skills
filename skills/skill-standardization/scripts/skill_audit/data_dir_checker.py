@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 data_dir_checker.py — R-22 数据目录规范检查
-v2.33.0
+v2.38.5
 
 检查技能安装目录是否包含应归属数据目录的文件，
 并在 --fix 模式下自动迁移到 skills/.standardization/<skill>/
@@ -19,279 +19,193 @@ import json
 import datetime
 from pathlib import Path
 
+# ── 路径常量（通用写法，适用于任何安装结构）───────────────────
+_SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR   = os.path.dirname(os.path.dirname(_SCRIPT_DIR))  # scripts/ → skill-root
+_SKILLS_ROOT = os.path.dirname(_SKILL_DIR)
+SKILL_NAME    = os.path.basename(_SKILL_DIR)
+DATA_DIR      = os.path.join(_SKILLS_ROOT, ".standardization", SKILL_NAME)
+BACKUP_DIR   = os.path.join(DATA_DIR, "backup")
+LOG_DIR      = os.path.join(DATA_DIR, "logs")
 
-# ── 备份目录 ─────────────────────────────────────────────────────
-_BACKUP_ROOT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))))),
-    ".standardization", "skill-standardization", "data", "backup"
-)
+# ── 数据目录合规子目录 ─────────────────────────────────────────
+# 参见 references/data_dir_map.md
+VALID_SUBDIRS = {"data", "backup", "logs", "temp", "cache", "output", "state"}
 
-# ── 日志目录 ─────────────────────────────────────────────────────
-_LOG_ROOT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))))),
-    ".standardization", "skill-standardization", "data", "logs"
-)
-
-# ── 应留在安装目录的文件（代码/配置/文档）──────────────────────────
-_KEEP_IN_INSTALL = {
-    "SKILL.md", "_meta.json",
-    "README.md", "LICENSE", "CHANGELOG.md",
+# ── 安装目录允许的文件/目录（白名单）─────────────────────────
+INSTALL_WHITELIST = {
+    "SKILL.md", "_meta.json", "CHANGELOG.md",
+    "scripts", "references", "assets",
 }
 
-# ── 应迁移到数据目录的文件/目录模式 ────────────────────────────────
-_MOVE_TO_DATA = {
-    # 构建产物
-    ".dist",
-    # 数据/缓存/日志
-    "data", "cache", "logs", "tmp", "temp",
-    # 特定文件名
-    "manifest.json", "progress.json",
-}
-
-# ── 应迁移到数据目录的文件扩展名 ────────────────────────────────────
-_MOVE_EXTS = {
-    ".zip", ".tar", ".gz", ".tgz",  # 构建产物
-    ".log", ".cache", ".tmp",           # 日志/缓存
-    ".db", ".sqlite", ".json",          # 数据文件（非配置）
-}
+# ── 跳过检查的文件名模式（修复脚本、测试脚本等）────────────
+SKIP_PATTERNS = [
+    "fix_", "test_", "debug_", "_test.py", "master_fix.py",
+]
 
 
-def _log_operation(log_path, operation, detail):
-    """记录操作日志（参考 universal-file-ops 设计）"""
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(f"[{ts}] {operation}: {detail}\n")
+def _is_fix_script(filepath):
+    """判断是否为修复/迁移脚本（允许写其他技能目录）"""
+    fname = os.path.basename(filepath)
+    return any(fname.startswith(p.replace("_", "")) for p in SKIP_PATTERNS if p.endswith("_")) or \
+           any(p in fname for p in SKIP_PATTERNS if not p.endswith("_"))
 
 
-def _classify_files(install_dir: str, data_dir: str) -> dict:
+def check_external_data_dir(skill_dir, verbose=False):
     """
-    分类安装目录中的文件：
-      - to_migrate: 需要迁移到数据目录的
-      - ok: 可以留在安装目录的
+    R-12: 检查技能是否把数据写到安装目录外合法位置
+    返回：(passed: bool, details: list)
     """
-    to_migrate = []
-    ok = []
+    issues = []
+    passed = True
 
-    for entry in sorted(os.listdir(install_dir)):
-        full = os.path.join(install_dir, entry)
-        # 跳过数据目录本身
-        if os.path.isdir(full) and entry == ".standardization":
-            ok.append(entry)
-            continue
-        # 明确应留在安装目录
-        if entry in _KEEP_IN_INSTALL:
-            ok.append(entry)
-            continue
-        # .dist/ 构建产物 → 迁移
-        if entry == ".dist":
-            to_migrate.append(("dir", entry, "构建产物应放在数据目录"))
-            continue
-        # data/ cache/ logs/ tmp/ → 迁移
-        if entry.lower() in _MOVE_TO_DATA:
-            kind = "dir" if os.path.isdir(full) else "file"
-            to_migrate.append((kind, entry, "数据/缓存文件应放在数据目录"))
-            continue
-        # 扩展名匹配 → 迁移
-        _, ext = os.path.splitext(entry)
-        if ext.lower() in _MOVE_EXTS:
-            to_migrate.append(("file", entry, f"扩展名 {ext} 属于构建产物/缓存"))
-            continue
-        # 默认：留在安装目录
-        ok.append(entry)
-
-    return {"to_migrate": to_migrate, "ok": ok}
-
-
-def check_data_dir_compliance(filepath=None, content=None, fm=None,
-                            body=None, dirname=None, skill_dir=None,
-                            manifest_version=None):
-    """
-    R-22: 数据目录规范检查。
-    检查技能安装目录是否包含应归属数据目录的文件。
-
-    返回: {"passed": bool, "skipped": bool, "detail": str, "fix": dict or None}
-    """
-    if not skill_dir or not os.path.isdir(skill_dir):
-        return {
-            "passed": True, "skipped": True,
-            "detail": f"{filepath}:1 - R-22 跳过：无法确定技能目录",
-        }
-
-    # 读取 data_dir 声明
-    data_dir_declared = fm.get("data_dir", "") if fm else ""
-    if not data_dir_declared:
-        # 尝试从 SHELL.md 推断
-        return {
-            "passed": False, "skipped": False,
-            "detail": f"{filepath}:1 - R-22 FAIL — 未在 frontmatter 中声明 data_dir: "
-                      "(应声明数据目录，如 data_dir: ../.standardization/git-sync/)",
-        }
-
-    # 解析 data_dir 的实际路径
-    install_path = Path(skill_dir).resolve()
-    # data_dir 是相对于安装目录的路径
-    data_dir_path = (install_path / data_dir_declared).resolve()
-
-    if not data_dir_path.is_dir():
-        # 数据目录不存在，提示创建
-        return {
-            "passed": False, "skipped": False,
-            "detail": f"R-22 WARN — 声明的数据目录不存在: {data_dir_path}",
-        }
-
-    # 分类文件
-    classification = _classify_files(skill_dir, str(data_dir_path))
-
-    if not classification["to_migrate"]:
-        return {
-            "passed": True, "skipped": False,
-            "detail": f"R-22 PASS — 安装目录无越位数据文件 (data_dir: {data_dir_declared})",
-        }
-
-    # 有需要迁移的文件
-    migrate_desc = ", ".join([f"{kind}:{name}" for kind, name, _ in classification["to_migrate"][:5]])
-    return {
-        "passed": False, "skipped": False,
-        "detail": f"R-22 FAIL — 安装目录存在应迁移文件: {migrate_desc} (共 {len(classification['to_migrate'])} 项)",
-    }
-
-
-def fix_data_dir_compliance(skill_dir: str, dry_run: bool = False) -> int:
-    """
-    自动修复 R-22 违规（参考 universal-file-ops 设计）：
-    1. 如果缺少 data_dir: 声明，添加到 SKILL.md frontmatter
-    2. 如果有文件需要迁移，自动迁移到数据目录
-    3. 操作前自动备份，记录日志，支持回滚
-
-    返回: 修复的文件数
-    """
-    fixed = 0
-    skill_md = os.path.join(skill_dir, "SKILL.md")
-    if not os.path.isfile(skill_md):
-        return 0
-
-    # 日志路径
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(_LOG_ROOT, f"r22_fix_{ts}.log")
-    backup_root = os.path.join(_BACKUP_ROOT, f"r22_{ts}")
-    os.makedirs(backup_root, exist_ok=True)
-    os.makedirs(_LOG_ROOT, exist_ok=True)
-
-    _log_operation(log_file, "START", f"skill_dir={skill_dir}, dry_run={dry_run}")
-
-    # 读取 frontmatter
-    from .utils import parse_simple_yaml_frontmatter
-    with open(skill_md, "r", encoding="utf-8") as f:
-        content = f.read()
-    fm, body = parse_simple_yaml_frontmatter(content)
-
-    if fm is None:
-        _log_operation(log_file, "ERROR", "无法解析 SKILL.md frontmatter")
-        return 0
-
-    install_path = Path(skill_dir).resolve()
-    dirname = os.path.basename(install_path)
-
-    # 修复 1: 添加 data_dir: 声明
-    if "data_dir" not in fm:
-        new_val = f"../.standardization/{dirname}/"
-        if not dry_run:
-            fm["data_dir"] = new_val
-            # 重写文件
-            import io
-            buf = io.StringIO()
-            buf.write("---\n")
-            for k, v in fm.items():
-                if isinstance(v, bool):
-                    buf.write(f"{k}: {'true' if v else 'false'}\n")
-                elif isinstance(v, (int, float)):
-                    buf.write(f"{k}: {v}\n")
-                else:
-                    buf.write(f"{k}: {v}\n")
-            buf.write("---\n")
-            buf.write(body)
-            with open(skill_md, "w", encoding="utf-8") as f:
-                f.write(buf.getvalue())
-            _log_operation(log_file, "FIX", f"添加 data_dir: {new_val} 到 {skill_md}")
-        else:
-            _log_operation(log_file, "DRY-RUN", f"将添加 data_dir: {new_val} 到 SKILL.md")
-        print(f"  [OK] R-22 fix: 已{'计划' if dry_run else '实际'}添加 data_dir: {new_val}")
-        fixed += 1
-
-    # 修复 2: 迁移文件
-    data_dir_declared = fm.get("data_dir", "")
-    if not data_dir_declared:
-        _log_operation(log_file, "SKIP", "data_dir 未声明，跳过文件迁移")
-        _log_operation(log_file, "END", f"共修复 {fixed} 项")
-        return fixed
-
-    data_dir_path = (install_path / data_dir_declared).resolve()
-    os.makedirs(data_dir_path, exist_ok=True)
-
-    classification = _classify_files(skill_dir, str(data_dir_path))
-
-    migrated = []  # 记录成功迁移的文件，用于回滚
-
-    for kind, entry, reason in classification["to_migrate"]:
-        src = os.path.join(skill_dir, entry)
-        dst = os.path.join(data_dir_path, entry)
-        backup_path = os.path.join(backup_root, entry)
-
-        if os.path.exists(dst):
-            _log_operation(log_file, "SKIP", f"目标已存在: {dst}")
-            if not dry_run:
-                print(f"  [skip] 目标已存在: {dst}")
-            continue
-
-        if dry_run:
-            _log_operation(log_file, "DRY-RUN", f"将迁移: {src} → {dst} ({reason})")
-            print(f"  [plan] 将迁移: {entry} → {data_dir_path} ({reason})")
-            fixed += 1
-            continue
-
-        # 备份（复制）
-        try:
-            if kind == "dir":
-                shutil.copytree(src, backup_path)
-            else:
-                shutil.copy2(src, backup_path)
-            _log_operation(log_file, "BACKUP", f"{src} → {backup_path}")
-        except Exception as e:
-            _log_operation(log_file, "ERROR", f"备份失败 {src}: {e}")
-            print(f"  [X] 备份失败 {entry}: {e}，跳过")
-            continue
-
-        # 迁移（移动）
-        try:
-            if kind == "dir":
-                shutil.move(src, dst)
-            else:
-                shutil.move(src, dst)
-            _log_operation(log_file, "MIGRATE", f"{src} → {dst} ({reason})")
-            print(f"  [OK] 已迁移: {entry} → {data_dir_path}")
-            migrated.append((src, dst, backup_path, kind))
-            fixed += 1
-        except Exception as e:
-            _log_operation(log_file, "ERROR", f"迁移失败 {src}: {e}，正在回滚...")
-            print(f"  [X] 迁移失败 {entry}: {e}，正在回滚...")
-            # 回滚：从备份恢复
+    # 检查是否引用了 skill 安装目录外的硬编码路径
+    for root, _, files in os.walk(skill_dir):
+        for fname in files:
+            if not fname.endswith(".py"):
+                continue
+            fpath = os.path.join(root, fname)
+            if _is_fix_script(fpath):
+                continue  # 修复脚本允许写其他位置
             try:
-                if kind == "dir":
-                    if os.path.exists(src):
-                        shutil.rmtree(src)
-                    shutil.copytree(backup_path, src)
-                else:
-                    if os.path.exists(src):
-                        os.remove(src)
-                    shutil.copy2(backup_path, src)
-                _log_operation(log_file, "ROLLBACK", f"已从备份恢复: {src}")
-                print(f"  [OK] 已回滚: {entry}")
-            except Exception as re:
-                _log_operation(log_file, "ERROR", f"回滚失败 {src}: {re}")
-                print(f"  [X] 回滚失败 {entry}: {re}")
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                # 检查是否有硬编码的绝对路径指向技能外
+                if "C:" in content or "/Users/" in content or "/home/" in content:
+                    # 排除注释和字符串中的示例路径
+                    lines = content.split("\n")
+                    for i, line in enumerate(lines):
+                        if ("C:" in line or "/Users/" in line or "/home/" in line) and \
+                           not line.strip().startswith("#") and "example" not in line.lower():
+                            issues.append(f"  {fpath}:{i+1} 可能包含硬编码绝对路径")
+                            passed = False
+            except Exception:
+                pass
 
-    _log_operation(log_file, "END", f"共修复 {fixed} 项，日志: {log_file}")
-    return fixed
+    return passed, issues
+
+
+def check_data_dir_compliance(skill_dir=None, auto_fix=False, verbose=False, **kwargs):
+    """
+    R-22: 检查技能安装目录是否包含应归属数据目录的文件
+    返回：(passed: bool, details: list, fixable: list)
+
+    支持两种调用方式：
+    - check_data_dir_compliance(skill_dir, ...)
+    - check_data_dir_compliance(filepath=..., skill_dir=..., **kwargs)  # METHOD_MAP 统一调用
+    """
+    # 兼容 METHOD_MAP 调用（传 filepath=skill_md）
+    if skill_dir is None:
+        skill_dir = kwargs.get("skill_dir", kwargs.get("filepath", "."))
+    if isinstance(skill_dir, str) and skill_dir.endswith("SKILL.md"):
+        skill_dir = os.path.dirname(skill_dir)
+    issues = []
+    fixable = []
+    passed = True
+
+    skill_name = os.path.basename(skill_dir.rstrip("/\\"))
+    skills_root = os.path.dirname(skill_dir.rstrip("/\\"))
+    expected_data_dir = os.path.join(skills_root, ".standardization", skill_name)
+
+    # 扫描安装目录，找数据类文件
+    for root, dirs, files in os.walk(skill_dir):
+        # 跳过 scripts/ 和 references/
+        rel_root = os.path.relpath(root, skill_dir)
+        if rel_root.startswith("scripts") or rel_root.startswith("references"):
+            continue
+
+        for fname in files:
+            fpath = os.path.join(root, fname)
+            ext = os.path.splitext(fname)[1].lower()
+
+            # 判断是否为数据类文件
+            is_data_file = (
+                ext in (".csv", ".json", ".log", ".txt", ".bak", ".tmp") or
+                "backup" in fname or "log" in fname or
+                fname.startswith(".")  # 隐藏文件
+            )
+
+            if is_data_file and fname not in INSTALL_WHITELIST:
+                rel_path = os.path.relpath(fpath, skill_dir)
+                fixable.append((fpath, os.path.join(expected_data_dir, "data", rel_path)))
+                issues.append(f"  产出物路径违规：{rel_path} — 应迁至 .standardization/{skill_name}/data/")
+                passed = False
+
+    # 检查 scripts/ 里的硬编码路径（排除修复脚本）
+    for root, _, files in os.walk(os.path.join(skill_dir, "scripts")):
+        for fname in files:
+            if not fname.endswith(".py"):
+                continue
+            fpath = os.path.join(root, fname)
+            if _is_fix_script(fpath):
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    for i, line in enumerate(f, 1):
+                        if "DATA_DIR" in line or "data_dir" in line:
+                            if "skills/" in line and ".standardization" not in line:
+                                issues.append(f"  {fname}:{i} 硬编码路径应改用动态 DATA_DIR")
+                                passed = False
+            except Exception:
+                pass
+
+    return passed, issues, fixable
+
+
+def fix_data_dir_compliance(skill_dir, fixable_list, dry_run=False):
+    """
+    自动修复 R-22 违规：迁移文件到数据目录
+    """
+    results = {"moved": 0, "skipped": 0, "errors": []}
+
+    for src, dst in fixable_list:
+        if dry_run:
+            print(f"  [DRY-RUN] 将移动：{src} → {dst}")
+            continue
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.move(src, dst)
+            results["moved"] += 1
+            print(f"  ✅ 已迁移：{os.path.basename(src)} → {dst}")
+        except Exception as e:
+            results["errors"].append(str(e))
+            results["skipped"] += 1
+
+    return results
+
+
+def log_check_result(skill_name, check_name, passed, details):
+    """记录检查结果到日志"""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    log_file = os.path.join(LOG_DIR, "audit.log")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {skill_name} | {check_name} | {'PASS' if passed else 'FAIL'}\n")
+        for d in details:
+            f.write(f"  {d}\n")
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("用法: python data_dir_checker.py <skill_dir> [--fix]")
+        sys.exit(1)
+
+    skill_dir = sys.argv[1]
+    auto_fix = "--fix" in sys.argv
+
+    print("=" * 60)
+    print("  R-22 数据目录规范检查")
+    print("=" * 60)
+
+    passed, issues, fixable = check_data_dir_compliance(skill_dir, auto_fix)
+    print(f"\n结果: {'✅ PASS' if passed else '❌ FAIL'}")
+    for issue in issues:
+        print(issue)
+
+    if not passed and auto_fix and fixable:
+        print("\n─── 自动修复 ───────────────────────────────────────")
+        fix_data_dir_issues(skill_dir, fixable)
+
+    log_check_result(os.path.basename(skill_dir), "R-22", passed, issues)
+    sys.exit(0 if passed else 1)

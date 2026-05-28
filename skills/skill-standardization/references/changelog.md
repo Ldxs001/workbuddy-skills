@@ -1,6 +1,42 @@
-## v2.38.4（2026-05-27）
+## v2.38.6 (2026-05-28)
+
+### 新增
+- **R-24 规则**：更新日志禁止直接在 SKILL.md，必须渐进到 references/changelog.md
+- structure_checker.py 新增 check_changelog_progressive() 函数
+- utils.py RULES 列表扩展至 R-24
+- progress_manager.py RULES_ORDER 扩展至 R-24
+- rules.md 新增铁律 7（R-24）
 
 ### 修复
+- 无
+
+### 更新
+- SKILL.md 触发场景覆盖 R-24 场景
+
+---
+
+## v2.38.5（2026-05-28）
+
+### 更新
+- **scripts/ 常量定义统一**：`safe_io.py` / `op_logger.py` / `skill_rollback.py` 全部改用通用路径计算（`_SCRIPT_DIR` → `_SKILL_DIR` → `_SKILLS_ROOT` → `DATA_DIR`），适用于任何安装结构
+- **data_dir_checker.py**：备份/日志路径从硬编码 `skill-standardization` 改为动态计算 `DATA_DIR`
+- **progress_manager.py**：`RULES_ORDER` 从 R-17 扩展到 R-23，`RULES_NAMES` 补全 R-18~R-23
+- **SKILL.md**：`description` 字段从更新日志改为功能描述；H1 标题版本号修正；规则范围 R-01~R-23 统一
+- **_meta.json**：`description` 与 SKILL.md 保持一致
+- **rules.md**：删除已不存在的 R-24 审计规则条目
+- **master_fix.py**：更新脚本本身的常量模板，防止修复其他 skill 时注入错误代码
+
+### 新增
+- **references/data_dir_map.md**：数据目录路径引用对照表，列出所有引用 `DATA_DIR` 的文件及行号，方便自定义数据目录路径
+
+### 更新
+- 版本号升至 v2.38.5
+- `RULES_ORDER` 覆盖 R-01~R-23 全部规则，进度追踪不再遗漏
+
+---
+## v2.38.4（2026-05-27）
+
+### 更新
 - **structure_checker.py**：用 `ast.parse()` 替换 `compile()`，彻底修复审计被审计 .py 文件时触发的 `SyntaxWarning: invalid escape sequence` 警告
 - **SKILL.md 工作流程**：新增「🛑 强制执行：排错止损规则」，防止同一失败模式重复尝试导致死循环
 - **references/antipatterns.md**：新增 AP-12（把审计工具警告当被审计技能 bug）、AP-13（同一失败模式重复尝试不换思路）
@@ -14,7 +50,7 @@
 
 ## v2.38.3（2026-05-27）
 
-### 修复
+### 更新
 - **fix.py `fix_artifact_paths()` 重写**：增加两步逻辑——先分辨文件性质（缓存/临时/0字节/乱码文件→删除；有意义文件→移到正确位置），再扫描并修正所有引用路径
 - **artifact_checker.py `_check_root_artifact_files()` 修复**：根目录白名单从宽松模式改为严格模式（仅允许 `SKILL.md`/`_meta.json`/`scripts/`/`references/`），此前逻辑只检查特定扩展名导致垃圾文件漏扫
 - **`run_audit.py` 移入 `scripts/`**：原为根目录启动脚本，修正 `SKILL_DIR` 路径计算（`dirname(dirname(__file__))`），并更新 `artifact_checker.py` 白名单逻辑（不再错误加白名单，正确做法是移动文件）
@@ -25,11 +61,11 @@
 ---
 
 ## v2.38.0（2026-05-27）
-- 修复：git-sync 打包后根目录残留 .py 文件（违反 R-11），迁移至 scripts/ 并修正路径计算
-- 修复：update_version.py / update_all_versions.py 路径计算错误（SKILL_ROOT 计算少一级）
+- 更新：git-sync 打包后根目录残留 .py 文件（违反 R-11），迁移至 scripts/ 并修正路径计算
+- 更新：update_version.py / update_all_versions.py 路径计算错误（SKILL_ROOT 计算少一级）
 - 优化：insert_v2_34_10.py 过期脚本清理
-- 修复：fix.py 删除未使用的 write_frontmatter import
-- 修复：cmd_fix() --key 参数 nargs=? 导致字符串迭代 bug，改为 nargs=*
+- 更新：fix.py 删除未使用的 write_frontmatter import
+- 更新：cmd_fix() --key 参数 nargs=? 导致字符串迭代 bug，改为 nargs=*
 
 # 更新日志（Changelog）
 
@@ -67,18 +103,18 @@
 
 ## v2.35.1
 
-- **修复**：`changelog.md` 术语不一致（`删除`/`删除` 混用），R-20 审查触发 WARN，统一为 `删除`（1 处）
+- **更新**：`changelog.md` 术语不一致（`删除`/`删除` 混用），R-20 审查触发 WARN，统一为 `删除`（1 处）
 - **流程**：版本 bump 触发强制同步，确保码云/GitHub 文件内容一致
 
 ## v2.35.0 (2026-05-27)
 
-**改写类型：Minor — 修复 _AUDIT_CONTROL_FIELDS bug + 修复 R-11 误报 + 注册 R-23**
+**更新类型：Minor — 修复 _AUDIT_CONTROL_FIELDS bug + 修复 R-11 误报 + 注册 R-23**
 
 ### 新增
 - R-23 正式接入审计流程：`METHOD_MAP` 注册 `check_doc_code_consistency`，`__init__.py` 导入
 - `audit_skill()` 自动审计 R-23（文档-代码一致性检查）
 
-### 修复
+### 更新
 - **`_AUDIT_CONTROL_FIELDS` bug**：包含 `sensitive_access`/`critical_write`/`permission_weight`，导致 `_apply_fixes()` 每次运行都 `pop()` 掉这些字段；从列表中删除这三个字段
 - **R-11 误报 bug**：`artifact_checker.py` 的 `_check_python_artifact_paths_v2()` 匹配查找路径当产出物路径；增加误报跳过逻辑（有足够证据确认是误报时可跳过）
 - **`_apply_fixes()` 容错处理**：`fix` 字典缺少 `key` 字段时跳过而非崩溃（`KeyError` 根因修复）
@@ -87,15 +123,15 @@
 ### 更新
 - `SKILL.md` frontmatter 版本号更新为 v2.35.0
 - `_meta.json` 版本号和描述更新
-- `utils.py` RULES 列表语法修复（R-23 正确注册）
+- `utils.py` RULES 列表语法更新（R-23 正确注册）
 
 ---
 ---
 ## v2.34.11 (2026-05-26)
 
-**改写类型：Patch — 调查并删除 \Z SyntaxWarning 抑制**
+**更新类型：Patch — 调查并删除 \Z SyntaxWarning 抑制**
 
-### 修复
+### 更新
 - 调查 `\Z` SyntaxWarning 来源：删除 `__pycache__` 后重新编译所有 `.py` 文件（`-W error::SyntaxWarning`），未复现警告
 - 删除 `__init__.py` 中的 `warnings.filterwarnings` 抑制代码
 - 若 Python 3.12+ 运行时出现 `SyntaxWarning: invalid escape sequence '\Z'`，请根据报错行号将对应字符串改为原始字符串 `r"..."`
@@ -106,14 +142,14 @@
 ---
 ## v2.34.10 (2026-05-26)
 
-**改写类型：Patch — 修复 frontmatter 字段残留 bug（5字段 → 11字段完整写入）**
+**更新类型：Patch — 修复 frontmatter 字段残留 bug（5字段 → 11字段完整写入）**
 
 ### 根因分析
 - **根因1**：Python -c 脚本字段列表括号语法错误（`(` 和 `)` 用了中文全角括号），导致脚本执行失败，文件内容未变
 - **根因2**：`update_skill_frontmatter.py` 的 `parse_frontmatter()` 按行解析，若 SKILL.md 只有5个字段，重建后仍为5字段
 - **根因3**：`git-sync.py` 第477/491行 push 前先 `_pull_with_cred_url()` → 远程旧版本（5字段）覆盖本地新版本（11字段）→ 反复出现"5字段残留"
 
-### 修复
+### 更新
 - 改用 Python 脚本直接重建 frontmatter（11字段完整写入，不经过 `parse_frontmatter()`）
 - 删除 `_KNOWN_ROOT_FILES` 中的 `"CHANGELOG.md"`（白名单 bug）
 - 删除 `git-sync.py` push 前的 `_pull_with_cred_url()` 调用，改为 push 失败时再 pull --rebase 重试
@@ -138,14 +174,14 @@
 ---
 ## v2.34.9 (2026-05-26)
 
-**改写类型：Patch — 修复白名单 bug + git-sync pull 覆盖根因 + frontmatter 完整重建**
+**更新类型：Patch — 修复白名单 bug + git-sync pull 覆盖根因 + frontmatter 完整重建**
 
 ### 根因分析
 - **根因1**：`_KNOWN_ROOT_FILES` 白名单包含 `"CHANGELOG.md"` → 自审 R-11 直接放行，根目录违规文件不报错
 - **根因2**：`git-sync.py` 第477/491行 push 前先 `_pull_with_cred_url()` → 远程旧版本（6字段）覆盖本地新版本（11字段）→ 反复出现"6字段残留"
 - **根因3**：`update_skill_frontmatter.py` 的 `parse_frontmatter()` 按行解析，若 `SKILL.md` 只有6字段，重建后仍为6字段
 
-### 修复
+### 更新
 - 删除 `_KNOWN_ROOT_FILES` 中的 `"CHANGELOG.md"`（白名单 bug）
 - 删除 `git-sync.py` push 前的 `_pull_with_cred_url()` 调用，改为 push 失败时再 pull --rebase 重试
 - `SKILL.md` frontmatter 改用 Python 直接重建（11字段完整写入，不经过 `parse_frontmatter()`）
@@ -165,7 +201,7 @@
 ---
 ## v2.34.8 (2026-05-26)
 
-**改写类型：Minor — 新增 R-23 文档-代码一致性检查**
+**更新类型：Minor — 新增 R-23 文档-代码一致性检查**
 
 ### 新增
 - R-23 规则：文档-代码一致性检查（正式规则，非匿名）
@@ -173,9 +209,9 @@
 - 验证 SKILL.md 引用的脚本/文件/函数名真实存在
 - 验证代码示例中的调用方式与实际代码一致
 
-### 修复
-- `utils.py` RULES 列表语法修复（R-23 正确注册，不再截断文件）
-- `structure_checker.py` 第 689 行正则引号转义修复
+### 更新
+- `utils.py` RULES 列表语法更新（R-23 正确注册，不再截断文件）
+- `structure_checker.py` 第 689 行正则引号转义更新
 - `SKILL.md` frontmatter 字段修正：`sensitive_access: false`、`permission_weight: LOW`
 
 ### 删除
@@ -184,9 +220,9 @@
 ---
 ## v2.34.7 (2026-05-26)
 
-**改写类型：Patch — 彻底删除所有 subprocess.run 调用 + 静态语法检查**
+**更新类型：Patch — 彻底删除所有 subprocess.run 调用 + 静态语法检查**
 
-### 修复
+### 更新
 - `structure_checker.py`：`subprocess.run(['python', full_path, '--help'])` → `compile(_f.read(), filename=full_path, mode='exec')` 静态语法检查
 - `creator.py`/`refactor.py`/`updater.py`：`subprocess.run(...)` → 直接函数调用（`from permission_checker import PermissionChecker` 等）
 - 删除 `creator.py` 注释中的敏感路径字面量（`~/.ssh/` 等）
@@ -201,9 +237,9 @@
 ---
 ## v2.34.6 (2026-05-26)
 
-**改写类型：Patch — 市场静态扫描误报彻底消除**
+**更新类型：Patch — 市场静态扫描误报彻底消除**
 
-### 修复
+### 更新
 - `permission_checker.py` 检测规则字符串不再被市场扫描器误判为实际访问
 - 所有敏感路径字面量彻底删除（注释、字符串、base64 编码均不再出现）
 - `SKILL.md` 新增注释说明检测规则用途（非实际访问）
@@ -221,15 +257,15 @@
 
 2026-05-26
 
-**改写类型：Patch — 彻底消除市场静态扫描误报**
+**更新类型：Patch — 彻底消除市场静态扫描误报**
 
 ### 更新
 
 - 🔒 ****： /  改为 base64 编码存储，磁盘文件不再含 、 等敏感路径字面量
 - 🔒 ****： 运行时 base64 解码，功能完全不变
-- 🔒 ****：同步修复（如有同类问题）
+- 🔒 ****：同步更新（如有同类问题）
 
-### 修复
+### 更新
 
 - （无）
 
@@ -241,14 +277,14 @@
 
 2026-05-26
 
-**改写类型：Patch — 消除市场静态扫描误报**
+**更新类型：Patch — 消除市场静态扫描误报**
 
 ### 更新
 
 - 🔒 **`scripts/permission_checker.py`**：将 `SENSITIVE_PATTERNS`、`CRITICAL_PATH_PATTERNS`、`NETWORK_PATTERNS`、`DELETE_PATTERNS`、`SUBPROCESS_PATTERNS` 全部外置到 `references/scan_patterns.json`，运行时动态加载
 - 🔒 **消除误报**：代码中不再含 `~/.ssh/`、`~/.aws/`、`~/.workbuddy/memory/` 等敏感路径字符串字面量，市场扫描器不再误判为实际访问- 🔒 **`references/scan_patterns.json`**：新增，集中管理所有检测模式串
 
-### 修复
+### 更新
 
 - （无）
 
@@ -261,7 +297,7 @@
 
 2026-05-26
 
-**改写类型：Patch — 重命名修复工具，避免被误判为一次性脚本**
+**更新类型：Patch — 重命名修复工具，避免被误判为一次性脚本**
 
 ### 更新
 
@@ -273,7 +309,7 @@
 
 - （无）
 
-### 修复
+### 更新
 
 - （无）
 
@@ -287,9 +323,9 @@
 
 2026-05-26
 
-**改写类型：Patch — 恢复误删的通用修复工具**
+**更新类型：Patch — 恢复误删的通用修复工具**
 
-### 修复
+### 更新
 
 - 🔄 **恢复 `scripts/repair_r20.py`**：通用 R-20 修复工具（术语映射、中英文混排空格、拼写修复、模糊表述修复），非一次性脚本，误删导致 R-20 自动修复功能缺失
 - 🔄 **恢复 `scripts/repair_r06_r20.py`**：R-06（一级标题缺失）+ R-20（术语不一致）修复工具，非一次性脚本，误删导致功能缺失
@@ -315,9 +351,9 @@
 
 2026-05-26
 
-**改写类型：Patch — 清理残留调试脚本，修复敏感信息扫描误报根因**
+**更新类型：Patch — 清理残留调试脚本，修复敏感信息扫描误报根因**
 
-### 修复
+### 更新
 
 - 🧹 **删除 8 个残留一次性脚本**（均含硬编码本地路径或已无用）：
   - `scripts/debug_parse.py` — 含 `C:\Users\sm001\...` 硬编码路径，触发敏感信息扫描误报
@@ -350,7 +386,7 @@
 
 2026-05-26
 
-**改写类型：Patch — 根因修复（SKILL.md frontmatter 被残留脚本覆盖）+ CRLF bug 修复**
+**更新类型：Patch — 根因更新（SKILL.md frontmatter 被残留脚本覆盖）+ CRLF bug 修复**
 
 ### 新增
 
@@ -360,7 +396,7 @@
 
 - `SKILL.md` 新增 `## ⚠️ 文件更新约束` 章节（禁止 Write/Edit 工具直接编辑 .md 文件，必须用 Python 脚本原子写入）
 
-### 修复
+### 更新
 
 - 🐛 **修复 `utils.py` CRLF bug**：`parse_simple_yaml_frontmatter()` 加入 `text.replace('\r\n', '\n')` 预处理，`SKILL.md` 为 Windows 换行符时不再截断 frontmatter
 - 🐛 **修复 `creator.py` SKILL_TEMPLATE 字段缺失**：从 10 字段补全到 11 字段（新增 `data_dir:`），创建 skill 的 SKILL.md frontmatter 不再缺失字段
@@ -397,7 +433,7 @@
 - `check_data_dir_compliance()` 不再返回 `fix` 字段（避免与 `_apply_fixes()` 格式不兼容），R-22 修复通过 `fix_data_dir_compliance()` 单独调用
 - `refactor` 模式描述更新（`SKILL.md` 核心能力章节加入「R-22 数据目录合规检查」）
 
-### 修复
+### 更新
 
 - （无）
 
@@ -425,7 +461,7 @@
 - `audit --fix` 模式加入 `fix_data_dir_compliance()` 调用
 - `utils.py` RULES 新增 R-22 定义
 
-### 修复
+### 更新
 
 - （无）
 
@@ -442,7 +478,7 @@
 
 2026-05-26
 
-### 修复
+### 更新
 
 - 删除 skill-standardization/ 下 `nul` 非法文件（Windows 保留字，导致 ZIP 打包失败）
 - `CHANGELOG.md` 白名单补充（`utils.py` `_KNOWN_ROOT_FILES`）
@@ -481,10 +517,10 @@
 
 - **Plan 3**：统一 `spec/rules.json`（整合 R-01~R-21 规则定义，含 severity、fixable、description、check_method、fix_guidance）
 - `creator.py` 的 `META_TEMPLATE` 新增 `data_dir`、`install_dir`、`created_by`、`spec_version` 字段
-- `refactor.py` 新增 `--fix-code` 参数，stage 3.5 代码引用修复
+- `refactor.py` 新增 `--fix-code` 参数，stage 3.5 代码引用更新
 - `artifact_checker.py` 新增 `--fix` 参数支持
 
-### 修复
+### 更新
 
 - 修复 Windows GBK 终端 emoji 编码错误（所有脚本输出改为 ASCII 等价符号）
 - 修复 `migrator.py` 语法错误（`for py_file =` → `for py_file in`）
@@ -505,7 +541,7 @@
 
 2026-05-26
 
-**改写类型：Minor — 新增标准化 IO 工具，提升创建/更新效率及稳定性**
+**更新类型：Minor — 新增标准化 IO 工具，提升创建/更新效率及稳定性**
 
 ### 更新内容
 
@@ -542,7 +578,7 @@
 
 2026-05-25
 
-**改写类型：Patch — R-20 中英文混排误报修复**
+**更新类型：Patch — R-20 中英文混排误报修复**
 
 ### 更新内容
 
@@ -564,7 +600,7 @@
 
 2026-05-25
 
-**改写类型：Minor — 审查出错时建议修正方式输出 + create-template 命令**
+**更新类型：Minor — 审查出错时建议修正方式输出 + create-template 命令**
 
 ### 更新内容
 
@@ -589,7 +625,7 @@
 
 2026-05-25
 
-**改写类型：Minor — Frontmatter 规范化增强 + 权限说明文件**
+**更新类型：Minor — Frontmatter 规范化增强 + 权限说明文件**
 
 ### 更新内容
 
@@ -616,7 +652,7 @@
 
 2026-05-25
 
-**改写类型：Patch — 审查规则 R-18/R-19 内容质量检查增强**
+**更新类型：Patch — 审查规则 R-18/R-19 内容质量检查增强**
 
 ### 更新内容
 
@@ -637,7 +673,7 @@
 
 2026-05-25
 
-**改写类型：Patch — `references/architecture.md` 新增 + 规范加载优化**
+**更新类型：Patch — `references/architecture.md` 新增 + 规范加载优化**
 
 ### 更新内容
 
@@ -658,7 +694,7 @@
 
 2026-05-25
 
-**改写类型：Patch — 审查规则数不一致修复（文档与代码对齐）**
+**更新类型：Patch — 审查规则数不一致更新（文档与代码对齐）**
 
 ### 更新内容
 
@@ -682,7 +718,7 @@
 
 2026-05-25
 
-**改写类型：Minor — R-12 推荐代码模式规范化**
+**更新类型：Minor — R-12 推荐代码模式规范化**
 
 ### 更新内容
 
