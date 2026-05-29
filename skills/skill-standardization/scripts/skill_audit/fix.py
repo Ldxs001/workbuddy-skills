@@ -937,12 +937,27 @@ def _insert_data_dir_python(content, skill_name, fname):
     insert_at = 0
     need_pathlib = True
     reached_body = False
+    in_multiline_import = False  # 跟踪多行 import 的括号嵌套
+    paren_depth = 0
     for i, l in enumerate(lines):
         s = l.strip()
         # 遇到函数定义、类定义、模块级 if/for/while 就停止统计 import
         if s.startswith("def ") or s.startswith("class "):
             reached_body = True
             break
+        # 跟踪多行 import: from x import ( ... )
+        if "import (" in s or ("import" in s and "(" in s.split("#")[0]):
+            if "(" in s and ")" not in s.split("#")[0]:
+                in_multiline_import = True
+                paren_depth = s.count("(") - s.count(")")
+                continue
+        if in_multiline_import:
+            paren_depth += s.count("(") - s.count(")")
+            if paren_depth <= 0:
+                in_multiline_import = False
+                # 多行 import 结束后，插入点设在此行之后
+                insert_at = i + 1
+            continue
         if s.startswith("import ") or s.startswith("from "):
             insert_at = i + 1  # 插入在此行之后
             if "pathlib" in s and "Path" in s:

@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.38.13",
+  "version": "2.38.14",
   "description": "Skill 标准化规范引擎 v2.38.11。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。R-12 全面修复：_meta.json 漏检、_extract_path_value 不存在 bug、step 2 路径比较、step 4 比较过滤、新增 step 1.5 缺失 DATA_DIR 检测。",
   "author": "wUwproject",
   "tags": [

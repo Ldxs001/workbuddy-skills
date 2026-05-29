@@ -1,3 +1,10 @@
+## v2.38.14 (2026-05-30) — 审计结果：无新问题需修正
+
+### Changed
+- 对 hug-html 和 skill-sub 进行审计，26/27 PASS，0 FAIL，无新问题
+- fix_missing_data_dir 多行 import 逻辑经验证正确，无需修正
+
+
 ## v2.38.13 (2026-05-30) — 完全解耦：删除所有 git-sync 参考
 
 ### Removed
