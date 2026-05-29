@@ -320,21 +320,17 @@ apply_fix(skill_dir, 'R-07', 'R-18', 'R-19')  # 批量修复
 
 ---
 
-## 七、与 git-sync 的集成
+## 七、与 git-sync 的协作（已解耦）
 
-git-sync 在每次同步时自动触发 skill_audit 审查：
+> **注意**：`skill-standardization` 与 `git-sync` 已解耦。以下仅说明过去的集成关系作为架构参考，不代表当前依赖。
 
 ```
-git-sync 执行
-  ├─ 步骤 1~3: 收集/检查/提交
-  ├─ 步骤 3.5: skill_audit.py audit ← 自动调用
-  │   ├─ PASS → 继续
-  │   ├─ WARN → 🟡 打印警告，继续
-  │   └─ FAIL → 🟡 打印警告，继续（纯警告模式）
-  └─ 步骤 4~6: 推送/生成 ZIP/更新 manifest
+git-sync 执行时
+  ├─ 步骤 3.5: skill_audit.py audit ← 可选调用（非强制）
+  └─ 审计纯警告模式，不阻断同步
 ```
 
-版本号需要三方一致（SKILL.md + _meta.json + manifest.json）。
+审计功能是独立的——即使没有 git-sync，审计器也能单独运行。两个技能各自维护，互不依赖。
 
 ---
 
@@ -378,17 +374,15 @@ AI 加载 skill-standardization
 再次审计确认 0 ERROR 0 WARN
   ↓
 更新版本号（三端同步 + changelog 自动追加）
-  ↓
-git-sync 推送 + 打包
 ```
 
 ### 审计结果判定
 
-| 结果 | 含义 | git-sync 行为 |
-|:----:|------|-------------|
-| **PASS** | 全部通过 | 继续同步 |
-| **WARN** | 仅 WARN 级失败 | 🟡 继续同步（纯警告） |
-| **FAIL** | 含 ERROR 级失败 | 🟡 继续同步（纯警告） |
+| 结果 | 含义 |
+|:----:|------|
+| **PASS** | 全部规则通过 |
+| **WARN** | 仅 WARN 级未通过 |
+| **FAIL** | 含 ERROR 级未通过 |
 
 ---
 
