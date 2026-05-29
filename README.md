@@ -35,24 +35,10 @@
 
 ```
 workbuddy-skills/
-├── README.md
 ├── LICENSE
+├── README.md
+├── skill-standardization-architecture.md
 └── skills/
-├── color-toolkit/
-├── drawiodo/
-├── everything-search-breadmemory/
-├── git-sync/
-├── hug-html/
-├── round-robin-allocator/
-├── semantic-split/
-├── simulated-peak-plot/
-├── skill-standardization/
-├── skill-sub/
-├── svg-composer/
-├── triphasic-execution/
-├── universal-file-ops/
-├── workbuddy-fs-manager/
-└── workday-calendar/
 ```
 
 ---

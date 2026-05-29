@@ -104,13 +104,20 @@ def generate_readme(repo_path, readme_path):
         table_lines.append(f"| `{name}` | {desc} |")
     table = "\n".join(table_lines)
 
-    # 生成目录树
+    # 生成目录树（从仓库根目录实际扫描）
+    SKIP_ROOT = {".git", "__pycache__", ".gitignore", "README.md.bak"}
+    root_entries = []
+    for entry in sorted(os.listdir(repo_path)):
+        if entry in SKIP_ROOT or entry.startswith("."):
+            continue
+        full = os.path.join(repo_path, entry)
+        suffix = "/" if os.path.isdir(full) else ""
+        root_entries.append((entry, suffix))
     tree_lines = []
-    if len(actual_skills) == 1:
-        tree_lines = [f"└── {actual_skills[0][0]}/"]
-    elif len(actual_skills) > 1:
-        tree_lines = [f"├── {name}/" for name, _ in actual_skills[:-1]]
-        tree_lines.append(f"└── {actual_skills[-1][0]}/")
+    for entry, suffix in root_entries[:-1]:
+        tree_lines.append(f"├── {entry}{suffix}")
+    if root_entries:
+        tree_lines.append(f"└── {root_entries[-1][0]}{root_entries[-1][1]}")
     tree = "\n".join(tree_lines)
 
     # 读取配置中的 clone URL
@@ -143,9 +150,6 @@ def generate_readme(repo_path, readme_path):
 
 ```
 workbuddy-skills/
-├── README.md
-├── LICENSE
-└── skills/
 {tree}
 ```
 
