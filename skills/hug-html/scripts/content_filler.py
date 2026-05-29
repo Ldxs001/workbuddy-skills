@@ -12,12 +12,6 @@ import sys
 import traceback
 from pathlib import Path
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
-
-SKILL_DIR = Path(__file__).parent.parent
-# 运行时绝对路径
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
 OUTPUT_DIR = DATA_DIR / "output"
 
 SAVED_HTML = {}  # 保存最近处理的 HTML，以便出错时提供上下文
@@ -66,7 +60,6 @@ STYLE_PRESETS = {
     },
 }
 
-
 def show_error(err_type, message, fix_hint=""):
     """输出中文错误提示 + 修复建议"""
     icon_map = {
@@ -87,7 +80,6 @@ def show_error(err_type, message, fix_hint=""):
             print(f"  💡 修复建议: {fix_hint}")
     except UnicodeEncodeError:
         print(msg.encode("ascii", errors="replace").decode("ascii"))
-
 
 def fill_template(template_path, content_data, output_path):
     """Fill template with content data (replaces data-field content)"""
@@ -130,7 +122,6 @@ def fill_template(template_path, content_data, output_path):
     print(f"[OK] 内容填充完成: {output_path}")
     print(f"  共填充了 {filled_count}/{len(content_data)} 个字段")
     return str(output_path)
-
 
 def auto_fill(template_path, output_path):
     """Auto-fill template with smart sample content based on field names"""
@@ -198,7 +189,6 @@ def auto_fill(template_path, output_path):
     print(f"  共填充了 {len(content)} 个字段")
     return str(output_path)
 
-
 def extract_content(html_path):
     """Extract data-field content from HTML"""
     p = Path(html_path)
@@ -225,7 +215,6 @@ def extract_content(html_path):
             content[field] = match.group(1).strip()
     return content
 
-
 def main():
     try:
         _main_impl()
@@ -237,7 +226,6 @@ def main():
         show_error("内部错误", f"程序发生未预期的错误: {type(e).__name__}",
                    "使用 --help 查看参数说明。如持续报错，可查看 FAQ。")
         traceback.print_exc()
-
 
 def _main_impl():
     ap = argparse.ArgumentParser(description="Grid-aware HTML 内容填充器 v2", add_help=True)
@@ -316,7 +304,6 @@ def _main_impl():
 
     else:
         ap.print_help()
-
 
 if __name__ == "__main__":
     main()

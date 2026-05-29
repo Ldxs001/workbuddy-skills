@@ -26,9 +26,6 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).parent.parent
 SCRIPTS_DIR = SKILL_DIR / "scripts"
 BUILTIN_TEMPLATES_DIR = SCRIPTS_DIR / "templates"   # 内置文件型模板（跟随技能）
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"  # 用户数据
 OUTPUT_DIR = DATA_DIR / "output"
 USER_TEMPLATES_DIR = DATA_DIR / "user-templates"
 
@@ -65,7 +62,6 @@ def show_error(err_type, message, fix_hint=""):
         # Fallback for GBK terminals (Windows)
         print(msg.encode("ascii", errors="replace").decode("ascii"))
 
-
 def safe_read_json(path):
     """安全读取 JSON 文件，失败输出中文错误"""
     p = Path(path)
@@ -81,7 +77,6 @@ def safe_read_json(path):
     except Exception as e:
         show_error("文件错误", f"读取文件 {p} 失败: {e}", "检查文件权限和编码（应为 UTF-8）")
         return None
-
 
 def safe_write_text(path, text, desc="文件"):
     """安全写入文本文件"""
@@ -189,7 +184,6 @@ BASE_MODULES = {
     "anim-slide": {"type": "css", "css": {"animation": "gridSlideIn 0.5s ease-out"}, "desc": "滑入动画"},
     "hover-scale":{"type": "css", "css": {"transition": "transform 0.3s"}, "desc": "悬停放大"},
 }
-
 
 # ══════════════════════════════════════════════════════
 # 第二层: Composite Modules (复合模块)
@@ -537,7 +531,6 @@ COMPOSITE_MODULES = {
     },
 }
 
-
 # ══════════════════════════════════════════════════════
 # 样式预设 (Style Presets)
 # ══════════════════════════════════════════════════════
@@ -606,7 +599,6 @@ STYLE_PRESETS = {
     },
 }
 
-
 # ══════════════════════════════════════════════════════
 # Grid Spec 默认包装器
 # ══════════════════════════════════════════════════════
@@ -623,11 +615,9 @@ DEFAULT_CARD_STYLE = {
     "border": "1px solid rgba(255,255,255,0.4)",
 }
 
-
 def css_dict_to_str(css_dict):
     """Convert dict of CSS properties to inline style string"""
     return "; ".join(f"{k}: {v}" for k, v in css_dict.items())
-
 
 def merge_css_dicts(*dicts):
     """Merge multiple CSS dicts; later dicts override earlier ones"""
@@ -636,7 +626,6 @@ def merge_css_dicts(*dicts):
         if d:
             result.update(d)
     return result
-
 
 def resolve_base_modules(base_names):
     """Resolve base module names to combined CSS dict"""
@@ -650,7 +639,6 @@ def resolve_base_modules(base_names):
             print(f"  [WARN] Unknown base module: {name}")
     return css
 
-
 def composite_inline_css(composite_name, cell_config=None):
     """Get inline CSS from composite module's base modules and cell overrides"""
     mod = COMPOSITE_MODULES.get(composite_name, {})
@@ -661,7 +649,6 @@ def composite_inline_css(composite_name, cell_config=None):
     cell_style = (cell_config or {}).get("style", {})
     css.update(cell_style)
     return css
-
 
 # ══════════════════════════════════════════════════════
 # 内置模板定义
@@ -742,7 +729,6 @@ BUILTIN_TEMPLATES = {
     },
 }
 
-
 # ══════════════════════════════════════════════════════
 # HTML 生成逻辑
 # ══════════════════════════════════════════════════════
@@ -753,7 +739,6 @@ def get_cells(spec):
     if not cells:
         cells = spec.get("grid", {}).get("cells", [])
     return cells
-
 
 def collect_all_css(template_spec):
     """Collect all CSS from composite modules used in this template"""
@@ -868,7 +853,6 @@ def collect_all_css(template_spec):
 
     return "\n".join(styles)
 
-
 def build_cell_html(template_spec):
     """Build HTML for each cell in the grid"""
     cells = get_cells(template_spec)
@@ -894,7 +878,6 @@ def build_cell_html(template_spec):
         parts.append(cell_html)
 
     return "\n".join(parts)
-
 
 def generate_html(template_spec):
     """Generate complete HTML from template spec"""
@@ -1138,7 +1121,6 @@ console.log('💡 提示：按 Ctrl+E 进入/退出编辑模式 | 点击图片�
     print_generation_guide(template_spec)
     return html
 
-
 def print_generation_guide(spec=None):
     """强制输出的生成说明 — 每次生成后必须调用"""
     name = spec.get("name", "") if spec else ""
@@ -1191,7 +1173,6 @@ def print_generation_guide(spec=None):
         # Fallback for terminals without full Unicode support
         print(msg.encode("ascii", errors="replace").decode("ascii"))
 
-
 # ══════════════════════════════════════════════════════
 # 主入口
 # ══════════════════════════════════════════════════════
@@ -1210,7 +1191,6 @@ def list_modules():
         base_str = ", ".join(bases) if bases else "—"
         print(f"  composite:{name} — {info['desc']}")
         print(f"    引用 base: {base_str}")
-
 
 def list_templates():
     """Print all built-in templates"""
@@ -1243,7 +1223,6 @@ def list_templates():
 
     # Also list user templates
     list_user_templates()
-
 
 def load_grid_spec(spec_path_or_name):
     """Load grid spec from file or built-in template name"""
@@ -1316,7 +1295,6 @@ def load_grid_spec(spec_path_or_name):
         print("\n".join(msg_lines))
     sys.exit(1)
 
-
 def save_template(template_spec, name):
     """Save template spec to scripts/templates/ directory (built-in)"""
     BUILTIN_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
@@ -1329,7 +1307,6 @@ def save_template(template_spec, name):
     except Exception as e:
         show_error("文件错误", f"保存模板失败: {e}")
     return ""
-
 
 def save_user_template(template_spec, name, description=""):
     """Save a grid spec as a user-defined template (方案模板)"""
@@ -1363,7 +1340,6 @@ def save_user_template(template_spec, name, description=""):
         show_error("文件错误", f"保存用户模板失败: {e}")
     return ""
 
-
 def list_user_templates():
     """List all user-defined templates"""
     USER_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
@@ -1386,7 +1362,6 @@ def list_user_templates():
                 print(f"    {desc}")
         except Exception:
             print(f"  {f.stem}: (文件无法解析)")
-
 
 def export_interfaces():
     """Export complete interface specification as JSON for LLM consumption"""
@@ -1455,7 +1430,6 @@ def export_interfaces():
             }
         }
     }
-
 
 # ══════════════════════════════════════════════════════
 # 生成后审计
@@ -1585,7 +1559,6 @@ def audit_html(html_str, template_spec=None):
     passed = len([i for i in issues if i.startswith("[CRITICAL]")]) == 0
     return passed, issues
 
-
 def print_audit_report(html_str, template_spec=None, silent=False):
     """Print audit results. silent=True skips printing (for non-interactive use)."""
     if silent:
@@ -1611,7 +1584,6 @@ def print_audit_report(html_str, template_spec=None, silent=False):
         print(f"  Result: {'[PASS]' if passed else '[FAIL]'}")
     return passed
 
-
 def main():
     try:
         _main_impl()
@@ -1625,7 +1597,6 @@ def main():
         # 仅 debug 模式下输出详细堆栈
         if "--debug" in sys.argv:
             traceback.print_exc()
-
 
 def _main_impl():
     ap = argparse.ArgumentParser(description="Grid-based HTML Module Engine")
@@ -1745,7 +1716,6 @@ def _main_impl():
     html = generate_html(spec)
     safe_write_text(out_path, html, "HTML 输出")
     print(f"[OK] 已生成: {out_path}")
-
 
 if __name__ == "__main__":
     main()

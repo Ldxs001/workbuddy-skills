@@ -14,11 +14,6 @@ SKILL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
 from grid_builder import BUILTIN_TEMPLATES, generate_html, show_error, safe_write_text
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
-
-# 运行时绝对路径
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
 OUTPUT_DIR = DATA_DIR / "output"
 
 # ══════════════════════════════════════════════════════

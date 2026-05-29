@@ -23,6 +23,29 @@ from grid_builder import (
 # R-12 审计锚点：数据目录字面量声明
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
 
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+
 # 运行时绝对路径
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
 OUTPUT_DIR = DATA_DIR / "output"

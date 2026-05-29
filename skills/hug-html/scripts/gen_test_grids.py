@@ -9,13 +9,9 @@ import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
-# R-12 审计锚点
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
 TEMPLATES_DIR = DATA_DIR / "templates"
 OUTPUT_DIR = DATA_DIR / "output"
 MODULES_DIR = DATA_DIR / "modules"
-
 
 def build_base_modules_json():
     """Extract base module library from grid_builder.py for persistence"""
@@ -42,7 +38,6 @@ def build_base_modules_json():
 
     return out
 
-
 def save_modules_json():
     modules = build_base_modules_json()
     MODULES_DIR.mkdir(parents=True, exist_ok=True)
@@ -50,7 +45,6 @@ def save_modules_json():
     with open(out, "w", encoding="utf-8") as f:
         json.dump(modules, f, ensure_ascii=False, indent=2)
     print(f"[OK] Modules saved: {out}")
-
 
 def create_3x3_merged_spec():
     """Create a 3×3 grid with rowspan/colspan merging demo"""
@@ -91,7 +85,6 @@ def create_3x3_merged_spec():
     print(f"[OK] 3×3 merged spec: {out}")
     return spec
 
-
 def create_4x2_app_card():
     """Create a 4×2 app card with diverse cell content"""
     spec = {
@@ -131,7 +124,6 @@ def create_4x2_app_card():
         json.dump(spec, f, ensure_ascii=False, indent=2)
     print(f"[OK] 4×2 app card: {out}")
     return spec
-
 
 def create_3x3_mixed_styles():
     """Create a 3×3 grid where each cell has a different style"""
@@ -187,7 +179,6 @@ def create_3x3_mixed_styles():
         json.dump(spec, f, ensure_ascii=False, indent=2)
     print(f"[OK] 3×3 mixed styles: {out}")
     return spec
-
 
 if __name__ == "__main__":
     save_modules_json()
