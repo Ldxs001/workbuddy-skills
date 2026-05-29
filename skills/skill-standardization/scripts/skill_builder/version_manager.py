@@ -83,7 +83,77 @@ class VersionManager:
         else:
             print(f"⚠️  _meta.json 不存在，跳过版本更新")
 
+        # 4. 输出更新日志模板 — 提示 LLM 编写
+        VersionManager.request_changelog(skill_dir, old_ver, new_ver)
+
         return new_ver
+
+    @staticmethod
+    def request_changelog(skill_dir, old_ver, new_ver):
+        """输出更新日志模板 — 提示 LLM 编写变更内容，然后调用 append_changelog 写入"""
+        skill_name = skill_dir.name
+        sep = "=" * 58
+        print(f"""
+{sep}
+  [更新日志] 版本 {old_ver} → {new_ver}
+{sep}
+
+  ⚡ 请根据本次实际修改内容，用以下格式编写更新日志，
+  然后调用 append_changelog() 写入 {skill_name}/references/changelog.md:
+
+  --- 格式 ---
+  ## v{new_ver} (YYYY-MM-DD) — 简短标题
+
+  ### Added
+  - 新增功能1
+  - 新增功能2
+
+  ### Changed
+  - 修改项1
+
+  ### Fixed
+  - 修复项1
+  ---
+
+  编写完成后，调用:
+    python -c \"from scripts.skill_builder.version_manager import VersionManager; VersionManager.append_changelog(Path('{skill_dir}'), '''更新日志内容''')\"
+""")
+        return new_ver
+
+    @staticmethod
+    def append_changelog(skill_dir, entry_text):
+        """将更新日志追加到 references/changelog.md（安全原子写入）"""
+        changelog = skill_dir / "references" / "changelog.md"
+        changelog.parent.mkdir(parents=True, exist_ok=True)
+
+        # 从 entry 提取版本号，检查重复
+        ver_m = re.search(r'^##\s*v([\d.]+)', entry_text, re.MULTILINE)
+        entry_ver = ver_m.group(1) if ver_m else ""
+
+        # 构建完整内容
+        header = f"# Changelog — {skill_dir.name}\n\n"
+        new_entry = entry_text.strip() + "\n"
+
+        if changelog.exists():
+            old = changelog.read_text(encoding="utf-8")
+            if entry_ver and re.search(r'^##\s*v' + re.escape(entry_ver), old, re.MULTILINE):
+                print(f"⚠️  版本 v{entry_ver} 的更新日志已存在，跳过追加")
+                return False
+            # 追加到第一行（# Changelog）之后
+            lines = old.split("\n", 1)
+            if len(lines) >= 2:
+                content = lines[0] + "\n\n" + new_entry + lines[1]
+            else:
+                content = old + "\n" + new_entry
+        else:
+            content = header + new_entry
+
+        # 原子写入
+        tmp = changelog.with_suffix(".md.tmp")
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(changelog)
+        print(f"✅  更新日志已写入: {changelog}")
+        return True
 
     @staticmethod
     def get_version_from_meta(skill_dir):

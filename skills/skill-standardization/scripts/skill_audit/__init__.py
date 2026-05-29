@@ -23,6 +23,12 @@ import json
 import argparse
 from pathlib import Path
 
+# ── [GBK 兼容] 强制 stdout 使用 UTF-8，防止 Windows 终端 emoji print 崩溃 ──
+if sys.stdout.encoding and sys.stdout.encoding.upper() not in ('UTF-8', 'UTF8'):
+    sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1, errors='replace')
+if sys.stderr.encoding and sys.stderr.encoding.upper() not in ('UTF-8', 'UTF8'):
+    sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf-8', buffering=1, errors='replace')
+
 # ── 导入子模块 ─────────────────────────────────────────────
 from .utils import (
     RULES, TRIGGER_KEYWORDS, CORE_KEYWORDS, WORKFLOW_KEYWORDS,

@@ -1,9 +1,19 @@
 ## v2.38.8 (2026-05-29)
 
+## v2.38.9 (2026-05-29) — GBK 兼容 + 版本强制升级 + 更新日志脚本化
+
+### Added
+- GBK 兼容：在 skill_builder/__init__.py、skill_audit/__init__.py、run_audit.py 三个入口点强制 stdout/stderr UTF-8 输出，防止 Windows 终端 emoji print 崩溃
+- ：版本升级后自动输出更新日志模板，提示 LLM 编写
+- ：安全原子写入更新日志到 references/changelog.md，内置去重
+
+### Changed
+-  子命令： 参数从不可用改为默认  级自动升级（之前参数定义缺失，永不触发）
+-  升级后自动调用  输出模板
+
 ### 修复
 - **`_meta.json` description 版本号未更新**：v2.38.7 升级后 description 仍写 v2.38.7，修复为 v2.38.8
 - **`SKILL.md` frontmatter description 版本号未更新**：同 `_meta.json`，已修复
-- **`reference.md` R-20 术语不一致**："修改" → "更新"（3 处）；中英文间距缺失修复（3 处）
 
 ### 新增
 - **`reference.md` 增加完整 CLI 命令参考**：覆盖所有 `scripts/*.py` 的 CLI 用法、参数、示例

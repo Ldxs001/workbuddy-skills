@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.38.8
+version: 2.38.9
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.38.8。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
@@ -10,6 +10,10 @@ permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
 ---
+
+
+
+
 
 
 

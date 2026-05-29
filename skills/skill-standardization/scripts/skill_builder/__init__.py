@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-skill_builder package — Skill 标准化构建器 v2.30.0
+skill_builder package — Skill 标准化构建器 v2.30.1
 
 支持三种模式：
   create   — 从模板初始化新的标准 skill
@@ -19,6 +19,12 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+
+# ── [GBK 兼容] 强制 stdout 使用 UTF-8，防止 Windows 终端 emoji print 崩溃 ──
+if sys.stdout.encoding and sys.stdout.encoding.upper() not in ('UTF-8', 'UTF8'):
+    sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1, errors='replace')
+if sys.stderr.encoding and sys.stderr.encoding.upper() not in ('UTF-8', 'UTF8'):
+    sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf-8', buffering=1, errors='replace')
 
 # ── 导入子模块 ─────────────────────────────────────────────
 from .creator import SkillCreator
@@ -76,6 +82,9 @@ def main():
     update_parser.add_argument("--workspace", default=".", help="工作区根目录")
     update_parser.add_argument("--inject-auth", action="store_true",
                              help="扫描风险操作并注入授权要求章节到 SKILL.md")
+    update_parser.add_argument("--version-bump", nargs="?", const="patch", default="patch",
+                             choices=["patch", "minor", "major"],
+                             help="自动升级版本号（默认：patch，传 --version-bump minor/major 指定）")
 
     # refactor 子命令
     refactor_parser = subparsers.add_parser("refactor", help="改造非标 Skill")
