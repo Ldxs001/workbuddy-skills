@@ -36,6 +36,4 @@ def check_zip(path, label):
     if len(names) > 40:
         print(f"    ... 还有 {len(names)-40} 个")
 
-check_zip(r"C:\Users\sm001\.workbuddy\skills\.dist\skill-sub-v1.19.2.zip", "skill-sub-v1.19.2.zip")
-check_zip(r"C:\Users\sm001\.workbuddy\skills\.dist\skill-standardization-v2.34.11.zip", "skill-standardization-v2.34.11.zip")
 print("\n验证完成")

@@ -6,6 +6,22 @@
 import os
 import sys
 import shutil
+from pathlib import Path
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
 
 
 # ── 排除规则（与 pack_zip.py 保持一致）──────────────────────────
@@ -33,7 +49,6 @@ FUNCTIONAL_FILE_WHITELIST = {"settings.html", "preview.html"}
 # 空文件白名单（这些空文件需要保留）
 EMPTY_FILE_WHITELIST = {".gitkeep", ".keep", ".gitignore", "readme"}
 
-
 def should_exclude(rel_path, file_path=None):
     """判断相对路径是否应被排除。
 
@@ -42,7 +57,6 @@ def should_exclude(rel_path, file_path=None):
     returns: True 表示排除，False 表示保留
     """
     import fnmatch
-
 
     p = rel_path.replace(os.sep, "/")
     name = os.path.basename(p)
@@ -84,7 +98,6 @@ def should_exclude(rel_path, file_path=None):
             pass
 
     return False
-
 
 def sync_with_exclude(src, dst):
     """用排除规则同步 src → dst（先清空 dst，再复制）"""
@@ -143,7 +156,6 @@ def sync_with_exclude(src, dst):
     if skipped_empty > 0:
         print(f"  ℹ️  跳过 {skipped_empty} 个空文件（0 KB）")
     return copy_count
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

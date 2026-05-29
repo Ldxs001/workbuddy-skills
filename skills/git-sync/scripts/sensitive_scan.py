@@ -18,6 +18,22 @@ import sys
 import argparse
 from pathlib import Path
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
 def normalize_path(p):
     """将路径规范化为 Windows 绝对路径（处理 Git Bash /c/... 格式）"""
     p = os.path.expanduser(p)
@@ -112,7 +128,6 @@ def load_config(config_path=None):
             return json.load(f)
     return {}
 
-
 def scan_file(file_path, config=None):
     """
     扫描单个文件，返回检测到的敏感信息列表。
@@ -188,7 +203,6 @@ def scan_file(file_path, config=None):
             deduped.append(r)
     return deduped
 
-
 def scan_skill(skill_dir, config=None):
     """
     扫描整个技能目录，返回按文件组织的检测结果。
@@ -220,7 +234,6 @@ def scan_skill(skill_dir, config=None):
                 })
     return results
 
-
 def _file_description(fname, skill_name):
     """返回文件用途说明（中文）"""
     base = fname.lower()
@@ -238,11 +251,9 @@ def _file_description(fname, skill_name):
         return "Markdown 文档"
     return "技能文件"
 
-
 def _max_severity(severities):
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     return min(severities, key=lambda s: order.get(s, 99))
-
 
 def build_replacements(findings_list):
     """
@@ -254,7 +265,6 @@ def build_replacements(findings_list):
         replacements[f["match"]] = f["replace"]
     return replacements
 
-
 def sanitize_content(content, replacements):
     """对内容执行脱敏替换（按 match 长度降序，避免子串优先替换）"""
     # 按 match 字符串长度降序排列，避免短串先替换导致长串匹配失败
@@ -264,7 +274,6 @@ def sanitize_content(content, replacements):
         if match_text in result:
             result = result.replace(match_text, replace_with)
     return result
-
 
 def sanitize_file(file_path, replacements, backup=True):
     """对单个文件执行脱敏，可选备份原文件"""
@@ -279,7 +288,6 @@ def sanitize_file(file_path, replacements, backup=True):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(new_content)
     return backup_path if backup else None
-
 
 # ── 交互式确认（命令行菜单） ──────────────────────────────────────────────
 
@@ -302,12 +310,10 @@ def format_findings_report(results):
         lines.append("")
     return "\n".join(lines)
 
-
 def _truncate(s, max_len):
     if len(s) <= max_len:
         return s
     return s[:max_len//2] + "..." + s[-(max_len//2 - 3):]
-
 
 def interactive_review(results, batch_mode=False):
     """
@@ -351,7 +357,6 @@ def interactive_review(results, batch_mode=False):
             print("  ❌ 已中止")
             sys.exit(1)
 
-
 def _per_file_choice(results):
     """逐个文件选择"""
     decisions = {}
@@ -378,7 +383,6 @@ def _per_file_choice(results):
                 break
     return decisions
 
-
 def _detailed_choice(results):
     """针对某个文件提更细要求"""
     decisions = {}
@@ -402,7 +406,6 @@ def _detailed_choice(results):
         decisions[entry["file"]] = _detailed_for_file(entry)
     return decisions
 
-
 def _detailed_for_file(entry):
     """对单个文件的每个敏感条目单独选择"""
     print(f"\n  文件：{entry['file']}")
@@ -419,7 +422,6 @@ def _detailed_for_file(entry):
             replacements[f["match"]] = f["replace"]
     return {"mode": "custom", "replacements": replacements}
 
-
 # ── CLI 入口 ─────────────────────────────────────────────────────────────
 
 def cmd_scan(args):
@@ -435,7 +437,6 @@ def cmd_scan(args):
     # 不要用 sys.exit，让调用方通过文件是否为空判断
     return
 
-
 def cmd_sanitize(args):
     config = load_config(args.config)
     # args.file 是要脱敏的文件，args.replacements 是 JSON 文件或直接 JSON 字符串
@@ -447,7 +448,6 @@ def cmd_sanitize(args):
         replacements = json.loads(args.replacements)
     backup = sanitize_file(target_file, replacements, backup=not args.no_backup)
     print(f"  ✅ 已脱敏：{args.file}" + (f"（备份：{backup}）" if backup else ""))
-
 
 def cmd_interactive(args):
     if not os.path.exists(args.scan_result):
@@ -466,7 +466,6 @@ def cmd_interactive(args):
         print(f"  ✅ 决策结果已写入 {args.output}")
     else:
         print(json.dumps(decisions, ensure_ascii=False, indent=2))
-
 
 def cmd_apply(args):
     """根据决策 JSON，对技能目录中的文件执行脱敏/保留"""
@@ -502,7 +501,6 @@ def cmd_apply(args):
                 f.write(new_content)
             print(f"  ✅ 已脱敏（部分）: {file_rel}")
     print(f"\n  ✅ 处理完成，技能目录: {skill_dir}")
-
 
 def main():
     parser = argparse.ArgumentParser(description="敏感信息扫描与脱敏")
@@ -544,7 +542,6 @@ def main():
         "apply": cmd_apply,
     }
     dispatch[args.command](args)
-
 
 if __name__ == "__main__":
     main()

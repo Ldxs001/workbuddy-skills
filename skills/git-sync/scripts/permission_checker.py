@@ -24,12 +24,6 @@ permission_checker.py v1.0.0
 import os
 from pathlib import Path
 import re
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
 
 import json
 import sys
@@ -37,6 +31,22 @@ import ast
 import tokenize
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, Optional, Any
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
 
 # ── 常量定义 ────────────────────────────────────────────────────────────────────
 
@@ -102,7 +112,6 @@ RISK_THRESHOLD = {
     "high": 0.60,      # ≥ 60% 高风险
     "critical": 0.80,  # ≥ 80% 严重风险
 }
-
 
 class PermissionChecker:
     """
@@ -352,7 +361,6 @@ class PermissionChecker:
                                 "severity": "HIGH",
                             })
                             break
-
 
     # ── 内部方法：正则模式判断 ─────────────────────────────────────────────
 
@@ -908,7 +916,6 @@ class PermissionChecker:
 
         return suggestions
 
-
 # ── CLI 入口 ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -942,7 +949,6 @@ def main():
     if args.exit_code:
         exit_code_map = {"low": 0, "medium": 1, "high": 2, "critical": 3}
         sys.exit(exit_code_map.get(report["risk_level"], 0))
-
 
 if __name__ == "__main__":
     main()

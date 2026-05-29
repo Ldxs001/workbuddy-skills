@@ -16,11 +16,25 @@ import sys
 from datetime import date
 from pathlib import Path
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
 
 def _find_skills_dir():
     """从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/"""
     return str(Path(__file__).resolve().parent.parent.parent)
-
 
 def load_config():
     """读取 skills/.standardization/git-sync/data/config.json"""
@@ -30,7 +44,6 @@ def load_config():
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
-
 
 def get_clone_urls(config):
     """从 config.json 生成 gitee/github clone URL"""
@@ -42,7 +55,6 @@ def get_clone_urls(config):
     if github_cfg.get('user') and github_cfg.get('repo'):
         urls['github'] = f"https://github.com/{github_cfg['user']}/{github_cfg['repo']}.git"
     return urls
-
 
 def extract_desc(skill_dir):
     """从 _meta.json 或 SKILL.md 提取描述"""
@@ -74,7 +86,6 @@ def extract_desc(skill_dir):
             pass
 
     return "技能描述"
-
 
 def generate_readme(repo_path, readme_path):
     """全量生成 README.md"""
@@ -204,14 +215,12 @@ MIT License
         f.write(new_readme)
     _safe_print(f"  README.md 已全量重新生成: {readme_path}")
 
-
 def _safe_print(msg):
     """兼容 GBK 终端的安全打印"""
     try:
         print(msg)
     except UnicodeEncodeError:
         print(msg.encode("ascii", errors="replace").decode("ascii"))
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

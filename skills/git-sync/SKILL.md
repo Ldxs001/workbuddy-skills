@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.6.30
+version: 2.6.31
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.28：修复跳过同步时状态显示「成功」的误导问题，改为「⏭️ 跳过」。
@@ -10,6 +10,7 @@ permission_weight: LOW
 data_dir: ../.standardization/git-sync/
 external_data_dir: true
 ---
+
 
 
 
@@ -45,7 +46,7 @@ external_data_dir: true
 - **三端同步** —— 码云、GitHub、本地 `.dist/` 目录
 - **版本号三方对比** —— `_meta.json` / `SKILL.md` frontmatter / `references/changelog.md`
 - **敏感信息过滤** —— 自动扫描并脱敏 `secrets/regex/telemetry`
-- **SKILL.md 规范审查** —— 调用 `skill-standardization` 进行审计
+- **SKILL.md 规范审查** —— 内联审计（版本一致性 + R-23 脚本引用检查）
 - **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页
 
 ## 工作流程

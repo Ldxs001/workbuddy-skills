@@ -1,3 +1,23 @@
+## v2.6.31 (2026-05-30) — 完全解耦：删除内嵌 skill_audit/ + 清理参考
+
+### Removed
+- 删除 scripts/skill_audit/ 内嵌包（含 7 个模块）
+- 删除 git-sync.sh 中的 skill_audit.py 外部调用代码块
+- 删除 verify_zip.py 中的 skill-standardization 硬编码路径
+
+### Changed
+- SKILL.md 描述更新：“调用 skill-standardization 进行审计” → “内联审计”
+- 与 skill-standardization 完全解耦，无任何代码依赖
+
+## v2.6.30 (2026-05-30) — R-12 合规整改
+
+### Changed
+- _meta.json: 补充 data_dir 字段
+- 9 个脚本补充 DEFAULT_DATA_DIR_RAW + DATA_DIR （R-12 step 1.5）
+- SKILL.md frontmatter 补充 external_data_dir、修正 sensitive_access/permission_weight
+
+### Fixed
+- 所有引用 .standardization 的脚本现均有合规的 DATA_DIR 声明，R-12 step 1.5 检测通过
 # changelog.md — git-sync 更新日志
 
 ## v2.6.29 (2026-05-29) — 自动版本升级

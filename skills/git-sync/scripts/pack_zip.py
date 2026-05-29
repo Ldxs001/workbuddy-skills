@@ -7,6 +7,22 @@ import sys
 import os
 import zipfile
 import fnmatch
+from pathlib import Path
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
 
 
 # UTF-8 输出（Windows 终端兼容）
@@ -15,7 +31,6 @@ if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-
 
 def pack_zip(source_dir, output_zip):
     """将 source_dir 打包为 output_zip，应用标准排除规则。"""
@@ -98,7 +113,6 @@ def pack_zip(source_dir, output_zip):
     size_kb = os.path.getsize(output) / 1024
     print(f"  ✅ ZIP 生成完毕: {output}")
     print(f"     大小: {size_kb:.1f} KB，文件数: {file_count}")
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

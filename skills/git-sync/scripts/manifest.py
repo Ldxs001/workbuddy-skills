@@ -27,6 +27,22 @@ import re
 from datetime import date
 from pathlib import Path
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
 # ── 路径解析 ───────────────────────────────────────────
 def _find_skills_dir():
     """从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/"""
@@ -74,7 +90,6 @@ def get_uploaded_items(data, repo_name):
     items = repos[repo_name].get("items", {})
     return {name for name, v in items.items() if isinstance(v, dict) and v.get("uploaded", False)}
 
-
 # ── 子命令实现 ─────────────────────────────────────────
 
 def cmd_list(args):
@@ -118,7 +133,6 @@ def cmd_list(args):
                 print(f"  [?] {name:<30} (旧格式: {v})")
         print()
 
-
 def cmd_add(args):
     data = load_manifest()
     repos = data.setdefault("repos", {})
@@ -151,7 +165,6 @@ def cmd_add(args):
     gh = "✅" if github_ok else "❌"
     print(f"  ✅ 已添加: [码云{ge}|GitHub{gh}] {args.name} → {args.repo}")
 
-
 def cmd_remove(args):
     data = load_manifest()
     repos = data.get("repos", {})
@@ -168,7 +181,6 @@ def cmd_remove(args):
     del items[args.name]
     save_manifest(data)
     print(f"  ✅ 已移除: {args.name} ← {args.repo}")
-
 
 def cmd_check(args):
     """检查技能是否在清单内，输出双平台状态。
@@ -200,7 +212,6 @@ def cmd_check(args):
         sys.exit(0)   # 双平台都成功
     else:
         sys.exit(1)   # 部分或全失败
-
 
 def cmd_version(args):
     """查询或更新清单中某个条目的版本号。
@@ -255,7 +266,6 @@ def cmd_version(args):
         print(f"{args.name}  版本: {ver}")
         print(f"  码云: {gitee_ver} {ge}  GitHub: {github_ver} {gh}")
 
-
 def cmd_diff(args):
     data = load_manifest()
     repos = data.get("repos", {})
@@ -300,7 +310,6 @@ def cmd_diff(args):
             print(f"  [多余] {name}")
 
     print()
-
 
 def cmd_sync_readme(args):
     """根据仓库实际文件全量重新生成 README.md
@@ -347,7 +356,6 @@ def cmd_sync_readme(args):
         f.write(new_readme)
     print(f"  ✅ README.md 已全量重新生成: {readme_path}")
 
-
 def cmd_set_uploaded(args):
     """标记指定平台为已上传（不更新版本号）
        用法: python manifest.py set-uploaded <repo> <name> [--platform gitee|github|both]
@@ -372,7 +380,6 @@ def cmd_set_uploaded(args):
     item["uploaded"] = item.get("gitee_ok", False) and item.get("github_ok", False)
     save_manifest(data)
     print(f"  OK: {args.name} gitee={item.get('gitee_ok')} github={item.get('github_ok')} uploaded={item['uploaded']}")
-
 
 def _extract_desc(skill_dir):
     """从 _meta.json 或 SKILL.md 提取描述"""
@@ -404,7 +411,6 @@ def _extract_desc(skill_dir):
             pass
 
     return "技能描述"
-
 
 def _load_config():
     """读取 skills/.standardization/git-sync/data/config.json，返回配置字典"""
@@ -510,7 +516,6 @@ MIT License
 
     return readme
 
-
 # ── CLI 参数解析 ─────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(
@@ -582,7 +587,6 @@ def main():
         "sync-readme": cmd_sync_readme,
     }
     commands[args.command](args)
-
 
 if __name__ == "__main__":
     main()

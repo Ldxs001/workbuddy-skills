@@ -11,7 +11,6 @@ import os
 import sys
 from datetime import datetime
 
-
 def build_index(dist_dir):
     if not os.path.isdir(dist_dir):
         print(f"❌ 目录不存在: {dist_dir}")
@@ -108,7 +107,6 @@ def build_index(dist_dir):
 
     print(f"  ✅ HTML 索引已生成: {index_path}")
     return index_path
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

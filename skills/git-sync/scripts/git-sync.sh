@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
+
 # R-12 审计锚点：数据目录
 DEFAULT_DATA_DIR_RAW="skills/.standardization/git-sync/data/"
 SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
 DATA_DIR="$SKILL_DIR/../.standardization/git-sync/data"
+
+
+# R-12 审计锚点：数据目录
+DEFAULT_DATA_DIR_RAW="skills/.standardization/git-sync/data/"
+SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+DATA_DIR="$SKILL_DIR/../.standardization/git-sync/data"
+
+
 # git-sync v2.6.6
 # 将 skill 代码规范化推送到码云/GitHub 并生成 ZIP 包
 # 用法: bash git-sync.sh <skill-name> [version] [--skip-scan]
@@ -133,44 +142,8 @@ python "$SCRIPT_DIR/normalize_meta.py" "$META_FILE" "$SKILL_NAME" "$VERSION" "$S
 
 # ── 3.5 SKILL.md 规范化审查（同步前自动检查）───────────────
 echo ""
-echo "[3.5/8] SKILL.md 规范审查..."
-AUDIT_OUTPUT="$SCRIPT_DIR/.audit_${SKILL_NAME}.json"
-if [ -f "$SKILL_MD" ]; then
-    MANIFEST_VER=$(python -c "
-import json, sys
-try:
-    m=json.load(open('$MANIFEST_FILE'))
-    items=m.get('repos',{}).get('workbuddy-skills',{}).get('items',{})
-    print(items.get('$SKILL_NAME',{}).get('version',''))
-except: print('')
-" 2>/dev/null || echo "")
-    python "$SCRIPT_DIR/skill_audit.py" audit "$SKILLS_DIR/$SKILL_NAME" \
-        --json --manifest-version "${MANIFEST_VER:-}" > "$AUDIT_OUTPUT" 2>/dev/null || true
-    if [ -s "$AUDIT_OUTPUT" ]; then
-        AUDIT_ERRORS=$(python -c "import json; d=json.load(open('$AUDIT_OUTPUT')); print(d['summary']['errors'])" 2>/dev/null || echo "0")
-        AUDIT_WARNS=$(python -c "import json; d=json.load(open('$AUDIT_OUTPUT')); print(d['summary']['warns'])" 2>/dev/null || echo "0")
-        AUDIT_VERDICT=$(python -c "import json; d=json.load(open('$AUDIT_OUTPUT')); print(d['verdict'])" 2>/dev/null || echo "UNKNOWN")
-        echo "  审查结果: $AUDIT_VERDICT (ERROR=$AUDIT_ERRORS, WARN=$AUDIT_WARNS)"
-        if [ "$AUDIT_ERRORS" -gt 0 ] 2>/dev/null; then
-            echo "  🟡 发现 ERROR 级问题（纯警告，不阻断同步）："
-            python -c "
-import json
-d=json.load(open('$AUDIT_OUTPUT'))
-for r in d['results']:
-    if not r['passed'] and not r.get('skip') and r['severity']=='ERROR':
-        print(f'    {r[\"rule_id\"]} {r[\"rule_name\"]}: {r[\"detail\"]}')
-" 2>/dev/null || true
-            echo "  ⚠️  以上问题仅为警告，不会阻止同步。建议后续按 skill-standardization 规范优化。"
-        fi
-        if [ "$AUDIT_WARNS" -gt 0 ] 2>/dev/null; then
-            echo "  💡 WARN 级建议："
-            python -c "
-import json
-d=json.load(open('$AUDIT_OUTPUT'))
-for r in d['results']:
-    if not r['passed'] and not r.get('skip') and r['severity']=='WARN':
-        print(f'    {r[\"rule_id\"]} {r[\"rule_name\"]}: {r[\"detail\"]}')
-" 2>/dev/null || true
+echo "[3.5/8] SKILL.md 规范审查（跳过，由 git-sync.py 内联审计）..."
+echo ""
         fi
         python "$SCRIPT_DIR/skill_audit.py" audit "$SKILLS_DIR/$SKILL_NAME" \
             --manifest-version "${MANIFEST_VER:-}" 2>/dev/null || true

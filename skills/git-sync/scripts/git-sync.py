@@ -16,9 +16,19 @@ from datetime import datetime
 
 # R-12 审计锚点：数据目录字面量声明
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
 SKILL_DIR = Path(__file__).resolve().parent.parent
 # 运行时绝对路径
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
 
 # ── 强制 UTF-8 输出（Windows 终端兼容）────────────────────────────
 if hasattr(sys.stdout, "reconfigure"):
@@ -65,7 +75,6 @@ def _git_env(base_env: dict = None) -> dict:
     env["GIT_CONFIG_KEY_0"] = "credential.helper"
     env["GIT_CONFIG_VALUE_0"] = ""
     return env
-
 
 def run_python(script: Path, *args, capture=False, check=True):
     """运行 scripts/ 下的 Python 辅助脚本"""
@@ -416,7 +425,6 @@ def _detect_remote(url_pattern: str) -> str:
             return parts[0]
     return ""
 
-
 def _get_cred_url(host: str) -> str:
     """从 ~/.git-credentials 读取含凭证的 URL，精确匹配 host"""
     cred_file = Path.home() / ".git-credentials"
@@ -437,7 +445,6 @@ def _get_cred_url(host: str) -> str:
             best = line
             break  # 精确匹配，直接用
     return best
-
 
 def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """
@@ -479,7 +486,6 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
         run_git("remote", "set-url", remote_name, raw_url,
                  workdir=WORK_REPO, check=False)
 
-
 def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """用凭证嵌入 URL 直接 pull，完全绕开 CredentialHelperSelector"""
     r = run_git("remote", "get-url", remote_name,
@@ -510,7 +516,6 @@ def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     finally:
         run_git("remote", "set-url", remote_name, raw_url,
                  workdir=WORK_REPO, check=False)
-
 
 def step_commit_and_push(skill_name: str, version: str):
     log(6, 8, "提交并推送...")
