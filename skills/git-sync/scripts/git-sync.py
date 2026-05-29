@@ -846,15 +846,17 @@ def main():
         else:
             print(f"  ✅ 脱敏状态：未扫描（--skip-scan）")
 
-        # 4. 文件筛选状态
+        # 4. 文件筛选状态（三档）
         f_info = audit_result.get("filter", {})
         violations = f_info.get("violations", [])
         if violations:
-            print(f"  ⚠️  文件筛选状态：有 {len(violations)} 处遗漏")
+            print(f"  ⚠️  文件筛选状态：有 {len(violations)} 个不应打包的文件")
             for v in violations[:5]:
                 print(f"     - {v}")
+        elif audit_result.get("summary", {}).get("errors", 0) > 0:
+            print(f"  ❌  文件筛选状态：检查失败")
         else:
-            print(f"  ✅ 文件筛选状态：PASS（无遗漏文件）")
+            print(f"  ✅ 文件筛选状态：干净（无多余文件）")
     else:
         print("  审计结论：未执行或执行失败")
 
