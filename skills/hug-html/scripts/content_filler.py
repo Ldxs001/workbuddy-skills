@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# content_filler.py — Grid-aware 内容填充器 v2.1.0
+# content_filler.py — Grid-aware 内容填充器 v2.1.2
 # 用法:
 #   python content_filler.py fill --template <path> --content <json> --output <path>
 #   python content_filler.py auto --template <path> --output <path>
@@ -11,6 +11,14 @@ import re
 import sys
 import traceback
 from pathlib import Path
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+
+SKILL_DIR = Path(__file__).parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+OUTPUT_DIR = DATA_DIR / "output"
 
 SAVED_HTML = {}  # 保存最近处理的 HTML，以便出错时提供上下文
 

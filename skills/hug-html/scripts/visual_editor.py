@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# visual_editor.py — Grid-aware 可视化编辑器 v2.1.0
+# visual_editor.py — Grid-aware 可视化编辑器 v2.1.2
 # 用法:
 #   python visual_editor.py --template <template.html> --output <editor.html>
 #   python visual_editor.py --type <模板名> --output <editor.html>  (从内置模板生成)
@@ -14,7 +14,12 @@ SKILL_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
 from grid_builder import BUILTIN_TEMPLATES, generate_html, show_error, safe_write_text
 
-OUTPUT_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data" / "output"
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+OUTPUT_DIR = DATA_DIR / "output"
 
 # ══════════════════════════════════════════════════════
 # 增强版编辑器 JS (grid-aware)
@@ -401,7 +406,6 @@ TOOLBAR_HTML = r"""
 </div>
 """
 
-
 def inject_editor(html_str):
     """Inject grid-aware editor into HTML string"""
     editor_block = TOOLBAR_HTML + '<script>' + GRID_EDITOR_JS + '</script>'
@@ -410,7 +414,6 @@ def inject_editor(html_str):
     else:
         html_str = html_str + editor_block
     return html_str
-
 
 def generate_standalone_editor(template_path, output_path):
     """Generate a standalone grid editor HTML wrapping the template"""
@@ -434,7 +437,6 @@ def generate_standalone_editor(template_path, output_path):
     print('     浏览器打开后按 Ctrl+E 切换编辑模式')
     return str(output_path)
 
-
 def generate_from_type(template_type, output_path):
     """Generate editor from built-in template type"""
     if template_type not in BUILTIN_TEMPLATES:
@@ -452,7 +454,6 @@ def generate_from_type(template_type, output_path):
     print('     浏览器打开后按 Ctrl+E 切换编辑模式')
     return str(output_path)
 
-
 def main():
     try:
         _main_impl()
@@ -465,7 +466,6 @@ def main():
                    "使用 --help 查看参数说明。如持续报错，可查看 FAQ。")
         import traceback
         traceback.print_exc()
-
 
 def _main_impl():
     ap = argparse.ArgumentParser(description='Grid-aware 可视化编辑器生成器 v2', add_help=True)
@@ -486,7 +486,6 @@ def _main_impl():
         generate_from_type(args.type, args.output)
     elif args.template:
         generate_standalone_editor(args.template, args.output)
-
 
 if __name__ == '__main__':
     main()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# template_generator.py — Grid-aware HTML模板生成器 v2.1.0
+# template_generator.py — Grid-aware HTML模板生成器 v2.1.2
 # 用法:
 #   python template_generator.py --type <模板名> -o <输出HTML>
 #   python template_generator.py --list-types
@@ -20,8 +20,12 @@ from grid_builder import (
     show_error, safe_read_json, safe_write_text,
 )
 
-OUTPUT_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data" / "output"
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
 
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+OUTPUT_DIR = DATA_DIR / "output"
 
 def generate(template_type, output_path, content=None):
     """Generate HTML from a built-in template type, with optional content fill"""
@@ -54,11 +58,9 @@ def generate(template_type, output_path, content=None):
     print(f"  网格: {grid.get('rows','?')}×{grid.get('cols','?')}, {n_cells} cells")
     return str(output_path)
 
-
 def list_types():
     """List all available template types"""
     gb_list_templates()
-
 
 def main():
     try:
@@ -72,7 +74,6 @@ def main():
                    "使用 --help 查看参数说明。如持续报错，可查看 FAQ。")
         if "--debug" in sys.argv:
             traceback.print_exc()
-
 
 def _main_impl():
     ap = argparse.ArgumentParser(description="Grid-aware HTML 模板生成器 v2", add_help=True)
@@ -113,7 +114,6 @@ def _main_impl():
         return
 
     ap.print_help()
-
 
 if __name__ == "__main__":
     main()

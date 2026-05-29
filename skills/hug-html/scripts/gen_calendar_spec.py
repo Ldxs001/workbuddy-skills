@@ -4,6 +4,14 @@ import json, sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+
+# 内置模板目录（位于安装目录下，跟随技能发布）
 TEMPLATES_DIR = SKILL_DIR / "scripts" / "templates"
 
 HEADER_HTML = """\

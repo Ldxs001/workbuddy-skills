@@ -1,5 +1,23 @@
 # Changelog — hug-html
 
+
+
+## v2.1.2 (2026-05-30) — skill-standardization 改造 + R-12 脚本补全
+
+### Changed
+- 版本号 v2.1.1 → v2.1.2（SKILL.md + _meta.json + 脚本版本字符串三端统一）
+- SKILL.md frontmatter 补全 description 字段
+- SKILL.md 缩减至 ≤230 行（删除冗余空白行和 H1 标题）
+- 尾部版本声明更新为 2.1.2
+- 删除 references/faq-q4-fixed.md 遗留文件
+- template_generator.py / visual_editor.py / content_filler.py: 补充 DEFAULT_DATA_DIR_RAW + DATA_DIR R-12 定义
+- gen_calendar_spec.py: 补充 DEFAULT_DATA_DIR_RAW + DATA_DIR，保留 TEMPLATES_DIR 指向内置模板
+- _meta.json: 补充 data_dir 字段
+
+### Fixed
+- SKILL.md 版本号与 _meta.json 不一致问题
+- 4 个脚本缺少 R-12 合规的数据目录变量声明
+
 ## v2.1.1 (2026-05-29) — skill-standardization 合规修正
 
 ### Changed

@@ -1,8 +1,9 @@
 ---
 name: hug-html
+version: 2.1.2
 author: Ldxs
 license: MIT
-description: >
+description: Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -10,7 +11,6 @@ data_dir: ../.standardization/hug-html/data/
 external_data_dir: true
 faq_quality: improve_qa
 antipattern_detail: add_detail
-version: 2.1.1
 ---
 
 
@@ -18,7 +18,6 @@ version: 2.1.1
 
 
 
-# hug-html
 
 ## 触发场景
 
@@ -234,4 +233,4 @@ python scripts/grid_builder.py --export-interfaces "data/output/interfaces.json"
 
 > 完整错误排查指南见 `references/faq.md`。
 
-> 版本 2.1.0 — 全面中文异常处理：所有脚本输出的英文 Traceback 改为中文错误提示+修复建议；新增能力边界定义和错误排查指引。
+> 版本 2.1.2 — 全面中文异常处理：所有脚本输出的英文 Traceback 改为中文错误提示+修复建议；新增能力边界定义和错误排查指引。
