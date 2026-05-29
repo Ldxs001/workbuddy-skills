@@ -1,138 +1,191 @@
-# hug-html 完整使用教程
+# guide.md — hug-html 完整使用教程 (v2 网格架构)
 
-HTML 模板生成技能，支持可视化编辑、模块库组装、样式预设。
+HTML 网格化模块生成技能，支持可配置的 N×M 网格布局、单元格合并、双层模块体系。
 
 ---
 
 ## 快速开始
 
-### 1. 生成 HTML 模板
+### 1. 查看所有可用基础模块
 
 ```bash
-python "scripts/template_generator.py" --output "data/output/template.html" --type promo
+python "scripts/grid_builder.py" --list-modules
 ```
 
-`--type` 选项：
-- `promo` — 宣传面板（粉紫渐变）
-- `product` — 产品介绍（绿青渐变）
-- `tech` — 技术说明（深色代码风格）
-- `flow` — 流程明白纸（橙黄渐变）
-
-### 2. 生成可视化编辑界面
+### 2. 查看所有内置模板
 
 ```bash
-python "scripts/visual_editor.py" --template "data/output/template.html" --output "data/output/editor.html"
+python "scripts/grid_builder.py" --list-templates
 ```
 
-生成的 `editor.html` 可直接在浏览器打开，支持：
-- 点击文字区域直接编辑
-- 点击图片更换 URL
-- 顶部工具栏：加粗/斜体/下划线、字色/背景色、字号、透明度
-- 图片样式：圆形裁剪 / 封面填充 / Logo 左上 / 完整显示
-- 快捷键：`Ctrl+E` 进入/退出编辑，`Ctrl+S` 生成最终 HTML
-
-### 3. 模块库组装
+### 3. 从内置模板生成 HTML
 
 ```bash
-# 查看所有可用模块
-python "scripts/module_assembler.py" --list
+# App 推广卡片
+python "scripts/template_generator.py" --type harmony-app -o "data/output/my-card.html"
 
-# 组装指定模块
-python "scripts/module_assembler.py" --modules "color:gradient-purple,font:title-large,image:img-cover,layout:two-col" --output "data/output/assembled.html"
+# 双端推广卡片
+python "scripts/template_generator.py" --type harmony-dual -o "data/output/dual-card.html"
+
+# 周历仪表板
+python "scripts/template_generator.py" --type calendar-dashboard -o "data/output/calendar.html"
 ```
 
-模块分类：
-| 分类 | 模块示例 |
-|------|---------|
-| `color` | `gradient-purple`, `gradient-blue`, `solid-primary`, `transparent-card` |
-| `font` | `title-large`, `title-medium`, `body-text`, `caption`, `mono-code` |
-| `image` | `img-circle`, `img-logo`, `img-cover`, `img-contain` |
-| `layout` | `two-col`, `three-col-cards`, `centered` |
-| `effect` | `fade-in`, `hover-scale`, `divider`, `spacer` |
-| `template` | `promo-panel`, `product-intro`, `tech-block`, `flow-step` |
-| `style` | `business`, `academic`, `festive`, `mourning` |
+### 4. 从自定义 Grid Spec 生成
 
-### 4. 内容填充
+```bash
+python "scripts/grid_builder.py" --spec "data/templates/3x3-merge.json" -o "data/output/3x3.html"
+```
+
+### 5. 生成可视化编辑界面
+
+```bash
+python "scripts/visual_editor.py" --template "data/output/my-card.html" -o "data/output/editor.html"
+# 或用内置模板直接生成
+python "scripts/visual_editor.py" --type harmony-app -o "data/output/editor.html"
+# 打开后按 Ctrl+E 进入编辑模式
+```
+
+### 6. 内容填充
 
 ```bash
 # 自动填充示例内容
-python "scripts/content_filler.py" --template "data/output/template.html" --auto --output "data/output/filled.html"
+python "scripts/content_filler.py" auto --template "data/output/template.html" --output "data/output/filled.html"
 
 # 用 JSON 文件填充
-python "scripts/content_filler.py" --template "data/output/template.html" --content "data/config/content.json" --output "data/output/final.html"
-
-# 从 HTML 提取内容到 JSON
-python "scripts/content_filler.py" --extract "data/output/editor.html" --output "data/config/content.json"
+python "scripts/content_filler.py" fill --template "data/output/template.html" --content "data/config/content.json" --output "data/output/final.html"
 ```
 
 ---
 
-## 图片处理说明
+## 核心架构
 
-本技能**用 HTML/CSS 实现图片效果**，无需真实图片处理库：
+### 四层体系
 
-| 效果 | CSS 实现方式 |
-|------|-------------|
-| 圆形裁剪（头像/Logo） | `border-radius: 50%; object-fit: cover` |
-| Logo 左上角 | `position: absolute; top: 12px; left: 12px; width: 80px` |
-| 封面填充 | `width: 100%; height: 200px; object-fit: cover` |
-| 完整显示（不变形） | `width: 100%; height: auto; object-fit: contain` |
-| 透明度 | `opacity: 0.9`（或 0.7 / 0.5 / 0.3） |
+```
+骨架 (Skeleton)
+├── 骨架结构 — N×M 网格、行列数、单元格合并(rowspan/colspan)、gap间距
+└── 骨架样式 — 底板背景/渐变/透明度、外阴影、外边框、圆角、内外边距
 
----
+模块 (Modules)  ← 模块模板 = {模块结构 + 模块样式} 预置组合
+├── 模块结构 — 复合模块的 HTML 骨架
+└── 模块样式 — 模块级的视觉样式（由 base 模块提供）
 
-## 样式预设
-
-| 预设名 | 适用场景 | 主色调 |
-|---------|---------|---------|
-| `business` | 商务报告、正式文档 | 深蓝灰 `#1a2a4a` |
-| `academic` | 科研论文、技术报告 | 黑 `#333` + 宋体 |
-| `festive` | 婚庆、节日、庆典 | 红金 `#c0392b` + 金 `#FFD700` |
-| `mourning` | 讣告、悼念 | 黑白灰素雅 |
-| `tech` | 技术文档、代码说明 | 深灰 `#2D3436` + Consolas |
-
----
-
-## 调用链（skill-sub）
-
-本技能已注册以下调用链（见 `references/call-chains.md`）：
-
-1. **generate-html** — 从需求到最终 HTML 的完整流程
-2. **edit-html** — 生成模板 → 生成编辑界面 → 用户编辑 → 导出最终 HTML
-3. **assemble-with-modules** — 选择模块 → 组装 → 填充内容 → 输出
-
----
-
-## 可编辑区域标准接口
-
-所有模板使用 `data-field="<字段名>"` 标识可编辑区域，方便程序化填充：
-
-```html
-<h1 class="edit-text" data-field="title">可编辑标题</h1>
-<p class="edit-text" data-field="desc">可编辑描述</p>
-<img class="editable-img" data-field="image" src="...">
+基础 (Base/Primitives)
+└── 基础样式 — 作用于具体文字/元素的 CSS 原语
 ```
 
-`content_filler.py` 通过 `data-field` 属性自动定位并替换内容。
+### 两层级模块体系
+
+```
+基础模块 (base)      →    复合模块 (composite)     →    放入网格格子
+CSS 原语                  可复用 HTML 组件
+─────────────────────────────────────────────────────
+font-size-xl               header-entity
+color-dark                 main-title
+bg-glass                   qr-card / qr-dual
+radius-xl                  feature-panel
+shadow-glass               comms-panel
+img-circle                 footer-caption
+flex-center                text-block / text-img-right
+...                        param-panel / data-table / stat-card
+```
+
+### Grid Spec 格式
+
+```json
+{
+  "name": "模板名称",
+  "desc": "描述",
+  "card_style": {
+    "max_width": "400px",
+    "bg": "rgba(255,255,255,0.82)",
+    "border_radius": "36px",
+    "padding": "24px 20px"
+  },
+  "grid": {
+    "rows": 6,
+    "cols": 1,
+    "gap": "0",
+    "cells": [
+      {"id": "header", "row": 0, "col": 0, "module": "composite:header-entity"},
+      {"id": "merged", "row": 1, "col": 0, "colspan": 2, "rowspan": 2,
+       "module": "composite:feature-panel", "style": {"background": "#f5f5f5"}},
+      {"id": "custom", "row": 2, "col": 0, "colspan": 3,
+       "html": "<div data-field='custom'>自定义HTML内容</div>"}
+    ]
+  }
+}
+```
+
+### 单元格合并
+
+通过 `colspan` 和 `rowspan` 实现合并效果：
+- `colspan: 2` — 跨 2 列
+- `rowspan: 2` — 跨 2 行
+- 两者同时使用 — 跨 2 列 2 行
 
 ---
 
-## 输出文件位置
+## 内置模板列表
 
-所有输出默认保存在：
+| 模板名 | 来源 | 网格 | 说明 |
+|--------|------|------|------|
+| `harmony-app` | 刻在石头上 | 6×1 | App 推广毛玻璃卡片 |
+| `harmony-dual` | 灯球色盘 | 6×1 | 双端（应用+元服务）推广卡片 |
+| `calendar-dashboard` | 智能周历 | 5×3 | **完全交互式仪表板**：年份控制、周末规则、假日区间CRUD、补班管理、每周日历视图、总工日统计 |
+| `promo` | 原 promo 模板 | 3×3 | 活动宣传面板（卡片网格） |
+| `3x3-merge` | — | 3×3 | 单元格合并演示 |
+| `4x2-app-card` | — | 4×2 | 应用推广卡（左右分栏） |
+| `3x3-mixed-styles` | — | 3×3 | 每格不同样式演示 |
+
+---
+
+## 基础模块 (Base Modules)
+
 ```
-C:/Users/sm001/.workbuddy/skills/hug-html/data/output/
+# 字体大小: font-size-xxl / xl / lg / md / sm / xs / xxs
+# 字体颜色: color-dark / mid / light / white / primary / gradient-text
+# 背景: bg-white / transparent / light-blue / glass / dark / gradient-*
+# 圆角: radius-sm / md / lg / xl / full / pill
+# 间距: pad-xs / sm / md / lg / xl
+# 阴影: shadow-sm / md / lg / glass
+# 边框: border-glass / light / bottom / divider-*
+# 图片: img-circle / cover / contain / logo
+# 布局: flex-center / between / col / text-center / text-left / gap-*
+# 透明度: opacity-100 / 90 / 70 / 50
+# 动画: anim-fade / slide / hover-scale
 ```
 
 ---
 
-## 常见问题
+## 复合模块 (Composite Modules)
 
-**Q: 生成的 HTML 在浏览器中打开后中文乱码？**
-A: 确认 HTML 含 `<meta charset="UTF-8">`，且文件以 UTF-8 编码保存（本技能默认 UTF-8）。
+| 模块名 | 用途 | 槽位 (data-field) |
+|--------|------|-------------------|
+| `header-entity` | 单实体头部（图标+名称+标签） | entity-name, entity-badge |
+| `header-dual` | 双实体头部（左应用+右元服务） | app-name, app-badge, service-name, service-badge |
+| `main-title` | 渐变文字主标题+副标题+底边线 | main-title, main-sub |
+| `qr-card` | 单张二维码卡片 | qr-image, qr-label, qr-hint |
+| `qr-dual` | 双二维码并排 | qr-image-left/right, qr-label-left/right |
+| `feature-panel` | 特性面板（多行图标+文字） | feature-icon-N, feature-text-N |
+| `comms-panel` | 多端通信面板（设备标签+协议） | 设备标签内容 |
+| `footer-caption` | 底部分隔线+标签组 | footer-tag-1/2/3 |
+| `small-note` | 极小注释文字 | note-text |
+| `text-block` | 纯文本块（标题+多行正文） | tb-title, tb-body, tb-body-2 |
+| `text-img-right` | 左文右图组合 | ti-title, ti-desc |
+| `param-panel` | 参数配置面板 | param-title, param-1/2 |
+| `data-table` | 数据表格（表头+行） | th-1/2, td-row*-col* |
+| `stat-card` | 数据统计卡片 | stat-label, stat-value |
 
-**Q: 可视化编辑器点击没有反应？**
-A: 确认浏览器 JS 未被禁用；打开浏览器控制台（F12）查看是否有报错。
+---
 
-**Q: 如何添加自定义模块？**
-A: 编辑 `data/modules/modules.json`，或调用 `module_assembler.py --save` 根据当前 `MODULE_LIB` 重新生成。
+## 可视化编辑器功能
+
+- **Ctrl+E** — 进入/退出编辑模式
+- **格子选择** — 点击格子 → 弹出属性面板
+- **字段编辑** — 点击带 data-field 的文字区域直接编辑
+- **工具栏** — 加粗/斜体/下划线、字色、背景色、字号、透明度
+- **网格概览** — 点击"📋 网格"按钮查看所有格子
+- **格子属性** — 右下角面板可调整底板颜色和内边距
+- **Ctrl+S** — 导出最终 HTML

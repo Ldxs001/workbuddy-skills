@@ -1,13 +1,15 @@
 {
   "name": "hug-html",
-  "version": "1.0.1",
-  "description": "HTML template generator with visual editor, module library, and style presets. Supports template generation, WYSIWYG editing, batch content filling, and reusable code modules.",
+  "version": "2.0.2",
+  "description": "Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as.",
   "author": "Ldxs",
   "tags": [
     "html",
+    "grid",
     "template",
     "visual-editor",
     "module-library",
-    "style-presets"
+    "style-presets",
+    "layout"
   ]
 }

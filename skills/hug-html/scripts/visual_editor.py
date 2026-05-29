@@ -1,227 +1,416 @@
 #!/usr/bin/env python3
-# visual_editor.py - Generate standalone visual editor HTML
-# Usage: python visual_editor.py --template <template.html> --output <editor.html>
+# visual_editor.py — Grid-aware 可视化编辑器 v2.0.0
+# 用法:
+#   python visual_editor.py --template <template.html> --output <editor.html>
+#   python visual_editor.py --type <模板名> --output <editor.html>  (从内置模板生成)
+#
+# 增强功能:
+#   - 网格视图显示 (显示所有格子编号)
+#   - 格子选择器 (点击格子高亮)
+#   - 格子属性面板 (背景色/间距/模块选择)
+#   - 模块填充界面
+#   - 行/列管理
 
 import argparse
 import sys
 from pathlib import Path
-from html.parser import HTMLParser
 
-EDITOR_JS = r"""
-// === Visual Editor Core ===
+SKILL_DIR = Path(__file__).parent.parent
+
+sys.path.insert(0, str(SKILL_DIR / "scripts"))
+from grid_builder import BUILTIN_TEMPLATES, generate_html
+
+OUTPUT_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data" / "output"
+
+# ══════════════════════════════════════════════════════
+# 增强版编辑器 JS (grid-aware)
+# ══════════════════════════════════════════════════════
+
+GRID_EDITOR_JS = r"""
+// === Grid-Aware Visual Editor v2 ===
 let editorOpen = false;
-let currentEditable = null;
+let selectedCell = null;
+let selectedField = null;
+let cellSelectorVisible = false;
 
-function initEditor() {
-  // Make all [data-field] elements editable
-  document.querySelectorAll('[data-field]').forEach(el => {
-    el.classList.add('ve-editable');
-    el.addEventListener('click', () => openFieldEditor(el));
-    el.style.outline = '2px dashed #6C63FF';
-    el.style.cursor = 'pointer';
-    el.style.padding = '4px 6px';
-    el.style.borderRadius = '4px';
-    el.style.minHeight = '1.2em';
-  });
+// Editor state
+const EDITOR_STATE = {
+    fields: {},
+    cells: {},
+};
 
-  // Make all .editable-img clickable
-  document.querySelectorAll('.editable-img, [data-field="image"]').forEach(img => {
-    img.style.cursor = 'pointer';
-    img.addEventListener('click', (e) => { e.stopPropagation(); openImagePicker(img); });
-    img.style.outline = '2px dashed #FF6584';
-    img.style.outlineOffset = '2px';
-  });
+// Initialize editor
+function initGridEditor() {
+    // Make all [data-field] elements editable
+    document.querySelectorAll('[data-field]').forEach(el => {
+        el.classList.add('ge-editable');
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectField(el);
+        });
+        el.style.outline = '2px dashed #6C63FF';
+        el.style.cursor = 'pointer';
+        el.style.padding = '4px 6px';
+        el.style.borderRadius = '4px';
+        el.style.minHeight = '1.2em';
+    });
 
-  // Make all [data-module] elements highlightable
-  document.querySelectorAll('[data-module]').forEach(el => {
-    el.style.outline = '1px dashed #00B894';
-    el.style.outlineOffset = '2px';
-    el.style.cursor = 'grab';
-  });
+    // Make all grid cells selectable
+    document.querySelectorAll('.grid-cell').forEach(cell => {
+        cell.style.outline = '1px solid #d0dae8';
+        cell.style.outlineOffset = '2px';
+        cell.style.cursor = 'pointer';
+        cell.style.position = 'relative';
+        cell.addEventListener('click', (e) => {
+            if (e.target === cell || e.target.closest('.grid-cell') === cell) {
+                selectCell(cell);
+                e.stopPropagation();
+            }
+        });
+    });
 
-  showToolbar();
-  editorOpen = true;
-  console.log('[Editor] ✅ 编辑模式已启动 — 点击可编辑区域开始修改');
+    // Show cell labels
+    document.querySelectorAll('.grid-cell').forEach((cell, idx) => {
+        const id = cell.id || 'cell-' + idx;
+        if (!cell.querySelector('.ge-cell-label')) {
+            const label = document.createElement('div');
+            label.className = 'ge-cell-label';
+            label.textContent = id.replace('cell-', '');
+            label.style.cssText = 'position:absolute;top:-10px;left:4px;background:#6C63FF;color:white;font-size:10px;padding:0 6px;border-radius:4px;z-index:10;opacity:0.7;';
+            cell.appendChild(label);
+        }
+    });
+
+    showGridToolbar();
+    editorOpen = true;
+    console.log('[Grid Editor] ✅ 网格编辑模式已启动');
+    console.log('[Grid Editor] 💡 点击格子编号区域选择格子，点击可编辑内容进行修改');
 }
 
-function openFieldEditor(el) {
-  currentEditable = el;
-  const val = el.innerText || el.textContent || '';
-  const bar = document.getElementById('ve-toolbar');
-  bar.style.display = 'flex';
-  document.getElementById('ve-field-name').textContent = el.getAttribute('data-field') || '(选中元素)';
-  el.focus();
+function selectCell(cellEl) {
+    // Deselect previous
+    if (selectedCell) {
+        selectedCell.style.outline = '1px solid #d0dae8';
+        selectedCell.style.backgroundColor = '';
+    }
+    // Select
+    selectedCell = cellEl;
+    cellEl.style.outline = '3px solid #6C63FF';
+    cellEl.style.backgroundColor = 'rgba(108,99,255,0.05)';
+
+    // Update toolbar info
+    const id = cellEl.id || 'unknown';
+    document.getElementById('ge-cell-id').textContent = '格子: ' + id.replace('cell-', '');
+    document.getElementById('ge-cell-id').style.display = 'inline';
+    document.getElementById('ge-field-name').textContent = '(未选中字段)';
+
+    // Show cell panel
+    showCellPanel(id);
 }
 
-function openImagePicker(imgEl) {
-  const url = prompt('输入图片 URL（留空使用占位图）：', imgEl.src || '');
-  if (url === null) return;
-  if (url.trim() === '') {
-    imgEl.src = 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27200%27%3E%3Crect fill=%27%23ddd%27 width=%27600%27 height=%27200%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 dominant-baseline=%27middle%27 text-anchor=%27middle%27 fill=%27%23999%27%3E点击上传图片%3C/text%3E%3C/svg%3E';
-  } else {
-    imgEl.src = url;
-  }
-  // Apply image style from select
-  const style = document.getElementById('ve-img-style').value;
-  applyImageStyle(imgEl, style);
+function selectField(el) {
+    selectedField = el;
+    document.getElementById('ge-field-name').textContent = el.getAttribute('data-field') || '(选中字段)';
+    el.focus();
 }
 
-function applyImageStyle(img, style) {
-  img.className = img.className.replace(/img-\\w+/g, '').trim();
-  if (style === 'circle') img.classList.add('img-circle');
-  else if (style === 'cover') img.classList.add('img-cover');
-  else if (style === 'logo') img.classList.add('img-logo');
-  else if (style === 'contain') img.classList.add('img-contain');
-  // Size
-  const w = document.getElementById('ve-img-w').value;
-  const h = document.getElementById('ve-img-h').value;
-  if (w) img.style.width = w;
-  if (h && h !== 'auto') img.style.height = h;
+function showCellPanel(cellId) {
+    const panel = document.getElementById('ge-cell-panel');
+    if (!panel) return;
+    panel.style.display = 'flex';
+
+    // Load cell bg if present
+    const cell = document.getElementById(cellId);
+    if (cell) {
+        const bg = cell.style.backgroundColor || '';
+        document.getElementById('ge-cell-bg').value = rgbToHex(bg) || '#ffffff';
+    }
 }
+
+function rgbToHex(rgb) {
+    if (!rgb || rgb === 'transparent') return '#ffffff';
+    const match = rgb.match(/\d+/g);
+    if (!match || match.length < 3) return '#ffffff';
+    return '#' + [0,1,2].map(i => parseInt(match[i]).toString(16).padStart(2,'0')).join('');
+}
+
+function applyCellBg() {
+    if (!selectedCell) return;
+    const color = document.getElementById('ge-cell-bg').value;
+    selectedCell.style.backgroundColor = color;
+}
+
+function applyCellPadding() {
+    if (!selectedCell) return;
+    const pad = document.getElementById('ge-cell-pad').value;
+    selectedCell.style.padding = pad;
+}
+
+function toggleCellSelector() {
+    if (cellSelectorVisible) {
+        document.getElementById('ge-cell-selector').style.display = 'none';
+        cellSelectorVisible = false;
+        return;
+    }
+    // Show grid overview with all cells
+    const selector = document.getElementById('ge-cell-selector');
+    if (!selector) return;
+    selector.style.display = 'block';
+    selector.innerHTML = '<div style="font-weight:bold;margin-bottom:8px;">📋 网格概览</div>';
+    document.querySelectorAll('.grid-cell').forEach((cell, idx) => {
+        const id = cell.id || 'cell-' + idx;
+        const btn = document.createElement('button');
+        btn.textContent = id.replace('cell-', '');
+        btn.style.cssText = 'margin:4px;padding:6px 12px;background:#eef2ff;border:1px solid #6C63FF;border-radius:8px;cursor:pointer;font-size:12px;';
+        btn.onclick = () => {
+            cell.scrollIntoView({behavior:'smooth', block:'center'});
+            selectCell(cell);
+            document.getElementById('ge-cell-selector').style.display = 'none';
+            cellSelectorVisible = false;
+        };
+        selector.appendChild(btn);
+    });
+    cellSelectorVisible = true;
+}
+
+// ── 编辑工具栏功能 ──
 
 function applyColor() {
-  const f = document.getElementById('ve-field-name').textContent;
-  const c = document.getElementById('ve-color-picker').value;
-  if (f && f !== '(选中元素)') {
-    const el = document.querySelector('[data-field="' + f + '"]');
-    if (el) el.style.color = c;
-  } else if (currentEditable) {
-    currentEditable.style.color = c;
-  }
+    if (!selectedField) return;
+    const c = document.getElementById('ge-color-picker').value;
+    selectedField.style.color = c;
 }
 
 function applyBgColor() {
-  const f = document.getElementById('ve-field-name').textContent;
-  const c = document.getElementById('ve-bg-picker').value;
-  if (f && f !== '(选中元素)') {
-    const el = document.querySelector('[data-field="' + f + '"]');
-    if (el) el.style.backgroundColor = c;
-  } else if (currentEditable) {
-    currentEditable.style.backgroundColor = c;
-  }
-}
-
-function applyFontSize() {
-  const s = document.getElementById('ve-font-size').value;
-  if (currentEditable && s) currentEditable.style.fontSize = s + 'px';
+    if (!selectedField) return;
+    const c = document.getElementById('ge-bg-picker').value;
+    selectedField.style.backgroundColor = c;
 }
 
 function applyOpacity() {
-  const v = document.getElementById('ve-opacity').value;
-  if (currentEditable) currentEditable.style.opacity = v;
+    if (!selectedField) return;
+    const v = document.getElementById('ge-opacity').value;
+    selectedField.style.opacity = v;
 }
 
-function toggleBold()  { document.execCommand('bold'); }
-function toggleItalic()  { document.execCommand('italic'); }
-function toggleUnderline() { document.execCommand('underline'); }
+// ── 字体/字重/字号/字色 独立控制 ──
+
+function getActiveEditorEl() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+        let node = sel.getRangeAt(0).startContainer;
+        while (node && node.nodeType === 3) node = node.parentNode;
+        return node ? node.closest('[data-field]') || node.closest('[contenteditable]') : null;
+    }
+    return selectedField || null;
+}
+
+function applyFontFamily() {
+    const el = getActiveEditorEl();
+    if (!el) return;
+    el.style.fontFamily = document.getElementById('ge-font-family').value;
+}
+
+function applyFontWeight() {
+    const el = getActiveEditorEl();
+    if (!el) return;
+    el.style.fontWeight = document.getElementById('ge-font-weight').value;
+}
+
+function applyFontSizeVE() {
+    const el = getActiveEditorEl();
+    if (!el) return;
+    el.style.fontSize = document.getElementById('ge-font-size').value;
+}
+
+function applyFontColor() {
+    const el = getActiveEditorEl();
+    if (!el) return;
+    el.style.color = document.getElementById('ge-color-picker').value;
+}
+
+// ── 导出与预览 ──
 
 function exportFinalHTML() {
-  // Clone and clean
-  const container = document.querySelector('.template-container') || document.body;
-  const clone = container.cloneNode(true);
+    const container = document.querySelector('.grid-card') || document.body;
+    const clone = container.cloneNode(true);
 
-  // Remove editor UI
-  clone.querySelectorAll('.ve-editable,.ve-toolbar,.ve-overlay').forEach(el => el.remove());
-  clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
-  clone.querySelectorAll('style').forEach(s => {
-    s.textContent = s.textContent.replace(/\.ve-[\s\S]*?}/g, ''); // strip editor styles
-  });
+    // Remove editor UI elements
+    clone.querySelectorAll('.ge-editable, .ge-toolbar, .ge-overlay, .ge-cell-label, #ge-cell-panel, #ge-init-hint, #ge-cell-selector').forEach(el => el.remove());
+    clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
 
-  const finalHTML = '<!DOCTYPE html>\n' + clone.outerHTML;
-  const blob = new Blob([finalHTML], {type: 'text/html;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'final-' + Date.now() + '.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  alert('✅ 最终 HTML 已下载！');
+    const finalHTML = '<!DOCTYPE html>\n' + clone.outerHTML;
+    const blob = new Blob([finalHTML], {type: 'text/html;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'final-' + Date.now() + '.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    alert('✅ 最终 HTML 已下载！');
 }
 
 function previewHTML() {
-  const container = document.querySelector('.template-container') || document.body;
-  const clone = container.cloneNode(true);
-  clone.querySelectorAll('.ve-editable,.ve-toolbar,.ve-overlay').forEach(el => el.remove());
-  const w = window.open('', '_blank');
-  w.document.write('<!DOCTYPE html>\n' + clone.outerHTML);
-  w.document.close();
+    const container = document.querySelector('.grid-card') || document.body;
+    const clone = container.cloneNode(true);
+    clone.querySelectorAll('.ge-editable, .ge-toolbar, .ge-overlay, .ge-cell-label').forEach(el => el.remove());
+    const w = window.open('', '_blank');
+    w.document.write('<!DOCTYPE html>\n' + clone.outerHTML);
+    w.document.close();
 }
 
 function closeEditor() {
-  document.querySelectorAll('.ve-editable').forEach(el => {
-    el.style.outline = '';
-    el.style.cursor = '';
-  });
-  document.getElementById('ve-toolbar').style.display = 'none';
-  editorOpen = false;
+    document.querySelectorAll('.ge-editable').forEach(el => {
+        el.style.outline = '';
+        el.style.cursor = '';
+        el.style.padding = '';
+    });
+    document.querySelectorAll('.grid-cell').forEach(el => {
+        el.style.outline = '';
+        el.style.cursor = '';
+    });
+    document.getElementById('ge-toolbar').style.display = 'none';
+    const panel = document.getElementById('ge-cell-panel');
+    if (panel) panel.style.display = 'none';
+    const sel = document.getElementById('ge-cell-selector');
+    if (sel) sel.style.display = 'none';
+    editorOpen = false;
+    selectedCell = null;
+    selectedField = null;
 }
 
-// Keyboard shortcut
+// Drag & drop image support
+document.addEventListener('dragover', e => {
+    const t = e.target.closest('img');
+    if (t && editorOpen) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; t.style.outline = '3px solid #00B894'; }
+});
+document.addEventListener('dragleave', e => {
+    const t = e.target.closest('img');
+    if (t) t.style.outline = '';
+});
+document.addEventListener('drop', e => {
+    e.preventDefault();
+    const t = e.target.closest('img');
+    if (!t || !editorOpen) return;
+    const f = e.dataTransfer.files[0];
+    if (!f || !f.type.startsWith('image/')) { alert('请拖入图片文件'); return; }
+    const r = new FileReader();
+    r.onload = ev => { t.src = ev.target.result; t.style.outline = ''; };
+    r.readAsDataURL(f);
+});
+
+// Keyboard shortcuts
 document.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key === 'e') { e.preventDefault(); editorOpen ? closeEditor() : initEditor(); }
-  if (e.ctrlKey && e.key === 's') { e.preventDefault(); exportFinalHTML(); }
+    if (e.ctrlKey && e.key === 'e') { e.preventDefault(); editorOpen ? closeEditor() : initGridEditor(); }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); exportFinalHTML(); }
 });
 """
 
-TOOLBAR_HTML = """\
-<div id="ve-toolbar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e1e2e;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;font-size:13px;box-shadow:0 2px 12px rgba(0,0,0,0.3);">
-  <span id="ve-field-name" style="color:#6C63FF;font-weight:bold;min-width:80px;">(选中元素)</span>
-  <div style="width:1px;height:20px;background:#555;"></div>
-  <button onclick="toggleBold()" title="加粗" style="background:#333;color:#fff;border:1px solid #666;padding:4px 8px;border-radius:4px;cursor:pointer;font-weight:bold;">B</button>
-  <button onclick="toggleItalic()" title="斜体" style="background:#333;color:#fff;border:1px solid #666;padding:4px 8px;border-radius:4px;cursor:pointer;font-style:italic;">I</button>
-  <button onclick="toggleUnderline()" title="下划线" style="background:#333;color:#fff;border:1px solid #666;padding:4px 8px;border-radius:4px;cursor:pointer;text-decoration:underline;">U</button>
-  <div style="width:1px;height:20px;background:#555;"></div>
-  <label style="color:#ccc;font-size:12px;">🎨字色</label>
-  <input type="color" id="ve-color-picker" value="#6C63FF" onchange="applyColor()" style="width:28px;height:28px;border:none;cursor:pointer;">
-  <label style="color:#ccc;font-size:12px;">🖌️背景</label>
-  <input type="color" id="ve-bg-picker" value="#ffffff" onchange="applyBgColor()" style="width:28px;height:28px;border:none;cursor:pointer;">
-  <label style="color:#ccc;font-size:12px;">🔤字号</label>
-  <select id="ve-font-size" onchange="applyFontSize()" style="background:#333;color:#fff;border:1px solid #666;padding:2px 4px;border-radius:4px;">
-    <option value="">--</option>
-    <option value="12">12px</option>
-    <option value="14">14px</option>
-    <option value="16">16px</option>
-    <option value="18">18px</option>
-    <option value="24">24px</option>
-    <option value="32">32px</option>
-  </select>
-  <label style="color:#ccc;font-size:12px;">👁️透明</label>
-  <select id="ve-opacity" onchange="applyOpacity()" style="background:#333;color:#fff;border:1px solid #666;padding:2px 4px;border-radius:4px;">
-    <option value="1">100%</option>
-    <option value="0.9">90%</option>
-    <option value="0.7">70%</option>
-    <option value="0.5">50%</option>
-    <option value="0.3">30%</option>
-  </select>
-  <div style="width:1px;height:20px;background:#555;"></div>
-  <label style="color:#ccc;font-size:12px;">🖼️图样</label>
-  <select id="ve-img-style" style="background:#333;color:#fff;border:1px solid #666;padding:2px 4px;border-radius:4px;">
-    <option value="">默认</option>
-    <option value="circle">圆形裁剪</option>
-    <option value="cover">覆盖填充</option>
-    <option value="logo">Logo（左上）</option>
-    <option value="contain">完整显示</option>
-  </select>
-  <input type="text" id="ve-img-w" placeholder="宽" value="" style="width:48px;background:#333;color:#fff;border:1px solid #666;padding:2px 4px;border-radius:4px;font-size:12px;">
-  <input type="text" id="ve-img-h" placeholder="高" value="" style="width:48px;background:#333;color:#fff;border:1px solid #666;padding:2px 4px;border-radius:4px;font-size:12px;">
-  <div style="flex:1;"></div>
-  <button onclick="previewHTML()" title="预览" style="background:#3F51B5;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;">👁️ 预览</button>
-  <button onclick="exportFinalHTML()" title="生成最终HTML" style="background:#00B894;color:#fff;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:bold;">✅ 生成最终HTML</button>
-  <button onclick="closeEditor()" title="退出编辑" style="background:#E17055;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;">❌ 退出</button>
-</div>
-"""
+# ── 增强工具栏 HTML (grid-aware) ──
 
-OVERLAY_HTML = """\
-<div id="ve-overlay" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.3);" onclick="closeEditor()"></div>
-<div id="ve-init-hint" style="position:fixed;bottom:20px;right:20px;z-index:99999;background:#6C63FF;color:white;padding:12px 20px;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 4px 12px rgba(108,99,255,0.4);" onclick="initEditor();this.style.display='none';">
-  🛠️ 点击启动可视化编辑
+TOOLBAR_HTML = r"""
+<div id="ge-toolbar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e1e2e;color:#fff;padding:6px 12px;align-items:center;gap:6px;font-size:12px;box-shadow:0 2px 12px rgba(0,0,0,0.3);max-height:48px;overflow:visible;">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;width:100%;">
+
+    <!-- Field info -->
+    <span id="ge-cell-id" style="color:#6C63FF;font-weight:bold;font-size:11px;display:none;white-space:nowrap;"></span>
+    <span id="ge-field-name" style="color:#FFD700;font-size:11px;min-width:60px;white-space:nowrap;">(未选中字段)</span>
+
+    <!-- Divider -->
+    <div style="width:1px;height:18px;background:#555;flex-shrink:0;"></div>
+
+    <!-- Text formatting -->
+    <button onclick="document.execCommand('bold')" title="加粗" style="background:#333;color:#fff;border:1px solid #666;padding:2px 6px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:11px;">B</button>
+    <button onclick="document.execCommand('italic')" title="斜体" style="background:#333;color:#fff;border:1px solid #666;padding:2px 6px;border-radius:4px;cursor:pointer;font-style:italic;font-size:11px;">I</button>
+    <button onclick="document.execCommand('underline')" title="下划线" style="background:#333;color:#fff;border:1px solid #666;padding:2px 6px;border-radius:4px;cursor:pointer;text-decoration:underline;font-size:11px;">U</button>
+
+    <!-- Font family -->
+    <select id="ge-font-family" onchange="applyFontFamily()" title="字体" style="background:#333;color:#fff;border:1px solid #666;padding:1px 4px;border-radius:4px;font-size:10px;max-width:90px;">
+      <option value="">字体</option>
+      <option value="system-ui, -apple-system, sans-serif">系统默认</option>
+      <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+      <option value="'PingFang SC', sans-serif">苹方</option>
+      <option value="SimSun, serif">宋体</option>
+      <option value="SimHei, sans-serif">黑体</option>
+      <option value="Consolas, monospace">等宽</option>
+    </select>
+
+    <!-- Font weight -->
+    <select id="ge-font-weight" onchange="applyFontWeight()" title="字重" style="background:#333;color:#fff;border:1px solid #666;padding:1px 4px;border-radius:4px;font-size:10px;width:50px;">
+      <option value="">字重</option>
+      <option value="100">细</option>
+      <option value="400">常规</option>
+      <option value="600">半粗</option>
+      <option value="700">粗</option>
+      <option value="900">超粗</option>
+    </select>
+
+    <!-- Font size -->
+    <select id="ge-font-size" onchange="applyFontSizeVE()" title="字号" style="background:#333;color:#fff;border:1px solid #666;padding:1px 4px;border-radius:4px;font-size:10px;width:48px;">
+      <option value="">字号</option>
+      <option value="9px">9</option><option value="11px">11</option><option value="12px">12</option>
+      <option value="14px">14</option><option value="15px">15</option><option value="16px">16</option>
+      <option value="18px">18</option><option value="20px">20</option><option value="24px">24</option>
+      <option value="28px">28</option><option value="32px">32</option><option value="36px">36</option>
+    </select>
+
+    <!-- Color & bg -->
+    <label style="color:#ccc;font-size:10px;">🎨</label>
+    <input type="color" id="ge-color-picker" value="#333333" onchange="applyFontColor()" title="字色" style="width:20px;height:20px;border:none;cursor:pointer;padding:0;">
+    <label style="color:#ccc;font-size:10px;">🖌️</label>
+    <input type="color" id="ge-bg-picker" value="#ffffff" onchange="applyBgColor()" title="背景色" style="width:20px;height:20px;border:none;cursor:pointer;padding:0;">
+
+    <!-- Opacity -->
+    <select id="ge-opacity" onchange="applyOpacity()" title="透明度" style="background:#333;color:#fff;border:1px solid #666;padding:1px 4px;border-radius:4px;font-size:10px;">
+      <option value="1">100%</option>
+      <option value="0.9">90%</option>
+      <option value="0.7">70%</option>
+      <option value="0.5">50%</option>
+    </select>
+
+    <!-- Grid controls -->
+    <div style="width:1px;height:18px;background:#555;flex-shrink:0;"></div>
+    <button onclick="toggleCellSelector()" title="网格概览" style="background:#3F51B5;color:#fff;border:none;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;">📋 网格</button>
+
+    <!-- Flex spacer -->
+    <div style="flex:1;"></div>
+
+    <!-- Actions -->
+    <button onclick="previewHTML()" title="预览" style="background:#3F51B5;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">👁️ 预览</button>
+    <button onclick="exportFinalHTML()" title="生成最终HTML" style="background:#00B894;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:11px;">✅ 导出</button>
+    <button onclick="closeEditor()" title="退出" style="background:#E17055;color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;">❌</button>
+  </div>
+</div>
+
+<!-- Cell property panel (floating) -->
+<div id="ge-cell-panel" style="display:none;position:fixed;bottom:60px;right:20px;z-index:99998;background:#1e1e2e;color:#fff;padding:12px 16px;border-radius:12px;font-size:12px;width:200px;box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+  <div style="font-weight:bold;margin-bottom:8px;color:#6C63FF;">🟣 格子属性</div>
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <label style="font-size:11px;color:#aaa;">底板颜色</label>
+    <input type="color" id="ge-cell-bg" value="#ffffff" onchange="applyCellBg()" style="width:100%;height:28px;border:none;cursor:pointer;">
+    <label style="font-size:11px;color:#aaa;">内边距</label>
+    <select id="ge-cell-pad" onchange="applyCellPadding()" style="background:#333;color:#fff;border:1px solid #666;padding:2px 4px;border-radius:4px;">
+      <option value="4px">4px</option>
+      <option value="8px">8px</option>
+      <option value="12px">12px</option>
+      <option value="16px" selected>16px</option>
+      <option value="24px">24px</option>
+    </select>
+  </div>
+</div>
+
+<!-- Grid cell selector overlay -->
+<div id="ge-cell-selector" style="display:none;position:fixed;bottom:120px;right:20px;z-index:99997;background:#1e1e2e;color:#fff;padding:12px 16px;border-radius:12px;font-size:12px;max-height:200px;overflow-y:auto;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+
+<!-- Init hint -->
+<div id="ge-init-hint" style="position:fixed;bottom:20px;right:20px;z-index:99996;background:#6C63FF;color:white;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:13px;box-shadow:0 4px 12px rgba(108,99,255,0.4);" onclick="this.style.display='none';initGridEditor();">
+  🛠️ 启动网格编辑器
 </div>
 """
 
 
 def inject_editor(html_str):
-    """Inject editor toolbar + JS into HTML string"""
-    # Append before </body>
-    editor_block = TOOLBAR_HTML + OVERLAY_HTML + '<script>' + EDITOR_JS + '</script>'
+    """Inject grid-aware editor into HTML string"""
+    editor_block = TOOLBAR_HTML + '<script>' + GRID_EDITOR_JS + '</script>'
     if '</body>' in html_str:
         html_str = html_str.replace('</body>', editor_block + '\n</body>', 1)
     else:
@@ -230,10 +419,10 @@ def inject_editor(html_str):
 
 
 def generate_standalone_editor(template_path, output_path):
-    """Generate a standalone editor HTML wrapping the template"""
+    """Generate a standalone grid editor HTML wrapping the template"""
     tpl = Path(template_path)
     if not tpl.exists():
-        print('[X] Template not found: ' + str(tpl))
+        print(f'[X] Template not found: {tpl}')
         sys.exit(1)
 
     html = tpl.read_text(encoding='utf-8')
@@ -242,14 +431,40 @@ def generate_standalone_editor(template_path, output_path):
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding='utf-8')
-    print('[OK] Visual editor generated: ' + str(out))
+    print(f'[OK] Grid Editor generated: {out}')
+    print('     Open in browser and press Ctrl+E to toggle editor')
+    return str(out)
+
+
+def generate_from_type(template_type, output_path):
+    """Generate editor from built-in template type"""
+    if template_type not in BUILTIN_TEMPLATES:
+        print(f'[X] Unknown template type: {template_type}')
+        sys.exit(1)
+
+    spec = BUILTIN_TEMPLATES[template_type]
+    html = generate_html(spec)
+    html = inject_editor(html)
+
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding='utf-8')
+    print(f'[OK] Grid Editor generated from type "{template_type}": {out}')
     print('     Open in browser and press Ctrl+E to toggle editor')
     return str(out)
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--template', required=True, help='Input template HTML path')
-    ap.add_argument('--output', required=True, help='Output editor HTML path')
+    ap = argparse.ArgumentParser(description='Grid-aware Visual Editor Generator v2')
+    ap.add_argument('--template', help='Input template HTML path')
+    ap.add_argument('--type', help='Built-in template type name')
+    ap.add_argument('--output', '-o', required=True, help='Output editor HTML path')
+
     args = ap.parse_args()
-    generate_standalone_editor(args.template, args.output)
+
+    if args.type:
+        generate_from_type(args.type, args.output)
+    elif args.template:
+        generate_standalone_editor(args.template, args.output)
+    else:
+        ap.print_help()

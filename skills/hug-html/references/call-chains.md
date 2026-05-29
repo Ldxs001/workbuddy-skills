@@ -27,7 +27,7 @@
 ```json
 {
   "name": "generate-html",
-  "description": "从需求到最终HTML的完整生成流程",
+  "description": "从需求到最终 HTML 的完整生成流程",
   "steps": [
     {"step": 1, "action": "parse-requirement", "tool": "AI", "output": "type,preset,modules"},
     {"step": 2, "action": "generate-template", "script": "template_generator.py", "args": "--type {type} --output data/output/template.html"},
@@ -55,7 +55,7 @@
 | 1 | 检查模板是否存在 | （AI 验证） | 模板路径 |
 | 2 | 生成可视化编辑界面 | `visual_editor.py --template <t> --output <o>` | `editor.html` |
 | 3 | 提示用户在浏览器中编辑 | （AI 输出提示） | 编辑说明 |
-| 4 | 用户导出最终 HTML | （用户点击「生成最终HTML」按钮） | `final.html` |
+| 4 | 用户导出最终 HTML | （用户点击「生成最终 HTML」按钮） | `final.html` |
 | 5 | 提取编辑后内容（可选） | `content_filler.py --extract <html> --output <json>` | `content.json` |
 
 **调用链 JSON**：
@@ -63,7 +63,7 @@
 ```json
 {
   "name": "edit-html",
-  "description": "生成可视化编辑界面并导出最终HTML",
+  "description": "生成可视化编辑界面并导出最终 HTML",
   "steps": [
     {"step": 1, "action": "validate-template", "tool": "AI", "output": "template-path"},
     {"step": 2, "action": "generate-editor", "script": "visual_editor.py", "args": "--template {template} --output data/output/editor.html"},
@@ -96,7 +96,7 @@
 ```json
 {
   "name": "assemble-with-modules",
-  "description": "选择模块并组装成完整HTML",
+  "description": "选择模块并组装成完整 HTML",
   "steps": [
     {"step": 1, "action": "list-modules", "script": "module_assembler.py", "args": "--list"},
     {"step": 2, "action": "assemble", "script": "module_assembler.py", "args": "--modules {modules} --output data/output/assembled.html"},
@@ -113,7 +113,7 @@
 将以上 JSON 保存到 `data/config/call-chains.json`，或在 `skill-sub` 中注册：
 
 ```bash
-python "C:/Users/sm001/.workbuddy/skills/skill-sub/scripts/chain_manager.py" register --file "C:/Users/sm001/.workbuddy/skills/hug-html/data/config/call-chains.json"
+python "$(SKILL_DIR)/../skill-sub/scripts/chain_manager.py" register --file "C:/Users/sm001/.workbuddy/skills/hug-html/data/config/call-chains.json"
 ```
 
 ---
@@ -122,11 +122,11 @@ python "C:/Users/sm001/.workbuddy/skills/skill-sub/scripts/chain_manager.py" reg
 
 ```bash
 # 使用 generate-html 调用链
-python "C:/Users/sm001/.workbuddy/skills/skill-sub/scripts/chain_executor.py" run --chain generate-html --type promo --preset business
+python "$(SKILL_DIR)/../skill-sub/scripts/chain_executor.py" run --chain generate-html --type promo --preset business
 
 # 使用 edit-html 调用链
-python "C:/Users/sm001/.workbuddy/skills/skill-sub/scripts/chain_executor.py" run --chain edit-html --template "data/output/template.html"
+python "$(SKILL_DIR)/../skill-sub/scripts/chain_executor.py" run --chain edit-html --template "data/output/template.html"
 
 # 使用 assemble-with-modules 调用链
-python "C:/Users/sm001/.workbuddy/skills/skill-sub/scripts/chain_executor.py" run --chain assemble-with-modules --modules "color:gradient-purple,font:title-large,image:img-cover"
+python "$(SKILL_DIR)/../skill-sub/scripts/chain_executor.py" run --chain assemble-with-modules --modules "color:gradient-purple,font:title-large,image:img-cover"
 ```

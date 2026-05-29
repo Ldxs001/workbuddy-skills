@@ -1,13 +1,55 @@
 # Changelog — hug-html
 
-## v1.0.1 (2026-05-28)
+## v2.0.2 (2026-05-29) — 合规修正
 
 ### Fixed
-- `SKILL.md`：添加 H1 标题 `# hug-html`（修复 R-06）
-- `SKILL.md`：修复快速开始代码块中的绝对路径为相对路径（修复 R-23）
-- `references/faq.md`：Q4 问题表述过短，改为具体问题（修复 R-19）
-- `references/antipatterns.md`：修正路径引用建议（「绝对路径」→「相对路径」）（修复 R-20）
-- `references/antipatterns.md`：移除模糊表述「可能」，改为确定性描述（修复 R-20）
+- `_meta.json` 补充 `data_dir` 字段，通过 R-12 检查
+- 版本号从 v2.0.1 升级至 v2.0.2（`skill-standardization update` 自动 bump）
+
+## v2.0.1 (2026-05-29) — 完整交互 + 审计 + 标准化
+
+### Added
+- `scripts/grid_builder.py` — 核心网格引擎：N×M 网格布局、单元格合并（rowspan/colspan）
+- 两层级模块体系：Base（63 个 CSS 原语）+ Composite（14 个可复用 HTML 组件）
+- 内置 7 个方案模板：harmony-app、harmony-dual、calendar-dashboard(交互版)、promo、3x3-merge、4x2-app-card、3x3-mixed-styles
+- 泛化三个用户模板：harmony-app，harmony-dual，calendar-dashboard
+- `calendar-dashboard` 完整交互版：5×3 网格、年份控制、周末规则勾选、假日区间 CRUD、补班管理、周历视图、总工日统计
+- `grid_builder.py` 支持 `scripts` 字段注入自定义 JS，支持 `file` 字段引用外部 JSON 模板
+- `scripts/gen_calendar_spec.py` — 交互日历模板生成器
+- `scripts/gen_test_grids.py` — 测试 Grid Spec / 模块 JSON 生成工具
+- 图片编辑：点击输入 URL + 拖放文件替换（`editable-img` 类），所有复合模块图片均支持
+- 编辑器字体控制：字体家族（8种）、字重（100-900）、字号（9-48px）、字色拾色器
+- 5 种样式预设：business / academic / festive / mourning / tech，`style_preset` 字段一键切换
+- 生成后审计 `audit_html()`：检查 DOCTYPE、标签平衡、网格越界、单元格重叠、backdrop-filter 裁剪、背景异常
+- 生成说明 `print_generation_guide()`：每次生成强制输出编辑方法、创作模式、可用资源、审计说明
+- 方案模板固化 `--save-as <名>`：将任意 Grid Spec 保存为用户模板，自动版本管理
+- `--export-interfaces`：导出完整接口定义 JSON（Grid Spec schema + 63 base + 14 composite + 5 presets）
+- `scripts/templates/` 目录：内置文件型模板跟随技能安装（不丢失）
+- body 背景智能选择：玻璃卡用 `#000`，普通卡用 card bg 或 `#eef2f7`
 
 ### Changed
-- 版本号 `1.0.0` → `1.0.1`
+- `scripts/module_assembler.py` — 重写为 grid-aware（接受 grid spec 而非扁平模块列表）
+- `scripts/template_generator.py` — 重写，删除 `gen_body_*` 硬编码，使用 grid 框架，支持用户模板
+- `scripts/visual_editor.py` — 增强为网格感知编辑器 + 字体/字重/字号/字色独立控制 + 拖放图片
+- `scripts/content_filler.py` — 更新为 v2 接口
+- 所有复合模块图标从 `<div>` 改为 `<img>` 可点击换图
+- 通用化模板内容：删除具体来源（刻在石头上/灯球色盘），改用通用占位符
+- header-entity/header-dual/qr-card/qr-dual/text-img-right 所有图片均加 `editable-img` 类
+- CSS cell style 去重：style dict 直接替换默认 bg/padding，不再叠加
+- 编辑器工具栏全面升级：B/I/U + 字体 + 字重 + 字号 + 拾色器 + 背景色 + 透明度
+- 数据库目录移至 `.standardization/hug-html/data/`，遵循 R-11/R-22 规范
+- `SKILL.md` — 四层架构定义（骨架结构/骨架样式/模块结构+样式/基础样式）
+- `references/guide.md` — 完整重写为 v2 网格架构教程
+- `references/module-library.md` — 完整重写为两层级模块说明
+- 版本号 `1.0.1` → `2.0.1`
+
+### Fixed
+- Grid Spec `cells` 位置统一：`grid.cells[...]` 为标准存储位置，兼容顶层 `cells`
+- 单元格 CSS 生成逻辑修正（style dict 重叠问题）
+- body 背景硬编码 `#000` 修复：根据模板类型智能选择
+- `backdrop-filter` 从 DEFAULT_CARD_STYLE 泄露到普通模板（导致内容裁剪）修复
+- 日历 JS 缺失 `<script>` 包裹导致不执行修复
+- GBK 编码兼容：所有 print 输出兼容 Windows 终端
+- 标签平衡检查改用正则精确匹配，排除 script/style 内容，消除假阳性
+- R-20 写作规范修复：guide.md 中英文混排空格
+- R-11/R-22 数据目录合规：`data/` → `.standardization/hug-html/data/`
