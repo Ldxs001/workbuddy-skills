@@ -1,3 +1,9 @@
+## v2.38.13 (2026-05-30) — 完全解耦：删除所有 git-sync 参考
+
+### Removed
+- 删除引用 git-sync 的层面：指南章节、架构图、FAQ 描述、SKILL.md 触发条件、__init__.py 描述、reference.md 表述
+- 所有 git-sync 关联参考均替换为独立描述，两者现完全解耦
+
 ## v2.38.12 (2026-05-30) — R-12 step 1.5 配套修复工具: fix_missing_data_dir
 
 ### Added

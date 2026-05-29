@@ -11,7 +11,6 @@
 3. [模式 C：refactor — 改造非标 Skill](#模式-crefactor--改造非标-skill)
 4. [审查模式 — 独立审计](#审查模式--独立审计)
 5. [规范加载 — 渐进式 JSON 查询](#规范加载--渐进式-json-查询)
-6. [与 git-sync 集成工作流](#与-git-sync-集成工作流)
 
 ---
 
@@ -599,36 +598,6 @@ structure ──→ progressive_md ─┘
 
 ---
 
-## 与 git-sync 集成工作流
-
-### 同步时的自动审查流程
-
-```
-git sync 执行
-  │
-  ├─ 步骤 1~3: 收集/检查/提交
-  │
-  ├─ 步骤 3.5: 审查每个 skill ← skill_audit.py 自动调用
-  │   ├─ PASS → 继续推送
-  │   ├─ WARN → 🟡 打印警告，继续推送
-  │   └─ FAIL(含 ERROR) → 🟡 打印警告，继续推送（纯警告模式）
-  │
-  └─ 步骤 4~6: 推送/生成 ZIP/更新 manifest
-```
-
-### 版本号三方一致
-
-skill-standardization 要求以下三处版本号保持一致：
-
-| 位置 | 文件 | 字段 |
-|------|------|------|
-| 技能声明 | `SKILL.md` | frontmatter `version:` |
-| 元数据 | `_meta.json` | `version` |
-| 注册清单 | git-sync 的 `manifest.json` | 对应条目的 `version` |
-
-**update/refactor 模式会自动检测和提示不一致。**
-
----
 
 ## 7. 安全增强功能（v2.13.0）
 
@@ -675,5 +644,5 @@ skill_builder.py update <skill-dir>
 1. **refactor 前务必先 `--dry-run`**
 2. **备份是 refactor 默认行为**：不要用 `--no-backup` 除非明确知道风险
 3. **本文件控制在 200 行以内**：超过部分已拆分到 `references/`
-4. **审查是纯警告模式**：不会阻止 git-sync 同步
+4. **审查是纯警告模式**：审计结果仅作参考，不阻断操作
 5. **版本号三方一致**：更新后按上表同步

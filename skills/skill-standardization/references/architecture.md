@@ -40,7 +40,7 @@ skill-standardization 是一个 **Skill 全生命周期标准化管理工具集*
          │                    │
          ▼                    ▼
    ┌──────────┐        ┌──────────┐
-   │ 目标 Skill │        │ git-sync │
+   │ 目标 Skill │        │ (独立)   │
    │ (输入/输出)│        │  (集成)  │
    └──────────┘        └──────────┘
 ```
@@ -111,7 +111,7 @@ skill_builder/ ──读取──→ spec/*.json（规范定义）
   └─ utils.py           工具函数
 skill_audit.py   ──读取──→ spec/rules.json（审查规则）
 json_loader.py   ──读取──→ spec/_index.json → spec/*.json
-git-sync.sh      ──调用──→ skill_audit.py audit
+git-sync          ──(独立)──   内联审计
 ```
 
 ---

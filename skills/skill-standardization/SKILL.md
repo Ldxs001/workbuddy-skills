@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.38.12
+version: 2.38.13
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.38.8。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
@@ -10,6 +10,7 @@ permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
 ---
+
 
 
 
@@ -122,7 +123,7 @@ external_data_dir: true
 **不触发**（以下情况不应触发本技能）：
 
 - 用户只是问[你有什么技能]——这是闲聊，不是真的要审计/改造
-- 用户要求执行某个 skill 的常规功能（如[用 git-sync 同步某个 skill]）——应直接调用该 skill，而不是先审计它
+- 用户要求执行某个 skill 的常规功能——应直接调用该 skill 本身，而不是先审计它
 - 用户只是提到[skill]这个词，但没有明确的审计/创建/改造意图
 
 ## 核心能力
