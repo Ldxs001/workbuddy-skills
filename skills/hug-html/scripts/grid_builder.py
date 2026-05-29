@@ -19,6 +19,7 @@ import argparse
 import json
 import re
 import sys
+import traceback
 from copy import deepcopy
 from pathlib import Path
 
@@ -28,6 +29,68 @@ BUILTIN_TEMPLATES_DIR = SCRIPTS_DIR / "templates"   # 内置文件型模板（�
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"  # 用户数据
 OUTPUT_DIR = DATA_DIR / "output"
 USER_TEMPLATES_DIR = DATA_DIR / "user-templates"
+
+# ══════════════════════════════════════════════════════
+# 中文错误处理工具
+# ══════════════════════════════════════════════════════
+
+def show_error(err_type, message, fix_hint=""):
+    """输出中文错误提示 + 修复建议。不抛异常，不输出英文 Traceback。"""
+    icon_map = {
+        "参数错误": "❌",
+        "文件错误": "📁",
+        "模块错误": "🧩",
+        "模板错误": "📋",
+        "路径错误": "🔗",
+        "JSON错误": "📄",
+        "内部错误": "⚙️",
+    }
+    icon = icon_map.get(err_type, "❌")
+    # 兼容 GBK 终端（Windows 下无法显示 emoji 时降级为纯文字）
+    lines = [
+        f"\n[{err_type}] {message}",
+    ]
+    if fix_hint:
+        lines.append(f"  [修复建议] {fix_hint}")
+    lines.append("  [提示] 如仍有问题，可查看 FAQ (references/faq.md) 或使用 --help 查看参数说明")
+    msg = "\n".join(lines)
+    try:
+        print(f"\n{icon} [{err_type}] {message}")
+        if fix_hint:
+            print(f"  💡 修复建议: {fix_hint}")
+        print("  ℹ️  如仍有问题，可查看 FAQ (references/faq.md) 或使用 --help 查看参数说明")
+    except UnicodeEncodeError:
+        # Fallback for GBK terminals (Windows)
+        print(msg.encode("ascii", errors="replace").decode("ascii"))
+
+
+def safe_read_json(path):
+    """安全读取 JSON 文件，失败输出中文错误"""
+    p = Path(path)
+    if not p.exists():
+        show_error("文件错误", f"找不到文件: {p}", f"请检查路径是否正确。可使用绝对路径，如: {Path.cwd() / p}")
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        show_error("JSON错误", f"文件 {p} 格式错误: {e}", "请确认 JSON 格式正确，可使用 jsonlint.com 校验")
+        return None
+    except Exception as e:
+        show_error("文件错误", f"读取文件 {p} 失败: {e}", "检查文件权限和编码（应为 UTF-8）")
+        return None
+
+
+def safe_write_text(path, text, desc="文件"):
+    """安全写入文本文件"""
+    p = Path(path)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+    except Exception as e:
+        show_error("文件错误", f"写入 {desc} 失败: {p}", f"检查目录权限或路径是否有效: {e}")
+        return False
+    return True
 
 # ══════════════════════════════════════════════════════
 # 第一层: Base Modules (CSS 原语)
@@ -1184,8 +1247,10 @@ def load_grid_spec(spec_path_or_name):
     """Load grid spec from file or built-in template name"""
     p = Path(spec_path_or_name)
     if p.exists():
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+        spec = safe_read_json(p)
+        if spec is None:
+            sys.exit(1)
+        return spec
 
     # Check built-in templates
     if spec_path_or_name in BUILTIN_TEMPLATES:
@@ -1194,35 +1259,59 @@ def load_grid_spec(spec_path_or_name):
         if "file" in entry:
             file_path = SKILL_DIR / entry["file"]
             if file_path.exists():
-                with open(file_path, "r", encoding="utf-8") as f:
-                    spec = json.load(f)
-                    # Merge card_style and other metadata from the entry
-                    for key in ["name", "desc", "source", "card_style"]:
-                        if key in entry and key not in spec:
-                            spec[key] = entry[key]
-                    return spec
+                spec = safe_read_json(file_path)
+                if spec is None:
+                    show_error("模板错误", f"内置模板 '{spec_path_or_name}' 引用的文件损坏: {file_path}")
+                    sys.exit(1)
+                # Merge card_style and other metadata from the entry
+                for key in ["name", "desc", "source", "card_style"]:
+                    if key in entry and key not in spec:
+                        spec[key] = entry[key]
+                return spec
             else:
-                print(f"[WARN] File-based template not found: {file_path}, falling back to built-in")
+                show_error("文件错误", f"内置模板 '{spec_path_or_name}' 引用的文件不存在: {file_path}",
+                           "这可能是技能安装不完整。尝试重新安装 hug-html 技能。")
+                # Fallback: use built-in entry without external file
+                return entry
+
         return entry
 
     # Check user templates directory
     user_file = USER_TEMPLATES_DIR / f"{spec_path_or_name}.json"
     if user_file.exists():
-        try:
-            with open(user_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+        spec = safe_read_json(user_file)
+        if spec:
+            return spec
+        show_error("模板错误", f"用户模板 '{spec_path_or_name}' 解析失败",
+                   f"请检查文件格式: {user_file}")
 
-    print(f"[X] Spec not found: {spec_path_or_name}")
-    print("  Available built-in templates:")
+    # Not found anywhere — print helpful message and exit
+    msg_lines = [
+        "",
+        "[模板/文件错误] 找不到模板或 Spec 文件: " + spec_path_or_name,
+        "  可用内置模板:",
+    ]
     for t in BUILTIN_TEMPLATES:
-        print(f"    {t}")
+        msg_lines.append(f"    {t}")
     user_files = sorted(USER_TEMPLATES_DIR.glob("*.json"))
     if user_files:
-        print("  User templates:")
+        msg_lines.append("  用户自定义模板:")
         for f in user_files:
-            print(f"    {f.stem}")
+            msg_lines.append(f"    {f.stem}")
+    msg_lines.append("  [提示] 使用 --list-templates 查看所有模板, 使用 --list-modules 查看模块")
+    try:
+        print(f"\n❌ 找不到模板或 Spec 文件: {spec_path_or_name}")
+        print("  可用内置模板:")
+        for t in BUILTIN_TEMPLATES:
+            print(f"    {t}")
+        user_files = sorted(USER_TEMPLATES_DIR.glob("*.json"))
+        if user_files:
+            print("  用户自定义模板:")
+            for f in user_files:
+                print(f"    {f.stem}")
+        print("  💡 提示: 使用 --list-templates 查看所有模板, 使用 --list-modules 查看模块")
+    except UnicodeEncodeError:
+        print("\n".join(msg_lines))
     sys.exit(1)
 
 
@@ -1230,10 +1319,14 @@ def save_template(template_spec, name):
     """Save template spec to scripts/templates/ directory (built-in)"""
     BUILTIN_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     out = BUILTIN_TEMPLATES_DIR / f"{name}.json"
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(template_spec, f, ensure_ascii=False, indent=2)
-    print(f"[OK] Template spec saved: {out}")
-    return str(out)
+    try:
+        content = json.dumps(template_spec, ensure_ascii=False, indent=2)
+        if safe_write_text(out, content, f"模板 {name}"):
+            print(f"[OK] 模板已保存: {out}")
+            return str(out)
+    except Exception as e:
+        show_error("文件错误", f"保存模板失败: {e}")
+    return ""
 
 
 def save_user_template(template_spec, name, description=""):
@@ -1249,17 +1342,24 @@ def save_user_template(template_spec, name, description=""):
     out = USER_TEMPLATES_DIR / f"{name}.json"
     # Version check - don't overwrite without incrementing
     if out.exists():
-        with open(out, "r", encoding="utf-8") as f:
-            existing = json.load(f)
-        spec["_version"] = existing.get("_version", 1) + 1
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(spec, f, ensure_ascii=False, indent=2)
-    print(f"[OK] 方案模板已固化: {out}")
-    print(f"  名称: {name}")
-    print(f"  版本: v{spec['_version']}")
-    grid = spec.get("grid", {})
-    print(f"  网格: {grid.get('rows','?')}×{grid.get('cols','?')}, {len(grid.get('cells',[]))} cells")
-    return str(out)
+        try:
+            with open(out, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+            spec["_version"] = existing.get("_version", 1) + 1
+        except Exception:
+            spec["_version"] = 1
+    try:
+        content = json.dumps(spec, ensure_ascii=False, indent=2)
+        if safe_write_text(out, content, f"用户模板 {name}"):
+            print(f"[OK] 方案模板已固化: {out}")
+            print(f"  名称: {name}")
+            print(f"  版本: v{spec['_version']}")
+            grid = spec.get("grid", {})
+            print(f"  网格: {grid.get('rows','?')}×{grid.get('cols','?')}, {len(grid.get('cells',[]))} cells")
+            return str(out)
+    except Exception as e:
+        show_error("文件错误", f"保存用户模板失败: {e}")
+    return ""
 
 
 def list_user_templates():
@@ -1511,6 +1611,21 @@ def print_audit_report(html_str, template_spec=None, silent=False):
 
 
 def main():
+    try:
+        _main_impl()
+    except SystemExit as e:
+        # argparse 自身错误退出或正常退出 → 静默处理
+        pass
+    except KeyboardInterrupt:
+        print("\n⚠️  用户中断操作")
+    except Exception as e:
+        show_error("内部错误", f"程序发生未预期的错误: {type(e).__name__}", "请检查参数是否正确。使用 --help 查看完整参数说明。")
+        # 仅 debug 模式下输出详细堆栈
+        if "--debug" in sys.argv:
+            traceback.print_exc()
+
+
+def _main_impl():
     ap = argparse.ArgumentParser(description="Grid-based HTML Module Engine")
     ap.add_argument("--spec", help="Path to grid spec JSON or built-in template name")
     ap.add_argument("--output", "-o", help="Output HTML file path")
@@ -1526,6 +1641,7 @@ def main():
     ap.add_argument("--list-user-templates", action="store_true", help="List user-defined templates")
     ap.add_argument("--export-interfaces", help="Export complete interface spec as JSON file", metavar="FILE")
     ap.add_argument("--desc", help="Description for --save-as", default="")
+    ap.add_argument("--debug", action="store_true", help="显示详细错误堆栈（调试用）")
 
     args = ap.parse_args()
 
@@ -1555,8 +1671,11 @@ def main():
         return
 
     if args.audit:
-        with open(args.audit, "r", encoding="utf-8") as f:
-            html_str = f.read()
+        p = Path(args.audit)
+        if not p.exists():
+            show_error("文件错误", f"找不到 HTML 文件: {args.audit}")
+            return
+        html_str = p.read_text(encoding="utf-8")
         print_audit_report(html_str)
         return
 
@@ -1567,9 +1686,7 @@ def main():
     if args.export_interfaces:
         interfaces = export_interfaces()
         out = Path(args.export_interfaces)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "w", encoding="utf-8") as f:
-            json.dump(interfaces, f, ensure_ascii=False, indent=2)
+        safe_write_text(out, json.dumps(interfaces, ensure_ascii=False, indent=2), "接口定义")
         print(f"[OK] 接口定义已导出: {out}")
         print(f"  Grid Spec 标准格式: 参考 interfaces.grid_spec.schema")
         print(f"  可用 Base 模块: {len(BASE_MODULES)} 个")
@@ -1584,7 +1701,8 @@ def main():
         elif args.demo and args.template in BUILTIN_TEMPLATES:
             spec = BUILTIN_TEMPLATES[args.template]
         else:
-            print("[X] --save-as 需要 --spec <模板名/路径> 或 --demo --template <内置模板名>")
+            show_error("参数错误", "--save-as 需要 --spec <模板名/路径> 或 --demo --template <内置模板名>",
+                       "用法示例: python scripts/grid_builder.py --save-as my-template --spec harmony-app")
             return
         save_user_template(spec, args.save_as, args.desc)
         print_generation_guide(spec)
@@ -1595,24 +1713,23 @@ def main():
         if args.save in BUILTIN_TEMPLATES:
             save_template(BUILTIN_TEMPLATES[args.save], args.save)
         else:
-            print(f"[X] Unknown template: {args.save}")
+            show_error("模板错误", f"未知模板: {args.save}", f"可用模板: {', '.join(BUILTIN_TEMPLATES.keys())}")
         return
 
     # Demo mode
     if args.demo:
         tpl_name = args.template or "harmony-app"
         if tpl_name not in BUILTIN_TEMPLATES:
-            print(f"[X] Unknown template: {tpl_name}")
-            print("  Available: " + ", ".join(BUILTIN_TEMPLATES.keys()))
+            show_error("模板错误", f"未知模板: {tpl_name}", f"可用模板: {', '.join(BUILTIN_TEMPLATES.keys())}")
             return
         spec = BUILTIN_TEMPLATES[tpl_name]
         out_path = args.output or str(OUTPUT_DIR / f"{tpl_name}.html")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         html = generate_html(spec)
-        Path(out_path).write_text(html, encoding="utf-8")
-        print(f"[OK] Generated: {out_path}")
-        print(f"  Template: {spec['name']}")
-        print(f"  Grid: {spec['grid']['rows']}×{spec['grid']['cols']}")
+        safe_write_text(out_path, html, f"HTML {tpl_name}")
+        print(f"[OK] 已生成: {out_path}")
+        print(f"  模板: {spec['name']}")
+        print(f"  网格: {spec['grid']['rows']}×{spec['grid']['cols']}")
         return
 
     # Normal mode: load spec → generate
@@ -1624,8 +1741,8 @@ def main():
     out_path = args.output or str(OUTPUT_DIR / "output.html")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     html = generate_html(spec)
-    Path(out_path).write_text(html, encoding="utf-8")
-    print(f"[OK] Generated: {out_path}")
+    safe_write_text(out_path, html, "HTML 输出")
+    print(f"[OK] 已生成: {out_path}")
 
 
 if __name__ == "__main__":

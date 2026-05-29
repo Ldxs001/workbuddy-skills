@@ -1,7 +1,7 @@
 {
   "name": "hug-html",
-  "version": "2.0.2",
-  "description": "Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as.",
+  "version": "2.1.0",
+  "description": "Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.",
   "author": "Ldxs",
   "tags": [
     "html",
@@ -10,6 +10,7 @@
     "visual-editor",
     "module-library",
     "style-presets",
-    "layout"
+    "layout",
+    "chinese-error-handling"
   ]
 }

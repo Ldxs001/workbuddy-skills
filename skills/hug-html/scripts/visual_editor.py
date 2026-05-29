@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
-# visual_editor.py — Grid-aware 可视化编辑器 v2.0.0
+# visual_editor.py — Grid-aware 可视化编辑器 v2.1.0
 # 用法:
 #   python visual_editor.py --template <template.html> --output <editor.html>
 #   python visual_editor.py --type <模板名> --output <editor.html>  (从内置模板生成)
-#
-# 增强功能:
-#   - 网格视图显示 (显示所有格子编号)
-#   - 格子选择器 (点击格子高亮)
-#   - 格子属性面板 (背景色/间距/模块选择)
-#   - 模块填充界面
-#   - 行/列管理
 
 import argparse
 import sys
+import traceback
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
-from grid_builder import BUILTIN_TEMPLATES, generate_html
+from grid_builder import BUILTIN_TEMPLATES, generate_html, show_error, safe_write_text
 
 OUTPUT_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data" / "output"
 
@@ -422,49 +416,77 @@ def generate_standalone_editor(template_path, output_path):
     """Generate a standalone grid editor HTML wrapping the template"""
     tpl = Path(template_path)
     if not tpl.exists():
-        print(f'[X] Template not found: {tpl}')
-        sys.exit(1)
+        show_error("文件错误", f"找不到模板文件: {tpl}", "请确认 --template 参数指向一个已存在的 HTML 文件")
+        return None
 
-    html = tpl.read_text(encoding='utf-8')
+    try:
+        html = tpl.read_text(encoding='utf-8')
+    except Exception as e:
+        show_error("文件错误", f"读取模板文件失败: {e}", "检查文件编码（应为 UTF-8）")
+        return None
+
     html = inject_editor(html)
 
-    out = Path(output_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding='utf-8')
-    print(f'[OK] Grid Editor generated: {out}')
-    print('     Open in browser and press Ctrl+E to toggle editor')
-    return str(out)
+    if not safe_write_text(output_path, html, "编辑器 HTML"):
+        return None
+
+    print(f'[OK] 网格编辑器已生成: {output_path}')
+    print('     浏览器打开后按 Ctrl+E 切换编辑模式')
+    return str(output_path)
 
 
 def generate_from_type(template_type, output_path):
     """Generate editor from built-in template type"""
     if template_type not in BUILTIN_TEMPLATES:
-        print(f'[X] Unknown template type: {template_type}')
-        sys.exit(1)
+        show_error("模板错误", f"未知模板类型: {template_type}", f"可用类型: {', '.join(BUILTIN_TEMPLATES.keys())}")
+        return None
 
     spec = BUILTIN_TEMPLATES[template_type]
     html = generate_html(spec)
     html = inject_editor(html)
 
-    out = Path(output_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding='utf-8')
-    print(f'[OK] Grid Editor generated from type "{template_type}": {out}')
-    print('     Open in browser and press Ctrl+E to toggle editor')
-    return str(out)
+    if not safe_write_text(output_path, html, f"编辑器 HTML ({template_type})"):
+        return None
+
+    print(f'[OK] 网格编辑器已生成（来自 "{template_type}"）: {output_path}')
+    print('     浏览器打开后按 Ctrl+E 切换编辑模式')
+    return str(output_path)
 
 
-if __name__ == '__main__':
-    ap = argparse.ArgumentParser(description='Grid-aware Visual Editor Generator v2')
-    ap.add_argument('--template', help='Input template HTML path')
-    ap.add_argument('--type', help='Built-in template type name')
-    ap.add_argument('--output', '-o', required=True, help='Output editor HTML path')
+def main():
+    try:
+        _main_impl()
+    except SystemExit:
+        pass
+    except KeyboardInterrupt:
+        print("\n⚠️  用户中断操作")
+    except Exception as e:
+        show_error("内部错误", f"程序发生未预期的错误: {type(e).__name__}",
+                   "使用 --help 查看参数说明。如持续报错，可查看 FAQ。")
+        import traceback
+        traceback.print_exc()
+
+
+def _main_impl():
+    ap = argparse.ArgumentParser(description='Grid-aware 可视化编辑器生成器 v2', add_help=True)
+    ap.add_argument('--template', help='输入模板 HTML 文件路径')
+    ap.add_argument('--type', help='内置模板类型名称（如 harmony-app, promo）')
+    ap.add_argument('--output', '-o', required=True, help='输出编辑器 HTML 文件路径')
+    ap.add_argument('--debug', action='store_true', help='显示详细错误堆栈')
 
     args = ap.parse_args()
+
+    if not args.template and not args.type:
+        show_error("参数错误", "必须提供 --template 或 --type 参数",
+                   "用法: python visual_editor.py --type harmony-app -o data/output/editor.html\n"
+                   "  或: python visual_editor.py --template data/output/template.html -o data/output/editor.html")
+        return
 
     if args.type:
         generate_from_type(args.type, args.output)
     elif args.template:
         generate_standalone_editor(args.template, args.output)
-    else:
-        ap.print_help()
+
+
+if __name__ == '__main__':
+    main()

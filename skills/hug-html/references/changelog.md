@@ -1,10 +1,22 @@
 # Changelog — hug-html
 
-## v2.0.2 (2026-05-29) — 合规修正
+## v2.1.0 (2026-05-29) — 全面中文异常处理 + 能力边界定义
 
-### Fixed
-- `_meta.json` 补充 `data_dir` 字段，通过 R-12 检查
-- 版本号从 v2.0.1 升级至 v2.0.2（`skill-standardization update` 自动 bump）
+### Added
+- 所有脚本集成中文错误处理机制：`show_error()` 函数统一输出 `❌ [错误类型] 说明 + 💡 修复建议`
+- `safe_read_json()` / `safe_write_text()` 安全文件操作工具，文件不存在/JSON格式错误/编码异常均有中文指引
+- `--debug` 参数支持（grid_builder.py / template_generator.py / visual_editor.py），加参数显示完整堆栈
+- SKILL.md 新增「能力边界」章节：✅ 支持场景 / ❌ 不支持场景 / ⚠️ 边界情况，明确回答"这个需求支不支持"
+- SKILL.md 新增「错误排查」快速入门表格+「错误处理说明」章节
+- SKILL.md 触发场景补充多个复杂需求触发示例
+- faq.md 新增 Q11-Q17：错误码对照表、文件找不到修复、布局错乱排查、编辑器无响应、模板固化使用、能力边界判断
+
+### Changed
+- `grid_builder.py`: main() 包裹 try/except，所有文件读取/写入改用安全函数
+- `template_generator.py`: 重写为 try/except + 中文错误，引入 grid_builder 的 show_error/safe_read_json/safe_write_text
+- `visual_editor.py`: 重写为 try/except + 中文错误，模板不存在/读取失败均有中文指引
+- `content_filler.py`: 重写为 try/except + 中文错误，文件读取/JSON解析/填充字段校验均有中文提示
+- `SKILL.md` frontmatter 版本号 v2.0.4 → v2.1.0
 
 ## v2.0.1 (2026-05-29) — 完整交互 + 审计 + 标准化
 
