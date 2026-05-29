@@ -1,6 +1,6 @@
 {
   "name": "git-sync",
-  "version": "2.6.32",
+  "version": "2.6.33",
   "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.28：修复跳过同步时状态显示「成功」的误导问题，改为「⏭️ 跳过」。",
   "author": "wUwproject",
   "tags": [

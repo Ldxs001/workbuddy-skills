@@ -849,12 +849,13 @@ def main():
         # 4. 文件筛选状态（三档）
         f_info = audit_result.get("filter", {})
         violations = f_info.get("violations", [])
-        if violations:
+        f_error = f_info.get("error", False) or f_info.get("status") == "error"
+        if f_error:
+            print(f"  ❌  文件筛选状态：检查失败")
+        elif violations:
             print(f"  ⚠️  文件筛选状态：有 {len(violations)} 个不应打包的文件")
             for v in violations[:5]:
                 print(f"     - {v}")
-        elif audit_result.get("summary", {}).get("errors", 0) > 0:
-            print(f"  ❌  文件筛选状态：检查失败")
         else:
             print(f"  ✅ 文件筛选状态：干净（无多余文件）")
     else:
