@@ -132,7 +132,7 @@ def generate_readme(repo_path, readme_path):
 > **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：{today}
 
-本仓库托管作者（wUwproject）原创开发的 WorkBuddy 技能合集，所有技能均为独立创作，公开提供使用。
+本仓库托管 wUwproject 技能合集。
 
 ---
 
