@@ -271,6 +271,7 @@ def sanitize_file(file_path, replacements, backup=True):
     if backup:
         backup_path = file_path + ".bak"
         import shutil
+
         shutil.copy2(file_path, backup_path)
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()

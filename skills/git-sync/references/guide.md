@@ -307,11 +307,11 @@ bash "C:/Users/sm001/.workbuddy/skills/git-sync/scripts/git-sync.sh" <skill-name
 
 | 字段 | 说明 | 默认值 |
 |------|------|--------|
-| `author` | `_meta.json` 默认作者名；敏感扫描中的用户名检测基准 | `[username-redacted]` |
-| `gitee.user` | 码云用户名，用于生成查看链接和 README 命令 | `[username-redacted]` |
+| `author` | `_meta.json` 默认作者名；敏感扫描中的用户名检测基准 | `wUwproject` |
+| `gitee.user` | 码云用户名，用于生成查看链接和 README 命令 | `wUwproject` |
 | `gitee.repo` | 码云仓库名 | `workbuddy-skills` |
 | `gitee.branch` | 码云推送目标分支 | `main` |
-| `github.user` | GitHub 用户名 | `[username-redacted]` |
+| `github.user` | GitHub 用户名 | `Ldxs001` |
 | `github.repo` | GitHub 仓库名 | `workbuddy-skills` |
 | `github.branch` | GitHub 推送目标分支 | `main` |
 

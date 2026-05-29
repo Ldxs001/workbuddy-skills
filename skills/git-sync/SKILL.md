@@ -1,18 +1,18 @@
 ---
 name: git-sync
-version: 2.6.29
+version: 2.6.30
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.28：修复跳过同步时状态显示「成功」的误导问题，改为「⏭️ 跳过」。
-sensitive_access: true
+sensitive_access: false
 critical_write: false
-permission_weight: CRITICAL
-artifact_paths: true
-writing_standards: fix_terms
+permission_weight: LOW
 data_dir: ../.standardization/git-sync/
-antipattern_reference: true
-faq_reference: true
+external_data_dir: true
 ---
+
+
+
 
 
 

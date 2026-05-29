@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# R-12 审计锚点：数据目录
+DEFAULT_DATA_DIR_RAW="skills/.standardization/git-sync/data/"
+SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
+DATA_DIR="$SKILL_DIR/../.standardization/git-sync/data"
 # git-sync v2.6.6
 # 将 skill 代码规范化推送到码云/GitHub 并生成 ZIP 包
 # 用法: bash git-sync.sh <skill-name> [version] [--skip-scan]

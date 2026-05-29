@@ -4,6 +4,13 @@
 import json, sys, os
 from pathlib import Path
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
 def _find_skills_dir():
     """从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/"""
     return str(Path(__file__).resolve().parent.parent.parent)

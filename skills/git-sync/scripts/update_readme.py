@@ -196,6 +196,7 @@ MIT License
     backup_path = readme_path + ".bak"
     if os.path.exists(readme_path):
         import shutil
+
         shutil.copy2(readme_path, backup_path)
         _safe_print("  已备份原 README.md -> README.md.bak")
 

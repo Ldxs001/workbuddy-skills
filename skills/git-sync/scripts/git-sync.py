@@ -14,6 +14,12 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+
 # ── 强制 UTF-8 输出（Windows 终端兼容）────────────────────────────
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -691,6 +697,7 @@ def main():
     # 方案：在最早时机固化 credential.helper 配置，所有后续 git 命令直接继承
     # 同时用 GIT_CREDENTIAL_HELPER 环境变量双重保险
     import subprocess as _sp
+
     _env = os.environ.copy()
     _env["GIT_TERMINAL_PROMPT"] = "0"
     # 写入 repo 级配置（最高优先级，覆盖全局）

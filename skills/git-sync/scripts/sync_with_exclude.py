@@ -43,6 +43,7 @@ def should_exclude(rel_path, file_path=None):
     """
     import fnmatch
 
+
     p = rel_path.replace(os.sep, "/")
     name = os.path.basename(p)
     parent_dir = os.path.dirname(p)  # "" 表示根目录
