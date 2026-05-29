@@ -1,9 +1,9 @@
 ---
 name: git-sync
-version: 2.6.27
+version: 2.6.28
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.27：SKILL.md输出指令扩展为完整报告模板（推送表+审计+ZIP详情+HTML路径）；新增GitHub失败自动询问重试；修复输出信息不完整问题。
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.28：修复跳过同步时状态显示「成功」的误导问题，改为「⏭️ 跳过」。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL

@@ -751,7 +751,8 @@ def main():
     step_normalize_meta(meta_file, skill_name, version)
 
     # 步骤 4：同步文件（版本相同时跳过）
-    if compare_result == "skip_sync":
+    skipped_sync = (compare_result == "skip_sync")
+    if skipped_sync:
         log(4, 8, "跳过文件同步（版本相同）", "skip")
         repo_skill_dir = WORK_REPO / "skills" / skill_name
     else:
@@ -784,8 +785,15 @@ def main():
     print("-" * 32)
     gitee_ver = version if gitee_ok else "未推送"
     github_ver = version if github_ok else "未推送"
-    print(f"{'码云':<10} {'✅ 成功' if gitee_ok else '❌ 失败':<10} {gitee_ver:<12}")
-    print(f"{'GitHub':<10} {'✅ 成功' if github_ok else '❌ 失败':<10} {github_ver:<12}")
+    # 跳过文件同步时，状态显示"⏭️ 跳过"而非"✅ 成功"
+    if skipped_sync:
+        gitee_status = "⏭️ 跳过"
+        github_status = "⏭️ 跳过"
+    else:
+        gitee_status = "✅ 成功" if gitee_ok else "❌ 失败"
+        github_status = "✅ 成功" if github_ok else "❌ 失败"
+    print(f"{'码云':<10} {gitee_status:<10} {gitee_ver:<12}")
+    print(f"{'GitHub':<10} {github_status:<10} {github_ver:<12}")
 
     # 审计报告
     print()
