@@ -85,17 +85,18 @@ def generate_readme(repo_path, readme_path):
         print(f"❌ skills/ 目录不存在: {skills_dir}")
         sys.exit(1)
 
-    # 扫描实际技能目录
+    # 扫描实际技能目录（排除非技能目录）
+    SKIP_DIRS = {".dist", ".standardization", "skills"}
     actual_skills = []
     for entry in sorted(os.listdir(skills_dir)):
         full = os.path.join(skills_dir, entry)
-        if os.path.isdir(full):
+        if os.path.isdir(full) and entry not in SKIP_DIRS:
             desc = extract_desc(full)
             actual_skills.append((entry, desc))
 
-    print(f"扫描到 {len(actual_skills)} 个技能目录:")
+    _safe_print(f"扫描到 {len(actual_skills)} 个技能目录:")
     for name, desc in actual_skills:
-        print(f"  - {name}: {desc[:60]}")
+        _safe_print(f"  - {name}: {desc[:60]}")
 
     # 生成技能列表表格
     table_lines = []
@@ -192,11 +193,19 @@ MIT License
     if os.path.exists(readme_path):
         import shutil
         shutil.copy2(readme_path, backup_path)
-        print(f"  ℹ️  已备份原 README.md → README.md.bak")
+        _safe_print("  已备份原 README.md -> README.md.bak")
 
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(new_readme)
-    print(f"  ✅ README.md 已全量重新生成: {readme_path}")
+    _safe_print(f"  README.md 已全量重新生成: {readme_path}")
+
+
+def _safe_print(msg):
+    """兼容 GBK 终端的安全打印"""
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        print(msg.encode("ascii", errors="replace").decode("ascii"))
 
 
 if __name__ == "__main__":

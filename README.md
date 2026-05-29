@@ -13,8 +13,6 @@
 
 | 技能名 | 描述 |
 |--------|------|
-| `.dist` | 技能描述 |
-| `.standardization` | 技能描述 |
 | `color-toolkit` | 专业颜色工具集 - HEX/RGB/HSL/HSV/CMYK转换、四种对比度算法、智能配色推荐 |
 | `drawiodo` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。 |
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
@@ -25,7 +23,6 @@
 | `simulated-peak-plot` | 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持自定义峰参数、噪声水平、基线设置、复合峰（N个子峰组合）、自定义坐标轴标题/单位、CSV完整数据导出、可点击的file:///路径输出、以及从设备导出数据导入CSV。 |
 | `skill-standardization` | Skill 标准化规范引擎 v2.38.9。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。 |
 | `skill-sub` | skill-sub 调用链编辑器与粗粒度规划器 |
-| `skills` | 技能描述 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.17.1。数据目录迁移到 .standardization/triphasic-execution/；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
@@ -41,8 +38,6 @@ workbuddy-skills/
 ├── README.md
 ├── LICENSE
 └── skills/
-├── .dist/
-├── .standardization/
 ├── color-toolkit/
 ├── drawiodo/
 ├── everything-search-breadmemory/
@@ -53,7 +48,6 @@ workbuddy-skills/
 ├── simulated-peak-plot/
 ├── skill-standardization/
 ├── skill-sub/
-├── skills/
 ├── svg-composer/
 ├── triphasic-execution/
 ├── universal-file-ops/
