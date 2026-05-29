@@ -140,7 +140,6 @@ def patch_smart_dep_inference():
     print("  ✅ cmd_infer_deps 已添加")
     return True
 
-
 def patch_historical_recommendation():
     """历史链推荐：添加 cmd_recommend 函数"""
     p = SKILL_DIR / "scripts" / "chain_manager.py"
@@ -223,7 +222,6 @@ def patch_historical_recommendation():
     p.write_text(content, encoding="utf-8")
     print("  ✅ cmd_recommend 已添加")
     return True
-
 
 def patch_chain_optimization():
     """链优化建议：添加 cmd_optimize 函数"""
@@ -329,7 +327,6 @@ def patch_chain_optimization():
     print("  ✅ cmd_optimize 已添加")
     return True
 
-
 def patch_parameter_inference():
     """参数推断：添加 cmd_infer_params 函数"""
     p = SKILL_DIR / "scripts" / "chain_manager.py"
@@ -423,7 +420,6 @@ def patch_parameter_inference():
     print("  ✅ cmd_infer_params 已添加")
     return True
 
-
 def add_subparsers():
     """添加子命令到 argparse"""
     p = SKILL_DIR / "scripts" / "chain_manager.py"
@@ -464,7 +460,6 @@ def add_subparsers():
 
     p.write_text(content, encoding="utf-8")
     return True
-
 
 if __name__ == "__main__":
     print("=== 开始 P1 扩展点补丁 ===")

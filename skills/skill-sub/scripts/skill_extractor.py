@@ -16,6 +16,22 @@ import re
 import sys
 from pathlib import Path
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
+
 # ============================================================
 # 缓存配置
 # ============================================================
@@ -32,9 +48,7 @@ def get_skills_dir():
         return Path(env_dir)
     return Path.home() / ".workbuddy" / "skills"
 
-
 SKILLS_DIR = get_skills_dir()
-
 
 # ============================================================
 # SKILL.md 解析
@@ -59,7 +73,6 @@ def find_skill_dir(skill_name):
 
     return None
 
-
 def read_skill_md(skill_path):
     """读取 SKILL.md 文件内容"""
     skill_file = skill_path / "SKILL.md"
@@ -67,7 +80,6 @@ def read_skill_md(skill_path):
         return None
     with open(skill_file, "r", encoding="utf-8") as f:
         return f.read()
-
 
 def extract_frontmatter(content):
     """提取 YAML frontmatter"""
@@ -89,7 +101,6 @@ def extract_frontmatter(content):
                 val = False
             result[key] = val
     return result
-
 
 def extract_description(content):
     """提取技能描述（从第一段非空非标题文本中获取）"""
@@ -122,7 +133,6 @@ def extract_description(content):
 
     return " ".join(desc_lines).strip()
 
-
 def extract_trigger_keywords(content):
     """提取触发关键词"""
     triggers = []
@@ -143,7 +153,6 @@ def extract_trigger_keywords(content):
 
     return list(set(t.strip() for t in triggers if t.strip()))
 
-
 def extract_core_commands(content):
     """提取核心指令/命令（含指令名称供 skill_instruction 使用）"""
     commands = []
@@ -162,7 +171,6 @@ def extract_core_commands(content):
             commands.append({"name": title, "command": title})
 
     return commands
-
 
 def extract_skill_instructions(content):
     """提取可用于调用链的 skill_instruction 候选列表。
@@ -198,7 +206,6 @@ def extract_skill_instructions(content):
 
     return instructions
 
-
 def extract_key_steps(content):
     """提取关键执行步骤（从代码块、列表、流程描述中）"""
     steps = []
@@ -232,7 +239,6 @@ def extract_key_steps(content):
 
     return unique_steps
 
-
 def extract_cli_usage(content):
     """提取 CLI 使用方式"""
     cli_info = []
@@ -247,8 +253,6 @@ def extract_cli_usage(content):
 
     return cli_info[:20]  # 限制数量
     return cli_info[:20]  # 限制数量
-
-
 
 def extract_parameters(content):
     """提取技能可调用的参数列表（从 SKILL.md 的 trigger/参数表中）"""
@@ -286,9 +290,6 @@ def extract_parameters(content):
             params.append({'name': param_name, 'type': 'string', 'description': ''})
 
     return params[:20]
-
-
-
 
 def extract_all(skill_name, skill_path=None, use_cache=True):
     """提取技能的所有关键信息"""
@@ -345,8 +346,6 @@ def extract_all(skill_name, skill_path=None, use_cache=True):
 
     return result
 
-
-
 # ============================================================
 # 命令实现
 # ============================================================
@@ -362,14 +361,12 @@ def load_cache():
             return {}
     return {}
 
-
 def save_cache(cache_data):
     """保存缓存数据"""
     cf = _cache_dir / "extraction_cache.json"
     cf.parent.mkdir(parents=True, exist_ok=True)
     with open(cf, "w", encoding="utf-8") as f:
         json.dump(cache_data, f, ensure_ascii=False, indent=2)
-
 
 def get_cached_extraction(skill_name):
     """获取缓存的提取结果（检查时效性：缓存有效期 1 小时）"""
@@ -382,7 +379,6 @@ def get_cached_extraction(skill_name):
         return None
     return entry.get("data")
 
-
 def cache_extraction(skill_name, data):
     """缓存提取结果"""
     cache = load_cache()
@@ -393,8 +389,6 @@ def cache_extraction(skill_name, data):
         "cached_at": time.time()
     }
     save_cache(cache)
-
-
 
 def cmd_extract(args):
     """提取单个技能的关键信息"""
@@ -446,11 +440,6 @@ def cmd_extract(args):
 
     return 0
 
-
-
-
-
-
 def cmd_extract_params(args):
 
     """提取指定技能的参数列表"""
@@ -461,8 +450,6 @@ def cmd_extract_params(args):
         print(f"❌ {result['error']}")
 
         return 1
-
-
 
     params = []
 
@@ -476,15 +463,11 @@ def cmd_extract_params(args):
 
             params = extract_parameters(md)
 
-
-
     if not params:
 
         print(f"未找到参数：{args.skill}")
 
         return 0
-
-
 
     print(f"📋 技能参数：{args.skill}")
 
@@ -500,23 +483,11 @@ def cmd_extract_params(args):
 
         print(f"  - {name} ({typ})：{desc}")
 
-
-
     if args.json:
 
         print(json.dumps(params, ensure_ascii=False, indent=2))
 
-
-
     return 0
-
-
-
-
-
-
-
-
 
 def cmd_scan(args):
     """扫描所有已安装技能"""
@@ -577,14 +548,9 @@ def cmd_scan(args):
 
     return 0
 
-
 # ============================================================
 # CLI 入口
 # ============================================================
-
-
-
-
 
 def cmd_clear_cache(args):
 
@@ -602,14 +568,6 @@ def cmd_clear_cache(args):
         print("ℹ️ 无缓存可清空")
 
     return 0
-
-
-
-
-
-
-
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -665,7 +623,6 @@ def main():
     else:
         parser.print_help()
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

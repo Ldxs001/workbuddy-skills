@@ -20,6 +20,21 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
 
 # ─── Paths ────────────────────────────────────────────────────────────
 
@@ -32,7 +47,6 @@ _SCRIPT_DIR_STR = str(SCRIPT_DIR)
 _SKILL_DIR_STR = str(SKILL_DIR)
 _ASSETS_DIR_STR = str(ASSETS_DIR)
 
-
 def get_home_dir():
     """Resolve SKILL_SUB_HOME with fallback."""
     home = (
@@ -42,18 +56,14 @@ def get_home_dir():
     )
     return Path(home).expanduser()
 
-
     def get_default_config_path():
         return SCRIPT_DIR / "default_config.json"
-
 
 def get_user_config_path():
     return get_home_dir() / "config.json"
 
-
 def get_settings_done_path():
     return SKILL_DIR / ".settings_done"
-
 
 def load_config():
     """Load merged config: default_config.json + config.json (user overrides)."""
@@ -70,7 +80,6 @@ def load_config():
     defaults.update(user_cfg)
     return defaults
 
-
 def save_config_from_dict(cfg_dict):
     """Save config dict to user config.json, creating parent dirs if needed."""
     user_path = get_user_config_path()
@@ -82,7 +91,6 @@ def save_config_from_dict(cfg_dict):
     with open(user_path, "w", encoding="utf-8") as f:
         json.dump(cfg_dict, f, indent=2, ensure_ascii=False)
     return user_path
-
 
 def save_config_from_json(json_str):
     """Parse JSON string and save. Returns (success: bool, message: str)."""
@@ -110,7 +118,6 @@ def save_config_from_json(json_str):
     except Exception as e:
         return False, f"Save error: {e}"
 
-
 # ─── HTTP Server ─────────────────────────────────────────────────────
 
 def find_available_port(start=8080, end=8999):
@@ -122,7 +129,6 @@ def find_available_port(start=8080, end=8999):
         except OSError:
             continue
     return start
-
 
 class SettingsHandler(BaseHTTPRequestHandler):
     """HTTP handler for settings UI."""
@@ -228,10 +234,8 @@ min-height:100vh;margin:0;background:#1a1a2e;color:#eee}
             self.send_response(404)
             self.end_headers()
 
-
 def _make_handler(*args, **kwargs):
     return SettingsHandler(*args, **kwargs)
-
 
 def _background_save(data):
     """Save config in background thread."""
@@ -247,11 +251,9 @@ def _background_save(data):
     except Exception as e:
         print(f"[settings] Background save error: {e}", file=sys.stderr)
 
-
 def shutdown_server():
     """Create the done flag file to signal server shutdown."""
     get_settings_done_path().touch()
-
 
 # ─── Server lifecycle ────────────────────────────────────────────────
 
@@ -281,7 +283,6 @@ def start_server(port, serve_only=False):
         server.server_close()
         if done_path.exists():
             done_path.unlink()
-
 
 # ─── CLI ─────────────────────────────────────────────────────────────
 
@@ -328,7 +329,6 @@ def main():
         t.start()
 
         start_server(port, serve_only=False)
-
 
 if __name__ == "__main__":
     main()

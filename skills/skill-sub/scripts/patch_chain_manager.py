@@ -63,7 +63,6 @@ def backup_chain(name, reason="auto"):
 
     return new_version
 
-
 def list_backups(name):
     """列出指定调用链的备份版本。"""
     backup_dir = CHAIN_HOME / "backups" / name
@@ -71,7 +70,6 @@ def list_backups(name):
     if not versions_file.exists():
         return []
     return json.loads(versions_file.read_text(encoding="utf-8"))
-
 
 def restore_backup(name, version):
     """从指定版本恢复调用链。"""
@@ -100,7 +98,6 @@ def restore_backup(name, version):
     chain_data.pop("_backup_reason", None)
     chain_data.pop("_backup_time", None)
     return chain_data, None
-
 
 '''
 
@@ -236,7 +233,6 @@ def cmd_list_backups(args):
     print(f"\n  恢复命令: python chain_manager.py restore --name \"{args.name}\" --version <版本号>")
     return 0
 
-
 def cmd_restore(args):
     """从备份恢复调用链"""
     chain_data, err = restore_backup(args.name, args.version)
@@ -254,7 +250,6 @@ def cmd_restore(args):
     save_chain(chain_data)
     print(f"✅ 已恢复 '{args.name}' 到版本 {args.version}")
     return 0
-
 
 '''
 

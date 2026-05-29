@@ -23,6 +23,21 @@ from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
 
 # ============================================================
 # Config - 配置管理
@@ -60,7 +75,6 @@ class Config:
     def get_default_max_retries(self):
         return self.get("default_max_retries", 3)
 
-
 # ============================================================
 # PathManager - 路径管理
 # ============================================================
@@ -96,7 +110,6 @@ class PathManager:
             if (p / "SKILL.md").exists():
                 return p
         return None
-
 
 # ============================================================
 # Validator - 里程碑判断 + 输入验证
@@ -160,7 +173,6 @@ class Validator:
         if mode not in valid:
             return False, f"无效 failure_mode: {mode}，有效值: {valid}"
         return True, ""
-
 
 # ============================================================
 # TopoSorter - 步骤拓扑排序 + 计数
@@ -248,7 +260,6 @@ class TopoSorter:
                     count += max(self.count_all_steps(if_steps), self.count_all_steps(else_steps))
         return count
 
-
 # ============================================================
 # InstructionGenerator - AI 指令生成器
 # ============================================================
@@ -303,7 +314,6 @@ class InstructionGenerator:
             lines.append("")
         
         return "\n".join(lines)
-
 
 # ============================================================
 # ExecutionPlanBuilder - 执行计划生成器
@@ -483,7 +493,6 @@ class CLIHandler:
         for m in ms:
             print(f"  - 步骤 {m['index']}: {m['reason']}")
 
-
 # ============================================================
 # main - 命令行入口
 # ============================================================
@@ -529,7 +538,6 @@ def main():
         handler.cmd_quick(args)
     elif args.command == "validate":
         handler.cmd_validate(args)
-
 
 if __name__ == "__main__":
     main()

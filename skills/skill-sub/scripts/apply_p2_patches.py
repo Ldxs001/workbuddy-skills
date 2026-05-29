@@ -6,7 +6,6 @@ import re
 
 SKILL_DIR = Path(r"C:\Users\sm001\.workbuddy\skills\skill-sub")
 
-
 def patch_parameter_extraction():
     """参数提取：增强 skill_extractor.py，提取技能的命令行参数 schema"""
     p = SKILL_DIR / "scripts" / "skill_extractor.py"
@@ -83,7 +82,6 @@ def extract_parameters(skill_name):
 
     return schema, None
 
-
 def cmd_extract_params(args):
     """命令行接口：提取技能参数"""
     schema, err = extract_parameters(args.skill)
@@ -113,7 +111,6 @@ def cmd_extract_params(args):
     p.write_text(content, encoding="utf-8")
     print("  ✅ 参数提取功能已添加")
     return True
-
 
 def patch_compatibility_check():
     """兼容性检查：添加 check_compatibility 函数"""
@@ -170,7 +167,6 @@ def check_compatibility(chain_name):
 
     return issues, None
 
-
 def cmd_check_compat(args):
     """命令行接口：检查兼容性"""
     issues, err = check_compatibility(args.name)
@@ -195,7 +191,6 @@ def cmd_check_compat(args):
     p.write_text(content, encoding="utf-8")
     print("  ✅ 兼容性检查功能已添加")
     return True
-
 
 def patch_resource_analysis():
     """资源分析：添加 analyze_resources 函数"""
@@ -255,7 +250,6 @@ def analyze_resources(chain):
 
     return analysis
 
-
 def cmd_analyze(args):
     """命令行接口：资源分析"""
     chain = load_chain(args.name)
@@ -281,7 +275,6 @@ def cmd_analyze(args):
     p.write_text(content, encoding="utf-8")
     print("  ✅ 资源分析功能已添加")
     return True
-
 
 def patch_plan_b_generation():
     """Plan B 生成：添加 generate_plan_b 函数"""
@@ -351,7 +344,6 @@ def generate_plan_b(chain, step_index):
 
     return plan_b, None
 
-
 def cmd_generate_plan_b(args):
     """命令行接口：生成 Plan B"""
     chain = load_chain(args.name)
@@ -378,7 +370,6 @@ def cmd_generate_plan_b(args):
     p.write_text(content, encoding="utf-8")
     print("  ✅ Plan B 生成功能已添加")
     return True
-
 
 if __name__ == "__main__":
     print("=== 开始 P2 扩展点补丁 ===")

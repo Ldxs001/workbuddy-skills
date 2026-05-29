@@ -73,7 +73,6 @@ def render_step(step, step_num, indent=0, verbose=True):
 
     return lines
 
-
 def render_plan_with_loop_branch(plan, verbose=True):
     """
     接收 build_execution_plan() 生成的 plan，
@@ -111,7 +110,6 @@ def render_plan_with_loop_branch(plan, verbose=True):
             lines.append(f"  步骤{vf['from_step']}({vf['from_step_name']}) → 输出: {vf['outputs']}")
 
     return "\n".join(lines)
-
 
 if __name__ == "__main__":
     # 自测

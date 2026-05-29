@@ -17,6 +17,15 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 # 运行时绝对路径
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
 
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
+
 SKILL_DIR = Path(r"C:\Users\sm001\.workbuddy\skills\skill-sub")
 # R-11 合规：产出物路径迁至数据目录
 DATA_HOME = Path.home() / ".workbuddy" / "skills" / ".standardization" / "skill-sub"
@@ -182,7 +191,6 @@ def patch_chain_manager():
     print("✅ chain_manager.py 补丁完成")
     return True
 
-
 # ============================================================
 # 补丁2：chain_executor.py 增强 cmd_validate 函数
 # ============================================================
@@ -214,7 +222,6 @@ def patch_chain_executor():
     p.write_text(content, encoding="utf-8")
     print("✅ chain_executor.py 补丁完成")
     return True
-
 
 if __name__ == "__main__":
     print("=== 开始打补丁 ===")

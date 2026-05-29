@@ -23,6 +23,15 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 # 运行时绝对路径
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
 
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+# 运行时绝对路径
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
+
+
 # ============================================================
 # 配置类
 # ============================================================
@@ -63,7 +72,6 @@ class ConfigManager:
             return max(1, int(config.get("default_max_retries", 3)))
         except (TypeError, ValueError):
             return 3
-
 
 # ============================================================
 # 路径管理类
@@ -116,7 +124,6 @@ class PathManager:
                     return entry
         
         return None
-
 
 # ============================================================
 # 验证器类
@@ -255,7 +262,6 @@ class ChainValidator:
         
         return errors, warnings
 
-
 # ============================================================
 # 备份管理类
 # ============================================================
@@ -313,7 +319,6 @@ class BackupManager:
             return True, f"已从备份恢复: {backup_file.name}"
         except Exception as e:
             return False, f"恢复失败: {e}"
-
 
 # ============================================================
 # 调用链管理类
@@ -700,7 +705,6 @@ def main():
     else:
         parser.print_help()
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

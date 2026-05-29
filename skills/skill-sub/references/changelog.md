@@ -1,3 +1,11 @@
+## v1.23.3 (2026-05-30) — R-12 合规完善
+
+### Changed
+- 所有脚本补充 DEFAULT_DATA_DIR_RAW + DATA_DIR R-12 定义
+- _meta.json 补充 data_dir 字段
+- 运行 fix_missing_data_dir 一键修复，R-12 审计通过
+
+
 ## v1.23.0 (2026-05-27)
 
 ### 修复（R-11 路径规范）

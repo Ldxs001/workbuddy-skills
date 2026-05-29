@@ -74,7 +74,6 @@ def patch_chain_manager():
     p.write_text(c, encoding="utf-8")
     return True
 
-
 def patch_chain_executor():
     p = SKILL_DIR / "scripts" / "chain_executor.py"
     c = p.read_text(encoding="utf-8")
@@ -188,7 +187,6 @@ def patch_chain_executor():
 
     p.write_text(c, encoding="utf-8")
     return True
-
 
 if __name__ == "__main__":
     print("=== 补全 P0 补丁 ===")
