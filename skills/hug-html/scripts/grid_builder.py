@@ -26,6 +26,8 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).parent.parent
 SCRIPTS_DIR = SKILL_DIR / "scripts"
 BUILTIN_TEMPLATES_DIR = SCRIPTS_DIR / "templates"   # 内置文件型模板（跟随技能）
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"  # 用户数据
 OUTPUT_DIR = DATA_DIR / "output"
 USER_TEMPLATES_DIR = DATA_DIR / "user-templates"

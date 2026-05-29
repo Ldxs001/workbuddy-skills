@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
 TEMPLATES_DIR = DATA_DIR / "templates"
 OUTPUT_DIR = DATA_DIR / "output"

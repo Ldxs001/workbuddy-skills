@@ -23,6 +23,8 @@ from grid_builder import (
     load_grid_spec, css_dict_to_str,
 )
 
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
 DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
 MODULES_DIR = DATA_DIR / "modules"
 TEMPLATES_DIR = DATA_DIR / "templates"

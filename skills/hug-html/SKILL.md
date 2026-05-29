@@ -10,7 +10,7 @@ data_dir: ../.standardization/hug-html/data/
 external_data_dir: true
 faq_quality: improve_qa
 antipattern_detail: add_detail
-version: 2.1.0
+version: 2.1.1
 ---
 
 
