@@ -1,5 +1,14 @@
 # Changelog — hug-html
 
+## v2.1.1 (2026-05-29) — skill-standardization 合规修正
+
+### Changed
+- 版本号 v2.1.0 → v2.1.1（`skill-standardization update --fix` 自动 bump）
+- `_meta.json` 补充 `data_dir` 字段，通过 R-12 检查
+- `scripts/grid_builder.py`：补充 `DEFAULT_DATA_DIR_RAW` R-12 数据目录字面量声明
+- `scripts/gen_test_grids.py`：补充 `DEFAULT_DATA_DIR_RAW` R-12 字面量
+- `scripts/module_assembler.py`：补充 `DEFAULT_DATA_DIR_RAW` R-12 字面量
+
 ## v2.1.0 (2026-05-29) — 全面中文异常处理 + 能力边界定义
 
 ### Added
