@@ -1,3 +1,12 @@
+## v2.38.12 (2026-05-30) — R-12 step 1.5 配套修复工具: fix_missing_data_dir
+
+### Added
+- fix_missing_data_dir() — R-12 step 1.5 配套修复，给引用 .standardization 但缺少 DATA_DIR 的脚本补上 DEFAULT_DATA_DIR_RAW + DATA_DIR
+  - Python 脚本：在第一个 def/class 之前的最后一个 import 后插入，缺 pathlib 则补 from pathlib import Path
+  - Shell 脚本：在 shebang 后插入，用 bash 兼容语法
+  - 已有 DATA_DIR 的脚本跳过
+- 注册到 apply_fix dispatch 表中，fix_key=“missing_data_dir”
+
 ## v2.38.8 (2026-05-29)
 
 

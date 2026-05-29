@@ -868,6 +868,144 @@ def fix_doc_code_consistency(skill_dir, **kw):
 
 
 # ═══════════════════════════════════════════════════
+# fix_missing_data_dir — 给脚本补 DEFAULT_DATA_DIR_RAW + DATA_DIR
+# ═══════════════════════════════════════════════════
+
+def fix_missing_data_dir(skill_dir, **kw):
+    """
+    R-12 step 1.5 配套修复：给引用 .standardization 但缺少 DATA_DIR 的脚本
+    补上 DEFAULT_DATA_DIR_RAW + DATA_DIR 声明。
+
+    处理逻辑：
+    - Python 脚本：在最后一个 import 后插入，缺 pathlib 则补
+    - Shell 脚本：在 shebang 后插入 bash 兼容的变量赋值
+    - 已有 DATA_DIR 的脚本跳过
+
+    返回：修复的脚本数量
+    """
+    dry_run = kw.get("dry_run", False)
+    skill_name = os.path.basename(os.path.normpath(skill_dir))
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return 0
+
+    fixed = 0
+    # DATA 变量正则（与 artifact_checker.py 保持一致）
+    data_var_re = re.compile(
+        r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*(?:_DIR|_PATH))\s*=\s*(.+)$'
+    )
+
+    for fname in sorted(os.listdir(scripts_dir)):
+        fpath = os.path.join(scripts_dir, fname)
+        if not os.path.isfile(fpath):
+            continue
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in (".py", ".sh", ".bat", ".ps1"):
+            continue
+
+        content = _read_file(fpath)
+        # 没引用 .standardization 的跳过
+        if ".standardization" not in content:
+            continue
+        # 已有 DATA 变量的跳过
+        if data_var_re.search(content, re.MULTILINE):
+            continue
+
+        if ext == ".py":
+            new_content = _insert_data_dir_python(content, skill_name, fname)
+        else:
+            new_content = _insert_data_dir_shell(content, skill_name, fname)
+
+        if new_content and new_content != content:
+            if dry_run:
+                print(f"  [DRY-RUN] {fname}: 将插入 DATA_DIR")
+            else:
+                _write_file(fpath, new_content)
+            fixed += 1
+            if not dry_run:
+                print(f"    [OK] {fname}: 已添加 DEFAULT_DATA_DIR_RAW + DATA_DIR")
+
+    return fixed
+
+
+def _insert_data_dir_python(content, skill_name, fname):
+    """为 Python 脚本插入 DATA_DIR 代码块（仅插入顶层导入区，不进函数体）"""
+    lines = content.splitlines(keepends=True)
+
+    # 找到插入点：最后一个顶层 import/from 行之后
+    # 仅统计在第一个 def/class/if __name__ 之前的 import
+    insert_at = 0
+    need_pathlib = True
+    reached_body = False
+    for i, l in enumerate(lines):
+        s = l.strip()
+        # 遇到函数定义、类定义、模块级 if/for/while 就停止统计 import
+        if s.startswith("def ") or s.startswith("class "):
+            reached_body = True
+            break
+        if s.startswith("import ") or s.startswith("from "):
+            insert_at = i + 1  # 插入在此行之后
+            if "pathlib" in s and "Path" in s:
+                need_pathlib = False
+
+    # 如果找不到任何顶层 import（文件内 import 都在函数中），在第一个函数定义前插入
+    if insert_at == 0 and reached_body:
+        for i, l in enumerate(lines):
+            s = l.strip()
+            if s.startswith("def ") or s.startswith("class "):
+                insert_at = i
+                break
+
+    # 构建插入块
+    block_lines = []
+    block_lines.append("")
+    block_lines.append("# R-12 审计锚点：数据目录字面量声明")
+    block_lines.append('DEFAULT_DATA_DIR_RAW = "skills/.standardization/' + skill_name + '/data/"')
+    block_lines.append("")
+    block_lines.append("SKILL_DIR = Path(__file__).resolve().parent.parent")
+    block_lines.append("# 运行时绝对路径")
+    block_lines.append('DATA_DIR = SKILL_DIR.parent / ".standardization" / "' + skill_name + '" / "data"')
+    block_lines.append("")
+
+    block = "\n".join(block_lines) + "\n"
+
+    if need_pathlib:
+        # 补 from pathlib import Path
+        pathlib_line = "from pathlib import Path\n"
+        # 在 insert_at 位置先插 pathlib，再插 block
+        new_lines = lines[:insert_at] + [pathlib_line] + [block] + lines[insert_at:]
+    else:
+        new_lines = lines[:insert_at] + [block] + lines[insert_at:]
+
+    return "".join(new_lines)
+
+
+def _insert_data_dir_shell(content, skill_name, fname):
+    """为 Shell 脚本插入 DATA_DIR 变量"""
+    lines = content.splitlines(keepends=True)
+
+    # 找到 shebang 行的位置
+    insert_at = 0
+    for i, l in enumerate(lines):
+        s = l.strip()
+        if s.startswith("#!") and ("bash" in s or "sh" in s or "zsh" in s):
+            insert_at = i + 1
+            break
+
+    block_lines = []
+    block_lines.append("")
+    block_lines.append("# R-12 审计锚点：数据目录")
+    block_lines.append('DEFAULT_DATA_DIR_RAW="skills/.standardization/' + skill_name + '/data/"')
+    block_lines.append('SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"')
+    block_lines.append('DATA_DIR="$SKILL_DIR/../.standardization/' + skill_name + '/data"')
+    block_lines.append("")
+
+    block = "\n".join(block_lines) + "\n"
+    new_lines = lines[:insert_at] + [block] + lines[insert_at:]
+    return "".join(new_lines)
+
+
+# ═══════════════════════════════════════════════════
 # 统一入口：apply_fix()
 # ═══════════════════════════════════════════════════
 
@@ -896,6 +1034,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "home_url": fix_home_url,
         "artifact_paths": fix_artifact_paths,
         "external_data_dir": fix_external_data_dir,
+        "missing_data_dir": fix_missing_data_dir,
         "sensitive_access": fix_sensitive_access,
         "critical_write": fix_critical_write,
         "create_permissions_md": fix_create_permissions_md,
@@ -929,6 +1068,7 @@ def list_fixable():
         "home_url",                  # R-10
         "artifact_paths",            # R-11
         "external_data_dir",         # R-12
+        "missing_data_dir",          # R-12 step 1.5
         "sensitive_access",          # R-13
         "critical_write",            # R-14
         "create_permissions_md",     # R-15

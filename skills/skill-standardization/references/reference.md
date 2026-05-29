@@ -789,7 +789,7 @@ cd /path/to/skill-standardization/scripts
 python restore_from_gitee.py
 ```
 
-**行为：** 遍历预定义的文件名列表，从 `gitee.com/[username-redacted]/workbuddy-skills/raw/main/skill-standardization/scripts/` 下载并覆盖本地文件。输出 `[OK]` 或 `[FAIL]` 结果。
+**行为：** 遍历预定义的文件名列表，从 `gitee.com/wUwproject/workbuddy-skills/raw/main/skill-standardization/scripts/` 下载并覆盖本地文件。输出 `[OK]` 或 `[FAIL]` 结果。
 
 > 注意：此脚本仅用于紧急恢复。正常情况下应通过 `git pull` 同步。
 
@@ -1051,7 +1051,7 @@ python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范�
 ```bash
 python scripts/restore_from_gitee.py
 ```
-**说明**: 该脚本无额外参数，运行后会从 `gitee.com/[username-redacted]/workbuddy-skills` 仓库拉取最新的脚本文件并覆盖本地文件，执行前会自动备份当前脚本目录。
+**说明**: 该脚本无额外参数，运行后会从 `gitee.com/wUwproject/workbuddy-skills` 仓库拉取最新的脚本文件并覆盖本地文件，执行前会自动备份当前脚本目录。
 ---
 ### scripts/progress_manager.py
 **功能**: 管理审计进度，支持创建进度文件、更新进度、加载进度、格式化进度条（无独立 CLI，仅作为 API 供其他脚本调用）。
