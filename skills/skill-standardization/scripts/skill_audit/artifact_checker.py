@@ -488,7 +488,8 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                         m = _DATA_VAR_RE.match(stripped)
                         if m:
                             val = m.group(2).strip()
-                            path_val = _extract_path_value(val)
+                            # 直接用原始值（无 _extract_path_value 函数可用）
+                            path_val = val.strip().strip('"').strip("'")
                             data_dir_vars.append((
                                 os.path.join("scripts", fname),
                                 m.group(1),
@@ -498,13 +499,47 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
             except Exception:
                 continue
 
+    # 1.5 [v2.38.9] check scripts that reference .standardization/ but lack proper DATA_DIR
+    #     修复前：template_generator.py/visual_editor.py 用 OUTPUT_DIR 指向 .standardization/
+    #     但无 DATA_DIR 变量名 → R-12 完全跳过检测
+    scripts_seen = {rel_file for rel_file, _, _, _ in data_dir_vars}
+    for fname in sorted(os.listdir(scripts_dir)):
+        fpath = os.path.join(scripts_dir, fname)
+        if not os.path.isfile(fpath):
+            continue
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in (".py", ".sh", ".bat", ".ps1"):
+            continue
+        rel = os.path.join("scripts", fname)
+        if rel in scripts_seen:
+            continue  # 已有 DATA 变量，无需二次检查
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                sc = f.read()
+        except Exception:
+            continue
+        if ".standardization" in sc:
+            violations.append({
+                "source": rel,
+                "var_name": "(missing DATA_DIR)",
+                "path_value": f"references .standardization/ via {fname}",
+                "expected": "should declare DEFAULT_DATA_DIR_RAW + DATA_DIR",
+                "detail": f"{fname} references .standardization/ paths but lacks a variable named with DATA|STORAGE|DB|CACHE|CONFIG + _DIR/_PATH. "
+                       "【推荐写法】添加 DEFAULT_DATA_DIR_RAW = \"skills/.standardization/<skill>/data/\" 和 "
+                       "DATA_DIR = SKILL_DIR.parent / \".standardization\" / \"<skill>\" / \"data\"",
+            })
+
     # 2. check paths conform to standardization/<skill-name>/ convention
-    expected_norm = os.path.normpath(".standardization/" + dirname + "/data/").lower()
+    #     path_val 可能是 Python 表达式（如 SKILL_DIR.parent / ".standardization" / "skill" / "data"）
+    #     不直接用 os.path.normpath 比较（会因引用/拼接操作符而失败），改为检查
+    #     .standardization + skill 名称是否同时出现
     for rel_file, var_name, path_val, lineno in data_dir_vars:
         if not path_val:
             continue
-        norm = os.path.normpath(path_val).lower()
-        if expected_norm not in norm:
+        pv_lower = path_val.lower()
+        has_std = ".standardization" in pv_lower
+        has_skill = dirname.lower() in pv_lower
+        if not (has_std and has_skill):
             violations.append({
                 "source": rel_file + ":" + str(lineno),
                 "var_name": var_name,
@@ -529,22 +564,32 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
         except Exception:
             pass
 
-    if data_dir_vars and not meta_has_data_dir:
+    # SKILL.md frontmatter data_dir (authoritative source for external data usage)
+    skill_md_data_dir = fm.get("data_dir") if fm else None
+
+    if (data_dir_vars or skill_md_data_dir) and not meta_has_data_dir:
+        src_parts = []
+        if data_dir_vars:
+            src_parts.append("scripts/ define data dir variable")
+        if skill_md_data_dir:
+            src_parts.append("SKILL.md declares data_dir")
+        source_desc = ", ".join(src_parts)
         violations.append({
             "source": "_meta.json",
             "var_name": "data_dir",
             "path_value": "(missing)",
             "expected": "should add data_dir field",
-            "detail": "_meta.json missing data_dir field (scripts/ defines data dir variable)",
+            "detail": f"_meta.json missing data_dir field ({source_desc})",
         })
 
     # 4. check _meta.json data_dir matches code path
+    #     path_val 可能是 Python 表达式（含空格/引号/运算符），只有字面路径（无空格/引号）才可比
     if meta_has_data_dir and data_dir_vars:
         skills_root = _find_skills_dir(skill_dir)
         meta_raw = os.path.join(skills_root, str(meta_data_dir))
         meta_abs = os.path.normpath(meta_raw).rstrip(os.sep).lower()
         for _, _, path_val, _ in data_dir_vars:
-            if path_val:
+            if path_val and ('"' not in path_val) and ("'" not in path_val) and (" " not in path_val):
                 code_raw = os.path.join(skills_root, str(path_val))
                 code_abs = os.path.normpath(code_raw).rstrip(os.sep).lower()
                 if code_abs != meta_abs:
@@ -558,7 +603,7 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                     break
 
     # 5. [v2.10.0] disk existence check
-    uses_external_data = bool(data_dir_vars) or meta_has_data_dir
+    uses_external_data = bool(data_dir_vars) or meta_has_data_dir or bool(skill_md_data_dir)
     if uses_external_data:
         skills_dir = _find_skills_dir(skill_dir)
         expected_disk_path = os.path.join(skills_dir, ".standardization", dirname, "data")

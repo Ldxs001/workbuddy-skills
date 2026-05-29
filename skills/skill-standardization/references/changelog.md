@@ -1,5 +1,17 @@
 ## v2.38.8 (2026-05-29)
 
+
+## v2.38.11 (2026-05-30) — R-12 全面修复：漏检 + hidden bug + 路径比较 + 缺失 DATA_DIR 检测
+
+### Fixed
+- scripts/skill_audit/artifact_checker.py check_external_data_dir() 五处问题一次修复：
+  - a) _meta.json 缺失 data_dir 漏检 — 检测条件从 if data_dir_vars and not meta_has_data_dir 改为 if (data_dir_vars or skill_md_data_dir) and not meta_has_data_dir
+  - b) _extract_path_value 函数不存在导致 data_dir_vars 始终为空 — 原代码调用未定义的 _extract_path_value()，每文件 NameError 被 except Exception: continue 吞掉，R-12 对脚本的检测从没真正运行过
+  - c) step 2 路径比较改用 .standardization + skill 名双检 — 原 os.path.normpath 比较对 Python 表达式路径（如 SKILL_DIR.parent / ...）全部失效
+  - d) step 4 _meta.json vs code 路径比较跳过 Python 表达式 — 含引号/空格的路径表达式不参与字面比较，防止乱码路径误报
+  - e) [新增] step 1.5 检测引用 .standardization 但无 DATA_DIR 的脚本 — 脚本用 OUTPUT_DIR 指向 .standardization/ 时标记缺失 DATA_DIR
+- scripts/artifact_checker.py 同步修复 _extract_path_value 调用
+
 ## v2.38.10 (2026-05-29) — 版本号三端同步强制 + 跳过状态修正
 
 ### Changed

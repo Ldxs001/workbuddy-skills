@@ -488,7 +488,8 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                         m = _DATA_VAR_RE.match(stripped)
                         if m:
                             val = m.group(2).strip()
-                            path_val = _extract_path_value(val)
+                            # 直接用原始值（无 _extract_path_value 函数可用）
+                            path_val = val.strip().strip('"').strip("'")
                             data_dir_vars.append((
                                 os.path.join("scripts", fname),
                                 m.group(1),
