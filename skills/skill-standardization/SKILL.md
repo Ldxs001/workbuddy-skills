@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.38.9
+version: 2.38.10
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.38.8。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。
@@ -92,6 +92,13 @@ external_data_dir: true
 | `SKILL.md` 正文 | Python 直接重建 | `scripts/safe_io.py` 的 `safe_write()` |
 | `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
+
+**版本号三端一致规则**（必须遵守）：
+- 版本号变更时必须同步更新以下 **3 处**，缺一不可：
+  1. `SKILL.md` frontmatter 的 `version:` 字段
+  2. `_meta.json` 的 `version` 字段
+  3. `references/changelog.md`（或 `CHANGELOG.md`）的版本条目
+- `update --fix` 已自动执行上述三端同步（v2.38.10+）
 
 **检查清单（每次更新前）**：
 - [ ] 是否用了 Write/Edit 工具？→ 立刻停止，改用 Python 脚本

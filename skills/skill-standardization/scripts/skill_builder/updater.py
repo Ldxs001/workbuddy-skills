@@ -105,9 +105,10 @@ class SkillUpdater:
             )
 
     def _bump_version(self, skill_dir, bump_type, results):
-        """自动升级版本号（SemVer）"""
+        """自动升级版本号（SemVer），同步更新 changelog"""
         from pathlib import Path
         import re, json
+        from datetime import datetime
 
         skill_md = skill_dir / "SKILL.md"
         meta_file = skill_dir / "_meta.json"
@@ -140,6 +141,7 @@ class SkillUpdater:
             parts[2] += 1
 
         new_ver = ".".join(map(str, parts))
+        today = datetime.now().strftime("%Y-%m-%d")
 
         # 写入 SKILL.md
         new_content = content[:m.start(1)] + new_ver + content[m.end(1):]
@@ -156,6 +158,49 @@ class SkillUpdater:
                 )
             except Exception as e:
                 results["warnings"].append(f"⚠️ 更新 _meta.json 版本号失败: {e}")
+
+        # ★ 同步更新 references/changelog.md 或 CHANGELOG.md
+        changelog_candidates = [
+            skill_dir / "references" / "changelog.md",
+            skill_dir / "references" / "CHANGELOG.md",
+            skill_dir / "CHANGELOG.md",
+            skill_dir / "changelog.md",
+        ]
+        changelog_path = None
+        for p in changelog_candidates:
+            if p.exists():
+                changelog_path = p
+                break
+
+        if changelog_path:
+            try:
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                old_content = changelog_path.read_text(encoding="utf-8")
+                # 如果已有前缀 title（# Changelog），在其后插入新条目
+                insert_pos = 0
+                title_match = re.search(r"^#\s+.+", old_content, re.MULTILINE)
+                if title_match:
+                    # 找第一个版本条目位置
+                    ver_match = re.search(r"\n##\s+v?[\d\.]+", old_content)
+                    if ver_match:
+                        insert_pos = ver_match.start() + 1
+                    else:
+                        insert_pos = len(old_content)  # append
+                entry = (
+                    f"\n## v{new_ver} ({today}) — 自动版本升级\n\n"
+                    f"### Changed\n"
+                    f"- 版本号 {old_ver} → {new_ver}（`update --fix` 自动 bump）\n"
+                )
+                new_cl = old_content[:insert_pos] + entry + old_content[insert_pos:]
+                changelog_path.write_text(new_cl, encoding="utf-8")
+                results["fixes"].append(f"✅ 更新日志已追加: {changelog_path.relative_to(skill_dir)}")
+            except Exception as e:
+                results["warnings"].append(f"⚠️ 更新 changelog 失败: {e}")
+        else:
+            results["warnings"].append(
+                "⚠️ 未找到 changelog 文件（checked: references/changelog.md, CHANGELOG.md），"
+                "版本号已升级但日志未记录"
+            )
 
         results["fixes"].append(f"✅ 版本号升级: {old_ver} → {new_ver} ({bt})")
 

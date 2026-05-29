@@ -1,5 +1,11 @@
 ## v2.38.8 (2026-05-29)
 
+## v2.38.10 (2026-05-29) — 版本号三端同步强制 + 跳过状态修正
+
+### Changed
+- **`_bump_version()` 新增 changelog 自动更新**：版本升级时同步追加条目到 `references/changelog.md` 或 `CHANGELOG.md`，实现三端同步
+- **SKILL.md 新增「版本号三端一致规则」**：明确版本号需同步更新的 3 处位置（SKILL.md + _meta.json + changelog）
+
 ## v2.38.9 (2026-05-29) — GBK 兼容 + 版本强制升级 + 更新日志脚本化
 
 ### Added
