@@ -387,6 +387,7 @@ def cache_extraction(skill_name, data):
     """缓存提取结果"""
     cache = load_cache()
     import time
+
     cache[skill_name] = {
         "data": data,
         "cached_at": time.time()

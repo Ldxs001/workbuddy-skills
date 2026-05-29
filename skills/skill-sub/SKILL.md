@@ -1,16 +1,18 @@
 ---
 name: skill-sub
-version: 1.22.0
+version: 1.23.1
 author: wUwproject
 license: MIT
 description: 调用链编排技能 v1.23.0 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
-tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
-data_dir: ../.standardization/skill-sub/
-external_data_dir: true
 sensitive_access: false
 critical_write: false
-permission_weight: MEDIUM
+permission_weight: LOW
+data_dir: ../.standardization/skill-sub/
+tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
+external_data_dir: true
 ---
+
+
 
 
 
@@ -161,74 +163,11 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 }
 ```
 
-> 📚 完整 schema 参见 `references/chain_schema.md`
+> 📚 完整 schema 参见 
+
+→ 版本历史详见 `references/chain_schema.md`
 
 ---
-
-## v1.17.0 新增功能
-
-### 1. 执行预览（Execution Preview）
-`chain_executor.py plan` 生成的执行计划现在包含**可视化执行路径图**：
-- 显示哪些步骤**并行**、哪些**串行**
-- 标记**里程碑位置**和判断依据
-- 显示**条件步骤**（有条件限制才执行）
-
-### 2. 条件执行（Conditional Execution）
-步骤支持 `condition` 字段，执行前先判断条件是否满足：
-- `step_N_success` — 步骤N成功才执行
-- `step_N_failed` — 步骤N失败才执行
-- `always` — 总是执行（默认）
-- `never` — 从不执行
-- `variable_X_exists` — 变量X存在才执行
-
-条件不满足时**跳过该步骤**，继续执行后续步骤。
-
-### 3. 执行沙箱模式（Dry-Run）
-新增 `--dry-run` 参数：
-```bash
-python {SKILL_DIR}/scripts/chain_executor.py plan --name "链名" --dry-run
-```
-- **不实际调用技能**，仅模拟执行
-- 输出每步会发生什么
-- 显示条件判断结果
-- 显示重试策略、失败处理方式
-
-### 4. 链备份机制（Chain Backup）
-在**覆盖/删除前自动备份**到 `chains/backups/<链名>/` 目录：
-```bash
-# 列出备份版本
-python {SKILL_DIR}/scripts/chain_manager.py list-backups --name "链名"
-
-# 从备份恢复
-python {SKILL_DIR}/scripts/chain_manager.py restore --name "链名" --version 1 --force
-```
-- 每次覆盖/删除前自动备份
-- 保留最近 **20 个版本索引**、**10 个备份文件**
-- 备份文件命名：`v<版本号>_<日期>.json`
-
-### 5. 链版本管理（Chain Version Management）
-备份机制同时维护**版本索引**（`versions.json`）：
-- 每次保存自动递增版本号
-- 记录备份原因（`overwrite` / `delete`）
-- 支持从任意版本恢复
-
-### 6. 摘取缓存（Extraction Cache）
-`{SKILL_DIR}/scripts/skill_extractor.py` 现在**缓存**技能摘取结果：
-```bash
-# 正常使用（自动命中缓存）
-python {SKILL_DIR}/scripts/skill_extractor.py extract --skill "triphasic-execution"
-
-# 跳过缓存，强制重新摘取
-python {SKILL_DIR}/scripts/skill_extractor.py extract --skill "triphasic-execution" --no-cache
-```
-- 缓存路径：`~/.workbuddy/skills/.standardization/skill-sub/cache/extraction_cache.json`
-- **自动失效**：技能 `SKILL.md` 文件更新时缓存自动失效
-- 保留最近 **200 个技能**的摘取结果
-- 输出时显示 `📁 命中摘取缓存` 提示
-
----
-
-
 
 ## 详细文档
 

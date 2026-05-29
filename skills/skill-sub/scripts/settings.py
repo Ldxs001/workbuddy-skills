@@ -20,6 +20,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+
 # ─── Paths ────────────────────────────────────────────────────────────
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -43,7 +44,7 @@ def get_home_dir():
 
 
     def get_default_config_path():
-    return SCRIPT_DIR / "default_config.json"
+        return SCRIPT_DIR / "default_config.json"
 
 
 def get_user_config_path():
