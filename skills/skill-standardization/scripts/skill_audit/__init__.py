@@ -499,7 +499,7 @@ def cmd_audit(args):
             # ★ 自动执行版本号 bump（patch）
             try:
                 _do_bump(skill_dir, 'fix', 'audit --fix 自动修正')
-                print(f"[OK] 版本号已自动升级（patch+1）")
+                print(f"[OK] 版本号已自动升级（R-03 规则: audit --fix 默认为 PATCH）")
             except Exception as e:
                 print(f"[WARN] 版本号自动更新失败（可手动执行 bump 子命令）: {e}")
             # 重新审计
@@ -624,13 +624,24 @@ def cmd_fix(args):
 
 
 def cmd_bump(args):
-    """bump 子命令：一键升级技能版本号三端"""
+    """bump 子命令：一键升级技能版本号三端（遵循 R-03 语义规则）"""
     import os, json, datetime
 
     skill_dir = os.path.abspath(args.skill_dir)
     dry_run = getattr(args, 'dry_run', False)
-    bump_type = getattr(args, 'type', 'fix')
+    bump_type = getattr(args, 'type', None)
     desc = getattr(args, 'desc', '')
+
+    # 未指定 --type 时显示规则并提示
+    if bump_type is None:
+        print("R-03 版本号变更语义规则：")
+        print("  breaking (MAJOR.0.0) = 架构级重构/破坏性变更/核心引擎重写")
+        print("  feature  (x.MINOR.0) = 新增功能/已有功能重构/大面积描述修正/bug修复")
+        print("  fix      (x.y.PATCH) = 单处描述修正/参数拼写/路径修正/错别字")
+        print()
+        bump_type = input("请选择变更类型 [fix/feature/breaking] (默认 feature): ").strip().lower()
+        if bump_type not in ('fix', 'feature', 'breaking'):
+            bump_type = 'feature'
 
     meta_path = os.path.join(skill_dir, '_meta.json')
     if not os.path.isfile(meta_path):
@@ -647,21 +658,25 @@ def cmd_bump(args):
         return
     if bump_type == 'fix':
         new_version = f"{major}.{minor}.{patch + 1}"
+        rule_note = "PATCH: 单处描述修正/参数拼写/路径修正"
     elif bump_type == 'feature':
         new_version = f"{major}.{minor + 1}.0"
+        rule_note = "MINOR: 新增功能/已有功能重构/大面积描述修正"
     else:
         new_version = f"{major + 1}.0.0"
+        rule_note = "MAJOR: 架构级重构/破坏性变更/核心引擎重写"
 
     if dry_run:
         print(f"[DRY-RUN] skill: {os.path.basename(skill_dir)}")
-        print(f"  {current_version} → {new_version} ({bump_type})")
+        print(f"  {current_version} → {new_version} ({bump_type}) — {rule_note}")
         return
 
     _do_bump(skill_dir, bump_type, desc)
     print(f"\n=== 版本号三端更新完成 ===")
     print(f"  skill:          {os.path.basename(skill_dir)}")
     print(f"  版本:           {current_version} → {new_version}")
-    print(f"  类型:           {bump_type}")
+    print(f"  类型:           {bump_type} — {rule_note}")
+    print(f"  规则:           R-03（SemVer + 变更语义）")
     print(f"  SKILL.md:       ✅ version={new_version}")
     print(f"  _meta.json:     ✅ version={new_version}")
     print(f"  changelog.md:   ✅ 已插入 v{new_version} 条目")
@@ -712,10 +727,16 @@ def main():
     p_fix.add_argument("--dry-run", action="store_true", help="仅模拟，不实际修改")
 
     # bump 子命令（v2.38.15 新增）
-    p_bump = subparsers.add_parser("bump", help="自动升级技能版本号三端（SKILL.md + _meta.json + changelog）")
+    p_bump = subparsers.add_parser("bump", help="自动升级技能版本号三端（SKILL.md + _meta.json + changelog）",
+        epilog="""版本号变更规则（R-03）：
+  breaking (MAJOR.0.0) = 架构级重构/破坏性变更/核心引擎重写    例: 2.3.4 → 3.0.0
+  feature  (x.MINOR.0) = 新增功能/已有功能重构/大面积描述修正   例: 2.3.4 → 2.4.0
+  fix      (x.y.PATCH) = 单处描述修正/参数拼写/路径修正/错别字  例: 2.3.4 → 2.3.5
+不确认时选 feature（MINOR），严禁随意使用 MAJOR。
+架构级重构（如模块系统替换、核心引擎重写）才使用 breaking。""")
     p_bump.add_argument("skill_dir", help="skill 目录路径")
-    p_bump.add_argument("--type", choices=["fix", "feature", "breaking"], default="fix",
-                        help="变更类型（fix=patch+1, feature=minor+1, breaking=major+1，默认 fix）")
+    p_bump.add_argument("--type", choices=["fix", "feature", "breaking"], default=None,
+                        help="变更类型（默认交互选择）")
     p_bump.add_argument("--desc", required=True, help="本次变更描述（将写入 changelog）")
     p_bump.add_argument("--dry-run", action="store_true", help="仅预览，不实际修改")
 

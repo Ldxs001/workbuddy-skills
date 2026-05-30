@@ -30,12 +30,12 @@ RULES = [
     },
     {
         "id": "R-03",
-        "name": "version 字段 (SemVer)",
+        "name": "version 字段 (SemVer) + 变更语义规则",
         "severity": "ERROR",
-        "check": "frontmatter 含 version 字段且符合 SemVer（MAJOR.MINOR.PATCH）",
+        "check": "frontmatter 含 version 字段且符合 SemVer（MAJOR.MINOR.PATCH）。变更语义规则：MAJOR=架构级重构/破坏性变更/核心引擎重写；MINOR=新增功能/已有功能重构/大面积描述修正/bug修复；PATCH=单处描述修正/参数拼写/路径修正/文档错别字",
         "method": "yaml_has_semver_version",
         "fixable": True,
-        "create_template": "version: 1.0.0",
+        "create_template": "version: 遵循 SemVer，MAJOR.MINOR.PATCH，严格按规则使用",
     },
     {
         "id": "R-04",
