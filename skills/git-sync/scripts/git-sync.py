@@ -161,7 +161,7 @@ def step_version_compare(skill_name: str, local_ver: str) -> str:
 
 # ── 步骤 3：_meta.json 标准化校验 ──────────────────────────────────────────
 def step_normalize_meta(meta_file: Path, skill_name: str, version: str):
-    log(3, 8, "校验 _meta.json 标准字段...")
+    log(3, 8, "同步 _meta.json 版本号（保留所有字段）...")
     normalize_py = SCRIPT_DIR / "normalize_meta.py"
     if not normalize_py.exists():
         log(3, 8, "normalize_meta.py 不存在，跳过", "skip")

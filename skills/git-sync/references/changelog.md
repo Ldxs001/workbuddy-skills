@@ -1,3 +1,10 @@
+## v2.6.34 (2026-05-30)
+
+### 修复
+- normalize_meta.py 不再删除 _meta.json 非标准字段（data_dir 等），只同步 version/name/description；guide.md 同步更新步骤 1 描述
+
+---
+
 ## v2.6.33 (2026-05-30) — 修复文件筛选三档逻辑
 
 ### Fixed

@@ -35,9 +35,9 @@
 
 > 注：以 manifest.json 记录的 version 为准，仓库 _meta.json 仅作参考。
 
-### 步骤 1：_meta.json 标准化校验
+### 步骤 1：_meta.json 版本同步
 
-确保符合标准 5 字段结构：
+同步 version 字段，补全缺失的 name/description，**保留所有既有字段**（不删除任何字段）。
 
 | 标准字段 | 缺失时处理 |
 |---------|-----------|
@@ -46,8 +46,6 @@
 | `description` | 从 SKILL.md 提取 |
 | `author` | 从 config.json 读取（缺省为 `your-name-here`） |
 | `tags` | 设为空数组 `[]` |
-
-**自动删除非标准字段**：`slug`、`ownerId`、`publishedAt`、`display_name`、`platforms`
 
 ### 步骤 1.5：SKILL.md 规范化审查（v1.8 新增）
 
@@ -307,11 +305,11 @@ bash "C:/Users/sm001/.workbuddy/skills/git-sync/scripts/git-sync.sh" <skill-name
 
 | 字段 | 说明 | 默认值 |
 |------|------|--------|
-| `author` | `_meta.json` 默认作者名；敏感扫描中的用户名检测基准 | `wUwproject` |
-| `gitee.user` | 码云用户名，用于生成查看链接和 README 命令 | `wUwproject` |
+| `author` | `_meta.json` 默认作者名；敏感扫描中的用户名检测基准 | `[username-redacted]` |
+| `gitee.user` | 码云用户名，用于生成查看链接和 README 命令 | `[username-redacted]` |
 | `gitee.repo` | 码云仓库名 | `workbuddy-skills` |
 | `gitee.branch` | 码云推送目标分支 | `main` |
-| `github.user` | GitHub 用户名 | `Ldxs001` |
+| `github.user` | GitHub 用户名 | `[username-redacted]` |
 | `github.repo` | GitHub 仓库名 | `workbuddy-skills` |
 | `github.branch` | GitHub 推送目标分支 | `main` |
 
