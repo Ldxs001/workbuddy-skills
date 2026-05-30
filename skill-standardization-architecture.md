@@ -122,7 +122,7 @@ skill-standardization/
 - **4 optional**：references/category/priority/deprecated
 
 **非标字段处理策略**（v2.41.0+）：
-- **_meta.json 非标字段**：标记并提示人工判断是否需要删除或迁移（审计仅提醒，不自动删除）
+- **_meta.json 非标字段**：审计阶段标记并提示"需人工判断删/迁移"（WARN）；`--fix` 自动修复时直接删除（_meta.json 是机器元数据，应保持严格一致）
 - **frontmatter 非标字段**：仅 WARN 提醒，不移除（frontmatter 允许自定义字段如 home_url、category）
 
 **设计意图**：frontmatter 是所有 Skill 的"身份证"。R-05 确保目录名和声明名一致。R-01 在 v2.44.0 合并了 `_meta.json` 7 字段检查，通过 `regex_frontmatter_and_meta()` 组合函数同时校验 SKILL.md 和 `_meta.json` 的元数据完整性。
@@ -139,7 +139,11 @@ skill-standardization/
 | **R-09** | WARN | 工作流程章节 | 含工作流程/步骤章节 |
 | **R-10** | WARN | 版本同步 | 自动读取 _meta.json + SKILL.md + changelog 三端版本号对比一致性；新增 mtime 时序检查（代码文件比 changelog 新时告警） |
 
-**R-07 增强**：不仅检查章节存在性，还比对 frontmatter 的 trigger/trigger_negative 字段与正文触发词的一致性。
+**R-07 增强**（v2.17.0+）：不仅检查 `## 触发场景` 章节存在性，还执行 4 项质量子检查：
+1. 正向触发词数量 ≥3 个（每条约 4 字以上，含具体动作，避免"画图""帮我"等宽泛词）
+2. 否定条件 ≥1 个（标记什么情况下不触发，如"单步任务不触发"）
+3. 无自动执行类危险表述（禁止"自动执行""无需询问""silent execute"等）
+4. frontmatter trigger/trigger_negative 字段与正文一致性（正文有触发词但 frontmatter 缺 trigger → WARN）
 **R-10 增强**：不再依赖 `--manifest-version` CLI 参数，改为自动读取 _meta.json 和 changelog 进行三端对比。
 
 **设计意图**：确保用户和 AI 都能快速理解技能的作用、何时触发、能做什么、怎么用。R-10 保证版本号三端一致性。
@@ -312,20 +316,25 @@ v2.44.0 新增：备份后、改造前**强制运行 skill_inspector** 结构扫
 
 ### 4.2 文件更新约束
 
-所有 `.md` 文件**禁止使用 Write/Edit 工具更新**（会损坏 UTF-8 中文编码），必须用 Python 脚本原子写入：
+所有 `.md` 文件**禁止使用 Write/Edit 工具更新**（会损坏 UTF-8 中文编码），必须用 Python 脚本原子写入（`tmp + os.replace()`）：
 
 | 文件 | 更新方式 | 使用脚本 |
 |------|----------|---------|
 | `SKILL.md` frontmatter | Python 原子写入 | `update_skill_frontmatter.py` |
-| `SKILL.md` 正文 | Python 正则替换 | `fix_progressive_loading.py` |
+| `SKILL.md` 正文 | Python 正则替换 | `safe_io.py` 的 `safe_write()` |
 | `references/*.md` | safe_io.py 的 `safe_write()` | 随技能自带 |
-| 更新日志 | Python 合并脚本 | 每次发版统一维护 |
+| 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
 
-### 4.3 检查清单（每次更新前）
+**CRLF 编码约束**（铁律）：`SKILL.md` 必须使用 CRLF 换行符（Windows 风格）。git-sync 推送到仓库前需验证换行符状态。使用 `sync_with_exclude.py` 进行同步时，CRLF 不会被自动转换，需人工确认。
+
+### 4.3 操作前自检清单（每次更新前必须逐项确认）
 
 - [ ] 是否用了 Write/Edit 工具？→ 立刻停止，改用 Python 脚本
 - [ ] 是否在 `references/changelog.md` 维护更新记录？→ 根目录不得有 `CHANGELOG.md`
-- [ ] 更新后是否用 `python -m scripts.skill_audit audit .` 自审？→ 必须 0 ERROR 0 WARN
+- [ ] `SKILL.md` CRLF 换行符状态是否正常？→ `git-sync` 前必须验证
+- [ ] 更新后是否用 `python -m scripts.skill_audit audit .` 自审？→ 必须 **0 ERROR 0 WARN**
+- [ ] 版本号三端是否一致？→ SKILL.md / _meta.json / changelog 同一版本号
+- [ ] 英文注释和文档是否至少包含 ASCII 字符？→ 禁止纯中文注释导致的编码问题
 
 ### 4.4 排错止损规则（v2.38.4+）
 
@@ -457,23 +466,47 @@ AI 加载 skill-standardization
   ↓
 执行 audit（R-01~R-25）或 update/refactor 后续步骤
   ↓
-输出审查报告（PASS/WARN/FAIL）
+输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
   ↓
-调用 fix.py 自动修复（如有 --fix）
+调用 fix.py 自动修复（如有 --fix），按规则 ID 分派
   ↓
 再次审计确认 0 ERROR 0 WARN
   ↓
 更新版本号（三端同步 + changelog 自动追加）
+  ↓
+git-sync 推送前验证 CRLF + 自审状态
 ```
 
-**inspect 扫描产出**（v2.44.0 强制前置）：
-- 元信息（SKILL.md 行数、## 章节数、_meta.json 字段）
-- 文件清单（按 .py/.md/.sh/.json 分类，标记非标位置）
-- 全部 ## 章节一览
-- 每个 .py 文件的 def/class 清单
-- 每个 .md 文件的行数和 H2 章节
-- 安全 & 数据声明
-- 结构标准化程度判定（标准/半标准/非标准）
+**update 模式完整步骤**（v2.44.0）：
+1. `_create_backup(skill_dir, "update", workspace)` — 时间戳完整备份
+2. `skill_inspector.inspect_skill(skill_dir)` — **强制**输出结构蓝皮书
+3. `_check_meta_json()` — 验证 _meta.json 7 字段 + 非标字段标记
+4. `_check_skill_md()` — 验证 SKILL.md 存在性、行数、必填章节
+5. `_check_dir_structure()` — 扫描根目录散落文件
+6. `_check_artifact_paths()` — 产出物路径合规（R-11）
+7. `_check_external_data_dir()` — 外部数据目录合规（R-12）
+8. `_bump_version()` — 版本号自动更新（如传 --version-bump）
+9. `_print_report()` — 输出检查报告（通过/警告计数 + 逐条详情）
+
+**refactor 模式完整步骤**（v2.44.0）：
+1. `_create_backup(skill_dir, "refactor", workspace)` — 强制备份
+2. `skill_inspector.inspect_skill(skill_dir)` — **强制**输出结构蓝皮书
+3. `_dry_run()` — 生成迁移计划（仅 --dry-run 时停止）
+4. `_build_migration_plan()` — 按 M-01~M-06 规则编排文件迁移
+5. `_execute_migration()` — 执行移动（仅 move，不 delete）
+6. `_fix_code_references()` — 代码引用重写（--fix-code）
+7. `_verify_migration()` — 字节一致性验证（±1% 容差）
+8. `_bump_version()` — 版本号自动升级（patch）
+9. `_audit_and_update_progress()` — 审计 + 进度记录
+
+**inspect 扫描产出明细**（v2.44.0 强制前置）：
+- 结构标准化判定：标准（scripts/ + references/）/ 半标准（仅有 scripts/ 或 references/）/ 非标准（文件散落根目录）
+- 元信息：SKILL.md 行数、## 章节数量及标题列表、_meta.json 字段清单
+- 文件清单：按扩展名分组计数（.py / .md / .sh/.bat /.json/.yaml / 其他）
+- 非标位置标记：每个不在 scripts/ 下的 .py 文件、不在 references/ 下的 .md 文件均标注 `[note] 建议迁移`
+- 功能清单：每个 .py 文件的 `def` 函数名和 `class` 类名列表
+- 引用概览：每个 .md 文件的行数和 ## 章节标题
+- 安全数据：sensitive_access / critical_write / permission_weight / data_dir 声明值
 
 ### 审计结果判定
 
@@ -482,6 +515,27 @@ AI 加载 skill-standardization
 | **PASS** | 全部规则通过 |
 | **WARN** | 仅 WARN 级未通过 |
 | **FAIL** | 含 ERROR 级未通过 |
+
+**审计报告格式**（标准输出）：
+```
+=======================================================
+  审查结果: <skill-name> — PASS / WARN / FAIL
+=======================================================
+  总计: 25 | 通过: N | 失败: N | 跳过: N
+
+规则ID     严重度     状态     详情
+------------------------------------------------------
+R-01     E       [OK]   发现 YAML frontmatter...
+R-06     W       [OK]   发现一级标题: # ...
+
+───────────────────────────────────────────────────────
+  🛠️ 提示：发现可修复问题时...
+```
+
+每条 FAIL 项附带：
+- `💡 建议修正` — 具体操作指引
+- `[search] 位置` — 文件路径:行号
+- `--fix` 可用时自动修复
 
 ### bump 子命令（v2.39.0+）
 
