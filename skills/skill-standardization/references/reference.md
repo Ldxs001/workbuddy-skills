@@ -457,12 +457,12 @@ else:
 | 更新 `scripts/*.py` 脚本逻辑 | `.py` 文件头版本字符串 + SKILL.md + `_meta.json` | MINOR（2.1.0→2.2.0） |
 | 新增功能/新脚本 | 所有上述文件 + `manifest.json`（上传时同步） | MINOR 或 MAJOR |
 | 仅改 `references/*.md` | 视情况——内容影响功能时升 SKILL.md + `_meta.json` | 通常 PATCH |
-| git-sync 上传成功后 | `manifest.json` 由 git-sync 自动更新 | 跟随 SKILL.md 版本 |
+| 最终同步上传后 | `manifest.json` 由同步流程自动更新 | 跟随 SKILL.md 版本 |
 
 **关键原则：**
 
 - 本地更新只改 SKILL.md + _meta.json + 受影响的脚本/json 文件内的版本字符串
-- `manifest.json` 由 git-sync 上传流程负责，本地不应擅改
+- `manifest.json` 由同步上传流程负责，本地不应擅改
 - **不确定是否升级版本号时，必须询问用户**（适用于所有上述文件类型）
 
 
@@ -594,8 +594,8 @@ python scripts/run_audit.py fix <skill_dir> --key name version --dry-run
 **示例：**
 
 ```bash
-# 审查 git-sync 技能
-python scripts/run_audit.py audit ~/.workbuddy/skills/git-sync
+# 审查单个技能
+python scripts/run_audit.py audit ~/.workbuddy/skills/<skill-name>
 
 # 批量审查 skills/ 目录下所有技能
 python scripts/run_audit.py audit-all ~/.workbuddy/skills --json
@@ -789,7 +789,7 @@ cd /path/to/skill-standardization/scripts
 python restore_from_gitee.py
 ```
 
-**行为：** 遍历预定义的文件名列表，从 `gitee.com/wUwproject/workbuddy-skills/raw/main/skill-standardization/scripts/` 下载并覆盖本地文件。输出 `[OK]` 或 `[FAIL]` 结果。
+**行为：** 遍历预定义的文件名列表，从 `gitee.com/[username-redacted]/workbuddy-skills/raw/main/skill-standardization/scripts/` 下载并覆盖本地文件。输出 `[OK]` 或 `[FAIL]` 结果。
 
 > 注意：此脚本仅用于紧急恢复。正常情况下应通过 `git pull` 同步。
 
@@ -1051,7 +1051,7 @@ python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范�
 ```bash
 python scripts/restore_from_gitee.py
 ```
-**说明**: 该脚本无额外参数，运行后会从 `gitee.com/wUwproject/workbuddy-skills` 仓库拉取最新的脚本文件并覆盖本地文件，执行前会自动备份当前脚本目录。
+**说明**: 该脚本无额外参数，运行后会从 `gitee.com/[username-redacted]/workbuddy-skills` 仓库拉取最新的脚本文件并覆盖本地文件，执行前会自动备份当前脚本目录。
 ---
 ### scripts/progress_manager.py
 **功能**: 管理审计进度，支持创建进度文件、更新进度、加载进度、格式化进度条（无独立 CLI，仅作为 API 供其他脚本调用）。

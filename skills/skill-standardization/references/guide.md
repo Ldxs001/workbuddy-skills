@@ -313,7 +313,7 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 
 ## 审查模式 — 独立审计
 
-审查由 `skill_audit.py` 提供（与 git-sync 共享），独立于 skill_builder：
+审查由 `skill_audit.py` 提供，独立于 skill_builder：
 
 ```bash
 # 基本审查
@@ -328,9 +328,9 @@ python scripts/skill_audit.py audit <skill-dir> --manifest-version 2.0.0
 
 ### 审查结果判定
 
-| 结果 | 含义 | git-sync 行为 |
-|------|------|---------------|
-| **PASS** | 全部通过 | 继续同步 |
+| 结果 | 含义 | 后续行为 |
+|------|------|----------|
+| **PASS** | 全部通过 | 继续后续流程 |
 | **WARN** | 仅 WARN 级失败 | 🟡 继续同步（纯警告） |
 | **FAIL** | 含 ERROR 级失败 | 🟡 继续同步（纯警告，v2起不阻断） |
 

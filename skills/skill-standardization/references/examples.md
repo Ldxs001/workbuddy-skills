@@ -268,7 +268,7 @@ Skill: another-skill
 [R-10] version 一致性 ................. ✅ PASS
 
 Verdict: ⚠️ WARN (6/10 PASS, 0 ERROR, 4 WARN)
-Exit code: 0 (pure warning mode — will NOT block git-sync)
+Exit code: 0 (pure warning mode — will NOT block subsequent steps)
 ```
 
 ---

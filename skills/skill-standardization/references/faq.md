@@ -30,19 +30,17 @@
 
 该草案存储在 `spec/frontmatter.json`、`spec/body.json` 和 `spec/rules.json` 中，可通过 `json_loader.py load` 查看。
 
-### Q2: skill-standardization 和 git-sync 是什么关系？
+### Q2: skill-standardization 可以独立使用吗？
 
-**A:** 它们是协作关系：
+**A:** 可以。skill-standardization 是一个独立审查工具，不依赖任何其他技能：
 
 ```
-git-sync（同步流程）
-  └─ 步骤 3.5: 调用 skill_audit.py audit
-       └─ skill-standardization（提供审查能力）
-            ├─ R-01~R-10 规则检查
-            └─ 输出报告（纯警告，不阻断同步）
+skill_audit.py audit <skill-dir>
+  ├─ R-01~R-24 规则检查
+  └─ 输出审查报告
 ```
 
-git-sync 负责将 skill 推送到远程仓库，在推送前调用 skill-standardization 进行规范性检查。
+它可以直接对任意 skill 目录执行审查，适合在 CI/CD 或手动工作流中调用。
 
 ### Q3: 「三级复杂度」是什么意思？
 
@@ -189,12 +187,12 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 ## 审查与规范
 
-### Q14: R-01~R-04 是 ERROR 级，会阻止 git-sync 吗？
+### Q14: R-01~R-04 是 ERROR 级，会阻断工作流吗？
 
 **A:** 不会！自 v2.0 起，所有审查结果均为**纯警告模式**：
 
 - 即使有 ERROR 级问题，`skill_audit.py` 也始终返回退出码 `0`
-- git-sync 收到退出码 0 后会继续后续同步步骤
+- 后续操作是否继续由调用方决定
 - 审查报告会明确标注每个问题的严重程度供参考
 
 这个设计的目的是**不阻断工作流**，让用户自行决定何时修复。

@@ -1,3 +1,64 @@
+## v2.39.1 (2026-05-30)
+
+### 修复
+- R-23 第7项改为两阶段模式：正则粗筛 + LLM精筛，移除白名单和URL过滤
+
+---
+
+## v2.39.0 (2026-05-30)
+
+### Fixed（根因修复）
+- **audit --fix 模式修复文件后自动执行版本号 bump**：这是反复出现改了文件忘了更新版本号的根因
+  - 此前 audit --fix 修完文件就直接结束，不更新版本号三端
+  - 现在 --fix 修复任何文件后自动调用 _do_bump() 执行 patch bump
+  - 无论走 audit --fix、refactor、还是手动修复，版本号三端都会被更新
+
+### Added
+- **R-23 新增第 7 项检查：MD 中引用的外部技能是否存在**
+  - 扫描 SKILL.md + references/*.md 中引用的  路径
+  - 排除 URL（gitee.com/github.com）、结构目录（.standardization/installed/）避免误报
+  - 引用的技能目录不存在于  时报 WARN，提示功能描述可能已过时
+  - 本次清理了 6 个文件中的 git-sync 残留描述，v2.38.13 解耦不彻底的问题
+- 清理所有 git-sync 残留描述：guide.md/faq.md/reference.md/rules.md/examples.md/__init__.py
+- 新增 bump 子命令：一键升级技能版本号三端（SKILL.md + _meta.json + changelog）
+  - 支持 --type fix/feature/breaking 自动计算新版本号
+  - 支持 --desc 自动生成 changelog 条目
+  - 支持 --dry-run 预览模式
+- 新增 _do_bump() 核心函数：供 --fix 和 bump 子命令复用
+
+### Changed
+- _do_bump() 内部调用已有 VersionManager.bump_version() 更新 SKILL.md + _meta.json，避免重复造轮子
+- cmd_bump() 简化为 _do_bump() 的薄封装
+
+---
+
+
+## v2.38.15 (2026-05-30) — R-10 三端一致性增强 + R-23 路径一致性检查
+
+### Fixed
+- **R-10 版本三端一致性检查（根本修复）**：不再依赖 `--manifest-version` CLI 参数
+  - 自动读取 `_meta.json` version 与 SKILL.md version 比对
+  - 自动读取 `references/changelog.md` 最新版本号，比对三端一致性
+  - 此前 R-10 因 `manifest_version` 参数缺失永远 SKIP，形同虚设
+  - 旧问题：每次改造后版本号三端不同步，审计抓不住
+
+### Added
+- **R-10 新增 mtime 时序检查**：检测"改了文件但忘了更新版本号/changelog"
+  - 比较 SKILL.md 和 scripts/*.py 的修改时间 vs references/changelog.md 的修改时间
+  - 如果代码文件比 changelog 新，在 detail 中附加 ⚠️ 警告提示
+  - 解决三端值一致但全部是旧版本的盲区
+- R-23 新增第 6 项检查：SKILL.md 正文中的文件路径描述是否与 frontmatter data_dir 一致
+  - 当 data_dir 包含 `.standardization/` 时，自动检测正文中缺少 `.standardization/` 层级的路径（如 `skills/<skill>/data/`）
+  - 使用负向先行断言精确匹配，避免误报已正确包含 `.standardization/` 的路径
+  - `must` 级别错误，强制要求修正
+
+### Changed
+- frontmatter_checker.py: version_matches_manifest() 重写，自动读取 _meta.json + changelog
+- structure_checker.py: check_doc_code_consistency() 末尾新增第 6 步路径一致性检查
+- utils.py: R-10 规则描述更新为"版本三端一致性"
+
+---
+
 ## v2.38.14 (2026-05-30) — 审计结果：无新问题需修正
 
 ### Changed

@@ -393,6 +393,76 @@ def cmd_rules():
     print(f"\n共 {len(RULES)} 条规则")
 
 
+def _do_bump(skill_dir, bump_type='fix', desc='自动升级'):
+    """版本号三端更新核心逻辑 — 供 --fix 和 bump 子命令复用"""
+    import os, sys, json, re, datetime
+
+    # 映射 fix/feature/breaking → patch/minor/major
+    type_map = {'fix': 'patch', 'feature': 'minor', 'breaking': 'major'}
+    vm_bump_type = type_map.get(bump_type, 'patch')
+
+    meta_path = os.path.join(skill_dir, '_meta.json')
+    if not os.path.isfile(meta_path):
+        raise FileNotFoundError(f"未找到 _meta.json: {meta_path}")
+
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        current_version = str(json.load(f).get('version', '0.0.0'))
+
+    parts = current_version.split('.')
+    major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+    if bump_type == 'fix':
+        new_version = f"{major}.{minor}.{patch + 1}"
+    elif bump_type == 'feature':
+        new_version = f"{major}.{minor + 1}.0"
+    else:
+        new_version = f"{major + 1}.0.0"
+
+    today = datetime.date.today().isoformat()
+
+    # 用已有 VersionManager 更新 SKILL.md + _meta.json
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from skill_builder.version_manager import VersionManager
+        VersionManager.bump_version(skill_dir, vm_bump_type)
+    except Exception:
+        # 兜底：直接写
+        meta_path = os.path.join(skill_dir, '_meta.json')
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        meta['version'] = new_version
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+        skill_md = os.path.join(skill_dir, 'SKILL.md')
+        with open(skill_md, 'r', encoding='utf-8') as f:
+            md_content = f.read()
+        md_content = re.sub(
+            r'^(version:\s*)\d+\.\d+\.\d+',
+            rf'\g<1>{new_version}',
+            md_content, count=1, flags=re.MULTILINE
+        )
+        import tempfile, shutil
+        tmp = tempfile.mktemp(suffix='.md', dir=skill_dir)
+        with open(tmp, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+        shutil.move(tmp, skill_md)
+
+    # 更新 changelog
+    cl_entry = f"## v{new_version} ({today})\n\n### 修复\n- {desc}\n"
+    cl_path = os.path.join(skill_dir, 'references', 'changelog.md')
+    if os.path.isfile(cl_path):
+        with open(cl_path, 'r', encoding='utf-8') as f:
+            cl_old = f.read()
+    else:
+        cl_old = ''
+        os.makedirs(os.path.dirname(cl_path), exist_ok=True)
+    new_cl = cl_entry + '\n---\n\n' + cl_old if cl_old else cl_entry
+    import tempfile, shutil
+    tmp = tempfile.mktemp(suffix='.md', dir=os.path.dirname(cl_path) or skill_dir)
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(new_cl)
+    shutil.move(tmp, cl_path)
+
+
 def cmd_audit(args):
     """审查单个 skill 目录"""
     # 强制 UTF-8 输出（Windows 终端兼容）
@@ -426,6 +496,12 @@ def cmd_audit(args):
                         print(f"[ERROR] R-{fix_key} 修正失败: {e}")
         if fixes_applied > 0:
             print(f"[OK] 共修正 {fixes_applied} 处")
+            # ★ 自动执行版本号 bump（patch）
+            try:
+                _do_bump(skill_dir, 'fix', 'audit --fix 自动修正')
+                print(f"[OK] 版本号已自动升级（patch+1）")
+            except Exception as e:
+                print(f"[WARN] 版本号自动更新失败（可手动执行 bump 子命令）: {e}")
             # 重新审计
             result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                                 progress_file=args.progress_file, _fix_applied=True)
@@ -547,6 +623,50 @@ def cmd_fix(args):
         print(format_report(result))
 
 
+def cmd_bump(args):
+    """bump 子命令：一键升级技能版本号三端"""
+    import os, json, datetime
+
+    skill_dir = os.path.abspath(args.skill_dir)
+    dry_run = getattr(args, 'dry_run', False)
+    bump_type = getattr(args, 'type', 'fix')
+    desc = getattr(args, 'desc', '')
+
+    meta_path = os.path.join(skill_dir, '_meta.json')
+    if not os.path.isfile(meta_path):
+        print(f"[ERROR] 未找到 _meta.json: {meta_path}")
+        return
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        current_version = str(json.load(f).get('version', '0.0.0'))
+
+    parts = current_version.split('.')
+    try:
+        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+    except (ValueError, IndexError):
+        print(f"[ERROR] 无法解析版本号: {current_version}")
+        return
+    if bump_type == 'fix':
+        new_version = f"{major}.{minor}.{patch + 1}"
+    elif bump_type == 'feature':
+        new_version = f"{major}.{minor + 1}.0"
+    else:
+        new_version = f"{major + 1}.0.0"
+
+    if dry_run:
+        print(f"[DRY-RUN] skill: {os.path.basename(skill_dir)}")
+        print(f"  {current_version} → {new_version} ({bump_type})")
+        return
+
+    _do_bump(skill_dir, bump_type, desc)
+    print(f"\n=== 版本号三端更新完成 ===")
+    print(f"  skill:          {os.path.basename(skill_dir)}")
+    print(f"  版本:           {current_version} → {new_version}")
+    print(f"  类型:           {bump_type}")
+    print(f"  SKILL.md:       ✅ version={new_version}")
+    print(f"  _meta.json:     ✅ version={new_version}")
+    print(f"  changelog.md:   ✅ 已插入 v{new_version} 条目")
+
+
 def main():
     """主入口函数"""
     parser = argparse.ArgumentParser(
@@ -554,7 +674,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python -m skill_audit audit ~/.workbuddy/skills/git-sync
+  python -m skill_audit audit ~/.workbuddy/skills/<skill-name>
   python -m skill_audit audit ~/.workbuddy/skills/svg-composer --json
   python -m skill_audit audit-all ~/.workbuddy/skills --manifest manifest.json
   python -m skill_audit rules
@@ -591,6 +711,14 @@ def main():
     p_fix.add_argument("--value", help="修复参数值（如 value=true）")
     p_fix.add_argument("--dry-run", action="store_true", help="仅模拟，不实际修改")
 
+    # bump 子命令（v2.38.15 新增）
+    p_bump = subparsers.add_parser("bump", help="自动升级技能版本号三端（SKILL.md + _meta.json + changelog）")
+    p_bump.add_argument("skill_dir", help="skill 目录路径")
+    p_bump.add_argument("--type", choices=["fix", "feature", "breaking"], default="fix",
+                        help="变更类型（fix=patch+1, feature=minor+1, breaking=major+1，默认 fix）")
+    p_bump.add_argument("--desc", required=True, help="本次变更描述（将写入 changelog）")
+    p_bump.add_argument("--dry-run", action="store_true", help="仅预览，不实际修改")
+
     args = parser.parse_args()
 
     if args.command == "audit":
@@ -601,6 +729,8 @@ def main():
         cmd_rules()
     elif args.command == "fix":
         cmd_fix(args)
+    elif args.command == "bump":
+        cmd_bump(args)
     elif args.command in ("create-template", "template"):
         if hasattr(args, "json") and args.json:
             import json

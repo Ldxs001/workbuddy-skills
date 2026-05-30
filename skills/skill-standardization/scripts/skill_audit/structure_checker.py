@@ -821,6 +821,71 @@ def check_doc_code_consistency(
                         f"R-23: {filepath}:1 - SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
                     )
 
+    # 6. (新增 v2.38.8) 检查 SKILL.md 正文中的路径描述是否与 frontmatter data_dir 一致
+    if fm and fm.get('data_dir'):
+        data_dir_val = str(fm['data_dir']).replace('\\', '/')
+        if '.standardization' in data_dir_val:
+            # 从 data_dir 提取技能目录名（最后一级目录）
+            _dd_parts = data_dir_val.rstrip('/').split('/')
+            skill_name_in_dir = _dd_parts[-2] if len(_dd_parts) >= 2 else ''
+            if skill_name_in_dir:
+                # 在正文中搜索 skills/<skill>/data/ 模式（缺少 .standardization 前缀）
+                # 使用负向先行断言 (?:(?!\.standardization/)[^/]+)* 确保路径中不含 .standardization/
+                _old_path_re = re.compile(
+                    r'skills/(?:(?!\.standardization/)[^/]+/)*' + re.escape(skill_name_in_dir) + r'/data/'
+                )
+                for _m in _old_path_re.finditer(body):
+                    _line = body[:_m.start()].count('\n') + 1
+                    issues["must"].append(
+                        f"R-23: {filepath}:{_line} - SKILL.md 正文路径 `{_m.group()}` 缺少 `.standardization/` 层级"
+                        f"（frontmatter data_dir 为 `{data_dir_val}`，路径应包含 `.standardization/` 前缀）"
+                    )
+
+    # 7. (v2.39.0) 两阶段：R-23 第 7 项 — MD 引用的外部技能是否存在
+    # 第一阶段（正则粗筛）：收集所有 skills/<name>/ 候选，不设白名单，不阻断 PASS
+    # 第二阶段（LLM 精筛）：AI 对粗筛结果逐条判断语境，过滤误报后才是最终结果
+    if skill_dir and os.path.isdir(skill_dir):
+        _skills_root = os.path.normpath(os.path.join(skill_dir, '..'))
+        _current_skill = os.path.basename(os.path.normpath(skill_dir))
+        _all_md = [('SKILL.md', body)]
+        _refs_dir = os.path.join(skill_dir, 'references')
+        if os.path.isdir(_refs_dir):
+            for _rf in sorted(os.listdir(_refs_dir)):
+                if _rf.endswith('.md') and _rf != 'changelog.md':
+                    _rp = os.path.join(_refs_dir, _rf)
+                    try:
+                        with open(_rp, 'r', encoding='utf-8') as _f:
+                            _all_md.append((f'references/{_rf}', _f.read()))
+                    except Exception:
+                        pass
+        # 正则粗筛：skills/<name>/ 或 ~/.workbuddy/skills/<name>/
+        # 不设白名单，不排除 URL — 第二阶段 LLM 精筛处理
+        _ref_skill_re = re.compile(r'(?:skills|\.workbuddy/skills)/([a-zA-Z0-9_-]+)/')
+        _candidates = []
+        for _src_name, _src_body in _all_md:
+            for _m in _ref_skill_re.finditer(_src_body):
+                _sn = _m.group(1)
+                if _sn == _current_skill:
+                    continue
+                _sd = os.path.join(_skills_root, _sn)
+                if not os.path.isdir(_sd):
+                    _src_line = _src_body[:_m.start()].count('\n') + 1
+                    _ctx_start = max(0, _m.start() - 40)
+                    _ctx_end = min(len(_src_body), _m.end() + 40)
+                    _context = _src_body[_ctx_start:_ctx_end].replace('\n', ' ')
+                    _candidates.append({
+                        'skill': _sn,
+                        'source': _src_name,
+                        'line': _src_line,
+                        'context': _context.strip()
+                    })
+        if _candidates:
+            _lines = [f"  {c['source']}:{c['line']} - `{c['skill']}` (上下文: ...{c['context']}...)" for c in _candidates]
+            issues["optional"].append(
+                f"R-23: {filepath}:1 - 【两阶段】粗筛发现 {len(_candidates)} 个 MD 引用的技能目录不存在"
+                f"，需 LLM 第二阶段精筛判断是否为真实过时描述（正则仅做粗筛，不阻断通过）：\n" + '\n'.join(_lines)
+            )
+
     # 汇总
     total = sum(len(issues[k]) for k in issues)
     if total == 0:

@@ -1,7 +1,7 @@
 import urllib.request
 import os
 
-url = "https://gitee.com/wUwproject/workbuddy-skills/raw/main/skill-standardization/scripts/{filename}"
+url = "https://gitee.com/[username-redacted]/workbuddy-skills/raw/main/skill-standardization/scripts/{filename}"
 files = [
     "_apply_all_fixes.py",
     "_fix_r23.py",

@@ -137,19 +137,88 @@ def name_matches_dirname(filepath, content, fm, body, dirname=None, **kw):
 
 
 def version_matches_manifest(filepath, content, fm, body, manifest_version=None, **kw):
-    """R-10: version 一致性检查（与 manifest 版本比对）"""
-    if manifest_version is None:
-        return {"passed": True, "detail": "跳过：未提供 manifest 版本号", "skip": True}
+    """R-10: 版本三端一致性检查（v2.38.15 增强：自动读取 _meta.json + changelog + mtime 时序检查）"""
+    import os, json, re
+    skill_dir = kw.get('skill_dir') or os.path.dirname(filepath) if filepath else None
+
     if fm is None or "version" not in fm:
         return {"passed": False, "detail": "无 frontmatter/version，无法比对", "skip": True}
     line = _find_fm_line(content, "version")
-    matched = str(fm["version"]) == str(manifest_version)
-    if not matched:
-        return {"passed": False,
-                "detail": f"{filepath}:{line} - SKILL.md({fm['version']}) != manifest({manifest_version})",
-                "fix": {"key": "version", "value": manifest_version,
+    skill_version = str(fm["version"])
+
+    # ── 1. 比对 _meta.json ──
+    meta_path = os.path.join(skill_dir, '_meta.json') if skill_dir else None
+    meta_version = None
+    if meta_path and os.path.isfile(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as _f:
+                meta_version = str(json.load(_f).get('version', ''))
+        except Exception:
+            pass
+
+    # 优先使用 manifest_version（CLI --manifest-version），否则从 _meta.json 获取
+    expected_version = str(manifest_version) if manifest_version is not None else meta_version
+
+    # ── 2. 比对 references/changelog.md ──
+    cl_path = os.path.join(skill_dir, 'references', 'changelog.md') if skill_dir else None
+    cl_version = None
+    if cl_path and os.path.isfile(cl_path):
+        try:
+            with open(cl_path, 'r', encoding='utf-8') as _f:
+                cl_content = _f.read()
+            _m = re.search(r'^##\s*v?(\d+\.\d+\.\d+)', cl_content, re.MULTILINE)
+            if _m:
+                cl_version = _m.group(1)
+        except Exception:
+            pass
+
+    # ── 3. 版本值一致性检查 ──
+    issues = []
+    if expected_version and skill_version != expected_version:
+        issues.append(f"SKILL.md({skill_version}) != _meta.json({expected_version})")
+    if cl_version and skill_version != cl_version:
+        issues.append(f"SKILL.md({skill_version}) != changelog({cl_version})")
+    if expected_version and cl_version and expected_version != cl_version:
+        issues.append(f"_meta.json({expected_version}) != changelog({cl_version})")
+
+    if issues:
+        detail = f"{filepath}:{line} - 版本不一致：{'；'.join(issues)}"
+        return {"passed": False, "detail": detail,
+                "fix": {"key": "version", "value": expected_version or skill_version,
                          "location": f"{filepath}:{line}",
-                         "operation": f"修改 version: {fm['version']} → {manifest_version} (与 manifest.json 一致)",
-                         "verification": "重新运行 audit_skill()，确认 R-10 passed"}}
-    return {"passed": True,
-            "detail": f"{filepath}:{line} - SKILL.md({fm['version']}) == manifest({manifest_version})"}
+                         "operation": f"同步 version 为 {expected_version or skill_version}，确保三端一致"}
+                }
+
+    # ── 4. mtime 时序检查（检测"改了文件但忘了更新版本号"） ──
+    mtime_warnings = []
+    try:
+        skill_md_mtime = os.path.getmtime(filepath) if filepath and os.path.isfile(filepath) else 0
+        cl_mtime = os.path.getmtime(cl_path) if cl_path and os.path.isfile(cl_path) else 0
+        # 检查 scripts/ 下所有 .py 文件的最新 mtime
+        scripts_dir = os.path.join(skill_dir, 'scripts') if skill_dir else None
+        scripts_max_mtime = 0
+        if scripts_dir and os.path.isdir(scripts_dir):
+            for root, dirs, files in os.walk(scripts_dir):
+                for f in files:
+                    if f.endswith('.py'):
+                        fp = os.path.join(root, f)
+                        scripts_max_mtime = max(scripts_max_mtime, os.path.getmtime(fp))
+
+        # SKILL.md 比 changelog 新
+        if skill_md_mtime > cl_mtime + 60:  # 60秒容差
+            mtime_warnings.append("SKILL.md 修改时间比 changelog 更新，可能忘了更新版本号/changelog")
+        # scripts/ 比 changelog 新
+        if scripts_max_mtime > cl_mtime + 60:
+            mtime_warnings.append("scripts/ 下有文件修改时间比 changelog 更新，可能忘了更新版本号/changelog")
+    except Exception:
+        pass
+
+    sources = []
+    if skill_version: sources.append(f"SKILL.md({skill_version})")
+    if meta_version: sources.append(f"_meta.json({meta_version})")
+    if cl_version: sources.append(f"changelog({cl_version})")
+    detail = f"{filepath}:{line} - 版本一致（{' == '.join(sources)}）"
+    if mtime_warnings:
+        detail += ' ⚠️ ' + '；'.join(mtime_warnings)
+    return {"passed": True,  # 版本值一致即 passed，mtime 仅做提示
+            "detail": detail}

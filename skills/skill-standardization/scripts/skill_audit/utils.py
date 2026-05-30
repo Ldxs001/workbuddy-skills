@@ -93,12 +93,12 @@ RULES = [
     },
     {
         "id": "R-10",
-        "name": "version 一致性",
+        "name": "版本三端一致性 + 时序检查",
         "severity": "ERROR",
-        "check": "SKILL.md version == _meta.json version（与铁律2版本号更新规则一致）",
+        "check": "SKILL.md version == _meta.json version == changelog 最新版本号（三端一致）；mtime时序检查检测修改后未更新版本号",
         "method": "version_matches_manifest",
         "fixable": True,
-        "create_template": "创建时 version: 1.0.0，同步写入 _meta.json",
+        "create_template": "version 须在 SKILL.md、_meta.json、references/changelog.md 三处一致",
     },
     {
         "id": "R-11",
