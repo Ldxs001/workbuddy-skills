@@ -591,6 +591,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         for fname in sorted(os.listdir(refs_dir)):
             if not fname.endswith('.md'):
                 continue
+            # changelog.md 也检查写作规范（审计标准不可绕过，问题应改文件而非改审计）
             fpath = os.path.join(refs_dir, fname)
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
