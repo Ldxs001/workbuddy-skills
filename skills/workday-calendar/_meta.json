@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.6.2",
   "description": "智能周历系统 v1.6.0 - skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点）",
   "author": "wUwproject",
   "name": "workday-calendar",
@@ -9,5 +9,7 @@
     "holiday",
     "schedule",
     "excel-export"
-  ]
+  ],
+  "data_dir": "skills/.standardization/workday-calendar/data/",
+  "triggers": []
 }

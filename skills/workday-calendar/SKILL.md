@@ -1,37 +1,18 @@
 ---
 name: workday-calendar
-version: 1.6.0
-description: 智能周历系统 v1.6.0 - skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点）
+author: wUwproject
+license: MIT
+tags: []
+version: 1.6.2
+description: 智能周历系统。skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点）
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/workday-calendar/data/
 trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
 trigger_negative: true
-faq_unparsable: reformat
-antipattern_detail: add_detail
 external_data_dir: true
 ---
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## 触发条件
 
 当用户出现以下意图时，加载本技能：
