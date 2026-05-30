@@ -7,7 +7,7 @@ description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-data_dir: skills/.standardization/skill-standardization/data/
+data_dir: ../.standardization/skill-standardization/
 tags: ['standardization', 'skill-builder', 'skill-audit', 'validation', 'json-loader', 'refactor', 'version-bump', 'changelog-auto', 'data-dir']
 external_data_dir: true
 trigger: 当用户要求审计/创建/更新/改造一个 skill 时；当用户问 R-xx 规则含义时；当用户要求检查某技能规范性时

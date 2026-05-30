@@ -337,8 +337,7 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
             if fm_data_dir and meta_data_dir:
                 def _norm_path(p):
                     p = p.replace('\\', '/').rstrip('/')
-                    p = re.sub(r'^(\.\./|skills/)', '', p)  # 去掉 ../ 或 skills/ 前缀
-                    return p.lstrip('/')
+                    p = re.sub(r'^(\.\./|skills/)', '../', p)  # 统一为 ../ 前缀
                 if _norm_path(fm_data_dir) != _norm_path(meta_data_dir):
                     field_issues.append(f"data_dir 不一致：frontmatter({fm_data_dir}) != _meta({meta_data_dir})")
 

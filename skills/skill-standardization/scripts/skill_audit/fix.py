@@ -1312,14 +1312,20 @@ def fix_meta_field_sync(skill_dir, **kw):
         meta['triggers'] = trigger_list
         fixed += 1
 
-    # 4. data_dir: _meta → frontmatter（_meta 更精确）
+    # 4. data_dir: _meta → frontmatter（转换 skills/ 格式为 ../ 相对路径）
     meta_data_dir = meta.get('data_dir', '')
     fm_data_dir_str = str(fm.get('data_dir', '')).strip() if isinstance(fm.get('data_dir'), str) else ''
     if meta_data_dir and fm_data_dir_str:
-        def _nn(p):
-            return p.replace('\\', '/').rstrip('/').lstrip('../skills/')
-        if _nn(meta_data_dir) != _nn(fm_data_dir_str):
-            fm['data_dir'] = meta_data_dir
+        def _norm_rel(p):
+            p = p.replace('\\', '/').rstrip('/')
+            # _meta 格式: skills/.standardization/xxx/data/ → ../.standardization/xxx/data/
+            if p.startswith('skills/'):
+                p = '../' + p[len('skills/'):]
+            return p
+        fm_data_dir_norm = _norm_rel(fm_data_dir_str)
+        meta_data_dir_norm = _norm_rel(meta_data_dir)
+        if fm_data_dir_norm != meta_data_dir_norm:
+            fm['data_dir'] = meta_data_dir_norm
             fixed += 1
 
     # Write _meta.json
