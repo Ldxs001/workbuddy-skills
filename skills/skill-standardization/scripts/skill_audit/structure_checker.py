@@ -31,7 +31,9 @@ def _abs_line(body, content, m_or_pos):
 
 def body_has_h1(filepath, content, fm, body, **kw):
     """R-06: 正文含一级标题检查（H1 不得含版本号，版本号由 version 字段管理）"""
-    m = re.search(r'^# .+', body, re.MULTILINE)
+    # v2.44.1: 排除代码块内容，避免 bash/json 中的 # 注释被误判为 H1
+    body_no_code = re.compile(r'```.*?```', re.DOTALL).sub('', body)
+    m = re.search(r'^# .+', body_no_code, re.MULTILINE)
     if m is None:
         name = fm.get("name", "<技能名>") if fm else "<技能名>"
         line = _abs_line(body, content, 0)
