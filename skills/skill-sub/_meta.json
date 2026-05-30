@@ -1,5 +1,5 @@
 {
-  "version": "1.24.0",
+  "version": "1.24.1",
   "author": "wUwproject",
   "name": "skill-sub",
   "description": "调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器",

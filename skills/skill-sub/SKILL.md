@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.24.0
+version: 1.24.1
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -13,7 +13,7 @@ external_data_dir: true
 trigger: ['规划类: 帮我规划一下/步骤是什么', '顺序类: 依次执行/先...再...', '链管理: 创建/查看/更新/删除调用链']
 trigger_negative: ['不使用调用链', '手动逐步执行']
 ---
-
+# skill-sub
 
 > 反模式详见 [references/antipatterns.md](references/antipatterns.md)
 
@@ -76,7 +76,7 @@ python {SKILL_DIR}/scripts/chain_manager.py list
 
 # 删除（自动备份）
 python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --force
-```
+```text
 
 ---
 
@@ -100,7 +100,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
     ]
   }
 }
-```
+```text
 
 ### while 循环
 
@@ -117,7 +117,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
     ]
   }
 }
-```
+```text
 
 ### if-else 分支
 
