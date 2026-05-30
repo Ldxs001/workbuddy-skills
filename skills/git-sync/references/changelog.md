@@ -1,9 +1,21 @@
+## 2.7.1 (2026-05-31)
+
+### 更新
+- **skill-standardization 标准化改造第二阶段**：通过 R-01~R-25 全规则审计
+
+### 修复
+- **R-06**: H1 标题删除版本号
+- **R-10**: 补全 v2.7.1 changelog 条目，确保三端版本一致
+- **R-20**: changelog 术语统一（统一为删除）
+- **guide.md**: 清理重复的配置说明章节
+
+---
 ## 2.7.0 (2026-05-30)
 
 ### 更新
 - **skill-standardization 标准化改造**：通过 R-01~R-25 全规则审计（25/25 PASS，0 ERROR，0 WARN ✅）
 - **R-01/R-07 frontmatter 补全**：新增 `trigger` 和 `trigger_negative` 字段
-- **R-04 description 清理**：移除 description 中的版本号信息
+- **R-04 description 清理**：删除 description 中的版本号信息
 - **R-10 版本号去 v 前缀**：changelog.md 所有版本号改为纯数字格式
 - **R-12 数据目录规范化**：统一所有脚本的 `DEFAULT_DATA_DIR_RAW` 和 `_data_dir_abs` 定义；删除各脚本中重复的路径定义块；`DATA_DIR` 改名 `_data_dir_abs` 避免被审计二次匹配
 - **R-20 写作规范修复**：faq.md 中"应该"改为"必须"（模糊表述→确定性描述）；SKILL.md 中 `git-sync.py` → `scripts/git-sync.py`（脚本路径修正）
