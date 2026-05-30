@@ -106,7 +106,7 @@ skills/
 
 - 所有创建、更新、改造过程中产生的临时文件和备份文件，**必须**记录到 `op_logger` 日志（`temp_files` 和 `backup_files` 字段）
 - 主体操作完成后（审计通过 + 版本号更新 + 更新日志维护完毕），**必须**按规范清除临时文件（会话级，立即清除）和过期备份（保留最新 10 个）
-- 更新/改造前**必须**对目标技能目录执行整体备份（`backup_skill()`），备份命名格式：`<skill-dir>_bak_<operation>_<YYYYMMDD_HHMMSS>`
+- 更新/改造前**必须**对目标技能目录执行整体备份（`cp -r`），备份命名格式：`<skill-dir>_bak_<operation>_<YYYYMMDD_HHMMSS>`
 - `scripts/safe_io.py` 所有写操作**必须**内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚
 
 

@@ -35,7 +35,7 @@
 **A:** 可以。skill-standardization 是一个独立审查工具，不依赖任何其他技能：
 
 ```
-skill_audit.py audit <skill-dir>
+-m scripts.skill_audit audit <skill-dir>
   ├─ R-01~R-24 规则检查
   └─ 输出审查报告
 ```
@@ -83,9 +83,9 @@ skill_audit.py audit <skill-dir>
 
 ### Q6: 可以自定义 create 模板吗？
 
-**A:** 当前版本的模板硬编码在 `skill_builder.py` 的 `SKILL_TEMPLATE` 和 `META_TEMPLATE` 变量中。要更新模板：
+**A:** 当前版本的模板硬编码在 `-m scripts.skill_builder` 的 `SKILL_TEMPLATE` 和 `META_TEMPLATE` 变量中。要更新模板：
 
-1. 更新 `scripts/skill_builder.py`
+1. 更新 `scripts/-m scripts.skill_builder`
 2. 找到第 ~34 行的 `SKILL_TEMPLATE` 字符串
 3. 更新占位符或新增字段
 4. 保存后下次 create 即生效
@@ -191,7 +191,7 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 **A:** 不会！自 v2.0 起，所有审查结果均为**纯警告模式**：
 
-- 即使有 ERROR 级问题，`skill_audit.py` 也始终返回退出码 `0`
+- 即使有 ERROR 级问题，`-m scripts.skill_audit` 也始终返回退出码 `0`
 - 后续操作是否继续由调用方决定
 - 审查报告会明确标注每个问题的严重程度供参考
 
@@ -274,8 +274,8 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 | 3 | `manifest.json` `"version"`（如有） | 仓库注册版本 | 与上述一致 |
 | 4 | 各 `spec/*.json` 的 `"_version"` | 规范文件自身的版本 | 通常跟随主版本 |
 | 5 | `json_loader.py` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
-| 6 | `skill_builder.py` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
-| 7 | `skill_audit.py` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
+| 6 | `-m scripts.skill_builder` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
+| 7 | `-m scripts.skill_audit` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
 
 **位置 1-3 必须严格一致**（三方一致原则）。位置 4-7 跟随主版本号更新即可。
 

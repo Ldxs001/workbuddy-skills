@@ -109,7 +109,7 @@ skill_builder/ ──读取──→ spec/*.json（规范定义）
   ├─ refactor.py        SkillRefactor 类
   ├─ version_manager.py  VersionManager 类
   └─ utils.py           工具函数
-skill_audit.py   ──读取──→ spec/rules.json（审查规则）
+-m scripts.skill_audit   ──读取──→ spec/rules.json（审查规则）
 json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 ```
 
@@ -128,7 +128,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 ├─────────────────────────────────────────────────┤
 │                  业务层 (Business)                │
 │                                                  │
-│   skill_builder.py              skill_audit.py   │
+│   -m scripts.skill_builder              -m scripts.skill_audit   │
 │   ┌──────────┬──────────┐      ┌──────────────┐ │
 │   │ create   │ update   │      │ 规则匹配引擎  │ │
 │   │ (模板生成)│ (检查修复)│      │ R-01~R-10    │ │
@@ -154,7 +154,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 
 ## 核心模块详解
 
-### 1. skill_builder.py（构建器）
+### 1. -m scripts.skill_builder（构建器）
 
 职责：Skill 的创建、更新和改造。
 
@@ -182,7 +182,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 | `REQUIRED_SECTIONS` | list[tuple] | update 检查的必填章节及同义词 |
 | `SPLITTABLE_KEYWORDS` | dict | refactor 判断可拆分章节的关键词 |
 
-### 2. skill_audit.py（审查器）
+### 2. -m scripts.skill_audit（审查器）
 
 职责：基于 R-01~R-10 对 SKILL.md 执行自动化审查。
 
@@ -327,7 +327,7 @@ cmd_refactor(args)
 ```
 skill_dir [--json] [--strict]
   ↓
-skill_audit.py audit ...
+-m scripts.skill_audit audit ...
   ↓
 读取: <skill_dir>/SKILL.md
   ↓
@@ -385,7 +385,7 @@ skill_audit.py audit ...
 |------|---------|--------|--------|
 | `frontmatter.json` | 定义字段名/类型/必须性 | 不含验证逻辑 | create 模板 + audit R-01~R-04 |
 | `body.json` | 定义章节名/层级/必须性 | 不含写作指导 | SKILL.md 编写 + audit R-06~R-09 |
-| `rules.json` | 完整规则定义（ID/级别/逻辑） | 不含执行引擎 | skill_audit.py |
+| `rules.json` | 完整规则定义（ID/级别/逻辑） | 不含执行引擎 | -m scripts.skill_audit |
 | `structure.json` | 目录结构规范 + 迁移规则 | 不含移动逻辑 | create + refactor |
 | `progressive_md.json` | MD 拆分方案 + 加载协议 | 不含文件操作 | references/ 创建 + 加载协议 |
 | `_index.json` | 模块注册表 + 依赖关系 | 不含具体规范 | json_loader.py |

@@ -20,7 +20,7 @@
 | 文件 | 更新方式 | 脚本 |
 |------|----------|------|
 | `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_skill_frontmatter.py` |
-| `SKILL.md` 正文 | Python 正则替换 | `scripts/fix_progressive_loading.py` |
+| `SKILL.md` 正文 | Python 正则替换 | `scripts/safe_io.py` 的 `safe_write()` |
 | `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
 
@@ -29,7 +29,7 @@
 ### 基础用法
 
 ```bash
-python scripts/skill_builder.py create <skill-name> --desc "技能描述"
+python -m scripts.skill_builder create <skill-name> --desc "技能描述"
 ```
 
 ### 完整参数
@@ -56,13 +56,13 @@ python scripts/skill_builder.py create <skill-name> --desc "技能描述"
 1. **更新 SKILL.md**：将 TODO 占位符替换为实际内容
 2. **补充脚本**：在 `scripts/` 中添加实际功能代码
 3. **补充文档**：按需在 `references/` 中创建渐进式 MD
-4. **运行 update**：`python scripts/skill_builder.py update <skill-dir>` 验证合规性
+4. **运行 update**：`python -m scripts.skill_builder update <skill-dir>` 验证合规性
 
 ### 示例：从头创建一个完整 skill
 
 ```bash
 # 1. 创建骨架
-python scripts/skill_builder.py create color-toolkit --desc "颜色工具集" --tags color,design,ui
+python -m scripts.skill_builder create color-toolkit --desc "颜色工具集" --tags color,design,ui
 
 # 2. 进入目录更新
 cd color-toolkit
@@ -72,7 +72,7 @@ cd color-toolkit
 # 在 scripts/ 下放入实际 .py 文件
 
 # 4. 验证
-python ../skill-standardization/scripts/skill_builder.py update .
+python ../skill-standardization/scripts/-m scripts.skill_builder update .
 ```
 
 ---
@@ -82,14 +82,14 @@ python ../skill-standardization/scripts/skill_builder.py update .
 ### 基础用法（仅检查）
 
 ```bash
-python scripts/skill_builder.py update <skill-dir>
+python -m scripts.skill_builder update <skill-dir>
 ```
 
 ### 工作流程（含临时/备份管理 + 强制 inspect 前置扫描）
 
 1. **操作前整体备份**（默认执行）
    ```bash
-   python scripts/skill_rollback.py backup_skill <skill-dir> update
+   # 备份：cp -r <skill-dir> <skill-dir>_bak_update_$(date +%Y%m%d_%H%M%S)
    ```
 2. **★ 强制 inspect 结构扫描**（v2.44.0 新增，备份后自动执行）
    工具自动输出技能蓝皮书（元信息、目录树、章节、函数清单、安全数据），
@@ -100,18 +100,18 @@ python scripts/skill_builder.py update <skill-dir>
    ```
 3. **执行审查/修复**
    ```bash
-   python scripts/skill_builder.py update <skill-dir> --fix
+   python -m scripts.skill_builder update <skill-dir> --fix
    ```
 4. **操作中记录**：所有临时文件（`*.tmp`、`temp_*`）和备份文件记录到 `op_logger` 日志
 5. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
    ```bash
-   python scripts/skill_rollback.py cleanup <operation_id>
+   # 清理备份：skill_rollback 暂不支持 cleanup，手动删除旧备份即可
    ```
 
 ### 自动修复模式
 
 ```bash
-python scripts/skill_builder.py update <skill-dir> --fix --backup
+python -m scripts.skill_builder update <skill-dir> --fix --backup
 ```
 
 ### update 检查项详解
@@ -188,25 +188,25 @@ Suggestion: 运行 refactor 清理根目录散落文件
 
 1. **操作前整体备份**（默认执行，`--no-backup` 跳过）
    ```bash
-   python scripts/skill_rollback.py backup_skill <skill-dir> refactor
+   # 备份：cp -r <skill-dir> <skill-dir>_bak_refactor_$(date +%Y%m%d_%H%M%S)
    ```
 2. **★ 强制 inspect 结构扫描**（v2.44.0 新增，备份后自动执行）
    工具自动输出技能蓝皮书，确保了解全貌后再迁移。
 3. **dry-run 预览**
    ```bash
-   python scripts/skill_builder.py refactor <skill-dir> --dry-run
+   python -m scripts.skill_builder refactor <skill-dir> --dry-run
    ```
-4. **执行改造**：`skill_builder.py refactor` 自动备份 + 迁移 + 验证
+4. **执行改造**：`-m scripts.skill_builder refactor` 自动备份 + 迁移 + 验证
 5. **操作中记录**：临时文件、备份文件记录到 `op_logger` 日志
 6. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
    ```bash
-   python scripts/skill_rollback.py cleanup <operation_id>
+   # 清理备份：skill_rollback 暂不支持 cleanup，手动删除旧备份即可
    ```
 
 ### dry-run（推荐首选）
 
 ```bash
-python scripts/skill_builder.py refactor <skill-dir> --dry-run
+python -m scripts.skill_builder refactor <skill-dir> --dry-run
 ```
 
 dry-run 输出完整的迁移计划但不做任何更新：
@@ -231,7 +231,7 @@ Total size: 18KB → verification will check ±1% tolerance
 ### 实际执行
 
 ```bash
-python scripts/skill_builder.py refactor <skill-dir>
+python -m scripts.skill_builder refactor <skill-dir>
 ```
 
 执行流程：
@@ -245,7 +245,7 @@ python scripts/skill_builder.py refactor <skill-dir>
 ### 跳过备份（不推荐）
 
 ```bash
-python scripts/skill_builder.py refactor <skill-dir> --no-backup
+python -m scripts.skill_builder refactor <skill-dir> --no-backup
 ```
 
 ### 回滚方法
@@ -316,9 +316,9 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 `scripts/safe_io.py` 所有写操作（`safe_write`、`safe_patch_by_line`、`safe_patch_regex`、`safe_insert_after`）均内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚。
 
 `scripts/skill_rollback.py` 提供：
-- `backup_skill(skill_dir, operation)` — 整体备份目标技能目录
-- `record_temp_file(temp_path, operation)` — 记录临时文件
-- `cleanup(operation_id)` — 按 operation_id 清理临时文件和过期备份
+- `backup_file()` — 单文件备份（safe_io 内置）
+- `op_logger` — 记录操作日志（含临时/备份文件追踪）
+
 - `rollback(rollback_id)` — 单文件回滚
 - `rollback_latest(N)` — 回滚最近 N 次操作
 
@@ -326,17 +326,17 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 
 ## 审查模式 — 独立审计
 
-审查由 `skill_audit.py` 提供，独立于 skill_builder：
+审查由 `-m scripts.skill_audit` 提供，独立于 skill_builder：
 
 ```bash
 # 基本审查
-python scripts/skill_audit.py audit <skill-dir>
+python -m scripts.skill_audit audit <skill-dir>
 
 # JSON 输出（供程序解析）
-python scripts/skill_audit.py audit <skill-dir> --json
+python -m scripts.skill_audit audit <skill-dir> --json
 
 # 指定 manifest 版本进行 R-10 对比
-python scripts/skill_audit.py audit <skill-dir> --manifest-version 2.0.0
+python -m scripts.skill_audit audit <skill-dir> --manifest-version 2.0.0
 ```
 
 ### 审查结果判定
@@ -621,7 +621,7 @@ structure ──→ progressive_md ─┘
 `skill-standardization` 在 `update` 模式下会自动调用 `permission_checker.py` 扫描目标 skill 的脚本，计算权限权重，生成风险报告。
 
 ```
-skill_builder.py update <skill-dir>
+-m scripts.skill_builder update <skill-dir>
   ↓
 调用 permission_checker.py 扫描脚本
   ↓

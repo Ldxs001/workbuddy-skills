@@ -20,7 +20,7 @@
 ### 示例 1：最小化创建
 
 ```bash
-$ python scripts/skill_builder.py create hello-world --desc "问候技能"
+$ python -m scripts.skill_builder create hello-world --desc "问候技能"
 
 [CREATE] Skill: hello-world
 [CREATE] Directory: ./hello-world
@@ -32,13 +32,13 @@ $ python scripts/skill_builder.py create hello-world --desc "问候技能"
 Done! Next steps:
 1. Edit hello-world/SKILL.md (replace TODOs with real content)
 2. Add scripts to hello-world/scripts/
-3. Run update to verify: python scripts/skill_builder.py update ./hello-world
+3. Run update to verify: python -m scripts.skill_builder update ./hello-world
 ```
 
 ### 示例 2：带完整参数创建
 
 ```bash
-python scripts/skill_builder.py create \
+python -m scripts.skill_builder create \
   data-processor \
   --desc "数据处理流水线" \
   --tags data,pipeline,etl \
@@ -102,7 +102,7 @@ tags: []
 ### 示例 4：检查一个合规的 skill
 
 ```bash
-$ python scripts/skill_builder.py update ./color-toolkit
+$ python -m scripts.skill_builder update ./color-toolkit
 
 === UPDATE REPORT ===
 Skill: color-toolkit
@@ -124,7 +124,7 @@ Verdict: ✅ PASS — skill is well-standardized
 ### 示例 5：检查有问题的 skill（不使用 --fix）
 
 ```bash
-$ python scripts/skill_builder.py update ./old-skill
+$ python -m scripts.skill_builder update ./old-skill
 
 === UPDATE REPORT ===
 Skill: old-skill
@@ -146,7 +146,7 @@ Suggestion: Run with --fix to auto-fix B-01; use refactor for B-05
 ### 示例 6：--fix 自动修复
 
 ```bash
-$ python scripts/skill_builder.py update ./old-skill --fix --backup
+$ python -m scripts.skill_builder update ./old-skill --fix --backup
 
 === UPDATE REPORT ===
 Skill: old-skill
@@ -174,7 +174,7 @@ Summary: Auto-fixed 1 item, 3 manual items remaining
 ### 示例 7：dry-run 查看迁移计划
 
 ```bash
-$ python scripts/skill_builder.py refactor ./legacy-tool --dry-run
+$ python -m scripts.skill_builder refactor ./legacy-tool --dry-run
 
 === REFACTOR DRY-RUN ===
 Target: ./legacy-tool
@@ -206,7 +206,7 @@ To execute: remove --dry-run flag
 ### 示例 8：实际执行 refactor
 
 ```bash
-$ python scripts/skill_builder.py refactor ./legacy-tool
+$ python -m scripts.skill_builder refactor ./legacy-tool
 
 === REFACTOR EXECUTE ===
 Target: ./legacy-tool
@@ -234,7 +234,7 @@ Rollback: mv ./legacy-tool_bak_refactor_* ./legacy-tool
 ### 示例 9：完整通过
 
 ```bash
-$ python scripts/skill_audit.py audit ./my-skill --json
+$ python -m scripts.skill_audit audit ./my-skill --json
 
 {
   "skill_dir": "./my-skill",
@@ -251,7 +251,7 @@ $ python scripts/skill_audit.py audit ./my-skill --json
 ### 示例 10：含 WARN 的结果（纯警告模式）
 
 ```bash
-$ python scripts/skill_audit.py audit ./another-skill
+$ python -m scripts.skill_audit audit ./another-skill
 
 === AUDIT REPORT ===
 Skill: another-skill

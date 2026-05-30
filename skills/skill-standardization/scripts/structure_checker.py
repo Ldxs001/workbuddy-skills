@@ -539,11 +539,44 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                     continue
                 script_paths.add(script_path)
 
+        # ── 扩展：也扫描 references/*.md 中的脚本引用（v2.44.1）──
+        _refs_dir = os.path.join(skill_dir, 'references')
+        if os.path.isdir(_refs_dir):
+            for _fname in sorted(os.listdir(_refs_dir)):
+                if not _fname.endswith('.md'):
+                    continue
+                _fpath = os.path.join(_refs_dir, _fname)
+                try:
+                    with open(_fpath, 'r', encoding='utf-8') as _f:
+                        _ref_content = _f.read()
+                except Exception:
+                    continue
+                # 从代码块提取
+                _ref_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', _ref_content, re.DOTALL)
+                for _block in _ref_blocks:
+                    for _line in _block.splitlines():
+                        _line = _line.strip()
+                        if _line.startswith('#'):
+                            continue
+                        for _m in re.finditer(r'(?:python3?)\s+([^\s]+\.py)', _line):
+                            _sp = _m.group(1)
+                            if re.search(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', _sp): continue
+                            if '{' in _sp or '}' in _sp: continue
+                            script_paths.add(_sp)
+                # 从行内代码提取
+                _ref_inline = re.findall(r'`([^`]+?)`', _ref_content)
+                for _ic in _ref_inline:
+                    for _m in re.finditer(r'(?:python3?)\s+([^\s]+\.py)', _ic):
+                        _sp = _m.group(1)
+                        if re.search(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', _sp): continue
+                        if '{' in _sp or '}' in _sp: continue
+                        script_paths.add(_sp)
+
         # 3. 检查脚本文件是否存在、能否运行 --help
         for script_path in script_paths:
             full_path = os.path.join(skill_dir, script_path)
             if not os.path.isfile(full_path):
-                all_issues["suggest"].append(f"SKILL.md 提到脚本 `{script_path}` 但文件不存在（应使用相对路径如 `scripts/foo.py`）")
+                all_issues["suggest"].append(f"SKILL.md/references/*.md 提到脚本 `{script_path}` 但文件不存在（应使用相对路径如 `scripts/foo.py`）")
             else:
                 # 静态分析：检查 Python 语法（不执行脚本，避免间接执行风险）
                 try:
@@ -704,6 +737,28 @@ def check_doc_code_consistency(
             all_commands.append(line)
     all_commands.extend(inline_codes)
 
+    # 1b. 扩展：也扫描 references/*.md 中的命令引用（v2.44.1）
+    _refs_dir = os.path.join(skill_dir, 'references')
+    if os.path.isdir(_refs_dir):
+        for _fname in sorted(os.listdir(_refs_dir)):
+            if not _fname.endswith('.md'):
+                continue
+            _fpath = os.path.join(_refs_dir, _fname)
+            try:
+                with open(_fpath, 'r', encoding='utf-8') as _f:
+                    _ref_content = _f.read()
+            except Exception:
+                continue
+            _ref_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', _ref_content, re.DOTALL)
+            _ref_inline_codes = re.findall(r'`([^`]+?)`', _ref_content)
+            for _block in _ref_blocks:
+                for _line in _block.splitlines():
+                    _line = _line.strip()
+                    if _line.startswith('#'):
+                        continue
+                    all_commands.append(_line)
+            all_commands.extend(_ref_inline_codes)
+
     # 2. 提取脚本路径（如 python scripts/xxx.py --list）
     script_paths = set()
     py_file_refs = set()  # 所有 .py 文件引用
@@ -734,7 +789,7 @@ def check_doc_code_consistency(
             if os.path.isfile(alt_path):
                 continue
             issues["suggest"].append(
-                f"R-23: {filepath}:1 - SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
+                f"R-23: {filepath}:1 - SKILL.md/references/*.md 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
             )
         else:
             # 静态语法检查
