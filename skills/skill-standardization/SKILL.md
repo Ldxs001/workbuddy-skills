@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.44.2
+version: 2.44.3
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -37,6 +37,7 @@ trigger_negative: 当用户仅闲聊或问你有什么技能时不触发；单�
 - [ ] 是否用了 Write/Edit 工具？→ 立刻停止，改用 Python 脚本
 - [ ] 是否在 `references/changelog.md` 维护更新记录？→ 根目录不得有 `CHANGELOG.md`
 - [ ] 更新后是否用 `python -m scripts.skill_audit audit .` 自审？→ 必须 0 ERROR 0 WARN
+- [ ] `--fix` 自动修正后，是否将 fix_details 转化为可读 changelog 并用 safe_io 写入？→ 不得留机器名，禁止留空
 
 > **注**：本技能的权限检查器（`permission_checker.py`）定义的敏感路径匹配模式（如 `~/.ssh/`、`~/.aws/` 等）仅用作**检测规则**，用于发现被审计 skill 是否违规访问这些路径；本技能本身不会实际访问这些敏感路径。
 

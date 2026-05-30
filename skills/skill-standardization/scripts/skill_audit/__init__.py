@@ -454,7 +454,7 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级'):
         shutil.move(tmp, skill_md)
 
     # 更新 changelog
-    cl_entry = f"## v{new_version} ({today})\n\n### 修复\n- {desc}\n"
+    cl_entry = f"## {new_version} ({today})\n\n### 修复\n- {desc}\n"
     cl_path = os.path.join(skill_dir, 'references', 'changelog.md')
     if os.path.isfile(cl_path):
         with open(cl_path, 'r', encoding='utf-8') as f:
@@ -491,6 +491,7 @@ def cmd_audit(args):
         print(f"\n=== 自动修正模式 ===")
         # 收集所有失败规则的 fix key
         fixes_applied = 0
+        fix_details = []
         for res in result.get("results", []):
             if not res.get("passed") and res.get("fix"):
                 fix_key = res["fix"].get("key")
@@ -498,20 +499,30 @@ def cmd_audit(args):
                     try:
                         n = apply_fix(skill_dir, fix_key, **res["fix"])
                         fixes_applied += n
+                        fix_details.append(fix_key)
                         print(f"[OK] R-{fix_key}：修正 {n} 处")
                     except Exception as e:
                         print(f"[ERROR] R-{fix_key} 修正失败: {e}")
         if fixes_applied > 0:
-            print(f"[OK] 共修正 {fixes_applied} 处")
-            # ★ 自动执行版本号 bump（patch）
+            print(f"[OK] 共修正 {fix_details} 处")
+            # ★ 自动执行版本号 bump（patch），changelog 写入实际修复内容而非空话
             try:
-                _do_bump(skill_dir, 'fix', 'audit --fix 自动修正')
+                fix_desc = f"audit --fix 自动修正: {', '.join(fix_details)}" if fix_details else 'audit --fix 自动修正'
+                _do_bump(skill_dir, 'fix', fix_desc)
                 print(f"[OK] 版本号已自动升级（R-03 规则: audit --fix 默认为 PATCH）")
             except Exception as e:
                 print(f"[WARN] 版本号自动更新失败（可手动执行 bump 子命令）: {e}")
             # 重新审计
             result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                                 progress_file=args.progress_file, _fix_applied=True)
+            # ⚠️ AI 强制执行：将 fix_details 转换为可读 changelog
+            print(f"\n{'='*70}")
+            print(f"  ⚠️  AI 必须执行：")
+            print(f"  1. 读取上述 fix_details（机器名列表），转换为自然语言描述")
+            print(f"  2. 用 safe_io 将可读的 changelog 条目写入 references/changelog.md")
+            print(f"  3. 示例：h1_version →「H1 移除版本号」")
+            print(f"  4. 确认 SKILL.md version == _meta.json version == changelog 版本号（三端一致）")
+            print(f"{'='*70}")
         else:
             print(f"ℹ️  无需修正或所有失败规则暂无自动修复工具")
 

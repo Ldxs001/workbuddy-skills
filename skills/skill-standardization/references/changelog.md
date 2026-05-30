@@ -1,3 +1,11 @@
+## 2.44.3 (2026-05-31)
+
+### 修复
+- **--fix changelog 机器名问题**: 收集 fix_details 替代硬编码空话，终端输出追加 AI 强制指令
+- **changelog v 前缀**: _do_bump() 写入版本号时去掉 v 前缀，符合 R-10
+- **SKILL.md 检查清单**: 新增 --fix 后转化 changelog 的 checklist 项
+
+---
 ## 2.44.2 (2026-05-31)
 
 ### 修复
