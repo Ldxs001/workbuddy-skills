@@ -1,19 +1,38 @@
 ---
 name: skill-standardization
-tags: []
-trigger: 
-trigger_negative: 
-version: 2.39.5
+version: 2.41.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎 v2.38.15。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。R-10 增强：自动三端版本号一致性检查；R-23 增强：MD 正文路径与 frontmatter data_dir 一致性检查。
+description: Skill 标准化规范引擎 v2.40.0。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
+tags: []
 external_data_dir: true
-frontmatter_fields: tags+trigger+trigger_negative
+trigger: 当用户要求审计/创建/更新/改造一个 skill 时；当用户问 R-xx 规则含义时；当用户要求检查某技能规范性时
+trigger_negative: 当用户仅闲聊或问你有什么技能时不触发；单步任务如查看文件不触发
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

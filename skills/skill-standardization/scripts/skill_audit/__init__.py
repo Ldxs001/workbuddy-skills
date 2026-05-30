@@ -115,6 +115,7 @@ def _apply_fixes(skill_md, fixes):
         "progressive_loading_explicit",
         "h1", "section_trigger", "section_core", "section_workflow",
         "antipattern_reference", "faq_reference",
+        "frontmatter_fields", "meta_json",
     }
     for fix in fixes:
         if "key" not in fix:

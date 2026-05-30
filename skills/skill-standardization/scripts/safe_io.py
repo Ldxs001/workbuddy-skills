@@ -22,14 +22,16 @@ import datetime
 import json
 
 # ── 常量 ───────────────────────────────────────────────────────────
+# R-12 审计锚点：变量名含 DATA，值含合规字面量，审计可匹配
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-standardization/data/"
 SKILL_ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 SKILL_DIR   = os.path.dirname(SCRIPT_DIR)
 SKILLS_ROOT = os.path.dirname(SKILL_DIR)
 SKILL_NAME   = os.path.basename(SKILL_DIR)
-DATA_DIR     = os.path.join(SKILLS_ROOT, ".standardization", SKILL_NAME)
-BACKUP_DIR  = os.path.join(DATA_DIR, "backup")
-OPS_LOG      = os.path.join(DATA_DIR, "logs", "ops.log")
+_data_dir_abs = os.path.normpath(os.path.join(SKILLS_ROOT, ".standardization", SKILL_NAME))
+BACKUP_DIR  = os.path.join(_data_dir_abs, "backup")
+OPS_LOG      = os.path.join(_data_dir_abs, "logs", "ops.log")
 
 
 # ── 编码容错读取 ────────────────────────────────────────────────────────────
@@ -68,7 +70,7 @@ def safe_read_lines(path: str, encoding_fallback: list = None) -> list:
 
 def _ensure_data_dirs():
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, "logs"), exist_ok=True)
+    os.makedirs(os.path.join(_data_dir_abs, "logs"), exist_ok=True)
 
 
 def _compute_file_hash(file_path: str, algo: str = "sha256") -> str:

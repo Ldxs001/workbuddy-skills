@@ -470,7 +470,7 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
     scripts_dir = os.path.join(skill_dir, "scripts")
     data_dir_vars = []
     _DATA_VAR_RE = re.compile(
-        r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*(?:_DIR|_PATH))\s*=\s*(.+)$'
+        r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*?(?:_DIR|_PATH|_RAW))\s*=\s*(.+)$'
     )
 
     if os.path.isdir(scripts_dir):

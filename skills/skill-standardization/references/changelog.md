@@ -1,3 +1,31 @@
+## v2.41.0 (2026-05-30)
+
+### 更新
+- **_meta.json 非标字段处理逻辑修正**：不再仅标记输出，改为直接删除（_meta.json 是机器元数据，不应存在非标准字段），同时输出提示供人工判断是否需要迁移
+- **frontmatter 非标字段处理逻辑修正**：从自动移除改为仅 WARN 提醒、不移除（frontmatter 允许自定义字段，如 home_url、category 等）
+- **R-01 审计提示优化**：frontmatter 非标字段提示从"应清理"改为"仅提醒，不阻断"
+- **structure.json v2.5.0**：增加 _meta.json 严格 7 字段说明和 frontmatter 可含自定义字段的对比说明
+- **frontmatter.json v2.5.0**：增加非标字段处理策略说明（仅 WARN 提醒不移除）
+
+---
+
+## v2.40.1 (2026-05-30)
+
+### 更新
+- **frontmatter.json 重分类**：11 个字段升级为 required（name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight），2 个字段改为 conditional（trigger/trigger_negative 正文有触发词/否定条件时必填）
+- **R-01 审计逻辑分层**：检查器与修复器均按 required→conditional→optional 三级处理，missing required 报 ERROR、missing conditional 报 ERROR（但 WARN 级提示）、仅 extra 非标字段不阻断通过
+- **frontmatter.json 版本 v2.4.0**：新增 conditional_fields 分区，field_type_empty_defaults 明确各类型正确空值
+
+---
+
+## v2.40.0 (2026-05-30)
+
+### 修复
+- **frontmatter.json 规范修正**：补齐 7 个缺失标准字段（data_dir/external_data_dir/sensitive_access/critical_write/permission_weight/trigger/trigger_negative），使 spec 定义与审计代码（R-07/R-13/R-14/R-16/R-22）完全一致
+- **structure.json _meta.json 字段统一**：由 5 字段改为 7 字段（+data_dir/+triggers），作为规范单一权威来源
+- **guide.md B-01**：改为引用 structure.json 并显示 7 字段完整列表
+
+---
 ## v2.39.5 (2026-05-30)
 
 ### 修复
@@ -49,7 +77,7 @@
 - **R-23 新增第 7 项检查：MD 中引用的外部技能是否存在**
   - 扫描 SKILL.md + references/*.md 中引用的  路径
   - 排除 URL（gitee.com/github.com）、结构目录（.standardization/installed/）避免误报
-  - 引用的技能目录不存在于  时报 WARN，提示功能描述可能已过时
+  - 引用的技能目录不存在时提示 WARN，建议人工确认功能描述是否过时
   - 本次清理了 6 个文件中的 git-sync 残留描述，v2.38.13 解耦不彻底的问题
 - 清理所有 git-sync 残留描述：guide.md/faq.md/reference.md/rules.md/examples.md/__init__.py
 - 新增 bump 子命令：一键升级技能版本号三端（SKILL.md + _meta.json + changelog）

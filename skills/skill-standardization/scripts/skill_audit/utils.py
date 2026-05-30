@@ -12,9 +12,9 @@ from pathlib import Path
 RULES = [
     {
         "id": "R-01",
-        "name": "Frontmatter 存在性 + 13 标准字段完整性",
+        "name": "Frontmatter 存在性 + 11 required + 2 conditional 字段完整性",
         "severity": "ERROR",
-        "check": "存在 YAML frontmatter，且含 13 标准字段：name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight/trigger/trigger_negative。非标字段报 WARN",
+        "check": "存在 YAML frontmatter，且含 11 required 字段：name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight；2 conditional 字段：trigger/trigger_negative（正文有触发词/否定条件时必填）。非标字段报 WARN",
         "method": "regex_frontmatter_exists",
         "fixable": True,
         "create_template": "自动在文件头部插入 --- 包裹的 frontmatter 块，含 name/version/description/sensitive_access/critical_write/permission_weight",

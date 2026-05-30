@@ -872,7 +872,7 @@ def fix_doc_code_consistency(skill_dir, **kw):
 # ═══════════════════════════════════════════════════
 
 def fix_meta_json_completeness(skill_dir, **kw):
-    """R-25: 补全 _meta.json 缺失的 7 标准字段，非标字段标记输出。"""
+    """R-25: 补全 _meta.json 缺失的 7 标准字段，非标字段判断迁移或删除。"""
     import os, json
     meta_path = os.path.join(skill_dir, '_meta.json')
     if not os.path.isfile(meta_path):
@@ -901,10 +901,18 @@ def fix_meta_json_completeness(skill_dir, **kw):
             meta[field] = defaults[field]
             fixes += 1
 
-    # 标记非标字段
+    # 非标字段处理：先输出供判断，再删除（_meta.json 不应有不一致字段）
     extra = [k for k in meta if k not in META_STANDARD]
     if extra:
-        print(f'  ⚠️  非标字段(需人工判断): {", ".join(extra)}')
+        print(f'  ⚠️  发现非标字段: {", ".join(extra)}')
+        print(f'  → _meta.json 是机器元数据，不应存在非标准字段。')
+        print(f'  → 请确认这些字段是否需要迁移到标准字段体系：')
+        print(f'     - 若字段值有用（如 home_url），建议迁移到 frontmatter 或 scripts/spec/')
+        print(f'     - 若字段是历史遗留/冗余数据，将自动删除')
+        # 直接删除非标字段（_meta.json 应保持严格一致）
+        for k in extra:
+            del meta[k]
+        print(f'  ✅ 已删除非标字段: {", ".join(extra)}')
 
     with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -918,16 +926,19 @@ def fix_meta_json_completeness(skill_dir, **kw):
 # ═══════════════════════════════════════════════════
 
 def fix_frontmatter_fields(skill_dir, **kw):
-    """R-01 修复：补全 frontmatter 缺失的 13 标准字段，标记非标字段。"""
+    """R-01 修复：补全 frontmatter 缺失的 11 required + 2 conditional 字段，标记非标字段。"""
     import os, re, tempfile, shutil
     skill_md = os.path.join(skill_dir, 'SKILL.md')
     if not os.path.isfile(skill_md):
         return 0
 
-    FM_STANDARD = {'name','version','description','author','license','tags',
+    # ── 分层字段定义 ──
+    FM_REQUIRED = {'name','version','description','author','license','tags',
                    'data_dir','external_data_dir',
-                   'sensitive_access','critical_write','permission_weight',
-                   'trigger','trigger_negative'}
+                   'sensitive_access','critical_write','permission_weight'}
+    FM_CONDITIONAL = {'trigger','trigger_negative'}
+    FM_OPTIONAL = {'references','category','priority','deprecated'}
+    FM_STANDARD = FM_REQUIRED | FM_CONDITIONAL | FM_OPTIONAL
 
     with open(skill_md, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -954,12 +965,12 @@ def fix_frontmatter_fields(skill_dir, **kw):
         'license': 'license: MIT',
         'tags': 'tags: []',
         'data_dir': f'data_dir: ../.standardization/{skill_name}/',
-        'external_data_dir': 'external_data_dir: true',
+        'external_data_dir': 'external_data_dir:',    # 空值（对应 YAML null）
         'sensitive_access': 'sensitive_access: false',
         'critical_write': 'critical_write: false',
         'permission_weight': 'permission_weight: LOW',
-        'trigger': 'trigger: ',
-        'trigger_negative': 'trigger_negative: ',
+        'trigger': 'trigger: ',                        # 空值（用户后续填写）
+        'trigger_negative': 'trigger_negative: ',      # 空值（用户后续填写）
     }
 
     fm_lines = fm_text.split('\n')
@@ -970,14 +981,19 @@ def fix_frontmatter_fields(skill_dir, **kw):
             break
 
     added = []
-    for field in sorted(FM_STANDARD):
+    # 先补 required，再补 conditional（条件字段优先级低）
+    for field in sorted(FM_REQUIRED):
+        if field not in existing:
+            fm_lines.insert(insert_pos + len(added), defaults[field])
+            added.append(field)
+    for field in sorted(FM_CONDITIONAL):
         if field not in existing:
             fm_lines.insert(insert_pos + len(added), defaults[field])
             added.append(field)
 
     extra = [k for k in existing if k not in FM_STANDARD]
     if extra:
-        print(f'  [WARN] 非标字段(应清理): {", ".join(extra)}')
+        print(f'  [WARN] 非标字段(仅提醒，不移除。如需清理请手动处理): {", ".join(extra)}')
 
     if not added:
         return 0

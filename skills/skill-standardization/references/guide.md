@@ -111,7 +111,9 @@ python scripts/skill_builder.py update <skill-dir> --fix --backup
 
 #### B-01: _meta.json 完整性
 
-检查 `_meta.json` 是否存在且包含全部五个必填字段：
+> 完整字段定义以 `scripts/spec/structure.json` 为准，此处仅作摘要。
+
+检查 `_meta.json` 是否存在且包含全部七个标准字段：
 
 | 字段 | 类型 | 必填 | 默认值 |
 |------|------|------|--------|
@@ -120,6 +122,8 @@ python scripts/skill_builder.py update <skill-dir> --fix --backup
 | description | string | ✅ | 从 SKILL.md 提取或空 |
 | author | string | ✅ | `[username-redacted]` |
 | tags | string[] | ✅ | `[]` |
+| data_dir | string | ❌ | 无（需要持久化数据时必填） |
+| triggers | string[] | ❌ | `[]` |
 
 **--fix 行为**：自动补充缺失字段，使用上述默认值。
 

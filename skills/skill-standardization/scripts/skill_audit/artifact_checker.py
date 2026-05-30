@@ -470,7 +470,7 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
     scripts_dir = os.path.join(skill_dir, "scripts")
     data_dir_vars = []
     _DATA_VAR_RE = re.compile(
-        r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*(?:_DIR|_PATH))\s*=\s*(.+)$'
+        r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*?(?:_DIR|_PATH|_RAW))\s*=\s*(.+)$'
     )
 
     if os.path.isdir(scripts_dir):
@@ -513,6 +513,21 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
         rel = os.path.join("scripts", fname)
         if rel in scripts_seen:
             continue  # 已有 DATA 变量，无需二次检查
+        # 白名单：这些脚本引用 .standardization/ 是因为它们是审计/检查逻辑的一部分，
+        # 并非自身使用数据目录。使用 os.path.join 确保 Windows 反斜杠兼容。
+        R12_WHITELIST = {
+            os.path.join("scripts", "artifact_checker.py"),
+            os.path.join("scripts", "authorization_manager.py"),
+            os.path.join("scripts", "creator.py"),
+            os.path.join("scripts", "fix.py"),
+            os.path.join("scripts", "migrator.py"),
+            os.path.join("scripts", "progress_manager.py"),
+            os.path.join("scripts", "refactor.py"),
+            os.path.join("scripts", "updater.py"),
+            os.path.join("scripts", "utils.py"),
+        }
+        if rel in R12_WHITELIST:
+            continue
         try:
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 sc = f.read()

@@ -21,12 +21,14 @@ author: your-name-here
 license: MIT
 description: >
   {description}
+tags: []
+data_dir: ../.standardization/{name}/
+external_data_dir:
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-artifact_paths: []
-writing_standards: []
-data_dir: ../.standardization/{name}/
+trigger:
+trigger_negative:
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
@@ -94,6 +96,16 @@ skill-sub {name} --input <input-file> --output <output-dir>
 
 > 本文档由 `skill-standardization v2.38.6` 生成，遵循 R-01~R-24 规范。
 """
+
+    META_TEMPLATE = """{{
+  "name": "{name}",
+  "version": "0.1.0",
+  "description": "{description}",
+  "author": "your-name-here",
+  "tags": [{tags_json}],
+  "data_dir": "skills/.standardization/{name}/",
+  "triggers": []
+}}"""
 
     def create(self, args):
         """创建新的标准 skill 目录结构"""

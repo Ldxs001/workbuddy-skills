@@ -516,6 +516,9 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         for k in ["must", "suggest", "optional"]:
             if f"R-23" in r23_result.get("detail", ""):
                 all_issues["suggest"].append(r23_result["detail"])
+    elif "ⓘ" in r23_result.get("detail", ""):
+        # R-23 通过但有 optional 提示，放在 optional 供参考
+        all_issues["optional"].append(r23_result["detail"])
 
     # ── 检查 SKILL.md 正文 ────────────────────────
     issues = _check_writing_standards_text(body, "SKILL.md")
@@ -597,7 +600,14 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         return {"passed": True,
                 "detail": "写作规范检查通过（SKILL.md + references/*.md 术语一致、无禁止表述、中英文混排规范）"}
 
+    # 仅 optional（如两阶段粗筛产物）→ 通过，detail 带 NOTE
+    if must_count == 0 and suggest_count == 0 and optional_count > 0:
+        return {"passed": True,
+                "detail": f"写作规范检查通过 ⓘ 仅可选问题（{optional_count} 条，不阻断通过）：{all_issues['optional'][0]}" +
+                          (f" 等（共 {optional_count} 条）" if optional_count > 1 else "")}
+
     # 格式化输出
+    parts = []
     parts = []
     if must_count > 0:
         parts.append(f"🔴 必须修（{must_count} 条）：{all_issues['must'][0]}")
@@ -903,9 +913,20 @@ def check_doc_code_consistency(
             )
 
     # 汇总
-    total = sum(len(issues[k]) for k in issues)
+    must_n = len(issues["must"])
+    suggest_n = len(issues["suggest"])
+    optional_n = len(issues["optional"])
+    total = must_n + suggest_n + optional_n
+
     if total == 0:
         return {"passed": True, "detail": f"{filepath}:1 - R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}
+
+    # 仅 optional（如两阶段粗筛产物）→ 通过，detail 带 NOTE
+    if must_n == 0 and suggest_n == 0 and optional_n > 0:
+        opt_msgs = "\n".join(issues["optional"])
+        return {"passed": True,
+                "detail": f"{filepath}:1 - R-23: ⓘ 两阶段粗筛 {optional_n} 条待 LLM 精筛确认（不阻断通过）：\n{opt_msgs}",
+                "fix": None}
 
     msgs = []
     for k in ["must", "suggest", "optional"]:

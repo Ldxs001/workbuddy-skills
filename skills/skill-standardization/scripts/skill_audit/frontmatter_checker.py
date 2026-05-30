@@ -47,7 +47,7 @@ def _find_fm_line(content, field_name=None):
 
 
 def regex_frontmatter_exists(filepath, content, fm, body, **kw):
-    """R-01: Frontmatter 存在性 + 13 标准字段完整性检查"""
+    """R-01: Frontmatter 存在性 + 字段完整性检查（required/conditional/optional 分层）"""
     # ── 存在性检查 ──
     if fm is None:
         line = 1
@@ -60,31 +60,38 @@ def regex_frontmatter_exists(filepath, content, fm, body, **kw):
 
     line = 1  # frontmatter 从第一行开始
 
-    # ── 13 标准字段完整性检查 ──
-    FM_STANDARD = {'name','version','description','author','license','tags',
+    # ── 分层字段定义 ──
+    FM_REQUIRED = {'name','version','description','author','license','tags',
                    'data_dir','external_data_dir',
-                   'sensitive_access','critical_write','permission_weight',
-                   'trigger','trigger_negative'}
+                   'sensitive_access','critical_write','permission_weight'}
+    FM_CONDITIONAL = {'trigger','trigger_negative'}
+    FM_OPTIONAL = {'references','category','priority','deprecated'}
+    FM_STANDARD = FM_REQUIRED | FM_CONDITIONAL | FM_OPTIONAL
+
     existing = set(fm.keys()) if fm else set()
-    missing = FM_STANDARD - existing
+    missing_required = FM_REQUIRED - existing
+    missing_conditional = FM_CONDITIONAL - existing
     extra = existing - FM_STANDARD
 
     issues = []
-    if missing:
-        issues.append(f"缺失 {len(missing)} 个标准字段: {', '.join(sorted(missing))}")
+    if missing_required:
+        issues.append(f"缺失必填字段({len(missing_required)}): {', '.join(sorted(missing_required))}")
+    if missing_conditional:
+        issues.append(f"缺失条件字段(正文有触发词/否定条件时必填，否则 WARN): {', '.join(sorted(missing_conditional))}")
     if extra:
-        issues.append(f"非标字段(应清理): {', '.join(sorted(extra))}")
+        issues.append(f"非标字段(仅提醒，不阻断): {', '.join(sorted(extra))}")
 
     if not issues:
         return {"passed": True,
-                "detail": f"发现 YAML frontmatter，13 标准字段完整"}
+                "detail": f"发现 YAML frontmatter，11 required + 2 conditional 字段完整"}
 
     issues_str = '；'.join(issues)
-    passed = not bool(missing) and not bool(extra)
+    # 仅 extra（非标字段）时不阻断通过，报 WARN
+    passed = not bool(missing_required) and not bool(missing_conditional)
     return {"passed": passed,
             "detail": f"{filepath}:{line} - {issues_str}",
-            "fix": {"key": "frontmatter_fields", "value": "+".join(sorted(missing)) if missing else 'clean',
-                     "operation": f"补全缺失字段{'、清理非标字段' if extra else ''}"}}
+            "fix": {"key": "frontmatter_fields", "value": "+".join(sorted(missing_required | missing_conditional)) if missing_required or missing_conditional else 'clean',
+                     "operation": f"补全缺失字段{'；非标字段仅提醒' if extra else ''}"}}
 
 
 def yaml_has_name(filepath, content, fm, body, **kw):

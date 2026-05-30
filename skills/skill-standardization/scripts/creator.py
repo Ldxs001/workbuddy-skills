@@ -95,6 +95,16 @@ skill-sub {name} --input <input-file> --output <output-dir>
 > 本文档由 `skill-standardization v2.38.6` 生成，遵循 R-01~R-24 规范。
 """
 
+    META_TEMPLATE = """{{
+  "name": "{name}",
+  "version": "0.1.0",
+  "description": "{description}",
+  "author": "your-name-here",
+  "tags": [{tags_json}],
+  "data_dir": "skills/.standardization/{name}/",
+  "triggers": []
+}}"""
+
     def create(self, args):
         """创建新的标准 skill 目录结构"""
         name = args.name
