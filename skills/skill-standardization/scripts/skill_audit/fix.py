@@ -294,6 +294,75 @@ def fix_h1_version(skill_dir, **kw):
     return 1
 
 
+def fix_h1_position(skill_dir, **kw):
+    """
+    R-06 修复：将 H1 移到 frontmatter 后首行。
+    如 H1 在 body 的非开头位置（如 ## 触发条件 之后），
+    将其提到 body 最前面。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    # 找到 body 中的 H1（排除代码块内的 # 注释）
+    body_no_code = re.sub(r'```.*?```', '', body, flags=re.DOTALL)
+    m = re.search(r'^# .+', body_no_code, re.MULTILINE)
+    if not m:
+        return 0
+    # 检查 H1 是否已在 body 前 2 行内
+    h1_body_line = body[:m.start()].count('\n') + 1
+    if h1_body_line <= 2:
+        return 0  # 位置已正确
+    # 分离 H1 之前的内容、H1 本身、H1 之后的内容
+    lines = body.split('\n')
+    h1_idx = m.group(0)
+    # 按行找到实际 H1 位置（用 body_no_code 定位但操作 body 的真实行）
+    body_lines = body.split('\n')
+    real_h1_idx = None
+    for i, line in enumerate(body_lines):
+        stripped = line.strip()
+        if stripped.startswith('# ') and stripped not in ('# 返回', '# {', '# [',
+             '# 每次', '# 备份', '# Windows', '# 或命令', '# 今天', '# 指定', '# 规则', '# 工作日', '# 日程'):
+            # 简单判断：不在代码块标志内（不以空格/制表符缩进的行）
+            if not line.startswith(' ') and not line.startswith('\t'):
+                # 确认这是我们要找的 H1（排除# 返回这类注释）
+                real_h1_idx = i
+                break
+    if real_h1_idx is None:
+        return 0
+    # 重组：H1 移到 body 开头，其余内容保持相对顺序
+    h1_line = body_lines[real_h1_idx].strip()
+    before = body_lines[:real_h1_idx]
+    after = body_lines[real_h1_idx + 1:]
+    # 清理 before 的尾部空行
+    while before and not before[-1].strip():
+        before.pop()
+    # 清理 after 的头部空行
+    while after and not after[0].strip():
+        after.pop(0)
+    # 新 body
+    new_body_lines = ['# ' + h1_line[2:].strip() if h1_line.startswith('# ') else h1_line,
+                      ''] + before + [''] + after
+    new_body = '\n'.join(new_body_lines)
+    # 写回
+    buf = io.StringIO()
+    buf.write("---\n")
+    for k, v in fm.items():
+        if isinstance(v, bool):
+            buf.write(f"{k}: {'true' if v else 'false'}\n")
+        elif isinstance(v, (int, float)):
+            buf.write(f"{k}: {v}\n")
+        else:
+            buf.write(f"{k}: {v}\n")
+    buf.write("---\n")
+    buf.write(new_body)
+    _write_file(skill_md, buf.getvalue())
+    return 1
+
+
 # ═══════════════════════════════════════════════════
 # R-07: 触发条件章节修复
 # ═══════════════════════════════════════════════════
@@ -1220,6 +1289,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "skill_macro": fix_skill_macro,
         "h1": fix_h1,
         "h1_version": fix_h1_version,
+        "h1_position": fix_h1_position,
         "section_trigger": fix_section_trigger,
         "section_core": fix_section_core,
         "section_workflow": fix_section_workflow,
@@ -1257,6 +1327,7 @@ def list_fixable():
         "skill_macro",               # R-05
         "h1",                        # R-06
         "h1_version",                # R-06 清理版本号
+        "h1_position",               # R-06 移到 frontmatter 后
         "section_trigger",            # R-07
         "section_core",              # R-08
         "section_workflow",          # R-09

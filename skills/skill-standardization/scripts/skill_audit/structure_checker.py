@@ -54,6 +54,24 @@ def body_has_h1(filepath, content, fm, body, **kw):
                          "location": f"{filepath}:{line}",
                          "operation": "移除 H1 标题中的版本号",
                          "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
+    # 检查 H1 是否包含技能名（v2.44.3 新增）
+    name = (fm or {}).get("name", "")
+    if name and name not in h1_text and name.replace('-', ' ') not in h1_text.lower():
+        return {"passed": False,
+                "detail": f"{filepath}:{line} - H1 \"{h1_text}\" 不含技能名 \"{name}\"，建议 H1 与技能名一致",
+                "fix": {"key": "h1", "value": name,
+                         "location": f"{filepath}:{line}",
+                         "operation": f"添加一级标题: # {name}",
+                         "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
+    # 检查 H1 位置——应紧跟在 frontmatter 后（v2.44.4 新增）
+    h1_body_line = body[:m.start()].count('\n') + 1
+    if h1_body_line > 2:
+        return {"passed": False,
+                "detail": f"{filepath}:{line} - H1 在第 {line} 行（距 frontmatter 闭合后有 {h1_body_line-1} 行空白），H1 应紧跟在 frontmatter 后",
+                "fix": {"key": "h1_position", "value": True,
+                         "location": f"{filepath}:{line}",
+                         "operation": "将 H1 移到 frontmatter 闭合 --- 后的下一行",
+                         "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
     return {"passed": True,
             "detail": f"{filepath}:{line} - 发现一级标题: {h1_text}"}
 
