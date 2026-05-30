@@ -1,9 +1,9 @@
 ---
 name: hug-html
-version: 2.1.4
+version: 3.0.0
 author: Ldxs
 license: MIT
-description: Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
+description: 组件式HTML模块引擎 v3.0.0：8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -12,6 +12,7 @@ external_data_dir: true
 faq_quality: improve_qa
 antipattern_detail: add_detail
 ---
+
 
 
 

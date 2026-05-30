@@ -1,7 +1,7 @@
 {
   "name": "hug-html",
-  "version": "2.1.4",
-  "description": "Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.",
+  "version": "3.0.0",
+  "description": "组件式HTML模块引擎 v3.0.0：8种原子组件自由组合 + 3级约束(fill/fit/clip) + 声明式组合逻辑",
   "author": "Ldxs",
   "tags": [
     "html",

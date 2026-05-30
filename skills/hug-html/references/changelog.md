@@ -1,3 +1,19 @@
+## v3.0.0 (2026-05-30) — 组件式架构重构
+
+### 重大变更（MAJOR）
+- **架构重构**：从预置复合模块模板改为原子组件+声明式组合
+  - 删除 14 个固定复合模块，替换为 8 种原子组件（text/image/icon/qrcode/table/divider/spacer/group）
+  - 新增 3 级约束系统（fill/fit/clip），递归作用于骨架→模块→组件
+  - 新增声明式组合逻辑：方向(row/column)、比例(ratios)、对齐(align/cross_align)
+  - 新增  组件引擎， 支持新旧两种 Spec 格式
+
+### Changed
+- module_assembler.py 完全重写为组件引擎
+- grid_builder.py build_cell_html() 支持 components 字段
+- references/module-library.md 重写为组件系统文档
+- SKILL.md 四层架构、核心能力、快速开始全面更新
+
+---
 ## v2.1.4 (2026-05-30)
 
 ### 修复
