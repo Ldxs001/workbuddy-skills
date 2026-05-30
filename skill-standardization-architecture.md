@@ -50,8 +50,8 @@ skill-standardization/
     │   └── utils.py            # 工具函数
     ├── skill_audit/            # 审查器包（OO 重构）
     │   ├── __init__.py         # 主入口 + audit_skill()
-    │   ├── frontmatter_checker.py  # R-01~R-05（含 R-25 _meta.json 检查）
-    │   ├── structure_checker.py    # R-06~R-10 + R-20~R-24
+    │   ├── frontmatter_checker.py  # R-01~R-05（含 _meta.json 字段检查）
+    │   ├── structure_checker.py    # R-06~R-09, R-18~R-25 正文结构检查
     │   ├── artifact_checker.py     # R-11~R-12
     │   ├── permission_checks.py    # R-13~R-17
     │   ├── data_dir_checker.py     # R-22 数据目录合规检查
@@ -104,9 +104,9 @@ skill-standardization/
 
 25 条规则按用途分为 6 大类别，严重度分为 **ERROR**（必须修）和 **WARN**（建议修）两级。
 
-### 2.1 类别 A：Frontmatter 结构（R-01 ~ R-05 + R-25）
+### 2.1 类别 A：Frontmatter 结构（R-01 ~ R-05）
 
-**目的**：确保每个 skill 有完整可解析的 YAML frontmatter，字段齐全、命名规范。R-25 额外检查 _meta.json 的规范性。
+**目的**：确保每个 skill 有完整可解析的 YAML frontmatter，字段齐全、命名规范。R-01 在 v2.44.0 合并了 _meta.json 7 字段检查。
 
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
@@ -122,7 +122,7 @@ skill-standardization/
 - **4 optional**：references/category/priority/deprecated
 
 **非标字段处理策略**（v2.41.0+）：
-- **_meta.json 非标字段**：直接删除（机器元数据不应有不一致字段），输出提示供人工判断是否需要迁移
+- **_meta.json 非标字段**：标记并提示人工判断是否需要删除或迁移（审计仅提醒，不自动删除）
 - **frontmatter 非标字段**：仅 WARN 提醒，不移除（frontmatter 允许自定义字段如 home_url、category）
 
 **设计意图**：frontmatter 是所有 Skill 的"身份证"。R-05 确保目录名和声明名一致。R-01 在 v2.44.0 合并了 `_meta.json` 7 字段检查，通过 `regex_frontmatter_and_meta()` 组合函数同时校验 SKILL.md 和 `_meta.json` 的元数据完整性。
@@ -176,8 +176,8 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
-| **R-13** | ERROR | 敏感信息访问 | 若脚本读取 memory/credentials/token → frontmatter 须声明 `sensitive_access: true` |
-| **R-14** | ERROR | 关键位置写入 | 若写入 skills/系统目录 → 须声明 `critical_write: true` |
+| **R-13** | WARN | 敏感信息访问 | 若脚本读取 memory/credentials/token → frontmatter 须声明 `sensitive_access: true` |
+| **R-14** | WARN | 关键位置写入 | 若写入 skills/系统目录 → 须声明 `critical_write: true` |
 | **R-15** | ERROR | 高权限风险说明 | 脚本含高/严重风险操作时，`references/permissions.md` 须有风险说明 |
 | **R-16** | WARN | 权限权重说明 | 建议在 SKILL.md 或 references/ 中说明各操作的权限权重 |
 | **R-17** | ERROR | 渐进加载引用 | SKILL.md > 200 行时必须拆分到 references/ 并通过引用链接 |
@@ -227,7 +227,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 
 ### 2.7 类别 G：文档写作格式（R-25 — v2.44.0 新增）
 
-**目的**：统一 SKILL.md 的写作格式，提供标准化的排版建议。全部 10 项子检查中仅 C-01 为 ERROR 级（强制），其余均为 WARN 建议级，不阻断流程。
+**目的**：统一 SKILL.md 的写作格式，提供标准化的排版建议。R-25 整体为 WARN 级，其 10 项子检查中 C-01 为 ERROR 级（仅作内部参考，不提升规则总体级别），其余均为 WARN 建议级。
 
 | 编号 | 级别 | 检查项 | 说明 |
 |:----:|:----:|--------|------|
@@ -256,13 +256,13 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | 类别 | 包含规则 | ERROR | WARN | 目的 |
 |------|---------|:-----:|:----:|------|
 | A. Frontmatter | R-01~R-05 | 4 | 1 | 技能身份标识 + _meta.json 字段完整性（R-01 合并） |
-| B. 正文结构 | R-06~R-10 | 1 | 4 | 文档结构和质量（R-07 为 ERROR） |
+| B. 正文结构 | R-06~R-10 | 2 | 3 | 文档结构和质量（R-07、R-10 为 ERROR） |
 | C. 产出物与目录 | R-11~R-12 | 2 | 0 | 目录隔离和数据安全 |
-| D. 安全与权限 | R-13~R-17 | 3 | 2 | 权限声明和风险控制 |
+| D. 安全与权限 | R-13~R-17 | 2 | 3 | 权限声明和风险控制（R-15、R-17 为 ERROR） |
 | E. 质量规范 | R-18~R-21 | 0 | 4 | 内容质量和可读性 |
 | F. 合规与维护 | R-22~R-24 | 0 | 3 | 长期维护一致性 |
-| G. 写作格式 | **R-25** | 1 | 9 | 文档排版统一建议（仅 C-01 强制） |
-| **合计** | **R-01~R-25** | **11** | **23** | |
+| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（10 项子检查仅 C-01 为 ERROR 级，但不改变规则总体 WARN 级别） |
+| **合计** | **R-01~R-25** | **10** | **15** | |
 
 ---
 
