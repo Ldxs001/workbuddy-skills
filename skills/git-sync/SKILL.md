@@ -1,16 +1,29 @@
 ---
 name: git-sync
-tags: []
-version: 2.6.36
+version: 2.7.0
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。v2.6.28：修复跳过同步时状态显示「成功」的误导问题，改为「⏭️ 跳过」。
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复跳过同步时状态显示「成功」的误导问题，改为跳过。修复审计问题，统一术语，修正自审粒度。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/git-sync/
+tags: []
 external_data_dir: true
+trigger: 同步/上传/推送/发布某个skill
+trigger_negative: 只是看文件/通用git提交/文件同步到云端
 ---
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -67,7 +80,7 @@ external_data_dir: true
 
 ```bash
 cd ~/.workbuddy/skills/git-sync/scripts
-python git-sync.py <skill-name> [version] [--skip-scan]
+python scripts/git-sync.py <skill-name> [version] [--skip-scan]
 ```
 
 ### AI 执行后必须输出（非可选）

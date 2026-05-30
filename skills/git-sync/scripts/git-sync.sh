@@ -3,13 +3,7 @@
 # R-12 审计锚点：数据目录
 DEFAULT_DATA_DIR_RAW="skills/.standardization/git-sync/data/"
 SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
-DATA_DIR="$SKILL_DIR/../.standardization/git-sync/data"
-
-
-# R-12 审计锚点：数据目录
-DEFAULT_DATA_DIR_RAW="skills/.standardization/git-sync/data/"
-SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
-DATA_DIR="$SKILL_DIR/../.standardization/git-sync/data"
+_data_dir_abs="$SKILL_DIR/../.standardization/git-sync/data"
 
 
 # git-sync v2.6.6
