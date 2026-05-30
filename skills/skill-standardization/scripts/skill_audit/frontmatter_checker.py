@@ -287,6 +287,71 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
     except Exception:
         pass
 
+    # ── 5. 共享字段一致性检查（v2.44.5）──
+    field_issues = []
+    if skill_dir and os.path.isfile(os.path.join(skill_dir, '_meta.json')):
+        try:
+            with open(os.path.join(skill_dir, '_meta.json'), 'r', encoding='utf-8') as _f:
+                meta = json.load(_f)
+
+            # name: frontmatter == _meta == 目录名
+            fm_name = str(fm.get('name', ''))
+            meta_name = str(meta.get('name', ''))
+            dir_name = os.path.basename(os.path.abspath(skill_dir))
+            if fm_name and meta_name and fm_name != meta_name:
+                field_issues.append(f"name 不一致：frontmatter({fm_name}) != _meta({meta_name})")
+            if fm_name and dir_name and fm_name != dir_name:
+                field_issues.append(f"name 不一致：frontmatter({fm_name}) != 目录名({dir_name})")
+
+            # description: frontmatter → _meta（frontmatter 权威）
+            fm_desc = str(fm.get('description', '')).strip()
+            meta_desc = str(meta.get('description', '')).strip()
+            if fm_desc and meta_desc and fm_desc != meta_desc:
+                field_issues.append("description 不一致：frontmatter 与 _meta.json 不同")
+
+            # tags: _meta → frontmatter（_meta 权威）
+            fm_tags_raw = fm.get('tags', [])
+            if isinstance(fm_tags_raw, str):
+                fm_tags_raw = fm_tags_raw.strip().strip('[]').split(',')
+                fm_tags_raw = [t.strip().strip("'\"") for t in fm_tags_raw if t.strip()]
+            fm_tags_set = set(str(t) for t in (fm_tags_raw or []))
+            meta_tags = meta.get('tags', [])
+            meta_tags_set = set(str(t) for t in (meta_tags or []))
+            if fm_tags_set != meta_tags_set:
+                field_issues.append(f"tags 不一致：frontmatter({fm_tags_set}) != _meta({meta_tags_set})")
+
+            # trigger/triggers: frontmatter → _meta（frontmatter 权威，转数组）
+            fm_trigger = fm.get('trigger', '')
+            if fm_trigger and isinstance(fm_trigger, str):
+                fm_trigger_set = set(t.strip() for t in fm_trigger.split('|') if t.strip())
+            else:
+                fm_trigger_set = set()
+            meta_triggers = meta.get('triggers', [])
+            meta_trigger_set = set(str(t) for t in (meta_triggers or []))
+            if fm_trigger_set and meta_trigger_set and fm_trigger_set != meta_trigger_set:
+                field_issues.append(f"trigger/triggers 不一致：frontmatter({fm_trigger_set}) != _meta({meta_trigger_set})")
+
+            # data_dir: 路径归一化后比较（../.standardization/ ≈ skills/.standardization/）
+            fm_data_dir = str(fm.get('data_dir', '')).strip()
+            meta_data_dir = str(meta.get('data_dir', '')).strip()
+            if fm_data_dir and meta_data_dir:
+                def _norm_path(p):
+                    p = p.replace('\\', '/').rstrip('/')
+                    p = re.sub(r'^(\.\./|skills/)', '', p)  # 去掉 ../ 或 skills/ 前缀
+                    return p.lstrip('/')
+                if _norm_path(fm_data_dir) != _norm_path(meta_data_dir):
+                    field_issues.append(f"data_dir 不一致：frontmatter({fm_data_dir}) != _meta({meta_data_dir})")
+
+        except Exception as e:
+            field_issues.append(f"读取 _meta.json 失败: {e}")
+
+    if field_issues:
+        return {"passed": False,
+                "detail": f"{filepath}:1 - 字段不一致（{len(field_issues)} 处）：{'；'.join(field_issues[:5])}",
+                "fix": {"key": "meta_field_sync", "value": True,
+                         "location": f"{filepath}:1",
+                         "operation": "按权威方向同步共享字段"}}
+
     sources = []
     if skill_version: sources.append(f"SKILL.md({skill_version})")
     if meta_version_raw: sources.append(f"_meta.json({meta_version_raw})")

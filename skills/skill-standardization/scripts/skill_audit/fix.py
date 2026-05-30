@@ -1265,6 +1265,84 @@ def _insert_data_dir_shell(content, skill_name, fname):
     return "".join(new_lines)
 
 
+def fix_meta_field_sync(skill_dir, **kw):
+    """
+    R-10 修复：同步 _meta.json 与 frontmatter 的共享字段。
+    按权威方向同步：tags(_meta→fm), description(fm→_meta), trigger(fm→_meta)
+    """
+    import json, os, re
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    meta_path = os.path.join(skill_dir, "_meta.json")
+    if not os.path.isfile(skill_md) or not os.path.isfile(meta_path):
+        return 0
+
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        meta = json.load(f)
+
+    fixed = 0
+
+    # 1. tags: _meta → frontmatter
+    meta_tags = meta.get('tags', [])
+    if meta_tags:
+        fm_tags_str = ', '.join(f"'{t}'" for t in meta_tags) if meta_tags else '[]'
+        # Update frontmatter
+        new_fm = {}
+        for k, v in fm.items():
+            if k == 'tags':
+                new_fm[k] = f"[{', '.join(repr(t) for t in meta_tags)}]"
+            else:
+                new_fm[k] = v
+        fm = new_fm
+        fixed += 1
+
+    # 2. description: frontmatter → _meta
+    fm_desc = str(fm.get('description', '')).strip() if isinstance(fm.get('description'), str) else ''
+    if fm_desc:
+        meta['description'] = fm_desc
+        fixed += 1
+
+    # 3. trigger: frontmatter → _meta.triggers（转数组）
+    fm_trigger = fm.get('trigger', '')
+    if fm_trigger and isinstance(fm_trigger, str):
+        trigger_list = [t.strip() for t in fm_trigger.split('|') if t.strip()]
+        meta['triggers'] = trigger_list
+        fixed += 1
+
+    # 4. data_dir: _meta → frontmatter（_meta 更精确）
+    meta_data_dir = meta.get('data_dir', '')
+    fm_data_dir_str = str(fm.get('data_dir', '')).strip() if isinstance(fm.get('data_dir'), str) else ''
+    if meta_data_dir and fm_data_dir_str:
+        def _nn(p):
+            return p.replace('\\', '/').rstrip('/').lstrip('../skills/')
+        if _nn(meta_data_dir) != _nn(fm_data_dir_str):
+            fm['data_dir'] = meta_data_dir
+            fixed += 1
+
+    # Write _meta.json
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    # Rebuild and write SKILL.md
+    buf = io.StringIO()
+    buf.write("---\n")
+    for k, v in fm.items():
+        if isinstance(v, bool):
+            buf.write(f"{k}: {'true' if v else 'false'}\n")
+        elif isinstance(v, (int, float)):
+            buf.write(f"{k}: {v}\n")
+        else:
+            buf.write(f"{k}: {v}\n")
+    buf.write("---\n")
+    buf.write(body)
+    _write_file(skill_md, buf.getvalue())
+
+    return fixed
+
+
 # ═══════════════════════════════════════════════════
 # 统一入口：apply_fix()
 # ═══════════════════════════════════════════════════
@@ -1310,6 +1388,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "doc_code_consistency": fix_doc_code_consistency,
         "meta_json": fix_meta_json_completeness,
         "frontmatter_fields": fix_frontmatter_fields,
+        "meta_field_sync": fix_meta_field_sync,
     }
     func = dispatch.get(fix_key)
     if func is None:
@@ -1348,4 +1427,5 @@ def list_fixable():
         "doc_code_consistency",      # R-23
         "meta_json",                 # R-25
         "frontmatter_fields",        # R-01
+        "meta_field_sync",           # R-10 共享字段同步
     ]
