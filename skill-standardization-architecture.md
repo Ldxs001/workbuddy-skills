@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.41.0 版的架构设计、审查规则体系、设计原则与编程规范  
-> 生成时间：2026-05-30
+> 完整解读 v2.44.0 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 生成时间：2026-05-31
 
 ---
 
@@ -59,6 +59,7 @@ skill-standardization/
     │   ├── fix.py              # 自动修复函数（20+ 规则）
     │   └── utils.py            # 工具函数
     ├── json_loader.py          # 渐进式 JSON 加载器
+    ├── skill_inspector.py      # 技能结构蓝皮书生成器（v2.44.0 新增）
     ├── permission_checker.py   # 权限检查器
     ├── authorization_manager.py# 授权管理器
     ├── safe_io.py              # 安全文件写入（原子写入+备份）
@@ -109,12 +110,11 @@ skill-standardization/
 
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
-| **R-01** | ERROR | YAML frontmatter 存在性 + 字段完整性 | 文件以 `---` 开头并包含闭合 `---`；11 required + 2 conditional 字段分层检查 |
+| **R-01** | ERROR | YAML frontmatter 存在性 + 字段完整性 + **_meta.json 7 字段检查**（v2.44.0 合并） | 文件以 `---` 开头并包含闭合 `---`；11 required + 2 conditional 字段分层检查；_meta.json 7 标准字段完整 |
 | **R-02** | ERROR | `name` 字段 | frontmatter 含 `name:`，值非空字符串 |
 | **R-03** | ERROR | `version` 字段 | 值符合 SemVer 格式（x.y.z） |
 | **R-04** | ERROR | `description` 字段 | 含 `description:`，值非空 |
 | **R-05** | WARN | name = 目录名 | frontmatter 的 name 与所在目录名一致 |
-| **R-25** | ERROR | _meta.json 规范性 | 7 标准字段（name/version/description/author/tags/data_dir/triggers）完整，非标字段自动删除 |
 
 **Frontmatter 字段分层体系**（v2.40.1+）：
 - **11 required**：name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight
@@ -125,7 +125,7 @@ skill-standardization/
 - **_meta.json 非标字段**：直接删除（机器元数据不应有不一致字段），输出提示供人工判断是否需要迁移
 - **frontmatter 非标字段**：仅 WARN 提醒，不移除（frontmatter 允许自定义字段如 home_url、category）
 
-**设计意图**：frontmatter 是所有 Skill 的"身份证"。R-05 确保目录名和声明名一致。R-25 确保 _meta.json 保持机器可读的严格一致性。
+**设计意图**：frontmatter 是所有 Skill 的"身份证"。R-05 确保目录名和声明名一致。R-01 在 v2.44.0 合并了 `_meta.json` 7 字段检查，通过 `regex_frontmatter_and_meta()` 组合函数同时校验 SKILL.md 和 `_meta.json` 的元数据完整性。
 
 ### 2.2 类别 B：正文结构（R-06 ~ R-10）
 
@@ -225,17 +225,44 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 6. **正文路径与 frontmatter data_dir 一致性**：当 data_dir 包含 `.standardization/` 时，检测正文中缺少 `.standardization/` 层级的路径
 7. **外部技能引用检查**：扫描 MD 中引用的技能路径，引用不存在的技能时 WARN
 
-### 2.7 规则汇总统计
+### 2.7 类别 G：文档写作格式（R-25 — v2.44.0 新增）
+
+**目的**：统一 SKILL.md 的写作格式，提供标准化的排版建议。全部 10 项子检查中仅 C-01 为 ERROR 级（强制），其余均为 WARN 建议级，不阻断流程。
+
+| 编号 | 级别 | 检查项 | 说明 |
+|:----:|:----:|--------|------|
+| C-01 | ERROR | H1 标题格式 | 必须为 `# <技能名>`，不得含版本号（版本号由 version 字段管理） |
+| C-02 | WARN | 标题层级 | 限制在 `##` 和 `###`，不应出现 `####+` |
+| C-03 | WARN | 表格使用 | 结构化信息应使用表格展示 |
+| C-04 | WARN | 引用块使用 | 提示/注意/警告应使用 `>` 引用块包装 |
+| C-05 | WARN | 列表区分 | 有序列表用于步骤流程，无序列表用于选项列举 |
+| C-06 | WARN | 加粗使用 | 关键术语/约束/规则名使用 `**加粗**` 强调 |
+| C-07 | WARN | 语言标识 | 代码块应带语言标识（` ```bash `、` ```python `） |
+| C-08 | WARN | Checklist | 操作前自检使用 `- [ ]` checklist 格式 |
+| C-09 | WARN | 渐进引用 | 引用渐进式文件统一使用 `→ 详见 references/xxx.md` |
+| C-10 | WARN | 空行规范 | frontmatter 闭合后 ≤2 个连续空行；正文 ≤4 个连续换行 |
+
+**冲突排除矩阵**：
+
+| 现有规则 | 冲突点 | 处理方式 |
+|---------|--------|---------|
+| R-06 | 均检查 H1 | R-06 查存在性（WARN），C-01 查格式（ERROR），互补不冲突 |
+| R-21 | 渐进式加载模板句含 `>` 引用 | C-02/C-04 不检查该模板句的格式 |
+| R-24 | 更新日志章节可能在 references/ | C-02 不约束更新日志位置 |
+| R-18/R-19 | 反模式/FAQ 须渐进式引用 | C-09 不约束已有强制规范的引用 |
+
+### 2.8 规则汇总统计
 
 | 类别 | 包含规则 | ERROR | WARN | 目的 |
 |------|---------|:-----:|:----:|------|
-| A. Frontmatter | R-01~R-05 + R-25 | 5 | 1 | 技能身份标识 + _meta.json 规范性 |
-| B. 正文结构 | R-06~R-10 | 0 | 5 | 文档结构和质量 |
+| A. Frontmatter | R-01~R-05 | 4 | 1 | 技能身份标识 + _meta.json 字段完整性（R-01 合并） |
+| B. 正文结构 | R-06~R-10 | 1 | 4 | 文档结构和质量（R-07 为 ERROR） |
 | C. 产出物与目录 | R-11~R-12 | 2 | 0 | 目录隔离和数据安全 |
 | D. 安全与权限 | R-13~R-17 | 3 | 2 | 权限声明和风险控制 |
 | E. 质量规范 | R-18~R-21 | 0 | 4 | 内容质量和可读性 |
 | F. 合规与维护 | R-22~R-24 | 0 | 3 | 长期维护一致性 |
-| **合计** | **R-01~R-25** | **10** | **15** | |
+| G. 写作格式 | **R-25** | 1 | 9 | 文档排版统一建议（仅 C-01 强制） |
+| **合计** | **R-01~R-25** | **11** | **23** | |
 
 ---
 
@@ -262,9 +289,10 @@ SKILL.md 是轻量入口（≤230行），详细内容拆分到 `references/*.md
 create 使用硬编码字符串模板（当前），未来可能支持外部模板文件。
 **目的**：简单直接，无额外抽象，易于理解和自定义。
 
-### D6: 备份优先
+### D6: 备份优先 + Inspect 先读全
 任何修改性操作（update --fix, refactor）在执行前均强制备份，带时间戳命名。
-**目的**：确保所有变更可回滚，零数据丢失。
+v2.44.0 新增：备份后、改造前**强制运行 skill_inspector** 结构扫描，输出技能蓝皮书（元信息、目录树、章节、函数清单、引用概览、安全数据），确保 AI/开发者了解全貌后再动手。
+**目的**：备份确保可回滚；inspect 确保不遗漏文件或功能，避免"AI 读哪算哪导致的改造遗漏"。
 
 ---
 
@@ -369,7 +397,7 @@ DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardizat
 | `fix_create_permissions_md(skill_dir)` | R-15 | 创建 permissions.md |
 | `fix_permission_weight(skill_dir)` | R-16 | 添加权限权重说明 |
 | `fix_frontmatter_fields(skill_dir)` | R-01 | 补全 frontmatter 字段（required→conditional 分层补全） |
-| `fix_meta_json_completeness(skill_dir)` | R-25 | 补全 _meta.json 7 标准字段，非标字段直接删除 |
+| `fix_meta_json_completeness(skill_dir)` | R-01（合并） | 补全 _meta.json 7 标准字段，标记非标字段供人工判断 |
 | `fix_missing_data_dir(skill_dir)` | R-12 | 为引用 .standardization 但缺少 DATA_DIR 的脚本补上声明 |
 
 统一修复入口：
@@ -425,7 +453,9 @@ AI 加载 skill-standardization
   ↓
 读取目标 skill 的 SKILL.md
   ↓
-执行 audit（R-01~R-25）或 update/refactor
+[update/refactor 模式] 备份 → ★ inspect 强制前置扫描
+  ↓
+执行 audit（R-01~R-25）或 update/refactor 后续步骤
   ↓
 输出审查报告（PASS/WARN/FAIL）
   ↓
@@ -435,6 +465,15 @@ AI 加载 skill-standardization
   ↓
 更新版本号（三端同步 + changelog 自动追加）
 ```
+
+**inspect 扫描产出**（v2.44.0 强制前置）：
+- 元信息（SKILL.md 行数、## 章节数、_meta.json 字段）
+- 文件清单（按 .py/.md/.sh/.json 分类，标记非标位置）
+- 全部 ## 章节一览
+- 每个 .py 文件的 def/class 清单
+- 每个 .md 文件的行数和 H2 章节
+- 安全 & 数据声明
+- 结构标准化程度判定（标准/半标准/非标准）
 
 ### 审计结果判定
 
@@ -457,6 +496,18 @@ python -m scripts.skill_builder bump <skill-dir> --type fix --desc "修复了XX�
 
 `audit --fix` 模式修复文件后自动执行 patch bump（v2.39.0+），不再忘记更新版本号。
 
+### inspect 子命令（v2.44.0 新增）
+
+结构无关的全量扫描工具，输出技能蓝皮书：
+
+```bash
+python -m scripts.skill_inspector <skill-dir>
+python -m scripts.skill_inspector <skill-dir> --json   # JSON 格式
+python -m scripts.skill_builder inspect <skill-dir>    # 通过 builder 调用
+```
+
+自动适配标准结构（scripts/ + references/）和非标准结构（文件散落根目录），标记非标文件位置（如"config.py 在根目录，建议迁至 scripts/"）。update 和 refactor 流程在备份后自动执行此扫描。
+
 ---
 
-> 本文档基于 skill-standardization v2.41.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-standardization v2.44.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
