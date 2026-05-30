@@ -47,10 +47,9 @@ def _find_fm_line(content, field_name=None):
 
 
 def regex_frontmatter_exists(filepath, content, fm, body, **kw):
-    """R-01: Frontmatter 存在性检查"""
-    passed = fm is not None
-    if not passed:
-        # 找文件头行号（第 1 行）
+    """R-01: Frontmatter 存在性 + 13 标准字段完整性检查"""
+    # ── 存在性检查 ──
+    if fm is None:
         line = 1
         return {"passed": False,
                 "detail": f"{filepath}:{line} - 缺少 YAML frontmatter（期望：文件以 --- 开头）",
@@ -58,8 +57,34 @@ def regex_frontmatter_exists(filepath, content, fm, body, **kw):
                          "location": f"{filepath}:{line}",
                          "operation": "在文件头部插入 --- 包裹的 frontmatter 块，含 name/version/description/sensitive_access/critical_write/permission_weight",
                          "verification": "重新运行 audit_skill()，确认 R-01 passed"}}
-    return {"passed": True,
-            "detail": f"发现 YAML frontmatter"}
+
+    line = 1  # frontmatter 从第一行开始
+
+    # ── 13 标准字段完整性检查 ──
+    FM_STANDARD = {'name','version','description','author','license','tags',
+                   'data_dir','external_data_dir',
+                   'sensitive_access','critical_write','permission_weight',
+                   'trigger','trigger_negative'}
+    existing = set(fm.keys()) if fm else set()
+    missing = FM_STANDARD - existing
+    extra = existing - FM_STANDARD
+
+    issues = []
+    if missing:
+        issues.append(f"缺失 {len(missing)} 个标准字段: {', '.join(sorted(missing))}")
+    if extra:
+        issues.append(f"非标字段(应清理): {', '.join(sorted(extra))}")
+
+    if not issues:
+        return {"passed": True,
+                "detail": f"发现 YAML frontmatter，13 标准字段完整"}
+
+    issues_str = '；'.join(issues)
+    passed = not bool(missing) and not bool(extra)
+    return {"passed": passed,
+            "detail": f"{filepath}:{line} - {issues_str}",
+            "fix": {"key": "frontmatter_fields", "value": "+".join(sorted(missing)) if missing else 'clean',
+                     "operation": f"补全缺失字段{'、清理非标字段' if extra else ''}"}}
 
 
 def yaml_has_name(filepath, content, fm, body, **kw):

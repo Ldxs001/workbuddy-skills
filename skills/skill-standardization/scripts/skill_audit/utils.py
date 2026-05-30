@@ -12,9 +12,9 @@ from pathlib import Path
 RULES = [
     {
         "id": "R-01",
-        "name": "Frontmatter 存在性",
+        "name": "Frontmatter 存在性 + 13 标准字段完整性",
         "severity": "ERROR",
-        "check": "存在 YAML frontmatter（--- 包裹）",
+        "check": "存在 YAML frontmatter，且含 13 标准字段：name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight/trigger/trigger_negative。非标字段报 WARN",
         "method": "regex_frontmatter_exists",
         "fixable": True,
         "create_template": "自动在文件头部插入 --- 包裹的 frontmatter 块，含 name/version/description/sensitive_access/critical_write/permission_weight",
@@ -66,9 +66,9 @@ RULES = [
     },
     {
         "id": "R-07",
-        "name": "触发条件章节（合规）",
+        "name": "触发条件章节（合规+一致性）",
         "severity": "ERROR",
-        "check": "正文含 ## 触发场景 章节，且含正向触发词≥3个、否定条件≥1个，无「自动执行」等危险表述",
+        "check": "正文含 ## 触发场景 章节，且含正向触发词≥3个、否定条件≥1个，无「自动执行」等危险表述，且 frontmatter trigger/trigger_negative 与正文一致（正文有触发词但 yaml 缺字段报 WARN）",
         "method": "body_has_trigger_section",
         "fixable": False,
         "create_template": "## 触发场景\n\n当用户提出以下意图时触发：\n- <触发词1> → 触发 <技能名>\n- <触发词2>\n- <触发词3>\n\n**不触发**：\n- <否定条件1>\n- <否定条件2>",
@@ -234,37 +234,7 @@ RULES = [
         "fixable": False,
         "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
     },
-    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
-    {
-        "id": "R-24",
-        "name": "更新日志渐进加载",
-        "severity": "WARN",
-        "method": "check_changelog_progressive",
-        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
-        "fixable": False,
-        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
-    },
-    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
-    {
-        "id": "R-24",
-        "name": "更新日志渐进加载",
-        "severity": "WARN",
-        "method": "check_changelog_progressive",
-        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
-        "fixable": False,
-        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
-    },
-    # ── 新增规则 R-24 (v2.38.6) ──────────────────────
-    {
-        "id": "R-24",
-        "name": "更新日志渐进加载",
-        "severity": "WARN",
-        "method": "check_changelog_progressive",
-        "check": "更新日志必须放在 references/changelog.md，SKILL.md 只能有引用",
-        "fixable": False,
-        "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
-    },
-    # ── 新增规则 R-25 (v2.39.2) ──────────────────────
+    # ── 新增规则 R-25 (v2.39.3) ──────────────────────
     {
         "id": "R-25",
         "name": "_meta.json 字段规范性",
@@ -530,3 +500,4 @@ def _extract_path_literal(line_text, matched_target):
         if matched_target in q:
             return q
     return matched_target
+    

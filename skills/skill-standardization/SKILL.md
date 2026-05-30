@@ -1,6 +1,9 @@
 ---
 name: skill-standardization
-version: 2.39.3
+tags: []
+trigger: 
+trigger_negative: 
+version: 2.39.5
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎 v2.38.15。支持 R-01~R-24 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制。R-10 增强：自动三端版本号一致性检查；R-23 增强：MD 正文路径与 frontmatter data_dir 一致性检查。
@@ -9,7 +12,9 @@ critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
 external_data_dir: true
+frontmatter_fields: tags+trigger+trigger_negative
 ---
+
 
 
 
@@ -110,7 +115,7 @@ external_data_dir: true
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
 
 **版本号三端一致规则**（必须遵守）：
-- 版本号变更时必须同步更新以下 **3 处**，缺一不可：
+- 版本号更新时必须同步更新以下 **3 处**，缺一不可：
   1. `SKILL.md` frontmatter 的 `version:` 字段
   2. `_meta.json` 的 `version` 字段
   3. `references/changelog.md`（或 `CHANGELOG.md`）的版本条目

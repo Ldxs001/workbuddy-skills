@@ -914,6 +914,85 @@ def fix_meta_json_completeness(skill_dir, **kw):
 
 
 # ═══════════════════════════════════════════════════
+# fix_frontmatter_fields — SKILL.md frontmatter 13 标准字段补全
+# ═══════════════════════════════════════════════════
+
+def fix_frontmatter_fields(skill_dir, **kw):
+    """R-01 修复：补全 frontmatter 缺失的 13 标准字段，标记非标字段。"""
+    import os, re, tempfile, shutil
+    skill_md = os.path.join(skill_dir, 'SKILL.md')
+    if not os.path.isfile(skill_md):
+        return 0
+
+    FM_STANDARD = {'name','version','description','author','license','tags',
+                   'data_dir','external_data_dir',
+                   'sensitive_access','critical_write','permission_weight',
+                   'trigger','trigger_negative'}
+
+    with open(skill_md, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    m = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+    if not m:
+        return 0
+
+    fm_text = m.group(1)
+    existing = {}
+    for line in fm_text.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('  '): continue
+        kv = re.match(r'^([\w_-]+)\s*:', line)
+        if kv:
+            existing[kv.group(1)] = line
+
+    skill_name = os.path.basename(skill_dir.rstrip('/\\'))
+    defaults = {
+        'name': f'name: {skill_name}',
+        'version': 'version: 1.0.0',
+        'description': 'description: ',
+        'author': 'author: [username-redacted]',
+        'license': 'license: MIT',
+        'tags': 'tags: []',
+        'data_dir': f'data_dir: ../.standardization/{skill_name}/',
+        'external_data_dir': 'external_data_dir: true',
+        'sensitive_access': 'sensitive_access: false',
+        'critical_write': 'critical_write: false',
+        'permission_weight': 'permission_weight: LOW',
+        'trigger': 'trigger: ',
+        'trigger_negative': 'trigger_negative: ',
+    }
+
+    fm_lines = fm_text.split('\n')
+    insert_pos = 0
+    for i, line in enumerate(fm_lines):
+        if line.startswith('name:'):
+            insert_pos = i + 1
+            break
+
+    added = []
+    for field in sorted(FM_STANDARD):
+        if field not in existing:
+            fm_lines.insert(insert_pos + len(added), defaults[field])
+            added.append(field)
+
+    extra = [k for k in existing if k not in FM_STANDARD]
+    if extra:
+        print(f'  [WARN] 非标字段(应清理): {", ".join(extra)}')
+
+    if not added:
+        return 0
+
+    new_fm = '\n'.join(fm_lines)
+    new_content = content[:m.start(1)] + new_fm + content[m.end(1):]
+    tmp = tempfile.mktemp(suffix='.md', dir=skill_dir)
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(new_content)
+    shutil.move(tmp, skill_md)
+    print(f'  [OK] SKILL.md frontmatter: +{", ".join(added)}')
+    return len(added)
+
+
+# ═══════════════════════════════════════════════════
 # fix_missing_data_dir — 给脚本补 DEFAULT_DATA_DIR_RAW + DATA_DIR
 # ═══════════════════════════════════════════════════
 
@@ -1108,6 +1187,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "data_dir_compliance": fix_data_dir_compliance,
         "doc_code_consistency": fix_doc_code_consistency,
         "meta_json": fix_meta_json_completeness,
+        "frontmatter_fields": fix_frontmatter_fields,
     }
     func = dispatch.get(fix_key)
     if func is None:
@@ -1143,4 +1223,5 @@ def list_fixable():
         "data_dir_compliance",       # R-22
         "doc_code_consistency",      # R-23
         "meta_json",                 # R-25
+        "frontmatter_fields",        # R-01
     ]

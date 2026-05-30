@@ -1,3 +1,17 @@
+## v2.39.5 (2026-05-30)
+
+### 修复
+- R-01 增强：13 标准字段完整性检查+修复；R-07 增强：trigger/trigger_negative 与正文一致性对比
+
+---
+
+## v2.39.4 (2026-05-30)
+
+### 修复
+- audit --fix 自动修正
+
+---
+
 ## v2.39.3 (2026-05-30)
 
 ### 修复
@@ -9,7 +23,7 @@
 
 ### Changed
 - R-03 规则描述细化：MAJOR=架构级重构/MINOR=功能重构/PATCH=单处修正，消除两个重构歧义
-- bump 命令 epilog 引用 R-03 规则，执行时显示变更语义
+- bump 命令 epilog 引用 R-03 规则，执行时显示更新语义
 - bump 命令 --type 未指定时交互选择，默认 feature
 - audit --fix 自动 bump 输出 R-03 规则引用
 
@@ -19,7 +33,7 @@
 ## v2.39.1 (2026-05-30)
 
 ### 修复
-- R-23 第7项改为两阶段模式：正则粗筛 + LLM精筛，移除白名单和URL过滤
+- R-23 第7项改为两阶段模式：正则粗筛 + LLM精筛，删除白名单和URL过滤
 
 ---
 
@@ -62,7 +76,7 @@
 
 ### Added
 - **R-10 新增 mtime 时序检查**：检测"改了文件但忘了更新版本号/changelog"
-  - 比较 SKILL.md 和 scripts/*.py 的修改时间 vs references/changelog.md 的修改时间
+  - 比较 SKILL.md 和 scripts/*.py 的更新时间 vs references/changelog.md 的更新时间
   - 如果代码文件比 changelog 新，在 detail 中附加 ⚠️ 警告提示
   - 解决三端值一致但全部是旧版本的盲区
 - R-23 新增第 6 项检查：SKILL.md 正文中的文件路径描述是否与 frontmatter data_dir 一致

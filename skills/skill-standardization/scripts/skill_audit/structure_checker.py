@@ -144,8 +144,24 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
                          "operation": f"移除或改写危险表述：{', '.join(found_dangerous)}",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
-    return {"passed": True,
-            "detail": f"{filepath}:{base_line} - 触发条件章节质量合格（{len(positive_triggers)} 个触发词，含否定条件）"}
+    # ── 质量检查4：frontmatter trigger/trigger_negative 一致性 ──
+    fm_trigger = str(fm.get('trigger', '')).strip() if fm else ''
+    fm_trigger_neg = str(fm.get('trigger_negative', '')).strip() if fm else ''
+    consistency_warnings = []
+
+    # 正文有正向触发词但 frontmatter 没有 trigger 字段
+    if len(positive_triggers) >= 3 and not fm_trigger:
+        consistency_warnings.append("正文有 ⩾3 个触发词但 frontmatter 缺 trigger 字段")
+    # 正文有否定条件但 frontmatter 没有 trigger_negative 字段
+    if has_negative and not fm_trigger_neg:
+        consistency_warnings.append("正文有否定条件但 frontmatter 缺 trigger_negative 字段")
+
+    detail = f"{filepath}:{base_line} - 触发条件章节质量合格（{len(positive_triggers)} 个触发词，含否定条件）"
+    if consistency_warnings:
+        detail += ' ⚠️ ' + '；'.join(consistency_warnings)
+
+    return {"passed": len(consistency_warnings) == 0,
+            "detail": detail}
 
 
 def body_has_core_section(filepath, content, fm, body, **kw):
