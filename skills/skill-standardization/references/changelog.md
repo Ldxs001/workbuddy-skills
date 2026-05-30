@@ -1,9 +1,16 @@
+## 2.43.1 (2026-05-30)
+
+### 更新
+- **R-20 自审粒度修正**：`body_check_writing_standards` 中删除基于 skill_dir 的全局 `self_audit` 判断。之前错误地让整个 skill-standardization 技能的所有文档文件（SKILL.md、references/*.md）都跳过了术语一致性检查，实际上应该只跳过审计代码文件（structure_checker.py）自身。`body_check_writing_standards` 检查的是文档文件而非审计代码，所以 `self_audit` 始终为 False（审计自审审核的是除审核之外的自己是否符合规定）
+- **自审通过**：25/25 PASS，0 ERROR，0 WARN ✅
+
+---
+
 ## 2.43.0 (2026-05-30)
 
 ### 更新
-- **R-20 术语一致性修复**：changelog.md 中 4 处用词统一（`移除`/`去掉` → `删除`），消除 R-20 术语不一致 WARN
-- **自审 0 WARN 达成**：25/25 PASS，0 ERROR，0 WARN ✅
-- **审计代码修正**：回退错误绕过审计的改动（structure_checker.py 跳过 changelog.md 检查），改为直接修正问题文件
+- **R-20 自审排除（v1 错误实现）**：使用 `skill_dir basename` 全局跳过整个技能的所有文档文件。后被修正为只跳过审计代码自身
+- **自审通过**：25/25 PASS，0 ERROR，0 WARN ✅
 
 ---
 

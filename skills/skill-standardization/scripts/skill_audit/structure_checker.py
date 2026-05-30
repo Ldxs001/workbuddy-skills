@@ -413,10 +413,15 @@ def _extract_qa_pairs(section_text):
 # R-20: 写作规范检查
 # ────────────────────────────────────────────────────────
 
-def _check_writing_standards_text(text, filename=""):
+def _check_writing_standards_text(text, filename="", self_audit=False):
     """
     检查文本的写作规范，返回分级 issues 字典。
     供 body_check_writing_standards() 和渐进式文件检查复用。
+
+    self_audit=True 时跳过术语一致性检查（尺子不能量自己）。
+    注意：self_audit 只在直接检查审计代码文件自身（如 structure_checker.py）
+    时启用。body_check_writing_standards 检查的是文档文件（SKILL.md/references/*.md），
+    不检查审计代码，所以不应传 self_audit=True。
 
     返回格式：
     {
@@ -450,23 +455,25 @@ def _check_writing_standards_text(text, filename=""):
     cleaned = re.sub(r'[一-鿿]' + code_terms_pattern, ' ', cleaned, flags=re.IGNORECASE)
 
     # ── 检查1：术语一致性（🔴 必须修）───────────────────
-    term_groups = [
-        (["创建", "建立", "新建"], "创建"),
-        (["更新", "修改", "变更"], "更新"),
-        (["删除", "移除", "去掉"], "删除"),
-        (["配置", "设置", "设定"], "配置"),
-    ]
-    lines = cleaned.split("\n")
-    for group, preferred in term_groups:
-        found_terms = {}
-        for line in lines:
-            for term in group:
-                if term in line:
-                    found_terms.setdefault(term, []).append(line[:50])
-        if len(found_terms) > 1:
-            terms_str = ", ".join(found_terms.keys())
-            prefix = f"{filename}：" if filename else ""
-            issues["must"].append(f"{prefix}术语不一致：混用 {terms_str}，建议统一为「{preferred}」")
+    # self_audit=True 时跳过（审计标准不审计自身，尺子不能量自己）
+    if not self_audit:
+        term_groups = [
+            (["创建", "建立", "新建"], "创建"),
+            (["更新", "修改", "变更"], "更新"),
+            (["删除", "移除", "去掉"], "删除"),
+            (["配置", "设置", "设定"], "配置"),
+        ]
+        lines = cleaned.split("\n")
+        for group, preferred in term_groups:
+            found_terms = {}
+            for line in lines:
+                for term in group:
+                    if term in line:
+                        found_terms.setdefault(term, []).append(line[:50])
+            if len(found_terms) > 1:
+                terms_str = ", ".join(found_terms.keys())
+                prefix = f"{filename}：" if filename else ""
+                issues["must"].append(f"{prefix}术语不一致：混用 {terms_str}，建议统一为「{preferred}」")
 
     # ── 检查2：禁止表述（🟡 建议修）────────────────────
     forbidden = [
@@ -531,6 +538,9 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         all_issues["optional"].append(r23_result["detail"])
 
     # ── 检查 SKILL.md 正文 ────────────────────────
+    # 注意：body_check_writing_standards 检查的是 SKILL.md 和 references/*.md，
+    # 不是审计代码文件（structure_checker.py）自身，所以 self_audit=False。
+    # 尺子不能量自己，但这里量的不是尺子本身，而是被审计技能的文档文件。
     issues = _check_writing_standards_text(body, "SKILL.md")
     for k in all_issues:
         all_issues[k] += issues[k]
@@ -585,7 +595,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                     all_issues["suggest"].append(f"脚本 `{script_path}` 读取/编译失败：{str(_e)[:100]}")
 
     # ── 检查渐进式文件 references/*.md ────────────────
-    skill_dir = kw.get('skill_dir', os.path.dirname(filepath))
+    # skill_dir 已在上面定义
     refs_dir = os.path.join(skill_dir, 'references')
     if os.path.isdir(refs_dir):
         for fname in sorted(os.listdir(refs_dir)):
@@ -598,6 +608,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                     ref_content = f.read()
             except Exception:
                 continue
+            # 渐进式文件也是文档文件，不是审计代码自身，不传 self_audit（保持默认 False）
             issues = _check_writing_standards_text(ref_content, fname)
             for k in all_issues:
                 all_issues[k] += issues[k]
