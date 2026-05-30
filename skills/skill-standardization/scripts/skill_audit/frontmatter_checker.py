@@ -179,8 +179,15 @@ def name_matches_dirname(filepath, content, fm, body, dirname=None, **kw):
             "detail": f"{filepath}:{line} - name({fm['name']}) == dirname({dirname})"}
 
 
+def _strip_v(s):
+    """去掉版本号的 v 前缀"""
+    return s[1:] if s and s.startswith("v") else s
+
 def version_matches_manifest(filepath, content, fm, body, manifest_version=None, **kw):
-    """R-10: 版本三端一致性检查（v2.38.15 增强：自动读取 _meta.json + changelog + mtime 时序检查）"""
+    """R-10: 版本三端一致性检查（v2.38.15 增强：自动读取 _meta.json + changelog + mtime 时序检查）
+    
+    版本号格式强制要求：纯数字 x.y.z，禁止 v 前缀（如 v2.42.0 → ERROR）。
+    """
     import os, json, re
     skill_dir = kw.get('skill_dir') or os.path.dirname(filepath) if filepath else None
 
@@ -189,40 +196,64 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
     line = _find_fm_line(content, "version")
     skill_version = str(fm["version"])
 
-    # ── 1. 比对 _meta.json ──
+    # ── 0. 版本号格式检查：纯数字 x.y.z，禁止 v 前缀 ──
+    format_issues = []
+    raw_versions = []
+
+    # SKILL.md frontmatter
+    raw_versions.append(("SKILL.md", skill_version))
+    # _meta.json version
     meta_path = os.path.join(skill_dir, '_meta.json') if skill_dir else None
-    meta_version = None
+    meta_version_raw = None
     if meta_path and os.path.isfile(meta_path):
         try:
             with open(meta_path, 'r', encoding='utf-8') as _f:
-                meta_version = str(json.load(_f).get('version', ''))
+                meta_version_raw = str(json.load(_f).get('version', ''))
+            raw_versions.append(("_meta.json", meta_version_raw))
         except Exception:
             pass
-
-    # 优先使用 manifest_version（CLI --manifest-version），否则从 _meta.json 获取
-    expected_version = str(manifest_version) if manifest_version is not None else meta_version
-
-    # ── 2. 比对 references/changelog.md ──
+    # changelog 标题版本
     cl_path = os.path.join(skill_dir, 'references', 'changelog.md') if skill_dir else None
-    cl_version = None
+    cl_version_raw = None
     if cl_path and os.path.isfile(cl_path):
         try:
             with open(cl_path, 'r', encoding='utf-8') as _f:
                 cl_content = _f.read()
-            _m = re.search(r'^##\s*v?(\d+\.\d+\.\d+)', cl_content, re.MULTILINE)
+            _m = re.search(r'^##\s*(v?\d+\.\d+\.\d+)', cl_content, re.MULTILINE)
             if _m:
-                cl_version = _m.group(1)
+                cl_version_raw = _m.group(1)
+            raw_versions.append(("changelog.md", cl_version_raw))
         except Exception:
             pass
 
-    # ── 3. 版本值一致性检查 ──
+    for src, ver in raw_versions:
+        if ver and ver.startswith("v"):
+            format_issues.append(f"{src} 版本号含 v 前缀（{ver}），应为纯数字格式 x.y.z")
+
+    if format_issues:
+        fmt_detail = f"{filepath}:{line} - {'；'.join(format_issues)}"
+        return {"passed": False, "detail": fmt_detail,
+                "fix": {"key": "version", "value": _strip_v(skill_version),
+                         "location": f"{filepath}:{line}",
+                         "operation": "去掉 v 前缀，使用纯数字版本号格式（如 2.42.0）"}}
+
+    # 优先使用 manifest_version（CLI --manifest-version），否则从 _meta.json 获取
+    expected_version_raw = str(manifest_version) if manifest_version is not None else meta_version_raw
+    expected_version = _strip_v(expected_version_raw) if expected_version_raw else ""
+
+    # ── 2. 比对 references/changelog.md ──
+    # cl_version_raw 已在上面读取
+    cl_version = _strip_v(cl_version_raw) if cl_version_raw else None
+
+    # ── 3. 版本值一致性检查（统一去 v 前缀后比较） ──
+    skill_version_clean = _strip_v(skill_version)
     issues = []
-    if expected_version and skill_version != expected_version:
-        issues.append(f"SKILL.md({skill_version}) != _meta.json({expected_version})")
-    if cl_version and skill_version != cl_version:
-        issues.append(f"SKILL.md({skill_version}) != changelog({cl_version})")
+    if expected_version and skill_version_clean != expected_version:
+        issues.append(f"SKILL.md({skill_version}) != _meta.json({expected_version_raw})")
+    if cl_version and skill_version_clean != cl_version:
+        issues.append(f"SKILL.md({skill_version}) != changelog({cl_version_raw})")
     if expected_version and cl_version and expected_version != cl_version:
-        issues.append(f"_meta.json({expected_version}) != changelog({cl_version})")
+        issues.append(f"_meta.json({expected_version_raw}) != changelog({cl_version_raw})")
 
     if issues:
         detail = f"{filepath}:{line} - 版本不一致：{'；'.join(issues)}"
@@ -258,7 +289,7 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
 
     sources = []
     if skill_version: sources.append(f"SKILL.md({skill_version})")
-    if meta_version: sources.append(f"_meta.json({meta_version})")
+    if meta_version_raw: sources.append(f"_meta.json({meta_version_raw})")
     if cl_version: sources.append(f"changelog({cl_version})")
     detail = f"{filepath}:{line} - 版本一致（{' == '.join(sources)}）"
     if mtime_warnings:

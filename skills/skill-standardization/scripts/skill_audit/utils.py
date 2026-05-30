@@ -95,7 +95,7 @@ RULES = [
         "id": "R-10",
         "name": "版本三端一致性 + 时序检查",
         "severity": "ERROR",
-        "check": "SKILL.md version == _meta.json version == changelog 最新版本号（三端一致）；mtime时序检查检测修改后未更新版本号",
+        "check": "SKILL.md version == _meta.json version == changelog 最新版本号（三端一致）；mtime时序检查检测修改后未更新版本号；版本号必须为纯数字 x.y.z（禁止 v 前缀）",
         "method": "version_matches_manifest",
         "fixable": True,
         "create_template": "version 须在 SKILL.md、_meta.json、references/changelog.md 三处一致",

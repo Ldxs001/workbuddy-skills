@@ -1,4 +1,16 @@
-## v2.42.0 (2026-05-30)
+## 2.42.1 (2026-05-30)
+
+### 变更
+- **版本号格式规范：纯数字 x.y.z 强制**：所有版本号统一为纯数字格式（如 2.42.0），禁止 v 前缀（v2.42.0）
+- **R-10 增强：版本号格式检测**：`version_matches_manifest` 新增版本号纯数字格式检测，含 `v` 前缀报 ERROR 并提供自动修复（去 v 前缀）；比较逻辑增加 `_strip_v` 函数统一去 v 前缀后再比较
+- **自身版本号修正**：`_meta.json` version 从 `"v2.42.0"` → `"2.42.0"`，`SKILL.md` frontmatter 从 `v2.42.0` → `2.42.0`，`changelog.md` 当前版本标题从 `## v2.42.0` → `## 2.42.0`
+- **spec 规范更新**：`frontmatter.json` v2.6.0 增加 version 字段纯数字格式说明；`structure.json` v2.6.0 增加 version 纯数字格式说明
+- **修复 git-sync 版本号兼容**：`_strip_v` 确保纯数字版本号在 git-sync 中正确比较（之前已修复）
+- **自审通过**：24 PASS + 1 WARN（R-20 legacy），0 ERROR ✅
+
+---
+
+## 2.42.0 (2026-05-30)
 
 ### 更新
 - **_meta.json 非标字段处理逻辑修正**：不再仅标记输出，改为直接删除（_meta.json 是机器元数据，不应存在非标准字段），同时输出提示供人工判断是否需要迁移
@@ -13,6 +25,16 @@
 - **creator 模板清理**：`scripts/skill_builder/creator.py` 和 `scripts/creator.py` 中 3 处写死的版本号引用全部改为纯 skill 名
 - **spec 规范更新**：`frontmatter.json` 的 description constraint 增加"不含版本号"；`structure.json` 增加 H1 不得含版本号的规范
 - **RULES 描述更新**：R-04 check 增加"不含版本号"说明，R-06 改为"正文含一级标题（不得含版本号）"
+
+## 2.42.1 (2026-05-30)
+
+### 变更
+- **版本号格式规范：纯数字 x.y.z 强制**：所有版本号统一为纯数字格式（如 2.42.0），禁止 v 前缀（v2.42.0）
+- **R-10 增强：版本号格式检测**：`version_matches_manifest` 新增版本号纯数字格式检测，含 `v` 前缀报 ERROR 并提供自动修复（去 v 前缀）；比较逻辑增加 `_strip_v` 函数统一去 v 前缀后再比较
+- **自身版本号修正**：`_meta.json` version 从 `"v2.42.0"` → `"2.42.0"`，`SKILL.md` frontmatter 从 `v2.42.0` → `2.42.0`，`changelog.md` 当前版本标题从 `## v2.42.0` → `## 2.42.0`
+- **spec 规范更新**：`frontmatter.json` v2.6.0 增加 version 字段纯数字格式说明；`structure.json` v2.6.0 增加 version 纯数字格式说明
+- **修复 git-sync 版本号兼容**：`_strip_v` 确保纯数字版本号在 git-sync 中正确比较（之前已修复）
+- **自审通过**：24 PASS + 1 WARN（R-20 legacy），0 ERROR ✅
 
 ---
 
