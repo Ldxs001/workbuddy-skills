@@ -137,6 +137,13 @@ def step_version_compare(skill_name: str, local_ver: str) -> str:
             repo_ver = json.load(open(repo_meta, encoding="utf-8"))["version"]
         except Exception:
             pass
+    # 统一去掉 v 前缀
+    def _strip_v(s):
+        return s[1:] if s.startswith("v") else s
+
+    repo_ver = _strip_v(repo_ver) if repo_ver else ""
+    local_ver = _strip_v(local_ver)
+
     print(f"  仓库版本: {repo_ver or '（无）'}")
     print(f"  本地源文件版本: {local_ver}")
 
@@ -612,7 +619,9 @@ def step_pack_zip(skill_name: str, version: str, skills_dir: Path,
                    skip_scan: bool = False):
     log(7, 8, "生成 ZIP 安装包...")
     DIST_DIR.mkdir(parents=True, exist_ok=True)
-    zip_name = f"{skill_name}-v{version}.zip"
+    # 防止 version 本身已带 v 前缀导致双 v
+    safe_ver = version[1:] if version.startswith("v") else version
+    zip_name = f"{skill_name}-v{safe_ver}.zip"
     zip_file = DIST_DIR / zip_name
 
     # 打包前敏感扫描

@@ -26,6 +26,9 @@
 
 ### 步骤 0.7：版本号三方对比（v1.6 新增）
 
+> 这一步检查的是**清单 version vs 待推送 version**，属于三单一致的前置校验。
+> 三单一致完整定义见 `reference.md` 的三单一致模型。
+
 | 对比结果 | 行为 |
 |---------|------|
 | 清单无此条目 | ✅ 正常执行，完后写入 version 到清单 |
@@ -90,10 +93,10 @@
 git add → git commit → git pull --rebase → git push
 ```
 
-推送结果分别记录：
-- 码云成功 → 更新 `gitee_version` + 标记 `gitee_ok=true`
-- GitHub 成功 → 更新 `github_version` + 标记 `github_ok=true`
-- `uploaded` = `gitee_ok AND github_ok`
+推送结果分别记录（对应三单一致的状态标记）：
+- 码云成功 → 更新 `gitee_version` + 标记 `gitee_ok=true`（Gitee 三单一致）
+- GitHub 成功 → 更新 `github_version` + 标记 `github_ok=true`（GitHub 三单一致）
+- `uploaded` = `gitee_ok AND github_ok`（双平台均三单一致）
 
 ### 步骤 5：生成 ZIP 安装包
 

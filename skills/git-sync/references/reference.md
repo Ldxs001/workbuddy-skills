@@ -201,12 +201,48 @@ python manifest.py sync-readme workbuddy-skills      # 根据仓库实际文件�
 
 ### 三单一致模型
 
-```
-维护清单 (manifest.json)
-    └─ 可含"只登记、未上传"条目 (uploaded:false)
+**三单 = 三个"单"：**
 
-执行端（仓库实际文件 skills/<name>/）
-    └─ 清单中 uploaded=true 的子集
+| # | 单 | 内容 | 维护方式 |
+|---|----|------|---------|
+| 第一单 | **本地源文件** | `_meta.json` version + `SKILL.md` frontmatter version | 开发者手动维护（两者必须一致） |
+| 第二单 | **远程仓库实际文件** | 推送到 Gitee/GitHub 后，`skills/<name>/_meta.json` 中的 version | 由 git-sync 推送，与本地一致 |
+| 第三单 | **维护清单** | `manifest.json` 中的 `version` / `gitee_version` / `github_version` | 推送成功后自动更新 |
+
+**三单一致的完整语义：**
+
+```
+同步前（本地准备阶段）：
+  _meta.json version = SKILL.md frontmatter version         ← 本地版本一致
+  manifest.json version < 待推送版本                         ← 清单版本低于本地，允许升级
+
+同步中（推送阶段）：
+  不需要管版本号 — 仓库实际文件 version = 推送时的本地 version
+
+同步后（推送成功）：
+  本地 _meta.json version = 远程仓库 version = 清单 version  ← 三单一致
+  README.md = 仓库实际内容（由 sync-readme 全量生成，永远一致）
+```
+
+**上传状态标记：**
+
+| 字段 | 含义 |
+|------|------|
+| `gitee_ok=true` | Gitee 平台三单一致（Gitee 仓库 version = 清单 version = 本地 version） |
+| `github_ok=true` | GitHub 平台三单一致（同上） |
+| `uploaded=true` | 双平台均已三单一致（`gitee_ok AND github_ok`） |
+
+**结构示意：**
+
+```
+本地源文件 (_meta.json + SKILL.md frontmatter version 一致)
+    ↓ 推送
+远程仓库 (skills/<name>/ 实际文件)
+    ↓ 推送成功后更新
+维护清单 (manifest.json)
+    ├─ gitee_ok=true  → Gitee 三单一致
+    ├─ github_ok=true → GitHub 三单一致
+    └─ uploaded=true  → 双平台三单一致
 
 README.md（技能列表 + 目录树）
     └─ 由 sync-readme 全量生成，永远 = 仓库实际内容
