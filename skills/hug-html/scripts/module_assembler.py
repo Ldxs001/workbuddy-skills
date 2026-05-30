@@ -15,6 +15,11 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/hug-html/data/"
+SKILL_DIR = Path(__file__).parent.parent
+DATA_DIR = SKILL_DIR.parent / ".standardization" / "hug-html" / "data"
+
 # ══════════════════════════════════════════════════════
 # 约束模式
 # ══════════════════════════════════════════════════════
@@ -486,7 +491,7 @@ body {{min-height:100vh;display:flex;align-items:center;justify-content:center;
             html += f'<div class="cell" style="grid-row:{row+1}/span{rs};grid-column:{col+1}/span{cs};{constraint_css}">{content}</div>'
         html += "</div></div></body></html>"
 
-        out = str(Path(__file__).parent.parent / "data" / "output" / "component-demo.html")
+        out = str(DATA_DIR / "output" / "component-demo.html")
         Path(out).parent.mkdir(parents=True, exist_ok=True)
         with open(out, "w", encoding="utf-8") as f:
             f.write(html)

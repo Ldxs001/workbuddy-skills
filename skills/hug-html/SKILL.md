@@ -1,30 +1,22 @@
 ---
 name: hug-html
-version: 3.0.0
+tags: []
+version: 3.0.3
 author: Ldxs
 license: MIT
-description: 组件式HTML模块引擎 v3.0.0：8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
+description: 组件式HTML模块引擎。8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/hug-html/data/
 external_data_dir: true
-faq_quality: improve_qa
-antipattern_detail: add_detail
+trigger: 生成 HTML 模板/编辑 HTML/HTML 模块/网格布局/单元格合并/可视化编辑/输出自包含 HTML
+trigger_negative: 只是简单文本编辑/不涉及 HTML 生成/使用其他框架
 ---
+# hug-html
 
-
-
-
-
-
-
-
-
-
-
-
-
+> → 详见 `references/antipatterns.md`
+> → 详见 `references/faq.md`
 
 ## 触发场景
 

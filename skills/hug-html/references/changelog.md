@@ -1,6 +1,31 @@
-## v3.0.0 (2026-05-30) — 组件式架构重构
+## 3.0.3 (2026-05-31)
 
-### 重大变更（MAJOR）
+### 修复
+- **R-01/R-07**: frontmatter 补全 trigger 和 trigger_negative 字段
+- **R-04**: description 移除版本号
+- **R-06**: 补回缺失的 H1 标题
+- **R-10**: changelog 版本号去 v 前缀
+- **R-18/R-19**: SKILL.md 补充 antipatterns/faq 引用
+
+---
+
+## 3.0.2 (2026-05-30)
+
+### 修复
+- audit --fix 自动修正
+
+---
+
+## 3.0.1 (2026-05-30)
+
+### 修复
+- audit --fix 自动修正
+
+---
+
+## 3.0.0 (2026-05-30) — 组件式架构重构
+
+### 重大更新（MAJOR）
 - **架构重构**：从预置复合模块模板改为原子组件+声明式组合
   - 删除 14 个固定复合模块，替换为 8 种原子组件（text/image/icon/qrcode/table/divider/spacer/group）
   - 新增 3 级约束系统（fill/fit/clip），递归作用于骨架→模块→组件
@@ -14,14 +39,14 @@
 - SKILL.md 四层架构、核心能力、快速开始全面更新
 
 ---
-## v2.1.4 (2026-05-30)
+## 2.1.4 (2026-05-30)
 
 ### 修复
 - audit --fix 自动修正
 
 ---
 
-## v2.1.3 (2026-05-30) — R-12 合规完善
+## 2.1.3 (2026-05-30) — R-12 合规完善
 
 ### Changed
 - 所有脚本补充 DEFAULT_DATA_DIR_RAW + DATA_DIR R-12 定义
@@ -33,7 +58,7 @@
 
 
 
-## v2.1.2 (2026-05-30) — skill-standardization 改造 + R-12 脚本补全
+## 2.1.2 (2026-05-30) — skill-standardization 改造 + R-12 脚本补全
 
 ### Changed
 - 版本号 v2.1.1 → v2.1.2（SKILL.md + _meta.json + 脚本版本字符串三端统一）
@@ -49,7 +74,7 @@
 - SKILL.md 版本号与 _meta.json 不一致问题
 - 4 个脚本缺少 R-12 合规的数据目录变量声明
 
-## v2.1.1 (2026-05-29) — skill-standardization 合规修正
+## 2.1.1 (2026-05-29) — skill-standardization 合规修正
 
 ### Changed
 - 版本号 v2.1.0 → v2.1.1（`skill-standardization update --fix` 自动 bump）
@@ -58,7 +83,7 @@
 - `scripts/gen_test_grids.py`：补充 `DEFAULT_DATA_DIR_RAW` R-12 字面量
 - `scripts/module_assembler.py`：补充 `DEFAULT_DATA_DIR_RAW` R-12 字面量
 
-## v2.1.0 (2026-05-29) — 全面中文异常处理 + 能力边界定义
+## 2.1.0 (2026-05-29) — 全面中文异常处理 + 能力边界定义
 
 ### Added
 - 所有脚本集成中文错误处理机制：`show_error()` 函数统一输出 `❌ [错误类型] 说明 + 💡 修复建议`
@@ -76,7 +101,7 @@
 - `content_filler.py`: 重写为 try/except + 中文错误，文件读取/JSON解析/填充字段校验均有中文提示
 - `SKILL.md` frontmatter 版本号 v2.0.4 → v2.1.0
 
-## v2.0.1 (2026-05-29) — 完整交互 + 审计 + 标准化
+## 2.0.1 (2026-05-29) — 完整交互 + 审计 + 标准化
 
 ### Added
 - `scripts/grid_builder.py` — 核心网格引擎：N×M 网格布局、单元格合并（rowspan/colspan）
