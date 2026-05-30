@@ -3,7 +3,7 @@ name: workday-calendar
 author: wUwproject
 license: MIT
 tags: []
-version: 1.6.2
+version: 1.6.3
 description: 智能周历系统。skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点）
 sensitive_access: false
 critical_write: false
@@ -12,7 +12,10 @@ data_dir: ../.standardization/workday-calendar/data/
 trigger: 法定假日|周历|工作日|调休|补班|节假日|假日区间|年度工日|日程|安排|空闲时间
 trigger_negative: true
 external_data_dir: true
+h1_position: true
 ---
+# 智能周历系统 (Workday Calendar)
+
 ## 触发条件
 
 当用户出现以下意图时，加载本技能：
@@ -34,7 +37,6 @@ external_data_dir: true
 - 用户要求操作其他日历应用（如 Google Calendar、Outlook 日历），本技能仅管理本地数据
 
 
-# 智能周历系统 (Workday Calendar)
 
 管理国家法定假日、补班日、自定义周末规则，计算年度工作日，生成周历，并支持个人日程管理。
 
