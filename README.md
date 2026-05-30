@@ -24,7 +24,7 @@
 | `skill-standardization` | Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。 |
 | `skill-sub` | 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
-| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架 v5.17.1。数据目录迁移到 .standardization/triphasic-execution/；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。 |
+| `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、明确空转/重试/换思路/求助完整流转规则。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
 | `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
 | `workday-calendar` | 智能周历系统 v1.6.0 - skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点） |

@@ -1,33 +1,24 @@
 ---
 name: triphasic-execution
-version: 5.17.1
+version: 5.17.3
 author: wUwproject
 license: MIT
-description: Execute→Review→Advance 三步循环执行框架 v5.17.1。增强步骤规划能力（参考 skill-sub 逻辑）、增强语义理解（参考 semantic-split 逻辑）；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。v5.17.1：数据目录从 ~/.workbuddy/triphasic/ 迁移到 ~/.workbuddy/.standardization/triphasic-execution/（符合R-11/R-12）；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。
+description: Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。
 tags: ['framework', 'execution', 'debugging', 'problem-tracking', 'risk-tracking', 'lessons-learned', 'cross-platform', 'configuration', 'config-ui']
 category: workflow
+trigger: 当用户要求执行三步循环框架/规划步骤/执行任务时；当用户需要任务进度管理/问题追踪时
 trigger_negative: true
 sensitive_access: false
 critical_write: false
-create_permissions_md: true
 permission_weight: LOW
-section_antipattern: true
-section_faq: true
 data_dir: ../.standardization/triphasic-execution/
 external_data_dir: true
 ---
-
-
-
-
-
-
-
-
-
-# Triphasic Execution Framework v5.17.1
-
+# Triphasic Execution Framework
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
+
+> → 详见 `references/antipatterns.md`
+> → 详见 `references/faq.md`
 
 ---
 

@@ -1,3 +1,10 @@
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
+_data_dir_abs = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "..", DEFAULT_DATA_DIR_RAW
+))
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """

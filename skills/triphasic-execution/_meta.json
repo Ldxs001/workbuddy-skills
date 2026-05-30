@@ -1,7 +1,7 @@
 {
   "name": "triphasic-execution",
-  "version": "5.17.1",
-  "description": "Execute→Review→Advance 三步循环执行框架 v5.17.1。数据目录迁移到 .standardization/triphasic-execution/；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。",
+  "version": "5.17.3",
+  "description": "Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、明确空转/重试/换思路/求助完整流转规则。",
   "author": "wUwproject",
   "tags": [
     "execution",
@@ -20,5 +20,5 @@
     "idle",
     "retry"
   ],
-  "created_at": "2025-01-01"
+  "data_dir": "skills/.standardization/triphasic-execution/data/"
 }

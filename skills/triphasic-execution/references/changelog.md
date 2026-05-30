@@ -1,3 +1,29 @@
+## 5.17.3 (2026-05-31)
+
+### 修复
+- **R-04**: description 移除版本号
+- **R-06**: H1 移除版本号
+- **R-07**: frontmatter 补全 trigger 字段
+- **R-10**: changelog 版本号去 v 前缀
+- **R-11/R-22**: temp_progress/ 迁移至数据目录
+- **R-12**: 3 个脚本补充 DEFAULT_DATA_DIR_RAW 声明
+- **R-18/R-19**: SKILL.md 补充 antipatterns/faq 引用
+
+---
+
+## 5.17.2 (2026-05-30)
+
+### 修复
+- **R-04**: description 移除版本号
+- **R-06**: H1 移除版本号
+- **R-07**: frontmatter 补全 trigger 字段
+- **R-10**: changelog 版本号去 v 前缀
+- **R-11/R-22**: temp_progress/ 迁移至数据目录
+- **R-12**: 3 个脚本补充 DEFAULT_DATA_DIR_RAW 声明
+- **R-18/R-19**: SKILL.md 补充 antipatterns/faq 引用
+
+---
+
 # triphasic-execution 版本更新日志
 ## v5.17.0（2026-05-28）
 
