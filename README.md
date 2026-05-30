@@ -27,7 +27,7 @@
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、明确空转/重试/换思路/求助完整流转规则。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。 v1.1.0：重建 python_env.py，修复 _log() 输出到 stderr，修复 utils.py VENV_DIR 定义顺序，18/18 功能测试通过。 支持：文件 CRUD、Python 环境管理、代码规范化/审查/OO 化/测试生成、沙箱验证。 |
 | `workbuddy-fs-manager` | WorkBuddy 文件系统管理器技能。 |
-| `workday-calendar` | 智能周历系统 v1.6.0 - skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点） |
+| `workday-calendar` | 智能周历系统。skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点） |
 
 ---
 
