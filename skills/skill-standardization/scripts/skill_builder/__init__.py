@@ -105,6 +105,11 @@ def main():
     migrate_parser.add_argument("--dry-run", action="store_true", help="仅输出计划，不执行")
     migrate_parser.add_argument("--force", action="store_true", help="强制覆盖已存在的目标目录")
 
+    # inspect 子命令（v2.44.0 新增）
+    inspect_parser = subparsers.add_parser("inspect", help="扫描 skill 结构生成蓝皮书")
+    inspect_parser.add_argument("skill_dir", help="技能目录路径")
+    inspect_parser.add_argument("--json", action="store_true", help="JSON 格式输出")
+
     args = parser.parse_args()
 
     if args.command == "create":
@@ -119,6 +124,10 @@ def main():
     elif args.command in ("migrate-data", "migrate"):
         migrator = SkillMigrator()
         migrator.migrate(args)
+    elif args.command == "inspect":
+        from ..skill_inspector import inspect_skill
+        result = inspect_skill(args.skill_dir, "json" if args.json else "text")
+        print(result)
     else:
         parser.print_help()
 

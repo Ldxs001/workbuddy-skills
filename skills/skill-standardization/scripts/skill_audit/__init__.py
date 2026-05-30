@@ -5,7 +5,7 @@ warnings.filterwarnings("ignore", category=SyntaxWarning)
 """
 skill_audit package — SKILL.md 规范化审查工具 v2.25.0
 
-支持 R-01~R-24 规则审查，独立审计工具。
+支持 R-01~R-25 规则审查，独立审计工具。
 
 用法:
     python -m skill_audit audit <skill_dir> [--json] [--manifest-version VER]
@@ -42,6 +42,7 @@ from .frontmatter_checker import (
     regex_frontmatter_exists, yaml_has_name, yaml_has_semver_version,
     yaml_has_description, name_matches_dirname, version_matches_manifest,
     check_meta_json_completeness,
+    regex_frontmatter_and_meta,
 )
 from .structure_checker import (
     body_has_h1, body_has_trigger_section, body_has_core_section,
@@ -51,6 +52,7 @@ from .structure_checker import (
     body_has_progressive_loading_explicit,
     check_doc_code_consistency,
     check_changelog_progressive,
+    body_check_document_format,
 )
 from .artifact_checker import (
     check_artifact_paths, check_external_data_dir,
@@ -70,6 +72,7 @@ from .fix import apply_fix, list_fixable
 METHOD_MAP = {
     "check_external_data_dir": check_external_data_dir,
     "regex_frontmatter_exists": regex_frontmatter_exists,
+    "regex_frontmatter_and_meta": regex_frontmatter_and_meta,
     "yaml_has_name": yaml_has_name,
     "yaml_has_semver_version": yaml_has_semver_version,
     "yaml_has_description": yaml_has_description,
@@ -93,6 +96,7 @@ METHOD_MAP = {
     "check_doc_code_consistency": check_doc_code_consistency,
     "check_changelog_progressive": check_changelog_progressive,
     "check_meta_json_completeness": check_meta_json_completeness,
+    "body_check_document_format": body_check_document_format,
 }
 
 
@@ -142,7 +146,7 @@ def _apply_fixes(skill_md, fixes):
         else:
             buf.write(f"{k}: {v}\n")
     buf.write("---\n")
-    buf.write(body)
+    buf.write(body.lstrip("\n"))
 
     with open(skill_md, "w", encoding="utf-8") as f:
         f.write(buf.getvalue())

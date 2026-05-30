@@ -46,6 +46,17 @@ class Refactor:
             backup_dir = _create_backup(skill_dir, "refactor", args.workspace)
             print(f"[file] 备份已创建: {backup_dir}")
 
+        # ★ 步骤2.5: inspect — 读取技能全貌（备份后、改造前）
+        try:
+            from ..skill_inspector import inspect_skill
+            print(f"\n{'='*50}")
+            print("  Skill 结构扫描 — 了解全貌后再改造")
+            print(f"{'='*50}")
+            print(inspect_skill(str(skill_dir)))
+            print()
+        except ImportError:
+            print("[!] skill_inspector 未找到，跳过结构扫描")
+
         # 3. 执行迁移（整理技能内部文件结构）
         migration_plan = self._build_migration_plan(skill_dir)
 

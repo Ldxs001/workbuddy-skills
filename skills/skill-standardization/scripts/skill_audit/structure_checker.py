@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-24)
+skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R-25)
+v2.44.0: 新增 R-25 文档写作格式规范（9项子检查）
 v2.38.6: R-18/R-19/R-20 新增渐进式文件（references/*.md）审查支持
 v2.37.0: 所有 detail/location 添加绝对行号（filepath:line# 格式）
 """
@@ -42,8 +43,8 @@ def body_has_h1(filepath, content, fm, body, **kw):
                          "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
     line = _abs_line(body, content, m)
     h1_text = m.group(0).strip()
-    # 检查 H1 是否含版本号（如 '# skill-name v2.38.7'）
-    ver_in_h1 = re.search(r'\s+v?\d+\.\d+\.\d+\s*$', h1_text)
+    # 检查 H1 是否含版本号（如 '# skill-name v2.38.7' 或 '# skill-name v2.6.27 — 描述'）
+    ver_in_h1 = re.search(r'v?\d+\.\d+\.\d+', h1_text)
     if ver_in_h1:
         return {"passed": False,
                 "detail": f"{filepath}:{line} - H1 含版本号 \"{ver_in_h1.group().strip()}\"，H1 不应含版本号（版本号由 version 字段管理）",
@@ -1028,3 +1029,194 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 
     return {"passed": True,
             "detail": f"{filepath}:1 - R-24: 更新日志在 references/changelog.md 中（SKILL.md 无内嵌日志，通过）"}
+
+
+def body_check_document_format(filepath, content, fm, body, **kw):
+    """
+    R-25: 文档写作格式规范 (v2.44.0)
+    9 项子检查：C-01 (ERROR) + C-02~C-09 (WARN 建议)。
+    冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
+    全部子检查仅作建议标准统一，不强制改造。
+    """
+    issues = {"error": [], "warn": []}
+
+    # ── 预清理：提取正文中非代码块的内容（代码块内的格式化模式不计入检查）──
+    # 先替换所有 ```code``` 块为占位符，避免代码里匹配到伪格式化模式
+    cleaned_body = re.sub(r'```[\s\S]*?```', '\n', body)
+    # 排除行内代码
+    tick = '\u0060'
+    cleaned_body = re.sub(f'{tick}[^{tick}]+?{tick}', '', cleaned_body)
+
+    # ════════════════════════════════════════════════════════════
+    # C-01 (ERROR): H1 标题格式正确
+    # 检查 H1 仅含技能名，可加 — 简短副标题，不含版本号
+    # ════════════════════════════════════════════════════════════
+    h1_match = re.search(r'^# (.+)', cleaned_body, re.MULTILINE)
+    if h1_match:
+        h1_text = h1_match.group(1).strip()
+        # 检查是否含版本号
+        if re.search(r'v?\d+\.\d+\.\d+', h1_text):
+            line_no = body[:h1_match.start()].count('\n') + 1
+            issues["error"].append(f"{filepath}:{line_no} - C-01: H1 标题含版本号「{h1_text}」，版本号应由 frontmatter version 字段管理")
+        # 检查是否过于复杂（含 ## 或更深的标题内容混入）
+        elif re.search(r'#{2,}', h1_text):
+            line_no = body[:h1_match.start()].count('\n') + 1
+            issues["error"].append(f"{filepath}:{line_no} - C-01: H1 标题格式异常「{h1_text}」，应为 # <技能名>")
+        else:
+            # 通过 — 不报 ERROR
+            pass
+
+    # ════════════════════════════════════════════════════════════
+    # C-02 (WARN): 标题层级限制在 ## 和 ###
+    # 不报 ####+ 的出现在允许范围内
+    # 冲突排除：跳过 R-21 渐进式加载模板句中的引用格式
+    # 冲突排除：跳过 R-24 更新日志可能提到的版本号标题
+    # ════════════════════════════════════════════════════════════
+    # 检查 H4+（#### 及更深）
+    deep_heads = []
+    for m in re.finditer(r'^#{4,}\s+', cleaned_body, re.MULTILINE):
+        line_text = cleaned_body[m.start():m.start()+80].split('\n')[0]
+        line_no = body[:m.start()].count('\n') + 1
+        deep_heads.append(f"第{line_no}行「{line_text.strip()[:40]}」")
+    if deep_heads:
+        issues["warn"].append(f"C-02: 发现 {len(deep_heads)} 处 ####+ 深层标题（建议改用 ## 或 ###）：{'; '.join(deep_heads[:3])}")
+
+    # ════════════════════════════════════════════════════════════
+    # C-03 (WARN): 表格用于结构化信息展示
+    # 检查正文中是否有表格（| 分隔行），如有则标记使用合理
+    # 仅当完全没有表格但有结构化数据时提示
+    # ════════════════════════════════════════════════════════════
+    table_rows = re.findall(r'^\|.+\|$', cleaned_body, re.MULTILINE)
+    # 检查是否有至少 3 行表格内容（表头+分隔+数据）
+    has_substantial_table = False
+    seen_tables = 0
+    for line in table_rows:
+        if re.match(r'^\|[\s\-:|]+\|$', line):
+            continue  # 分隔行
+        seen_tables += 1
+        if seen_tables >= 3:
+            has_substantial_table = True
+            break
+    if not has_substantial_table:
+        # 检查是否有明显的键值对比数据（如文件映射、参数列表）但没有用表格
+        structured_lines = [l for l in cleaned_body.split('\n') if '→' in l or '—' in l]
+        if structured_lines and len(structured_lines) >= 5:
+            issues["warn"].append("C-03: 正文包含较多键值对应关系（→ 或 — 分隔），建议用表格结构化展示")
+
+    # ════════════════════════════════════════════════════════════
+    # C-04 (WARN): 引用块 > 用于提示/注意/警告
+    # 检查是否使用了 > 引用块
+    # 冲突排除：R-21 的固定模板句也是引用块，不应计为"未使用"
+    # ════════════════════════════════════════════════════════════
+    blockquote_lines = [l for l in cleaned_body.split('\n') if l.strip().startswith('>')]
+    if len(blockquote_lines) == 0:
+        # 检查正文中是否有警告性提示（加粗的"注意"/"警告"/"注"）但没有用 > 包装
+        warning_keywords = re.findall(r'\*\*(?:注意|警告|提示|注)\*\*', cleaned_body)
+        if warning_keywords:
+            issues["warn"].append("C-04: 正文含「注意/警告/提示」类关键词但未使用 > 引用块包装，建议统一使用 > 块")
+
+    # ════════════════════════════════════════════════════════════
+    # C-05 (WARN): 有序列表用于步骤，无序列表用于选项
+    # 检查混合使用情况：同一章节内是否混用
+    # ════════════════════════════════════════════════════════════
+    sections = re.split(r'^##\s+', cleaned_body, flags=re.MULTILINE)
+    for i, sec in enumerate(sections):
+        if i == 0:
+            continue
+        has_ordered = bool(re.search(r'^\d+\.\s+', sec, re.MULTILINE))
+        has_unordered = bool(re.search(r'^[-*]\s+', sec, re.MULTILINE))
+        # 如果同时有有序和无序列表在同一章节内，且数量都不少，可能混用不当
+        if has_ordered and has_unordered:
+            ordered_count = len(re.findall(r'^\d+\.\s+', sec, re.MULTILINE))
+            unordered_count = len(re.findall(r'^[-*]\s+', sec, re.MULTILINE))
+            if ordered_count >= 3 and unordered_count >= 3:
+                sec_title = sec.split('\n')[0].strip()
+                issues["warn"].append(f"C-05: 章节「{sec_title[:20]}」同时包含有序列表({ordered_count}条)和无序列表({unordered_count}条)，建议区分：有序→步骤流程，无序→选项列举")
+
+    # ════════════════════════════════════════════════════════════
+    # C-06 (WARN): 加粗用于关键术语/约束
+    # 检查正文是否使用了 **加粗** 标记
+    # ════════════════════════════════════════════════════════════
+    bold_markers = re.findall(r'\*\*[^*]+\*\*', cleaned_body)
+    # 排除引用块内的加粗（C-04 已处理）和表格内的加粗（C-03 已处理）
+    # 如果正文完全没有加粗，且正文较长（>100行），建议使用加粗
+    if not bold_markers and len(body) > 500:
+        issues["warn"].append("C-06: 正文未使用 **加粗** 标记，建议对关键术语/约束/规则名使用加粗强调")
+
+    # ════════════════════════════════════════════════════════════
+    # C-07 (WARN): 代码块使用语言标识
+    # 检查所有的 ``` 代码块是否都有语言标识
+    # ════════════════════════════════════════════════════════════
+    code_fence_count = 0
+    no_lang_count = 0
+    for m in re.finditer(r'```(\w*)\s*\n', body):
+        code_fence_count += 1
+        lang = m.group(1).strip()
+        if not lang:
+            no_lang_count += 1
+    if code_fence_count > 0 and no_lang_count > 0:
+        issues["warn"].append(f"C-07: {no_lang_count}/{code_fence_count} 个代码块缺少语言标识（如 ```bash、```python、```json），建议补充")
+
+    # ════════════════════════════════════════════════════════════
+    # C-08 (WARN): Checklist [ ] 用于操作前自检
+    # 检查是否使用了 - [ ] checklist 格式
+    # ════════════════════════════════════════════════════════════
+    checklist_items = re.findall(r'^[-*]\s+\[\s*[ xX]?\s*\]', cleaned_body, re.MULTILINE)
+    # 如果完全没有 checklist，但正文中包含"检查"/"确认"/"清单"等关键词，建议使用
+    if not checklist_items:
+        checklist_keywords = re.findall(r'检查清单|自检|确认.*是否|\.\.\.\]|\[.*\]', cleaned_body)
+        if checklist_keywords:
+            issues["warn"].append("C-08: 正文含「检查/确认/清单」类描述但未使用 `- [ ]` checklist 格式，建议统一")
+
+    # ════════════════════════════════════════════════════════════
+    # C-09 (WARN): → 详见 用于渐进式文件引用
+    # 检查是否使用了 → 详见 references/xxx.md 格式
+    # 冲突排除：R-18 反模式引用、R-19 FAQ 引用已有规则约束
+    # ════════════════════════════════════════════════════════════
+    arrow_refs = re.findall(r'→\s*详见?\s*`?references/', cleaned_body)
+    simple_refs = re.findall(r'→\s*`?references/', cleaned_body)
+    if not arrow_refs and not simple_refs:
+        # 只检查 references/ 目录中是否有 .md 文件但 SKILL.md 没有引用的情况
+        # 这个会在其他 R-18/R-19/R-24 中检查，这里不做交叉检查
+        pass
+
+    # ════════════════════════════════════════════════════════════
+    # C-10 (WARN): 空行规范 — frontmatter 后及正文中过多的连续空白行
+    # 代码块内的空行不计入（使用 body 原文而非 cleaned_body 时需排除代码块）
+    # ════════════════════════════════════════════════════════════
+    # 检查 frontmatter 闭合 --- 后的连续空行
+    # 使用 content（全文）定位 frontmatter 结束位置
+    fm_end = content.find('\n---')
+    if fm_end >= 0:
+        after_fm = content[fm_end + 4:]  # 跳过 \n---
+        trailing_newlines = len(re.match(r'\n*', after_fm).group())
+        if trailing_newlines > 2:
+            issues["warn"].append(f"C-10: frontmatter 闭合 --- 后有 {trailing_newlines} 个连续空行（建议仅保留 1 个）")
+    # 检查正文（排除代码块后）是否有连续 4+ 换行
+    excess_blank = re.findall(r'\n{5,}', cleaned_body)
+    if excess_blank:
+        max_blank = max(len(b) for b in excess_blank)
+        spots = len(excess_blank)
+        issues["warn"].append(f"C-10: 正文中发现 {spots} 处连续 5+ 换行（最大 {max_blank} 行），建议精简到 1~2 个空行")
+
+    # ════════════════════════════════════════════════════════════
+    # 汇总输出
+    # ════════════════════════════════════════════════════════════
+    error_count = len(issues["error"])
+    warn_count = len(issues["warn"])
+    total = error_count + warn_count
+
+    if total == 0:
+        return {"passed": True,
+                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（10项子检查均符合建议标准）"}
+
+    detail_parts = []
+    if error_count > 0:
+        detail_parts.append(f"🔴 ERROR({error_count}): {'; '.join(issues['error'])}")
+    if warn_count > 0:
+        detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:3])}")
+        if warn_count > 3:
+            detail_parts[-1] += f" 等（共 {warn_count} 条建议）"
+
+    return {"passed": error_count == 0,
+            "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}

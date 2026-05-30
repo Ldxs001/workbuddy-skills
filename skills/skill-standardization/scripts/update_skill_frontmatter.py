@@ -22,6 +22,7 @@ def parse_frontmatter(filepath):
     return fm, content[m.end():], None
 
 def write_frontmatter(filepath, fm, body):
+    body = body.lstrip('\n')
     order = ['name','version','author','license','description',
              'sensitive_access','critical_write','permission_weight',
              'artifact_paths','writing_standards','data_dir']

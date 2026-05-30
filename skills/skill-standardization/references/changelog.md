@@ -1,3 +1,33 @@
+## 2.44.0 (2026-05-31)
+
+### 新增
+- R-25 文档写作格式规范审计（10项子检查：C-01 H1格式ERROR + C-02~C-09 WARN建议 + C-10 空行规范 WARN）
+- body.json: enhanced format_rules with R-25 C-01~C-10 references
+- rules.json: R-25 规则定义 + create_template 参考模板
+- structure_checker.py: body_check_document_format() 审计函数
+- **skill_inspector.py**: 新增技能结构扫描工具（蓝皮书生成器），输出元信息/目录树/章节/函数清单/引用概览/安全数据
+- **skill_builder 新增 inspect 子命令**: `python -m scripts.skill_builder inspect <skill-dir>`
+- **update/refactor 流程增强**: 备份后自动运行 inspect 结构扫描，确保改造前了解技能全貌
+- guide.md: update/refactor 工作流加入强制 inspect 步骤
+- 冲突排除：不与 R-06/R-18/R-19/R-21/R-24 冲突
+- 全部子检查仅作建议标准统一，不强制改造
+
+### 修复
+- R-01 合并 _meta.json 字段检查：新增 regex_frontmatter_and_meta() 组合函数
+- update_skill_frontmatter.py / fix.py / __init__.py: 写 SKILL.md 前清理 body 前导空行（body.lstrip('\n')）
+- 修复 frontmatter 闭合后多余空行问题
+
+
+---
+
+## 2.43.2 (2026-05-30)
+
+### 修复
+- **R-06 H1 版本号检测正则增强**：原正则只匹配版本号在 H1 标题末尾的情况（如 `# name v2.38.7`），无法检测版本号在标题中间的情况（如 `# git-sync v2.6.27 -- 描述`）。改为检测 H1 中任何位置的版本号模式
+
+---
+
+
 ## 2.43.1 (2026-05-30)
 
 ### 更新

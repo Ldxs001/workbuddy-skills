@@ -332,6 +332,17 @@ class SkillUpdater:
         if args.backup:
             backup_dir = _create_backup(skill_dir, "update", args.workspace)
 
+        # ★ 步骤0: inspect — 读取技能全貌（备份后、改造前）
+        try:
+            from ..skill_inspector import inspect_skill
+            print(f"\n{'='*50}")
+            print("  Skill 结构扫描 — 了解全貌后再改造")
+            print(f"{'='*50}")
+            print(inspect_skill(str(skill_dir)))
+            print()
+        except ImportError:
+            print("[!] skill_inspector 未找到，跳过结构扫描")
+
         results = {"checks": [], "fixes": [], "warnings": []}
 
         # 检查 1: _meta.json 是否存在且标准

@@ -12,12 +12,12 @@ from pathlib import Path
 RULES = [
     {
         "id": "R-01",
-        "name": "Frontmatter 存在性 + 11 required + 2 conditional 字段完整性",
+        "name": "Frontmatter 存在性 + 11 required + 2 conditional + _meta.json 7字段完整性",
         "severity": "ERROR",
-        "check": "存在 YAML frontmatter，且含 11 required 字段：name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight；2 conditional 字段：trigger/trigger_negative（正文有触发词/否定条件时必填）。非标字段报 WARN",
-        "method": "regex_frontmatter_exists",
+        "check": "存在 YAML frontmatter，且含 11 required 字段；_meta.json 含 7 标准字段（name/version/description/author/tags/data_dir/triggers）。具体：SKILL.md: name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight + 2 conditional: trigger/trigger_negative。非标字段报 WARN",
+        "method": "regex_frontmatter_and_meta",
         "fixable": True,
-        "create_template": "自动在文件头部插入 --- 包裹的 frontmatter 块，含 name/version/description/sensitive_access/critical_write/permission_weight",
+        "create_template": "自动在文件头部插入 --- 包裹的 frontmatter 块，含 name/version/description/sensitive_access/critical_write/permission_weight；同步生成含 7 标准字段的 _meta.json",
     },
     {
         "id": "R-02",
@@ -234,16 +234,15 @@ RULES = [
         "fixable": False,
         "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
     },
-    # ── 新增规则 R-25 (v2.39.3) ──────────────────────
+    # ── 新增规则 R-25 (v2.44.0) ──────────────────────
     {
         "id": "R-25",
-        "name": "_meta.json 字段规范性",
+        "name": "文档写作格式规范",
         "severity": "WARN",
-        "method": "check_meta_json_completeness",
-        "check": "_meta.json 须含 7 个标准字段：name/version/description/author/tags/data_dir/triggers；多出非标字段需判断是删除还是迁移；triggers 无依赖用 []",
-        "fixable": True,
-        "fix_action": "fix_meta_json_completeness(skill_dir) — 补全缺失字段，标记非标字段供人工判断",
-        "create_template": "创建时同步生成含 7 标准字段的 _meta.json",
+        "method": "body_check_document_format",
+        "check": "SKILL.md 正文写作格式统一性检查（10项子检查）。C-01 (ERROR)：H1 标题格式正确（# <技能名>，仅含技能名或技能名 — 简短副标题，不含版本号）；C-02 (WARN)：标题层级限制在 ## 和 ###；C-03 (WARN)：表格用于结构化信息展示；C-04 (WARN)：引用块 > 用于提示/注意/警告；C-05 (WARN)：有序列表用于步骤，无序列表用于选项；C-06 (WARN)：加粗用于关键术语/约束；C-07 (WARN)：代码块使用语言标识；C-08 (WARN)：Checklist [ ] 用于操作前自检；C-09 (WARN)：箭头引用 → 详见 用于渐进式文件引用；C-10 (WARN)：空行规范 — frontmatter 闭合后不超过 2 个连续空行，正文不超过 4 个连续换行。冲突排除：R-06 已检查 H1 存在性（WARN），R-25 C-01 升级为 ERROR 检查 H1 格式质量；R-21 渐进式加载模板句不受 C-02/C-04 约束；R-24 更新日志位置不受 C-02 约束；R-18/R-19 渐进式引用不受 C-09 约束；代码块内空行不受 C-10 约束。全部子检查仅作建议标准统一，不强制改造，create 模式作为模板参考。",
+        "fixable": False,
+        "create_template": "R-25 写作格式规范：1) # <技能名> 仅一个H1；2) ## / ### 限制层级；3) 表格结构化数据；4) > 提示/注意；5) 有序列表步骤，无序列表选项；6) **加粗** 关键术语；7) ```+语言 代码块；8) [ ] checklist；9) → 详见 渐进引用",
     },
 ]
 

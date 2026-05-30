@@ -333,3 +333,37 @@ def check_meta_json_completeness(filepath, content, fm, body, **kw):
             "detail": f"R-25: {meta_path} - {issues_str}",
             "fix": {"key": "meta_json", "value": "+".join(sorted(missing)) if missing else 'clean',
                      "operation": f"补全缺失字段{'、标记非标字段供判断' if extra else ''}"}}
+
+
+def regex_frontmatter_and_meta(filepath, content, fm, body, **kw):
+    """
+    R-01 组合检查（v2.44.0 合并 _meta.json 字段检查）：
+    1. 调用 regex_frontmatter_exists() — SKILL.md frontmatter 字段
+    2. 调用 check_meta_json_completeness() — _meta.json 字段
+    合并两个结果，任一失败则整体失败。
+    """
+    fm_result = regex_frontmatter_exists(filepath, content, fm, body, **kw)
+    meta_result = check_meta_json_completeness(filepath, content, fm, body, **kw)
+
+    # 两个都通过 → 通过
+    if fm_result.get("passed", False) and meta_result.get("passed", False):
+        return {"passed": True,
+                "detail": fm_result["detail"] + "；" + meta_result["detail"]}
+
+    # 合并 detail 和 fix
+    combined_detail = fm_result.get("detail", "")
+    combined_fix = None
+
+    if not meta_result.get("passed", False):
+        combined_detail += "；" + meta_result.get("detail", "")
+        if meta_result.get("fix"):
+            combined_fix = meta_result["fix"]
+
+    if not fm_result.get("passed", False):
+        combined_detail = fm_result.get("detail", "") + "；" + combined_detail
+        if fm_result.get("fix"):
+            combined_fix = fm_result["fix"]
+
+    return {"passed": False,
+            "detail": combined_detail,
+            "fix": combined_fix}

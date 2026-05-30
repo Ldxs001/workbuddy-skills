@@ -50,6 +50,7 @@ def _update_frontmatter_field(filepath, field_name, field_value):
     if fm is None:
         return False
     fm[field_name] = field_value
+    body = body.lstrip("\n")
     # 重写文件
     buf = io.StringIO()
     buf.write("---\n")

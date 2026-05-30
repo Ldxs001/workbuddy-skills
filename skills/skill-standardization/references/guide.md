@@ -85,18 +85,25 @@ python ../skill-standardization/scripts/skill_builder.py update .
 python scripts/skill_builder.py update <skill-dir>
 ```
 
-### 工作流程（含临时/备份管理）
+### 工作流程（含临时/备份管理 + 强制 inspect 前置扫描）
 
 1. **操作前整体备份**（默认执行）
    ```bash
    python scripts/skill_rollback.py backup_skill <skill-dir> update
    ```
-2. **执行审查/修复**
+2. **★ 强制 inspect 结构扫描**（v2.44.0 新增，备份后自动执行）
+   工具自动输出技能蓝皮书（元信息、目录树、章节、函数清单、安全数据），
+   确保 AI/开发者了解技能全貌后再动手，避免遗漏文件或功能。
+   也可独立运行：
+   ```bash
+   python -m scripts.skill_inspector <skill-dir>
+   ```
+3. **执行审查/修复**
    ```bash
    python scripts/skill_builder.py update <skill-dir> --fix
    ```
-3. **操作中记录**：所有临时文件（`*.tmp`、`temp_*`）和备份文件记录到 `op_logger` 日志
-4. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
+4. **操作中记录**：所有临时文件（`*.tmp`、`temp_*`）和备份文件记录到 `op_logger` 日志
+5. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
    ```bash
    python scripts/skill_rollback.py cleanup <operation_id>
    ```
@@ -177,19 +184,21 @@ Suggestion: 运行 refactor 清理根目录散落文件
 
 > ⚠️ refactor 会移动文件！务必先 `--dry-run`！
 
-### 工作流程（含临时/备份管理）
+### 工作流程（含临时/备份管理 + 强制 inspect 前置扫描）
 
 1. **操作前整体备份**（默认执行，`--no-backup` 跳过）
    ```bash
    python scripts/skill_rollback.py backup_skill <skill-dir> refactor
    ```
-2. **dry-run 预览**
+2. **★ 强制 inspect 结构扫描**（v2.44.0 新增，备份后自动执行）
+   工具自动输出技能蓝皮书，确保了解全貌后再迁移。
+3. **dry-run 预览**
    ```bash
    python scripts/skill_builder.py refactor <skill-dir> --dry-run
    ```
-3. **执行改造**：`skill_builder.py refactor` 自动备份 + 迁移 + 验证
-4. **操作中记录**：临时文件、备份文件记录到 `op_logger` 日志
-5. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
+4. **执行改造**：`skill_builder.py refactor` 自动备份 + 迁移 + 验证
+5. **操作中记录**：临时文件、备份文件记录到 `op_logger` 日志
+6. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
    ```bash
    python scripts/skill_rollback.py cleanup <operation_id>
    ```
