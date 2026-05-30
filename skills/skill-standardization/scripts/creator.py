@@ -92,7 +92,7 @@ skill-sub {name} --input <input-file> --output <output-dir>
 | `references/antipatterns.md` | 反模式与禁忌做法 |
 | `references/faq.md` | 常见问题解答 |
 
-> 本文档由 `skill-standardization v2.38.6` 生成，遵循 R-01~R-24 规范。
+> 本文档由 `skill-standardization` 生成，遵循 R-01~R-25 规范。
 """
 
     META_TEMPLATE = """{{
@@ -558,7 +558,7 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 
 - **技能名称**：`{name}`
 - **当前版本**：`0.1.0`
-- **审计工具版本**：`skill-standardization v2.29.2`
+- **审计工具版本**：`skill-standardization`
 - **最后审计时间**：待首次审计
 - **通过规则数**：0 / 21
 - **待修复问题数**：0
@@ -632,7 +632,7 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 ## [0.1.0] - 2026-05-26
 
 ### 新增
-- 初始版本，由 `skill-standardization v2.29.2` 创建
+- 初始版本，由 `skill-standardization` 创建
 - 基础目录结构：`SKILL.md`、`references/`、`scripts/`、`data/`
 - 支持基本输入处理和结果输出
 - 包含权限声明（R-07 合规）

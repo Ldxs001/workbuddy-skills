@@ -134,7 +134,7 @@ def yaml_has_semver_version(filepath, content, fm, body, **kw):
 
 
 def yaml_has_description(filepath, content, fm, body, **kw):
-    """R-04: description 字段检查"""
+    """R-04: description 字段检查（功能描述，不应含版本号）"""
     has_desc = fm is not None and "description" in fm
     line = _find_fm_line(content, "description") if has_desc else _find_fm_line(content)
     if not has_desc:
@@ -142,9 +142,20 @@ def yaml_has_description(filepath, content, fm, body, **kw):
                 "detail": f"{filepath}:{line} - 缺少 description 字段（期望：≤120 字符的简要描述）",
                 "fix": {"key": "description", "value": "<技能的简要描述>",
                          "location": f"{filepath}:{line}",
-                         "operation": "添加 description: <技能的简要描述，一行概括技能用途>",
+                         "operation": "添加 description: <技能的简要描述，一行概括技能用途，不含版本号>",
                          "verification": "重新运行 audit_skill()，确认 R-04 passed"}}
     dv = str(fm.get("description", ""))[:60]
+    desc_raw = str(fm.get("description", ""))
+    # 检测 description 中是否含版本号（如 v2.40.0、v1.0 等模式）
+    version_in_desc = re.search(r'v?\d+\.\d+\.\d+', desc_raw)
+    if version_in_desc:
+        line = _find_fm_line(content, "description")
+        return {"passed": False,
+                "detail": f'{filepath}:{line} - description 含版本号 "{version_in_desc.group()}"，description 是功能摘要不应含版本号（版本号由 version 字段管理）',
+                "fix": {"key": "description", "value": desc_raw,
+                         "location": f"{filepath}:{line}",
+                         "operation": f"从 description 中移除版本号 {version_in_desc.group()}",
+                         "verification": "重新运行 audit_skill()，确认 R-04 passed"}}
     return {"passed": True,
             "detail": f'{filepath}:{line} - description = "{dv}"'}
 

@@ -41,10 +41,10 @@ RULES = [
         "id": "R-04",
         "name": "description 字段",
         "severity": "ERROR",
-        "check": "frontmatter 含 description 字段（≤120字符）",
+        "check": "frontmatter 含 description 字段（≤120字符，功能摘要不应含版本号；版本号由 version 字段管理）",
         "method": "yaml_has_description",
         "fixable": False,
-        "create_template": 'description: "<一句话描述技能用途，≤120字符>"',
+        "create_template": 'description: "<一句话描述技能用途，≤120字符，不含版本号>"',
     },
     {
         "id": "R-05",
@@ -57,12 +57,12 @@ RULES = [
     },
     {
         "id": "R-06",
-        "name": "正文含一级标题",
+        "name": "正文含一级标题（不得含版本号）",
         "severity": "WARN",
-        "check": "正文含 # 开头的一级标题（与 name 字段一致）",
+        "check": "正文含 # 开头的一级标题（与 name 字段一致），且不得含版本号（如 '# skill v1.2.3' 应改为 '# skill'，版本号由 version 字段管理）",
         "method": "body_has_h1",
         "fixable": True,
-        "create_template": "# <技能名>（与 frontmatter name 字段一致）",
+        "create_template": "# <技能名>（与 frontmatter name 字段一致，不含版本号）",
     },
     {
         "id": "R-07",

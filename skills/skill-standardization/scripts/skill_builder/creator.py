@@ -94,7 +94,7 @@ skill-sub {name} --input <input-file> --output <output-dir>
 | `references/antipatterns.md` | 反模式与禁忌做法 |
 | `references/faq.md` | 常见问题解答 |
 
-> 本文档由 `skill-standardization v2.38.6` 生成，遵循 R-01~R-24 规范。
+> 本文档由 `skill-standardization` 生成，遵循 R-01~R-25 规范。
 """
 
     META_TEMPLATE = """{{

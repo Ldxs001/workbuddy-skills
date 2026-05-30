@@ -29,7 +29,7 @@ def _abs_line(body, content, m_or_pos):
 
 
 def body_has_h1(filepath, content, fm, body, **kw):
-    """R-06: 正文含一级标题检查"""
+    """R-06: 正文含一级标题检查（H1 不得含版本号，版本号由 version 字段管理）"""
     m = re.search(r'^# .+', body, re.MULTILINE)
     if m is None:
         name = fm.get("name", "<技能名>") if fm else "<技能名>"
@@ -41,8 +41,18 @@ def body_has_h1(filepath, content, fm, body, **kw):
                          "operation": f"添加一级标题: # {name}",
                          "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
     line = _abs_line(body, content, m)
+    h1_text = m.group(0).strip()
+    # 检查 H1 是否含版本号（如 '# skill-name v2.38.7'）
+    ver_in_h1 = re.search(r'\s+v?\d+\.\d+\.\d+\s*$', h1_text)
+    if ver_in_h1:
+        return {"passed": False,
+                "detail": f"{filepath}:{line} - H1 含版本号 \"{ver_in_h1.group().strip()}\"，H1 不应含版本号（版本号由 version 字段管理）",
+                "fix": {"key": "h1_version", "value": True,
+                         "location": f"{filepath}:{line}",
+                         "operation": "移除 H1 标题中的版本号",
+                         "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
     return {"passed": True,
-            "detail": f"{filepath}:{line} - 发现一级标题: {m.group(0).strip()}"}
+            "detail": f"{filepath}:{line} - 发现一级标题: {h1_text}"}
 
 
 def _section_text(body, keywords):

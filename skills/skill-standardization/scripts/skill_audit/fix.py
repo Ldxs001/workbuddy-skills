@@ -259,6 +259,40 @@ def fix_h1(skill_dir, **kw):
     return 1
 
 
+def fix_h1_version(skill_dir, **kw):
+    """
+    R-06 修复：移除 H1 标题中的版本号。
+    如 '# skill-standardization v2.38.7' → '# skill-standardization'
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    # 匹配 # 开头的一级标题中是否含版本号
+    m = re.search(r'^(#\s+.*?)\s+v?\d+\.\d+\.\d+\s*$', body, re.MULTILINE)
+    if not m:
+        return 0  # 无版本号
+    h1_clean = m.group(1).strip()
+    # 替换
+    new_body = re.sub(r'^(#\s+.*?)\s+v?\d+\.\d+\.\d+\s*$', f'# {h1_clean}', body, count=1, flags=re.MULTILINE)
+    buf = io.StringIO()
+    buf.write("---\n")
+    for k, v in fm.items():
+        if isinstance(v, bool):
+            buf.write(f"{k}: {'true' if v else 'false'}\n")
+        elif isinstance(v, (int, float)):
+            buf.write(f"{k}: {v}\n")
+        else:
+            buf.write(f"{k}: {v}\n")
+    buf.write("---\n")
+    buf.write(new_body)
+    _write_file(skill_md, buf.getvalue())
+    return 1
+
+
 # ═══════════════════════════════════════════════════
 # R-07: 触发条件章节修复
 # ═══════════════════════════════════════════════════
@@ -1184,6 +1218,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "version": fix_version,
         "skill_macro": fix_skill_macro,
         "h1": fix_h1,
+        "h1_version": fix_h1_version,
         "section_trigger": fix_section_trigger,
         "section_core": fix_section_core,
         "section_workflow": fix_section_workflow,
@@ -1220,6 +1255,7 @@ def list_fixable():
         "version",                    # R-04
         "skill_macro",               # R-05
         "h1",                        # R-06
+        "h1_version",                # R-06 清理版本号
         "section_trigger",            # R-07
         "section_core",              # R-08
         "section_workflow",          # R-09

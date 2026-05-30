@@ -780,21 +780,6 @@ md = format_progress_markdown(data_dir)
 
 ---
 
-### restore_from_gitee — Gitee 恢复
-
-**功能：** 从 Gitee 仓库恢复指定的脚本文件列表。硬编码文件列表，无 CLI 参数。
-
-```bash
-cd /path/to/skill-standardization/scripts
-python restore_from_gitee.py
-```
-
-**行为：** 遍历预定义的文件名列表，从 `gitee.com/[username-redacted]/workbuddy-skills/raw/main/skill-standardization/scripts/` 下载并覆盖本地文件。输出 `[OK]` 或 `[FAIL]` 结果。
-
-> 注意：此脚本仅用于紧急恢复。正常情况下应通过 `git pull` 同步。
-
----
-
 ### op_logger — 操作日志
 
 **已有 API 文档：** 见上文 [op_logger](#op_logger) 章节。
@@ -1045,14 +1030,8 @@ python scripts/update_Skill_frontmatter.py . version 2.38.8
 python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范引擎，支持 R-01~R-24 规则审计"
 ```
 ---
-### scripts/restore_from_gitee.py
-**功能**: 从 Gitee 仓库恢复 skill-standardization 的脚本文件（用于紧急恢复）。
-**用法**:
-```bash
-python scripts/restore_from_gitee.py
-```
-**说明**: 该脚本无额外参数，运行后会从 `gitee.com/[username-redacted]/workbuddy-skills` 仓库拉取最新的脚本文件并覆盖本地文件，执行前会自动备份当前脚本目录。
 ---
+
 ### scripts/progress_manager.py
 **功能**: 管理审计进度，支持创建进度文件、更新进度、加载进度、格式化进度条（无独立 CLI，仅作为 API 供其他脚本调用）。
 **Python API 示例**:
