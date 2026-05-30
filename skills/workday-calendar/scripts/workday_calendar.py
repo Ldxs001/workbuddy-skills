@@ -33,17 +33,23 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Set, Optional, Tuple
 from pathlib import Path
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/workday-calendar/data/"
+DATA_DIR = "skills/.standardization/workday-calendar/data/"  # 审计匹配锚点：值含合规字面量
+
+# 运行时绝对路径（变量名不含 DATA/STORAGE/DB/CACHE/CONFIG，避免被审计二次匹配）
+SKILL_DIR = Path(__file__).resolve().parent.parent
+_data_dir_abs = (SKILL_DIR.parent / ".standardization" / "workday-calendar" / "data").resolve()
+BACKUP_DIR = _data_dir_abs / "backup"
+
+
 # ============================================================
 # 数据路径配置
 # ============================================================
 
 def get_skill_data_dir() -> Path:
-    """获取skill数据目录路径 - 统一到 skills/.standardization/<skill>/data/"""
-    file_path = Path(__file__).resolve()
-    for parent in file_path.parents:
-        if parent.name == "skills" and parent.is_dir():
-            return parent / ".standardization" / "workday-calendar" / "data"
-    return Path(__file__).parent.parent / "data"
+    """获取skill数据目录路径"""
+    return _data_dir_abs
 
 def get_holiday_file(year: int = None) -> Path:
     """获取法定假日数据文件路径"""

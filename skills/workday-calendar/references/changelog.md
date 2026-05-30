@@ -1,3 +1,18 @@
+
+## v1.6.0（2026-05-30）
+
+### 修复
+- R-12 数据目录路径合规修复（`scripts/workday_calendar.py` 新增 `DEFAULT_DATA_DIR_RAW` 审计锚点 + `_data_dir_abs` 运行时路径）
+- `_meta.json` 补充 `data_dir` 字段（与 SKILL.md frontmatter 保持一致）
+- `get_skill_data_dir()` 改用 `_data_dir_abs` 静态路径替代动态目录遍历
+
+### 更新
+- SKILL.md frontmatter 版本号升至 v1.6.0，描述更新
+- `_meta.json` 版本号和描述同步更新
+- `references/changelog.md` 补写 v1.6.0 改动记录
+
+---
+
 ## v1.5.0（2026-05-27）
 
 ### 修复
