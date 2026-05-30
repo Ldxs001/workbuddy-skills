@@ -8,35 +8,35 @@
 
 ```bash
 # 初始化数据目录
-python chain_manager.py init
+python {SKILL_DIR}/scripts/chain_manager.py init
 
 # 配置
-python settings.py                          # 交互式配置（打开浏览器）
-python settings.py --serve-only             # Agent 模式
-python settings.py --get-config             # 查看配置
-python settings.py --save-config '<json>'   # 保存配置
-python chain_manager.py config              # 查看配置
+python {SKILL_DIR}/scripts/settings.py                          # 交互式配置（打开浏览器）
+python {SKILL_DIR}/scripts/settings.py --serve-only             # Agent 模式
+python {SKILL_DIR}/scripts/settings.py --get-config             # 查看配置
+python {SKILL_DIR}/scripts/settings.py --save-config '<json>'   # 保存配置
+python {SKILL_DIR}/scripts/chain_manager.py config              # 查看配置
 
 # 创建调用链
-python chain_manager.py create --name "链名" --description "描述" --purpose "目的" --steps '[...]'
+python {SKILL_DIR}/scripts/chain_manager.py create --name "链名" --description "描述" --purpose "目的" --steps '[...]'
 
 # 查询
-python chain_manager.py list [--tag "标签"]
-python chain_manager.py show --name "链名"
+python {SKILL_DIR}/scripts/chain_manager.py list [--tag "标签"]
+python {SKILL_DIR}/scripts/chain_manager.py show --name "链名"
 
 # 执行
-python chain_executor.py plan --name "链名" [-v] [--json]
-python chain_executor.py quick --steps '[...]' --name "临时"
-python chain_executor.py validate --name "链名"
+python {SKILL_DIR}/scripts/chain_executor.py plan --name "链名" [-v] [--json]
+python {SKILL_DIR}/scripts/chain_executor.py quick --steps '[...]' --name "临时"
+python {SKILL_DIR}/scripts/chain_executor.py validate --name "链名"
 
 # 调整
-python chain_manager.py add-step --name "链名" ...
-python chain_manager.py remove-step --name "链名" --step N
-python chain_manager.py update-step --name "链名" --step N [--action ...] [--milestone] [--retry-max N]
-python chain_manager.py rename --name "旧名" --new-name "新名"
+python {SKILL_DIR}/scripts/chain_manager.py add-step --name "链名" ...
+python {SKILL_DIR}/scripts/chain_manager.py remove-step --name "链名" --step N
+python {SKILL_DIR}/scripts/chain_manager.py update-step --name "链名" --step N [--action ...] [--milestone] [--retry-max N]
+python {SKILL_DIR}/scripts/chain_manager.py rename --name "旧名" --new-name "新名"
 
 # 删除
-python chain_manager.py delete --name "链名" --force
+python {SKILL_DIR}/scripts/chain_manager.py delete --name "链名" --force
 ```
 
 ---

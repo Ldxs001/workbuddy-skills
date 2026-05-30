@@ -1,38 +1,21 @@
 ---
 name: skill-sub
-version: 1.23.3
+version: 1.24.0
 author: wUwproject
 license: MIT
-description: 调用链编排技能 v1.23.0 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
+description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-data_dir: ../.standardization/skill-sub/
+data_dir: ../.standardization/skill-sub/data/
 tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
 external_data_dir: true
+trigger: ['规划类: 帮我规划一下/步骤是什么', '顺序类: 依次执行/先...再...', '链管理: 创建/查看/更新/删除调用链']
+trigger_negative: ['不使用调用链', '手动逐步执行']
 ---
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-> 反模式详见 [references/antipatterns.md](../references/antipatterns.md)
-
-
-
-
-
-
-
+> 反模式详见 [references/antipatterns.md](references/antipatterns.md)
 
 ## 触发场景
 
@@ -57,17 +40,6 @@ external_data_dir: true
 | 6 | **链备份与版本管理** | 自动备份，支持版本恢复 |
 
 ---
-
----
-
-
-
-
-# skill-sub v1.21.0
-
-调用链编排技能。**既是调用链编辑器，也是粗粒度规划器。**
-
-> 📢 **v1.19.1 修复**：里程碑影响分析（milestones）、动态里程碑（--dynamic）、里程碑统计（milestone-stats）、标签系统增强（list-tags）现已真正实现并注册到 parser。v1.19.0 仅标记 DONE 但未实现。
 
 ---
 
@@ -165,9 +137,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 }
 ```
 
-> 📚 完整 schema 参见 
-
-→ 版本历史详见 `references/chain_schema.md`
+> 📚 完整 schema 详见 `references/chain_schema.md`
 
 ---
 
@@ -193,7 +163,3 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 | **默认重试次数** | 1-10（默认3） | 所有步骤的默认最大重试次数 |
 
 ---
-
-
-
-**v1.17.0 — 执行预览 + 条件执行 + Dry-Run + 备份机制 + 版本管理 + 摘取缓存**

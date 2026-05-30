@@ -1,4 +1,24 @@
-## v1.23.3 (2026-05-30) — R-12 合规完善
+## 1.24.0 (2026-05-31)
+
+### Changed（skill-standardization 规范化改造）
+- **SKILL.md 全面重构** — frontmatter 补充 trigger/trigger_negative 字段；description 删除版本号（R-04 修复）；删除 H1 版本号（R-06 修复）；清理冗余空白行和历史性内容
+- **_meta.json 同步修复** — 补全 data_dir 字段（同步 SKILL.md frontmatter）；tags 与 SKILL.md 同步；补全 triggers 字段；R-12 合规
+- **references/changelog.md** — 版本号去除 v 前缀，使用纯数字 SemVer 格式（R-10 修复）
+- **references/faq.md** — 删除与 antipatterns.md 重复的反模式内容，专注 FAQ + 使用技巧；修正文档描述
+- **references/reference.md** — CLI 命令补全 `{SKILL_DIR}/scripts/` 路径前缀，确保从任意目录可执行
+- **references/workflow.md** — 修正配置路径错误（`scripts/default_config.json` → `config.json`）
+- **scripts/ 目录清理** — 删除 13 个 .bak 备份文件和 9 个历史 patch/fix 脚本，仅保留 7 个活动文件
+
+---
+
+## 1.23.4 (2026-05-30)
+
+### 修复
+- audit --fix 自动修正
+
+---
+
+## 1.23.3 (2026-05-30) — R-12 合规完善
 
 ### Changed
 - 所有脚本补充 DEFAULT_DATA_DIR_RAW + DATA_DIR R-12 定义
@@ -6,7 +26,7 @@
 - 运行 fix_missing_data_dir 一键修复，R-12 审计通过
 
 
-## v1.23.0 (2026-05-27)
+## 1.23.0 (2026-05-27)
 
 ### 修复（R-11 路径规范）
 - **assets/ 目录迁移** — `assets/` 目录下的 `default_config.json` 和 `settings.html` 迁移到 `scripts/`
@@ -14,7 +34,7 @@
 - **assets/ 目录删除** — 符合 R-11 规则（产出物必须在 `scripts/` 或根目录）
 
 ---
-## v1.22.0 (2026-05-26)
+## 1.22.0 (2026-05-26)
 
 ### 面向对象（OO）改造
 - **chain_executor.py** — 全面 OO 改造，拆分为 7 个类：
@@ -38,7 +58,7 @@
 
 ---
 
-## v1.21.0 (2026-05-26)
+## 1.21.0 (2026-05-26)
 
 ### 新增功能（build_execution_plan 子步骤处理）
 - **子步骤拓扑排序** — `_topo_sort_substeps(steps)` 递归对 loop/branch 内的子步骤按 depends_on 依赖关系进行拓扑排序，替代原来的数组顺序执行
@@ -52,7 +72,7 @@
 ---
 
 # skill-sub 更新日志
-## v1.20.0 (2026-05-26)
+## 1.20.0 (2026-05-26)
 
 ### 新增功能（高级编排）
 - **循环步骤（Loop Step）** — `type: "loop"` 支持 `for_each` / `while` 两种模式，可嵌套子步骤
@@ -69,7 +89,7 @@
 
 ---
 
-## v1.19.1 (2026-05-25)
+## 1.19.1 (2026-05-25)
 
 ### 修复（v1.19.0 虚假 DONE 项实际实现）
 - 里程碑影响分析（milestones）— 真正实现并注册到 parser
@@ -80,7 +100,7 @@
 
 ---
 
-## v1.19.0 (2026-05-24)
+## 1.19.0 (2026-05-24)
 
 ### 新增功能
 - 链标签系统增强（Chain Tag System Enhancement）— `list-tags`

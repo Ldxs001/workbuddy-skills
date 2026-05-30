@@ -62,7 +62,7 @@
   "type": "skill",
   "step_name": "代码审查",
   "skill_name": "code-review",
-  "action": "审查 PR #123 的代码变更",
+  "action": "审查 PR #123 的代码更新",
   "skill_instruction": "review-pr",
   "depends_on": [],
   "condition": "always",

@@ -1,14 +1,21 @@
 {
-  "version": "1.23.3",
+  "version": "1.24.0",
   "author": "wUwproject",
   "name": "skill-sub",
-  "description": "skill-sub 调用链编辑器与粗粒度规划器",
+  "description": "调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器",
   "tags": [
     "chain",
     "orchestration",
-    "reusable",
+    "usable",
     "skill-builder",
+    "progressive-loading",
     "planner",
     "editor"
+  ],
+  "data_dir": "skills/.standardization/skill-sub/data/",
+  "triggers": [
+    "规划类: 帮我规划一下/步骤是什么",
+    "顺序类: 依次执行/先...再...",
+    "链管理: 创建/查看/更新/删除调用链"
   ]
 }
