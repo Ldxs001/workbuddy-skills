@@ -222,3 +222,40 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
         detail += ' ⚠️ ' + '；'.join(mtime_warnings)
     return {"passed": True,  # 版本值一致即 passed，mtime 仅做提示
             "detail": detail}
+
+
+def check_meta_json_completeness(filepath, content, fm, body, **kw):
+    """R-25: _meta.json 字段规范性检查（7 标准字段 + 非标字段标记）"""
+    import os, json, re
+    skill_dir = kw.get('skill_dir') or (os.path.dirname(filepath) if filepath else None)
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return {"passed": True, "detail": "R-25: 无法访问技能目录，跳过"}
+    meta_path = os.path.join(skill_dir, '_meta.json')
+    if not os.path.isfile(meta_path):
+        return {"passed": False, "detail": "R-25: _meta.json 文件不存在",
+                "fix": {"key": "meta_json", "value": "missing",
+                         "operation": "创建 _meta.json（含 7 标准字段）"}}
+
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        meta = json.load(f)
+
+    META_STANDARD_FIELDS = {'name', 'version', 'description', 'author', 'tags',
+                            'data_dir', 'triggers'}
+    existing = set(meta.keys())
+    missing = META_STANDARD_FIELDS - existing
+    extra = existing - META_STANDARD_FIELDS
+
+    issues = []
+    if missing:
+        issues.append(f"缺失字段: {', '.join(sorted(missing))}")
+    if extra:
+        issues.append(f"非标字段(需人工判断删/迁移): {', '.join(sorted(extra))}")
+
+    if not issues:
+        return {"passed": True, "detail": f"R-25: _meta.json 字段完整（{len(existing)}字段）"}
+
+    issues_str = '；'.join(issues)
+    return {"passed": False,
+            "detail": f"R-25: {meta_path} - {issues_str}",
+            "fix": {"key": "meta_json", "value": "+".join(sorted(missing)) if missing else 'clean',
+                     "operation": f"补全缺失字段{'、标记非标字段供判断' if extra else ''}"}}

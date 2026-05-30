@@ -1,9 +1,17 @@
+## v2.39.3 (2026-05-30)
+
+### 修复
+- 新增 R-25：_meta.json 字段规范性检查。7 标准字段(name/version/description/author/tags/data_dir/triggers)，缺失自动补全，非标字段标记输出。批量修复 13 个技能 _meta.json
+
+---
+
 ## v2.39.2 (2026-05-30) — R-03 版本号语义规则细化 + bump 命令规则引用
 
 ### Changed
-- R-03 规则描述细化：MAJOR=架构级重构/MINOR=功能重构/PATCH=单处修正
-- bump 命令 epilog 引用 R-03 规则
-- bump 命令 --type 未指定时交互选择
+- R-03 规则描述细化：MAJOR=架构级重构/MINOR=功能重构/PATCH=单处修正，消除两个重构歧义
+- bump 命令 epilog 引用 R-03 规则，执行时显示变更语义
+- bump 命令 --type 未指定时交互选择，默认 feature
+- audit --fix 自动 bump 输出 R-03 规则引用
 
 ---
 

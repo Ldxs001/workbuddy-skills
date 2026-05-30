@@ -868,6 +868,52 @@ def fix_doc_code_consistency(skill_dir, **kw):
 
 
 # ═══════════════════════════════════════════════════
+# fix_meta_json_completeness — _meta.json 7 标准字段补全
+# ═══════════════════════════════════════════════════
+
+def fix_meta_json_completeness(skill_dir, **kw):
+    """R-25: 补全 _meta.json 缺失的 7 标准字段，非标字段标记输出。"""
+    import os, json
+    meta_path = os.path.join(skill_dir, '_meta.json')
+    if not os.path.isfile(meta_path):
+        meta = {}
+    else:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+
+    META_STANDARD = {'name', 'version', 'description', 'author', 'tags',
+                     'data_dir', 'triggers'}
+    skill_name = os.path.basename(skill_dir.rstrip('/\\'))
+    fixes = 0
+
+    # 补缺失字段
+    defaults = {
+        'name': skill_name,
+        'version': '1.0.0',
+        'description': '',
+        'author': 'unknown',
+        'tags': [],
+        'data_dir': f'skills/.standardization/{skill_name}/',
+        'triggers': [],
+    }
+    for field in META_STANDARD:
+        if field not in meta:
+            meta[field] = defaults[field]
+            fixes += 1
+
+    # 标记非标字段
+    extra = [k for k in meta if k not in META_STANDARD]
+    if extra:
+        print(f'  ⚠️  非标字段(需人工判断): {", ".join(extra)}')
+
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    if fixes > 0:
+        print(f'  ✅ _meta.json: 补全 {fixes} 个缺失字段')
+    return fixes
+
+
+# ═══════════════════════════════════════════════════
 # fix_missing_data_dir — 给脚本补 DEFAULT_DATA_DIR_RAW + DATA_DIR
 # ═══════════════════════════════════════════════════
 
@@ -1061,6 +1107,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "progressive_loading_explicit": fix_progressive_loading_explicit,
         "data_dir_compliance": fix_data_dir_compliance,
         "doc_code_consistency": fix_doc_code_consistency,
+        "meta_json": fix_meta_json_completeness,
     }
     func = dispatch.get(fix_key)
     if func is None:
@@ -1095,4 +1142,5 @@ def list_fixable():
         "progressive_loading_explicit",  # R-21
         "data_dir_compliance",       # R-22
         "doc_code_consistency",      # R-23
+        "meta_json",                 # R-25
     ]

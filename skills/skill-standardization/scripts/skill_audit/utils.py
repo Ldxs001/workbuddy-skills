@@ -264,6 +264,17 @@ RULES = [
         "fixable": False,
         "create_template": "将更新日志移至 references/changelog.md，SKILL.md 中保留引用：「→ 详见 references/changelog.md」",
     },
+    # ── 新增规则 R-25 (v2.39.2) ──────────────────────
+    {
+        "id": "R-25",
+        "name": "_meta.json 字段规范性",
+        "severity": "WARN",
+        "method": "check_meta_json_completeness",
+        "check": "_meta.json 须含 7 个标准字段：name/version/description/author/tags/data_dir/triggers；多出非标字段需判断是删除还是迁移；triggers 无依赖用 []",
+        "fixable": True,
+        "fix_action": "fix_meta_json_completeness(skill_dir) — 补全缺失字段，标记非标字段供人工判断",
+        "create_template": "创建时同步生成含 7 标准字段的 _meta.json",
+    },
 ]
 
 

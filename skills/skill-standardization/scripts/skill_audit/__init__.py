@@ -41,6 +41,7 @@ from .utils import (
 from .frontmatter_checker import (
     regex_frontmatter_exists, yaml_has_name, yaml_has_semver_version,
     yaml_has_description, name_matches_dirname, version_matches_manifest,
+    check_meta_json_completeness,
 )
 from .structure_checker import (
     body_has_h1, body_has_trigger_section, body_has_core_section,
@@ -91,6 +92,7 @@ METHOD_MAP = {
     "check_data_dir_compliance": check_data_dir_compliance,
     "check_doc_code_consistency": check_doc_code_consistency,
     "check_changelog_progressive": check_changelog_progressive,
+    "check_meta_json_completeness": check_meta_json_completeness,
 }
 
 
