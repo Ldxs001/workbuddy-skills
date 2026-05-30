@@ -854,27 +854,45 @@ def collect_all_css(template_spec):
     return "\n".join(styles)
 
 def build_cell_html(template_spec):
-    """Build HTML for each cell in the grid"""
+    """Build HTML for each cell in the grid (支持组件式和旧模块格式)"""
     cells = get_cells(template_spec)
     parts = []
+
+    # 导入组件引擎
+    try:
+        from module_assembler import render_cell_content, cell_constraint_css
+        _HAVE_COMPONENT_ENGINE = True
+    except Exception:
+        _HAVE_COMPONENT_ENGINE = False
 
     for cell in cells:
         cell_id = cell.get("id", "cell-x")
         module_name = cell.get("module", "")
         raw_html = cell.get("html", "")
+        components = cell.get("components", None)
 
-        if raw_html:
-            # Direct HTML in cell
+        # 优先级1：组件式 → 使用 module_assembler
+        if components and _HAVE_COMPONENT_ENGINE:
+            content = render_cell_content(cell, cell_id)
+        # 优先级2：旧格式 raw HTML
+        elif raw_html:
             content = raw_html
+        # 优先级3：旧格式 composite module
         elif module_name.startswith("composite:"):
             mname = module_name.split(":", 1)[1]
             mod = COMPOSITE_MODULES.get(mname, {})
             content = mod.get("template", f"<div data-field='{cell_id}'>[{mname}]</div>")
         else:
-            # Empty cell or text placeholder
             content = f'<div data-field="{cell_id}" class="edit-text">[{cell_id}]</div>'
 
-        cell_html = f'<div id="cell-{cell_id}" class="grid-cell">{content}</div>'
+        # 约束CSS
+        constraint_css = ""
+        if _HAVE_COMPONENT_ENGINE and cell.get("constraint"):
+            constraint_css = cell_constraint_css(cell)
+        elif _HAVE_COMPONENT_ENGINE and components:
+            constraint_css = cell_constraint_css(cell)
+
+        cell_html = f'<div id="cell-{cell_id}" class="grid-cell" style="{constraint_css}">{content}</div>'
         parts.append(cell_html)
 
     return "\n".join(parts)

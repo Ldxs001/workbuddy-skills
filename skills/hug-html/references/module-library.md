@@ -1,108 +1,228 @@
-# module-library.md — hug-html 模块库说明 (v2 网格架构)
+# module-library.md — hug-html 组件式模块库 v3.0
 
-## 两层级模块体系
+## 架构总览
 
 ```
-基础模块 (base) → CSS原语（字体/颜色/渐变/图片裁切/圆角/间距）
-复合模块 (composite) → 可复用 HTML 组件（引用基础模块）
-网格 (grid) → N×M 布局，单元格可合并，放置复合模块
+骨架 (Skeleton) — N×M 网格 + 3级约束(fill/fit/clip)
+  └─ 单元格 (Cell) — 放置组件组合
+       ├─ 组件 (Component) — 8种原子类型
+       │    ├─ text     纯文本（title/body/caption）
+       │    ├─ image    图片（fit/cover/clip）
+       │    ├─ icon     图标（FontAwesome/SVG）
+       │    ├─ qrcode   二维码
+       │    ├─ table    数据表格
+       │    ├─ divider  分割线
+       │    ├─ spacer   空白占位
+       │    └─ group    组合容器（递归）
+       └─ 约束系统 — fill/fit/clip 递归应用
 ```
 
-## 基础模块
+**核心变化**（v2 → v3）：
+- 旧：14 个预置复合模块，每个固定 HTML 结构 → 硬编码，难以定制
+- 新：8 个原子组件 + 声明式组合 → 自由搭配，无限可能
 
-存储在 `grid_builder.py` 的 `BASE_MODULES` 字典中。
+---
 
-使用方法：在 Grid Spec 中通过 `"base": ["base:font-size-xl", "base:color-dark"]` 引用。
+## 组件类型
 
-### 分类
+### text — 纯文本
 
-| 分类 | 模块前缀 | 示例 |
-|------|---------|------|
-| 字体大小 | `font-size-` | xxl, xl, lg, md, sm, xs, xxs |
-| 字体颜色 | `color-` | dark, mid, light, white, primary, gradient-text |
-| 背景 | `bg-` | white, transparent, light-blue, glass, dark, gradient-purple/blue/dark/gold |
-| 圆角 | `radius-` | sm, md, lg, xl, full, pill |
-| 间距 | `pad-` | xs, sm, md, lg, xl |
-| 阴影 | `shadow-` | sm, md, lg, glass |
-| 边框 | `border-` | glass, light, bottom, divider-gradient, divider-solid |
-| 图片 | `img-` | circle, cover, contain, logo |
-| 布局 | `flex-` | center, between, col; text-center/left; gap-xs/sm/md/lg |
-| 透明度 | `opacity-` | 100, 90, 70, 50 |
-| 动画 | `anim-` | fade, slide, hover-scale |
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"text"` |
+| `content` | string | ✅ | 文本内容 |
+| `variant` | string | ❌ | `title`(标题) / `body`(正文) / `caption`(注释)，默认 `body` |
+| `style` | object | ❌ | 覆盖样式（font_size, font_weight, color 等） |
 
-## 复合模块
+**变体默认样式：**
 
-存储在 `grid_builder.py` 的 `COMPOSITE_MODULES` 字典中。
+| 变体 | font_size | font_weight | color |
+|------|-----------|-------------|-------|
+| title | 18px | 700 | #1a1a2e |
+| body | 14px | 400 | #4a4a6a |
+| caption | 12px | 300 | #8888aa |
 
-在 Grid Spec 中通过 `"module": "composite:模块名"` 引用。
+### image — 图片
 
-### 完整列表
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"image"` |
+| `src` | string | ✅ | 图片URL |
+| `alt` | string | ❌ | 替代文字 |
+| `constraint` | string | ❌ | `fit`(默认) / `cover` / `fill` |
+| `aspect` | string | ❌ | 宽高比，如 `"1/1"`、`"16/9"` |
+| `style` | object | ❌ | 额外CSS |
 
-| 模块名 | 用途 | data-field 槽位 |
-|--------|------|-----------------|
-| `header-entity` | 单实体头部 | entity-name, entity-badge |
-| `header-dual` | 双实体头部(左应用+右服务) | app-name, app-badge, service-name, service-badge |
-| `main-title` | 渐变主标题+副标题 | main-title, main-sub |
-| `qr-card` | 单二维码卡片 | qr-image, qr-label, qr-hint |
-| `qr-dual` | 双二维码并排 | qr-image-left/right, qr-label-left/right, qr-hint-left/right |
-| `feature-panel` | 特性面板 | feature-icon-0/1, feature-text-0/1 |
-| `comms-panel` | 通信面板 | 设备标签内容 |
-| `footer-caption` | 底部标签行 | footer-tag-1/2/3 |
-| `small-note` | 注释文字 | note-text |
-| `text-block` | 纯文本块 | tb-title, tb-body, tb-body-2 |
-| `text-img-right` | 左文右图 | ti-title, ti-desc |
-| `param-panel` | 参数面板 | param-title, param-1, param-2 |
-| `data-table` | 数据表格 | th-1/2, td-row*-col* |
-| `stat-card` | 统计卡片 | stat-label, stat-value |
+### icon — 图标
 
-## Grid Spec 结构
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"icon"` |
+| `name` | string | ✅ | 图标名（如 `star`、`heart`） |
+| `family` | string | ❌ | `fa`(FontAwesome) / `svg`(内联)，默认 `fa` |
+| `size` | string | ❌ | 尺寸，如 `"24px"`，默认 `24px` |
+| `color` | string | ❌ | 颜色，默认 `#1a1a2e` |
 
-完整的 Grid Spec JSON 格式：
+### qrcode — 二维码
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"qrcode"` |
+| `content` | string | ✅ | 二维码内容（URL/文本） |
+| `size` | string | ❌ | 尺寸如 `"120px"`，默认 `120px` |
+| `label` | string | ❌ | 二维码下方标注文字 |
+
+### table — 数据表格
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"table"` |
+| `headers` | string[] | ✅ | 表头数组 |
+| `rows` | string[][] | ✅ | 数据行二维数组 |
+| `style` | object | ❌ | 额外CSS |
+
+### divider — 分割线
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"divider"` |
+| `height` | string | ❌ | 线粗，默认 `"1px"` |
+| `color` | string | ❌ | 颜色，默认 `"#e0e0e0"` |
+| `style_type` | string | ❌ | `solid` / `dashed` / `dotted`，默认 `solid` |
+
+### spacer — 空白占位
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"spacer"` |
+| `width` | string | ❌ | 宽度，默认 `"100%"` |
+| `height` | string | ❌ | 高度，默认 `"auto"` |
+
+### group — 组合容器（递归）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"group"` |
+| `direction` | string | ❌ | `"row"`(默认) / `"column"` |
+| `align` | string | ❌ | 主轴对齐：`left` / `center` / `right` / `top` / `bottom` |
+| `cross_align` | string | ❌ | 交叉轴对齐：`stretch`(默认) / `center` / `flex-start` / `flex-end` |
+| `ratios` | number[] | ❌ | 子组件flex比例，如 `[1, 2]` 表示1/3和2/3 |
+| `children` | array | ✅ | 子组件列表 |
+| `style` | object | ❌ | 容器额外CSS |
+
+---
+
+## 约束系统
+
+三种约束模式递归应用于：**骨架 → 模块 → 组件**
+
+| 模式 | 枚举值 | CSS 行为 | 适用场景 |
+|------|--------|----------|---------|
+| 完全贴合 | `fill` | `width/height:100%` 拉伸填充 | 背景图、全宽文字 |
+| 等比缩放 | `fit` | `max-width/max-height:100%` + `object-fit:contain` | 图标、Logo |
+| 裁剪遮挡 | `clip` | `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);overflow:hidden` | 头像、封面图 |
+
+约束在 Spec 中的配置位置：
+
+```json
+// 骨架对模块的约束（cell级别）
+{"row": 0, "constraint": "fit", ...}
+
+// 组件级别的约束
+{"type": "image", "constraint": "clip", "aspect": "1/1", ...}
+```
+
+---
+
+## Grid Spec 完整示例
 
 ```json
 {
-  "name": "模板名称",
-  "desc": "描述",
-  "source": "来源（可选）",
+  "name": "图文卡片",
   "card_style": {
     "max_width": "400px",
-    "bg": "rgba(255,255,255,0.82)",
-    "backdrop": "blur(25px)",
-    "border_radius": "36px",
-    "shadow": "0 20px 35px rgba(...)",
-    "padding": "24px 20px",
-    "border": "1px solid rgba(255,255,255,0.4)"
+    "bg": "rgba(255,255,255,0.85)",
+    "backdrop": "blur(20px)",
+    "border_radius": "24px",
+    "shadow": "0 12px 40px rgba(0,0,0,0.12)",
+    "padding": "20px"
   },
   "grid": {
-    "rows": 6,
-    "cols": 1,
-    "gap": "0",
+    "rows": 3, "cols": 3, "gap": "12px",
     "cells": [
       {
-        "id": "cell-id",
-        "row": 0, "col": 0,
-        "rowspan": 1, "colspan": 1,
-        "module": "composite:模块名",
-        "style": {"background": "#xxx", "padding": "16px"},
-        "html": "自定义HTML（与module二选一）"
-      }
+        "id": "hero", "row": 0, "col": 0, "rowspan": 2, "colspan": 2,
+        "constraint": "fill",
+        "padding": "8px",
+        "components": [
+          {
+            "type": "image",
+            "src": "https://picsum.photos/200",
+            "constraint": "cover",
+            "style": {"border_radius": "12px"}
+          }
+        ]
+      },
+      {
+        "id": "info", "row": 0, "col": 2, "rowspan": 2,
+        "direction": "column",
+        "ratios": [1, 2, 1],
+        "components": [
+          {"type": "icon", "name": "star", "size": "28px", "color": "#ffd700"},
+          {"type": "group", "direction": "column", "children": [
+            {"type": "text", "variant": "title", "content": "卡片标题"},
+            {"type": "text", "variant": "body", "content": "这里是正文描述，展示组件式组合的效果。"}
+          ]},
+          {"type": "text", "variant": "caption", "content": "¥ 99.00"}
+        ]
+      },
+      {"id": "div", "row": 2, "col": 0, "colspan": 3,
+       "components": [{"type": "divider"}]}
     ]
   }
 }
 ```
 
-## 命令行工具链
+---
 
-| 工具 | 命令 | 用途 |
-|------|------|------|
-| `grid_builder.py` | `--spec <spec> -o <html>` | 核心引擎：从 Grid Spec 生成 HTML |
-| `grid_builder.py` | `--list-modules` | 列出所有 base + composite 模块 |
-| `grid_builder.py` | `--list-templates` | 列出所有内置模板 |
-| `grid_builder.py` | `--demo --template <name>` | 快速生成模板示例 |
-| `module_assembler.py` | `--spec <spec> -o <html>` | 网格化组装（兼容旧调用方式） |
-| `module_assembler.py` | `--create-spec <path>` | 交互式创建 Grid Spec |
-| `template_generator.py` | `--type <name> -o <html>` | 从内置模板生成 |
-| `visual_editor.py` | `--template <html> -o <editor>` | 生成网格编辑界面 |
-| `visual_editor.py` | `--type <name> -o <editor>` | 从内置模板直接生成编辑界面 |
-| `content_filler.py` | `fill/auto/extract` | 内容填充与提取 |
-| `gen_test_grids.py` | (直接运行) | 生成模块库 JSON + 额外 Grid Spec |
+## 命令行
+
+```bash
+# 列出所有组件类型
+python scripts/module_assembler.py --list-components
+
+# 导出接口定义JSON
+python scripts/module_assembler.py --export-interfaces interfaces.json
+
+# 生成组件系统演示HTML
+python scripts/module_assembler.py --demo
+
+# 旧模块系统（向后兼容）
+python scripts/grid_builder.py --list-modules
+python scripts/grid_builder.py --spec <spec> -o <output.html>
+```
+
+---
+
+## 从旧格式迁移
+
+旧版 `"module": "composite:xxx"` 格式仍然支持，但建议迁移到组件式格式。
+
+**迁移示例：text-img-right（左文右图）**
+
+旧格式：
+```json
+{"module": "composite:text-img-right"}
+```
+
+新格式：
+```json
+{
+  "direction": "row",
+  "ratios": [1, 1],
+  "components": [
+    {"type": "text", "variant": "title", "content": "标题"},
+    {"type": "image", "src": "https://...", "constraint": "fit", "aspect": "1/1"}
+  ]
+}
+```

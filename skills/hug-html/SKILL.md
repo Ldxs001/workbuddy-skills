@@ -1,6 +1,6 @@
 ---
 name: hug-html
-version: 2.1.3
+version: 2.1.4
 author: Ldxs
 license: MIT
 description: Grid-based HTML module engine: NxM grid layout, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
@@ -12,6 +12,11 @@ external_data_dir: true
 faq_quality: improve_qa
 antipattern_detail: add_detail
 ---
+
+
+
+
+
 
 
 
@@ -47,16 +52,26 @@ antipattern_detail: add_detail
 ```
 骨架 (Skeleton)
 ├── 骨架结构 — N×M 网格、行列数、单元格合并(rowspan/colspan)、gap间距
-└── 骨架样式 — 底板背景/渐变/透明度、外阴影、外边框、圆角、内外边距
+├── 骨架样式 — 底板背景/渐变/透明度、外阴影、外边框、圆角、内外边距
+└── 约束模式 — fill(完全贴合) / fit(等比缩放) / clip(裁剪遮挡)
 
-模块 (Modules)  ← 模块模板 = {模块结构 + 模块样式} 预置组合
-├── 模块结构 — 复合模块的 HTML 骨架（header-entity 的图标+文字布局、qr-card 的卡片+二维码结构等）
-└── 模块样式 — 模块级的视觉样式（由 base 模块组合提供：字体、颜色、背景、圆角等）
+模块 (Module)  ← 组件组合 = {组件声明 + 约束 + 比例} 自由搭配
+├── 组件组合 — 8种原子组件自由搭配（text/image/icon/qrcode/table/divider/spacer/group）
+├── 组合逻辑 — 方向(row/column)、比例(ratios)、对齐(align/cross_align)
+└── 约束传递 — 骨架约束模块 → 模块约束组件（递归）
 
-基础 (Base/Primitives)
-└── 基础样式 — 作用于具体文字/元素的 CSS 原语：字族、字号、字重、字色、行高、透明度、对齐方式
+组件 (Component)  ← 8种原子类型
+├── text     — 纯文本（title/body/caption 三种变体）
+├── image    — 图片（支持 fit/cover/fill 填充模式）
+├── icon     — 图标（FontAwesome / SVG内联）
+├── qrcode   — 二维码（API生成）
+├── table    — 数据表格（表头+行）
+├── divider  — 分割线
+├── spacer   — 空白占位
+└── group    — 组合容器（递归包含子组件）
 
-          方案模板 = 预置的{骨架结构 + 骨架样式 + 模块结构 + 模块样式 + 基础样式}组合
+基础样式 (Base)
+└── CSS原语 — 字体/颜色/渐变/圆角/间距/阴影/边框
 ```
 
 **编辑粒度**（可视化编辑器内）：
@@ -68,9 +83,10 @@ antipattern_detail: add_detail
 
 **大模型使用流程**（自由生成模式）：
 1. 理解用户需求 → 确定骨架结构：几行几列、哪些单元格需要合并
-2. 描述需要的模块 → 从复合模块库中选择匹配的模块模板，放入对应骨架位置
-3. 应用基础样式 → 为每个文字元素配置字体、字号、字色、字重
-4. 组合为 HTML → 直接生成自包含 HTML（data-field 标记编辑区），用 `--audit` 审查
+2. 确定约束模式：fill/fit/clip → 决定骨架对模块、模块对组件的约束
+3. 描述需要的组件 → 从8种原子组件中自由组合，放入对应骨架位置
+4. 配置组合逻辑：方向、比例、对齐方式
+5. 生成 HTML → 可直接用 `module_assembler.py` 或自由生成自包含 HTML
 
 ## 核心能力
 
@@ -79,16 +95,18 @@ antipattern_detail: add_detail
 | # | 能力 | 说明 |
 |---|------|------|
 | 1 | **骨架结构** | N×M 网格、行列数、单元格合并（rowspan/colspan）、gap 间距 |
-| 2 | **骨架样式** | 底板背景/渐变、外阴影、外边框、圆角、卡片内外边距 |
-| 3 | **模块体系** | 复合模块（header-entity/qr-card/feature-panel 等 14 种）+ Base CSS 原语 |
-| 4 | **方案模板库** | 内置 7+ 预置{骨架+模块+样式}组合 + **用户可自定义固化** |
-| 5 | **样式预设** | 5 种内置风格：商务/科研/喜庆/丧事/技术，一键切换配色字体 |
-| 6 | **基础编辑** | 每个文字元素独立控制：字体家族(8种)/字重(100-900)/字号(9-48px)/字色/透明度 |
-| 7 | **图片编辑** | 点击输入URL + 拖放文件替换，所有复合模块图片均支持 |
-| 8 | **生成后审计** | 自动检查 HTML 结构完整性、标签平衡、图片属性、网格越界、渲染风险 |
-| 9 | **统一接口** | `--export-interfaces` 导出完整接口定义 JSON，大模型可直接理解 |
-| 10 | **方案模板固化** | `--save-as <名>` 将任意生成固化为用户模板，后续按名引用 |
-| 11 | **自由生成模式** | AI 参考模块库和模板范，理解需求确定骨架→选模块→设样式→生成→审计 |
+| 2 | **骨架约束** | 3级约束（fill/fit/clip），递归传递到组件级别 |
+| 3 | **组件体系** | 8种原子组件（text/image/icon/qrcode/table/divider/spacer/group），自由组合 |
+| 4 | **组合逻辑** | 方向(row/column)、比例(ratios)、对齐(align)、8方向位置 |
+| 5 | **方案模板库** | 内置 7+ 预置{骨架+组件+样式}组合 + **用户可自定义固化** |
+| 6 | **样式预设** | 5 种内置风格：商务/科研/喜庆/丧事/技术，一键切换配色字体 |
+| 7 | **基础编辑** | 每个文字元素独立控制：字体家族(8种)/字重(100-900)/字号(9-48px)/字色/透明度 |
+| 8 | **图片编辑** | 点击输入URL + 拖放文件替换，所有图片组件均支持 |
+| 9 | **生成后审计** | 自动检查 HTML 结构完整性、标签平衡、图片属性、网格越界、渲染风险 |
+| 10 | **统一接口** | `--export-interfaces` 导出完整接口定义 JSON，大模型可直接理解 |
+| 11 | **方案模板固化** | `--save-as <名>` 将任意生成固化为用户模板，后续按名引用 |
+| 12 | **自由生成模式** | AI 参考组件库，理解需求确定骨架→组合组件→约束→生成→审计 |
+| 13 | **向后兼容** | 旧格式 `"module": "composite:xxx"` 仍然支持 |
 
 ## 能力边界
 
@@ -131,26 +149,23 @@ antipattern_detail: add_detail
 ## 快速开始
 
 ```bash
-# 查看所有模板
+# 列出所有组件类型（v3 新！）
+python scripts/module_assembler.py --list-components
+
+# 导出完整的组件接口定义
+python scripts/module_assembler.py --export-interfaces "data/output/interfaces.json"
+
+# 生成组件系统演示HTML
+python scripts/module_assembler.py --demo
+
+# 查看所有模板（向后兼容）
 python scripts/grid_builder.py --list-templates
 
 # 从内置模板生成 HTML
 python scripts/template_generator.py --type harmony-app -o "data/output/card.html"
 
-# 生成可视化编辑界面
-python scripts/visual_editor.py --type harmony-app -o "data/output/editor.html"
-
-# 内容填充
-python scripts/content_filler.py auto --template "data/output/card.html" --output "data/output/filled.html"
-
-# 使用自定义 Grid Spec
+# 使用自定义 Grid Spec（支持新旧两种格式）
 python scripts/grid_builder.py --spec "data/templates/3x3-merge.json" -o "data/output/grid.html"
-
-# 固化方案模板（将当前生成保存为可复用的用户模板）
-python scripts/grid_builder.py --save-as my-template --spec harmony-app --desc "我的毛玻璃卡片"
-
-# 按名称使用用户方案模板（下次直接引用）
-python scripts/grid_builder.py --spec "my-template" -o "data/output/from-user-template.html"
 
 # 导出完整接口定义（供大模型参考）
 python scripts/grid_builder.py --export-interfaces "data/output/interfaces.json"
@@ -211,9 +226,9 @@ python scripts/grid_builder.py --export-interfaces "data/output/interfaces.json"
 
 | 文档 | 内容 |
 |------|------|
-| `references/guide.md` | 完整使用教程（v2 网格架构） |
+| `references/guide.md` | 完整使用教程（v3 组件式架构） |
+| `references/module-library.md` | 组件系统 + 约束系统 + 组合示例（v3 新版） |
 | `references/permissions.md` | 权限扫描报告和风险说明 |
-| `references/module-library.md` | 两层级模块库说明 |
 | `references/style-presets.md` | 样式预设系统说明 |
 | `references/call-chains.md` | 调用链定义（skill-sub） |
 | `references/antipatterns.md` | 反模式手册 |

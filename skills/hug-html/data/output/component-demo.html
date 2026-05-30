@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+* {margin:0;padding:0;box-sizing:border-box;}
+body {min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#667eea,#764ba2);font-family:'Segoe UI',sans-serif;padding:20px;}
+.card {max-width:600px;width:100%;
+  background:rgba(255,255,255,0.9);
+  border-radius:24px;
+  padding:20px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.15);}
+.grid {display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;}
+.cell {overflow:hidden;}
+</style></head><body><div class="card"><div class="grid">
+<div class="cell" style="grid-row:1/span1;grid-column:1/span2;width:100%;height:100%;overflow:hidden;"><div class="component-group" style="display:flex;flex-direction:row;align-items:stretch;justify-content:center"><img style="flex:0 0 33.33%;max-width:33.33%;" class="component-image" src="https://picsum.photos/100/100" alt="" style="max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:1/1;object-fit:contain;" loading="lazy"><div style="flex:0 0 66.67%;max-width:66.67%;" class="component-group" style="display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start"><p style="flex:0 0 66.67%;max-width:66.67%;" class="component-text" style="font-size:18px;font-weight:700;color:#1a1a2e;margin:0;">图文卡片标题</p><p style="flex:0 0 66.67%;max-width:66.67%;" class="component-text" style="font-size:14px;font-weight:400;color:#4a4a6a;margin:0;">这里是正文描述，展示图文左右组合的效果。</p></div></div></div><div class="cell" style="grid-row:1/span1;grid-column:3/span1;width:100%;height:100%;overflow:hidden;"><div class="component-group" style="display:flex;flex-direction:row;align-items:stretch;justify-content:center"><i class="component-icon fa fa-star" style="font-size:32px;color:#ffd700;"></i><p class="component-text" style="font-size:12px;font-weight:300;color:#8888aa;margin:0;">收藏</p></div></div><div class="cell" style="grid-row:2/span1;grid-column:1/span3;width:100%;height:100%;overflow:hidden;"><hr class="component-divider" style="border:none;border-top:1px solid #e0e0e0;margin:8px 0;width:100%;"></div><div class="cell" style="grid-row:3/span1;grid-column:1/span3;width:100%;height:100%;overflow:hidden;"><div class="component-group" style="display:flex;flex-direction:row;align-items:stretch;justify-content:center"><p style="flex:0 0 33.33%;max-width:33.33%;" class="component-text" style="font-size:14px;font-weight:400;color:#4a4a6a;margin:0;">左列文字</p><p style="flex:0 0 33.33%;max-width:33.33%;" class="component-text" style="font-size:14px;font-weight:400;color:#4a4a6a;margin:0;">中列文字</p><p style="flex:0 0 33.33%;max-width:33.33%;" class="component-text" style="font-size:14px;font-weight:400;color:#4a4a6a;margin:0;">右列文字</p></div></div></div></div></body></html>
