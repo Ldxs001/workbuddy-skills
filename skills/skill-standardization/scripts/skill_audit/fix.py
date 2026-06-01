@@ -371,7 +371,7 @@ def fix_h1_position(skill_dir, **kw):
 def fix_section_trigger(skill_dir, **kw):
     """
     R-07 修复：添加/完善 ## 触发场景 章节。
-    使用 body.json content_format 模板生成，分正向触发和否定条件两个子列表。
+    优先从目标技能自身采集触发词，回退到 content_format 格式。
     """
     skill_md = os.path.join(skill_dir, "SKILL.md")
     if not os.path.isfile(skill_md):
@@ -381,36 +381,58 @@ def fix_section_trigger(skill_dir, **kw):
     if fm is None:
         return 0
     name = fm.get("name", "本技能")
+    desc = fm.get("description", "")
 
-    # 从 body.json 读取 content_format 模板
-    spec = _load_body_spec()
-    fmt = None
-    for sec in spec.get("required_sections", []):
-        if any(k in str(sec.get("keywords", [])) for k in ["触发条件", "触发场景", "触发"]):
-            fmt = sec.get("content_format", {})
-            break
+    # ── 采集源：从脚本 docstring 中提取功能关键词 ──
+    triggers = []
+    neg_triggers = ["简单问答、闲聊、问候（不需要本技能）", "单步任务（不需要结构化执行）"]
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if os.path.isdir(scripts_dir):
+        for root, dirs, files in os.walk(scripts_dir):
+            for f in files:
+                if not f.endswith('.py'): continue
+                try:
+                    with open(os.path.join(root, f), 'r', encoding='utf-8') as fh:
+                        src = fh.read()
+                except: continue
+                # 从 docstring 提取功能描述
+                docstrings = re.findall(r'"""(.*?)"""', src, re.DOTALL)
+                for ds in docstrings:
+                    lines = [l.strip() for l in ds.split('\n') if l.strip()]
+                    for line in lines[:3]:
+                        if len(line) > 6 and len(line) < 60 and not line.startswith(('Args', 'Returns', 'Raises')):
+                            triggers.append(line[:50])
 
-    if fmt and fmt.get("type") == "mixed" and "一" in str(fmt.get("template", "")):
-        # 使用 content_format 的分两段模板
-        section_body = (
-            f"**正向触发（满足以下任意一条）：**\n"
-            f"- 用户需要使用 {name}\n"
-            f"- 用户询问关于 {name} 的问题\n"
-            f"- 场景需要 {name}\n\n"
-            f"**否定条件（满足以下任意一条，不触发）：**\n"
-            f"- 简单问答、闲聊、问候\n"
-            f"- 单步任务（不需要结构化执行）\n"
-        )
-    else:
-        # 回退到原有模板
-        section_body = (
-            f"当用户需要使用 {name} 时\n"
-            f"当要求使用 {name} 时\n"
-            f"当询问关于 {name} 的问题时\n\n"
-            "不触发条件：\n"
-            "- 用户没有明确提到相关需求时\n"
-            "- 上下文不足以判断时需要询问用户\n"
-        )
+    # ── 采集源：从 frontmatter trigger 字段 ──
+    fm_triggers = fm.get("trigger", "")
+    if isinstance(fm_triggers, list):
+        for t in fm_triggers:
+            if t and t not in triggers:
+                triggers.append(t)
+
+    # ── 采集源：从 description 提取关键动作 ──
+    action_kw = re.findall(r'[\u4e00-\u9fff]{2,}(?:工具|功能|能力|模块|系统)', desc)
+    for a in action_kw:
+        if a not in triggers:
+            triggers.append(a)
+
+    # ── 去重截断 ──
+    triggers = [t for t in triggers if len(t) > 4][:6]
+
+    if not triggers:
+        triggers = [f"使用 {name}", f"询问关于 {name} 的问题", f"需要 {name}"]
+
+    # ── 生成正/否定双列表 ──
+    pos_items = '\n'.join(f"- 用户需要{t}" if not t.startswith('- ') else t for t in triggers[:4])
+    neg_section = '\n'.join(f"- {t}" for t in neg_triggers)
+
+    section_body = (
+        f"**正向触发（满足以下任意一条）：**\n"
+        f"{pos_items}\n\n"
+        f"**否定条件（满足以下任意一条，不触发）：**\n"
+        f"{neg_section}\n"
+    )
+
     ok = _add_section_to_body(skill_md, "触发场景", section_body, insert_after=None)
     return 1 if ok else 0
 
