@@ -3,7 +3,7 @@ name: skill-sub
 version: 1.24.5
 author: wUwproject
 license: MIT
-description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
+description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -12,27 +12,12 @@ tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading
 external_data_dir: true
 trigger: ['规划类: 帮我规划一下/步骤是什么', '顺序类: 依次执行/先...再...', '链管理: 创建/查看/更新/删除调用链']
 trigger_negative: ['不使用调用链', '手动逐步执行']
-meta_field_sync: true
 ---
 # skill-sub
 
 > 反模式详见 [references/antipatterns.md](references/antipatterns.md)
 
-## 约束
-- assets/ 目录删除** — 符合 R-11 规则（产出物必须在 `scripts/` 或根目录）
-
----
-## 1.22.0 (2026-05-26)
-
-### 面向对象（OO）改造
-- **chai
-- assets/ 目录删除** — 符合 R-11 规则（产出物必须在 `scripts/` 或根目录）
-
----
 ## 触发场景
-
-**正向触发（满足以下任意一条）：**
-
 
 **当用户提出以下意图时触发本技能：**
 - 规划类：「帮我规划一下...」、「...的步骤是什么」
@@ -43,9 +28,21 @@ meta_field_sync: true
 
 ## 核心能力
 
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `refere
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-### 渐进式文件索引
+| # | 功能 | 说明 |
+|---|------|------|
+| 1 | **调用链管理** | 创建、查询、更新、删除调用链 |
+| 2 | **执行计划生成** | 生成结构化执行计划，含并行/串行标记 |
+| 3 | **条件执行** | 支持条件步骤，按条件判断是否执行 |
+| 4 | **循环与分支编排** | 支持 for-each/while 循环和 if-else 分支 |
+| 5 | **Dry-Run 模式** | 模拟执行，不实际调用技能 |
+| 6 | **链备份与版本管理** | 自动备份，支持版本恢复 |
+
+---
+
+---
+
 
 ### 渐进式文件索引
 
@@ -59,28 +56,16 @@ meta_field_sync: true
 | `permissions.md` | 权限说明 | 权限扫描风险等级：**MEDIUM** |
 | `reference.md` | skill-sub 参考手册 | > 本文档是 SKILL.md 的渐进式补充，包含完整 CLI 速查、脚本 API、存储格式。 |
 | `workflow.md` | skill-sub 详细工作流程 | > 本文档是 SKILL.md 的渐进式补充，详细描述执行流程、里程碑判断规则、三层回退策略。 |
-## 触发场景
+## 工作流程
 
-**正向触发（满足以下任意一条）：**
-
-
-**当用户提出以下意图时触发本技能：**
-- 规划类：「帮我规划一下...」、「...的步骤是什么」
-- 顺序类：「依次执行 A、B、C」、「先...再...」
-- 链管理：「创建/查看/更新/删除调用链」
-
-**否定条件**：仅当用户明确要求「不使用调用链」或「手动逐步执行」时，不自动触发。
-
-## 核心能力
-
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `refere
-
-### 渐进式文件索引
----
+1. **理解意图** → 分析用户输入，判断是否需要调用链
+2. **规划技能顺序** → 推荐参与的 Skill 及其顺序
+3. **生成调用链** → 创建 JSON 格式的调用链定义
+4. **生成执行计划** → 输出 AI 可直接执行的指令序列
+5. **（可选）实际执行** → 按执行计划逐步调用技能
 
 ---
 
-### 渐进式文件索引
 ## 快速开始
 
 ```bash
@@ -108,18 +93,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 
 ---
 
-
-## 工作流程
-
-1. **理解意图** → 分析用户输入，判断是否需要调用链
-2. **规划技能顺序** → 推荐参与的 Skill 及其顺序
-3. **生成调用链** → 创建 JSON 格式的调用链定义
-4. **生成执行计划** → 输出 AI 可直接执行的指令序列
-5. **（可选）实际执行** → 按执行计划逐步调用技能
-
----
-
-## 循环与分支编排
+## 循环与分支编排（v1.20.0 新增）
 
 ### for-each 循环
 
@@ -177,6 +151,17 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 ```
 
 > 📚 完整 schema 详见 `references/chain_schema.md`
+
+---
+
+## 详细文档
+
+完整工作流程、使用示例、反模式与常见问题 → 见 `references/` 目录：
+- `references/workflow.md` — 详细工作流程
+- `references/examples.md` — 使用示例
+- `references/faq.md` — 常见问题与反模式
+- `references/chain_schema.md` — 调用链数据结构定义
+- `references/permissions.md` — 权限说明
 
 ---
 
