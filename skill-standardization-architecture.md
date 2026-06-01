@@ -59,7 +59,7 @@ skill-standardization/
     │   ├── fix.py              # 自动修复函数（30+ 规则）
     │   └── utils.py            # 工具函数
     ├── json_loader.py          # 渐进式 JSON 加载器
-    ├── skill_inspector.py      # 技能结构蓝皮书生成器（v2.44.0 新增）
+    ├── skill_inspector.py      # 技能结构蓝皮书生成器
     ├── permission_checker.py   # 权限检查器
     ├── authorization_manager.py# 授权管理器
     ├── safe_io.py              # 安全文件写入（原子写入+备份）
@@ -102,30 +102,30 @@ skill-standardization/
 
 ## 二、完整审查规则体系（R-01 ~ R-25）
 
-25 条规则按用途分为 6 大类别，严重度分为 **ERROR**（必须修）和 **WARN**（建议修）两级。
+25 条规则按用途分为 7 大类别，严重度分为 **ERROR**（必须修）和 **WARN**（建议修）两级。
 
 ### 2.1 类别 A：Frontmatter 结构（R-01 ~ R-05）
 
-**目的**：确保每个 skill 有完整可解析的 YAML frontmatter，字段齐全、命名规范。R-01 在 v2.44.0 合并了 _meta.json 7 字段检查。
+**目的**：确保每个 skill 有完整可解析的 YAML frontmatter，字段齐全、命名规范。R-01 合并了 _meta.json 7 字段检查。
 
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
-| **R-01** | ERROR | YAML frontmatter 存在性 + 字段完整性 + **_meta.json 7 字段检查**（v2.44.0 合并） | 文件以 `---` 开头并包含闭合 `---`；11 required + 2 conditional 字段分层检查；_meta.json 7 标准字段完整 |
+| **R-01** | ERROR | YAML frontmatter 存在性 + 字段完整性 + **_meta.json 7 字段检查**（合并） | 文件以 `---` 开头并包含闭合 `---`；11 required + 2 conditional 字段分层检查；_meta.json 7 标准字段完整 |
 | **R-02** | ERROR | `name` 字段 | frontmatter 含 `name:`，值非空字符串 |
 | **R-03** | ERROR | `version` 字段 | 值符合 SemVer 格式（x.y.z） |
 | **R-04** | ERROR | `description` 字段 | 含 `description:`，值非空 |
 | **R-05** | WARN | name = 目录名 | frontmatter 的 name 与所在目录名一致 |
 
-**Frontmatter 字段分层体系**（v2.40.1+）：
+**Frontmatter 字段分层体系**：
 - **11 required**：name/version/description/author/license/tags/data_dir/external_data_dir/sensitive_access/critical_write/permission_weight
 - **2 conditional**：trigger/trigger_negative（正文有触发词/否定条件时必填）
 - **4 optional**：references/category/priority/deprecated
 
-**非标字段处理策略**（v2.41.0+）：
+**非标字段处理策略**：
 - **_meta.json 非标字段**：审计阶段标记并提示"需人工判断删/迁移"（WARN）；`--fix` 自动修复时直接删除（_meta.json 是机器元数据，应保持严格一致）
 - **frontmatter 非标字段**：仅 WARN 提醒，不移除（frontmatter 允许自定义字段如 home_url、category）
 
-**设计意图**：frontmatter 是所有 Skill 的"身份证"。R-05 确保目录名和声明名一致。R-01 在 v2.44.0 合并了 `_meta.json` 7 字段检查，通过 `regex_frontmatter_and_meta()` 组合函数同时校验 SKILL.md 和 `_meta.json` 的元数据完整性。
+**设计意图**：frontmatter 是所有 Skill 的"身份证"。R-05 确保目录名和声明名一致。R-01 通过 `regex_frontmatter_and_meta()` 组合函数同时校验 SKILL.md 和 `_meta.json` 的元数据完整性。
 
 ### 2.2 类别 B：正文结构（R-06 ~ R-10）
 
@@ -164,7 +164,7 @@ skill-standardization/
 
 只要有任何一个来源表明技能有数据需求，就要求 `_meta.json` 声明 `data_dir`。
 
-**R-12 修复历程**（v2.38.11）：修复了 `_extract_path_value` 函数不存在导致的漏检问题（R-12 对脚本的检测从没真正运行过），并新增 step 1.5 检测引用 `.standardization` 但无 `DATA_DIR` 的脚本。
+**R-12 修复历程**：修复了 `_extract_path_value` 函数不存在导致的漏检问题，新增 step 1.5 检测引用 `.standardization` 但无 `DATA_DIR` 的脚本。
 
 **推荐写法**：
 ```python
@@ -299,7 +299,7 @@ create 使用硬编码字符串模板（当前），未来可能支持外部模�
 
 ### D6: 备份优先 + Inspect 先读全
 任何修改性操作（update --fix, refactor）在执行前均强制备份，带时间戳命名。
-v2.44.0 新增：备份后、改造前**强制运行 skill_inspector** 结构扫描，输出技能蓝皮书（元信息、目录树、章节、函数清单、引用概览、安全数据），确保 AI/开发者了解全貌后再动手。
+备份后、改造前**强制运行 skill_inspector** 结构扫描，输出技能蓝皮书（元信息、目录树、章节、函数清单、引用概览、安全数据），确保 AI/开发者了解全貌后再动手。
 **目的**：备份确保可回滚；inspect 确保不遗漏文件或功能，避免"AI 读哪算哪导致的改造遗漏"。
 
 ---
@@ -316,7 +316,7 @@ v2.44.0 新增：备份后、改造前**强制运行 skill_inspector** 结构扫
 | 2 | `_meta.json` | `"version"` 字段 |
 | 3 | `references/changelog.md` | 版本条目 |
 
-`update --fix` 已自动执行上述三端同步（v2.38.10+）。`bump` 子命令（v2.39.0+）可一键升级版本号三端。
+`update --fix` 已自动执行上述三端同步。`bump` 子命令可一键升级版本号三端。
 
 ### 4.2 文件更新约束
 
@@ -347,7 +347,7 @@ v2.44.0 新增：备份后、改造前**强制运行 skill_inspector** 结构扫
 | 章节格式合规 | R-25 C-12 自动比对 body.json content_format |
 | 渐进式索引表 | C-13 审计自动检查完整性 |
 
-### 4.4 排错止损规则（v2.38.4+）
+### 4.4 排错止损规则
 
 1. **区分警告来源**：审计 WARNING/ERROR 可能是审计工具自身的问题。先判断是被审计技能的真实问题还是审计工具的问题，再动手。
 2. **同一操作失败 ≥2 次 → 强制停止换思路**：重复同样的失败操作不会得到不同结果。
@@ -370,7 +370,7 @@ DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardizat
 
 ## 五、反模式速查表
 
-13 条预注册反模式，按影响级别分级：
+预注册反模式，按影响级别分级：
 
 | ID | 反模式 | 级别 | 正确做法 |
 |----|--------|:----:|---------|
@@ -436,7 +436,7 @@ apply_fix(skill_dir, 'R-07', 'R-18', 'R-19')  # 批量修复
 
 ## 七、与 git-sync 的协作（已解耦）
 
-> **注意**：`skill-standardization` 与 `git-sync` 已完全解耦（v2.38.13）。以下仅说明过去的集成关系作为架构参考，不代表当前依赖。
+> **注意**：`skill-standardization` 与 `git-sync` 已完全解耦。以下仅说明集成关系作为架构参考。
 
 ```
 git-sync 执行时
@@ -494,7 +494,7 @@ AI 加载 skill-standardization
 git-sync 推送前验证 CRLF + 自审状态
 ```
 
-**update 模式完整步骤**（v2.44.0）：
+**update 模式完整步骤**：
 1. `_create_backup(skill_dir, "update", workspace)` — 时间戳完整备份
 2. `skill_inspector.inspect_skill(skill_dir)` — **强制**输出结构蓝皮书
 3. `_check_meta_json()` — 验证 _meta.json 7 字段 + 非标字段标记
@@ -505,7 +505,7 @@ git-sync 推送前验证 CRLF + 自审状态
 8. `_bump_version()` — 版本号自动更新（如传 --version-bump）
 9. `_print_report()` — 输出检查报告（通过/警告计数 + 逐条详情）
 
-**refactor 模式完整步骤**（v2.44.0）：
+**refactor 模式完整步骤**：
 1. `_create_backup(skill_dir, "refactor", workspace)` — 强制备份
 2. `skill_inspector.inspect_skill(skill_dir)` — **强制**输出结构蓝皮书
 3. `_dry_run()` — 生成迁移计划（仅 --dry-run 时停止）
@@ -516,7 +516,7 @@ git-sync 推送前验证 CRLF + 自审状态
 8. `_bump_version()` — 版本号自动升级（patch）
 9. `_audit_and_update_progress()` — 审计 + 进度记录
 
-**inspect 扫描产出明细**（v2.44.0 强制前置）：
+**inspect 扫描产出明细**（强制前置）：
 - 结构标准化判定：标准（scripts/ + references/）/ 半标准（仅有 scripts/ 或 references/）/ 非标准（文件散落根目录）
 - 元信息：SKILL.md 行数、## 章节数量及标题列表、_meta.json 字段清单
 - 文件清单：按扩展名分组计数（.py / .md / .sh/.bat /.json/.yaml / 其他）
@@ -559,15 +559,15 @@ R-06     W       [OK]   发现一级标题: # ...
 一键升级技能版本号三端：
 
 ```bash
-python -m scripts.skill_builder bump <skill-dir> --type fix    # patch 升级
-python -m scripts.skill_builder bump <skill-dir> --type feature # minor 升级
-python -m scripts.skill_builder bump <skill-dir> --type breaking # major 升级
-python -m scripts.skill_builder bump <skill-dir> --type fix --desc "修复了XX问题"  # 带描述
+python -m scripts.skill_audit bump <skill-dir> --type fix    # patch 升级
+python -m scripts.skill_audit bump <skill-dir> --type feature # minor 升级
+python -m scripts.skill_audit bump <skill-dir> --type breaking # major 升级
+python -m scripts.skill_audit bump <skill-dir> --type fix --desc "修复说明"  # 带描述
 ```
 
-`audit --fix` 模式修复文件后自动执行 patch bump（v2.39.0+），不再忘记更新版本号。v2.44.2 起 changelog 写入实际修复规则名（fix_details）而非空话，AI 须将其转化为可读描述后写入。
+`audit --fix` 模式修复文件后自动执行 patch bump，changelog 写入实际修复规则名而非空话，AI 须将其转化为可读描述后写入。
 
-### inspect 子命令（v2.44.0 新增）
+### inspect 子命令
 
 结构无关的全量扫描工具，输出技能蓝皮书：
 
