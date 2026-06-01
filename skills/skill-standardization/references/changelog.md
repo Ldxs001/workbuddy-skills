@@ -1,3 +1,23 @@
+## 2.53.0 (2026-06-01)
+
+### 新增
+
+- **R-22 联动 _is_asset_dir**：`data_dir_checker.py` 的 os.walk 扫描跳过被脚本引用的功能数据目录，不再误报 components/manifest.json 等文件
+- **`_is_asset_dir` 迁移至 utils.py**：从 artifact_checker.py 抽出到 skill_audit/utils.py，供 R-11/R-22 共享
+- **审计报告误报分类**：新增 `_reclassify_false_positive()` 后处理，已知误报（如系统工具名 lualatex 被误检为函数名）显示为 ⓘ 已排除，不与真实 WARN/ERROR 混排
+
+---
+
+## 2.52.0 (2026-06-01)
+
+### 新增
+
+- **R-11 交叉引用检查**：新增 `_is_asset_dir()` 函数，在 `_scan_unknown_dir` 和 `_check_root_artifact_files` 判定产出物前，扫描 scripts/ 下脚本是否有硬编码引用。被引用的目录视为功能数据而非产出物，不再误报
+- **隐藏目录不再盲目放过**：`.cache/`、`.tmp/` 等隐藏目录如果含产出物且未被脚本引用，仍报违规；只有被引用的隐藏目录才放过
+- **根目录白名单扩展**：`_KNOWN_ROOT_FILES` 补充 Makefile、Dockerfile、Cargo.toml、package.json、pyproject.toml 等 40+ 构建工具和项目配置文件
+
+---
+
 ## 2.51.1 (2026-06-01)
 
 ### 修复

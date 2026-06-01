@@ -14,7 +14,7 @@ from .utils import (
     _ARTIFACT_EXTS_COMPREHENSIVE, _ROOT_ARTIFACT_EXTS, _ROOT_EXT_CLASSIFY,
     _ARTIFACT_WRITE_PATTERNS, _HARDCODED_PATH_RE, _PATH_EXCLUDE_RE,
     _is_hardcoded_path, _classify_artifact, _classify_artifact_by_ext,
-    _extract_path_literal, _find_skills_dir,
+    _extract_path_literal, _find_skills_dir, _is_asset_dir,
 )
 
 
@@ -87,11 +87,12 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
 
 def _check_root_artifact_files(skill_dir, violations):
     """根目录白名单检查（R-11）
-    根目录只能包含：
-      - 文件：SKILL.md, _meta.json
-      - 目录：scripts/, references/
-      - 外部数据目录（当启用 external_data_dir 时）
-    其余一律报违规。
+    根目录允许：
+      - 白名单文件（_KNOWN_ROOT_FILES）
+      - 标准目录 scripts/, references/
+      - 被脚本引用的功能数据目录
+      - 非产出物/数据/缓存的隐藏目录
+    产出物/数据/缓存类隐藏目录仍然报违规。
     """
     try:
         root_entries = os.listdir(skill_dir)
@@ -110,7 +111,6 @@ def _check_root_artifact_files(skill_dir, violations):
             fm = {}
     external_data = fm.get("external_data_dir", False)
 
-    _ROOT_ALLOWED_FILES = {"SKILL.md", "_meta.json"}
     _ROOT_ALLOWED_DIRS = {"scripts", "references"}
     if external_data:
         _ROOT_ALLOWED_DIRS = _ROOT_ALLOWED_DIRS | {".standardization"}
@@ -118,18 +118,27 @@ def _check_root_artifact_files(skill_dir, violations):
     for entry in sorted(root_entries):
         fpath = os.path.join(skill_dir, entry)
         if os.path.isfile(fpath):
-            if entry in _ROOT_ALLOWED_FILES:
+            if entry in _KNOWN_ROOT_FILES:
                 continue
             violations.append({
                 "source": f"ROOT/{entry}",
                 "path_literal": entry,
-                "suggestion": "删除此文件（根目录只允许 SKILL.md 和 _meta.json）",
+                "suggestion": "删除此文件（根目录只允许白名单文件）",
             })
         elif os.path.isdir(fpath):
             if entry in _ROOT_ALLOWED_DIRS:
                 continue
-            if entry.startswith(".") and entry not in _ROOT_ALLOWED_DIRS:
-                continue  # 其他隐藏目录不报错，但不是允许的
+            # 隐藏目录：不盲目跳过，检查是否含产出物/数据/缓存
+            if entry.startswith("."):
+                # 是被脚本引用的功能数据？→放过
+                if _is_asset_dir(skill_dir, entry):
+                    continue
+                # 否则扫描内容，有产出物仍报违规
+                _scan_unknown_dir(skill_dir, entry, fpath, violations)
+                continue
+            # 普通目录：交叉引用检查
+            if _is_asset_dir(skill_dir, entry):
+                continue
             violations.append({
                 "source": f"ROOT/{entry}/",
                 "path_literal": entry + "/",
@@ -200,6 +209,40 @@ def _scan_dir_recursive(skill_dir, rel_dir, dir_path, category, violations):
         return
 
 
+def _is_asset_dir(skill_dir, dir_name):
+    """检查目录是否被 scripts/ 下的脚本硬编码引用（是 -> 功能数据，非产出物）"""
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return False
+    patterns = [
+        f'"{dir_name}/',
+        f"'{dir_name}/",
+        f'"{dir_name}\\\\',
+        f"'{dir_name}\\\\",
+        f'"{dir_name}"',
+        f"'{dir_name}'",
+        f"os.path.join.*{dir_name}",
+    ]
+    try:
+        for fname in sorted(os.listdir(scripts_dir)):
+            if not fname.endswith(".py"):
+                continue
+            fpath = os.path.join(scripts_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            for pat in patterns:
+                if pat in content:
+                    return True
+    except OSError:
+        pass
+    return False
+
+
 def _scan_unknown_dir(skill_dir, entry, entry_path, violations):
     """扫描未知目录名"""
     try:
@@ -223,6 +266,9 @@ def _scan_unknown_dir(skill_dir, entry, entry_path, violations):
         return
 
     if artifact_files:
+        # 交叉引用检查：目录被脚本硬编码引用则视为功能数据，跳过
+        if _is_asset_dir(skill_dir, entry):
+            return
         cat = "outputs"
         for sub in artifact_files:
             violations.append({

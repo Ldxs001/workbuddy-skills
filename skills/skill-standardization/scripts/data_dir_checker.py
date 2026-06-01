@@ -54,6 +54,36 @@ def _is_fix_script(filepath):
            any(p in fname for p in SKIP_PATTERNS if not p.endswith("_"))
 
 
+def _is_local_asset_dir(skill_dir, dir_name):
+    """检查目录是否被 scripts/ 下的脚本硬编码引用（是 -> 功能数据，非产出物）"""
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return False
+    patterns = [
+        f'"{dir_name}/', f"'{dir_name}/",
+        f'"{dir_name}\\\\', f"'{dir_name}\\\\",
+        f'"{dir_name}"', f"'{dir_name}'",
+    ]
+    try:
+        for fname in sorted(os.listdir(scripts_dir)):
+            if not fname.endswith(".py"):
+                continue
+            fpath = os.path.join(scripts_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            for pat in patterns:
+                if pat in content:
+                    return True
+    except OSError:
+        pass
+    return False
+
+
 def check_external_data_dir(skill_dir, verbose=False):
     """
     R-12: 检查技能是否把数据写到安装目录外合法位置
@@ -117,6 +147,10 @@ def check_data_dir_compliance(skill_dir=None, auto_fix=False, verbose=False, **k
         # 跳过 scripts/ 和 references/
         rel_root = os.path.relpath(root, skill_dir)
         if rel_root.startswith("scripts") or rel_root.startswith("references"):
+            continue
+        # 跳过被脚本引用的功能数据目录（R-11 同款交叉引用检查）
+        rel_parts = rel_root.replace("\\", "/").split("/")
+        if any(_is_local_asset_dir(skill_dir, p) for p in rel_parts if p and p != "."):
             continue
 
         for fname in files:

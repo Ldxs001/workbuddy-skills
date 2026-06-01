@@ -334,7 +334,28 @@ _ARTIFACT_EXTS_COMPREHENSIVE = {
 }
 
 # 根目录已知白名单文件（非产出物）
-_KNOWN_ROOT_FILES = {"SKILL.md", "_meta.json", ".gitignore", ".gitkeep", ".progress.md"}
+_KNOWN_ROOT_FILES = {
+    "SKILL.md", "_meta.json",             # 技能元信息
+    ".gitignore", ".gitkeep", ".progress.md",  # 项目/进度文件
+    "Makefile", "makefile", "GNUmakefile",     # 构建工具
+    "Dockerfile", "dockerfile",                # 容器化
+    "Justfile", "justfile",                    # Just 构建工具
+    "Rakefile", "rakefile",                    # Ruby Rake
+    "CMakeLists.txt",                          # CMake
+    "Cargo.toml", "Cargo.lock",               # Rust
+    "go.mod", "go.sum",                       # Go
+    "package.json", "pnpm-lock.yaml",          # Node.js
+    "yarn.lock", ".npmrc",                     # Node.js
+    "Gemfile", "Gemfile.lock",                # Ruby
+    "composer.json", "composer.lock",          # PHP
+    "pom.xml", "build.gradle",                # Java
+    "gradlew", "gradlew.bat",                 # Gradle wrapper
+    "Pipfile", "Pipfile.lock", ".python-version",  # Python
+    "pyproject.toml", "setup.py", "setup.cfg",     # Python
+    ".envrc", ".env.example",                 # 环境
+    ".editorconfig", ".prettierrc",           # 编辑器配置
+    ".gitattributes", ".gitmodules",          # Git 配置
+}
 
 # 旧版兼容：产出物扩展名集合（用于根目录文件扫描）
 _ROOT_ARTIFACT_EXTS = set(_ARTIFACT_EXTS_COMPREHENSIVE.keys())
@@ -499,4 +520,38 @@ def _extract_path_literal(line_text, matched_target):
         if matched_target in q:
             return q
     return matched_target
+
+
+def _is_asset_dir(skill_dir, dir_name):
+    """检查目录是否被 scripts/ 下的脚本硬编码引用（是 -> 功能数据，非产出物）"""
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return False
+    patterns = [
+        f'"{dir_name}/',
+        f"'{dir_name}/",
+        f'"{dir_name}\\\\',
+        f"'{dir_name}\\\\",
+        f'"{dir_name}"',
+        f"'{dir_name}'",
+        f"os.path.join.*{dir_name}",
+    ]
+    try:
+        for fname in sorted(os.listdir(scripts_dir)):
+            if not fname.endswith(".py"):
+                continue
+            fpath = os.path.join(scripts_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            for pat in patterns:
+                if pat in content:
+                    return True
+    except OSError:
+        pass
+    return False
     

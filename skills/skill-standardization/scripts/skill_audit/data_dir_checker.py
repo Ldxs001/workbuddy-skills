@@ -19,6 +19,8 @@ import json
 import datetime
 from pathlib import Path
 
+from .utils import _is_asset_dir
+
 # ── 路径常量（通用写法，适用于任何安装结构）───────────────────
 _SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 _SKILL_DIR   = os.path.dirname(os.path.dirname(_SCRIPT_DIR))  # scripts/ → skill-root
@@ -114,6 +116,10 @@ def check_data_dir_compliance(skill_dir=None, auto_fix=False, verbose=False, **k
         # 跳过 scripts/ 和 references/
         rel_root = os.path.relpath(root, skill_dir)
         if rel_root.startswith("scripts") or rel_root.startswith("references"):
+            continue
+        # 跳过被脚本引用的功能数据目录（R-11 同款交叉引用检查）
+        rel_parts = rel_root.replace("\\", "/").split("/")
+        if any(_is_asset_dir(skill_dir, p) for p in rel_parts if p and p != "."):
             continue
 
         for fname in files:

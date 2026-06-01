@@ -301,6 +301,16 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
     return r
 
 
+def _reclassify_false_positive(res):
+    """检测已知误报模式，匹配时标记为 ⓘ 已排除（不进入 WARN/ERROR 统计）"""
+    detail = res.get("detail", "")
+    rule = res.get("rule_id", "")
+    # 系统工具名被误判为函数引用
+    if "lualatex" in detail and "函数/类名" in detail:
+        return True
+    return False
+
+
 def format_report(audit_result, verbose=True):
     """格式化人类可读的审查报告"""
     lines = []
@@ -332,8 +342,13 @@ def format_report(audit_result, verbose=True):
         lines.append(f"{'规则ID':<8} {'严重度':<7} {'状态':<6} 详情")
         lines.append(f"{'-'*8}-{'-'*7}-{'-'*6}-{'-'*30}")
         for res in r["results"]:
-            status = "[OK]" if res["passed"] else ("⏭️" if res["skipped"] else ("[ERROR]" if res["severity"]=="ERROR" else "[WARN]"))
-            sev = res["severity"][0] if res["severity"] else "?"
+            # 已知误报检测：LLM 可确定的 false positive 降级为 ⓘ
+            if _reclassify_false_positive(res):
+                status = "ⓘ"
+                sev = "排除"
+            else:
+                status = "[OK]" if res["passed"] else ("⏭️" if res["skipped"] else ("[ERROR]" if res["severity"]=="ERROR" else "[WARN]"))
+                sev = res["severity"][0] if res["severity"] else "?"
             lines.append(f"{res['rule_id']:<8} {sev:<7} {status:<6} {res['detail']}")
             # 新增：输出修正建议（供 LLM 参考）
             if not res["passed"] and not res["skipped"] and res.get("fix"):
