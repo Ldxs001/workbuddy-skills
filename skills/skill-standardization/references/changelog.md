@@ -1,3 +1,10 @@
+## 2.46.2 (2026-06-01)
+
+### 修复
+- 修复 #B1 progressive_index_table 重复bug #B2 section_constraint 过宽regex
+
+---
+
 ## 2.46.1 (2026-06-01)
 
 ### 修复

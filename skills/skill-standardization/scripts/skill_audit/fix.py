@@ -1459,7 +1459,7 @@ def fix_section_constraint(skill_dir, **kw):
                 except Exception:
                     continue
                 # 提取 docstring 中含约束词的句子
-                for m in re.finditer(r'[\u4e00-\u9fff]*?(?:必须|不得|禁止|MUST|REQUIRED)[\u4e00-\u9fff]*?[。！\n]', src):
+                for m in re.finditer(r'(?:必须|不得|禁止|MUST|REQUIRED)[\u4e00-\u9fff]{4,}[。！]', src):
                     rule = m.group().strip().strip('。！\n')
                     if rule and len(rule) > 4 and rule not in constraints:
                         constraints.append(rule)
@@ -1476,7 +1476,7 @@ def fix_section_constraint(skill_dir, **kw):
                     ref_content = fh.read()
             except Exception:
                 continue
-            for m in re.finditer(r'^[-*]\s+.*?(?:必须|不得|禁止)[^\\n]*', ref_content, re.MULTILINE):
+            for m in re.finditer(r'^[-*]\s+(?:必须|不得|禁止)[\u4e00-\u9fff]{4,}[。！]', ref_content, re.MULTILINE):
                 rule = m.group().strip().lstrip('-* ')
                 if rule and len(rule) > 6 and rule not in constraints:
                     constraints.append(rule)
@@ -1588,36 +1588,17 @@ def fix_progressive_index_table(skill_dir, **kw):
     
     section_body = '\n'.join(table_lines)
     
-    # 检查是否已存在，存在则替换
+        # 检查是否已存在，存在则整块删除后重建
     has_table = '### 渐进式文件索引' in body
     if has_table:
-        # 替换已有表格
-        lines = body.split('\n')
-        new_lines = []
-        in_table = False
-        for line in lines:
-            if line.strip() == '### 渐进式文件索引':
-                in_table = True
-                new_lines.append(line)
-                continue
-            if in_table:
-                if line.strip().startswith('## ') or line.strip().startswith('---'):
-                    in_table = False
-                    new_lines.append(line)
-                continue
-            new_lines.append(line)
-        body = '\n'.join(new_lines)
-    
-    # 插入到核心能力章节末尾
-    if '\\n' in repr(body):
-        pass
+        body = re.sub(
+            r'### 渐进式文件索引\n.*?(?=\n## |\n---|\Z)',
+            '',
+            body,
+            flags=re.DOTALL
+        )
     
     # 找到核心能力章节末尾
-    core_match = re.search(r'^##\s+(?:核心能力|核心功能|概述).*?(?=^##\s|\\Z)', body, re.MULTILINE | re.DOTALL)
-    if core_match:
-        core_end = core_match.end()
-        body = body[:core_end] + '\n' + section_body + body[core_end:]
-    
     # 写回
     new_content = '---\n'
     for k, v in fm.items():
