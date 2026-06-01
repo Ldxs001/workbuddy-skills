@@ -1612,6 +1612,128 @@ def fix_progressive_index_table(skill_dir, **kw):
     return len(rows)
 
 
+# ═══════════════════════════════════════════════════════════
+# fix_reclassify_section — 通用的非标章节归类处理（Phase 3）
+# ═══════════════════════════════════════════════════════════
+def fix_reclassify_section(skill_dir, **kw):
+    """
+    通用的非标章节归类处理。不由硬编码驱动，由参数驱动。
+    
+    三种处理方式（由 action 参数控制）：
+    - "merge": 将 section_title 的内容降级为 ### 移入 target_section
+    - "split": 将 section_title 的内容拆分到 references/
+    - "delete": 删除该章节（内容已被其他章节覆盖）
+    
+    用法：
+        from scripts.skill_audit.fix import fix_reclassify_section
+        # 归并到工作流程
+        fix_reclassify_section(skill_dir, 
+            action="merge", 
+            section_title="循环与分支编排（v1.20.0 新增）", 
+            target_section="工作流程")
+        # 拆分到 references/
+        fix_reclassify_section(skill_dir,
+            action="split",
+            section_title="旧版功能说明")
+        # 直接删除
+        fix_reclassify_section(skill_dir,
+            action="delete",
+            section_title="已废弃章节")
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    
+    action = kw.get("action", "split")
+    section_title = kw.get("section_title", "")
+    target_section = kw.get("target_section", "")
+    
+    if not section_title:
+        return 0
+    
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    
+    # 找到目标章节在 body 中的起止位置
+    section_pattern = re.compile(
+        r'^##\s*' + re.escape(section_title) + r'\s*$\n(.*?)(?=^##\s|\Z)',
+        re.MULTILINE | re.DOTALL
+    )
+    section_match = section_pattern.search(body)
+    if not section_match:
+        # 尝试前缀匹配（兼容版本标注）
+        for m in re.finditer(r'^##\s+(.+?)$\n(.*?)(?=^##\s|\Z)', body, re.MULTILINE | re.DOTALL):
+            title = m.group(1).strip()
+            if title.startswith(section_title) or section_title.startswith(title):
+                section_match = m
+                section_title = title
+                break
+    
+    if not section_match:
+        return 0
+    
+    section_content = section_match.group(0)
+    section_body_raw = section_match.group(2)
+    
+    if action == "delete":
+        # 直接删除
+        body = body.replace(section_content, '', 1)
+        
+    elif action == "split":
+        # 拆分到 references/
+        refs_dir = os.path.join(skill_dir, "references")
+        os.makedirs(refs_dir, exist_ok=True)
+        safe_name = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', section_title).strip('_')
+        if not safe_name:
+            safe_name = "section"
+        ref_path = os.path.join(refs_dir, f"{safe_name}.md")
+        ref_rel = f"references/{safe_name}.md"
+        
+        ref_content = f"# {section_title}\n\n{section_body_raw.strip()}\n"
+        _write_file(ref_path, ref_content)
+        
+        # 替换为引用
+        replacement = f"## {section_title}\n\n> → 详见 `{ref_rel}`\n"
+        body = body.replace(section_content, replacement, 1)
+        
+    elif action == "merge" and target_section:
+        # 降级为 ### 移入目标章节
+        target_pattern = re.compile(
+            r'^##\s*' + re.escape(target_section) + r'\s*$\n.*?(?=^##\s|\Z)',
+            re.MULTILINE | re.DOTALL
+        )
+        target_match = target_pattern.search(body)
+        if not target_match:
+            return 0
+        
+        # 从原位置删除
+        body = body.replace(section_content, '', 1)
+        
+        # 降级内容（## → ###）
+        merged_content = section_content
+        merged_content = merged_content.replace(f'## {section_title}', f'### {section_title}', 1)
+        
+        # 重新计算目标章节位置（body 变了）
+        target_match_new = target_pattern.search(body)
+        if target_match_new:
+            target_end = target_match_new.end()
+            body = body[:target_end] + '\n' + merged_content.strip() + '\n' + body[target_end:]
+    
+    # 写回
+    new_content = '---\n'
+    for k, v in fm.items():
+        if isinstance(v, bool):
+            new_content += f'{k}: {"true" if v else "false"}\n'
+        else:
+            new_content += f'{k}: {v}\n'
+    new_content += '---\n' + body.lstrip('\n')
+    _write_file(skill_md, new_content)
+    
+    return 1
+
+
 # ═══════════════════════════════════════════════════
 # 统一入口：apply_fix()
 # ═══════════════════════════════════════════════════
@@ -1662,6 +1784,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "section_order": fix_section_order,
         "section_constraint": fix_section_constraint,
         "progressive_index_table": fix_progressive_index_table,
+        "reclassify_section": fix_reclassify_section,
     }
 
     func = dispatch.get(fix_key)
@@ -1894,4 +2017,5 @@ def list_fixable():
         "section_order",             # R-25 C-11 章节重排
         "section_constraint",         # 从目标技能采集约束生成 ## 约束
         "progressive_index_table",    # 从 references/ 生成渐进式索引表
+        "reclassify_section",         # Phase 3 通用非标章节归类（merge/split/delete）
     ]
