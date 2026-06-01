@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.46.1 版的架构设计、审查规则体系、标准化执行流程与修复体系  
-> 生成时间：2026-06-01（v2.46.1 最新更新）
+> 完整解读 v2.49.0 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 生成时间：2026-06-01（v2.49.0 最新更新）
 
 ---
 
@@ -62,7 +62,8 @@ skill-standardization/
     ├── skill_inspector.py      # 技能结构蓝皮书生成器
     ├── permission_checker.py   # 权限检查器
     ├── authorization_manager.py# 授权管理器
-    ├── safe_io.py              # 安全文件写入（原子写入+备份）
+    ├── cleanup_manager.py      # manifest 驱动临时文件清理
+    └── safe_io.py              # 安全文件写入（原子写入+备份）
     ├── op_logger.py            # 操作日志记录
     ├── op_logger_patch.py      # 操作日志补丁
     ├── data_dir_checker.py     # 数据目录合规检查器
@@ -88,7 +89,20 @@ skill-standardization/
         └── progressive_md.json # 渐进式 MD 体系规范
 ```
 
-### 1.3 三种执行模式
+### 1.3 三层章节体系（section_tiers）
+
+SKILL.md 的 ## 章节分为三个层级，决定其存留行为和拆分优先级：
+
+| 层级 | 包含章节 | 行为 |
+|------|---------|------|
+| **① must_have** | H1/约束/触发条件/核心能力/工作流程 | 永远留在 SKILL.md，不拆分 |
+| **② whitelist.optional_progressive** | 快速开始/配置/反模式/FAQ/API/示例/限制/铁律 | 可留，超230行时优先拆到 references/ |
+| **②' whitelist.always_progressive** | 版本日志/更新日志/Changelog | 强制在 references/，SKILL.md 只能有引用（R-24） |
+| **③ nonstandard** | 不在①②的所有H2 | Phase 1 粗筛 rarr; Phase 2 精筛：合并 or 拆分 |
+
+**渐进式索引表**：所有标准技能的 ## 核心能力 末尾应包含 ### 渐进式文件索引 表格（文件名/位置/说明），集中列出所有 references/*.md。C-13 审计完整性，C-15 审计正文重复引用。
+
+### 1.4 三种执行模式
 
 | 模式 | 命令 | 作用 | 风险等级 |
 |------|------|------|---------|
@@ -229,7 +243,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 6. **正文路径与 frontmatter data_dir 一致性**：当 data_dir 包含 `.standardization/` 时，检测正文中缺少 `.standardization/` 层级的路径
 7. **外部技能引用检查**：扫描 MD 中引用的技能路径，引用不存在的技能时 WARN
 
-### 2.7 类别 G：文档写作格式（R-25 — v2.44.0 新增，v2.45.0 扩展 C-11~C-14）
+### 2.7 类别 G：文档写作格式（R-25 v2.49.0 含 C-01~C-15 十五项子检查）
 
 **目的**：统一 SKILL.md 的写作格式，提供标准化的排版建议。R-25 整体为 WARN 级，其 14 项子检查中 C-01 为 ERROR 级（仅作内部参考，不提升规则总体级别），其余均为 WARN 建议级。
 
@@ -249,6 +263,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | C-12 | WARN | 格式合规 | 每个 H2 章节使用的格式应与 body.json content_format 定义一致；从 guidelines 提取语义要求转 LLM Phase 2（v2.45.0） |
 | C-13 | WARN | 渐进式索引表 | 核心能力章节末尾应包含 渐进式文件索引 表（列：文件名/位置/说明），references/ 文件未列出时报 WARN（v2.45.0） |
 | C-14 | WARN | 工作流程完整性 | 工作流程步骤数 + 混入版本标记检测 → LLM Phase 2 确认覆盖率（v2.45.0） |
+| C-15 | WARN | 内容冗余检测 | 索引表引用重复(15a) + H1后独立引用(15c) + 章节标题近似重叠(15d), rarr; LLM Phase 2（v2.49.0） |
 
 **冲突排除矩阵**：
 
@@ -269,7 +284,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | D. 安全与权限 | R-13~R-17 | 2 | 3 | 权限声明和风险控制（R-15、R-17 为 ERROR） |
 | E. 质量规范 | R-18~R-21 | 0 | 4 | 内容质量和可读性 |
 | F. 合规与维护 | R-22~R-24 | 0 | 3 | 长期维护一致性 |
-| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（14 项子检查仅 C-01 为 ERROR 级，其余均 WARN） |
+| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（15 项子检查仅 C-01 为 ERROR 级，其余均 WARN） |
 | **合计** | **R-01~R-25** | **10** | **15** | |
 
 ---
@@ -415,7 +430,8 @@ DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardizat
 | `fix_split_nonstandard(skill_dir)` | R-17 | 非标章节拆分到 references/（v2.45.0） |
 | `fix_section_order(skill_dir)` | R-25 C-11 | 按 body.json section_order 重排章节（v2.45.0） |
 | `fix_section_constraint(skill_dir)` | must_have | 从目标技能脚本采集约束词生成 ## 约束（v2.46.0） |
-| `fix_progressive_index_table(skill_dir)` | C-13 | 从 references/ 扫描文件名+H1 生成索引表（v2.46.0） |
+| `fix_progressive_index_table(skill_dir)` | C-13 | 从 references/ 扫描文件名+H1 生成索引表，操作后自动同步（v2.46.0） |
+| `fix_reclassify_section(skill_dir, action, section_title, target_section)` | R-17 Phase 3 | 通用非标归类：merge(降级###)/split(拆到refs)/delete(删除), 参数驱动（v2.47.0） |
 | `fix_artifact_paths(skill_dir)` | R-11 | 修复产出物路径 |
 | `fix_external_data_dir(skill_dir)` | R-12 | 修复外部数据目录 |
 | `fix_sensitive_access(skill_dir)` | R-13 | 添加敏感信息访问声明 |
@@ -439,8 +455,11 @@ apply_fix(skill_dir, 'R-07', 'R-18', 'R-19')  # 批量修复
 - `fix_section_trigger`：扫描 docstring + frontmatter trigger 字段 → 生成触发表
 - `fix_section_core`：扫描模块级 docstring + def 函数名 → 生成能力表格
 - `fix_section_workflow`：扫描 `def main()` 和 CLI 入口 → 生成步骤列表
+- `fix_reclassify_section`：参数驱动（action/section_title/target_section），不写死任何章节名
 
 `audit --fix` 执行完毕后，终端输出 fix_details 机器名列表，并强制提示 AI 将其转化为可读 changelog 描述用 safe_io 写入 references/changelog.md。
+
+**自动同步机制**（v2.47.0+）：`fix_reclassify_section` 和 `fix_split_nonstandard` 执行后自动调用 `fix_progressive_index_table` 刷新索引表，保证 references/ 新增文件立即出现在索引表中。
 
 ---
 
@@ -564,7 +583,7 @@ R-06     W       [OK]   发现一级标题: # ...
 - `[search] 位置` — 文件路径:行号
 - `--fix` 可用时自动修复
 
-### bump 子命令（v2.39.0+）
+### bump 子命令
 
 一键升级技能版本号三端：
 
@@ -591,4 +610,4 @@ python -m scripts.skill_builder inspect <skill-dir>    # 通过 builder 调用
 
 ---
 
-> 本文档基于 skill-standardization v2.46.1 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-standardization v2.49.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
