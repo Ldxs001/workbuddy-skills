@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.47.3
+version: 2.47.4
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -10,7 +10,15 @@ permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
 tags: ['standardization', 'skill-builder', 'skill-audit', 'validation', 'json-loader', 'refactor', 'version-bump', 'changelog-auto', 'data-dir']
 external_data_dir: true
-trigger: 当用户要求审计/创建/更新/改造一个 skill 时；当用户问 R-xx 规则含义时；当用户要求检查某技能规范性时
+trigger:
+  - 帮我看看这个技能写得怎么样
+  - 检查这个技能是否规范
+  - 审计 skill
+  - 创建新技能
+  - 更新 skill
+  - 重构技能
+  - skill 规范
+  - R-规则
 trigger_negative: 当用户仅闲聊或问你有什么技能时不触发；单步任务如查看文件不触发
 meta_field_sync: true
 h1_position: true
@@ -53,21 +61,24 @@ h1_position: true
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
+
+
+
+
 ### 渐进式文件索引
 
 | 文件名 | 位置 | 说明 |
 |--------|------|------|
-| `references/guide.md` | 使用指南 | 三种模式操作教程、审查模式详解 |
-| `references/architecture.md` | 架构设计 | 模块划分、RULES 注册、METHOD_MAP |
-| `references/antipatterns.md` | 反模式 | 常见错误及正确做法 |
-| `references/faq.md` | FAQ | 用户常见问题解答 |
-| `references/changelog.md` | 版本日志 | 版本更新记录 |
-
-- **audit 模式** — 审查（R-01~R-25）+ 可选 --fix 自动修复
-- **update 模式** — 备份 → inspect → 审查 → 修复 → 重审 → bump → 清理
-- **refactor 模式** — 备份 → inspect → 迁移(目录/文档) → 审查 → 修复 → bump → 清理
-- **create 模式** — 基于标准化模板创建新 skill，自动注入标准章节引用
-
+| `references/antipatterns.md` | 反模式（Anti-Patterns） | > 本文件收录 skill 编写过程中的常见反模式，帮助 AI 和开发者避开典型坑点。 |
+| `references/architecture.md` | 架构设计 | > 本文件描述 skill-standardization v2 的整体架构、模块关系和数据流。 |
+| `references/changelog.md` | changelog | - 修复 _load_body_spec 路径错误（spec/→scripts/spec/），导致 fix_sectio |
+| `references/data_dir_map.md` | skill-standardization 数据目录路径引用对照表 | 1. **安装目录**（`skills/<name>/` 或 `skills/installed/<name>/`）—— |
+| `references/examples.md` | 示例集合 — skill-standardization v2 | 本文件包含 skill-standardization v2 各种使用场景的完整示例。 |
+| `references/faq.md` | 常见问题（FAQ） | > 本文件收集 skill-standardization v2 使用过程中的常见疑问和解答。 |
+| `references/guide.md` | 使用指南 — skill-standardization v2 | 本指南提供 skill-standardization v2 三种执行模式的详细操作教程。 |
+| `references/permissions.md` | 权限说明 | 权限扫描风险等级：**CRITICAL** |
+| `references/reference.md` | API / 命令参考 | > 本文件为 skill-standardization v2 的完整命令参考手册。 |
+| `references/rules.md` | 改写/更新铁律（AI 执行前必须遵守） | > 本文件为 skill-standardization v2.13.0 的铁律条款，AI 更新任何 skill 前必须 |
 ## 工作流程
 
 **audit 模式**（仅审查）：
@@ -107,4 +118,3 @@ h1_position: true
 ```
 
 > 安装目录 `skills/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。
-

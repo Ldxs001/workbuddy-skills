@@ -1,3 +1,10 @@
+## 2.47.4 (2026-06-01)
+
+### 修复
+- 自修 C-13 索引表补全 + R-10 trigger 同步 + fix_progressive_index_table references/ 前缀
+
+---
+
 ## 2.47.3 (2026-06-01)
 
 ### 修复

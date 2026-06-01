@@ -1583,7 +1583,7 @@ def fix_progressive_index_table(skill_dir, **kw):
     ]
     for fn, pos, desc in rows:
         desc_clean = desc.replace('|', '/') if desc else ''
-        table_lines.append(f'| `{fn}` | {pos} | {desc_clean} |')
+        table_lines.append(f'| `references/{fn}` | {pos} | {desc_clean} |')
     table_lines.append('')
     
     section_body = '\n'.join(table_lines)
@@ -1598,7 +1598,12 @@ def fix_progressive_index_table(skill_dir, **kw):
             flags=re.DOTALL
         )
     
-    # 找到核心能力章节末尾
+    # 找到核心能力章节末尾，插入索引表
+    core_match = re.search(r'^##\s+(?:核心能力|核心功能|概述).*?(?=^##\s|\Z)', body, re.MULTILINE | re.DOTALL)
+    if core_match:
+        core_end = core_match.end()
+        body = body[:core_end] + '\n' + section_body + body[core_end:]
+    
     # 写回
     new_content = '---\n'
     for k, v in fm.items():
