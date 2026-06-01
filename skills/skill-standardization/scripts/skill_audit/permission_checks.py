@@ -360,10 +360,6 @@ def _find_nonstandard_sections(body_text, skill_dir=None):
                 found = True
                 break
         if not found:
-            # 检查是否在已知合法章节列表中（前缀匹配，兼容版本标注）
-            known = _load_known_sections(skill_dir) if skill_dir else set()
-            if any(title.startswith(k) or k.startswith(title) for k in known):
-                continue
             line_no = body_text[:m.start()].count('\n') + 1
             content = m.group(2).strip() if m.lastindex and m.lastindex >= 2 else ""
             # 取前 80 字作为内容预览（供 LLM 判断用）
