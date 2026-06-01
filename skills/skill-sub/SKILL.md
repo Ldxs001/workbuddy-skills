@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.24.3
+version: 1.24.4
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -20,9 +20,10 @@ meta_field_sync: true
 
 ## 约束
 
-- **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 Python 脚本原子写入
-- **更新后必须 `audit .` 自审** — 0 ERROR 0 WARN 方可提交
-- **版本号三端一致** — 更新时同步 SKILL.md / _meta.json / references/changelog.md
+- **调用链 JSON 必须包含 `type`/`step`/`skill` 三字段** — 缺一不可
+- **引用外部 skill 前必须先确认该 skill 已安装** — 避免运行时找不到路径
+- **更新调用链后必须 `chain_manager.py validate` 验证** — 确保 JSON 格式正确
+- **循环/分支步骤必须指定退出条件** — 防止无限循环
 
 ## 触发场景
 
