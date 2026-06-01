@@ -1395,6 +1395,220 @@ def fix_meta_field_sync(skill_dir, **kw):
     return fixed
 
 
+# ═══════════════════════════════════════════════════════════
+# fix_section_constraint — 从目标技能代码采集约束，生成 ## 约束 章节
+# ═══════════════════════════════════════════════════════════
+def fix_section_constraint(skill_dir, **kw):
+    """
+    从目标技能自身的脚本和文档中采集约束，生成 ## 约束 章节。
+    不套模板，不照抄——只提取该技能特有的操作规则。
+    
+    采集来源（按优先级）：
+    1. scripts/*.py 中注释/文档字符串含"必须/不得/禁止/MUST/REQUIRED"的规则
+    2. references/*.md 中 markdown 列表项含"必须/不得/禁止"的条目
+    3. SKILL.md 正文中已有的规则描述（去重后提取）
+    
+    输出：无序列表，每行一条约束，最多 5 条。
+    """
+    import ast, os, re
+    
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    
+    constraints = []
+    
+    # ── 采集源1: 扫描 scripts/*.py 中的 docstring 和注释 ──
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if os.path.isdir(scripts_dir):
+        for root, dirs, files in os.walk(scripts_dir):
+            for f in files:
+                if not f.endswith('.py'):
+                    continue
+                fpath = os.path.join(root, f)
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as fh:
+                        src = fh.read()
+                except Exception:
+                    continue
+                # 提取 docstring 中含约束词的句子
+                for m in re.finditer(r'[\u4e00-\u9fff]*?(?:必须|不得|禁止|MUST|REQUIRED)[\u4e00-\u9fff]*?[。！\n]', src):
+                    rule = m.group().strip().strip('。！\n')
+                    if rule and len(rule) > 4 and rule not in constraints:
+                        constraints.append(rule)
+    
+    # ── 采集源2: 扫描 references/*.md 中的列表项 ──
+    refs_dir = os.path.join(skill_dir, "references")
+    if os.path.isdir(refs_dir):
+        for f in os.listdir(refs_dir):
+            if not f.endswith('.md'):
+                continue
+            fpath = os.path.join(refs_dir, f)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as fh:
+                    ref_content = fh.read()
+            except Exception:
+                continue
+            for m in re.finditer(r'^[-*]\s+.*?(?:必须|不得|禁止)[^\\n]*', ref_content, re.MULTILINE):
+                rule = m.group().strip().lstrip('-* ')
+                if rule and len(rule) > 6 and rule not in constraints:
+                    constraints.append(rule)
+    
+    # ── 采集源3: 从已有 body 中找约束类内容（去重）──
+    for m in re.finditer(r'^[-*]\s+.*?(?:必须|不得|禁止|MUST)[^\\n]*', body, re.MULTILINE):
+        rule = m.group().strip().lstrip('-* ')
+        if rule and len(rule) > 6 and rule not in constraints:
+            constraints.append(rule)
+    
+    # ── 如果没有采集到，回退到从蓝皮书中提取核心功能 ──
+    if not constraints:
+        # 从 SKILL.md 的触发场景和核心能力中提取关键词
+        trigger_section = re.search(r'## 触发场景.*?(?=## |\\Z)', body, re.DOTALL)
+        if trigger_section:
+            # 提取触发词作为能力的体现
+            items = re.findall(r'[-*]\s*(.+?)(?:当|如果|用户|需要)', trigger_section.group())
+            for item in items[:3]:
+                item = item.strip()
+                if item and len(item) > 4:
+                    constraints.append(f"操作前必须确认{item[:30]}")
+    
+    if not constraints:
+        return 0  # 实在采集不到就跳过
+    
+    # ── 去重 + 截断最多 5 条 ──
+    seen = set()
+    unique = []
+    for c in constraints:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+    constraints = unique[:5]
+    
+    body_lines = constraints
+    section_body = '\n'.join(f'- {c}' for c in constraints)
+    
+    ok = _add_section_to_body(skill_md, "约束", section_body, insert_after=None)
+    return len(constraints) if ok else 0
+
+
+# ═══════════════════════════════════════════════════════════
+# fix_progressive_index_table — 扫描 references/ 生成渐进式索引表
+# ═══════════════════════════════════════════════════════════
+def fix_progressive_index_table(skill_dir, **kw):
+    """
+    扫描目标技能 references/ 目录下的每个 .md 文件，读取其标题和首段内容，
+    生成 ### 渐进式文件索引 表格（3 列：文件名 | 位置 | 说明）。
+    
+    不从模板拷贝——每个文件的说明从文件自身的标题和首段提取。
+    放在 ## 核心能力 章节末尾。
+    """
+    import os
+    
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    
+    refs_dir = os.path.join(skill_dir, "references")
+    if not os.path.isdir(refs_dir):
+        return 0
+    
+    # 收集所有 .md 文件及其描述
+    ref_files = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
+    if not ref_files:
+        return 0
+    
+    rows = []
+    for fn in ref_files:
+        fpath = os.path.join(refs_dir, fn)
+        try:
+            with open(fpath, 'r', encoding='utf-8') as fh:
+                ref_content = fh.read()
+        except Exception:
+            rows.append((fn, '参考文档', ''))
+            continue
+        
+        # 提取 H1 或第一行非空文本作为"位置"
+        h1 = re.search(r'^#\s+(.+)$', ref_content, re.MULTILINE)
+        position = h1.group(1).strip() if h1 else fn.replace('.md', '').replace('-', ' ')
+        
+        # 提取 H1 后的第一段非空文本作为"说明"
+        after_h1 = ref_content[h1.end():] if h1 else ref_content
+        first_para = ''
+        for line in after_h1.split('\n'):
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                first_para = stripped[:60]
+                break
+        
+        rows.append((fn, position, first_para))
+    
+    # 生成表格
+    table_lines = [
+        '### 渐进式文件索引',
+        '',
+        '| 文件名 | 位置 | 说明 |',
+        '|--------|------|------|',
+    ]
+    for fn, pos, desc in rows:
+        desc_clean = desc.replace('|', '/') if desc else ''
+        table_lines.append(f'| `{fn}` | {pos} | {desc_clean} |')
+    table_lines.append('')
+    
+    section_body = '\n'.join(table_lines)
+    
+    # 检查是否已存在，存在则替换
+    has_table = '### 渐进式文件索引' in body
+    if has_table:
+        # 替换已有表格
+        lines = body.split('\n')
+        new_lines = []
+        in_table = False
+        for line in lines:
+            if line.strip() == '### 渐进式文件索引':
+                in_table = True
+                new_lines.append(line)
+                continue
+            if in_table:
+                if line.strip().startswith('## ') or line.strip().startswith('---'):
+                    in_table = False
+                    new_lines.append(line)
+                continue
+            new_lines.append(line)
+        body = '\n'.join(new_lines)
+    
+    # 插入到核心能力章节末尾
+    if '\\n' in repr(body):
+        pass
+    
+    # 找到核心能力章节末尾
+    core_match = re.search(r'^##\s+(?:核心能力|核心功能|概述).*?(?=^##\s|\\Z)', body, re.MULTILINE | re.DOTALL)
+    if core_match:
+        core_end = core_match.end()
+        body = body[:core_end] + '\n' + section_body + body[core_end:]
+    
+    # 写回
+    new_content = '---\n'
+    for k, v in fm.items():
+        if isinstance(v, bool):
+            new_content += f'{k}: {"true" if v else "false"}\n'
+        else:
+            new_content += f'{k}: {v}\n'
+    new_content += '---\n' + body.lstrip('\n')
+    _write_file(skill_md, new_content)
+    
+    return len(rows)
+
+
 # ═══════════════════════════════════════════════════
 # 统一入口：apply_fix()
 # ═══════════════════════════════════════════════════
@@ -1443,6 +1657,8 @@ def apply_fix(skill_dir, fix_key, **kw):
         "meta_field_sync": fix_meta_field_sync,
         "split_nonstandard": fix_split_nonstandard,
         "section_order": fix_section_order,
+        "section_constraint": fix_section_constraint,
+        "progressive_index_table": fix_progressive_index_table,
     }
 
     func = dispatch.get(fix_key)
@@ -1673,4 +1889,6 @@ def list_fixable():
         "meta_field_sync",           # R-10 共享字段同步
         "split_nonstandard",         # R-17 非标章节拆分
         "section_order",             # R-25 C-11 章节重排
+        "section_constraint",         # 从目标技能采集约束生成 ## 约束
+        "progressive_index_table",    # 从 references/ 生成渐进式索引表
     ]

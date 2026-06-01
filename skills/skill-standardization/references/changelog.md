@@ -1,3 +1,10 @@
+## 2.46.0 (2026-06-01)
+
+### 修复
+- 新增 fix_section_constraint + fix_progressive_index_table（从目标技能采集内容，不照抄模板）
+
+---
+
 ## 2.45.4 (2026-06-01)
 
 ### 修复
