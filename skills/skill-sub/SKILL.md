@@ -1,9 +1,9 @@
 ---
 name: skill-sub
-version: 1.24.7
+version: 1.24.8
 author: wUwproject
 license: MIT
-description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器
+description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -12,10 +12,13 @@ tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading
 external_data_dir: true
 trigger: ['规划类: 帮我规划一下/步骤是什么', '顺序类: 依次执行/先...再...', '链管理: 创建/查看/更新/删除调用链']
 trigger_negative: ['不使用调用链', '手动逐步执行']
+meta_field_sync: true
 ---
+
 # skill-sub
 
 > 反模式详见 [references/antipatterns.md](references/antipatterns.md)
+
 
 
 ## 触发场景
@@ -26,6 +29,7 @@ trigger_negative: ['不使用调用链', '手动逐步执行']
 - 链管理：「创建/查看/更新/删除调用链」
 
 **否定条件**：仅当用户明确要求「不使用调用链」或「手动逐步执行」时，不自动触发。
+
 
 
 ## 核心能力
@@ -44,6 +48,7 @@ trigger_negative: ['不使用调用链', '手动逐步执行']
 ---
 
 ---
+
 
 
 
@@ -89,7 +94,6 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 
 
 
-
 ## 工作流程
 
 1. **理解意图** → 分析用户输入，判断是否需要调用链
@@ -99,6 +103,7 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 5. **（可选）实际执行** → 按执行计划逐步调用技能
 
 ---
+
 
 ### 循环与分支编排
 
@@ -174,3 +179,4 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 | **默认重试次数** | 1-10（默认3） | 所有步骤的默认最大重试次数 |
 
 ---
+
