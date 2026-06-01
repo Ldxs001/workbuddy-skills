@@ -1,7 +1,7 @@
 ---
 name: latex-modular
 data_dir: ../.standardization/latex-modular/data
-version: 1.2.2
+version: 1.2.4
 author: wUwproject
 license: MIT
 description: LaTeX 模块化组合技能。提取 LaTeX 文档头/组件（表格、图片、列表、章节样式）作为可组合模块，通过 Python 脚本稳定组合生成不报错的 lualatex 文档，支持从原始 LaTeX 代码重构进模块化体系。
@@ -28,7 +28,7 @@ meta_field_sync: true
 |------|----------|--------|
 | `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_frontmatter.py` |
 | `SKILL.md` 正文 | Python 直接重建 | `scripts/safe_write.py` 的 `safe_write()` |
-| `scripts/components/*.tex` | Python 写入 | `scripts/component_manager.py` |
+| `scripts/components/*.txt` | Python 写入 | `scripts/component_manager.py` |
 | `references/*.md` | `scripts/safe_write.py` | 随技能自带 |
 
 - [把这段 LaTeX 做成模块化模板]
@@ -92,7 +92,7 @@ meta_field_sync: true
 1. 读取用户提供的 LaTeX 源文件
 2. 解析文档结构：导言区（\\documentclass 到 \\begin{document}）、正文区
 3. 提取组件并分类保存到 `scripts/components/`：
-   - `preamble/*.tex` — 宏包引入、颜色定义、字体设置
+   - `preamble/*.tex` — 宏包引入、颜色定义、字体配置
    - `environments/*.tex` — 自定义环境（mylist、mycolumns 等）
    - `commands/*.tex` — 自定义命令（\\timu、\\seeref 等）
    - `styles/*.tex` — 章节样式、目录样式、页眉页脚
@@ -108,7 +108,7 @@ meta_field_sync: true
    - 第1层：文档类声明
    - 第2层：宏包引入（自动去重）
    - 第3层：自定义命令和环境
-   - 第4层：样式设置
+   - 第4层：样式配置
    - 第5层：文档正文（用户提供）
 4. 输出完整 .tex 文件
 
@@ -118,28 +118,23 @@ meta_field_sync: true
 scripts/components/
 ├── manifest.json          # 组件索引
 ├── preamble/              # 导言区组件
-│   ├── class-settings.tex
-│   ├── packages.tex
-│   ├── colors.tex
-│   └── fonts.tex
+│   ├── class-settings.txt
+│   └── packages.txt
 ├── environments/          # 自定义环境
-│   ├── mylist.tex
-│   ├── mycolumns.tex
-│   └── abstract-env.tex
+│   ├── mylist.txt
+│   ├── mycolumns.txt
+│   └── abstract-env.txt
 ├── commands/              # 自定义命令
-│   ├── title-commands.tex
-│   ├── ref-commands.tex
-│   └── font-commands.tex
-├── styles/                # 样式设置
-│   ├── section-style.tex
-│   ├── toc-style.tex
-│   └── header-footer.tex
+│   ├── title-commands.txt
+│   └── background.txt
+├── styles/                # 样式配置
+│   ├── section-style.txt
+│   ├── toc-style.txt
+│   └── header-footer.txt
 ├── tables/                # 表格模板
-│   ├── standard-table.tex
-│   └── multirow-table.tex
+│   └── table-style.txt
 └── graphics/              # 图片模板
-    ├── figure-insert.tex
-    └── background.tex
+    └── figure-insert.txt
 ```
 
 ### refactor 模式（重构）

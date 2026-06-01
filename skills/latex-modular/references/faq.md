@@ -74,7 +74,7 @@ python scripts/component_manager.py add my_package.tex \
   --desc "我的宏包配置"
 ```
 
-或直接手动创建 `scripts/components/preamble/my_package.tex`，然后编辑 `manifest.json` 添加条目。
+或直接手动创建 `scripts/components/preamble/my_package.txt`，然后编辑 `manifest.json` 添加条目。
 
 ---
 

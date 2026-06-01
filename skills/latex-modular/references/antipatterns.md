@@ -128,7 +128,7 @@ python scripts/safe_write.py write SKILL.md "<content>"
 **后果**：`Undefined control sequence` 错误。
 
 **正确做法**：
-确保 `commands/title-commands.tex` 组件已被 `\input` 引入。
+确保 `scripts/components/commands/title-commands.txt` 组件已被 `\input` 引入。
 
 ---
 

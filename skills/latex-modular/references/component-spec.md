@@ -12,12 +12,12 @@
 
 | 组件键 | 文件名 |
 |---------|--------|
-| `preamble/class-settings` | `preamble/class-settings.tex` |
-| `environments/mylist` | `environments/mylist.tex` |
-| `commands/title-commands` | `commands/title-commands.tex` |
-| `styles/section-style` | `styles/section-style.tex` |
-| `tables/standard-table` | `tables/standard-table.tex` |
-| `graphics/figure-insert` | `graphics/figure-insert.tex` |
+| `preamble/class-settings` | `scripts/components/preamble/class-settings.txt` |
+| `environments/mylist` | `scripts/components/environments/mylist.txt` |
+| `commands/title-commands` | `scripts/components/commands/title-commands.txt` |
+| `styles/section-style` | `scripts/components/styles/section-style.txt` |
+| `tables/table-style` | `scripts/components/tables/table-style.txt` |
+| `graphics/figure-insert` | `scripts/components/graphics/figure-insert.txt` |
 
 ---
 
@@ -29,9 +29,9 @@
 - 只包含一个功能模块的 LaTeX 代码
 - 不使用 `\begin{document}` 或 `\end{document}`
 - 宏包引入使用 `\usepackage[<options>]{<package>}` 格式
-- 多个宏包可以合并到一个文件（如 `preamble/packages.tex`）
+- 多个宏包可以合并到一个文件（如 `scripts/components/preamble/packages.txt`）
 
-**示例** (`preamble/class-settings.tex`):
+**示例** (`scripts/components/preamble/class-settings.txt`):
 
 ```latex
 % --- 文档类配置 ---
@@ -39,7 +39,7 @@
 \linespread{1.5}
 ```
 
-**示例** (`preamble/packages.tex`):
+**示例** (`scripts/components/preamble/packages.txt`):
 
 ```latex
 % --- 颜色支持 ---
@@ -79,7 +79,7 @@
 - 环境名使用小写字母 + 连字符（`-`）分隔
 - 明确环境参数（如果有）
 
-**示例** (`environments/mylist.tex`):
+**示例** (`scripts/components/environments/mylist.txt`):
 
 ```latex
 % --- 列表系统 ---
@@ -128,7 +128,7 @@
 - 命令名使用小写字母 + 连字符（`-`）分隔（如果有多单词）
 - 明确命令参数（如果有）
 
-**示例** (`commands/title-commands.tex`):
+**示例** (`scripts/components/commands/title-commands.txt`):
 
 ```latex
 % --- 字体指令 ---
@@ -174,7 +174,7 @@
 - 或使用 `\ctexset`、`\tikzset` 等全局配置命令
 - 明确样式参数（如颜色、字体、间距）
 
-**示例** (`styles/section-style.tex`):
+**示例** (`scripts/components/styles/section-style.txt`):
 
 ```latex
 % --- 章节样式 ---
@@ -242,7 +242,7 @@
 - 提供表格样式配置（如 `\newlength{\tablegap}`）
 - 可以包含示例表格代码（注释掉）
 
-**示例** (`tables/table-style.tex`):
+**示例** (`scripts/components/tables/table-style.txt`):
 
 ```latex
 % --- 表格系统 ---
@@ -261,7 +261,7 @@
 - 提供图片插入命令（如 `\newcommand{\coverbackground}[1]{...}`）
 - 明确图片路径格式（推荐使用正斜杠 `/`）
 
-**示例** (`graphics/figure-insert.tex`):
+**示例** (`scripts/components/graphics/figure-insert.txt`):
 
 ```latex
 % --- 图形支持 ---
@@ -289,12 +289,12 @@
   "generated_at": "2026-05-27T19:06:17",
   "components": {
     "preamble/class-settings": {
-      "file": "preamble/class-settings.tex",
+      "file": scripts/components/preamble/class-settings.txt",
       "desc": "文档类声明",
       "dependencies": []
     },
     "preamble/packages": {
-      "file": "preamble/packages.tex",
+      "file": scripts/components/preamble/packages.txt",
       "desc": "宏包引入",
       "dependencies": []
     },
@@ -308,42 +308,42 @@
       "dependencies": ["fontspec", "ctex"]
     },
     "environments/mylist": {
-      "file": "environments/mylist.tex",
+      "file": scripts/components/environments/mylist.txt",
       "desc": "自定义列表环境",
       "dependencies": ["enumitem", "newunicodechar"]
     },
     "commands/title-commands": {
-      "file": "commands/title-commands.tex",
+      "file": scripts/components/commands/title-commands.txt",
       "desc": "标题命令",
       "dependencies": ["ctex", "amssymb"]
     },
     "styles/section-style": {
-      "file": "styles/section-style.tex",
+      "file": scripts/components/styles/section-style.txt",
       "desc": "章节样式（ctexset）",
       "dependencies": ["ctex"]
     },
     "styles/toc-style": {
-      "file": "styles/toc-style.tex",
+      "file": scripts/components/styles/toc-style.txt",
       "desc": "目录样式",
       "dependencies": ["tocloft"]
     },
     "styles/header-footer": {
-      "file": "styles/header-footer.tex",
+      "file": scripts/components/styles/header-footer.txt",
       "desc": "页眉页脚",
       "dependencies": ["fancyhdr", "lastpage"]
     },
     "tables/table-style": {
-      "file": "tables/table-style.tex",
+      "file": scripts/components/tables/table-style.txt",
       "desc": "表格样式",
       "dependencies": ["tabularx", "booktabs", "multirow", "float", "subcaption", "makecell", "longtable", "array"]
     },
     "graphics/figure-insert": {
-      "file": "graphics/figure-insert.tex",
+      "file": scripts/components/graphics/figure-insert.txt",
       "desc": "图片插入",
       "dependencies": ["graphicx"]
     },
     "graphics/background": {
-      "file": "graphics/background.tex",
+      "file": scripts/components/commands/background.txt",
       "desc": "背景图片",
       "dependencies": ["eso-pic"]
     }
@@ -360,11 +360,11 @@
 
 **示例**:
 
-如果 `commands/title-commands.tex` 中使用了 `\newcommand` 和 `\newCJKfontfamily`，则需要声明：
+如果 `scripts/components/commands/title-commands.txt` 中使用了 `\newcommand` 和 `\newCJKfontfamily`，则需要声明：
 
 ```json
 "commands/title-commands": {
-  "file": "commands/title-commands.tex",
+  "file": scripts/components/commands/title-commands.txt",
   "desc": "标题命令",
   "dependencies": ["ctex", "amssymb"]
 }

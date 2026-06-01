@@ -24,17 +24,17 @@ python scripts/extract.py <source.tex> --output-dir scripts/components/
 
 | 分类 | 目录 | 内容 |
 |------|------|------|
-| 文档类配置 | `preamble/class-settings.tex` | `\documentclass` 及选项 |
-| 宏包引入 | `preamble/packages.tex` | 所有 `\usepackage` 行 |
+| 文档类配置 | `scripts/components/preamble/class-settings.txt` | `\documentclass` 及选项 |
+| 宏包引入 | `scripts/components/preamble/packages.txt` | 所有 `\usepackage` 行 |
 | 颜色定义 | `preamble/colors.tex` | `xcolor`、`\definecolor` |
 | 字体配置 | `preamble/fonts.tex` | `fontspec`、`\setmainfont`、`ctex` |
 | 页面配置 | `preamble/geometry.tex` | `geometry` 宏包配置 |
 | 作图支持 | `preamble/pgfplots.tex` | `pgfplots`、`tikz`、`siunitx` |
 | 自定义环境 | `environments/*.tex` | `mylist`、`mycolumns` 等 |
 | 自定义命令 | `commands/*.tex` | `\timu`、`\seeref` 等 |
-| 章节样式 | `styles/section-style.tex` | `ctexset` 配置 |
-| 目录样式 | `styles/toc-style.tex` | `tocloft` 相关配置 |
-| 页眉页脚 | `styles/header-footer.tex` | `fancyhdr` 配置 |
+| 章节样式 | `scripts/components/styles/section-style.txt` | `ctexset` 配置 |
+| 目录样式 | `scripts/components/styles/toc-style.txt` | `tocloft` 相关配置 |
+| 页眉页脚 | `scripts/components/styles/header-footer.txt` | `fancyhdr` 配置 |
 | 表格样式 | `tables/*.tex` | `tabularx`、`booktabs` 等 |
 | 图片插入 | `graphics/*.tex` | `graphicx`、`eso-pic` |
 
@@ -53,7 +53,7 @@ python scripts/compose.py \
 
 组合顺序（自动处理依赖）：
 
-1. 文档类声明（`preamble/class-settings.tex`）
+1. 文档类声明（`scripts/components/preamble/class-settings.txt`）
 2. 宏包引入（自动去重 + 按正确顺序排序）
 3. 颜色/字体/页面配置
 4. 自定义环境和命令

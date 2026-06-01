@@ -7,7 +7,7 @@
 | 读取 manifest/组件 | READ | 读取 components/ 目录和 manifest.json |
 | 生成 .tex 文档 | WRITE | 调用 compose.py 输出 .tex 文件 |
 | 编译验证 | EXECUTE | 调用系统 lualatex 编译 |
-| 写入 body.tex | WRITE | 更新 components/body.tex |
+| 写入 body.txt | WRITE | 更新 components/body.txt |
 | 操作组件库 | WRITE | 更新 components/ 下的组件文件 |
 | 读取系统 LaTeX | READ | 调用系统 lualatex/latex 引擎 |
 

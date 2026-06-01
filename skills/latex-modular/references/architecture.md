@@ -59,7 +59,7 @@ os.replace(tmp_path, target_path)
 
 **输出**：
 - `scripts/components/manifest.json` — 组件索引（JSON）
-- `scripts/components/<category>/<name>.tex` — 各组件文件
+- `scripts/components/<category>/<name>.txt` — 各组件文件
 
 ### 3. compose.py（组合引擎）
 
@@ -132,7 +132,7 @@ os.replace(tmp_path, target_path)
 ### extract 模式
 
 ```
-source.tex → extract.py → scripts/components/*.tex + manifest.json
+source.tex → extract.py → scripts/components/*.txt + manifest.json
 ```
 
 ### compose 模式
@@ -144,7 +144,7 @@ manifest.json + body.tex → compose.py → output.tex → lualatex → output.p
 ### refactor 模式
 
 ```
-source.tex → refactor.py → scripts/components/*.tex + manifest.json + output_modular.tex
+source.tex → refactor.py → scripts/components/*.txt + manifest.json + output_modular.tex
 ```
 
 ## 依赖查找顺序
