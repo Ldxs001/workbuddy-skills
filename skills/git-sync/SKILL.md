@@ -4,19 +4,20 @@ version: 2.7.2
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。
-sensitive_access: false
-critical_write: false
+sensitive_access: False
+critical_write: False
 permission_weight: LOW
 data_dir: ../.standardization/git-sync/
 tags: []
-external_data_dir: true
+external_data_dir: True
 trigger: 同步/上传/推送/发布某个skill
 trigger_negative: 只是看文件/通用git提交/文件同步到云端
-h1_version: true
+h1_version: True
 ---
 # git-sync — 三端同步技能
 
 将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
+
 
 ## 触发场景
 
@@ -33,6 +34,7 @@ h1_version: true
 - 用户要求「用 git 提交代码」——这是通用 git 操作，不是 skill 同步
 - 用户提到「同步」但指的是文件同步（如「同步到云端」）——不是 skill 仓库同步
 
+
 ## 核心能力
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
@@ -43,7 +45,19 @@ h1_version: true
 - **SKILL.md 规范审查** —— 内联审计（版本一致性 + R-23 脚本引用检查）
 - **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页
 
+
 ## 工作流程
+
+
+## 数据目录说明
+
+本技能的数据文件（扫描结果、临时副本、ZIP 包等）存放在：
+
+```
+skills/.standardization/git-sync/
+```
+
+通过 frontmatter 的 `data_dir: ../.standardization/git-sync/` 声明。安装目录 `skills/git-sync/` 只保留 SKILL.md 和 scripts/。
 
 ## 执行流程（AI 操作指南）
 
@@ -88,6 +102,7 @@ HTML 索引：<完整路径>
 
 #### 4. [文本] 如果 GitHub 推送失败（443 超时），必须询问用户是否重试
 
+
 ## 渐进式加载说明
 
 本技能采用渐进式 MD 体系，`SKILL.md` 为轻量入口，详细规范拆分到 `references/` 按需加载。
@@ -102,12 +117,3 @@ HTML 索引：<完整路径>
 - `references/antipatterns.md` — 反模式（常见错误）
 - `references/faq.md` — 常见问题（443 超时、版本冲突等）
 
-## 数据目录说明
-
-本技能的数据文件（扫描结果、临时副本、ZIP 包等）存放在：
-
-```
-skills/.standardization/git-sync/
-```
-
-通过 frontmatter 的 `data_dir: ../.standardization/git-sync/` 声明。安装目录 `skills/git-sync/` 只保留 SKILL.md 和 scripts/。
