@@ -1589,6 +1589,20 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     f"该文件已在核心能力索引表中列出，建议移到索引表统一管理"
                 )
     
+    # ── 15c-2: 同样检测 markdown 链接语法 [text](references/xxx.md) ──
+    for m in re.finditer(r'^>.*?\[([^\]]*)\]\(references/([^)]+)\)', body, re.MULTILINE):
+        ref_text = m.group(1)
+        ref_path = m.group(2)
+        ref_fn = ref_path.split('/')[-1]
+        ref_line = body[:m.start()].count('\n') + 1
+        if _index_table_refs and ref_fn in _index_table_refs:
+            first_section_pos = body.find('\n## ')
+            if m.start() < first_section_pos:
+                issues["warn"].append(
+                    f"C-15: 正文第 {ref_line} 行在 H1 后使用 markdown 链接独立引用了 `references/{ref_path}`，"
+                    f"该文件已在核心能力索引表中列出，建议统一由索引表管理"
+                )
+    
     # ── 15d: 同一概念在不同章节中重复提及的线索检测（Phase 2 精筛）──
     # 提取所有 ## 章节的标题，检查是否有近似重复
     seen_titles = set()
