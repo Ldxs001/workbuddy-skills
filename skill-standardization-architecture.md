@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.45.2 版的架构设计、审查规则体系、标准化执行流程与修复体系  
-> 生成时间：2026-06-01（v2.45.2 最新更新）
+> 完整解读 v2.46.1 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 生成时间：2026-06-01（v2.46.1 最新更新）
 
 ---
 
@@ -414,6 +414,8 @@ DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardizat
 | `fix_doc_code_consistency(skill_dir)` | R-23 | 修复文档-代码一致性 |
 | `fix_split_nonstandard(skill_dir)` | R-17 | 非标章节拆分到 references/（v2.45.0） |
 | `fix_section_order(skill_dir)` | R-25 C-11 | 按 body.json section_order 重排章节（v2.45.0） |
+| `fix_section_constraint(skill_dir)` | must_have | 从目标技能脚本采集约束词生成 ## 约束（v2.46.0） |
+| `fix_progressive_index_table(skill_dir)` | C-13 | 从 references/ 扫描文件名+H1 生成索引表（v2.46.0） |
 | `fix_artifact_paths(skill_dir)` | R-11 | 修复产出物路径 |
 | `fix_external_data_dir(skill_dir)` | R-12 | 修复外部数据目录 |
 | `fix_sensitive_access(skill_dir)` | R-13 | 添加敏感信息访问声明 |
@@ -430,6 +432,14 @@ DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardizat
 from scripts.skill_audit.fix import apply_fix
 apply_fix(skill_dir, 'R-07', 'R-18', 'R-19')  # 批量修复
 ```
+
+**内容采集原则**（v2.46.0+）：所有 fix 函数生成章节内容时优先从目标技能自身采集，不照抄 skill-standardization 的模板：
+- `fix_section_constraint`：扫描 `scripts/*.py` 中 必须/不得/禁止/MUST → 生成 ≤5 条约束
+- `fix_progressive_index_table`：扫描 `references/*.md` 的 H1 和首段 → 生成 3 列索引表
+- `fix_section_trigger`：扫描 docstring + frontmatter trigger 字段 → 生成触发表
+- `fix_section_core`：扫描模块级 docstring + def 函数名 → 生成能力表格
+- `fix_section_workflow`：扫描 `def main()` 和 CLI 入口 → 生成步骤列表
+
 `audit --fix` 执行完毕后，终端输出 fix_details 机器名列表，并强制提示 AI 将其转化为可读 changelog 描述用 safe_io 写入 references/changelog.md。
 
 ---
@@ -581,4 +591,4 @@ python -m scripts.skill_builder inspect <skill-dir>    # 通过 builder 调用
 
 ---
 
-> 本文档基于 skill-standardization v2.45.2 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-standardization v2.46.1 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
