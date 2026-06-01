@@ -1,18 +1,18 @@
 ---
 name: git-sync
-version: 2.7.2
+version: 2.7.3
 author: wUwproject
 license: MIT
-description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。
-sensitive_access: False
-critical_write: False
+description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复跳过同步时状态显示「成功」的误导问题，改为跳过。修复审计问题，统一术语，修正自审粒度。
+sensitive_access: false
+critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/git-sync/
-tags: []
-external_data_dir: True
+tags: ['sync', 'git', 'zip', 'skill-manager', 'manifest', 'security']
+external_data_dir: true
 trigger: 同步/上传/推送/发布某个skill
 trigger_negative: 只是看文件/通用git提交/文件同步到云端
-h1_version: True
+h1_version: true
 ---
 # git-sync — 三端同步技能
 
@@ -46,6 +46,17 @@ h1_version: True
 - **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页
 
 
+
+### 渐进式文件索引
+
+| 文件名 | 位置 | 说明 |
+|--------|------|------|
+| `antipatterns.md` | git-sync 反模式 | 常见错误和注意事项，避免误用本技能。 |
+| `changelog.md` | changelog.md — git-sync 更新日志 | - 版本号 2.6.28 → 2.6.29（`update --fix` 自动 bump） |
+| `faq.md` | git-sync 常见问题 | --- |
+| `guide.md` | git-sync 完整使用指南 | > 本文档是 SKILL.md 的渐进式补充，包含完整的执行流程、步骤详解和配置说明。 |
+| `permissions.md` | git-sync — 权限说明（详细版） | > 本文档由 `permission_checker.py` 扫描生成，记录 git-sync 所有权限需求、风险等级及 |
+| `reference.md` | git-sync 完整参考手册 | > CLI 命令速查、路径变量、排除列表、文件结构规范。 |
 ## 工作流程
 
 
@@ -116,4 +127,3 @@ HTML 索引：<完整路径>
 - `references/architecture.md` — 内部架构（脚本映射、目录结构）
 - `references/antipatterns.md` — 反模式（常见错误）
 - `references/faq.md` — 常见问题（443 超时、版本冲突等）
-
