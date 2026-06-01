@@ -325,7 +325,40 @@ def _load_allowed_sections():
         return None
 
 
-def _find_nonstandard_sections(body_text):
+def _load_known_sections(skill_dir):
+    """加载该技能已知的合法非标章节（由 Phase 2 LLM 确认后写入）。"""
+    if not skill_dir:
+        return set()
+    ks_path = os.path.join(skill_dir, '.skill_sections.json')
+    if not os.path.isfile(ks_path):
+        return set()
+    try:
+        with open(ks_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return set(data.get("known_sections", []))
+    except Exception:
+        return set()
+
+
+def _save_known_sections(skill_dir, section_title):
+    """将 LLM Phase 2 确认合法的章节记录到 .skill_sections.json。"""
+    if not skill_dir:
+        return
+    ks_path = os.path.join(skill_dir, '.skill_sections.json')
+    known = set()
+    if os.path.isfile(ks_path):
+        try:
+            with open(ks_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            known = set(data.get("known_sections", []))
+        except Exception:
+            pass
+    known.add(section_title)
+    with open(ks_path, 'w', encoding='utf-8') as f:
+        json.dump({"known_sections": sorted(known)}, f, ensure_ascii=False, indent=2)
+
+
+def _find_nonstandard_sections(body_text, skill_dir=None):
     """
     扫描正文中的 ## H2 章节，与 body.json allowed_sections 白名单对比。
     Phase 1: 正则粗筛。
@@ -360,6 +393,10 @@ def _find_nonstandard_sections(body_text):
                 found = True
                 break
         if not found:
+            # 检查是否在已知合法章节列表中（前缀匹配，兼容版本标注）
+            known = _load_known_sections(skill_dir) if skill_dir else set()
+            if any(title.startswith(k) or k.startswith(title) for k in known):
+                continue
             line_no = body_text[:m.start()].count('\n') + 1
             content = m.group(2).strip() if m.lastindex and m.lastindex >= 2 else ""
             # 取前 80 字作为内容预览（供 LLM 判断用）
@@ -379,6 +416,8 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
     if not content:
         return {"passed": True, "detail": f"{filepath}:1 - 无内容，跳过检查"}
 
+    # 从 **kw 提取 skill_dir
+    _skill_dir_r17 = kw.get("skill_dir", "")
     lines = content.splitlines()
     line_count = len(lines)
     detail_parts = []
@@ -399,7 +438,7 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
             )
 
     # ── 检查 2: 非标准章节检测（Phase 1 正则粗筛 → LLM Phase 2 精筛）──
-    nonstandard = _find_nonstandard_sections(body)
+    nonstandard = _find_nonstandard_sections(body, _skill_dir_r17)
     if nonstandard:
         phase1_lines = []
         for ln, title, preview in nonstandard:

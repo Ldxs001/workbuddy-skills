@@ -321,9 +321,9 @@ def _load_allowed_sections():
         return None
 
 
-def _find_nonstandard_sections(body_text):
+def _find_nonstandard_sections(body_text, skill_dir=None):
     """
-    扫描正文中的 ## H2 章节，与 body.json allowed_sections 白名单对比。
+    扫描正文中的 ## H2 章节，与 body.json allowed_sections + 已知合法章节列表对比。
     Phase 1: 正则粗筛。
     返回非标章节列表，每项含 (line_no, title, content_preview)。
     content_preview 供 LLM 第二阶段精筛判断。
@@ -374,6 +374,7 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
     if not content:
         return {"passed": True, "detail": f"{filepath}:1 - 无内容，跳过检查"}
 
+    _skill_dir_r17 = kw.get("skill_dir", "")
     lines = content.splitlines()
     line_count = len(lines)
     detail_parts = []
@@ -394,7 +395,7 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
             )
 
     # ── 检查 2: 非标准章节检测 ──
-    nonstandard = _find_nonstandard_sections(body)
+    nonstandard = _find_nonstandard_sections(body, _skill_dir_r17)
     if nonstandard:
         details = "; ".join(f"第{ln}行「{t[:30]}」" for ln, t in nonstandard[:5])
         if len(nonstandard) > 5:
