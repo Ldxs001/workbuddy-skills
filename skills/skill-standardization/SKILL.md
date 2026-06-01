@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.49.0
+version: 2.50.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -10,15 +10,7 @@ permission_weight: LOW
 data_dir: ../.standardization/skill-standardization/
 tags: ['standardization', 'skill-builder', 'skill-audit', 'validation', 'json-loader', 'refactor', 'version-bump', 'changelog-auto', 'data-dir']
 external_data_dir: true
-trigger:
-  - 帮我看看这个技能写得怎么样
-  - 检查这个技能是否规范
-  - 审计 skill
-  - 创建新技能
-  - 更新 skill
-  - 重构技能
-  - skill 规范
-  - R-规则
+trigger: ['帮我看看这个技能写得怎么样', '检查这个技能是否规范', '审计 skill', '创建新技能', '更新 skill', '重构技能', 'skill 规范', 'R-规则', '这个 skill 质量怎么样', '帮我检查一下这个 skill 的格式', '看看这个 skill 有没有问题', '给这个 skill 做个体检', '规范一下这个 skill', '标准化这个项目- 帮我看看这个技能写得怎么样', '检查这个技能是否规范', '审计 skill', '创建新技能', '更新 skill', '重构技能', 'skill 规范', 'R-规则']
 trigger_negative: 当用户仅闲聊或问你有什么技能时不触发；单步任务如查看文件不触发
 meta_field_sync: true
 h1_position: true
@@ -37,12 +29,12 @@ h1_position: true
 当用户提出以下类型请求时，应触发本技能：
 
 **自然语言（推荐）**：
-- [帮我看看这个技能写得怎么样 / 这个技能规范吗]
-- [检查/审查/评估一下这个技能]
-- [给这个 skill 做个检查 / 跑一遍规范]
-- [创建/生成一个新技能 / 把 xxx 做成 skill]
-- [更新/改造一下这个 skill / 重构这个技能]
-- [这个 skill 的 frontmatter/描述/规则怎么写]
+- [帮我看看这个技能写得怎么样 / 这个技能规范吗 / 质量怎么样]
+- [检查/审查/评估一下这个 skill / 跑一遍规范 / 做个体检]
+- [给这个 skill 做个检查 / 看看有没有问题 / 格式对吗]
+- [创建/生成一个新技能 / 把 xxx 做成 skill / 标准化这个项目]
+- [更新/改造一下这个 skill / 重构这个技能 / 升级一下]
+- [这个 skill 的 frontmatter/描述/规则怎么写 / 怎么优化]
 
 **技术关键词**：
 - [用 skill-standardization 审计/改造某技能]

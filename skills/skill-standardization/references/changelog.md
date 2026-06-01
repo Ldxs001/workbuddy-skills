@@ -1,3 +1,10 @@
+## 2.50.0 (2026-06-01)
+
+### 修复
+- 文档优化：触发条件口语化增强 + FAQ过时描述修复 + guide 审计输出示例
+
+---
+
 ## 2.49.0 (2026-06-01)
 
 ### 修复
@@ -64,7 +71,7 @@
 ## 2.46.2 (2026-06-01)
 
 ### 修复
-- 修复 #B1 progressive_index_table 重复bug #B2 section_constraint 过宽regex
+- 修复 #B1 progressive_index_table 重复 bug #B2 section_constraint 过宽 regex
 
 ---
 

@@ -20,15 +20,15 @@
 
 ## 基础概念
 
-### Q1: 什么是 SKILL.md 标准化规范草案 v0.1？
+### Q1: 什么是 SKILL.md 标准化规范？
 
-**A:** 这是 skill-standardization 的核心依据——一份定义了标准 Skill 文件应如何编写的规范文档。主要包含：
+**A:** 这是 skill-standardization 的核心规范——一套定义了标准 Skill 文件应如何编写的规则体系（v2+）。主要包含：
 
 - **Frontmatter 规范**：3 个必须字段（name/version/description）+ 7 个可选字段
-- **正文结构规范**：5 个必须章节 + 4 个推荐章节 + N 个可选章节
-- **审查规则**：R-01~R-10 共 10 条自动检查规则
+- **正文结构规范**：三层体系（must_have 必须章节 / whitelist 白名单章节 / nonstandard 非标章节）+ 渐进式索引表
+- **审查规则**：R-01~R-25 共 25 条自动检查规则（含安全审计、写作规范、章节顺位、格式合规等）
 
-该草案存储在 `spec/frontmatter.json`、`spec/body.json` 和 `spec/rules.json` 中，可通过 `json_loader.py load` 查看。
+该规范定义在 `scripts/spec/frontmatter.json`、`scripts/spec/body.json` 和 `scripts/spec/rules.json` 中，可通过 `python -m scripts.json_loader load` 查看。
 
 ### Q2: skill-standardization 可以独立使用吗？
 
@@ -36,7 +36,7 @@
 
 ```
 -m scripts.skill_audit audit <skill-dir>
-  ├─ R-01~R-24 规则检查
+  ├─ R-01~R-25 规则检查
   └─ 输出审查报告
 ```
 
@@ -83,14 +83,13 @@
 
 ### Q6: 可以自定义 create 模板吗？
 
-**A:** 当前版本的模板硬编码在 `-m scripts.skill_builder` 的 `SKILL_TEMPLATE` 和 `META_TEMPLATE` 变量中。要更新模板：
+**A:** create 模板位于 `scripts/skill_builder/creator.py` 中的 `SKILL_TEMPLATE` 变量。当前模板已对齐 v2.45.0+ 规范：
 
-1. 更新 `scripts/-m scripts.skill_builder`
-2. 找到第 ~34 行的 `SKILL_TEMPLATE` 字符串
-3. 更新占位符或新增字段
-4. 保存后下次 create 即生效
+- 包含 `## 约束` must_have 章节
+- 核心能力末尾含 `### 渐进式文件索引` 表格
+- references/ 引用通过索引表统一管理
 
-> 未来版本计划支持外部模板文件。
+要更新模板：修改 `creator.py` 中 `SKILL_TEMPLATE` 字符串后保存即可。
 
 ---
 
@@ -110,17 +109,20 @@ update 是**轻量检查**（只读+可选修复），refactor 是**重量改造
 
 ### Q8: update --fix 会更新哪些内容？
 
-**A:** 当前 --fix 仅自动修复以下项目：
+**A:** 当前 --fix 自动修复以下项目：
 
 | 修复项 | 动作 |
 |--------|------|
 | `_meta.json` 缺失 | 创建新的 _meta.json（含默认值） |
 | `_meta.json` 缺少字段 | 补充空值（tags 为空数组） |
+| 描述/标签同步 | description/tags 从 _meta.json 同步到 SKILL.md frontmatter |
+| 渐进式索引表 | 扫描 references/ 自动生成/更新索引表 |
+| 约束章节 | 从目标技能脚本采集约束规则 |
+| 章节重排 | 按 section_order 重排章节顺序 |
 
 **不会自动更新的：**
-- SKILL.md frontmatter（需手动添加）
-- 缺失的正文章节（仅提示）
-- 根目录散落文件（仅建议）
+- 缺失的 must_have 章节（仅提示）
+- 非标章节归类（由 LLM Phase 2 判断后调用 fix_reclassify_section）
 
 ### Q9: update 报告中的 ERROR/WARN/PASS 是什么意思？
 
@@ -133,7 +135,7 @@ update 是**轻量检查**（只读+可选修复），refactor 是**重量改造
 | **ERROR** (❌) | 存在严重不规范 | 应尽快修复 |
 | **💡** | 改进建议（非规则） | 可选优化 |
 
-> 注意：这些分类是 skill-builder 自身的报告格式，与 R-01~R-10 审查规则的分类体系不同。R-01~R-04 为 ERROR 级，R-05~R-10 为 WARN 级。
+> 注意：这些分类是审计报告的报告格式，与 R-01~R-25 审查规则的分类体系不同。ERROR 级指结构性问题，WARN 级指格式/风格建议。
 
 ---
 
@@ -230,13 +232,14 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 对于 minimal 级别的 skill，可以完全不创建 references/ 目录。
 对于 standard/full 级别，建议至少有 `guide.md`。
 
-### Q18: SKILL.md 超过 200 行怎么办？
+### Q18: SKILL.md 超过 230 行怎么办？
 
-**A:** update 检查时会提示超过 200 行的建议拆分。拆分策略：
+**A:** audit 检查时会提示超过 230 行需要拆分。按三层体系优先级拆分：
 
-1. 识别可独立成文档的大段落（如详细教程、大量示例）
-2. 在 SKILL.md 中保留摘要 + 引用语法指向 references/
-3. 将详细内容移入对应 .md 文件
+1. **优先拆 whitelist_optional 章节**（反模式/FAQ/配置/示例等）——它们可留在 SKILL.md 也可拆到 references/
+2. **always_progressive 章节**（版本日志）——永远在 references/，SKILL.md 只留 → 详见引用
+3. **非标章节**——直接拆分到 references/
+4. **must_have 章节**（H1/触发条件/核心能力/工作流程/约束）——永远留在 SKILL.md，不拆分
 
 引用语法示例：
 ```markdown
