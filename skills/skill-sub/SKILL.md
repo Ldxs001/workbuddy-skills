@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.24.4
+version: 1.24.5
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -19,12 +19,16 @@ meta_field_sync: true
 > 反模式详见 [references/antipatterns.md](references/antipatterns.md)
 
 ## 约束
+- assets/ 目录删除** — 符合 R-11 规则（产出物必须在 `scripts/` 或根目录）
 
-- **调用链 JSON 必须包含 `type`/`step`/`skill` 三字段** — 缺一不可
-- **引用外部 skill 前必须先确认该 skill 已安装** — 避免运行时找不到路径
-- **更新调用链后必须 `chain_manager.py validate` 验证** — 确保 JSON 格式正确
-- **循环/分支步骤必须指定退出条件** — 防止无限循环
+---
+## 1.22.0 (2026-05-26)
 
+### 面向对象（OO）改造
+- **chai
+- assets/ 目录删除** — 符合 R-11 规则（产出物必须在 `scripts/` 或根目录）
+
+---
 ## 触发场景
 
 **正向触发（满足以下任意一条）：**
@@ -39,31 +43,44 @@ meta_field_sync: true
 
 ## 核心能力
 
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `refere
 
-| # | 功能 | 说明 |
-|---|------|------|
-| 1 | **调用链管理** | 创建、查询、更新、删除调用链 |
-| 2 | **执行计划生成** | 生成结构化执行计划，含并行/串行标记 |
-| 3 | **条件执行** | 支持条件步骤，按条件判断是否执行 |
-| 4 | **循环与分支编排** | 支持 for-each/while 循环和 if-else 分支 |
-| 5 | **Dry-Run 模式** | 模拟执行，不实际调用技能 |
-| 6 | **链备份与版本管理** | 自动备份，支持版本恢复 |
-
----
-
----
+### 渐进式文件索引
 
 ### 渐进式文件索引
 
 | 文件名 | 位置 | 说明 |
 |--------|------|------|
-| `references/workflow.md` | 工作流程详解 | 完整工作流和示例 |
-| `references/examples.md` | 使用示例 | 调用链构建示例 |
-| `references/antipatterns.md` | 反模式 | 常见错误及正确做法 |
-| `references/faq.md` | FAQ | 常见问题解答 |
-| `references/changelog.md` | 版本日志 | 版本更新记录 |
+| `antipatterns.md` | skill-sub 反模式 | > 本文档收录 skill-sub 使用中的常见错误和正确做法。完整反模式示例见 `references/faq.md` |
+| `chain_schema.md` | skill-sub 调用链数据结构 | > 本文档定义 Chain / Step / retry_policy / failure_mode 的完整结构。 |
+| `changelog.md` | skill-sub 更新日志 | - **循环步骤（Loop Step）** — `type: "loop"` 支持 `for_each` / `whil |
+| `examples.md` | skill-sub 使用示例 | > 本文档是 SKILL.md 的渐进式补充，提供完整使用示例。 |
+| `faq.md` | skill-sub 常见问题 | > 本文档是 SKILL.md 的渐进式补充，收录常见问题与使用技巧。 |
+| `permissions.md` | 权限说明 | 权限扫描风险等级：**MEDIUM** |
+| `reference.md` | skill-sub 参考手册 | > 本文档是 SKILL.md 的渐进式补充，包含完整 CLI 速查、脚本 API、存储格式。 |
+| `workflow.md` | skill-sub 详细工作流程 | > 本文档是 SKILL.md 的渐进式补充，详细描述执行流程、里程碑判断规则、三层回退策略。 |
+## 触发场景
 
+**正向触发（满足以下任意一条）：**
+
+
+**当用户提出以下意图时触发本技能：**
+- 规划类：「帮我规划一下...」、「...的步骤是什么」
+- 顺序类：「依次执行 A、B、C」、「先...再...」
+- 链管理：「创建/查看/更新/删除调用链」
+
+**否定条件**：仅当用户明确要求「不使用调用链」或「手动逐步执行」时，不自动触发。
+
+## 核心能力
+
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `refere
+
+### 渐进式文件索引
+---
+
+---
+
+### 渐进式文件索引
 ## 快速开始
 
 ```bash
