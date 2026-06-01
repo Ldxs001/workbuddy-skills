@@ -1,3 +1,10 @@
+## 2.51.0 (2026-06-01)
+
+### 修复
+- 补全5个缺失fix函数: version_con/sanitize/data_dir/section_antipattern/section_faq
+
+---
+
 ## 2.50.1 (2026-06-01)
 
 ### 修复

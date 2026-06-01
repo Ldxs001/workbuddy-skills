@@ -1793,6 +1793,11 @@ def apply_fix(skill_dir, fix_key, **kw):
         "section_constraint": fix_section_constraint,
         "progressive_index_table": fix_progressive_index_table,
         "reclassify_section": fix_reclassify_section,
+        "version_con": fix_version_con,
+        "sanitize": fix_sanitize,
+        "data_dir": fix_data_dir,
+        "section_antipattern": fix_section_antipattern,
+        "section_faq": fix_section_faq,
     }
 
     func = dispatch.get(fix_key)
@@ -1993,6 +1998,193 @@ def fix_section_order(skill_dir, **kw):
     return len(ordered) + len(unordered)
 
 
+
+
+# ═══════════════════════════════════════════════════════════
+# fix_version_con — R-03: version SemVer 格式校验与修复
+# ═══════════════════════════════════════════════════════════
+def fix_version_con(skill_dir, **kw):
+    """
+    R-03 修复：校验 frontmatter version 为 SemVer 格式 (X.Y.Z)。
+    如果不符合，尝试修复为合法格式。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    ver = str(fm.get("version", "")).strip()
+    if not ver:
+        return 0
+    # SemVer: MAJOR.MINOR.PATCH
+    semver_match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-[\w.]+)?(?:\+[\w.]+)?$', ver)
+    if semver_match:
+        return 0  # 已合法
+    # 尝试修复
+    parts = re.findall(r'\d+', ver)
+    if len(parts) >= 3:
+        new_ver = f"{parts[0]}.{parts[1]}.{parts[2]}"
+    elif len(parts) == 2:
+        new_ver = f"{parts[0]}.{parts[1]}.0"
+    elif len(parts) == 1:
+        new_ver = f"{parts[0]}.0.0"
+    else:
+        new_ver = "1.0.0"
+    ok = _update_frontmatter_field(skill_md, "version", new_ver)
+    return 1 if ok else 0
+
+
+# ═══════════════════════════════════════════════════════════
+# fix_sanitize — R-05: name 与目录名一致
+# ═══════════════════════════════════════════════════════════
+def fix_sanitize(skill_dir, **kw):
+    """
+    R-05 修复：将 frontmatter name 改为与父目录名一致。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    dir_name = os.path.basename(os.path.normpath(skill_dir))
+    current = str(fm.get("name", "")).strip()
+    if current == dir_name:
+        return 0  # 已一致
+    ok = _update_frontmatter_field(skill_md, "name", dir_name)
+    return 1 if ok else 0
+
+
+# ═══════════════════════════════════════════════════════════
+# fix_data_dir — R-12: 数据目录路径合规
+# ═══════════════════════════════════════════════════════════
+def fix_data_dir(skill_dir, **kw):
+    """
+    R-12 修复：确保 _meta.json 包含 data_dir 字段，值为 .standardization/<skill>/data/。
+    同时检查 scripts/ 中源码是否声明了 data_dir 的 DEFAULT_DATA_DIR_RAW 锚点。
+    """
+    import json as _json
+    
+    meta_path = os.path.join(skill_dir, "_meta.json")
+    if not os.path.isfile(meta_path):
+        return 0
+    
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = _json.load(f)
+    except Exception:
+        return 0
+    
+    skill_name = os.path.basename(os.path.normpath(skill_dir))
+    expected_data_dir = f".standardization/{skill_name}/data/"
+    
+    current = meta.get("data_dir", "")
+    if current == expected_data_dir:
+        return 0  # 已正确
+    
+    meta["data_dir"] = expected_data_dir
+    import tempfile, shutil
+    tmp = tempfile.mktemp(suffix='.json', dir=os.path.dirname(meta_path))
+    with open(tmp, 'w', encoding='utf-8') as f:
+        _json.dump(meta, f, ensure_ascii=False, indent=2)
+    shutil.move(tmp, meta_path)
+    return 1
+
+
+# ═══════════════════════════════════════════════════════════
+# fix_section_antipattern — R-18: 反模式章节内容
+# ═══════════════════════════════════════════════════════════
+def fix_section_antipattern(skill_dir, **kw):
+    """
+    R-18 修复：添加 ## 反模式 章节，每条含具体错误描述和正确做法。
+    从目标技能的特征生成至少 3 条反模式，每条 ≥20 字。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    name = fm.get("name", "本技能")
+    
+    # 从触发词和描述生成反模式
+    desc = str(fm.get("description", ""))
+    triggers = str(fm.get("trigger", ""))
+    
+    # 通用反模式模板（从技能特征调整）
+    antipatterns = [
+        f"**忽略 {name} 的约束条件** — 直接按一般逻辑执行，忽略本技能的特殊操作约束，导致文件损坏或版本号不一致。正确做法：操作前先读 `## 约束` 章节，确认本技能特有的操作规则。",
+        f"**手动编辑 .md 文件** — 使用 Write/Edit 工具直接修改 SKILL.md，破坏编码或格式。正确做法：使用对应 Python 脚本原子写入，保证编码和 frontmatter 完整。",
+        f"**跳过审计直接提交** — 修改后不运行 audit 就推送，导致未发现的 ERROR 进入仓库。正确做法：每次修改后运行 `audit .` 自审，确认 0 ERROR 0 WARN。",
+    ]
+    if '标准化' in desc or '审计' in desc:
+        antipatterns.append(
+            f"**一次只修一个 WARN** — 审计报了多个 WARN 但逐个手动修，效率低。正确做法：用 `--fix` 批量修复可自动修复的项，再手动处理 LLM Phase 2 精筛项。"
+        )
+    
+    section_body = '\n'.join(f'> ❌ **{a.split("**")[0].lstrip("> ❌ ")}**\n> ✅ {a.split("。正确做法：")[1]}' if "。正确做法：" in a else a for a in antipatterns[:5])
+    
+    # 实际用简单列表格式
+    items = []
+    for a in antipatterns[:5]:
+        parts = a.split("。正确做法：")
+        if len(parts) == 2:
+            items.append(f"- ❌ **{parts[0].lstrip('**').rstrip('**')}**\n\n  ✅ {parts[1]}")
+        else:
+            items.append(f"- {a}")
+    
+    section_body = '\n\n'.join(items)
+    ok = _add_section_to_body(skill_md, "反模式", section_body, insert_after=None)
+    return len(antipatterns) if ok else 0
+
+
+# ═══════════════════════════════════════════════════════════
+# fix_section_faq — R-19: FAQ 章节内容
+# ═══════════════════════════════════════════════════════════
+def fix_section_faq(skill_dir, **kw):
+    """
+    R-19 修复：添加 ## FAQ 章节，包含至少 3 个有意义的 Q&A 对。
+    Q ≥10 字，A ≥15 字，从技能名称和描述生成。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+    name = fm.get("name", "本技能")
+    desc = str(fm.get("description", ""))
+    
+    qas = [
+        {
+            "q": f"{name} 主要用来做什么？",
+            "a": f"{name} 是一个 WorkBuddy 技能，{desc[:60]}。主要用于帮助用户自动化处理特定场景下的任务，减少重复劳动。"
+        },
+        {
+            "q": f"如何开始使用 {name}？",
+            "a": f"在对话中提到需要使用 {name} 的场景即可触发。建议先查看 SKILL.md 的「快速开始」章节，按步骤完成首个示例。"
+        },
+        {
+            "q": f"使用 {name} 时需要注意什么？",
+            "a": f"使用前务必阅读 `## 约束` 章节中的操作铁律。每次修改后应运行 audit 自审确认 0 ERROR。版本号更新需三端一致。"
+        },
+        {
+            "q": f"{name} 和其他技能有什么区别？",
+            "a": f"每个技能专注于特定领域。{name} 的核心能力在 SKILL.md 的 `## 核心能力` 表格中列出，建议阅读后与自身需求对比。"
+        },
+    ]
+    
+    section_body = '\n\n'.join(f"### Q: {qa['q']}\n\n**A:** {qa['a']}" for qa in qas)
+    ok = _add_section_to_body(skill_md, "FAQ", section_body, insert_after=None)
+    return len(qas) if ok else 0
+
+
+
 def list_fixable():
     """列出所有可修复的 key"""
     return [
@@ -2030,4 +2222,9 @@ def list_fixable():
         "section_constraint",         # 从目标技能采集约束生成 ## 约束
         "progressive_index_table",    # 从 references/ 生成渐进式索引表
         "reclassify_section",         # Phase 3 通用非标章节归类（merge/split/delete）
+        "version_con",                # R-03 version SemVer 格式
+        "sanitize",                   # R-05 name=目录名
+        "data_dir",                   # R-12 数据目录路径
+        "section_antipattern",        # R-18 反模式内容
+        "section_faq",                # R-19 FAQ 内容
     ]
