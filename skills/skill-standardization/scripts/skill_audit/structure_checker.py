@@ -1134,8 +1134,8 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
-    R-25: 文档写作格式规范 (v2.44.0, v2.5.0 C-11/C-12, v2.6.0 C-13)
-    11 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 索引表引用冗余。
+    R-25: 文档写作格式规范 (v2.44.0, v2.6.0 C-11/C-12, v2.50.0 C-16)
+    16 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
     全部子检查仅作建议标准统一，不强制改造。
     """
@@ -1606,6 +1606,44 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         seen_titles.add(title_lower)
     
     # ════════════════════════════════════════════════════════════
+    # C-16 (WARN): references/ 文档内容过时检测 — Phase 1 正则粗筛 known outdated patterns
+    # ════════════════════════════════════════════════════════════
+    _c16_skill_dir = kw.get("skill_dir", "")
+    if _c16_skill_dir:
+        _c16_docs = [_c16_skill_dir]
+        _refs_dir = os.path.join(_c16_skill_dir, "references")
+        if os.path.isdir(_refs_dir):
+            for f in sorted(os.listdir(_refs_dir)):
+                if f.endswith(".md"):
+                    _c16_docs.append(os.path.join(_refs_dir, f))
+    else:
+        _c16_docs = [filepath]
+
+    _c16_outdated_patterns = {
+        "R-01~R-1[0-9]": ("规则编号范围", "当前规则为 R-01~R-25，references/ 中引用的旧范围需要更新"),
+        "R-01~R-24\\b": ("规则编号范围", "当前规则为 R-01~R-25，references/ 中引用的旧范围需要更新"),
+        "200 行": ("行数阈值", "当前 SKILL.md 行数上限为 230 行，references/ 中引用旧值 200 行需要更新"),
+        "草案|v0\\.1": ("过时描述", "规范已正式发布 v2+，references/ 中不应仍称为「草案」或「v0.1」"),
+        "5 个必须章节 \\+ 4 个推荐章节": ("章节分类过时", "当前规范为三层体系（must_have/whitelist/nonstandard），非旧五必需+四推荐"),
+        "R-01~R-10 共 10 条": ("规则数量过时", "当前规则为 R-01~R-25 共 25 条"),
+    }
+    for _c16_doc in _c16_docs:
+        try:
+            with open(_c16_doc, "r", encoding="utf-8") as f:
+                _c16_text = f.read()
+        except Exception:
+            continue
+        _c16_lines = _c16_text.splitlines()
+        for _c16_pattern, (_c16_label, _c16_desc) in _c16_outdated_patterns.items():
+            for _c16_m in re.finditer(_c16_pattern, _c16_text):
+                _c16_ln = 1 + _c16_text[:_c16_m.start()].count("\n")
+                _c16_context = _c16_lines[_c16_ln - 1][:60] if _c16_ln <= len(_c16_lines) else ""
+                _c16_filename = os.path.relpath(_c16_doc, _c16_skill_dir) if _c16_skill_dir else _c16_doc
+                issues["warn"].append(
+                    f"C-16: {_c16_filename}:{_c16_ln} - 发现过时{_c16_label}「{_c16_m.group()[:30]}」（上下文：{_c16_context}）。{_c16_desc}（需 LLM Phase 2 确认并更新）"
+                )
+
+    # ════════════════════════════════════════════════════════════
     # 汇总输出
     # ════════════════════════════════════════════════════════════
     error_count = len(issues["error"])
@@ -1614,7 +1652,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     if total == 0:
         return {"passed": True,
-                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（13项子检查均符合建议标准）"}
+                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（16项子检查均符合建议标准）"}
 
     detail_parts = []
     if error_count > 0:

@@ -151,7 +151,7 @@ python -m scripts.skill_builder update <skill-dir> --fix --backup
 
 #### B-04: 文件大小合理性
 
-检查 SKILL.md 行数是否超过 200 行。
+检查 SKILL.md 行数是否超过 230 行。
 
 建议：超过时考虑拆分到 `references/`。
 
@@ -463,7 +463,7 @@ A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需
 | # | 功能 | 说明 |
 |---|------|------|
 | 1 | **三种执行模式** | create / update / refactor |
-| 2 | **17 条审查规则** | R-01~R-17（含安全规则） |
+| 2 | **25 条审查规则** | R-01~R-25（含安全规则） |
 ```
 
 （避免 `可能 `~` 等模糊表述；中英文之间加空格，如 `Python 脚本` 而非 Python脚本（缺空格）。）
@@ -624,7 +624,7 @@ python scripts/json_loader.py list
 # 加载指定模块
 python scripts/json_loader.py load frontmatter    # Frontmatter 字段规范
 python scripts/json_loader.py load body           # 正文章节规范
-python scripts/json_loader.py load rules          # 审查规则 R-01~R-10
+python scripts/json_loader.py load rules          # 审查规则 R-01~R-25
 python scripts/json_loader.py load structure      # 目录结构规范 [v2]
 python scripts/json_loader.py load progressive_md # 渐进式 MD 体系 [v2]
 
@@ -685,7 +685,7 @@ structure ──→ progressive_md ─┘
 | R-14 | ERROR | 关键位置写入声明（写入 skills/技能数据目录/系统目录须声明 `critical_write: true`） |
 | R-15 | ERROR | 高权限操作风险说明（脚本含高/严重风险操作时，`references/permissions.md` 须包含对应操作的风险说明、权限作用、执行步骤） |
 | R-16 | WARN | 权限权重说明（建议在 SKILL.md 或 references/ 中说明各操作的权限权重） |
-| R-17 | ERROR | 渐进加载引用（SKILL.md > 200 行时必须拆分到 references/ 并通过引用链接） |
+| R-17 | ERROR | 渐进加载引用（SKILL.md > 230 行时必须拆分到 references/ 并通过引用链接） |
 
 
 ---
@@ -694,6 +694,6 @@ structure ──→ progressive_md ─┘
 
 1. **refactor 前务必先 `--dry-run`**
 2. **备份是 refactor 默认行为**：不要用 `--no-backup` 除非明确知道风险
-3. **本文件控制在 200 行以内**：超过部分已拆分到 `references/`
+3. **本文件控制在 230 行以内**：超过部分已拆分到 `references/`
 4. **审查是纯警告模式**：审计结果仅作参考，不阻断操作
 5. **版本号三方一致**：更新后按上表同步

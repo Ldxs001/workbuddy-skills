@@ -131,7 +131,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 │   -m scripts.skill_builder              -m scripts.skill_audit   │
 │   ┌──────────┬──────────┐      ┌──────────────┐ │
 │   │ create   │ update   │      │ 规则匹配引擎  │ │
-│   │ (模板生成)│ (检查修复)│      │ R-01~R-10    │ │
+│   │ (模板生成)│ (检查修复)│      │ R-01~R-25    │ │
 │   ├──────────┴──────────┤      └──────────────┘ │
 │   │ refactor (迁移引擎)  │                      │
 │   └─────────────────────┘                       │
@@ -184,7 +184,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 
 ### 2. -m scripts.skill_audit（审查器）
 
-职责：基于 R-01~R-10 对 SKILL.md 执行自动化审查。
+职责：基于 R-01~R-25 对 SKILL.md 执行自动化审查。
 
 **执行流程：**
 ```

@@ -168,8 +168,8 @@ skills/
 ### R-17：渐进加载引用（强制）
 
 **检查内容：**
-- `SKILL.md` > 200 行时必须拆分到 `references/`，并通过「→ 详见 references/xxx.md」引用
-- 禁止主文件超限（> 200 行）
+- `SKILL.md` > 230 行时必须拆分到 `references/`，并通过「→ 详见 references/xxx.md」引用
+- 禁止主文件超限（> 230 行）
 
 **修复方法：**
 1. 将 `SKILL.md` 中详细内容拆分到 `references/xxx.md`
@@ -177,7 +177,7 @@ skills/
 
 **检查方法：**
 - 计算 `SKILL.md` 行数
-- 如果 > 200 行，检查是否有 `references/` 引用
+- 如果 > 230 行，检查是否有 `references/` 引用
 
 ---
 

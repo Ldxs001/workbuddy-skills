@@ -93,7 +93,7 @@ python -m skill_builder update <skill_dir> [--fix] [--backup]
    ✅ _meta.json 结构正常
 
 ⚠️  警告/建议:
-   ⚠️  SKILL.md 共 250 行，超过 200 行建议拆分到 references/
+   ⚠️  SKILL.md 共 250 行，超过 230 行建议拆分到 references/
 
 结论: ERROR=0 WARN=1 PASS=1
 ```
@@ -174,7 +174,7 @@ python -m skill_builder refactor <skill_dir> [--no-backup] [--dry-run]
 
 > 路径：`scripts/skill_audit/`
 >
-> 用途：基于 R-01~R-17 规则对 SKILL.md 进行自动化审查
+> 用途：基于 R-01~R-25 规则对 SKILL.md 进行自动化审查
 
 ### audit 命令
 
@@ -189,7 +189,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | `--json` | flag | ❌ | `False` | 以 JSON 格式输出结果 |
 | `--strict` | flag | ❌ | `False` | 严格模式（ERROR 级 exit(1)） |
 
-**审查规则一览（共 24 条）：**
+**审查规则一览（共 25 条）：**
 
 | ID | 级别 | 名称 | 检查内容 |
 |----|------|------|----------|
@@ -209,7 +209,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-14 | ERROR | 关键位置写入声明 | 脚本含关键位置写入（skills/技能数据目录/系统目录）时，frontmatter 须声明 critical_write: true 并说明用途 |
 | R-15 | ERROR | 高权限操作授权检查 | 脚本含文件删除/网络请求/subprocess 调用时，执行前须调用 authorization_manager.py 请求用户授权 |
 | R-16 | WARN | 权限权重说明 | 建议在 SKILL.md 或 references/ 中说明各操作的权限权重，便于审查时评估风险 |
-| R-17 | ERROR | 渐进加载引用（强制） | SKILL.md > 200 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用 |
+| R-17 | ERROR | 渐进加载引用（强制） | SKILL.md > 230 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用 |
 | R-18 | WARN | 反模式具体性 | 正文含 ## 反模式/常见错误 章节，且每条反模式含具体描述（≥20字）或代码示例 |
 | R-19 | WARN | FAQ 有意义性 | 正文含 ## FAQ/常见问题 章节，且 Q&A 对有意义（Q≥10字，A≥15字） |
 | R-20 | WARN | 写作规范（术语一致/禁止模糊表述/中英文混排） | 正文术语一致、无模糊表述、中英文混排有空格 |
@@ -255,7 +255,7 @@ python -m json_loader load <module_name>
 |-------------|---------|----------|
 | `frontmatter` | `spec/frontmatter.json` | Frontmatter 字段定义（3必须+7可选） |
 | `body` | `spec/body.json` | 正文章节规范（5必须+4推荐+N可选） |
-| `rules` | `spec/rules.json` | 审查规则 R-01~R-10 完整定义 |
+| `rules` | `spec/rules.json` | 审查规则 R-01~R-25 完整定义 |
 | `structure` | `spec/structure.json` | 目录结构规范（三级复杂度+迁移规则） |
 | `progressive_md` | `spec/progressive_md.json` | 渐进式 MD 体系（拆分边界+加载协议+文件映射） |
 | `all` | *全部* | 加载所有模块的合并视图 |
@@ -542,7 +542,7 @@ python scripts/skill_rollback.py purge [keep_count]
 
 ### run_audit — 全量审计入口
 
-**功能：** 对指定技能目录执行全部24条规则(R-01~R-24)审计。通过子命令模式区分不同操作。
+**功能：** 对指定技能目录执行全部25条规则(R-01~R-25)审计。通过子命令模式区分不同操作。
 
 ```bash
 # 审查单个技能
@@ -859,7 +859,7 @@ run_audit.py (入口)
        ├─ creator / updater / migrator  (模式路由)
        └─ version_manager               (版本管理)
   └─ skill_audit
-       ├─ audit_runner                  (编排24条规则)
+       ├─ audit_runner                  (编排25条规则)
        ├─ frontmatter_checker           (R-01~R-06)
        ├─ structure_checker             (R-07~R-12)
        ├─ permission_checks             (R-13~R-17)
@@ -895,7 +895,7 @@ python scripts/update_all_versions.py --skill skill-standardization --version 2.
 ```
 ---
 ### scripts/run_audit.py
-**功能**: 对指定技能目录执行全量规则审计（R-01~R-24），支持 audit、check、fix 三种子命令。
+**功能**: 对指定技能目录执行全量规则审计（R-01~R-25），支持 audit、check、fix 三种子命令。
 **用法**:
 ```bash
 # 审计模式（默认）
@@ -1008,7 +1008,7 @@ python scripts/op_logger.py "<操作名称>" "<操作详情>" [--output <log_pat
 | `--output` | 日志输出路径 | 否 | `.standardization/<skill>/.operations.log` |
 **示例**:
 ```bash
-python scripts/op_logger.py "audit" "R-01~R-24 审计完成，24/24 PASS"
+python scripts/op_logger.py "audit" "R-01~R-25 审计完成，24/24 PASS"
 python scripts/op_logger.py "update_version" "version updated to 2.38.8"
 ```
 ---
@@ -1027,7 +1027,7 @@ python scripts/update_Skill_frontmatter.py <skill_dir> <field> <value>
 **示例**:
 ```bash
 python scripts/update_Skill_frontmatter.py . version 2.38.8
-python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范引擎，支持 R-01~R-24 规则审计"
+python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范引擎，支持 R-01~R-25 规则审计"
 ```
 ---
 ---
@@ -1045,7 +1045,7 @@ print(format_progress('.standardization/skill-standardization'))
 ```
 ---
 ### scripts/fix.py
-**功能**: 统一修复入口，根据审计结果自动修复可修复的规则违规（覆盖 R-01~R-24）。
+**功能**: 统一修复入口，根据审计结果自动修复可修复的规则违规（覆盖 R-01~R-25）。
 **子命令**: `audit`（默认，根据审计结果修复）、`fix`（强制修复指定规则）
 **用法**:
 ```bash
@@ -1062,7 +1062,7 @@ python scripts/fix.py fix <skill_dir> --rule R-11 --params '{"violations": [...]
 | `fix` | `--params` | 修复所需的参数（JSON 格式） | 否 | `{}` |
 ---
 ### scripts/skill_audit/fix.py
-**功能**: 规则级修复函数库，提供每个规则（R-01~R-24）的独立修复函数，供 `scripts/fix.py` 调用。
+**功能**: 规则级修复函数库，提供每个规则（R-01~R-25）的独立修复函数，供 `scripts/fix.py` 调用。
 **Python API 示例**:
 ```python
 from skill_audit.fix import apply_fix, list_fixable_rules
