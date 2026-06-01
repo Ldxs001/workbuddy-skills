@@ -1,28 +1,22 @@
 ---
 name: everything-search-breadmemory
-version: 
 description: 基于 Everything/es.exe 的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联。
 author: wUwproject
 license: MIT
 tags: ['search', 'filesystem', 'knowledge-management', 'ebbinghaus', 'everything']
 trigger_negative: true
 external_data_dir: true
-sensitive_access: true
+sensitive_access: false
 critical_write: false
-create_permissions_md: true
-permission_weight: CRITICAL
-antipattern_reference: true
-faq_reference: true
-writing_standards: fix_terms
-progressive_loading_explicit: true
-artifact_paths: true
-antipattern_progressive: true
-faq_progressive: true
+permission_weight: LOW
 data_dir: .standardization/everything-search-breadmemory/data/
-section_workflow: true
-faq_unparsable: reformat
-faq_quality: improve_qa
+version: 1.5.1
 ---
+
+
+
+
+
 
 
 

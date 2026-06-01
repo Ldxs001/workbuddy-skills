@@ -1,3 +1,10 @@
+## v1.5.1 (2026-05-30)
+
+### 修复
+- audit --fix 自动修正
+
+---
+
 # everything-search-breadmemory 更新日志
 
 ## v1.2.0（2026-05-23）
