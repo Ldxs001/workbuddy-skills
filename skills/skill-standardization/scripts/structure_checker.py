@@ -505,7 +505,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
 
     # ── 检查 SKILL.md 正文 ────────────────────────
     issues = _check_writing_standards_text(body, "SKILL.md")
-    for k in all_issues:
+    for k in ["must", "suggest", "optional"]:
         all_issues[k] += issues[k]
 
     # ── 新增：脚本调用验证检查（v2.24.4）─────────────────────
@@ -604,7 +604,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
             except Exception:
                 continue
             issues = _check_writing_standards_text(ref_content, fname)
-            for k in all_issues:
+            for k in ["must", "suggest", "optional"]:
                 all_issues[k] += issues[k]
 
     # ── 分级格式化输出 ──────────────────────────────
@@ -737,7 +737,10 @@ def check_doc_code_consistency(
             if line.startswith('#'):
                 continue
             all_commands.append(line)
-    all_commands.extend(inline_codes)
+    for _ic in inline_codes:
+        if re.match(r'^[a-zA-Z_]\w{0,14}\n', _ic):
+            continue
+        all_commands.append(_ic)
 
     # 1b. 扩展：也扫描 references/*.md 中的命令引用（v2.44.1）
     _refs_dir = os.path.join(skill_dir, 'references')
@@ -759,28 +762,81 @@ def check_doc_code_consistency(
                     if _line.startswith('#'):
                         continue
                     all_commands.append(_line)
-            all_commands.extend(_ref_inline_codes)
+            for _ic in _ref_inline_codes:
+                if re.match(r'^[a-zA-Z_]\w{0,14}\n', _ic):
+                    continue
+                all_commands.append(_ic)
 
-    # 2. 提取脚本路径（如 python scripts/xxx.py --list）
+    # 2. 提取文件路径引用（脚本 + 其他文件）
     script_paths = set()
-    py_file_refs = set()  # 所有 .py 文件引用
-
+    py_file_refs = set()
+    other_file_refs = set()  # 非 .py 文件引用
+    
     for cmd in all_commands:
-        # 匹配 python scripts/xxx.py 或 `scripts/xxx.py`
-        match = re.search(r'(?:python3?\s+)?([^\s`]+\.py)', cmd)
-        if match:
-            script_path = match.group(1).strip()
-            # 排除含变量/中文的路径
-            if re.search(r'[{\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', script_path):
+        # 跳过示例输出行
+        if '→' in cmd or cmd.startswith(('[CREAT', '[UPDA', '[DELE', '[READ', '[WRIT', '[B-')):
+            continue
+        # 匹配所有带扩展名的文件路径 (scripts/xxx.py, components/xxx.tex 等)
+        matches = list(re.finditer(r'([^\s`]+\.[a-zA-Z]{2,4})', cmd))
+        for m in matches:
+            fpath = m.group(1).strip().strip('"\'')
+            # 排除 URL、模板占位符、无路径的纯文件名
+            if fpath.startswith(('http', 'file:', '{', '<')):
                 continue
-            if '{' in script_path or '}' in script_path:
+            if re.search(r'[{\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', fpath):
                 continue
-            script_paths.add(script_path)
-        # 也匹配行内代码中的 .py 引用
-        for m2 in re.finditer(r'([^\s`]*\.py)', cmd):
-            py_file_refs.add(m2.group(1))
-
-    script_paths.update(py_file_refs)
+            # 排除通配符/glob 模式（如 preamble/*.tex）
+            if '*' in fpath or '?' in fpath:
+                continue
+            # 排除 Python 模块引用（os.path、json.dump 等）
+            if re.match(r'^[a-z_][a-zA-Z0-9_]*\.[a-z_]', fpath):
+                continue
+            # 排除无路径分隔符的纯文件名（如 "class-settings.tex" 单独出现不是路径引用）
+            if '/' not in fpath and '\\' not in fpath:
+                continue
+            # 排除命令行参数（--xxx=value）
+            if fpath.startswith('-'):
+                continue
+            # 排除 tikz 绘图样式引用
+            if '.styl' in fpath or '.appe' in fpath:
+                continue
+            # 排除 Windows 绝对路径（C:\...）
+            if fpath[1:2] == ':' and fpath[2:3] in ('/', '\\'):
+                continue
+            # 排除 .github/、.git/ 等 Git/CI 路径（非技能文件）
+            if fpath.startswith('.github/') or fpath.startswith('.git/'):
+                continue
+            # 排除占位符/示例路径：包含 < > 变量、xxx、...、/path/ 等特征
+            if '<' in fpath or '>' in fpath or 'xxx' in fpath or '...' in fpath:
+                continue
+            # 排除绝对路径（以 / 开头，不是技能相对路径）
+            if fpath.startswith('/'):
+                continue
+            # 排除示例路径模式（/path/to/）
+            if '/path/' in fpath or '/example/' in fpath or '/sample/' in fpath:
+                continue
+            # 排除以 ./ 开头的相对路径（示例输出，如 ./hello-world/SKILL.md）
+            if fpath.startswith('./'):
+                continue
+            # 排除扩展名列表模式（.png/.jpg/.gif/.svg 等）
+            if fpath.startswith('.') and fpath.count('/') == 0:
+                continue
+            # 排除 ~ 开头的家目录路径
+            if '~/' in fpath or fpath.startswith('~'):
+                continue
+            # 排除编码损坏字符（如替换字符、非法代理对等）
+            if '\ufffd' in fpath:
+                continue
+            if any(0xD800 <= ord(c) <= 0xDFFF for c in fpath):
+                continue
+            # 排除 __pycache__ 等缓存路径
+            if '__pycache__' in fpath:
+                continue
+            if fpath.endswith('.py'):
+                script_paths.add(fpath)
+                py_file_refs.add(fpath)
+            else:
+                other_file_refs.add(fpath)
 
     # 3. 检查脚本文件是否存在
     for script_path in script_paths:
@@ -840,6 +896,59 @@ def check_doc_code_consistency(
                     except Exception:
                         pass
 
+        # 4b. 检查非 .py 文件引用是否真实存在（v2.54.0）
+    if other_file_refs and skill_dir:
+        # 预读所有 .md 文件内容，用于上下文提取
+        _md_contents = {}
+        for _mf in ['SKILL.md'] + ['references/' + f for f in sorted(os.listdir(os.path.join(skill_dir, 'references'))) if f.endswith('.md')]:
+            _mp = os.path.join(skill_dir, _mf)
+            if os.path.isfile(_mp):
+                try:
+                    _md_contents[_mf] = open(_mp, 'r', encoding='utf-8').read().split('\n')
+                except Exception:
+                    _md_contents[_mf] = []
+        for ref_path in sorted(other_file_refs):
+            full_path = os.path.join(skill_dir, ref_path)
+            if not os.path.isfile(full_path):
+                # 在 references/ 和 scripts/ 下也尝试找
+                alt = None
+                for prefix in ['references', 'scripts']:
+                    trial = os.path.join(skill_dir, prefix, os.path.basename(ref_path))
+                    if os.path.isfile(trial):
+                        alt = os.path.join(prefix, os.path.basename(ref_path))
+                        break
+                # 递归搜索 scripts/ 下同名文件
+                if not alt:
+                    scripts_dir = os.path.join(skill_dir, 'scripts')
+                    if os.path.isdir(scripts_dir):
+                        ref_stem = os.path.splitext(os.path.basename(ref_path))[0]
+                        for _root, _dirs, _files in os.walk(scripts_dir):
+                            for _f in _files:
+                                if os.path.splitext(_f)[0] == ref_stem:
+                                    alt = os.path.relpath(os.path.join(_root, _f), skill_dir).replace('\\', '/')
+                                    break
+                            if alt:
+                                break
+                if alt:
+                    continue
+                # 查找源文件中的引用位置，提取上下文（供LLM精筛判断）
+                ctx_parts = []
+                for _src_name, _src_lines in _md_contents.items():
+                    for _ln, _line in enumerate(_src_lines, 1):
+                        if ref_path in _line:
+                            _start = max(0, _ln - 3)
+                            _end = min(len(_src_lines), _ln + 2)
+                            _ctx = '\n'.join(f"    {_src_name}:{i} {_src_lines[i-1]}" for i in range(_start + 1, _end + 1))
+                            ctx_parts.append(f"  {_src_name}:{_ln} 附近:\n{_ctx}")
+                            break
+                ctx = ctx_parts[0] if ctx_parts else f"  文件: {ref_path} 不存在"
+                issues["suggest"].append(
+                    f"R-23: {filepath}:1 - 文档引用 `{ref_path}` 但文件不存在"
+                )
+                if "ctx_lines" not in issues:
+                    issues["ctx_lines"] = []
+                issues["ctx_lines"].append(ctx)
+
     # 5. 检查 SKILL.md 正文提到的函数/类名是否在实际代码中存
     # 匹配中文描述后的代码引用，如 "调用 XXXFunction" 或 "`XXXClass`"
     func_refs = re.findall(r'`([A-Z][a-zA-Z0-9_]*)`', body)
@@ -868,6 +977,13 @@ def check_doc_code_consistency(
                     issues["suggest"].append(
                         f"R-23: {filepath}:1 - SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
                     )
+
+    # 检查目录树与磁盘一致性（v2.56.0）
+    try:
+        from ._tree_scanner import _check_directory_tree
+        _check_directory_tree(filepath, body, skill_dir, issues)
+    except Exception:
+        pass
 
     # 汇总
     total = sum(len(issues[k]) for k in issues)

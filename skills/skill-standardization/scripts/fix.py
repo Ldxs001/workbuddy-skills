@@ -842,28 +842,65 @@ def fix_data_dir_compliance(skill_dir, dry_run=False, **kw):
 # R-23: 文档-代码一致性修复
 # ═══════════════════════════════════════════════════
 
+def _fix_md_file_refs(skill_dir, md_path):
+    """修复单个 .md 中不存在的文件路径引用（查找同名不同扩展名文件）"""
+    import re
+    if not os.path.isfile(md_path):
+        return 0
+    content = _read_file(md_path)
+    changed = 0
+    new_content = content
+    for m in reversed(list(re.finditer(r'([^\s`]+\.[a-zA-Z]{2,4})', content))):
+        ref = m.group(1).strip().strip("'\"")
+        if '/' not in ref and '\\' not in ref:
+            continue
+        if ref.startswith(('http', 'file:', '{', '<', '-')):
+            continue
+        if '*' in ref or '?' in ref:
+            continue
+        if re.search(r'[{\u4e00-\u9fff]', ref):
+            continue
+        full = os.path.join(skill_dir, ref)
+        if os.path.isfile(full):
+            continue
+        ref_dir = os.path.dirname(full)
+        ref_stem = os.path.splitext(os.path.basename(ref))[0]
+        if not os.path.isdir(ref_dir):
+            continue
+        for actual in sorted(os.listdir(ref_dir)):
+            actual_stem, actual_ext = os.path.splitext(actual)
+            if actual_stem == ref_stem and actual_ext != os.path.splitext(ref)[1]:
+                old_ref = m.group(1)
+                new_ref = os.path.join(os.path.dirname(ref), actual).replace('\\', '/')
+                new_content = new_content.replace(old_ref, new_ref, 1)
+                changed += 1
+                break
+    if changed > 0:
+        _write_file(md_path, new_content)
+    return changed
+
+
 def fix_doc_code_consistency(skill_dir, **kw):
     """
     R-23 修复：文档-代码一致性问题。
-    这是一个复杂修复，通常需要人工介入。
-    此函数提供一个基础实现：自动添加缺失的 --help 文档。
+    1. 自动修复 .md 中不存在的文件路径引用（查找同名不同扩展名的文件）
+    2. 脚本 --help 检查（基础）
     返回：修复的问题数
     """
     fixed = 0
+    # 1. 修复 .md 文件中的文件路径引用
+    md_files = [os.path.join(skill_dir, 'SKILL.md')]
+    refs_dir = os.path.join(skill_dir, 'references')
+    if os.path.isdir(refs_dir):
+        for fname in sorted(os.listdir(refs_dir)):
+            if fname.endswith('.md'):
+                md_files.append(os.path.join(refs_dir, fname))
+    for md_path in md_files:
+        fixed += _fix_md_file_refs(skill_dir, md_path)
+    # 2. 脚本 --help 检查（原有逻辑，保持空实现）
     scripts_dir = os.path.join(skill_dir, "scripts")
     if not os.path.isdir(scripts_dir):
-        return 0
-    for fname in sorted(os.listdir(scripts_dir)):
-        if not fname.endswith(".py"):
-            continue
-        fpath = os.path.join(scripts_dir, fname)
-        content = _read_file(fpath)
-        # 检查是否定义了 --help
-        if "--help" not in content and "-h" not in content:
-            # 简单添加 argparse --help 支持（基础模板）
-            if 'argparse' in content and 'add_argument' in content:
-                # 在第一个 add_argument 前插入 --help
-                pass  # 复杂，不自动修复
+        return fixed
     return fixed
 
 

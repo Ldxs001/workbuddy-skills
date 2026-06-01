@@ -330,7 +330,7 @@ def _find_nonstandard_sections(body_text, skill_dir=None):
     扫描正文中的 ## H2 章节，与 body.json allowed_sections 白名单对比。
     Phase 1: 正则粗筛。
     返回非标章节列表，每项含 (line_no, title, content_preview)。
-    content_preview 供 LLM 第二阶段精筛判断。
+    content_preview 供 LLM 全报告LLM精筛判断。
     """
     spec = _load_allowed_sections()
     if spec is None:
@@ -400,16 +400,16 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
                 f"SKILL.md 共 {line_count} 行，超过 230 行限制，但未拆分到 references/ 或通过「→ 详见 references/xxx.md」引用"
             )
 
-    # ── 检查 2: 非标准章节检测（Phase 1 正则粗筛 → LLM Phase 2 精筛）──
+    # ── 检查 2: 非标准章节检测（Phase 1 正则粗筛 → LLM  精筛）──
     nonstandard = _find_nonstandard_sections(body, _skill_dir_r17)
     if nonstandard:
         phase1_lines = []
         for ln, title, preview in nonstandard:
             phase1_lines.append(f"  {filepath}:{ln} - 「{title}」（内容预览：{preview}...）")
         detail_parts.append(
-            f"ⓘ 两阶段粗筛 {len(nonstandard)} 个疑似非标章节，待 LLM 第二阶段精筛确认（不阻断通过）："
-            f"\n【两阶段】Phase 1（正则）：发现以下 H2 章节不在 allowed_sections 白名单中，"
-            f"需 LLM 第二阶段精筛判断为真实非标（应拆分到 references/）"
+            f"ⓘ 粗筛 {len(nonstandard)} 个疑似非标章节，待 LLM 全报告LLM精筛确认（不阻断通过）："
+            f"\n【两阶段】正则粗筛：发现以下 H2 章节不在 allowed_sections 白名单中，"
+            f"需 LLM 全报告LLM精筛判断为真实非标（应拆分到 references/）"
             f"还是应合并到已有标准章节（如「注意事项」→「铁律/规范」）："
             f"\n" + '\n'.join(phase1_lines)
         )
@@ -426,5 +426,5 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
     return {
         "passed": passed,
         "detail": f"{filepath}:1 - {'; '.join(detail_parts)}",
-        "suggestion": "LLM 第二阶段精筛：对 Phase 1 粗筛的疑似非标章节逐条判断。如果内容属于某标准章节（如「注意事项」→「铁律/规范」），合并之；如果确实是非标内容，用 fix_split_nonstandard 拆分到 references/ 并替换为 → 详见引用。"
+        "suggestion": "LLM 全报告LLM精筛：对 Phase 1 粗筛的疑似非标章节逐条判断。如果内容属于某标准章节（如「注意事项」→「铁律/规范」），合并之；如果确实是非标内容，用 fix_split_nonstandard 拆分到 references/ 并替换为 → 详见引用。"
     }

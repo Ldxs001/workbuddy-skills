@@ -1014,28 +1014,94 @@ def fix_data_dir_compliance(skill_dir, dry_run=False, **kw):
 # R-23: 文档-代码一致性修复
 # ═══════════════════════════════════════════════════
 
+def _find_actual_file(skill_dir, ref_stem, ref_ext):
+    """通用文件查找：先同目录，再递归 scripts/
+    返回 (found_path, skill_dir_relative_path) 或 None
+    """
+    from pathlib import Path
+    # 递归搜索 scripts/ 下所有文件，建立 basename→实际路径 索引
+    scripts_dir = os.path.join(skill_dir, 'scripts')
+    if os.path.isdir(scripts_dir):
+        for root, dirs, files in os.walk(scripts_dir):
+            for fname in files:
+                fstem, fext = os.path.splitext(fname)
+                if fstem == ref_stem and fext != ref_ext:
+                    rel = os.path.relpath(os.path.join(root, fname), skill_dir).replace('\\', '/')
+                    return (os.path.join(root, fname), rel)
+    return None
+
+
+def _fix_md_file_refs(skill_dir, md_path):
+    """修复单个 .md 中不存在的文件路径引用（通用文件查找）"""
+    import re
+    if not os.path.isfile(md_path):
+        return 0
+    content = _read_file(md_path)
+    changed = 0
+    new_content = content
+    for m in reversed(list(re.finditer(r'([^\s`]+\.[a-zA-Z]{2,4})', content))):
+        ref = m.group(1).strip().strip("'\"")
+        if '/' not in ref and '\\' not in ref:
+            continue
+        if ref.startswith(('http', 'file:', '{', '<', '-')):
+            continue
+        if '*' in ref or '?' in ref:
+            continue
+        if re.search(r'[{\u4e00-\u9fff]', ref):
+            continue
+        full = os.path.join(skill_dir, ref)
+        if os.path.isfile(full):
+            continue
+        ref_stem = os.path.splitext(os.path.basename(ref))[0]
+        ref_ext = os.path.splitext(ref)[1]
+
+        # 先查同目录
+        ref_dir = os.path.dirname(full)
+        found = False
+        if os.path.isdir(ref_dir):
+            for actual in sorted(os.listdir(ref_dir)):
+                actual_stem, actual_ext = os.path.splitext(actual)
+                if actual_stem == ref_stem and actual_ext != ref_ext:
+                    new_path = os.path.join(os.path.dirname(ref), actual).replace('\\', '/')
+                    new_content = new_content.replace(m.group(1), new_path, 1)
+                    changed += 1
+                    found = True
+                    break
+        if found:
+            continue
+
+        # 递归查 scripts/
+        result = _find_actual_file(skill_dir, ref_stem, ref_ext)
+        if result:
+            new_content = new_content.replace(m.group(1), result[1], 1)
+            changed += 1
+
+    if changed > 0:
+        _write_file(md_path, new_content)
+    return changed
+
+
 def fix_doc_code_consistency(skill_dir, **kw):
     """
     R-23 修复：文档-代码一致性问题。
-    这是一个复杂修复，通常需要人工介入。
-    此函数提供一个基础实现：自动添加缺失的 --help 文档。
+    1. 自动修复 .md 中不存在的文件路径引用（查找同名不同扩展名的文件）
+    2. 脚本 --help 检查（基础）
     返回：修复的问题数
     """
     fixed = 0
+    # 1. 修复 .md 文件中的文件路径引用
+    md_files = [os.path.join(skill_dir, 'SKILL.md')]
+    refs_dir = os.path.join(skill_dir, 'references')
+    if os.path.isdir(refs_dir):
+        for fname in sorted(os.listdir(refs_dir)):
+            if fname.endswith('.md'):
+                md_files.append(os.path.join(refs_dir, fname))
+    for md_path in md_files:
+        fixed += _fix_md_file_refs(skill_dir, md_path)
+    # 2. 脚本 --help 检查（原有逻辑）
     scripts_dir = os.path.join(skill_dir, "scripts")
     if not os.path.isdir(scripts_dir):
-        return 0
-    for fname in sorted(os.listdir(scripts_dir)):
-        if not fname.endswith(".py"):
-            continue
-        fpath = os.path.join(scripts_dir, fname)
-        content = _read_file(fpath)
-        # 检查是否定义了 --help
-        if "--help" not in content and "-h" not in content:
-            # 简单添加 argparse --help 支持（基础模板）
-            if 'argparse' in content and 'add_argument' in content:
-                # 在第一个 add_argument 前插入 --help
-                pass  # 复杂，不自动修复
+        return fixed
     return fixed
 
 
@@ -2123,7 +2189,7 @@ def fix_section_antipattern(skill_dir, **kw):
     ]
     if '标准化' in desc or '审计' in desc:
         antipatterns.append(
-            f"**一次只修一个 WARN** — 审计报了多个 WARN 但逐个手动修，效率低。正确做法：用 `--fix` 批量修复可自动修复的项，再手动处理 LLM Phase 2 精筛项。"
+            f"**一次只修一个 WARN** — 审计报了多个 WARN 但逐个手动修，效率低。正确做法：用 `--fix` 批量修复可自动修复的项，再手动处理 LLM  精筛项。"
         )
     
     section_body = '\n'.join(f'> ❌ **{a.split("**")[0].lstrip("> ❌ ")}**\n> ✅ {a.split("。正确做法：")[1]}' if "。正确做法：" in a else a for a in antipatterns[:5])

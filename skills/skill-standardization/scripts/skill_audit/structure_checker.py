@@ -614,6 +614,10 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         for k in ["must", "suggest", "optional"]:
             if f"R-23" in r23_result.get("detail", ""):
                 all_issues["suggest"].append(r23_result["detail"])
+        if r23_result.get("ctx_lines"):
+            if "ctx_lines" not in all_issues:
+                all_issues["ctx_lines"] = []
+            all_issues["ctx_lines"].extend(r23_result["ctx_lines"])
     elif "ⓘ" in r23_result.get("detail", ""):
         # R-23 通过但有 optional 提示，放在 optional 供参考
         all_issues["optional"].append(r23_result["detail"])
@@ -623,7 +627,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
     # 不是审计代码文件（structure_checker.py）自身，所以 self_audit=False。
     # 尺子不能量自己，但这里量的不是尺子本身，而是被审计技能的文档文件。
     issues = _check_writing_standards_text(body, "SKILL.md")
-    for k in all_issues:
+    for k in ["must", "suggest", "optional"]:
         all_issues[k] += issues[k]
 
     # ── 新增：脚本调用验证检查（v2.24.4）─────────────────────
@@ -691,7 +695,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
                 continue
             # 渐进式文件也是文档文件，不是审计代码自身，不传 self_audit（保持默认 False）
             issues = _check_writing_standards_text(ref_content, fname)
-            for k in all_issues:
+            for k in ["must", "suggest", "optional"]:
                 all_issues[k] += issues[k]
 
     # ── 分级格式化输出 ──────────────────────────────
@@ -703,7 +707,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         return {"passed": True,
                 "detail": "写作规范检查通过（SKILL.md + references/*.md 术语一致、无禁止表述、中英文混排规范）"}
 
-    # 仅 optional（如两阶段粗筛产物）→ 通过，detail 带 NOTE
+    # 仅 optional（如粗筛产物）→ 通过，detail 带 NOTE
     if must_count == 0 and suggest_count == 0 and optional_count > 0:
         return {"passed": True,
                 "detail": f"写作规范检查通过 ⓘ 仅可选问题（{optional_count} 条，不阻断通过）：{all_issues['optional'][0]}" +
@@ -726,12 +730,15 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
             parts[-1] += f" 等（共 {optional_count} 条）"
 
     detail = "；".join(parts)
-    return {"passed": False,
-            "detail": f"写作规范问题：{detail}",
-            "fix": {"key": "writing_standards", "value": "fix_terms",
-                     "location": f"{filepath} 正文 + references/*.md",
-                     "operation": "优先修复🔴必须修问题，建议修复🟡建议修问题（含渐进式文件）",
-                     "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
+    result = {"passed": False,
+              "detail": f"写作规范问题：{detail}",
+              "fix": {"key": "writing_standards", "value": "fix_terms",
+                       "location": f"{filepath} 正文 + references/*.md",
+                       "operation": "优先修复🔴必须修问题，建议修复🟡建议修问题（含渐进式文件）",
+                       "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
+    if all_issues.get("ctx_lines"):
+        result["ctx_lines"] = all_issues["ctx_lines"][:8]
+    return result
 
 
 def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
@@ -838,28 +845,106 @@ def check_doc_code_consistency(
             if line.startswith('#'):
                 continue
             all_commands.append(line)
-    all_commands.extend(inline_codes)
+    for _ic in inline_codes:
+        if re.match(r'^[a-zA-Z_]\w{0,14}\n', _ic):
+            continue
+        all_commands.append(_ic)
 
-    # 2. 提取脚本路径（如 python scripts/xxx.py --list）
+    # 1b. 扩展：也扫描 references/*.md 中的命令引用（v2.44.1）
+    _refs_dir = os.path.join(skill_dir, 'references')
+    if os.path.isdir(_refs_dir):
+        for _fname in sorted(os.listdir(_refs_dir)):
+            if not _fname.endswith('.md'):
+                continue
+            _fpath = os.path.join(_refs_dir, _fname)
+            try:
+                with open(_fpath, 'r', encoding='utf-8') as _f:
+                    _ref_content = _f.read()
+            except Exception:
+                continue
+            _ref_blocks = re.findall(r'```(?:bash|sh|python)?\s*\n(.*?)```', _ref_content, re.DOTALL)
+            _ref_inline_codes = re.findall(r'`([^`]+?)`', _ref_content)
+            for _block in _ref_blocks:
+                for _line in _block.splitlines():
+                    _line = _line.strip()
+                    if _line.startswith('#'):
+                        continue
+                    all_commands.append(_line)
+            # 过滤：形如 "json\n{" 的行内代码是 ```json 三连反引号误抓的代码块头，不是真实行内引用
+            for _ic in _ref_inline_codes:
+                if re.match(r'^[a-zA-Z_]\w{0,14}\n', _ic):
+                    continue
+                all_commands.append(_ic)
+
+    # 2. 提取文件路径引用（脚本 + 其他文件）
     script_paths = set()
-    py_file_refs = set()  # 所有 .py 文件引用
+    py_file_refs = set()
+    other_file_refs = set()  # 非 .py 文件引用
 
     for cmd in all_commands:
-        # 匹配 python scripts/xxx.py 或 `scripts/xxx.py`
-        match = re.search(r'(?:python3?\s+)?([^\s`]+\.py)', cmd)
-        if match:
-            script_path = match.group(1).strip()
-            # 排除含变量/中文的路径
-            if re.search(r'[{\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', script_path):
+        # 跳过示例输出行（→ 是转换标记，[CREATE]/[B-0 等是流程标记，不属于真实文件引用）
+        if '→' in cmd or cmd.startswith(('[CREAT', '[UPDA', '[DELE', '[READ', '[WRIT', '[B-')):
+            continue
+        # 匹配所有带扩展名的文件路径 (scripts/xxx.py, components/xxx.tex 等)
+        for m in re.finditer(r'([^\s`]+\.[a-zA-Z]{2,4})', cmd):
+            fpath = m.group(1).strip().strip('"\'')
+            # 排除 URL、模板占位符、无路径的纯文件名
+            if fpath.startswith(('http', 'file:', '{', '<')):
                 continue
-            if '{' in script_path or '}' in script_path:
+            if re.search(r'[{\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', fpath):
                 continue
-            script_paths.add(script_path)
-        # 也匹配行内代码中的 .py 引用
-        for m2 in re.finditer(r'([^\s`]*\.py)', cmd):
-            py_file_refs.add(m2.group(1))
-
-    script_paths.update(py_file_refs)
+            # 排除通配符/glob 模式
+            if '*' in fpath or '?' in fpath:
+                continue
+            # 排除 Python 模块引用（os.path、json.dump 等）
+            if re.match(r'^[a-z_][a-zA-Z0-9_]*\.[a-z_]', fpath):
+                continue
+            # 排除无路径分隔符的纯文件名
+            if '/' not in fpath and '\\' not in fpath:
+                continue
+            # 排除命令行参数（--xxx=value 或 -x=value）
+            if fpath.startswith('-'):
+                continue
+            # 排除 tikz/绘图样式引用（如 myplot/.styl, plot/.appe）
+            if '.styl' in fpath or '.appe' in fpath:
+                continue
+            # 排除 Windows 绝对路径（C:\...）
+            if fpath[1:2] == ':' and fpath[2:3] in ('/', '\\'):
+                continue
+            # 排除 .github/、.git/ 等 Git/CI 路径（非技能文件）
+            if fpath.startswith('.github/') or fpath.startswith('.git/'):
+                continue
+            # 排除占位符/示例路径：包含 < > 变量、xxx、...、/path/ 等特征
+            if '<' in fpath or '>' in fpath or 'xxx' in fpath or '...' in fpath:
+                continue
+            # 排除绝对路径（以 / 开头，不是技能相对路径）
+            if fpath.startswith('/'):
+                continue
+            # 排除示例路径模式（/path/to/）
+            if '/path/' in fpath or '/example/' in fpath or '/sample/' in fpath:
+                continue
+            # 排除以 ./ 开头的相对路径（示例输出，如 ./hello-world/SKILL.md）
+            if fpath.startswith('./'):
+                continue
+            # 排除扩展名列表模式（.png/.jpg/.gif/.svg 等）
+            if fpath.startswith('.') and fpath.count('/') == 0:
+                continue
+            # 排除 ~ 开头的家目录路径
+            if '~/' in fpath or fpath.startswith('~'):
+                continue
+            # 排除编码损坏字符（如替换字符、非法代理对等）
+            if '\ufffd' in fpath:
+                continue
+            if any(0xD800 <= ord(c) <= 0xDFFF for c in fpath):
+                continue
+            # 排除 __pycache__ 等缓存路径
+            if '__pycache__' in fpath:
+                continue
+            if fpath.endswith('.py'):
+                script_paths.add(fpath)
+                py_file_refs.add(fpath)
+            else:
+                other_file_refs.add(fpath)
 
     # 3. 检查脚本文件是否存在
     for script_path in script_paths:
@@ -921,6 +1006,59 @@ def check_doc_code_consistency(
                     except Exception:
                         pass
 
+    # 4b. 检查非 .py 文件引用是否真实存在（v2.54.0）
+    if other_file_refs and skill_dir:
+        # 预读所有 .md 文件内容，用于上下文提取
+        _md_contents = {}
+        for _mf in ['SKILL.md'] + ['references/' + f for f in sorted(os.listdir(os.path.join(skill_dir, 'references'))) if f.endswith('.md')]:
+            _mp = os.path.join(skill_dir, _mf)
+            if os.path.isfile(_mp):
+                try:
+                    _md_contents[_mf] = open(_mp, 'r', encoding='utf-8').read().split('\n')
+                except Exception:
+                    _md_contents[_mf] = []
+        for ref_path in sorted(other_file_refs):
+            full_path = os.path.join(skill_dir, ref_path)
+            if not os.path.isfile(full_path):
+                # 在 references/ 和 scripts/ 下也尝试找
+                alt = None
+                for prefix in ['references', 'scripts']:
+                    trial = os.path.join(skill_dir, prefix, os.path.basename(ref_path))
+                    if os.path.isfile(trial):
+                        alt = os.path.join(prefix, os.path.basename(ref_path))
+                        break
+                # 递归搜索 scripts/ 下同名文件
+                if not alt:
+                    scripts_dir = os.path.join(skill_dir, 'scripts')
+                    if os.path.isdir(scripts_dir):
+                        ref_stem = os.path.splitext(os.path.basename(ref_path))[0]
+                        for _root, _dirs, _files in os.walk(scripts_dir):
+                            for _f in _files:
+                                if os.path.splitext(_f)[0] == ref_stem:
+                                    alt = os.path.relpath(os.path.join(_root, _f), skill_dir).replace('\\', '/')
+                                    break
+                            if alt:
+                                break
+                if alt:
+                    continue
+                # 查找源文件中的引用位置，提取上下文（供LLM精筛判断）
+                ctx_parts = []
+                for _src_name, _src_lines in _md_contents.items():
+                    for _ln, _line in enumerate(_src_lines, 1):
+                        if ref_path in _line:
+                            _start = max(0, _ln - 3)
+                            _end = min(len(_src_lines), _ln + 2)
+                            _ctx = '\n'.join(f"    {_src_name}:{i} {_src_lines[i-1]}" for i in range(_start + 1, _end + 1))
+                            ctx_parts.append(f"  {_src_name}:{_ln} 附近:\n{_ctx}")
+                            break
+                ctx = ctx_parts[0] if ctx_parts else f"  文件: {ref_path} 不存在"
+                issues["suggest"].append(
+                    f"R-23: {filepath}:1 - 文档引用 `{ref_path}` 但文件不存在"
+                )
+                if "ctx_lines" not in issues:
+                    issues["ctx_lines"] = []
+                issues["ctx_lines"].append(ctx)
+
     # 5. 检查 SKILL.md 正文提到的函数/类名是否在实际代码中存
     # 匹配中文描述后的代码引用，如 "调用 XXXFunction" 或 "`XXXClass`"
     func_refs = re.findall(r'`([A-Z][a-zA-Z0-9_]*)`', body)
@@ -972,7 +1110,7 @@ def check_doc_code_consistency(
 
     # 7. (v2.39.0) 两阶段：R-23 第 7 项 — MD 引用的外部技能是否存在
     # 第一阶段（正则粗筛）：收集所有 skills/<name>/ 候选，不设白名单，不阻断 PASS
-    # 第二阶段（LLM 精筛）：AI 对粗筛结果逐条判断语境，过滤误报后才是最终结果
+    # 全报告LLM（LLM 精筛）：AI 对粗筛结果逐条判断语境，过滤误报后才是最终结果
     if skill_dir and os.path.isdir(skill_dir):
         _skills_root = os.path.normpath(os.path.join(skill_dir, '..'))
         _current_skill = os.path.basename(os.path.normpath(skill_dir))
@@ -988,7 +1126,7 @@ def check_doc_code_consistency(
                     except Exception:
                         pass
         # 正则粗筛：skills/<name>/ 或 ~/.workbuddy/skills/<name>/
-        # 不设白名单，不排除 URL — 第二阶段 LLM 精筛处理
+        # 不设白名单，不排除 URL — 全报告LLM LLM 精筛处理
         _ref_skill_re = re.compile(r'(?:skills|\.workbuddy/skills)/([a-zA-Z0-9_-]+)/')
         _candidates = []
         for _src_name, _src_body in _all_md:
@@ -1012,8 +1150,15 @@ def check_doc_code_consistency(
             _lines = [f"  {c['source']}:{c['line']} - `{c['skill']}` (上下文: ...{c['context']}...)" for c in _candidates]
             issues["optional"].append(
                 f"R-23: {filepath}:1 - 【两阶段】粗筛发现 {len(_candidates)} 个 MD 引用的技能目录不存在"
-                f"，需 LLM 第二阶段精筛判断是否为真实过时描述（正则仅做粗筛，不阻断通过）：\n" + '\n'.join(_lines)
+                f"，由全报告 LLM 精筛判断：\n" + '\n'.join(_lines)
             )
+
+    # 检查目录树与磁盘一致性（v2.56.0）
+    try:
+        from ._tree_scanner import _check_directory_tree
+        _check_directory_tree(filepath, body, skill_dir, issues)
+    except Exception:
+        pass
 
     # 汇总
     must_n = len(issues["must"])
@@ -1024,11 +1169,11 @@ def check_doc_code_consistency(
     if total == 0:
         return {"passed": True, "detail": f"{filepath}:1 - R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}
 
-    # 仅 optional（如两阶段粗筛产物）→ 通过，detail 带 NOTE
+    # 仅 optional（如粗筛产物）→ 通过，detail 带 NOTE
     if must_n == 0 and suggest_n == 0 and optional_n > 0:
         opt_msgs = "\n".join(issues["optional"])
         return {"passed": True,
-                "detail": f"{filepath}:1 - R-23: ⓘ 两阶段粗筛 {optional_n} 条待 LLM 精筛确认（不阻断通过）：\n{opt_msgs}",
+                "detail": f"{filepath}:1 - R-23: ⓘ 粗筛 {optional_n} 条待 LLM 精筛确认（不阻断通过）：\n{opt_msgs}",
                 "fix": None}
 
     # ── 检查 4: SKILL.md 中引用的规则编号范围是否与 rules.json 一致 ──
@@ -1055,10 +1200,12 @@ def check_doc_code_consistency(
     msgs = []
     for k in ["must", "suggest", "optional"]:
         msgs.extend(issues[k])
-    return {"passed": False,
-            "detail": f"{filepath}:1 - R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
-            # R-23 只检查，不自动修复——需要人工判断
-            "fix": None}
+    result = {"passed": False,
+              "detail": f"{filepath}:1 - R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
+              "fix": None}
+    if issues.get("ctx_lines"):
+        result["ctx_lines"] = issues["ctx_lines"][:8]
+    return result
 
 def check_changelog_progressive(filepath, content, fm, body, **kw):
     """
@@ -1485,7 +1632,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     for rule in semantic_rules[:3]:
                         detail_preview = rule[:80].replace('\n', ' ')
                         issues["warn"].append(
-                            "C-12: 章节「" + sec_title[:16] + "」" + detail_preview + "（需 LLM Phase 2 确认是否满足）"
+                            "C-12: 章节「" + sec_title[:16] + "」" + detail_preview + "（由全报告 LLM 精筛确认）"
                         )
     # C-13 (WARN): 渐进式索引表完整性 — 检查 ## 核心能力 末尾是否包含索引表
     # ════════════════════════════════════════════════════════════
@@ -1514,7 +1661,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     issues["warn"].append(f"C-13: references/ 目录有 {ref_count} 个 .md 文件，但 ## 核心能力 章节末尾缺少渐进式索引表（### 渐进式文件索引）")
 
     # ════════════════════════════════════════════════════════════
-    # C-14 (WARN): 工作流程步骤完整性 — Phase 1 正则粗筛步骤数，Phase 2 LLM 确认
+    # C-14 (WARN): 工作流程步骤完整性 — Phase 1 正则粗筛步骤数， LLM 确认
     # ════════════════════════════════════════════════════════════
     # 提取 ## 工作流程 章节中的编号步骤
     wf_section = re.search(r'^## 工作流程\n\n.*?(?=^## |\Z)', body, re.MULTILINE | re.DOTALL)
@@ -1527,7 +1674,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if len(steps) > 6:
                 step_details += f" 等（共 {len(steps)} 步）"
             issues["warn"].append(
-                f"C-14: ⓘ 工作流程共 {len(steps)} 步，需 LLM Phase 2 确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
+                f"C-14: 工作流程共 {len(steps)} 步，由全报告LLM精筛确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
             )
 
         # ── C-14b: 检测工作流程中混入 changelog 风格内容（版本号+更新类关键词） ──
@@ -1603,7 +1750,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     f"该文件已在核心能力索引表中列出，建议统一由索引表管理"
                 )
     
-    # ── 15d: 同一概念在不同章节中重复提及的线索检测（Phase 2 精筛）──
+    # ── 15d: 同一概念在不同章节中重复提及的线索检测（ 精筛）──
     # 提取所有 ## 章节的标题，检查是否有近似重复
     seen_titles = set()
     for title in all_section_titles:
@@ -1613,7 +1760,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if len(title) > 4 and len(seen) > 4:
                 if title_lower in seen.lower() or seen.lower() in title_lower:
                     issues["warn"].append(
-                        f"C-15: ⓘ 章节「{title}」与「{seen}」内容范围可能重叠，需 LLM Phase 2 "
+                        f"C-15: ⓘ 章节「{title}」与「{seen}」内容范围可能重叠，需 LLM  "
                         f"确认是否冗余或可以合并"
                     )
                     break
@@ -1654,7 +1801,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 _c16_context = _c16_lines[_c16_ln - 1][:60] if _c16_ln <= len(_c16_lines) else ""
                 _c16_filename = os.path.relpath(_c16_doc, _c16_skill_dir) if _c16_skill_dir else _c16_doc
                 issues["warn"].append(
-                    f"C-16: {_c16_filename}:{_c16_ln} - 发现过时{_c16_label}「{_c16_m.group()[:30]}」（上下文：{_c16_context}）。{_c16_desc}（需 LLM Phase 2 确认并更新）"
+                    f"C-16: {_c16_filename}:{_c16_ln} - 发现过时{_c16_label}「{_c16_m.group()[:30]}」（上下文：{_c16_context}）。{_c16_desc}（由全报告LLM精筛确认并更新）"
                 )
 
     # ════════════════════════════════════════════════════════════

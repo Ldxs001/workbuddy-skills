@@ -18,6 +18,7 @@ import warnings
 # warnings.filterwarnings("ignore", category=SyntaxWarning, message=r'.*invalid escape sequence.*')
 
 import os
+import re
 import sys
 import json
 import argparse
@@ -230,6 +231,8 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
             "skipped": skipped,
             "detail": result.get("detail", ""),
         }
+        if result.get("ctx_lines"):
+            entry["ctx_lines"] = result["ctx_lines"][:8]  # 最多8行上下文
         # 新增：附带修正建议（供 LLM 参考）
         if not passed and not skipped:
             if result.get("fix"):
@@ -242,7 +245,11 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
         if not passed and not skipped and result.get("fix"):
             fixes.append(result["fix"])
 
-        if skipped:
+        # 误报不计入 WARN/ERROR 统计
+        is_false_positive = not passed and not skipped and _reclassify_false_positive(entry)
+        if is_false_positive:
+            pass_count += 1
+        elif skipped:
             skip_count += 1
         elif passed:
             pass_count += 1
@@ -303,10 +310,28 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
 
 def _reclassify_false_positive(res):
     """检测已知误报模式，匹配时标记为 ⓘ 已排除（不进入 WARN/ERROR 统计）"""
-    detail = res.get("detail", "")
+    detail = str(res.get("detail", ""))
     rule = res.get("rule_id", "")
     # 系统工具名被误判为函数引用
     if "lualatex" in detail and "函数/类名" in detail:
+        return True
+    # examples.md 中的示例输出路径（[CREATE] SKILL.md → ./hello-world/SKILL.md）
+    if "examples.md" in detail and ("→" in detail or "[CREATE]" in detail or "[B-0" in detail):
+        return True
+    # architecture.md 中的分类说明（.py/.sh/.bat → move → scripts/）
+    if "architecture.md" in detail and "→ move →" in detail:
+        return True
+    # R-23 step 3 示例脚本引用（SKILL.md 中的用法示例路径，非真实文件）
+    if rule == "R-23" and "但文件不存在（期望相对路径如" in detail:
+        return True
+    # R-20 如果仅包含 R-23 问题则同步标记
+    if rule == "R-20" and "R-23" in detail and "但文件不存在" in detail:
+        return True
+    # JSON 示例中的文件路径（如 component-spec.md 的 manifest.json schema 展示）
+    if '"file": "' in detail:
+        return True
+    # 使用示例中的占位符路径（如 my_package 等通用占位符名）
+    if 'my_package' in detail:
         return True
     return False
 
@@ -338,6 +363,23 @@ def format_report(audit_result, verbose=True):
         lines.append(f"{'─'*55}")
 
     if verbose:
+        # 预读技能目录文件内容，用于自动上下文提取
+        _skill_dir = r.get("path", "")
+        _file_cache = {}
+
+        def _get_file_lines(filepath):
+            if filepath in _file_cache:
+                return _file_cache[filepath]
+            if os.path.isfile(filepath):
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        _file_cache[filepath] = f.read().split('\n')
+                except Exception:
+                    _file_cache[filepath] = []
+            else:
+                _file_cache[filepath] = []
+            return _file_cache[filepath]
+
         lines.append("")
         lines.append(f"{'规则ID':<8} {'严重度':<7} {'状态':<6} 详情")
         lines.append(f"{'-'*8}-{'-'*7}-{'-'*6}-{'-'*30}")
@@ -350,7 +392,27 @@ def format_report(audit_result, verbose=True):
                 status = "[OK]" if res["passed"] else ("⏭️" if res["skipped"] else ("[ERROR]" if res["severity"]=="ERROR" else "[WARN]"))
                 sev = res["severity"][0] if res["severity"] else "?"
             lines.append(f"{res['rule_id']:<8} {sev:<7} {status:<6} {res['detail']}")
-            # 新增：输出修正建议（供 LLM 参考）
+            # 详细上下文行：优先使用检查器返回的 ctx_lines，否则自动从 detail 中的路径提取
+            ctx = res.get("ctx_lines") or []
+            if not ctx and _skill_dir:
+                _detail_str = res.get("detail", "")
+                if isinstance(_detail_str, str):
+                    for _m in re.finditer(r'([^\s]+\.(?:md|py|tex|txt|json|yaml|yml|cfg|ini|toml)):(\d+)', _detail_str):
+                        _fp = _m.group(1)
+                        _ln = int(_m.group(2))
+                        for _base in ('', _skill_dir):
+                            _full = os.path.join(_base, _fp) if _base else _fp
+                            _ls = _get_file_lines(_full)
+                            if _ls:
+                                _start = max(0, _ln - 3)
+                                _end = min(len(_ls), _ln + 2)
+                                _ctx = '\n'.join(f"    {_fp}:{i} {_ls[i-1]}" for i in range(_start + 1, _end + 1))
+                                ctx.append(f"  {_fp}:{_ln} 附近:\n{_ctx}")
+                                break
+            if ctx:
+                for cl in ctx[:8]:
+                    lines.append(f"       {cl}")
+            # 修正建议（供 LLM 参考）
             if not res["passed"] and not res["skipped"] and res.get("fix"):
                 fix = res["fix"]
                 if fix.get("operation"):

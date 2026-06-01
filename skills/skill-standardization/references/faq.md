@@ -89,7 +89,7 @@
 - 核心能力末尾含 `### 渐进式文件索引` 表格
 - references/ 引用通过索引表统一管理
 
-要更新模板：修改 `creator.py` 中 `SKILL_TEMPLATE` 字符串后保存即可。
+要更新模板：更新 `creator.py` 中 `SKILL_TEMPLATE` 字符串后保存即可。
 
 ---
 
