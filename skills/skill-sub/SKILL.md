@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.24.1
+version: 1.24.3
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -12,12 +12,22 @@ tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading
 external_data_dir: true
 trigger: ['规划类: 帮我规划一下/步骤是什么', '顺序类: 依次执行/先...再...', '链管理: 创建/查看/更新/删除调用链']
 trigger_negative: ['不使用调用链', '手动逐步执行']
+meta_field_sync: true
 ---
 # skill-sub
 
 > 反模式详见 [references/antipatterns.md](references/antipatterns.md)
 
+## 约束
+
+- **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 Python 脚本原子写入
+- **更新后必须 `audit .` 自审** — 0 ERROR 0 WARN 方可提交
+- **版本号三端一致** — 更新时同步 SKILL.md / _meta.json / references/changelog.md
+
 ## 触发场景
+
+**正向触发（满足以下任意一条）：**
+
 
 **当用户提出以下意图时触发本技能：**
 - 规划类：「帮我规划一下...」、「...的步骤是什么」
@@ -43,15 +53,15 @@ trigger_negative: ['不使用调用链', '手动逐步执行']
 
 ---
 
-## 工作流程
+### 渐进式文件索引
 
-1. **理解意图** → 分析用户输入，判断是否需要调用链
-2. **规划技能顺序** → 推荐参与的 Skill 及其顺序
-3. **生成调用链** → 创建 JSON 格式的调用链定义
-4. **生成执行计划** → 输出 AI 可直接执行的指令序列
-5. **（可选）实际执行** → 按执行计划逐步调用技能
-
----
+| 文件名 | 位置 | 说明 |
+|--------|------|------|
+| `references/workflow.md` | 工作流程详解 | 完整工作流和示例 |
+| `references/examples.md` | 使用示例 | 调用链构建示例 |
+| `references/antipatterns.md` | 反模式 | 常见错误及正确做法 |
+| `references/faq.md` | FAQ | 常见问题解答 |
+| `references/changelog.md` | 版本日志 | 版本更新记录 |
 
 ## 快速开始
 
@@ -80,7 +90,18 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 
 ---
 
-## 循环与分支编排（v1.20.0 新增）
+
+## 工作流程
+
+1. **理解意图** → 分析用户输入，判断是否需要调用链
+2. **规划技能顺序** → 推荐参与的 Skill 及其顺序
+3. **生成调用链** → 创建 JSON 格式的调用链定义
+4. **生成执行计划** → 输出 AI 可直接执行的指令序列
+5. **（可选）实际执行** → 按执行计划逐步调用技能
+
+---
+
+## 循环与分支编排
 
 ### for-each 循环
 
@@ -138,17 +159,6 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "发布流水线" --fo
 ```
 
 > 📚 完整 schema 详见 `references/chain_schema.md`
-
----
-
-## 详细文档
-
-完整工作流程、使用示例、反模式与常见问题 → 见 `references/` 目录：
-- `references/workflow.md` — 详细工作流程
-- `references/examples.md` — 使用示例
-- `references/faq.md` — 常见问题与反模式
-- `references/chain_schema.md` — 调用链数据结构定义
-- `references/permissions.md` — 权限说明
 
 ---
 
