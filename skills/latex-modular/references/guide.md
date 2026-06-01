@@ -14,10 +14,10 @@
 
 ### 模式 1: extract（提取组件）
 
-从已有 LaTeX 源文件提取可复用组件到 `components/` 目录：
+从已有 LaTeX 源文件提取可复用组件到 `scripts/components/` 目录：
 
 ```bash
-python scripts/extract.py <source.tex> --output-dir components/
+python scripts/extract.py <source.tex> --output-dir scripts/components/
 ```
 
 **提取的组件分类**：
@@ -44,7 +44,7 @@ python scripts/extract.py <source.tex> --output-dir components/
 
 ```bash
 python scripts/compose.py \
-  --manifest components/manifest.json \
+  --manifest scripts/components/manifest.json \
   --output output.tex \
   --body-file body.tex \
   --engine lualatex \
@@ -66,7 +66,7 @@ python scripts/compose.py \
 
 ```bash
 python scripts/refactor.py input.tex \
-  --output-dir components/ \
+  --output-dir scripts/components/ \
   --output-doc output_modular.tex \
   --engine lualatex
 ```
@@ -75,7 +75,7 @@ python scripts/refactor.py input.tex \
 
 1. 读取原始 .tex 文件
 2. 分割为导言区和正文区
-3. 按分类规则提取各组件到 `components/` 对应目录
+3. 按分类规则提取各组件到 `scripts/components/` 对应目录
 4. 生成 `manifest.json` 组件索引
 5. 生成模块化主文档（使用 `\input{}` 引入组件）
 6. 编译验证（可选）
@@ -178,25 +178,25 @@ python scripts/template.py --template article --content '\\section{引言}自定
 
 ```bash
 # 列出所有组件
-python scripts/component_manager.py list --dir components/
+python scripts/component_manager.py list --dir scripts/components/
 
 # 添加组件
 python scripts/component_manager.py add new_component.tex \
-  --dir components/ \
+  --dir scripts/components/ \
   --category preamble \
   --name my-package \
   --desc "我的宏包配置"
 
 # 删除组件
 python scripts/component_manager.py remove preamble/my-package \
-  --dir components/
+  --dir scripts/components/
 
 # 显示组件内容
 python scripts/component_manager.py show preamble/packages \
-  --dir components/
+  --dir scripts/components/
 
 # 验证所有组件
-python scripts/component_manager.py validate --dir components/
+python scripts/component_manager.py validate --dir scripts/components/
 ```
 
 ## 输出格式

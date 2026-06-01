@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-COMPONENTS_DIR = Path(__file__).parent.parent / "components"
+COMPONENTS_DIR = Path(__file__).parent / "components"
 MANIFEST_PATH = COMPONENTS_DIR / "manifest.json"
 
 def load_manifest():

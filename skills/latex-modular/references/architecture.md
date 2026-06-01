@@ -13,7 +13,7 @@ latex-modular/
 │   ├── refactor.py            # 重构引擎
 │   ├── component_manager.py    # 组件库管理
 │   └── update_frontmatter.py  # 更新 SKILL.md frontmatter
-├── components/                 # 组件库（auto-generated）
+├── scripts/components/                 # 组件库（auto-generated）
 │   ├── manifest.json          # 组件索引
 │   ├── preamble/              # 导言区组件
 │   ├── environments/          # 自定义环境
@@ -58,8 +58,8 @@ os.replace(tmp_path, target_path)
 按正则模式匹配，将导言区内容分类到不同组件文件。
 
 **输出**：
-- `components/manifest.json` — 组件索引（JSON）
-- `components/<category>/<name>.tex` — 各组件文件
+- `scripts/components/manifest.json` — 组件索引（JSON）
+- `scripts/components/<category>/<name>.tex` — 各组件文件
 
 ### 3. compose.py（组合引擎）
 
@@ -109,7 +109,7 @@ os.replace(tmp_path, target_path)
 1. 读取源文件（`read_source()`）
 2. 分割文档为导言区和正文区（`split_document()`）
 3. 分类导言区内容到模块（`classify_preamble()`）
-4. 保存模块到 `components/`（`save_components()`）
+4. 保存模块到 `scripts/components/`（`save_components()`）
 5. 生成模块化主文档（`generate_modular_document()`，使用 `\input{}` 引入组件）
 6. 编译验证（`validate_refactored()`，调用 `validate.py`）
 
@@ -132,7 +132,7 @@ os.replace(tmp_path, target_path)
 ### extract 模式
 
 ```
-source.tex → extract.py → components/*.tex + manifest.json
+source.tex → extract.py → scripts/components/*.tex + manifest.json
 ```
 
 ### compose 模式
@@ -144,7 +144,7 @@ manifest.json + body.tex → compose.py → output.tex → lualatex → output.p
 ### refactor 模式
 
 ```
-source.tex → refactor.py → components/*.tex + manifest.json + output_modular.tex
+source.tex → refactor.py → scripts/components/*.tex + manifest.json + output_modular.tex
 ```
 
 ## 依赖查找顺序

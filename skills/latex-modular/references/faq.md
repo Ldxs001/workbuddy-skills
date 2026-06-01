@@ -68,13 +68,13 @@
 
 ```bash
 python scripts/component_manager.py add my_package.tex \
-  --dir components/ \
+  --dir scripts/components/ \
   --category preamble \
   --name my-package \
   --desc "我的宏包配置"
 ```
 
-或直接手动创建 `components/preamble/my_package.tex`，然后编辑 `manifest.json` 添加条目。
+或直接手动创建 `scripts/components/preamble/my_package.tex`，然后编辑 `manifest.json` 添加条目。
 
 ---
 
@@ -123,8 +123,8 @@ jobs:
         run: sudo apt-get install -y texlive-lualatex
       - name: Build LaTeX
         run: |
-          python scripts/extract.py input.tex --output-dir components/
-          python scripts/compose.py --manifest components/manifest.json --output output.tex --validate
+          python scripts/extract.py input.tex --output-dir scripts/components/
+          python scripts/compose.py --manifest scripts/components/manifest.json --output output.tex --validate
       - name: Upload PDF
         uses: actions/upload-artifact@v3
         with:
@@ -193,7 +193,7 @@ echo "All files passed!"
 
 切换方式：
 ```bash
-python scripts/compose.py --manifest components/manifest.json --output output.tex --engine xelatex --validate
+python scripts/compose.py --manifest scripts/components/manifest.json --output output.tex --engine xelatex --validate
 python scripts/template.py --type article --engine xelatex --output-mode pdf
 ```
 

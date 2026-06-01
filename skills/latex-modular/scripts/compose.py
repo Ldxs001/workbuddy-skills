@@ -38,10 +38,7 @@ def find_engine(engine: str) -> str:
     return ""
 
 def resolve_base_dir(manifest_path: str) -> str:
-    """manifest.json 所在目录即为 base_dir。
-    manifest.json 中的 path 相对于 components/ 目录，
-    而 components/ 就是 manifest.json 所在目录。
-    """
+    """manifest.json 所在目录即为 base_dir。"""
     return os.path.dirname(os.path.abspath(manifest_path))
 
 def read_tex(path: str) -> str:
@@ -157,7 +154,8 @@ def build_document(manifest: Dict, base_dir: str) -> str:
     return "\n".join(l for l in doc_lines if l.strip()) + "\n"
 
 def find_manifest(base_dir: str) -> str:
-    for c in [os.path.join(base_dir, "components", "manifest.json"),
+    for c in [os.path.join(base_dir, "scripts", "components", "manifest.json"),
+               os.path.join(base_dir, "components", "manifest.json"),
                os.path.join(base_dir, "manifest.json")]:
         if os.path.isfile(c):
             return c

@@ -19,7 +19,7 @@ def _balanced_end(lines, start):
     return len(lines)
 
 def _save(out, sub, name, content):
-    d = os.path.join(out, "components", sub)
+    d = os.path.join(out, "scripts", "components", sub)
     os.makedirs(d, exist_ok=True)
     p = os.path.join(d, name)
     with open(p, "w", encoding="utf-8") as f:
@@ -145,7 +145,7 @@ def extract(in_path, out_dir):
 
     # manifest
     manifest = {"components": comps, "version": "1.0.0"}
-    mdir = os.path.join(out_dir, "components")
+    mdir = os.path.join(out_dir, "scripts", "components")
     os.makedirs(mdir, exist_ok=True)
     with open(os.path.join(mdir, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)

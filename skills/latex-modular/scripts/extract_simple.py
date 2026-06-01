@@ -16,7 +16,7 @@ def main():
     body = text[bs+len(r"\begin{document}"):be].strip() if be != -1 else ""
 
     # 保存 body
-    body_dir = os.path.join(output_dir, "components", "body")
+    body_dir = os.path.join(output_dir, "scripts", "components", "body")
     os.makedirs(body_dir, exist_ok=True)
     with open(os.path.join(body_dir, "body.tex"), "w", encoding="utf-8") as f:
         f.write(body + "\n")
@@ -29,7 +29,7 @@ def main():
     for ln in plines:
         s = ln.strip()
         if s.startswith(r"\documentclass"):
-            d = os.path.join(output_dir, "components", "preamble")
+            d = os.path.join(output_dir, "scripts", "components", "preamble")
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "class-settings.tex"), "w", encoding="utf-8") as f:
                 f.write(s.rstrip() + "\n")
@@ -39,7 +39,7 @@ def main():
     # 2. usepackage 行（直接按行收集，不分组）
     pkg_lines = [l.strip() for l in plines if l.strip().startswith(r"\usepackage")]
     if pkg_lines:
-        d = os.path.join(output_dir, "components", "preamble")
+        d = os.path.join(output_dir, "scripts", "components", "preamble")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "packages.tex"), "w", encoding="utf-8") as f:
             f.write("\n".join(pkg_lines) + "\n")
@@ -55,7 +55,7 @@ def main():
         misc_lines.append(ln.rstrip())
 
     if misc_lines:
-        d = os.path.join(output_dir, "components", "preamble")
+        d = os.path.join(output_dir, "scripts", "components", "preamble")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "preamble-misc.tex"), "w", encoding="utf-8") as f:
             f.write("\n".join(misc_lines) + "\n")
@@ -63,7 +63,7 @@ def main():
 
     # manifest
     manifest = {"components": components, "version": "1.0.0"}
-    mdir = os.path.join(output_dir, "components")
+    mdir = os.path.join(output_dir, "scripts", "components")
     os.makedirs(mdir, exist_ok=True)
     with open(os.path.join(mdir, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)

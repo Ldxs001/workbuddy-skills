@@ -1,7 +1,7 @@
 ---
 name: latex-modular
 data_dir: ../.standardization/latex-modular/data
-version: 1.2.0
+version: 1.2.1
 author: wUwproject
 license: MIT
 description: LaTeX 模块化组合技能。提取 LaTeX 文档头/组件（表格、图片、列表、章节样式）作为可组合模块，通过 Python 脚本稳定组合生成不报错的 lualatex 文档，支持从原始 LaTeX 代码重构进模块化体系。
@@ -28,7 +28,7 @@ meta_field_sync: true
 |------|----------|--------|
 | `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_frontmatter.py` |
 | `SKILL.md` 正文 | Python 直接重建 | `scripts/safe_write.py` 的 `safe_write()` |
-| `components/*.tex` | Python 写入 | `scripts/component_manager.py` |
+| `scripts/components/*.tex` | Python 写入 | `scripts/component_manager.py` |
 | `references/*.md` | `scripts/safe_write.py` | 随技能自带 |
 
 - [把这段 LaTeX 做成模块化模板]
@@ -91,18 +91,18 @@ meta_field_sync: true
 
 1. 读取用户提供的 LaTeX 源文件
 2. 解析文档结构：导言区（\\documentclass 到 \\begin{document}）、正文区
-3. 提取组件并分类保存到 `components/`：
+3. 提取组件并分类保存到 `scripts/components/`：
    - `preamble/*.tex` — 宏包引入、颜色定义、字体设置
    - `environments/*.tex` — 自定义环境（mylist、mycolumns 等）
    - `commands/*.tex` — 自定义命令（\\timu、\\seeref 等）
    - `styles/*.tex` — 章节样式、目录样式、页眉页脚
    - `tables/*.tex` — 表格样式模板
    - `graphics/*.tex` — 图片插入模板
-4. 生成组件索引 `components/manifest.json`
+4. 生成组件索引 `scripts/components/manifest.json`
 
 ### compose 模式（组合生成）
 
-1. 读取 `components/manifest.json` 获取可用组件列表
+1. 读取 `scripts/components/manifest.json` 获取可用组件列表
 2. 根据用户需求选择所需组件
 3. 调用 `scripts/compose.py` 按正确顺序组合：
    - 第1层：文档类声明
@@ -115,7 +115,7 @@ meta_field_sync: true
 ### 组件库结构
 
 ```
-components/
+scripts/components/
 ├── manifest.json          # 组件索引
 ├── preamble/              # 导言区组件
 │   ├── class-settings.tex
@@ -145,7 +145,7 @@ components/
 ### refactor 模式（重构）
 
 1. 读取原始 LaTeX 文件
-2. 解析并提取各组件到 `components/` 对应目录
+2. 解析并提取各组件到 `scripts/components/` 对应目录
 3. 生成模块化版本的主文档（使用 \\input{} 或 \\include{} 引入组件）
 4. 验证重构后文档编译通过
 

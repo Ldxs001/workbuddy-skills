@@ -304,7 +304,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="LaTeX 代码重构引擎")
     parser.add_argument("source", help="原始 LaTeX 文件路径")
-    parser.add_argument("--output-dir", default="components", help="组件输出目录")
+    parser.add_argument("--output-dir", default="scripts/components", help="组件输出目录")
     parser.add_argument("--output-doc", default="", help="输出的模块化主文档路径")
     parser.add_argument("--engine", default="lualatex", help="验证用编译引擎")
     parser.add_argument("--no-validate", action="store_true", help="跳过编译验证")

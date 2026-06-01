@@ -290,7 +290,7 @@ def main():
     # 输出参数
     og = parser.add_argument_group("输出控制")
     og.add_argument("--manifest", default="",
-                    help="manifest.json 路径  默认: <skill>/components/manifest.json")
+                    help="manifest.json 路径  默认: <skill>/scripts/components/manifest.json")
     og.add_argument("--output", "-o", default="template_output.tex",
                     help="输出 .tex 路径  默认: template_output.tex")
     og.add_argument("--engine", default="lualatex",
@@ -358,7 +358,7 @@ def main():
     # 读取 manifest
     manifest_path = args.manifest
     if not manifest_path:
-        manifest_path = os.path.join(skill_dir, "components", "manifest.json")
+        manifest_path = os.path.join(skill_dir, "scripts", "components", "manifest.json")
     if not os.path.isfile(manifest_path):
         print(f"[ERROR] manifest.json not found: {manifest_path}")
         sys.exit(1)
