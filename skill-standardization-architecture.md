@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.49.0 版的架构设计、审查规则体系、标准化执行流程与修复体系  
-> 生成时间：2026-06-01（v2.49.0 最新更新）
+> 完整解读 v2.50.1 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 生成时间：2026-06-01（v2.50.1 最新更新）
 
 ---
 
@@ -243,7 +243,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 6. **正文路径与 frontmatter data_dir 一致性**：当 data_dir 包含 `.standardization/` 时，检测正文中缺少 `.standardization/` 层级的路径
 7. **外部技能引用检查**：扫描 MD 中引用的技能路径，引用不存在的技能时 WARN
 
-### 2.7 类别 G：文档写作格式（R-25 v2.49.0 含 C-01~C-15 十五项子检查）
+### 2.7 类别 G：文档写作格式（R-25 v2.50.1 含 C-01~C-15 十五项子检查）
 
 **目的**：统一 SKILL.md 的写作格式，提供标准化的排版建议。R-25 整体为 WARN 级，其 14 项子检查中 C-01 为 ERROR 级（仅作内部参考，不提升规则总体级别），其余均为 WARN 建议级。
 
@@ -263,7 +263,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | C-12 | WARN | 格式合规 | 每个 H2 章节使用的格式应与 body.json content_format 定义一致；从 guidelines 提取语义要求转 LLM Phase 2（v2.45.0） |
 | C-13 | WARN | 渐进式索引表 | 核心能力章节末尾应包含 渐进式文件索引 表（列：文件名/位置/说明），references/ 文件未列出时报 WARN（v2.45.0） |
 | C-14 | WARN | 工作流程完整性 | 工作流程步骤数 + 混入版本标记检测 → LLM Phase 2 确认覆盖率（v2.45.0） |
-| C-15 | WARN | 内容冗余检测 | 索引表引用重复(15a) + H1后独立引用(15c) + 章节标题近似重叠(15d), rarr; LLM Phase 2（v2.49.0） |
+| C-15 | WARN | 内容冗余检测 | 索引表引用重复(15a) + H1后独立引用(15c) + 章节标题近似重叠(15d), rarr; LLM Phase 2（v2.50.1） |
 
 **冲突排除矩阵**：
 
@@ -284,7 +284,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | D. 安全与权限 | R-13~R-17 | 2 | 3 | 权限声明和风险控制（R-15、R-17 为 ERROR） |
 | E. 质量规范 | R-18~R-21 | 0 | 4 | 内容质量和可读性 |
 | F. 合规与维护 | R-22~R-24 | 0 | 3 | 长期维护一致性 |
-| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（15 项子检查仅 C-01 为 ERROR 级，其余均 WARN） |
+| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（16 项子检查仅 C-01 为 ERROR 级，其余均 WARN） |
 | **合计** | **R-01~R-25** | **10** | **15** | |
 
 ---
@@ -610,4 +610,4 @@ python -m scripts.skill_builder inspect <skill-dir>    # 通过 builder 调用
 
 ---
 
-> 本文档基于 skill-standardization v2.49.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-standardization v2.50.1 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
