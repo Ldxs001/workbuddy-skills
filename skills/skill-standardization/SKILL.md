@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.45.2
+version: 2.45.3
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -63,17 +63,28 @@ h1_position: true
 | `references/faq.md` | FAQ | 用户常见问题解答 |
 | `references/changelog.md` | 版本日志 | 版本更新记录 |
 
-- **audit 模式** — 对指定 skill 目录执行 R-01~R-25 规范审查，输出通过/失败/跳过统计
-- **refactor 模式** — 改造现有技能（修复 frontmatter、迁移更新记录、统一术语、规范数据目录、R-22 数据目录合规检查）
-- **create 模式** — 基于标准化模板创建新 skill，自动注入 R-07~R-09/R-18~R-22 章节引用
+- **audit 模式** — 审查（R-01~R-25）+ 可选 --fix 自动修复
+- **update 模式** — 备份 → inspect → 审查 → 修复 → 重审 → bump → 清理
+- **refactor 模式** — 备份 → inspect → 迁移(目录/文档) → 审查 → 修复 → bump → 清理
+- **create 模式** — 基于标准化模板创建新 skill，自动注入标准章节引用
 
 ## 工作流程
 
+**audit 模式**（仅审查）：
 1. 读取目标 skill 的 SKILL.md
 2. 执行 R-01~R-25 规则检查
-3. 输出审查报告（通过/失败/跳过）
-4. 若传了 --fix，自动修正 R-11/R-12/R-22 违规
-5. **审计后自动修复（推荐）**：审计完成后，调用 `scripts/skill_audit/fix.py` 中的对应修复函数，批量修复 WARN/ERROR 项（详见 `references/guide.md` 审查模式章节）
+3. 输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
+4. 若传了 --fix，自动修正可修复项（R-01/R-03/R-11/R-12/R-22 等）
+5. 调用 `fix.py` 按规则 ID 分派自动修复（推荐：审计后自动修复 WARN/ERROR 项）
+
+**update/refactor 模式**（改造+审查）：
+1. 操作前整体备份（时间戳命名）
+2. **★ 强制 inspect 蓝皮书扫描** — 输出技能结构、AST 函数签名、引用链路
+3. 执行 audit（R-01~R-25）或 refactor 改造步骤
+4. 调用 fix.py 自动修复（规则 ID 分派）
+5. **再次审计确认 0 ERROR 0 WARN**
+6. **bump 版本号**（三端同步 SKILL.md / _meta.json / changelog）
+7. **cleanup 清理** — manifest 驱动删除临时文件、过期备份
 
 > 两阶段检查协议、排错止损规则 → 详见 `references/guide.md`
 > 临时文件与备份管理 → 详见 `references/guide.md` 的 cleanup 章节
