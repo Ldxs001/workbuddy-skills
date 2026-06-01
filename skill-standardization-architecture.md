@@ -331,14 +331,21 @@ v2.44.0 新增：备份后、改造前**强制运行 skill_inspector** 结构扫
 
 **CRLF 编码约束**（铁律）：`SKILL.md` 必须使用 CRLF 换行符（Windows 风格）。git-sync 推送到仓库前需验证换行符状态。使用 `sync_with_exclude.py` 进行同步时，CRLF 不会被自动转换，需人工确认。
 
-### 4.3 操作前自检清单（每次更新前必须逐项确认）
+### 4.3 工具自动保障（无需人工确认）
 
-- [ ] 是否用了 Write/Edit 工具？→ 立刻停止，改用 Python 脚本
-- [ ] 是否在 `references/changelog.md` 维护更新记录？→ 根目录不得有 `CHANGELOG.md`
-- [ ] `SKILL.md` CRLF 换行符状态是否正常？→ `git-sync` 前必须验证
-- [ ] 更新后是否用 `python -m scripts.skill_audit audit .` 自审？→ 必须 **0 ERROR 0 WARN**
-- [ ] 版本号三端是否一致？→ SKILL.md / _meta.json / changelog 同一版本号
-- [ ] 英文注释和文档是否至少包含 ASCII 字符？→ 禁止纯中文注释导致的编码问题
+以下事项已由工具链自动保障，不再需要人工逐项检查：
+
+| 事项 | 保障方式 |
+|------|---------|
+| .md 文件写入 | `safe_io.py` 原子写入（`tmp + os.replace()`）替代 Write/Edit |
+| 更新日志维护 | `bump` 子命令自动插入 `references/changelog.md` 条目 |
+| CRLF 编码 | `git-sync` 推送前自动验证换行符 |
+| 自审状态 | `bump` 后自动触发审计；`git-sync` 推送前再次验证 |
+| 版本号三端一致 | `bump` 子命令自动同步 SKILL.md / _meta.json / changelog |
+| 临时文件清理 | `cleanup_manager` manifest 驱动，builder 收尾强制清理 |
+| 非标章节检测 | R-17 Phase 1 正则粗筛 → Phase 2 LLM 精筛 |
+| 章节格式合规 | R-25 C-12 自动比对 body.json content_format |
+| 渐进式索引表 | C-13 审计自动检查完整性 |
 
 ### 4.4 排错止损规则（v2.38.4+）
 
