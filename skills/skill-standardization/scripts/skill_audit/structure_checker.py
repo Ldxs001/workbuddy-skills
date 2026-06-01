@@ -1135,7 +1135,7 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
     R-25: 文档写作格式规范 (v2.44.0, v2.5.0 C-11/C-12, v2.6.0 C-13)
-    10 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表。
+    10 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
     全部子检查仅作建议标准统一，不强制改造。
     """
@@ -1514,6 +1514,36 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     issues["warn"].append(f"C-13: references/ 目录有 {ref_count} 个 .md 文件，但 ## 核心能力 章节末尾缺少渐进式索引表（### 渐进式文件索引）")
 
     # ════════════════════════════════════════════════════════════
+    # C-14 (WARN): 工作流程步骤完整性 — Phase 1 正则粗筛步骤数，Phase 2 LLM 确认
+    # ════════════════════════════════════════════════════════════
+    # 提取 ## 工作流程 章节中的编号步骤
+    wf_section = re.search(r'^## 工作流程\n\n.*?(?=^## |\Z)', body, re.MULTILINE | re.DOTALL)
+    if wf_section:
+        wf_text = wf_section.group(0)
+        steps = re.findall(r'^\d+\.\s+(.+)$', wf_text, re.MULTILINE)
+        if steps:
+            # Phase 1: 输出步骤列表供 LLM 精筛
+            step_details = "; ".join(s[:40] for s in steps[:6])
+            if len(steps) > 6:
+                step_details += f" 等（共 {len(steps)} 步）"
+            issues["warn"].append(
+                f"C-14: ⓘ 工作流程共 {len(steps)} 步，需 LLM Phase 2 确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
+            )
+
+        # ── C-14b: 检测工作流程中混入 changelog 风格内容（版本号+更新类关键词） ──
+        # 检查 blockquote 行中是否含版本号标记
+        versioned_lines = []
+        for line in wf_text.split('\n'):
+            if re.search(r'v\d+\.\d+\.\d+.*(?:新增|修复|修改|变更|优化)', line):
+                versioned_lines.append(line.strip()[:60])
+        if versioned_lines:
+            issues["warn"].append(
+                f"C-14: ⓘ 工作流程中含有 {len(versioned_lines)} 条版本标记内容（类似更新日志），"
+                f"应移至 references/changelog.md，工作流程只保留步骤描述。"
+                f"触发行：{' / '.join(versioned_lines[:3])}"
+            )
+
+    # ════════════════════════════════════════════════════════════
     # 汇总输出
     # ════════════════════════════════════════════════════════════
     error_count = len(issues["error"])
@@ -1522,14 +1552,14 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     if total == 0:
         return {"passed": True,
-                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（12项子检查均符合建议标准）"}
+                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（13项子检查均符合建议标准）"}
 
     detail_parts = []
     if error_count > 0:
         detail_parts.append(f"🔴 ERROR({error_count}): {'; '.join(issues['error'])}")
     if warn_count > 0:
-        detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:4])}")
-        if warn_count > 4:
+        detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:20])}")
+        if warn_count > 20:
             detail_parts[-1] += f" 等（共 {warn_count} 条建议）"
 
     return {"passed": error_count == 0,
