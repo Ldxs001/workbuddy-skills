@@ -1731,6 +1731,9 @@ def fix_reclassify_section(skill_dir, **kw):
     new_content += '---\n' + body.lstrip('\n')
     _write_file(skill_md, new_content)
     
+    # ★ 操作后自动同步渐进式索引表，保证引用表与 references/ 一致
+    fix_progressive_index_table(skill_dir)
+    
     return 1
 
 
@@ -1902,6 +1905,10 @@ def fix_split_nonstandard(skill_dir, **kw):
         new_content += "---\n"
         new_content += body.lstrip('\n')
         _write_file(skill_md, new_content)
+    
+    if migrated > 0:
+        # ★ 新增引用文件后自动同步索引表
+        fix_progressive_index_table(skill_dir)
 
     return migrated
 
