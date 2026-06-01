@@ -325,39 +325,6 @@ def _load_allowed_sections():
         return None
 
 
-def _load_known_sections(skill_dir):
-    """加载该技能已知的合法非标章节（由 Phase 2 LLM 确认后写入）。"""
-    if not skill_dir:
-        return set()
-    ks_path = os.path.join(skill_dir, '.skill_sections.json')
-    if not os.path.isfile(ks_path):
-        return set()
-    try:
-        with open(ks_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return set(data.get("known_sections", []))
-    except Exception:
-        return set()
-
-
-def _save_known_sections(skill_dir, section_title):
-    """将 LLM Phase 2 确认合法的章节记录到 .skill_sections.json。"""
-    if not skill_dir:
-        return
-    ks_path = os.path.join(skill_dir, '.skill_sections.json')
-    known = set()
-    if os.path.isfile(ks_path):
-        try:
-            with open(ks_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            known = set(data.get("known_sections", []))
-        except Exception:
-            pass
-    known.add(section_title)
-    with open(ks_path, 'w', encoding='utf-8') as f:
-        json.dump({"known_sections": sorted(known)}, f, ensure_ascii=False, indent=2)
-
-
 def _find_nonstandard_sections(body_text, skill_dir=None):
     """
     扫描正文中的 ## H2 章节，与 body.json allowed_sections 白名单对比。
