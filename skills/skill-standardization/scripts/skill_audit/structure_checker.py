@@ -1135,7 +1135,7 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
     R-25: 文档写作格式规范 (v2.44.0, v2.5.0 C-11/C-12, v2.6.0 C-13)
-    10 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性。
+    11 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 索引表引用冗余。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
     全部子检查仅作建议标准统一，不强制改造。
     """
@@ -1543,6 +1543,34 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 f"触发行：{' / '.join(versioned_lines[:3])}"
             )
 
+    # ════════════════════════════════════════════════════════════
+    # C-15 (WARN): 正文中 references/ 引用冗余检测 — 检测正文中 references/ 引用是否已被索引表覆盖
+    # ════════════════════════════════════════════════════════════
+    _index_table_refs = set()
+    index_match = re.search(r'### 渐进式文件索引\n\n\| 文件名.*?(?=\n## |\n---|\Z)', body, re.DOTALL)
+    if index_match:
+        index_text = index_match.group(0)
+        for m in re.finditer(r'`references/([^`]+)`', index_text):
+            _index_table_refs.add(m.group(1))
+    
+    if _index_table_refs:
+        # 扫描正文中所有 references/xxx.md 引用（排除索引表本身）
+        for m in re.finditer(r'`references/([^`]+)`', body):
+            fn = m.group(1)
+            ref_line = body[:m.start()].count('\n') + 1
+            # 排除在索引表区域内的行
+            if index_match and m.start() >= index_match.start() and m.start() <= index_match.end():
+                continue
+            # 排除渐进式加载模板句（R-21 固定）
+            if '📚 **渐进式加载**' in body[m.start()-30:m.start()+30]:
+                continue
+            # 排除后记引用（如 → 详见）
+            if fn in _index_table_refs:
+                issues["warn"].append(
+                    f"C-15: 正文第 {ref_line} 行引用了 `references/{fn}`，该文件已在渐进式索引表中列出，"
+                    f"建议将正文中的引用合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
+                )
+    
     # ════════════════════════════════════════════════════════════
     # 汇总输出
     # ════════════════════════════════════════════════════════════
