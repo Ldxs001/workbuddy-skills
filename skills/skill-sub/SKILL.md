@@ -1,15 +1,15 @@
 ---
 name: skill-sub
-version: 1.24.6
+version: 1.24.7
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器
-sensitive_access: False
-critical_write: False
+sensitive_access: false
+critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/skill-sub/data/
 tags: ['chain', 'orchestration', 'usable', 'skill-builder', 'progressive-loading', 'planner', 'editor']
-external_data_dir: True
+external_data_dir: true
 trigger: ['规划类: 帮我规划一下/步骤是什么', '顺序类: 依次执行/先...再...', '链管理: 创建/查看/更新/删除调用链']
 trigger_negative: ['不使用调用链', '手动逐步执行']
 ---
@@ -46,19 +46,20 @@ trigger_negative: ['不使用调用链', '手动逐步执行']
 ---
 
 
+
+
 ### 渐进式文件索引
 
 | 文件名 | 位置 | 说明 |
 |--------|------|------|
-| `antipatterns.md` | skill-sub 反模式 | > 本文档收录 skill-sub 使用中的常见错误和正确做法。完整反模式示例见 `references/faq.md` |
-| `chain_schema.md` | skill-sub 调用链数据结构 | > 本文档定义 Chain / Step / retry_policy / failure_mode 的完整结构。 |
-| `changelog.md` | skill-sub 更新日志 | - **循环步骤（Loop Step）** — `type: "loop"` 支持 `for_each` / `whil |
-| `examples.md` | skill-sub 使用示例 | > 本文档是 SKILL.md 的渐进式补充，提供完整使用示例。 |
-| `faq.md` | skill-sub 常见问题 | > 本文档是 SKILL.md 的渐进式补充，收录常见问题与使用技巧。 |
-| `permissions.md` | 权限说明 | 权限扫描风险等级：**MEDIUM** |
-| `reference.md` | skill-sub 参考手册 | > 本文档是 SKILL.md 的渐进式补充，包含完整 CLI 速查、脚本 API、存储格式。 |
-| `workflow.md` | skill-sub 详细工作流程 | > 本文档是 SKILL.md 的渐进式补充，详细描述执行流程、里程碑判断规则、三层回退策略。 |
-
+| `references/antipatterns.md` | skill-sub 反模式 | > 本文档收录 skill-sub 使用中的常见错误和正确做法。完整反模式示例见 `references/faq.md` |
+| `references/chain_schema.md` | skill-sub 调用链数据结构 | > 本文档定义 Chain / Step / retry_policy / failure_mode 的完整结构。 |
+| `references/changelog.md` | skill-sub 更新日志 | - **循环步骤（Loop Step）** — `type: "loop"` 支持 `for_each` / `whil |
+| `references/examples.md` | skill-sub 使用示例 | > 本文档是 SKILL.md 的渐进式补充，提供完整使用示例。 |
+| `references/faq.md` | skill-sub 常见问题 | > 本文档是 SKILL.md 的渐进式补充，收录常见问题与使用技巧。 |
+| `references/permissions.md` | 权限说明 | 权限扫描风险等级：**MEDIUM** |
+| `references/reference.md` | skill-sub 参考手册 | > 本文档是 SKILL.md 的渐进式补充，包含完整 CLI 速查、脚本 API、存储格式。 |
+| `references/workflow.md` | skill-sub 详细工作流程 | > 本文档是 SKILL.md 的渐进式补充，详细描述执行流程、里程碑判断规则、三层回退策略。 |
 ## 快速开始
 
 ```bash
