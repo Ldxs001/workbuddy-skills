@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.24.5
+version: 1.24.6
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器
