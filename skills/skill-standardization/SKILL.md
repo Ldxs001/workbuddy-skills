@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.45.1
+version: 2.45.2
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -28,6 +28,15 @@ h1_position: true
 
 当用户提出以下类型请求时，应触发本技能：
 
+**自然语言（推荐）**：
+- [帮我看看这个技能写得怎么样 / 这个技能规范吗]
+- [检查/审查/评估一下这个技能]
+- [给这个 skill 做个检查 / 跑一遍规范]
+- [创建/生成一个新技能 / 把 xxx 做成 skill]
+- [更新/改造一下这个 skill / 重构这个技能]
+- [这个 skill 的 frontmatter/描述/规则怎么写]
+
+**技术关键词**：
 - [用 skill-standardization 审计/改造某技能]
 - [检查某技能的 SKILL.md 是否规范]
 - [创建/更新/重构一个 skill]
