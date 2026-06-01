@@ -1544,8 +1544,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             )
 
     # ════════════════════════════════════════════════════════════
-    # C-15 (WARN): 正文中 references/ 引用冗余检测 — 检测正文中 references/ 引用是否已被索引表覆盖
+    # C-15 (WARN): 内容冗余检测 — 检测正文中的引用重复、章节内容重复、以及索引表已覆盖的引用
     # ════════════════════════════════════════════════════════════
+    # ── 15a: 索引表引用冗余（references/ 文件已入索引表但正文另外引用）──
     _index_table_refs = set()
     index_match = re.search(r'### 渐进式文件索引\n\n\| 文件名.*?(?=\n## |\n---|\Z)', body, re.DOTALL)
     if index_match:
@@ -1554,22 +1555,55 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             _index_table_refs.add(m.group(1))
     
     if _index_table_refs:
-        # 扫描正文中所有 references/xxx.md 引用（排除索引表本身）
         for m in re.finditer(r'`references/([^`]+)`', body):
             fn = m.group(1)
             ref_line = body[:m.start()].count('\n') + 1
-            # 排除在索引表区域内的行
             if index_match and m.start() >= index_match.start() and m.start() <= index_match.end():
                 continue
-            # 排除渐进式加载模板句（R-21 固定）
             if '📚 **渐进式加载**' in body[m.start()-30:m.start()+30]:
                 continue
-            # 排除后记引用（如 → 详见）
             if fn in _index_table_refs:
                 issues["warn"].append(
-                    f"C-15: 正文第 {ref_line} 行引用了 `references/{fn}`，该文件已在渐进式索引表中列出，"
-                    f"建议将正文中的引用合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
+                    f"C-15: 正文第 {ref_line} 行引用了 `references/{fn}`，该文件已在索引表中列出，"
+                    f"建议合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
                 )
+    
+    # ── 15b: 正文引用的渐进式文件不在索引表中（C-13 反向，但 C-13 只查 references/ 目录）──
+    # （C-13 已覆盖 references/ 文件完整性，此处不重复）
+    
+    # ── 15c: 章节内容与索引表说明高度重复（如 H1 后紧接的反模式/FAQ 引用与索引表重复）──
+    all_section_titles = []
+    for m in re.finditer(r'^##\s+(.+)$', body, re.MULTILINE):
+        all_section_titles.append(m.group(1).strip())
+    
+    for m in re.finditer(r'^>\s*(?:→\s*)?详见\s*`(references/[^`]+)`', body, re.MULTILINE):
+        ref_path = m.group(1)
+        ref_fn = ref_path.split('/')[-1]
+        ref_line = body[:m.start()].count('\n') + 1
+        if _index_table_refs and ref_fn in _index_table_refs:
+            # 检查该引用是否在 H1 后、第一个 ## 前的区域
+            first_section_pos = body.find('\n## ')
+            if m.start() < first_section_pos:
+                issues["warn"].append(
+                    f"C-15: 正文第 {ref_line} 行在 H1 后独立引用了 `{ref_path}`，"
+                    f"该文件已在核心能力索引表中列出，建议移到索引表统一管理"
+                )
+    
+    # ── 15d: 同一概念在不同章节中重复提及的线索检测（Phase 2 精筛）──
+    # 提取所有 ## 章节的标题，检查是否有近似重复
+    seen_titles = set()
+    for title in all_section_titles:
+        title_lower = title.lower()
+        for seen in seen_titles:
+            # 检查其中一个是否包含另一个
+            if len(title) > 4 and len(seen) > 4:
+                if title_lower in seen.lower() or seen.lower() in title_lower:
+                    issues["warn"].append(
+                        f"C-15: ⓘ 章节「{title}」与「{seen}」内容范围可能重叠，需 LLM Phase 2 "
+                        f"确认是否冗余或可以合并"
+                    )
+                    break
+        seen_titles.add(title_lower)
     
     # ════════════════════════════════════════════════════════════
     # 汇总输出
