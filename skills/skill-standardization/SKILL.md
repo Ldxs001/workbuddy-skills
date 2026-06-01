@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.44.7
+version: 2.45.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -16,32 +16,13 @@ meta_field_sync: true
 h1_position: true
 ---
 # skill-standardization
-## 文件更新约束
 
-> **本技能的所有 `.md` 文件禁止使用 Write/Edit 工具更新（会损坏 UTF-8 中文编码）。**
-> 必须用 `scripts/` 下的 Python 脚本原子写入（`tmp + os.replace()`）。
+## 约束
 
-| 文件 | 更新方式 | 脚本 |
-|------|----------|------|
-| `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_skill_frontmatter.py` |
-| `SKILL.md` 正文 | Python 直接重建 | `scripts/safe_io.py` 的 `safe_write()` |
-| `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
-| 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
-
-**版本号三端一致规则**（必须遵守）：
-- 版本号更新时必须同步更新以下 **3 处**，缺一不可：
-  1. `SKILL.md` frontmatter 的 `version:` 字段
-  2. `_meta.json` 的 `version` 字段
-  3. `references/changelog.md`（或 `CHANGELOG.md`）的版本条目
-- `update --fix` 已自动执行上述三端同步（v2.38.10+）
-
-**检查清单（每次更新前）**：
-- [ ] 是否用了 Write/Edit 工具？→ 立刻停止，改用 Python 脚本
-- [ ] 是否在 `references/changelog.md` 维护更新记录？→ 根目录不得有 `CHANGELOG.md`
-- [ ] 更新后是否用 `python -m scripts.skill_audit audit .` 自审？→ 必须 0 ERROR 0 WARN
-- [ ] `--fix` 自动修正后，是否将 fix_details 转化为可读 changelog 并用 safe_io 写入？→ 不得留机器名，禁止留空
-
-> **注**：本技能的权限检查器（`permission_checker.py`）定义的敏感路径匹配模式（如 `~/.ssh/`、`~/.aws/` 等）仅用作**检测规则**，用于发现被审计 skill 是否违规访问这些路径；本技能本身不会实际访问这些敏感路径。
+- **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 `scripts/` 下的 Python 脚本原子写入
+- **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `references/changelog.md`
+- **更新后必须 `audit .` 自审** — 0 ERROR 0 WARN 方可提交
+- **`--fix` 自动修正后** — 将 fix_details 转化为可读 changelog 并用 safe_io 写入
 
 ## 触发场景
 
@@ -63,14 +44,21 @@ h1_position: true
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-- **audit 模式** — 对指定 skill 目录执行 R-01~R-24 规范审查，输出通过/失败/跳过统计
+详见渐进式文件列表：
+- `references/guide.md` — 完整使用指南
+- `references/architecture.md` — 内部架构
+- `references/antipatterns.md` — 反模式手册
+- `references/faq.md` — FAQ
+- `references/changelog.md` — 版本日志
+
+- **audit 模式** — 对指定 skill 目录执行 R-01~R-25 规范审查，输出通过/失败/跳过统计
 - **refactor 模式** — 改造现有技能（修复 frontmatter、迁移更新记录、统一术语、规范数据目录、R-22 数据目录合规检查）
 - **create 模式** — 基于标准化模板创建新 skill，自动注入 R-07~R-09/R-18~R-22 章节引用
 
 ## 工作流程
 
 1. 读取目标 skill 的 SKILL.md
-2. 执行 R-01~R-24 规则检查
+2. 执行 R-01~R-25 规则检查
 3. 输出审查报告（通过/失败/跳过）
 4. 若传了 --fix，自动修正 R-11/R-12/R-22 违规
 5. **审计后自动修复（推荐）**：审计完成后，调用 `scripts/skill_audit/fix.py` 中的对应修复函数，批量修复 WARN/ERROR 项（详见 `references/guide.md` 审查模式章节）
@@ -90,19 +78,6 @@ h1_position: true
 > 3. **用户提示止损**：当用户说又停了/死循环/你在干什么时，立即停止当前操作，向用户说明当前状态和下一步计划，禁止继续原操作。
 > 4. **5 轮无实质进展 → 主动求助**：超过 5 轮对话还没有向前推进，必须向用户承认困境并请求指引。
 
-## 渐进式加载说明
-
-本技能采用渐进式 MD 体系，SKILL.md 为轻量入口，详细规范拆分到 references/ 按需加载：
-
-- `references/guide.md` — 完整使用指南（触发词、工作流程、输出格式）
-- `references/architecture.md` — 内部架构（模块划分、RULES 注册、METHOD_MAP）
-- `references/antipatterns.md` — 反模式手册（常见错误 + 正确做法标记）
-- `references/faq.md` — 常见问题解答（排错、自定义规则、CI 集成）
-- `references/changelog.md` — 版本更新记录
-
-> 阅读时先看本章节，按需让 AI 加载 references/*.md。
-
-## 临时文件与备份管理
 
 > 本技能在创建、更新、改造过程中，对临时文件和备份文件进行全生命周期管理。
 
@@ -150,3 +125,4 @@ h1_position: true
 ```
 
 > 安装目录 `skills/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。
+

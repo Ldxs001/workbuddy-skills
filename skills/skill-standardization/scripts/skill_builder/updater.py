@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from .utils import _create_backup, _check_artifact_paths, _check_external_data_dir, _write_json
+from scripts.cleanup_manager import start_session, end_session
 
 
 class SkillUpdater:
@@ -332,6 +333,9 @@ class SkillUpdater:
         if args.backup:
             backup_dir = _create_backup(skill_dir, "update", args.workspace)
 
+        # ★ cleanup session: 开始追踪临时/备份文件
+        _cm_manifest = start_session(str(skill_dir), "update")
+
         # ★ 步骤0: inspect — 读取技能全貌（备份后、改造前）
         try:
             from ..skill_inspector import inspect_skill
@@ -377,6 +381,16 @@ class SkillUpdater:
 
         # 输出报告
         self._print_report(skill_dir, results)
+
+        # ★ cleanup session: 结束追踪并清理临时/备份文件
+        _cm_report = end_session()
+        if _cm_report["deleted"] > 0 or _cm_report["errors"]:
+            print(f"\n{'─'*50}")
+            print(f"  清理报告: 删除 {_cm_report['deleted']} 个临时文件（跳过 {_cm_report['skipped']}）")
+            if _cm_report["errors"]:
+                for e in _cm_report["errors"]:
+                    print(f"    ⚠️ {e}")
+            print(f"{'─'*50}")
 
         return results
 

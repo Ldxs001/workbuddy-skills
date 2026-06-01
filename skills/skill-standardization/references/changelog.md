@@ -1,3 +1,45 @@
+## 2.45.0 (2026-06-01)
+
+### 新增
+- **body.json v2.6.0 三层章节体系**: section_tiers (must_have/whitelist.optional_progressive/whitelist.always_progressive) + progressive_index_table 定义
+- **classification_hints**: 所有标准章节新增供 LLM Phase 2 精筛的内容模式匹配字段
+- **C-13 渐进式索引表审计**: 检查 ## 核心能力 末尾是否包含索引表及完整性
+- **manifest 驱动清理**: cleanup_manager.py + safe_io 自动注册 + builder 强制清理
+- **fix_split_nonstandard**: 非标章节拆分到 references/
+- **fix_section_order**: 按 body.json section_order 重排章节
+
+### 更新
+- **R-17 阈值 200→230**: 放宽渐进式拆分行数限制
+- **R-17 两阶段协议**: 非标章节改为 Phase 1 正则粗筛 → Phase 2 LLM 精筛
+- **fix_section_trigger/core/workflow**: 对接 body.json content_format 生成规范内容
+- **manifest 合并**: old backup/manifest.txt → new data/manifests/<id>.json 统一体系
+- **快速开始**: 从 must_have 移至 whitelist.optional_progressive
+- **约束章节**: 新增 must_have 层级的 ## 约束（简短操作约束清单），位于 H1 后首位
+- **约束序位**: section_order 第2位（H1后），SKILL.md 相应调整
+
+### 修复
+- **C-12 升级为内容完整性检查**: 通过 classification_hints.format_clues 逐章节验证内容是否完整，含智能格式匹配（正向触发/否定条件→check literal、编号列表/简短列表→check regex）
+- **C-12 语义检查 → Phase 2**: 从 content_format.guidelines 提取含"应/必须"的语义要求，输出为"需 LLM Phase 2 确认"项（如"工作流程每步应标注输入输出"）
+- **R-23 描述过时检测**: 扫描 SKILL.md 中 R-XX~R-YY 引用，与 rules.json 实际规则数对比，不一致则标记
+- **蓝皮书增强 (skill_inspector)**: AST 函数签名扫描（函数名+参数+docstring）+ 类结构 + CLI 子命令 + 关键常量 + 引用链路图（标记未引用文件）+ 文档-代码脱节检测
+- **蓝皮书 Windows 兼容**: root_py/root_md 路径分隔符修复
+- **C-07 代码块计数修正**: 排除闭合 ``` 被误计为"缺少语言标识"，改用成对算法
+- **create 模板对齐新审计**: 新增 `## 约束` must_have 章节 + 渐进式索引表（替代旧附录）+ 清理过时引用
+- **create 模板清理**: 移除硬编码权限说明章节（应由 AI 按需生成）
+- **C-07/C-08 输出增强**: 代码块缺语言标识和 checklist 检测现在包含行号 + 触发文本
+- **C-08 正则收紧**: 避免"确认无异常后"等非 checklist 文本误报
+- **R-20 输出增强**: changelog 术语一致性检查的 fix 描述不再自触发 WARN
+- **审计输出格式统一**: 所有 WARN 项均包含 filepath:line_number + 上下文片段
+- **术语统一**: changelog.md 统一使用"更新"一词
+- **SKILL.md 清理**: 多余空行收敛、独立渐进式加载说明合并到核心能力
+- **section_order**: 补充 数据目录说明、临时文件与备份管理 条目
+- **根目录垃圾文件**: 清理 8 个 0 字节残留文件
+- **_record_backup**: 改为调用 cleanup_manager.register_backup()，放弃 manifest.txt
+- **skill_rollback.py**: load_manifest() 从 data/manifests/*.json 读取 + 兼容旧 manifest.txt
+- **自审 0 ERROR 0 WARN**: 全量通过
+
+---
+
 ## 2.44.8 (2026-05-31)
 
 ### 修复

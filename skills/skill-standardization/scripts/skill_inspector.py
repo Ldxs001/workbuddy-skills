@@ -2,27 +2,31 @@
 # -*- coding: utf-8 -*-
 """
 skill_inspector.py -- Skill 结构快速扫描（蓝皮书生成器）
-输出结构化报告：元信息、目录树、章节、函数、引用、安全数据
+输出结构化报告：元信息、目录树、章节内容摘要、函数/类签名、引用链路、安全数据
+
+只读操作，不修改任何文件。
 
 用法：
     python -m scripts.skill_inspector <skill-dir>
     python -m scripts.skill_inspector <skill-dir> --json
 
-v2.44.0: 初始版本；结构无关扫描适配标准和非标准 skill
+v2.44.0: 初始版本
+v2.45.0: AST 函数扫描 + H2 内容摘要 + 引用链路图
 """
 
 import os
 import re
 import sys
 import json
+import ast
 from pathlib import Path
 
 
 def inspect_skill(skill_dir, output_format="text"):
     """
     扫描 skill 目录，生成结构化蓝皮书。
-    output_format: "text" (markdown, 默认) | "json"
-    自适应标准（scripts/references/assets）和非标准（文件散落根目录）结构。
+    output_format: "text" (markdown树, 默认) | "json"
+    只读操作，不修改任何文件。
     """
     skill_path = Path(skill_dir).resolve()
     skill_name = skill_path.name
@@ -47,8 +51,11 @@ def inspect_skill(skill_dir, output_format="text"):
         else:
             body_text = content
         body_lines = body_text.split('\n')
-        for m in re.finditer(r'^##\s+(.+)$', body_text, re.MULTILINE):
-            h2_sections.append(m.group(1).strip())
+        # 提取 H2 章节及其内容摘要
+        for m in re.finditer(r'^##\s+(.+?)$\n(.*?)(?=^##\s|\Z)', body_text, re.MULTILINE | re.DOTALL):
+            title = m.group(1).strip()
+            sec_content = m.group(2).strip()[:100].replace('\n', ' ')
+            h2_sections.append({"title": title, "preview": sec_content + ("..." if len(m.group(2).strip()) > 100 else "")})
 
     # ---- 2. 读取 _meta.json ----
     meta = {}
@@ -60,8 +67,7 @@ def inspect_skill(skill_dir, output_format="text"):
         except Exception:
             meta = {"error": "parse_failed"}
 
-    # ---- 3. 扫描所有文件（结构无关，按类型分组） ----
-    # 递归扫全部，忽略隐藏文件和缓存
+    # ---- 3. 扫描所有文件 ----
     all_files = []
     for entry in sorted(skill_path.rglob('*')):
         if entry.name.startswith('.'):
@@ -72,7 +78,6 @@ def inspect_skill(skill_dir, output_format="text"):
             continue
         all_files.append((rel_str, entry.is_dir()))
 
-    # 按扩展名分类（不管文件在 scripts/ 还是根目录）
     py_files = sorted([f for f, is_d in all_files if f.endswith('.py')])
     md_files = sorted([f for f, is_d in all_files
                        if f.endswith('.md') and f != 'SKILL.md' and not f.startswith('_meta')])
@@ -82,50 +87,106 @@ def inspect_skill(skill_dir, output_format="text"):
                            if f.endswith(('.json', '.yaml', '.yml', '.toml', '.ini', '.cfg'))])
     other_files = sorted([f for f, is_d in all_files
                           if f not in py_files + md_files + script_files + config_files])
+    root_py = [f for f in py_files if os.sep not in f]
+    root_md = [f for f in md_files if os.sep not in f]
 
-    # 非标位置标记
-    root_py = [f for f in py_files if '/' not in f]
-    root_md = [f for f in md_files if '/' not in f]
-
-    # 按标准目录估算标准化程度
     has_scripts_dir = (skill_path / 'scripts').is_dir()
     has_refs_dir = (skill_path / 'references').is_dir()
     standard_score = sum([has_scripts_dir, has_refs_dir])
     if standard_score == 2:
         struct_label = "标准（scripts/ + references/）"
     elif standard_score == 1:
-        struct_label = "半标准（has scripts/ or references/）"
+        struct_label = "半标准"
     else:
         struct_label = "非标准（文件散落根目录）"
 
-    # ---- 4. 扫描所有 .py 文件的函数/类 ----
-    py_functions = {}
+    # ---- 4. AST 扫描 Python 函数/类/CLI ----
+    py_ast_info = {}
     for pf in py_files:
         pf_path = skill_path / pf
+        info = {"functions": [], "classes": [], "cli_subcommands": [], "key_constants": []}
         try:
             with open(pf_path, "r", encoding="utf-8", errors="replace") as f:
                 src = f.read()
-            funcs = re.findall(r'^\s*(?:async\s+)?def\s+([a-zA-Z_]\w*)\s*\(', src, re.MULTILINE)
-            classes = re.findall(r'^\s*class\s+([a-zA-Z_]\w*)\s*[:\(]', src, re.MULTILINE)
-            if funcs or classes:
-                py_functions[pf] = funcs + [f"class {c}" for c in classes]
-        except Exception:
-            py_functions[pf] = ["[读取失败]"]
+            tree = ast.parse(src, filename=pf)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    doc = ast.get_docstring(node)
+                    info["functions"].append({
+                        "name": node.name,
+                        "lineno": node.lineno,
+                        "doc": (doc[:60] + "..." if doc and len(doc) > 60 else doc) if doc else None,
+                        "args": [a.arg for a in node.args.args[:5]],
+                    })
+                elif isinstance(node, ast.ClassDef):
+                    doc = ast.get_docstring(node)
+                    methods = [n.name for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+                    info["classes"].append({
+                        "name": node.name,
+                        "lineno": node.lineno,
+                        "doc": (doc[:60] + "..." if doc and len(doc) > 60 else doc) if doc else None,
+                        "methods": methods[:8],
+                    })
+                elif isinstance(node, ast.Assign):
+                    # 提取大写下划线常量
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and re.match(r'^[A-Z][A-Z_]+$', target.id):
+                            try:
+                                val = ast.literal_eval(node.value)
+                                info["key_constants"].append(f"{target.id} = {repr(val)[:40]}")
+                            except Exception:
+                                pass
+            # CLI 子命令扫描
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and hasattr(node.func, 'attr') and node.func.attr == 'add_parser':
+                    for k in node.keywords:
+                        if k.arg == 'name' and isinstance(k.value, ast.Constant):
+                            info["cli_subcommands"].append(k.value.value)
+                        elif k.arg == 'aliases' and isinstance(k.value, (ast.List, ast.Tuple)):
+                            for elt in k.value.elts:
+                                if isinstance(elt, ast.Constant):
+                                    info["cli_subcommands"].append(elt.value)
+            py_ast_info[pf] = info
+        except (SyntaxError, Exception) as e:
+            py_ast_info[pf] = {"error": str(e)[:60]}
 
-    # ---- 5. 扫描所有 .md 文件概要 ----
-    md_summaries = {}
-    for mf in md_files:
-        mf_path = skill_path / mf
-        try:
-            with open(mf_path, "r", encoding="utf-8", errors="replace") as f:
-                m_content = f.read()
-            m_lines = m_content.count('\n') + 1
-            m_sections = re.findall(r'^##\s+(.+)$', m_content, re.MULTILINE)
-            md_summaries[mf] = {"lines": m_lines, "sections": m_sections[:10]}
-        except Exception:
-            md_summaries[mf] = {"lines": 0, "sections": []}
+    # ---- 5. 引用链路图：SKILL.md → references/ 文件 ----
+    ref_links = {}
+    if body_text and md_files:
+        for mf in md_files:
+            mf_path = skill_path / mf
+            try:
+                with open(mf_path, "r", encoding="utf-8", errors="replace") as f:
+                    m_content = f.read()
+                ref_links[mf] = {
+                    "referenced_in_skillmd": mf.replace('\\', '/') in body_text or mf.split('/')[-1] in body_text,
+                    "lines": m_content.count('\n') + 1,
+                    "h1_title": "",
+                }
+                m1 = re.search(r'^#\s+(.+)$', m_content, re.MULTILINE)
+                if m1:
+                    ref_links[mf]["h1_title"] = m1.group(1).strip()
+            except Exception:
+                pass
 
-    # ---- 6. 安全 & 数据信息 ----
+    # ---- 6. 文档-代码潜在脱节标记 ----
+    doc_code_gaps = []
+    # 检查 SKILL.md 描述的规则数 vs 实际
+    all_r_numbers = re.findall(r'R-(\d+)', body_text) if body_text else []
+    if all_r_numbers:
+        claimed = max(int(x) for x in all_r_numbers)
+        rules_json_path = skill_path / "scripts" / "spec" / "rules.json"
+        if rules_json_path.exists():
+            try:
+                with open(rules_json_path) as f:
+                    rules_data = json.load(f)
+                actual = rules_data.get('_total_rules', 0)
+                if claimed != actual:
+                    doc_code_gaps.append(f"SKILL.md 声称 R-01~R-{claimed}，实际 rules.json 有 {actual} 条")
+            except Exception:
+                pass
+
+    # ---- 7. 安全 & 数据信息 ----
     sec_info = {
         "sensitive_access": fm.get("sensitive_access", "?"),
         "critical_write": fm.get("critical_write", "?"),
@@ -156,8 +217,9 @@ def inspect_skill(skill_dir, output_format="text"):
             "root_py": root_py,
             "root_md": root_md,
         },
-        "python_functions": py_functions,
-        "reference_summaries": md_summaries,
+        "python_ast": py_ast_info,
+        "reference_links": ref_links,
+        "doc_code_gaps": doc_code_gaps,
         "security": sec_info,
     }
 
@@ -188,85 +250,104 @@ def _format_text_report(report, skill_path):
     meta = report.get("meta_json", {})
     if meta and "error" not in meta:
         meta_fields = list(meta.keys())
-        lines.append(f"|   +-- _meta.json: {len(meta_fields)} 字段 ({', '.join(meta_fields[:6])})")
+        lines.append(f"|   +-- _meta.json: {len(meta_fields)} 字段")
     else:
         lines.append("|   +-- _meta.json: [MISS] 缺失或解析失败")
     lines.append("")
 
-    # ---- 文件清单（按类型分组） ----
-    lines.append("|-- 文件清单")
-    d = report["directory"]
-    lines.append(f"|   |-- Python: {d['py_files']} 个")
-    if d['root_py']:
-        for rp in d['root_py']:
-            lines.append(f"|   |   [note] {rp} 在根目录（非标准），建议迁至 scripts/")
-    lines.append(f"|   |-- Markdown: {d['md_files']} 个")
-    if d['root_md']:
-        for rm in d['root_md']:
-            lines.append(f"|   |   [note] {rm} 在根目录（非标准），建议迁至 references/")
-    lines.append(f"|   |-- 脚本(sh/bat/js): {d['script_files']} 个")
-    lines.append(f"|   |-- 配置(json/yaml): {d['config_files']} 个")
-    lines.append(f"|   +-- 其他: {d['other_files']} 个")
-    lines.append("")
-
-    # ---- 正文章节 ----
+    # ---- 正文章节（含内容预览） ----
     sections = smd["h2_sections"]
     if sections:
         lines.append("|-- 正文章节 (##)")
         for sec in sections:
-            lines.append(f"|   +-- {sec}")
+            title = sec["title"]
+            preview = sec.get("preview", "")
+            if preview:
+                lines.append(f"|   |-- {title}")
+                lines.append(f"|   |   `-- {preview}")
+            else:
+                lines.append(f"|   +-- {title}")
         lines.append("")
 
-    # ---- 功能清单 ----
-    py_funcs = report.get("python_functions", {})
-    if py_funcs:
-        lines.append("|-- 功能清单 (Python)")
-        py_items = list(py_funcs.items())
-        for i, (fpath, funcs) in enumerate(py_items):
-            marker = "+--" if i == len(py_items) - 1 else "|--"
-            func_str = ", ".join(funcs[:8])
-            if len(funcs) > 8:
-                func_str += f" ... (共{len(funcs)}个)"
-            lines.append(f"|   {marker} {fpath}: {func_str}")
+    # ---- AST 功能清单 ----
+    py_info = report.get("python_ast", {})
+    if py_info:
+        lines.append("|-- Python 代码结构 (AST)")
+        items = list(py_info.items())
+        for i, (fpath, info) in enumerate(items):
+            marker = "+--" if i == len(items) - 1 else "|--"
+            lines.append(f"|   {marker} {fpath}")
+            if info.get("error"):
+                lines.append(f"|       [解析失败] {info['error']}")
+                continue
+            for func in info.get("functions", [])[:5]:
+                args = ", ".join(func.get("args", [])[:4])
+                doc = f" — {func['doc']}" if func.get("doc") else ""
+                lines.append(f"|       |-- def {func['name']}({args}){doc}")
+            for cls in info.get("classes", [])[:3]:
+                doc = f" — {cls['doc']}" if cls.get("doc") else ""
+                lines.append(f"|       |-- class {cls['name']}{doc}")
+                for m in cls.get("methods", [])[:4]:
+                    lines.append(f"|       |   +-- method: {m}")
+            for const in info.get("key_constants", [])[:3]:
+                lines.append(f"|       |-- {const}")
+            subs = info.get("cli_subcommands", [])
+            if subs:
+                lines.append(f"|       +-- CLI: {', '.join(subs[:6])}")
         lines.append("")
 
-    # ---- 引用文件概览 ----
-    refs = report.get("reference_summaries", {})
+    # ---- 引用链路 ----
+    refs = report.get("reference_links", {})
     if refs:
-        lines.append("|-- 引用文件概览")
-        ref_items = list(refs.items())
-        for i, (fname, info) in enumerate(ref_items):
-            marker = "+--" if i == len(ref_items) - 1 else "|--"
-            sec_str = f", {len(info['sections'])} sections" if info['sections'] else ""
-            lines.append(f"|   {marker} {fname} ({info['lines']}行{sec_str})")
-            for sec in info['sections'][:4]:
-                lines.append(f"|       + {sec}")
+        lines.append("|-- 引用文件链路")
+        items = list(refs.items())
+        for i, (fname, info) in enumerate(items):
+            marker = "+--" if i == len(items) - 1 else "|--"
+            status = "引用" if info.get("referenced_in_skillmd") else "未引用"
+            h1 = f" ({info['h1_title']})" if info.get("h1_title") else ""
+            lines.append(f"|   {marker} {fname} [{status}]{h1} ({info['lines']}行)")
         lines.append("")
 
-    # ---- 安全 & 数据 ----
-    sec = report["security"]
-    lines.append("+-- 安全 & 数据")
-    lines.append(f"    |-- sensitive_access: {sec['sensitive_access']}")
-    lines.append(f"    |-- critical_write: {sec['critical_write']}")
-    lines.append(f"    |-- permission_weight: {sec['permission_weight']}")
-    lines.append(f"    +-- data_dir: {sec['data_dir']}")
+    # ---- 文档-代码潜在脱节 ----
+    gaps = report.get("doc_code_gaps", [])
+    if gaps:
+        lines.append("+-- ⚠️ 文档-代码潜在脱节")
+        for g in gaps:
+            lines.append(f"    +-- {g}")
+        lines.append("")
 
+    # ---- 文件清单（按类型分组） ----
+    lines.append("+-- 文件清单")
+    d = report["directory"]
+    lines.append(f"    |-- Python: {d['py_files']} 个")
+    if d['root_py']:
+        for rp in d['root_py']:
+            lines.append(f"    |   [note] {rp} 在根目录，建议迁至 scripts/")
+    lines.append(f"    |-- Markdown: {d['md_files']} 个")
+    if d['root_md']:
+        for rm in d['root_md']:
+            lines.append(f"    |   [note] {rm} 在根目录，建议迁至 references/")
+    lines.append(f"    |-- 脚本(sh/bat/js): {d['script_files']} 个")
+    lines.append(f"    |-- 配置(json/yaml): {d['config_files']} 个")
+    lines.append(f"    +-- 其他: {d['other_files']} 个")
     lines.append("")
+
     lines.append("-" * 40)
-    lines.append("[tip] 将此报告用于 update/refactor 前了解技能全貌")
-    lines.append(f"   python -m scripts.skill_inspector {skill_path} --json  (JSON format)")
+    lines.append("蓝皮书：结构扫描 + AST 功能清单 + 引用链路")
+    lines.append(f"  python -m scripts.skill_inspector {skill_path} --json")
 
     return "\n".join(lines)
 
 
 def main():
-    """CLI 入口"""
+    """CLI 入口 — 只读，不修改任何文件"""
     if sys.stdout.encoding and sys.stdout.encoding.upper() not in ('UTF-8', 'UTF8'):
         sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1, errors='replace')
 
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print("Usage: python -m scripts.skill_inspector <skill-dir> [--json]")
-        print("Output skill blueprint for understanding full structure before update/refactor")
+        print("只读操作，输出 skill 蓝皮书：结构、AST函数签名、引用链路")
+        print("用于 update/refactor 前的全貌扫描")
         sys.exit(1)
 
     skill_dir = sys.argv[1]

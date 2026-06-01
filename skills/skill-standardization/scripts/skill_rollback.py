@@ -32,32 +32,75 @@ BACKUP_DIR    = os.path.join(_data_dir_abs, "backup")
 MANIFEST_FILE = os.path.join(BACKUP_DIR, "manifest.txt")
 
 
-# ── Manifest 读写 ──────────────────────────────────────────────────────
+# ── Manifest 读写（统一从 data/manifests/ 读取）───────────────
+# 旧 backup/manifest.txt 已废弃，统一由 cleanup_manager 维护 data/manifests/<id>.json
+# 回滚功能读取所有 completed 状态 manifest 中的 backups[] 记录
+
+_MANIFESTS_DIR = os.path.join(_data_dir_abs, "data", "manifests")
+
+
+def _find_all_manifests():
+    """返回所有 manifest 文件路径列表（按创建时间排序）"""
+    if not os.path.isdir(_MANIFESTS_DIR):
+        return []
+    files = sorted(f for f in os.listdir(_MANIFESTS_DIR) if f.endswith('.json'))
+    return [os.path.join(_MANIFESTS_DIR, f) for f in files]
+
 
 def load_manifest():
-    """读取 manifest.txt，返回 {backup_fn: {original_path, operation, timestamp}}"""
+    """
+    从所有 completed 状态的 manifest 中收集备份记录。
+    返回 {backup_fn: {original_path, operation, timestamp, manifest_id}}
+    兼容旧 manifest.txt 格式的输出结构。
+    """
     manifest = {}
-    if not os.path.exists(MANIFEST_FILE):
-        return manifest
-    with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-                manifest[entry["backup_fn"]] = entry
-            except (json.JSONDecodeError, KeyError):
-                continue
+    for mpath in _find_all_manifests():
+        try:
+            with open(mpath, 'r', encoding='utf-8') as f:
+                entry = json.load(f)
+        except Exception:
+            continue
+        if entry.get("status") != "completed":
+            continue
+        for backup in entry.get("backups", []):
+            bfn = backup.get("backup_fn", "")
+            if bfn:
+                manifest[bfn] = {
+                    "original_path": backup.get("original_path", ""),
+                    "operation": backup.get("operation", "unknown"),
+                    "timestamp": backup.get("timestamp", "unknown"),
+                    "manifest_id": entry.get("manifest_id", ""),
+                }
+    # 兼容旧 manifest.txt（如有，过渡期后移除）
+    _legacy_file = os.path.join(BACKUP_DIR, "manifest.txt")
+    if os.path.isfile(_legacy_file):
+        with open(_legacy_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("backup_fn") and entry["backup_fn"] not in manifest:
+                        manifest[entry["backup_fn"]] = entry
+                except (json.JSONDecodeError, KeyError):
+                    continue
     return manifest
 
 
 def save_manifest(manifest):
-    """将 manifest dict 写回 manifest.txt（覆盖写）"""
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
-        for entry in manifest.values():
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    """
+    （已迁移）备份记录现由 data/manifests/ 统一管理。
+    此函数仍保留对新 manifest.txt 的写入以兼容旧脚本，但 purge 应通过 cleanup_manager.run_cleanup() 执行。
+    """
+    # 兼容写入（防止旧脚本报错）
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
+            for entry in manifest.values():
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
 
 # ── 核心接口 ──────────────────────────────────────────────────────────

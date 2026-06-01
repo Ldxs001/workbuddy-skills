@@ -21,6 +21,12 @@ import tempfile
 import datetime
 import json
 
+# ── cleanup_manager session 集成：如果当前有活跃 session，自动注册备份/临时文件 ──
+try:
+    from scripts.cleanup_manager import register as _cm_register
+except ImportError:
+    _cm_register = None
+
 # ── 常量 ───────────────────────────────────────────────────────────
 # R-12 审计锚点：变量名含 DATA，值含合规字面量，审计可匹配
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-standardization/data/"
@@ -104,6 +110,9 @@ def backup_file(path: str, operation: str = "unknown") -> str | None:
         import shutil
         shutil.copy2(path, backup_path)
         _record_backup(backup_id, os.path.abspath(path), operation)
+        # 注册到 cleanup session
+        if _cm_register:
+            _cm_register(backup_path, category="backup")
         return backup_id
     except Exception as e:
         print(f"[WARN] 备份失败: {e}", file=sys.stderr)
@@ -111,16 +120,13 @@ def backup_file(path: str, operation: str = "unknown") -> str | None:
 
 
 def _record_backup(backup_id: str, original_path: str, operation: str):
-    """记录备份元数据到 manifest.txt（JSON Lines 格式）"""
-    manifest_path = os.path.join(BACKUP_DIR, "manifest.txt")
-    entry = {
-        "backup_fn": backup_id,
-        "original_path": os.path.abspath(original_path),
-        "operation": operation,
-        "timestamp": datetime.datetime.now().isoformat(),
-    }
-    with open(manifest_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    """记录备份元数据到 cleanup session（manifest 驱动）。"""
+    if _cm_register:
+        try:
+            from scripts.cleanup_manager import register_backup
+            register_backup(backup_id, original_path, operation)
+        except Exception:
+            pass
 
 
 # ── 原子写入 ─────────────────────────────────────────────────────────────────

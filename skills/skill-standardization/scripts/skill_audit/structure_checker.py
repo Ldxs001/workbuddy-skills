@@ -5,11 +5,71 @@ skill_audit/structure_checker.py — 正文结构检查函数 (R-06~R-09, R-18~R
 v2.44.0: 新增 R-25 文档写作格式规范（9项子检查）
 v2.38.6: R-18/R-19/R-20 新增渐进式文件（references/*.md）审查支持
 v2.37.0: 所有 detail/location 添加绝对行号（filepath:line# 格式）
+v2.5.0: R-25 C-11 章节顺位/C-12 章节格式合规
 """
 
 import re
 import os
+import json
 import warnings
+
+
+# ── C-11/C-12 辅助函数：从 body.json 加载章节顺位/格式定义 ──────────
+_BODY_SPEC_CACHE = None
+
+def _load_body_spec():
+    """加载 body.json 并缓存结果。"""
+    global _BODY_SPEC_CACHE
+    if _BODY_SPEC_CACHE is not None:
+        return _BODY_SPEC_CACHE
+    spec_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'spec', 'body.json'
+    )
+    if not os.path.isfile(spec_path):
+        _BODY_SPEC_CACHE = {}
+        return {}
+    try:
+        with open(spec_path, 'r', encoding='utf-8') as f:
+            _BODY_SPEC_CACHE = json.load(f)
+        return _BODY_SPEC_CACHE
+    except Exception:
+        _BODY_SPEC_CACHE = {}
+        return {}
+
+
+def _load_section_order():
+    """返回 section_order 列表。"""
+    spec = _load_body_spec()
+    return spec.get("section_order", [])
+
+
+def _section_order_synonyms():
+    """返回 section_synonyms 字典。"""
+    spec = _load_body_spec()
+    return spec.get("section_synonyms", {})
+
+
+def _load_section_formats():
+    """
+    构建 章节名(小写) → content_format 的查找表。
+    合并 required_sections + recommended_sections + optional_sections 的 content_format。
+    """
+    spec = _load_body_spec()
+    fmt_map = {}
+    for group_key in ("required_sections", "recommended_sections", "optional_sections"):
+        for sec in spec.get(group_key, []):
+            fmt = sec.get("content_format")
+            if fmt:
+                # 章节名取 keywords[0] 或 description
+                name = (sec.get("keywords") or [""])[0]
+                if name:
+                    fmt_map[name.lower()] = fmt
+                else:
+                    # 用 description 的前 10 个字
+                    desc = sec.get("description", "")
+                    fmt_map[desc[:10].lower()] = fmt
+    return fmt_map
 
 
 def _abs_line(body, content, m_or_pos):
@@ -971,6 +1031,27 @@ def check_doc_code_consistency(
                 "detail": f"{filepath}:1 - R-23: ⓘ 两阶段粗筛 {optional_n} 条待 LLM 精筛确认（不阻断通过）：\n{opt_msgs}",
                 "fix": None}
 
+    # ── 检查 4: SKILL.md 中引用的规则编号范围是否与 rules.json 一致 ──
+    _rules_spec_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'spec', 'rules.json'
+    )
+    if os.path.isfile(_rules_spec_path):
+        try:
+            with open(_rules_spec_path, 'r', encoding='utf-8') as f:
+                _rules_data = json.load(f)
+            _actual_max = _rules_data.get('_total_rules', 0)
+            for m in re.finditer(r'R-(\d+)~R-(\d+)', content):
+                claimed_max = int(m.group(2))
+                if claimed_max != _actual_max:
+                    line_no = content[:m.start()].count('\n') + 1
+                    issues["must"].append(
+                        f"{filepath}:{line_no} - SKILL.md 声称最大规则编号为 R-{claimed_max}，"
+                        f"但 rules.json 实际为 R-{_actual_max}，描述可能过时"
+                    )
+        except Exception:
+            pass
+
     msgs = []
     for k in ["must", "suggest", "optional"]:
         msgs.extend(issues[k])
@@ -1053,8 +1134,8 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
-    R-25: 文档写作格式规范 (v2.44.0)
-    9 项子检查：C-01 (ERROR) + C-02~C-09 (WARN 建议)。
+    R-25: 文档写作格式规范 (v2.44.0, v2.5.0 C-11/C-12, v2.6.0 C-13)
+    10 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
     全部子检查仅作建议标准统一，不强制改造。
     """
@@ -1169,13 +1250,19 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     # ════════════════════════════════════════════════════════════
     code_fence_count = 0
     no_lang_count = 0
-    for m in re.finditer(r'```(\w*)\s*\n', body):
-        code_fence_count += 1
-        lang = m.group(1).strip()
-        if not lang:
-            no_lang_count += 1
+    no_lang_lines = []
+    all_fences = list(re.finditer(r'^```', body, re.MULTILINE))
+    code_fence_count = len(all_fences) // 2  # 仅统计起始 ```（成对的一半）
+    for i, m in enumerate(all_fences):
+        if i % 2 == 0:  # 起始 ```（i为偶数）
+            line_text = body[m.start():body.find('\n', m.start())]
+            if not re.search(r'```\w+', line_text):
+                no_lang_count += 1
+                line_no = body[:m.start()].count('\n') + 1
+                no_lang_lines.append(str(line_no))
     if code_fence_count > 0 and no_lang_count > 0:
-        issues["warn"].append(f"C-07: {no_lang_count}/{code_fence_count} 个代码块缺少语言标识（如 ```bash、```python、```json），建议补充")
+        lines_str = ", ".join(no_lang_lines[:5])
+        issues["warn"].append(f"C-07: {no_lang_count}/{code_fence_count} 个代码块缺少语言标识（如 ```bash、```python、```json），位于第 {lines_str} 行，建议补充")
 
     # ════════════════════════════════════════════════════════════
     # C-08 (WARN): Checklist [ ] 用于操作前自检
@@ -1184,9 +1271,15 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     checklist_items = re.findall(r'^[-*]\s+\[\s*[ xX]?\s*\]', cleaned_body, re.MULTILINE)
     # 如果完全没有 checklist，但正文中包含"检查"/"确认"/"清单"等关键词，建议使用
     if not checklist_items:
-        checklist_keywords = re.findall(r'检查清单|自检|确认.*是否|\.\.\.\]|\[.*\]', cleaned_body)
-        if checklist_keywords:
-            issues["warn"].append("C-08: 正文含「检查/确认/清单」类描述但未使用 `- [ ]` checklist 格式，建议统一")
+        checklist_matches = list(re.finditer(r'(检查清单|自检|确认是否)', cleaned_body))
+        if checklist_matches:
+            details = "; ".join(
+                f"L{body[:m.start()].count(chr(10)) + 1}「{m.group()[:30]}」"
+                for m in checklist_matches[:3]
+            )
+            if len(checklist_matches) > 3:
+                details += f" 等（共 {len(checklist_matches)} 处）"
+            issues["warn"].append(f"C-08: 正文含「检查/确认/清单」类关键词但未使用 checklist 格式，触发位置：{details}")
 
     # ════════════════════════════════════════════════════════════
     # C-09 (WARN): → 详见 用于渐进式文件引用
@@ -1220,6 +1313,207 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         issues["warn"].append(f"C-10: 正文中发现 {spots} 处连续 5+ 换行（最大 {max_blank} 行），建议精简到 1~2 个空行")
 
     # ════════════════════════════════════════════════════════════
+    # C-11 (WARN): 章节顺位 — 检查 H2 出现顺序是否与 body.json section_order 一致
+    # ════════════════════════════════════════════════════════════
+    _section_order = _load_section_order()
+    if _section_order:
+        # 从 body（原始）提取 H2 标题（按出现顺序）
+        h2_titles = []
+        for m in re.finditer(r'^##\s+(.+)$', body, re.MULTILINE):
+            h2_titles.append(m.group(1).strip())
+        if h2_titles:
+            # 构建 section_order 的别名查找表（canonical -> position）
+            order_position = {}
+            for pos, name in enumerate(_section_order):
+                order_position[name.lower()] = pos
+
+            # 将实际 H2 标题映射到顺序位置
+            actual_positions = []
+            unmapped = []
+            for t in h2_titles:
+                tl = t.lower()
+                if tl in order_position:
+                    actual_positions.append(order_position[tl])
+                else:
+                    # 尝试匹配 synonyms
+                    found = False
+                    for canon, syns in _section_order_synonyms().items():
+                        if tl in [s.lower() for s in syns]:
+                            actual_positions.append(order_position[canon.lower()])
+                            found = True
+                            break
+                    if not found:
+                        unmapped.append(t)
+                        actual_positions.append(-1)
+
+            # 检查逆序（相邻两个章节位置递减即为逆序）
+            inversions = []
+            for i in range(1, len(actual_positions)):
+                if actual_positions[i] >= 0 and actual_positions[i-1] >= 0:
+                    if actual_positions[i] < actual_positions[i-1]:
+                        inversions.append((h2_titles[i-1], h2_titles[i]))
+            if inversions:
+                inv_details = "; ".join(f"「{a}」应在「{b}」之后" for a, b in inversions[:3])
+                if len(inversions) > 3:
+                    inv_details += f" 等（共 {len(inversions)} 处逆序）"
+                issues["warn"].append(f"C-11: 章节顺位异常——{inv_details}（建议按 body.json section_order 调整顺序：H1→触发条件→核心能力→快速开始→工作流程→...）")
+            elif unmapped:
+                issues["warn"].append(f"C-11: 以下章节不在 section_order 白名单中：{'; '.join(unmapped[:3])}（建议按 body.json section_order 调整顺序或拆分到 references/）")
+            else:
+                pass  # 顺序正确，不报
+    # 若无 section_order 数据，静默跳过 C-11
+
+    # ════════════════════════════════════════════════════════════
+    # C-12 (WARN): 章节格式合规 — 检查核心章节是否使用了 content_format 指定的格式
+    # ════════════════════════════════════════════════════════════
+    _sec_formats = _load_section_formats()
+    if _sec_formats:
+        # 提取每个 ## 章节的正文内容
+        sections_raw = re.split(r'^(?=##\s+)', body, flags=re.MULTILINE)
+        for sec_text in sections_raw:
+            if not sec_text.strip() or not sec_text.startswith('## '):
+                continue
+            first_line = sec_text.split('\n')[0].strip()
+            sec_title = re.sub(r'^##\s+', '', first_line).strip()
+            sec_title_lower = sec_title.lower()
+
+            # 查找此章节的 content_format 定义
+            fmt = _sec_formats.get(sec_title_lower)
+            if not fmt:
+                # 尝试 synonyms
+                for canon, syns in _section_order_synonyms().items():
+                    if sec_title_lower in [s.lower() for s in syns]:
+                        fmt = _sec_formats.get(canon.lower())
+                        break
+
+            if not fmt:
+                continue
+
+            fmt_type = fmt.get("type", "")
+            sec_body = sec_text[len(first_line):].strip()
+            sec_body_no_code = re.sub(r'```[\s\S]*?```', '', sec_body)
+
+            # 检查表格类型章节是否真的有表格
+            if fmt_type == "table":
+                table_lines = [l for l in sec_body_no_code.split('\n') if l.strip().startswith('|') and '|' in l[1:]]
+                if len(table_lines) < 3:
+                    col_info = fmt.get("table_columns", [])
+                    col_hint = f"（期望列：{', '.join(col_info)}）" if col_info else ""
+                    issues["warn"].append(f"C-12: 章节「{sec_title[:20]}」的 content_format 要求用表格{col_hint}，但未检测到有效表格（至少 3 行）")
+
+            # 检查列表类型章节是否真的有列表
+            elif fmt_type in ("unordered_list", "ordered_list"):
+                has_list_items = bool(re.search(r'^[-*]\s+', sec_body_no_code, re.MULTILINE))
+                has_ordered = bool(re.search(r'^\d+\.\s+', sec_body_no_code, re.MULTILINE))
+                if not has_list_items and not has_ordered:
+                    issues["warn"].append(f"C-12: 章节「{sec_title[:20]}」的 content_format 要求用{'无序' if fmt_type=='unordered_list' else '有序'}列表，但未检测到列表项")
+
+            # 检查代码块类型章节是否真的有代码块
+            elif fmt_type == "code":
+                has_code = bool(re.search(r'```\w*', sec_body))
+                if not has_code:
+                    issues["warn"].append(f"C-12: 章节「{sec_title[:20]}」的 content_format 要求用代码块，但未检测到 ``` 代码块")
+
+            # ── 内容完整性检查：使用 classification_hints.format_clues 验证 ──
+            hints = fmt.get("classification_hints", {})
+            clues = hints.get("format_clues", [])
+            if clues:
+                missing_clues = []
+                for clue in clues:
+                    found = False
+                    if clue == "正向触发":
+                        found = "**正向触发**" in sec_body
+                    elif clue == "否定条件":
+                        found = "**否定条件**" in sec_body
+                    elif clue == "表格":
+                        found = bool(re.search(r'^\|.+\|$', sec_body_no_code, re.MULTILINE))
+                    elif clue == "加粗":
+                        found = bool(re.search(r'\*\*[^*]+\*\*', sec_body))
+                    elif clue in ("编号列表", "序号"):
+                        found = bool(re.search(r'^\d+\.\s+', sec_body_no_code, re.MULTILINE))
+                    elif clue == "简短列表":
+                        found = bool(re.search(r'^[-*]\s+', sec_body, re.MULTILINE))
+                    elif clue == "流程图":
+                        found = bool(re.search(r'[\u2193\u2192\u2191\u2193]', sec_body))
+                    elif clue == "代码块":
+                        found = bool(re.search(r'```', sec_body))
+                    elif clue == "命令":
+                        found = bool(re.search(r'`[^`]+`', sec_body))
+                    elif clue in ("Q/A 对",):
+                        found = bool(re.search(r'^Q:|^A:', sec_body_no_code, re.MULTILINE))
+                    elif clue == "目录树":
+                        found = bool(re.search(r'^[\u2502\u251c\u2514\u2500]|^[a-zA-Z]/', sec_body, re.MULTILINE))
+                    elif clue in ("版本号",):
+                        found = bool(re.search(r'\d+\.\d+\.\d+', sec_body))
+                    elif clue == "日期":
+                        found = bool(re.search(r'\d{4}-\d{2}-\d{2}', sec_body))
+                    elif clue == "路径结构":
+                        found = bool(re.search(r'[\\/]', sec_body))
+                    elif clue == "一行一条":
+                        items_c = len(re.findall(r'^[-*]\s+', sec_body, re.MULTILINE))
+                        found = items_c > 0
+                    else:
+                        found = clue in sec_body
+                    if not found:
+                        missing_clues.append(clue)
+                if missing_clues:
+                    extra = ""
+                    if "正向触发" in missing_clues and "正向触发" in clues:
+                        extra = "（应分「**正向触发**」和「**否定条件**」两段）"
+                    if "Q/A 对" in missing_clues:
+                        extra = "（应使用 Q: / A: 格式）"
+                    issues["warn"].append(
+                        "C-12: 章节「" + sec_title[:20] + "」内容不完整——缺少格式要素：" + ", ".join(missing_clues) + extra
+                    )
+            if "约束" in sec_title:
+                items_c = len(re.findall(r'^[-*]\s+', sec_body, re.MULTILINE))
+                if items_c > 5:
+                    issues["warn"].append("C-12: 章节「约束」共 " + str(items_c) + " 条，超过建议上限 5 条，建议精简或部分移到 references/")
+
+            guidelines_str = fmt.get("guidelines", "")
+            if guidelines_str:
+                semantic_rules = []
+                for sentence in re.split(r'[。；;]', guidelines_str):
+                    s = sentence.strip()
+                    if not s:
+                        continue
+                    if re.search(r'[应必][该须]?|[不得][能]?', s):
+                        skip = all(clue in s for clue in clues if clue)
+                        if not skip and len(s) > 6:
+                            semantic_rules.append(s)
+                if semantic_rules:
+                    for rule in semantic_rules[:3]:
+                        detail_preview = rule[:80].replace('\n', ' ')
+                        issues["warn"].append(
+                            "C-12: 章节「" + sec_title[:16] + "」" + detail_preview + "（需 LLM Phase 2 确认是否满足）"
+                        )
+    # C-13 (WARN): 渐进式索引表完整性 — 检查 ## 核心能力 末尾是否包含索引表
+    # ════════════════════════════════════════════════════════════
+    _c13_sd = kw.get("skill_dir", "")
+    core_section_match = re.search(r'^##\s+(?:核心能力|核心功能|概述).*?(?=^##\s|\Z)', body, re.MULTILINE | re.DOTALL)
+    if core_section_match:
+        core_text = core_section_match.group(0)
+        has_index_table = "### 渐进式文件索引" in core_text
+        if has_index_table and _c13_sd:
+            refs_dir = os.path.join(_c13_sd, "references")
+            if os.path.isdir(refs_dir):
+                actual_refs = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
+                listed_refs = set()
+                table_rows = re.findall(r'^\|.*?`(references/[^`]+)`.*?\|', core_text, re.MULTILINE)
+                for r in table_rows:
+                    fn = r.split('/')[-1] if '/' in r else r
+                    listed_refs.add(fn)
+                missing_from_table = [f for f in actual_refs if f not in listed_refs]
+                if missing_from_table:
+                    issues["warn"].append(f"C-13: references/ 中存在但渐进式索引表未列出的文件：{', '.join(missing_from_table[:5])}")
+        elif not has_index_table and _c13_sd:
+            refs_dir = os.path.join(_c13_sd, "references")
+            if os.path.isdir(refs_dir):
+                ref_count = len([f for f in os.listdir(refs_dir) if f.endswith('.md')])
+                if ref_count > 0:
+                    issues["warn"].append(f"C-13: references/ 目录有 {ref_count} 个 .md 文件，但 ## 核心能力 章节末尾缺少渐进式索引表（### 渐进式文件索引）")
+
+    # ════════════════════════════════════════════════════════════
     # 汇总输出
     # ════════════════════════════════════════════════════════════
     error_count = len(issues["error"])
@@ -1228,14 +1522,14 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     if total == 0:
         return {"passed": True,
-                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（10项子检查均符合建议标准）"}
+                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（12项子检查均符合建议标准）"}
 
     detail_parts = []
     if error_count > 0:
         detail_parts.append(f"🔴 ERROR({error_count}): {'; '.join(issues['error'])}")
     if warn_count > 0:
-        detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:3])}")
-        if warn_count > 3:
+        detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:4])}")
+        if warn_count > 4:
             detail_parts[-1] += f" 等（共 {warn_count} 条建议）"
 
     return {"passed": error_count == 0,

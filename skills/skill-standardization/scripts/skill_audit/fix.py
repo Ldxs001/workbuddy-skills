@@ -16,6 +16,7 @@ v2.37.0: 初始版本，覆盖全部 23 条规则
 import os
 import re
 import io
+import json
 
 from .utils import parse_simple_yaml_frontmatter
 
@@ -370,7 +371,7 @@ def fix_h1_position(skill_dir, **kw):
 def fix_section_trigger(skill_dir, **kw):
     """
     R-07 修复：添加/完善 ## 触发场景 章节。
-    value: True（触发词数量 ≥3、含否定条件、无危险表述）
+    使用 body.json content_format 模板生成，分正向触发和否定条件两个子列表。
     """
     skill_md = os.path.join(skill_dir, "SKILL.md")
     if not os.path.isfile(skill_md):
@@ -380,14 +381,36 @@ def fix_section_trigger(skill_dir, **kw):
     if fm is None:
         return 0
     name = fm.get("name", "本技能")
-    section_body = (
-        f"当用户需要使用 {name} 时\n"
-        f"当要求使用 {name} 时\n"
-        f"当询问关于 {name} 的问题时\n\n"
-        "不触发条件：\n"
-        "- 用户没有明确提到相关需求时\n"
-        "- 上下文不足以判断时需要询问用户\n"
-    )
+
+    # 从 body.json 读取 content_format 模板
+    spec = _load_body_spec()
+    fmt = None
+    for sec in spec.get("required_sections", []):
+        if any(k in str(sec.get("keywords", [])) for k in ["触发条件", "触发场景", "触发"]):
+            fmt = sec.get("content_format", {})
+            break
+
+    if fmt and fmt.get("type") == "mixed" and "一" in str(fmt.get("template", "")):
+        # 使用 content_format 的分两段模板
+        section_body = (
+            f"**正向触发（满足以下任意一条）：**\n"
+            f"- 用户需要使用 {name}\n"
+            f"- 用户询问关于 {name} 的问题\n"
+            f"- 场景需要 {name}\n\n"
+            f"**否定条件（满足以下任意一条，不触发）：**\n"
+            f"- 简单问答、闲聊、问候\n"
+            f"- 单步任务（不需要结构化执行）\n"
+        )
+    else:
+        # 回退到原有模板
+        section_body = (
+            f"当用户需要使用 {name} 时\n"
+            f"当要求使用 {name} 时\n"
+            f"当询问关于 {name} 的问题时\n\n"
+            "不触发条件：\n"
+            "- 用户没有明确提到相关需求时\n"
+            "- 上下文不足以判断时需要询问用户\n"
+        )
     ok = _add_section_to_body(skill_md, "触发场景", section_body, insert_after=None)
     return 1 if ok else 0
 
@@ -399,28 +422,51 @@ def fix_section_trigger(skill_dir, **kw):
 def fix_section_core(skill_dir, **kw):
     """
     R-08 修复：添加 ## 核心能力 章节。
+    使用 body.json content_format 模板生成表格格式。
     """
     skill_md = os.path.join(skill_dir, "SKILL.md")
     if not os.path.isfile(skill_md):
         return 0
-    name = fm.get("name", "本技能") if (fm := ...) else "本技能"
     content = _read_file(skill_md)
     fm, body = parse_simple_yaml_frontmatter(content)
-    name = fm.get("name", "本技能") if fm else "本技能"
-    section_body = (
-        f"- {name} 的核心功能 1\n"
-        f"- {name} 的核心功能 2\n"
-        f"- {name} 的核心功能 3\n"
-        "> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），"
-        "详细内容拆分到 `references/*.md` 按需加载。"
-    )
+    if fm is None:
+        return 0
+    name = fm.get("name", "本技能")
+
+    # 从 body.json 读取 content_format 模板
+    spec = _load_body_spec()
+    fmt = None
+    for sec in spec.get("required_sections", []):
+        kws = sec.get("keywords", [])
+        if any(k in str(kws) for k in ["核心功能", "核心能力", "概述"]):
+            fmt = sec.get("content_format", {})
+            break
+
+    if fmt and fmt.get("type") == "table":
+        # 使用 content_format 的表格模板
+        cols = fmt.get("table_columns", ["#", "能力", "说明"])
+        col_header = "| " + " | ".join(cols) + " |"
+        col_sep = "|" + "|".join("-" * max(len(c) + 2, 3) for c in cols) + "|"
+        section_body = (
+            f"> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。\n\n"
+            f"{col_header}\n"
+            f"{col_sep}\n"
+            f"| 1 | **{name} 功能一** | 功能一的简要说明 |\n"
+            f"| 2 | **{name} 功能二** | 功能二的简要说明 |\n"
+            f"| 3 | **{name} 功能三** | 功能三的简要说明 |\n"
+        )
+    else:
+        # 回退：无序列表格式
+        section_body = (
+            f"- {name} 的核心功能 1\n"
+            f"- {name} 的核心功能 2\n"
+            f"- {name} 的核心功能 3\n"
+            "> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），"
+            "详细内容拆分到 `references/*.md` 按需加载。\n"
+        )
     ok = _add_section_to_body(skill_md, "核心能力", section_body, insert_after=None)
     return 1 if ok else 0
 
-
-# ═══════════════════════════════════════════════════
-# R-09: 工作流程章节修复
-# ═══════════════════════════════════════════════════
 
 def fix_section_workflow(skill_dir, **kw):
     """
@@ -1395,11 +1441,202 @@ def apply_fix(skill_dir, fix_key, **kw):
         "meta_json": fix_meta_json_completeness,
         "frontmatter_fields": fix_frontmatter_fields,
         "meta_field_sync": fix_meta_field_sync,
+        "split_nonstandard": fix_split_nonstandard,
+        "section_order": fix_section_order,
     }
+
     func = dispatch.get(fix_key)
     if func is None:
         raise ValueError(f"未知的 fix_key: {fix_key}（支持：{', '.join(sorted(dispatch.keys()))}）")
     return func(skill_dir, **kw)
+
+
+# ── Body spec 辅助 ──────────────────────────────────────────────────
+
+def _load_body_spec():
+    """加载 body.json 规范。"""
+    spec_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        'spec', 'body.json'
+    )
+    if not os.path.isfile(spec_path):
+        return {}
+    try:
+        with open(spec_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _load_section_order():
+    """返回 section_order 列表。"""
+    return _load_body_spec().get("section_order", [])
+
+
+def _load_allowed_sections():
+    """返回 allowed_sections 白名单。"""
+    spec = _load_body_spec()
+    allowed = set(k.lower() for k in spec.get("allowed_sections", []))
+    for syns in spec.get("section_synonyms", {}).values():
+        for s in syns:
+            allowed.add(s.lower())
+    return allowed
+
+
+# ═══════════════════════════════════════════════════
+# R-17/C-11: 非标章节拆分 + 章节重排
+# ═══════════════════════════════════════════════════
+
+def fix_split_nonstandard(skill_dir, **kw):
+    """
+    R-17 修复：将不在 allowed_sections 白名单中的 H2 章节拆分到 references/。
+    每个非标章节的内容被迁移到 references/<section-slug>.md，
+    原始位置替换为「→ 详见 references/<section-slug>.md」引用。
+    
+    Returns: 迁移的章节数
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+
+    allowed = _load_allowed_sections()
+    if not allowed:
+        return 0
+
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+
+    refs_dir = os.path.join(skill_dir, "references")
+    os.makedirs(refs_dir, exist_ok=True)
+
+    # 解析所有 ## H2 章节
+    sections = list(re.finditer(r'^##\s+(.+?)$\n(.*?)(?=^##\s|\Z)', body, re.MULTILINE | re.DOTALL))
+    if not sections:
+        return 0
+
+    migrated = 0
+    dry_run = kw.get("dry_run", False)
+
+    for m in sections:
+        title = m.group(1).strip()
+        title_lower = title.lower()
+        if title_lower in allowed:
+            continue
+
+        section_content = m.group(2).strip()
+        if not section_content:
+            continue
+
+        # 生成安全文件名
+        safe_name = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', title).strip('_')
+        if not safe_name:
+            safe_name = f"section_{m.start()}"
+
+        ref_path = os.path.join(refs_dir, f"{safe_name}.md")
+        ref_rel = f"references/{safe_name}.md"
+
+        if dry_run:
+            migrated += 1
+            continue
+
+        # 写 references/ 文件
+        ref_content = f"# {title}\n\n{section_content}\n\n*由 fix_split_nonstandard 从 SKILL.md 迁移*"
+        with open(ref_path, 'w', encoding='utf-8') as f:
+            f.write(ref_content)
+
+        # 在 body 中替换为引用
+        full_match = m.group(0)
+        replacement = f"## {title}\n\n> → 详见 `{ref_rel}`\n"
+        body = body.replace(full_match, replacement, 1)
+        migrated += 1
+
+    if migrated > 0 and not dry_run:
+        # 写回 SKILL.md
+        new_content = f"---\n"
+        for k, v in fm.items():
+            new_content += f"{k}: {v}\n"
+        new_content += "---\n"
+        new_content += body.lstrip('\n')
+        _write_file(skill_md, new_content)
+
+    return migrated
+
+
+def fix_section_order(skill_dir, **kw):
+    """
+    R-25 C-11 修复：按 body.json section_order 重排 SKILL.md 的 H2 章节顺序。
+    不在 section_order 中的章节放到末尾。
+    
+    Returns: 重排的章节数
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+
+    order = _load_section_order()
+    if not order:
+        return 0
+
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+
+    # 构建别名映射
+    spec = _load_body_spec()
+    synonyms = spec.get("section_synonyms", {})
+    name_to_pos = {}
+    for pos, name in enumerate(order):
+        name_to_pos[name.lower()] = pos
+        for canon, syns in synonyms.items():
+            if canon.lower() == name.lower():
+                for s in syns:
+                    name_to_pos[s.lower()] = pos
+
+    # 找到所有 ## 章节在 body 中的位置（含前导内容）
+    # 用 split 分割 body
+    parts = re.split(r'^(?=##\s)', body, flags=re.MULTILINE)
+    if not parts:
+        return 0
+
+    # 第一部分是非章节前导内容（H1、空行、注释等）
+    preamble = parts[0]
+    sections = parts[1:]
+
+    # 给每个章节分配位置
+    ordered = []
+    unordered = []
+    for sec in sections:
+        first_line = sec.split('\n')[0].strip()
+        title = re.sub(r'^##\s+', '', first_line).strip()
+        pos = name_to_pos.get(title.lower(), -1)
+        if pos >= 0:
+            ordered.append((pos, sec))
+        else:
+            unordered.append(sec)
+
+    ordered.sort(key=lambda x: x[0])
+
+    dry_run = kw.get("dry_run", False)
+    if dry_run:
+        return len(ordered) + len(unordered)
+
+    # 组装
+    new_body = preamble + '\n' + '\n'.join(sec for _, sec in ordered)
+    if unordered:
+        new_body += '\n' + '\n'.join(unordered)
+
+    # 写回
+    new_content = f"---\n"
+    for k, v in fm.items():
+        new_content += f"{k}: {v}\n"
+    new_content += "---\n"
+    new_content += new_body.lstrip('\n')
+    _write_file(skill_md, new_content)
+
+    return len(ordered) + len(unordered)
 
 
 def list_fixable():
@@ -1434,4 +1671,6 @@ def list_fixable():
         "meta_json",                 # R-25
         "frontmatter_fields",        # R-01
         "meta_field_sync",           # R-10 共享字段同步
+        "split_nonstandard",         # R-17 非标章节拆分
+        "section_order",             # R-25 C-11 章节重排
     ]

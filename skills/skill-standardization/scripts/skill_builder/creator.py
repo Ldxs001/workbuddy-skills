@@ -51,6 +51,20 @@ trigger_negative:
 | 2 | 辅助功能 | <!-- 可选 --> |
 | 3 | 输出格式 | <!-- Markdown / HTML / JSON 等 --> |
 
+### 渐进式文件索引
+
+| 文件名 | 位置 | 说明 |
+|--------|------|------|
+| `references/guide.md` | 完整使用教程 | 参数说明和完整工作流 |
+| `references/permissions.md` | 权限说明 | 权限扫描报告和风险说明 |
+| `references/examples.md` | 示例集合 | 使用示例和输出样例 |
+
+## 约束
+
+<!-- 本技能特有的操作约束，每条一句话，最多 5 条 -->
+- <!-- 例：`.md` 文件禁止使用 Write/Edit 工具更新 -->
+- <!-- 例：更新后必须自审 0 ERROR 0 WARN -->
+
 ## 快速开始
 
 ```bash
@@ -82,17 +96,7 @@ skill-sub {name} --input <input-file> --output <output-dir>
 
 ---
 
-> [R-06 渐进式加载] 反模式详见 `references/antipatterns.md`，常见问题详见 `references/faq.md`
-
-## 附录：详细文档索引
-
-| 文档 | 内容 |
-|------|------|
-| `references/guide.md` | 完整使用教程和参数说明 |
-| `references/permissions.md` | 权限扫描报告和风险说明 |
-| `references/examples.md` | 使用示例和输出样例 |
-| `references/antipatterns.md` | 反模式与禁忌做法 |
-| `references/faq.md` | 常见问题解答 |
+> 反模式详见 `references/antipatterns.md`，常见问题详见 `references/faq.md`
 
 > 本文档由 `skill-standardization` 生成，遵循 R-01~R-25 规范。
 """

@@ -304,34 +304,126 @@ def check_permission_weight_explained(filepath, content, fm, body, skill_dir=Non
     return {"passed": True, "detail": f"{filepath}:1 - 权限权重说明检查通过（声明: {fm_weight}，实际风险: {actual_weight}）"}
 
 
+def _load_allowed_sections():
+    """加载 body.json 的 allowed_sections 白名单。"""
+    spec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'spec', 'body.json')
+    if not os.path.isfile(spec_path):
+        return None
+    try:
+        import json
+        with open(spec_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {
+            "allowed": data.get("allowed_sections", []),
+            "synonyms": data.get("section_synonyms", {})
+        }
+    except Exception:
+        return None
+
+
+def _find_nonstandard_sections(body_text):
+    """
+    扫描正文中的 ## H2 章节，与 body.json allowed_sections 白名单对比。
+    Phase 1: 正则粗筛。
+    返回非标章节列表，每项含 (line_no, title, content_preview)。
+    content_preview 供 LLM 第二阶段精筛判断。
+    """
+    spec = _load_allowed_sections()
+    if spec is None:
+        return []
+
+    allowed = spec["allowed"]
+    synonyms = spec["synonyms"]
+
+    # 收集所有 allowed 关键词的平铺列表（含同义词）
+    allowed_keywords_lower = set(k.lower() for k in allowed)
+
+    # 提取 H2 及其后续内容直到下一个 ##
+    section_pattern = re.compile(r'^##\s+(.+?)$\n(.*?)(?=^##\s|\Z)', re.MULTILINE | re.DOTALL)
+    h2_matches = list(section_pattern.finditer(body_text))
+    if not h2_matches:
+        h2_matches = list(re.finditer(r'^##\s+(.+)$', body_text, re.MULTILINE))
+
+    nonstandard = []
+    for m in h2_matches:
+        title = m.group(1).strip()
+        title_lower = title.lower()
+        if title_lower in allowed_keywords_lower:
+            continue
+        found = False
+        for canon, syns in synonyms.items():
+            if title_lower in [s.lower() for s in syns]:
+                found = True
+                break
+        if not found:
+            line_no = body_text[:m.start()].count('\n') + 1
+            content = m.group(2).strip() if m.lastindex and m.lastindex >= 2 else ""
+            preview = content[:80].replace('\n', ' ') if content else "(无内容)"
+            nonstandard.append((line_no, title, preview))
+
+    return nonstandard
+
+
 def check_progressive_loading_forced(filepath, content, fm, body, **kw):
-    """R-17: 渐进加载强制检查。"""
+    """
+    R-17: 渐进加载强制检查 + 非标准章节检测。
+    
+    检查 1: SKILL.md > 230 行时必须拆分到 references/。
+    检查 2: 正文中超出 body.json allowed_sections 白名单的非标准 H2 章节，提示拆分到 references/。
+    """
     if not content:
         return {"passed": True, "detail": f"{filepath}:1 - 无内容，跳过检查"}
 
     lines = content.splitlines()
     line_count = len(lines)
+    detail_parts = []
+    passed = True
 
-    if line_count <= 200:
-        return {"passed": True, "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，符合渐进加载要求（≤200 行）"}
+    # ── 检查 1: 行数超过 200 → 必须拆分 ──
+    if line_count > 200:
+        has_references = False
+        for line in lines:
+            if "references/" in line or "→ 详见" in line or "详见 `references/" in line:
+                has_references = True
+                break
 
-    has_references = False
-    for line in lines:
-        if "references/" in line or "→ 详见" in line or "详见 `references/" in line:
-            has_references = True
-            break
+        if not has_references:
+            passed = False
+            detail_parts.append(
+                f"SKILL.md 共 {line_count} 行，超过 230 行限制，但未拆分到 references/ 或通过「→ 详见 references/xxx.md」引用"
+            )
 
-    if not has_references:
-        return {
-            "passed": False,
-            "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，超过 200 行限制，但未拆分到 references/ 或通过「→ 详见 references/xxx.md」引用",
-            "fix": {"key": "progressive_loading", "value": True,
-                     "location": f"{filepath} (SKILL.md 超过 200 行部分)",
-                     "operation": "将 SKILL.md 中详细内容拆分到 references/ 目录下的独立 .md 文件，并在 SKILL.md 中用「→ 详见 references/xxx.md」引用",
-                     "verification": "重新运行 audit_skill()，确认 R-17 passed"}
-        }
+    # ── 检查 2: 非标准章节检测 ──
+    nonstandard = _find_nonstandard_sections(body)
+    if nonstandard:
+        details = "; ".join(f"第{ln}行「{t[:30]}」" for ln, t in nonstandard[:5])
+        if len(nonstandard) > 5:
+            details += f" 等（共 {len(nonstandard)} 处）"
+        phase1_lines = []
+        for ln, title, preview in nonstandard:
+            phase1_lines.append(f"  {filepath}:{ln} - 「{title}」（内容预览：{preview}...）")
+        detail_parts.append(
+            f"ⓘ 两阶段粗筛 {len(nonstandard)} 个疑似非标章节，待 LLM 第二阶段精筛确认（不阻断通过）："
+            f"
+【两阶段】Phase 1（正则）：发现以下 H2 章节不在 allowed_sections 白名单中，"
+            f"需 LLM 第二阶段精筛判断为真实非标（应拆分到 references/）"
+            f"还是应合并到已有标准章节（如「注意事项」→「铁律/规范」）："
+            f"
+" + '
+'.join(phase1_lines)
+        )
+        # 非标章节仅 Phase 1 粗筛，不设置 passed=False（行数强制拆分才是 ERROR）
+
+    if not detail_parts:
+        if line_count > 200:
+            return {
+                "passed": True,
+                "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，已超过 230 行但已拆分到 references/（符合渐进加载要求）；无非标章节"
+            }
+        return {"passed": True, "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，符合渐进加载要求（≤230 行），无非标章节"}
 
     return {
-        "passed": True,
-        "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，已超过 200 行，但已拆分到 references/（符合渐进加载要求）"
+        "passed": passed,
+        "detail": f"{filepath}:1 - {'; '.join(detail_parts)}",
+        "suggestion": "LLM 第二阶段精筛：对 Phase 1 粗筛的疑似非标章节逐条判断。如果内容属于某标准章节（如「注意事项」→「铁律/规范」），合并之；如果确实是非标内容，用 fix_split_nonstandard 拆分到 references/ 并替换为 → 详见引用。"
     }
