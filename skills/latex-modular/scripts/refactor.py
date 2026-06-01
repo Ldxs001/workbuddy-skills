@@ -167,7 +167,7 @@ def save_modules(modules: dict, output_dir: str) -> dict:
     manifest = {
         "version": "1.0.0",
         "components": [],
-        "body_file": "body.tex"
+        "body_file": "body.txt"
     }
     
     for key, data in modules.items():
@@ -177,7 +177,7 @@ def save_modules(modules: dict, output_dir: str) -> dict:
         cat_dir = output / cat
         cat_dir.mkdir(parents=True, exist_ok=True)
         
-        filename = f"{name}.tex"
+        filename = f"{name}.txt"
         filepath = cat_dir / filename
         rel_path = f"{cat}/{filename}"
         
@@ -338,11 +338,11 @@ def main():
     
     # 保存正文
     if args.keep_body or not args.output_doc:
-        body_path = Path(args.output_dir) / "body.tex"
+        body_path = Path(args.output_dir) / "body.txt"
         with open(body_path, "w", encoding="utf-8") as f:
             f.write(doc["body"] + "\n")
         print(f"[refactor] 正文已保存: {body_path}")
-        manifest["body_file"] = "body.tex"
+        manifest["body_file"] = "body.txt"
         # 更新 manifest
         manifest_path = Path(args.output_dir) / "manifest.json"
         with open(manifest_path, "w", encoding="utf-8") as f:

@@ -1,5 +1,5 @@
 % --- 标题 ---
-\title{\timu{迁移测试}}
+\title{\timu{扩展名测试}}
 \author{test}
 \date{\today}
 

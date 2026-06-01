@@ -80,7 +80,7 @@ def discover_components(manifest: dict) -> list:
             typ, name = (key.split("/", 1) + [""])[:2]
             new_list.append({
                 "type": typ, "name": name,
-                "path": val.get("file", f"{typ}/{name}.tex"),
+                "path": val.get("file", f"{typ}/{name}.txt"),
                 "description": val.get("desc", "")
             })
         return new_list
@@ -463,7 +463,7 @@ def main():
 
     # ── 写入 body.tex ─────────────────────────────────
     components_dir = os.path.dirname(manifest_path)
-    body_path = os.path.join(components_dir, "body.tex")
+    body_path = os.path.join(components_dir, "body.txt")
     with open(body_path, "w", encoding="utf-8") as f:
         f.write(body_content.lstrip("\n") + "\n")
     print(f"[template] body 已写入: {body_path}")

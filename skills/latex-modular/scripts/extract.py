@@ -43,14 +43,14 @@ def extract(in_path, out_dir):
     for ln in plines:
         s = ln.strip()
         if s.startswith(r"\documentclass"):
-            p = _save(out_dir, "preamble", "class-settings.tex", s.rstrip() + "\n")
+            p = _save(out_dir, "preamble", "class-settings.txt", s.rstrip() + "\n")
             comps.append({"type":"preamble","name":"class-settings","path":p,"category":"class","description":"文档类"})
             break
 
     # ── 2. usepackage（按行，不过度解析）────────────
     pkg = [l.rstrip() for l in plines if l.strip().startswith(r"\usepackage")]
     if pkg:
-        p = _save(out_dir, "preamble", "packages.tex", "\n".join(pkg) + "\n")
+        p = _save(out_dir, "preamble", "packages.txt", "\n".join(pkg) + "\n")
         comps.append({"type":"preamble","name":"packages","path":p,"category":"package","description":"宏包"})
 
     # ── 3. 字体设置块（\setmainfont 到下一个顶级命令）──
@@ -66,7 +66,7 @@ def extract(in_path, out_dir):
             continue
         i += 1
     if font_lines:
-        p = _save(out_dir, "preamble", "font-settings.tex", "\n".join(font_lines) + "\n")
+        p = _save(out_dir, "preamble", "font-settings.txt", "\n".join(font_lines) + "\n")
         comps.append({"type":"preamble","name":"font-settings","path":p,"category":"font","description":"字体设置"})
 
     # ── 4. ctexset 块 ─────────────────────────────────
@@ -81,7 +81,7 @@ def extract(in_path, out_dir):
             continue
         i += 1
     if ctex_lines:
-        p = _save(out_dir, "styles", "section-style.tex", "\n".join(ctex_lines) + "\n")
+        p = _save(out_dir, "styles", "section-style.txt", "\n".join(ctex_lines) + "\n")
         comps.append({"type":"styles","name":"section-style","path":p,"category":"style","description":"章节样式"})
 
     # ── 5. newcommand / renewcommand ────────────────────
@@ -96,7 +96,7 @@ def extract(in_path, out_dir):
             continue
         i += 1
     if cmd_lines:
-        p = _save(out_dir, "commands", "user-commands.tex", "\n".join(cmd_lines) + "\n")
+        p = _save(out_dir, "commands", "user-commands.txt", "\n".join(cmd_lines) + "\n")
         comps.append({"type":"commands","name":"user-commands","path":p,"category":"command","description":"自定义命令"})
 
     # ── 6. newenvironment / renewenvironment / NewDocumentEnvironment ──
@@ -111,7 +111,7 @@ def extract(in_path, out_dir):
             continue
         i += 1
     if env_lines:
-        p = _save(out_dir, "environments", "user-environments.tex", "\n".join(env_lines) + "\n")
+        p = _save(out_dir, "environments", "user-environments.txt", "\n".join(env_lines) + "\n")
         comps.append({"type":"environments","name":"user-environments","path":p,"category":"environment","description":"自定义环境"})
 
     # ── 7. fancyhdr 设置 ───────────────────────────────
@@ -136,11 +136,11 @@ def extract(in_path, out_dir):
             continue
         i += 1
     if fancy_lines:
-        p = _save(out_dir, "styles", "header-footer.tex", "\n".join(fancy_lines) + "\n")
+        p = _save(out_dir, "styles", "header-footer.txt", "\n".join(fancy_lines) + "\n")
         comps.append({"type":"styles","name":"header-footer","path":p,"category":"header","description":"页眉页脚"})
 
     # ── 保存 body ───────────────────────────────────────
-    p = _save(out_dir, "body", "body.tex", body + "\n")
+    p = _save(out_dir, "body", "body.txt", body + "\n")
     comps.append({"type":"body","name":"main-body","path":p,"category":"body","description":"正文"})
 
     # manifest

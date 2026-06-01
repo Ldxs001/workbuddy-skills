@@ -85,7 +85,7 @@ def build_document(manifest: Dict, base_dir: str) -> str:
         typ = comp.get("type", "")
         name = comp.get("name", "")
 
-        # 1. documentclass：从 class-settings.tex 里提取
+        # 1. documentclass：从 class-settings.txt 里提取
         if name == "class-settings":
             for ln in content.splitlines():
                 if ln.strip().startswith("\\documentclass"):
@@ -187,7 +187,7 @@ def main():
             new_list.append({
                 "type": typ,
                 "name": name,
-                "path": val.get("file", f"{typ}/{name}.tex"),
+                "path": val.get("file", f"{typ}/{name}.txt"),
                 "category": val.get("category", ""),
                 "description": val.get("desc", "")
             })
