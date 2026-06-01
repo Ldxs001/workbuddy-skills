@@ -1,3 +1,10 @@
+## 2.47.3 (2026-06-01)
+
+### 修复
+- 修复 _load_body_spec 路径错误（spec/→scripts/spec/），导致 fix_section_order 失效
+
+---
+
 ## 2.47.2 (2026-06-01)
 
 ### 修复

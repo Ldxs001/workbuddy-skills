@@ -1802,7 +1802,7 @@ def _load_body_spec():
     """加载 body.json 规范。"""
     spec_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        'spec', 'body.json'
+        'scripts', 'spec', 'body.json'
     )
     if not os.path.isfile(spec_path):
         return {}
