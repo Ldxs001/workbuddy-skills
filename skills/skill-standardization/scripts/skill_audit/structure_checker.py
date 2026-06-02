@@ -1281,8 +1281,8 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
-    R-25: 文档写作格式规范 (v2.44.0, v2.6.0 C-11/C-12, v2.50.0 C-16, v2.59.0 C-17/C-18/C-19)
-    19 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测 + C-17 使用示例检查 + C-18 能力边界检查 + C-19 错误处理检查。
+    R-25: 文档写作格式规范 (v2.44.0, v2.6.0 C-11/C-12, v2.50.0 C-16, v2.59.0 C-17/C-18/C-19, v2.60.0 C-17/C-18/C-19质量升级)
+    19 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测 + C-17 使用示例质量检查 + C-18 能力边界质量检查 + C-19 错误处理质量检查。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
     全部子检查仅作建议标准统一，不强制改造。
     """
@@ -1805,36 +1805,108 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 )
 
     # ════════════════════════════════════════════════════════════
-    # C-17 (WARN): 技能文档是否包含使用示例
+    # C-17 (WARN): 使用示例质量 — 检查示例是否展示完整的用户输入到输出
+    # 修复方式：LLM 根据输出指引，在 SKILL.md 的「快速开始」或示例章节执行增删替换
     # ════════════════════════════════════════════════════════════
     _c17_body = body.lower()
-    _c17_ok = bool(re.search(r'^##\s+.*示例|^##\s+.*example|^##\s+.*使用', body, re.MULTILINE | re.IGNORECASE))
-    _c17_ok = _c17_ok or bool(re.search(r'用户[：:]|输入[：:]|→ →|```.*\n#\s', body))
-    if not _c17_ok:
-        issues["warn"].append("C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个输入→输出对话示例）")
+    _c17_has_section = bool(re.search(
+        r'^##\s+.*示例|^##\s+.*example|^##\s+.*使用|^##\s+.*快速',
+        body, re.MULTILINE | re.IGNORECASE))
+    _c17_has_dialog = bool(re.search(r'用户[：:]|→|输入[：:].*输出[：:]', body))
+    _c17_quality_issues = []
+    if not (_c17_has_section or _c17_has_dialog):
+        _c17_quality_issues.append('缺少使用示例 → 在「快速开始」或独立示例章节中新增至少一个完整输入到输出的对话示例')
+    else:
+        # 定位示例所在章节
+        _c17_section = '快速开始'
+        for _h in re.finditer(r'^##\s+(.+)$', body, re.MULTILINE):
+            if re.search(r'示例|快速|使用', _h.group(1)):
+                _c17_section = _h.group(1)
+                break
+        if not re.search(r'用户[：:].*?(推荐|结果|报告|输出)', body):
+            _c17_quality_issues.append(
+                f'【{_c17_section}】示例缺少完整交互流程：当前示例未展示系统响应 → '
+                f'LLM执行：在用户输入之后补充系统推荐/计算结果/输出内容的描述')
+        if not re.search(r'\d+\s*[天/小时]|\d+[.,]\s*\d+\s*[天/小时]|[OoMmPp]\s*[=:]\s*\d+', _c17_body):
+            _c17_quality_issues.append(
+                f'【{_c17_section}】示例缺乏具体数值参数 → '
+                f'LLM执行：将示例中的输入改为带真实OMP值（如 O=3/M=6/P=15）的场景')
+        if not re.search(r'用户[：:].*?\n.*?用户[：:]', body, re.DOTALL):
+            _c17_quality_issues.append(
+                f'【{_c17_section}】仅提供1种场景 → '
+                f'LLM执行：在现有示例之后新增至少1个不同场景的示例'
+                f'（如完整OMP:单阶段直接估算 + 含紧前关系:多阶段CPM分析）')
+    if _c17_quality_issues:
+        if '缺少使用示例' in _c17_quality_issues[0]:
+            issues['warn'].append('C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个完整输入到输出对话示例）')
+        else:
+            issues['warn'].append('C-17: 使用示例质量不足 -- ' + '; '.join(_c17_quality_issues))
 
     # ════════════════════════════════════════════════════════════
-    # C-18 (WARN): 技能文档是否声明能力边界
+    # C-18 (WARN): 能力边界质量 — 检查边界说明是否具体、可操作
+    # 修复方式：LLM 根据输出指引，在 SKILL.md 的「限制与边界」章节或 FAQ 中增补
     # ════════════════════════════════════════════════════════════
-    _c18_ok = bool(re.search(r'^##\s+.*限制|^##\s+.*边界|^##\s+.*约束|^##\s+.*局限', body, re.MULTILINE | re.IGNORECASE))
-    # 也检查FAQ中是否有容量说明
-    _c18_faq = os.path.join(os.path.dirname(filepath), "references", "faq.md")
-    if os.path.isfile(_c18_faq):
-        _c18_ft = open(_c18_faq, encoding="utf-8").read()
-        _c18_ok = _c18_ok or bool(re.search(r'最多|上限|建议不超过|容量|不能超过', _c18_ft))
-    if not _c18_ok:
-        issues["warn"].append("C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）")
+    _c18_has_section = bool(re.search(
+        r'^##\s+.*限制|^##\s+.*边界|^##\s+.*约束|^##\s+.*局限',
+        body, re.MULTILINE | re.IGNORECASE))
+    _c18_faq_path = os.path.join(os.path.dirname(filepath), 'references', 'faq.md')
+    _c18_has_faq_capacity = False
+    if os.path.isfile(_c18_faq_path):
+        _c18_faq_text = open(_c18_faq_path, encoding='utf-8').read()
+        _c18_has_faq_capacity = bool(re.search(r'最多|上限|建议不超过|容量|不能超过', _c18_faq_text))
+    _c18_quality_issues = []
+    if not (_c18_has_section or _c18_has_faq_capacity):
+        _c18_quality_issues.append('未声明能力边界 → 在 SKILL.md 中新增「限制与边界」章节或在FAQ中补充容量说明')
+    else:
+        _c18_boundary_text = (body if _c18_has_section else '') + \
+                             (_c18_faq_text if _c18_has_faq_capacity else '')
+        _c18_loc = '「限制与边界」章节' if _c18_has_section else 'FAQ'
+        if not re.search(r'≤\s*\d+|≥\s*\d+|不超过\s*\d+|上限\s*\d+|建议\s*\d+', _c18_boundary_text):
+            _c18_quality_issues.append(
+                f'【{_c18_loc}】边界阈值未量化 → '
+                f'LLM执行：将笼统描述改为具体数字限制（如 "建议不超过50个阶段"）')
+        if not re.search(r'参数|O.*M.*P|输入.*格式|输入.*范围|单位.*统一|格式.*要求', _c18_boundary_text):
+            _c18_quality_issues.append(
+                f'【{_c18_loc}】缺少参数约束 → '
+                f'LLM执行：补充输入参数的范围、单位、格式要求说明')
+        if not re.search(r'环境|网络|离线|在线|依赖|浏览器|外网|本地', _c18_boundary_text):
+            _c18_quality_issues.append(
+                f'【{_c18_loc}】缺少环境要求 → '
+                f'LLM执行：补充运行环境依赖说明（离线/联网、输出格式等）')
+    if _c18_quality_issues:
+        if '未声明能力边界' in _c18_quality_issues[0]:
+            issues['warn'].append('C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）')
+        else:
+            issues['warn'].append('C-18: 能力边界质量不足 -- ' + '; '.join(_c18_quality_issues))
 
     # ════════════════════════════════════════════════════════════
-    # C-19 (WARN): FAQ 是否包含错误处理指导
+    # C-19 (WARN): 错误处理质量 — 检查错误指导是否具体、可执行
+    # 修复方式：LLM 根据输出指引，在 references/faq.md 中增删改问答条目
     # ════════════════════════════════════════════════════════════
-    _c19_ok = False
-    _c19_faq = os.path.join(os.path.dirname(filepath), "references", "faq.md")
-    if os.path.isfile(_c19_faq):
-        _c19_ft = open(_c19_faq, encoding="utf-8").read()
-        _c19_ok = bool(re.search(r'出错|报错|异常|怎么办|修正|修复建议', _c19_ft))
-    if not _c19_ok:
-        issues["warn"].append("C-19: FAQ缺少错误处理指导（建议新增出错/异常相关的问答条目）")
+    _c19_faq_path = os.path.join(os.path.dirname(filepath), 'references', 'faq.md')
+    _c19_has_err_faq = False
+    if os.path.isfile(_c19_faq_path):
+        _c19_faq_text = open(_c19_faq_path, encoding='utf-8').read()
+        _c19_has_err_faq = bool(re.search(r'出错|报错|异常|怎么办|修正|修复', _c19_faq_text))
+    _c19_quality_issues = []
+    if not _c19_has_err_faq:
+        _c19_quality_issues.append(
+            'FAQ缺少错误处理指导 → LLM执行：在 references/faq.md 中新增「出错了怎么办？」问答条目')
+    else:
+        _c19_loc = 'references/faq.md 的「出错了怎么办？」'
+        if not re.search(r'(检查|确认|修改|调整|建议)[^。]*。', _c19_faq_text):
+            _c19_quality_issues.append(
+                f'【{_c19_loc}】缺少具体修复步骤 → '
+                f'LLM执行：将笼统提示改为"检查XX参数→调整XX值→重新运行"的具体修复链')
+        if not re.search(r'(场景|情况|类型|分类|示例).*(出错|错误|异常|问题)', _c19_faq_text, re.DOTALL):
+            _c19_quality_issues.append(
+                f'【{_c19_loc}】未分类说明 → '
+                f'LLM执行：区分 参数错误/依赖错误/环境错误 三类场景并分别给出修复步骤')
+    if _c19_quality_issues:
+        if 'FAQ缺少错误处理指导' in _c19_quality_issues[0]:
+            issues['warn'].append('C-19: FAQ缺少错误处理指导（建议新增出错或异常相关的问答条目）')
+        else:
+            issues['warn'].append('C-19: 错误处理质量不足 -- ' + '; '.join(_c19_quality_issues))
 
     # ════════════════════════════════════════════════════════════
     # 汇总输出
