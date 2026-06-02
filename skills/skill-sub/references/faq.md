@@ -68,3 +68,49 @@
 4. **`tags` 不要随便填** — 它是自动推荐的匹配依据，填 `["通用"]` 等于没填。用领域关键词：`["发布","安全","数据分析"]`
 5. **定期清理不用的调用链** — `chain_manager.py list` 检查，`delete --force` 清理。链不是越多越好
 6. **里程碑只在"失败不可接受"的步骤用** — 如安全审计、部署上线。中间步骤失败通常可跳过或询问
+
+---
+
+## 常见错误场景
+
+### E1：创建链时报"连续缺口应合并为一个粘连点"
+
+**原因**：两个 `type: "adhesion"` 步骤相邻。粘连点是 skill 之间的连接器，禁止连续。
+
+**解决**：合并为一个 adhesion，用 hybrid 方案覆盖全部缺口。
+
+```json
+// 错误：两个连续粘连点
+{"index":2,"type":"adhesion","step_name":"审核"},
+{"index":3,"type":"adhesion","step_name":"转换"}  // 禁止
+
+// 正确：合并为一个 hybrid 粘连点
+{"index":2,"type":"adhesion","step_name":"审核+转换",
+ "adhesion":{"reason":"需要人工审核和数据格式转换",
+  "solutions":[{"mode":"hybrid","llm_steps":"人工审核",
+                "tool_steps":"脚本转换格式"}]}}
+```
+
+### E2：创建链时报"引用的 skill 不存在"
+
+**原因**：`skill_name` 对应的 skill 未安装或名称写错。
+
+**解决**：用 `python scripts/skill_extractor.py scan` 查看已安装 skill 列表。
+
+### E3：执行时报"步骤失败"
+
+| 原因 | 现象 | 解决 |
+|------|------|------|
+| action 描述模糊 | AI 反复确认 | 用具体动词+对象+产出重写 action |
+| 依赖的 skill 报错 | skill 本身执行失败 | 单独运行该 skill 确认 |
+| 里程碑步骤失败 | 整条链中止 | 修复后重新执行 |
+| 重试耗尽 | 超过 max_retries | 检查错误类型后修正重试 |
+
+### E4：校验器阻断保存
+
+| 阻断信息 | 原因 | 解决 |
+|---------|------|------|
+| 缺少必填字段 skill_name | skill 步骤没有指定 skill | 补充 skill_name |
+| 无效类型 'xxx' | type 不在 skill/loop/branch/adhesion 中 | 修正 type 字段 |
+| 检测到依赖闭环 | depends_on 形成循环 | 打破循环依赖 |
+| 索引重复 | 两个步骤相同 index | 使用 --fix 自动修复 |

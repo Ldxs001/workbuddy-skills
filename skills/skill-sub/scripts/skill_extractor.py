@@ -569,6 +569,104 @@ def cmd_clear_cache(args):
 
     return 0
 
+def cmd_suggest(args):
+    """根据用户意图推荐技能并检测缺口（v1.25.0）"""
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+    
+    intent = args.intent.lower().strip()
+    if not intent:
+        print("❌ 请提供意图关键词")
+        return 1
+
+    if not SKILLS_DIR.exists():
+        print(f"❌ 技能目录不存在: {SKILLS_DIR}")
+        return 1
+
+    # 1. 扫描所有技能
+    candidates = []
+    for entry in sorted(SKILLS_DIR.iterdir()):
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        skill_md = entry / "SKILL.md"
+        if not skill_md.exists():
+            continue
+
+        result = extract_all(entry.name, entry)
+        if "error" in result:
+            continue
+
+        # 2. 关键词匹配打分
+        desc = result.get("description", "").lower()
+        triggers = " ".join(result.get("trigger_keywords", [])).lower()
+        tags = " ".join(result.get("tags", [])).lower()
+        skill_name = result.get("dir_name", "").lower()
+
+        search_text = f"{skill_name} {desc} {triggers} {tags}"
+        intent_words = intent.split()
+
+        if not intent_words:
+            continue
+
+        # 简单词频匹配
+        match_count = sum(1 for w in intent_words if w in search_text)
+        score = match_count / len(intent_words)
+
+        if score >= args.min_score:
+            candidates.append({
+                "name": result["dir_name"],
+                "description": result.get("description", ""),
+                "trigger": result.get("trigger_keywords", []),
+                "tags": result.get("tags", []),
+                "score": round(score, 2),
+            })
+
+    # 3. 按分数排序
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+
+    # 4. 缺口检测：意图中有但没有任何 skill 匹配的词
+    matched_words = set()
+    for c in candidates:
+        text = f"{c['name']} {c['description']} {' '.join(c['trigger'])} {' '.join(c['tags'])}".lower()
+        for w in intent_words:
+            if w in text:
+                matched_words.add(w)
+
+    unmatched = [w for w in intent_words if w not in matched_words and len(w) > 1]
+
+    # 5. 输出
+    result = {
+        "intent": intent,
+        "total_skills": len([e for e in SKILLS_DIR.iterdir() if e.is_dir() and not e.name.startswith(".")]),
+        "candidates": candidates,
+        "gaps": [{"word": w, "hint": f"意图中的「{w}」无 skill 直接匹配，可能需要粘连点或新 skill"} for w in unmatched],
+    }
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"推荐报告: {intent}")
+        print(f"扫描技能: {result['total_skills']} 个")
+        print(f"匹配候选: {len(candidates)} 个")
+        if candidates:
+            print(f"{'':-<50}")
+            print(f"{'排名':<6} {'技能名称':<20} {'匹配分':<8} {'描述'}")
+            print(f"{'':-<50}")
+            for i, c in enumerate(candidates, 1):
+                desc_short = c["description"][:40] + "..." if len(c["description"]) > 40 else c["description"]
+                print(f"{i:<6} {c['name']:<20} {c['score']:<8} {desc_short}")
+        if result["gaps"]:
+            print(f"\n检测到缺口（{len(result['gaps'])} 个）：")
+            for g in result["gaps"]:
+                print(f"  - {g['hint']}")
+        else:
+            print("\n未检测到明显缺口")
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Skill Extractor v1.19.0 - 技能关键步骤提取工具",
@@ -604,6 +702,12 @@ def main():
     # clear-cache
     p_clear = subparsers.add_parser("clear-cache", help="清空提取缓存")
 
+    # suggest (v1.25.0)
+    p_suggest = subparsers.add_parser("suggest", help="根据用户意图推荐技能并检测缺口")
+    p_suggest.add_argument("--intent", required=True, help="用户意图关键词（自然语言描述）")
+    p_suggest.add_argument("--json", action="store_true", help="JSON 格式输出")
+    p_suggest.add_argument("--min-score", type=float, default=0.1, help="最低匹配分数（默认0.1）")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -615,6 +719,7 @@ def main():
         "scan": cmd_scan,
         "extract-params": cmd_extract_params,
         "clear-cache": cmd_clear_cache,
+        "suggest": cmd_suggest,
     }
 
     cmd_func = commands.get(args.command)

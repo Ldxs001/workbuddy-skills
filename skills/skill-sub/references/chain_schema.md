@@ -15,6 +15,7 @@
   "purpose": "string",        // 核心目的
   "user_intent": "string",    // 用户原始意图（用于意图匹配）
   "tags": ["string"],         // 标签（用于自动匹配）
+  "user_specified": false,    // 用户是否显式指定了所有 skill（true→自愈时跳过）
   "created_at": "datetime",
   "updated_at": "datetime",
   "exec_count": 0,            // 执行次数
@@ -237,6 +238,61 @@
 - **里程碑步骤失败** → 无论 `on_exhaust` 配置如何，**强制中止整条链**
 - **里程碑步骤的 on_exhaust** → 建议设为 `abort`（validate 时会发出警告）
 - **非里程碑步骤失败** → 按 `on_exhaust` 配置处理（ask/skip/abort）
+
+---
+
+## 类型 D：`"type": "adhesion"`（粘连点步骤）
+
+> **v1.25.0 新增**。粘连点标记调用链中无法由 skill 自动化的缺口，
+> 提供三种解决方案供 LLM 选择执行，保证调用链不断裂。
+
+### 通用字段（继承 Step 通用字段）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `index` | int | ✅ | 步骤序号 |
+| `type` | string | ✅ | 固定为 `"adhesion"` |
+| `step_name` | string | ✅ | 步骤名称 |
+| `depends_on` | int[] | ❌ | 依赖的前置步骤索引 |
+
+### adhesion 专用字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `adhesion.reason` | string | ✅ | 粘连原因描述 |
+| `adhesion.solutions` | array | ✅ | 解决方案数组，至少 1 个 |
+| `adhesion.updated_at` | string | ❌ | 最后检查时间（自愈扫描时更新） |
+
+### solutions[n] 字段
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `mode` | string | ✅ | `"manual"` / `"auto"` / `"hybrid"` |
+| `description` | string | ✅ | 执行描述 |
+| `constraints` | string | ❌ | 约束条件（manual/hybrid 使用） |
+| `tool_name` | string | 条件① | mode=auto/hybrid 时，工具名称 |
+| `script_path` | string | 条件① | mode=auto/hybrid 时，脚本路径（相对数据目录） |
+| `llm_steps` | string | 条件② | mode=hybrid 时，LLM 执行步骤 |
+| `tool_steps` | string | 条件② | mode=hybrid 时，工具执行步骤 |
+
+> ① auto/hybrid 模式至少提供 tool_name 或 script_path 之一
+> ② hybrid 模式必须同时提供 llm_steps + tool_steps
+
+### 三种 solution mode 说明
+
+| mode | 说明 | 适用场景 |
+|------|------|---------|
+| `manual` | LLM 直接手动执行步骤，不依赖脚本或新 skill | 一次性、高度灵活的判断任务 |
+| `auto` | 通过自调用脚本工具执行，产生的脚本入数据目录管理 | 可标准化、重复执行的任务 |
+| `hybrid` | LLM 描述流程步骤 + 约束 + 自调用工具协同执行 | 需要智能判断 + 自动化执行的复合任务 |
+
+### 自愈流程
+
+每次调用链执行时，AI 检查链中所有 `adhesion` 类型步骤：
+
+1. 扫描技能库（`scripts/` 目录或已安装技能）查找是否有新 skill 能填补该缺口
+2. 找到匹配 skill → 将 `adhesion` 步骤升级为 `skill` 类型步骤，保留原 `adhesion.solutions` 到 `notes` 字段
+3. 未找到 → 按 `adhesion.solutions` 中的方案执行（优先 hybrid → auto → manual）
 
 ---
 

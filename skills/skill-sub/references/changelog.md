@@ -1,3 +1,27 @@
+## 1.25.0 (2026-06-02)
+
+### 新增
+
+- **粘连点（Adhesion Point）系统**：新增第四种步骤类型 `type: "adhesion"`，标记调用链中无法由 skill 自动化的缺口，提供三种解决方案（manual/auto/hybrid）保证链不断
+- **链自愈机制**：新增 `check-gaps` 命令，扫描所有调用链的粘连点，自动检测是否有新 skill 可填补并升级为 skill 步骤；`user_specified: true` 的链跳过自愈
+- **执行计划渲染**：`chain_executor.py` 在计划中渲染粘连点步骤，展示原因和 3 种方案
+- **流程缺口分析**：创建调用链时新增流程缺口分析，按语义/流程/决策三类真实缺口判断是否打粘连点；明确禁止过度粘连
+- **算法组件**：新增 `chain_flow_validator.py`（步骤连续性/依赖链/孤立步骤/粘连点比例≤30%/禁止连续粘连点）和 `chain_structure_checker.py`（JSON 结构/类型枚举/必填字段/依赖闭环——最后一道关，不合格拒保存）
+- **skill_extractor suggest**：新增 `suggest` 子命令，根据用户意图关键词匹配 skill 并排序候选，检测未匹配缺口（Python 扫描+LLM 选最终集合的混合模式）
+- **能力边界文档**：SKILL.md 新增「能力边界与限制」章节，含适宜/不适宜场景表、硬限制表、常见创建错误速查
+- **FAQ 错误场景**：faq.md 新增 E1~E4 四个常见错误场景（粘连点连续、skill 不存在、步骤失败、校验器阻断），每条报错附原因和解决方法
+
+### 变更
+
+- **`chain_manager.py`**：`validate_chain` 适配 adhesion 类型（跳过 skill_name/action 检查）；新增 `check-gaps` CLI 子命令；`create_chain` 和 `update` 自动调用 `flow_validator` + `structure_checker` 校验；新增 `user_specified` 字段和 `--user-specified` CLI 参数
+- **`chain_schema.md`**：新增类型 D 粘连点步骤的完整 schema；Chain 定义新增 `user_specified` 字段
+- **`workflow.md`**：创建流程从 7 步扩展为 8 步，新增步骤 6 流程+结构双重校验
+- **`adhesion.md`**：补充缺口分析规则、禁止行为清单、连续粘连点合并规则、判定示例
+- **`SKILL.md`**：核心能力新增第 7 项粘连点支持；工作流程新增步骤 3 流程缺口分析；快速开始重写为「三步上手」含完整 JSON 示例；新增「能力边界与限制」章节
+- **`faq.md`**：新增 E1~E4 常见错误场景
+
+---
+
 ## 1.24.10 (2026-06-01)
 
 ### 修复

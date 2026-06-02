@@ -310,7 +310,26 @@ class InstructionGenerator:
                 for sub in branch.get("else_steps", []):
                     sub_idx = sub.get("index", "?")
                     lines.append(f"  - 子步骤 {sub_idx}: {sub.get('step_name', '')}")
-            
+
+            # 处理 adhesion 步骤（v1.25.0）
+            elif step.get("type", "skill") == "adhesion":
+                adhesion = step.get("adhesion", {})
+                lines.append(f"⚠️ 粘连点 — 原因：{adhesion.get('reason', '未知')}")
+                solutions = adhesion.get("solutions", [])
+                for i, sol in enumerate(solutions, 1):
+                    mode = sol.get("mode", "manual")
+                    mode_label = {"manual": "纯手工", "auto": "脚本化", "hybrid": "混合"}.get(mode, mode)
+                    desc = sol.get("description", "")
+                    lines.append(f"  方案{i} [{mode_label}]：{desc}")
+                    if mode == "hybrid":
+                        if sol.get("llm_steps"): lines.append(f"    LLM: {sol['llm_steps']}")
+                        if sol.get("tool_steps"): lines.append(f"    工具: {sol['tool_steps']}")
+                    elif mode == "auto":
+                        if sol.get("tool_name"): lines.append(f"    工具: {sol['tool_name']}")
+                        if sol.get("script_path"): lines.append(f"    脚本: {sol['script_path']}")
+                    if sol.get("constraints"):
+                        lines.append(f"    约束: {sol['constraints']}")
+
             lines.append("")
         
         return "\n".join(lines)

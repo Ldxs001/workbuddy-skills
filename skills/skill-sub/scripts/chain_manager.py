@@ -238,16 +238,30 @@ class ChainValidator:
             idx = step.get("index", i + 1)
             indices.add(idx)
             
+            step_type = step.get("type", "skill")
+            
+            if not step.get("step_name"):
+                warnings.append(f"步骤 {idx}: 缺少步骤名称")
+
+            # adhesion 类型不需要 skill_name 和 action（v1.25.0）
+            if step_type == "adhesion":
+                adhesion = step.get("adhesion", {})
+                if not adhesion.get("reason"):
+                    warnings.append(f"步骤 {idx}: 粘连点缺少原因（adhesion.reason）")
+                if not adhesion.get("solutions"):
+                    warnings.append(f"步骤 {idx}: 粘连点缺少解决方案（adhesion.solutions）")
+                continue
+
             if not step.get("skill_name"):
                 warnings.append(f"步骤 {idx}: 缺少技能名称")
             if not step.get("action"):
                 warnings.append(f"步骤 {idx}: 缺少动作描述")
-            if not step.get("step_name"):
-                warnings.append(f"步骤 {idx}: 缺少步骤名称")
         
-        # 3. 技能可用性
+        # 3. 技能可用性（跳过 adhesion 步骤）
         missing = []
         for step in steps:
+            if step.get("type", "skill") == "adhesion":
+                continue
             skill_name = step.get("skill_name", "")
             if skill_name in ("(内置)", "(内置打包)", ""):
                 continue
@@ -406,18 +420,44 @@ class ChainManager:
         index = self.load_index()
         return list(index.keys())
     
-    def create_chain(self, name, description="", purpose="", tags=None, steps=None):
-        """创建调用链"""
+    def create_chain(self, name, description="", purpose="", tags=None, steps=None, user_specified=False):
+        """创建调用链（v1.25.0：自动调用 flow_validator + structure_checker 校验）"""
         if tags is None:
             tags = []
         if steps is None:
             steps = []
-        
+
+        # 调用 chain_flow_validator 校验流程
+        try:
+            from chain_flow_validator import validate as flow_validate
+            flow_result = flow_validate(steps)
+            if not flow_result["passed"]:
+                err_msgs = [i["message"] for i in flow_result["issues"] if i["severity"] == "ERROR"]
+                if err_msgs:
+                    return False, f"流程校验未通过: {'; '.join(err_msgs[:3])}"
+        except ImportError:
+            pass  # 校验器不存在时不阻断
+
+        # 调用 chain_structure_checker 校验结构
+        try:
+            from chain_structure_checker import check as struct_check
+            struct_result = struct_check({
+                "name": name,
+                "steps": steps
+            })
+            if not struct_result["passed"]:
+                err_msgs = [e["message"] for e in struct_result["errors"]]
+                if err_msgs:
+                    return False, f"结构校验未通过: {'; '.join(err_msgs[:3])}"
+        except ImportError:
+            pass
+
         chain_data = {
             "name": name,
             "description": description,
             "purpose": purpose,
             "tags": tags,
+            "user_specified": user_specified,
             "steps": steps,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
@@ -492,10 +532,18 @@ class ChainEditor:
         
         chain_data["updated_at"] = datetime.now().isoformat()
         
-        # 验证
+        # 验证（保留原有 validate_chain + 新增 structure_checker 作为最后一道关）
         errors, warnings = self.validator.validate_chain(chain_data)
         if errors:
             return False, f"验证失败: {'; '.join(errors)}"
+        try:
+            from chain_structure_checker import check as struct_check
+            struct_result = struct_check(chain_data)
+            if not struct_result["passed"]:
+                err_msgs = [e["message"] for e in struct_result["errors"]]
+                return False, f"结构校验未通过: {'; '.join(errors[:3])}"
+        except ImportError:
+            pass
         
         # 保存
         self.cm.save_chain(chain_data)
@@ -584,8 +632,10 @@ class CLIHandler:
             except json.JSONDecodeError as e:
                 print(f"❌ 步骤 JSON 解析失败: {e}")
                 return 1
+
+        user_specified = getattr(args, "user_specified", False) or getattr(args, "user", False)
         
-        success, message = self.chain_manager.create_chain(name, description, purpose, tags, steps)
+        success, message = self.chain_manager.create_chain(name, description, purpose, tags, steps, user_specified=user_specified)
         if success:
             print(f"✅ {message}")
             return 0
@@ -619,6 +669,71 @@ class CLIHandler:
         print(f"目的: {chain.get('purpose', '')}")
         print(f"步骤数: {len(chain.get('steps', []))}")
         
+        return 0
+    
+    def cmd_check_gaps(self, args):
+        """检查所有调用链的粘连点，尝试用新 skill 填补（v1.25.0）"""
+        chains = self.chain_manager.list_chains()
+        if not chains:
+            print("没有调用链")
+            return 0
+        
+        skills_dir = self.chain_manager.path_manager.skill_dir
+        installed_skills = {}
+        if skills_dir.exists():
+            for d in sorted(skills_dir.iterdir()):
+                if (d / "SKILL.md").exists():
+                    installed_skills[d.name] = d
+        
+        total_gaps = 0
+        filled = 0
+        
+        for name in chains:
+            chain_data = self.chain_manager.load_chain(name)
+            if not chain_data:
+                continue
+
+            # 用户指定 skill 的链跳过自愈
+            if chain_data.get("user_specified", False):
+                continue
+
+            steps = chain_data.get("steps", [])
+            changed = False
+            chain_filled = 0
+            for step in steps:
+                if step.get("type", "skill") != "adhesion":
+                    continue
+                total_gaps += 1
+                adhesion = step.get("adhesion", {})
+                reason = adhesion.get("reason", "")
+                
+                best_match = None
+                for sk_name, sk_path in installed_skills.items():
+                    try:
+                        skill_md = (sk_path / "SKILL.md").read_text(encoding="utf-8")
+                        if reason.lower() in skill_md.lower():
+                            best_match = sk_name
+                            break
+                    except Exception:
+                        continue
+                
+                if best_match:
+                    import json as _json
+                    step["type"] = "skill"
+                    step["skill_name"] = best_match
+                    step["action"] = adhesion.get("solutions", [{}])[0].get("description", reason)
+                    step["notes"] = f"原为粘连点，由 check-gaps 升级。原方案: {_json.dumps(adhesion.get('solutions', []), ensure_ascii=False)}"
+                    del step["adhesion"]
+                    chain_filled += 1
+                    filled += 1
+                    changed = True
+            
+            if changed:
+                chain_data["updated_at"] = datetime.now().isoformat()
+                self.chain_manager.save_chain(chain_data)
+                print(f"  ✅ {name}: {chain_filled} 个粘连点已升级为 skill 步骤")
+        
+        print(f"检查完成: {total_gaps} 个粘连点，{filled} 个可升级")
         return 0
     
     def cmd_delete(self, args):
@@ -670,6 +785,7 @@ def main():
     p_create.add_argument("--purpose", default="", help="目的")
     p_create.add_argument("--tags", default="", help="标签 (JSON 数组)")
     p_create.add_argument("--steps", default="", help="步骤 (JSON 数组)")
+    p_create.add_argument("--user-specified", action="store_true", help="标记为用户显式指定的 skill，自愈时跳过")
     
     # list
     subparsers.add_parser("list", help="列出所有调用链")
@@ -682,6 +798,9 @@ def main():
     p_delete = subparsers.add_parser("delete", help="删除调用链")
     p_delete.add_argument("--name", required=True, help="调用链名称")
     p_delete.add_argument("--force", action="store_true", help="强制删除（不确认）")
+    
+    # check-gaps (v1.25.0)
+    subparsers.add_parser("check-gaps", help="检查所有调用链的粘连点，尝试用新 skill 填补")
     
     args = parser.parse_args()
     
@@ -697,6 +816,7 @@ def main():
         "list": cli_handler.cmd_list,
         "show": cli_handler.cmd_show,
         "delete": cli_handler.cmd_delete,
+        "check-gaps": cli_handler.cmd_check_gaps,
     }
     
     cmd_func = commands.get(args.command)
