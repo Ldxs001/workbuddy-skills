@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.7.4
+version: 2.8.0
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复跳过同步时状态显示「成功」的误导问题，改为跳过。修复审计问题，统一术语，修正自审粒度。

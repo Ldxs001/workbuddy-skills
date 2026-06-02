@@ -673,6 +673,27 @@ def step_pack_zip(skill_name: str, version: str, skills_dir: Path,
                     zf.write(f, arcname)
     log(7, 8, f"ZIP 已生成: {zip_file}", "ok")
 
+    # 清理旧包：每个技能保留最近 5 个版本
+    try:
+        import re as _re
+        from collections import defaultdict as _dd
+        _skill_zips = _dd(list)
+        for _f in DIST_DIR.iterdir():
+            if _f.name == 'index.html':
+                continue
+            _m = _re.match(r'^(.+)-v?(\d+\.\d+\.\d+)\.zip$', _f.name)
+            if _m and _m.group(1) == skill_name:
+                _ver = tuple(int(x) for x in _m.group(2).split('.'))
+                _skill_zips[skill_name].append((_ver, _f))
+        for _name, _versions in _skill_zips.items():
+            _versions.sort(key=lambda x: x[0], reverse=True)
+            if len(_versions) > 5:
+                for _v in _versions[5:]:
+                    _v[1].unlink(missing_ok=True)
+                    log(7, 8, f"  清理旧包: {_v[1].name}")
+    except Exception:
+        pass  # 清理失败不阻断主流程
+
     # 清理临时目录（仅在定义了 tmp_dir 时）
     if 'tmp_dir' in locals() and tmp_dir.exists():
         shutil.rmtree(tmp_dir, ignore_errors=True)
