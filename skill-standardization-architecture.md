@@ -66,20 +66,10 @@ skill-standardization/
     └── safe_io.py              # 安全文件写入（原子写入+备份）
     ├── op_logger.py            # 操作日志记录
     ├── op_logger_patch.py      # 操作日志补丁
-    ├── data_dir_checker.py     # 数据目录合规检查器
-    ├── artifact_checker.py     # 产出物检查器
     ├── run_audit.py            # 独立审计入口
-    ├── progress_manager.py     # 进度管理器
     ├── update_all_versions.py  # 全版本更新
     ├── update_skill_frontmatter.py # frontmatter 更新脚本
-    ├── migrator.py             # 迁移器
     ├── restore_from_gitee.py   # 从码云恢复
-    ├── patch_utils.py          # 补丁工具函数
-    ├── fix.py                  # 修复器
-    ├── creator.py              # 创建器
-    ├── refactor.py             # 改造器
-    ├── updater.py              # 更新器
-    ├── version_manager.py      # 版本管理器
     └── spec/                   # 规范定义（JSON Schema）
         ├── _index.json         # 模块注册索引
         ├── frontmatter.json    # Frontmatter 字段规范 v2.5.0
@@ -168,7 +158,7 @@ SKILL.md 的 ## 章节分为三个层级，决定其存留行为和拆分优先�
 
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
-| **R-11** | ERROR | 产出物路径 | 产出物应放在 `skills/.standardization/<skill>/data/output/`，不在安装目录 |
+| **R-11** | ERROR | 产出物路径 | 产出物应放在 `skills/.standardization/<skill>/output/`，不在安装目录 |
 | **R-12** | ERROR | 数据目录路径 | 脚本中 `DATA_DIR` 变量的值必须包含合规字面量 |
 
 **R-12 的核心机制**：审计器对源码做**三源证据链**判断：
@@ -255,7 +245,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | C-04 | WARN | 引用块使用 | 提示/注意/警告应使用 `>` 引用块包装 |
 | C-05 | WARN | 列表区分 | 有序列表用于步骤流程，无序列表用于选项列举 |
 | C-06 | WARN | 加粗使用 | 关键术语/约束/规则名使用 `**加粗**` 强调 |
-| C-07 | WARN | 语言标识 | 代码块应带语言标识（` ```bash `、` ```python `），带行号 |
+| C-07 | WARN | 语言标识 | 代码块应带语言标识（` ```bash `、` ```python `） |
 | C-08 | WARN | Checklist | 操作前自检使用 `- [ ]` checklist 格式（带行号+触发词） |
 | C-09 | WARN | 渐进引用 | 引用渐进式文件统一使用 `→ 详见 references/xxx.md` |
 | C-10 | WARN | 空行规范 | frontmatter 闭合后 ≤2 个连续空行；正文 ≤4 个连续换行 |
@@ -424,7 +414,7 @@ DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardizat
 | `fix_progressive_loading(skill_dir)` | R-21 | 添加渐进式加载模板句 |
 | `fix_antipattern_progressive(skill_dir)` | R-18 | 创建/更新 antipatterns.md |
 | `fix_faq_progressive(skill_dir)` | R-19 | 创建/更新 faq.md |
-| `fix_writing_standards(skill_dir)` | R-20 | 统一术语 |
+| `fix_writing_standards(skill_dir)` | R-20 + R-18 | 统一术语 + 反模式格式修正（`**错误做法**：`→`**错误做法：**`） |
 | `fix_data_dir_compliance(skill_dir)` | R-22 | 添加 data_dir 声明 |
 | `fix_doc_code_consistency(skill_dir)` | R-23 | 修复文档-代码一致性 |
 | `fix_split_nonstandard(skill_dir)` | R-17 | 非标章节拆分到 references/（v2.45.0） |
@@ -584,6 +574,8 @@ R-06     W       [OK]   发现一级标题: # ...
 - `💡 建议修正` — 具体操作指引
 - `[search] 位置` — 文件路径:行号
 - `--fix` 可用时自动修复
+
+**误报分类机制**：`_reclassify_false_positive()` 在审计运行时自动过滤已知误报模式（如系统工具名被误检为函数名），过滤后的项显示为 `ⓘ 已排除`，不计入 WARN/ERROR 统计。`--verify` 模式也使用此函数排除误报后判断是否通过。
 
 ### bump 子命令
 
