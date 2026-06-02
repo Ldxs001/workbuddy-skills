@@ -10,6 +10,25 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+# 从 skill_audit/utils.py 复用 frontmatter 解析函数（fix.py 依赖）
+try:
+    from .skill_audit.utils import parse_simple_yaml_frontmatter
+except ImportError:
+    # 兜底实现
+    import yaml
+    def parse_simple_yaml_frontmatter(text):
+        parts = text.split('---', 2)
+        if len(parts) >= 3:
+            try:
+                fm = yaml.safe_load(parts[1]) or {}
+            except Exception:
+                fm = {}
+            body = parts[2]
+        else:
+            fm = {}
+            body = text
+        return fm, body
+
 # R-12: 外部数据目录变量检测模式（通用化，非框架绑定）
 _DATA_VAR_RE = re.compile(
     r'^([A-Za-z_]*?(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Za-z_]*(?:_DIR|_PATH))\s*=\s*(.+)$'

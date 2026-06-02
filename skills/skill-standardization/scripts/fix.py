@@ -774,8 +774,16 @@ def fix_writing_standards(skill_dir, **kw):
                 if wrong in ref_content:
                     ref_content = ref_content.replace(wrong, right)
                     fixed += 1
+            # R-18: 反模式格式修正 — 将 **错误做法**：修正为 **错误做法：**
+            # (冒号应在加粗内而非加粗外)
+            ref_content = ref_content.replace("**错误做法**：", "**错误做法：**")
+            ref_content = ref_content.replace("**正确做法**：", "**正确做法：**")
+            # 去除 ❌/✅ 前缀（审计工具按格式识别，不依赖图标）
+            ref_content = ref_content.replace("❌ **错误做法：**", "**错误做法：**")
+            ref_content = ref_content.replace("✅ **正确做法：**", "**正确做法：**")
             if ref_content != ref_original:
                 _write_file(fpath, ref_content)
+                fixed += 1
     return fixed
 
 
