@@ -604,4 +604,28 @@ python -m scripts.skill_builder inspect <skill-dir>    # 通过 builder 调用
 
 ---
 
+## 十、铁律8：全报告 LLM 细筛
+
+审计报告（`run_audit audit`）输出后，LLM **必须**逐条阅读每条结果。
+
+审计输出已包含行号、上下文、问题描述，信息完整。`_reclassify_false_positive()` 已在 Python 侧自动过滤已知误报模式，过滤后的剩余项由 LLM 终审判断：
+
+- **真问题** → 立即修复
+- **新误报模式** → LLM 直接放过，后续由开发者按需补充
+
+LLM **禁止**跳过终审步骤，也**禁止**将应修复的真问题解释为误报放任不管。全报告处理完毕后，才能进入铁律9验证。
+
+## 十一、铁律9：0 ERROR 0 WARN 强制验证
+
+`audit --verify` 在 LLM 细筛完成后执行：
+
+1. 运行完整审计 R-01~R-25
+2. 排除 `_reclassify_false_positive()` 已知的误报项
+3. 有非误报的未通过项 → exit(1)，输出每项 rule_id + detail
+4. 全部通过或仅误报 → exit(0)
+
+exit code 是 LLM 无法忽略的信号。非零退出码意味着验证绝对失败，LLM **不得**声称"审计通过"。
+
+---
+
 > 本文档基于 skill-standardization v2.58.1 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
