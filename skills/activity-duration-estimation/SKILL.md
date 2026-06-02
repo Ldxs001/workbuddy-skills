@@ -1,39 +1,31 @@
 ---
 name: activity-duration-estimation
-tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'html-report']
-version: 1.3.2
+tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report']
+version: 1.5.3
 author: Ldxs
 license: MIT
-description: 活动历时估算（Activity Duration Estimation）—— 支持三点估算（直接/β分布/正态分布）、蒙特卡洛模拟四种方法。具备语义分析能力，根据任务类型自动推荐最适估算组合，支持外部知识搜索补充，输出自包含HTML评估报告（有图有表有数据有分析）。
+description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/activity-duration-estimation/
 external_data_dir: true
-trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析
+trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析/WBS/WBS分解/项目规划/工作分解/项目分解/分解任务/立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板
 trigger_negative: 只是询问概念不执行估算/纯数学公式讨论不含实际任务
 antipattern_count: add_examples
 faq_quality: improve_qa
 ---
 # Activity Duration Estimation — 活动历时估算
 
-> 本技能提供完整的**活动历时估算**能力，包含四种估算方法、语义分析推荐引擎、外部知识搜索集成和HTML报告模板。
->
-> → 详见 `references/methods.md`（四种估算方法完整说明）
-> → 详见 `references/semantic-analysis.md`（语义分析引擎）
-> → 详见 `references/search-integration.md`（外部知识搜索集成）
-> → 详见 `references/report-template.md`（HTML报告模板说明）
-> → 详见 `references/antipatterns.md`（反模式）
-> → 详见 `references/faq.md`（常见问题）
+> 本技能提供**活动历时估算 + WBS工作分解 + 项目文档生成**。包含四种估算方法、语义分析、外部知识搜索、HTML报告、WBS项目规划与分解、项目文档双模式生成。全流程由 `scripts/runner.py` 编排，LLM只需调用 `run_pipeline()` 即可一键执行 WBS→估算→文档。详细内容拆分到 `references/*.md` 按需加载。
 
 ---
 
 ## 触发场景
 
-**正向触发**：估算工期/三点估算/PERT/蒙特卡洛/β分布/OMP/紧前关系/FS-SS-FF-SF/CPM甘特图/重叠分析/P50-P90/生成评估报告
+**正向触发**：估算工期/三点估算/PERT/蒙特卡洛/β分布/OMP/紧前关系/FS-SS-FF-SF/CPM甘特图/重叠分析/P50-P90/生成评估报告：估算工期/三点估算/PERT/蒙特卡洛/β分布/OMP/紧前关系/FS-SS-FF-SF/CPM甘特图/重叠分析/P50-P90/生成评估报告
 
 **不触发**：仅概念询问 / 纯数学讨论 / 明确使用其他技能
-
 ---
 
 ## 核心能力
@@ -42,7 +34,9 @@ faq_quality: improve_qa
 
 | # | 能力 | 说明 |
 |---|------|------|
-| 1 | **四种估算方法** | 直接估算法 / β分布（PERT）估算法 / 正态分布估算法 / 蒙特卡洛模拟法 |
+| 0 | **WBS工作分解** (子技能) | 基于3个参考模板+LLM自适应填充，支持4种分解方法，100%规则验证，自动衔接估算 |
+| 1 | **项目文档生成** (子技能) | 双模式：手动模式输出特化空模版（token≈0）/ 自动模式逐节生成，4个预置模板（立项/结项/相关方/风险） |
+| 2 | **四种估算方法** | 直接估算法 / β分布（PERT）估算法 / 正态分布估算法 / 蒙特卡洛模拟法 |
 | 2 | **语义分析推荐** | 根据任务类型（建筑/制造/软件/科研/农业等）自动推荐最适估算方法组合 |
 | 3 | **外部知识搜索** | 两阶段搜索流程：大模型自判→搜索补充→汇总推荐 |
 | 4 | **CPM关键路径分析** | 基于紧前关系的关键路径计算，含ES/EF/LS/LF/总时差，自动识别关键任务 |
@@ -58,22 +52,32 @@ faq_quality: improve_qa
 |------|------|------|
 | `references/methods.md` | 方法详解 | 四种估算方法的完整公式、计算步骤和适用场景 |
 | `references/semantic-analysis.md` | 语义分析 | 任务参数提取、分类映射、方法推荐逻辑 |
+| `references/wbs-methodology.md` | WBS方法论 | WBS四种分解方法、3个参考模板、递归分解算法、100%规则验证、多格式输出 |
+| `references/project-docs-methodology.md` | 项目文档+思维工具 | 双模式设计、模板操作、12个方法论(SWOT/SMART/PDCA/RACI等)含章节映射（详见`thinking-tools.md`） |
 | `references/search-integration.md` | 搜索集成 | 两阶段外部知识搜索流程 |
 | `references/report-template.md` | 报告模板 | HTML评估报告模板说明 |
-| `references/antipatterns.md` | 反模式 | 常见错误做法 |
-| `references/faq.md` | FAQ | 常见问题解答 |
+| `references/antipatterns.md` | 反模式 | WBS+项目文档反模式 |
+| `references/faq.md` | FAQ | WBS+项目文档相关 |
 | `references/changelog.md` | 更新日志 | 版本更新记录 |
+| `references/templates/` | 模板目录 | 4个预置JSON模板文件 |
+| `scripts/runner.py` | 编排层 | PipelineState + run_pipeline() 全流程Python驱动 |
 
 ---
 
 ## 工作流程总览
 
 ```text
-用户输入任务信息
+用户输入任务信息（有明确任务 / 模糊需求）
+  ↓
+┌─────────────────────────────────────────────┐
+│ Phase -1：WBS项目规划（模糊需求时激活）      │
+│ ①需求澄清→②模板匹配+LLM定制化→③100%验证    │
+│ ④输出WBS（text/md/json/svg可选）→⑤确认入估算  │
+└─────────────────────────────────────────────┘
   ↓
 ┌─────────────────────────────────────────────┐
 │ Phase 0：语义分析与方法推荐                   │
-│ ① 提取任务参数                              │
+│ ① 提取任务参数（支持WBS自动导入）            │
 │ ② 任务类型分类                               │
 │ ③ 推荐最适估算方法组合                       │
 └─────────────────────────────────────────────┘
@@ -113,45 +117,41 @@ faq_quality: improve_qa
 
 ## 快速开始
 
-**使用示例：**
-
 ```text
-场景1：直接估算，用户提供完整OMP值
-用户："单阶段任务，乐观3天、最可能6天、悲观15天，帮我估算"
-系统：β分布PERT：(3+4×6+15)/6=7天，标准差(15-3)/6=2天
-      → 任务68%概率在5~9天内完成，生成快速结论。
-输出：可直接显示结果，或加 --report 生成HTML报告
-
-场景2：多阶段项目，含紧前关系和CPM分析
-用户："3阶段开发项目，前端(5/10/20)、后端(8/15/25)、测试(10/20/35)，依赖1→2(FS),2→3(FS)"
-系统：推荐方法：β分布+蒙特卡洛模拟+CPM关键路径分析。建议执行？
-用户："按推荐的来"
-系统：计算完成。总工期约47天，关键路径：前端→后端→测试(3个关键任务，TF=0)。
-输出：生成HTML报告(甘特图/概率分布图/CPM表/重叠分析/5维风险建议)
-
-场景3：参数不确定，需搜索辅助
-用户："装配式建筑施工，没有具体OMP值，3个阶段，大概工期不确定"
-→ 大模型判断自身知识不足 → 询问是否搜索同类项目参考 → 搜索后给出典型值 → 用户确认后估算
+场景1：直接估算 — "单阶段任务，乐观3天、最可能6天、悲观15天" → β分布：(3+4×6+15)/6=7天，σ=2天 → 68%概率5~9天
+场景2：多阶段CPM — "前端(5/10/20)→后端(8/15/25)→测试(10/20/35)，依赖FS串联" → 总工期~47天，关键路径3任务TF=0 → 出HTML报告
+场景3：搜索辅助 — "装配式建筑施工，无OMP，3阶段" → 自判不足→搜索同类→给出典型值→用户确认后估算
+场景4：WBS→估算 — "帮我规划并估算一个电商后台管理系统" → Phase -1激活→模板匹配→分解→文本树确认→自动入Phase 0→HTML报告
+场景5：项目文档 — "针对电商项目生成立项申请书，手动模式" → 加载模板→特化（填入WBS/CPM引用）→输出空模板MD；或"自动模式，从项目背景开始" → 逐节生成→确认→拼合
 ```
 
 ---
 
+## WBS子技能 — Phase -1：项目规划与工作分解
+
+> 详见 `references/wbs-methodology.md` | `scripts/wbs_engine.py`
+> 激活：模糊需求（无任务列表/OMP）| 跳过：已有明确任务参数
+
+**7步流程**：①需求澄清 → ②方法推荐（交付/生命周期/模块）→ ③模板匹配+LLM定制 → ④递归分解至终止（可估算/可分配/可验证/可控制）→ ⑤100%规则验证（仅标记不更新）→ ⑥用户确认（可更新/补OMP）→ ⑦输出
+
+**输出可选**：文本树（默认，确认后自动入Phase 0）/ JSON字典 / SVG树形图 / Markdown文档。用户也可选"仅做WBS不做估算"。
+
+**WBS→估算映射**：工作包→阶段名称+OMP；层级→紧前关系（FS串联）；交付物→报告字段。
+
+---
+
+## 项目文档生成子技能 — :project-docs
+
+> 详见 `references/project-docs-methodology.md` | `scripts/project_docs_engine.py`
+
+**双模式**：手动模式→输出特化空模版（token≈0，含结构+提示+已有资料引用），用户手动填或单独调LLM填 | 自动模式→逐节生成+逐节确认，不满意只重算那节
+**模板定制**：增/删/改/重排章节 + 每节独立模式（auto/manual/outline）+ 另存为新模板重复使用
+**可用模板**：`立项申请书`(11节) / `结项报告书`(10节) / `相关方登记册`(4节) / `风险登记册`(5节)
+---
+
 ## Phase 0：语义分析与方法推荐
 
-> 详见 `references/semantic-analysis.md`
-
-从用户输入中提取任务参数，根据任务类型匹配推荐方法：
-
-```text
-任务类型: 软件开发 → β分布 + 蒙特卡洛（推荐）
-任务类型: 建筑工程 → β分布 + 蒙特卡洛（推荐）
-任务类型: 制造生产 → 直接估算 + 正态分布
-任务类型: 科研实验 → 蒙特卡洛模拟（推荐）
-任务类型: 农业种植 → 直接估算 + β分布
-任务类型: 活动策划 → β分布估算
-不确定性高 → 蒙特卡洛模拟（推荐）
-不确定性低 → 直接估算
-```
+类型映射：软件/建筑→β+MC | 制造→直接+正态 | 科研→MC | 农业→直接+β | 活动→β | 高不确定性→MC
 
 ---
 
@@ -227,4 +227,4 @@ sigma = (P - O) / 6
 
 ## 版本
 
-**v1.3.0** — CPM支持四种依赖类型 + 合理性审查层 + 完整HTML报告
+**v1.5.0** — 项目文档子技能:project-docs（双模式生成 + 4个P0模板 + 逐节确认）

@@ -1,3 +1,109 @@
+## 1.5.3 (2026-06-02)
+
+### 修复
+- 全量 skill-standardization 审计改造：0 ERROR, 3 WARN
+- --fix 自动修正: meta_json, writing_standards（R-01 非标字段清理, R-10 版本同步）
+- R-19: FAQ低质量条目重写（OMP来源从简短描述扩展为4种方法对比+组合建议）
+- R-25 C-13: thinking-tools.md 加入渐进式索引表
+- 版本三端一致 1.5.3
+
+---
+
+## 1.5.2 (2026-06-02)
+### 新增
+- `scripts/runner.py` — Python全流程编排层：PipelineState + run_pipeline() 三阶段一键执行
+- LLM只需调用 `run_pipeline()` 即可自动串联 WBS→估算→文档，阶段顺序/验证/数据流转由代码硬编码保障
+- 支持 mode="full" / "wbs" / "estimate" / "docs" 灵活选择执行范围
+- PipelineState 状态管理：wbs_text_tree / estimate_summary / doc_content 等字段直接读取
+- `references/thinking-tools.md` — 12个思维工具方法论
+- **思维工具嵌入手动模式**：`output_manual()` 和 `assemble_mixed_document()` 自动在各章节末尾注入对应思维工具的框架说明+完整示例，用户/其他LLM拿到模板即可参考使用
+- TOOL_REFERENCES 覆盖9个文档章节的8种工具映射（含SWOT/5W2H/SMART/MoSCoW/Pareto/PDCA/RACI/CPM等）
+- 项目文档方法论文档新增"六、思维工具参考"章节，含章节-工具映射速查表
+
+### 修复
+- 标准化审计修复：H1位置 / tags同步 / 行数超限 / 文档-代码一致性
+- 0-based → 1-based 依赖索引转换（wbs_to_dependencies 返回0-based，calc_cpm 需要1-based）
+
+---
+
+## 1.5.1 (2026-06-02)
+
+### 修复
+- audit --fix 自动修正: meta_json, version, writing_standards, progressive_loading_explicit
+
+---
+
+## 1.5.2 (2026-06-02)
+
+### 新增功能
+- 章节模式系统：每节独立配置 auto/manual/outline 模式，固化在模板中
+- set_section_mode() + list_sections_by_mode() + get_template_mode_summary()
+- assemble_mixed_document() 按模式混合组装文档
+- outline 模式：LLM生成概要思路（短内容），用户在基础上扩展
+- customize_sections 新增 set_mode 操作
+- 模板可定义各章节模式 → save_template → 下次直接调用
+
+---
+
+## 1.5.1 (2026-06-02)
+
+### 新增功能
+- 模板定制系统：增/删/改/重排章节 + 另存为新模板（customize_sections / save_template）
+- 新增：add_section / remove_section / reorder_sections / rename_section / delete_template 全套API
+- 新增：get_template_structure_summary 章节预览
+- 支持用户自定义章节类型（rich_text / fields / table / wbs_attachment 全支持）
+
+### 文档
+- project-docs-methodology.md 新增"四、模板定制"章节，含全部操作说明和调用示例
+- antipatterns.md 新增 AP-D04（每次用同一套模板不改）
+- SKILL.md 新增"模板定制"一行
+
+---
+
+## 1.5.0 (2026-06-02)
+
+### 新增功能
+- 项目文档子技能 `activity-duration-estimation:project-docs`：双模式文档生成（手动空模版/逐节自动）
+- 4个P0模板：立项申请书(11节)、结项报告书(10节)、相关方登记册(4节)、风险登记册(5节)
+- 手动模式：根据WBS/估算/CPM输出项目特化空模版，含章节结构+填充提示+已有资料引用，token≈0
+- 自动模式：逐节独立LLM生成+逐节用户确认，不满意只重算该节
+- 双模式互不冲突，可混用（手动出结构+自动填特定节）
+- skill-sub 编排支持：project-docs 可消费 WBS 和估算的产出物
+
+### 新增文件
+- `references/templates/` — 4个JSON模板文件目录
+- `references/project-docs-methodology.md` — 项目文档生成方法论
+- `scripts/project_docs_engine.py` — 项目文档引擎（load/customize/manual/auto/assemble）
+
+### 文档
+- SKILL.md 新增:project-docs子技能入口、场景5示例
+- _meta.json 新增 sub_skills.project-docs 注册
+- antipatterns.md 新增 AP-D01~AP-D03 项目文档反模式
+- faq.md 新增5个项目文档Q&A
+
+---
+
+## 1.4.0 (2026-06-02)
+
+### 新增功能
+- WBS子技能 `activity-duration-estimation:wbs`：基于3个参考模板+LLM自适应填充的项目规划与工作分解
+- 四种输出格式：缩进文本树 / Markdown树 / JSON字典 / SVG树形图（用户可选）
+- 100%规则启发式验证：结构性+语义性检查，标记问题不自动更新
+- WBS→估算自动衔接：工作包自动映射为阶段参数+OMP+紧前关系
+- 全流程支持：模糊需求→WBS→确认→估算→HTML报告 一键走通
+
+### 新增文件
+- `references/wbs-methodology.md` — WBS方法论（分解方法/模板/算法/验证/输出格式）
+- `scripts/wbs_engine.py` — WBS引擎（WBSNode/WBSResult/模板/验证/输出格式化）
+
+### 文档
+- SKILL.md 新增WBS子技能入口、Phase -1 工作流、场景4快速示例
+- antipatterns.md 新增 AP-W01~AP-W04 四个WBS反模式
+- faq.md 新增5个WBS相关Q&A
+- _meta.json 新增 sub_skills.wbs 子技能注册
+
+---
+
 ## 1.3.2 (2026-06-02)
 
 ### 改进
@@ -49,7 +155,7 @@
 - 报告中新增紧前关系表（CPM章节顶部，显示任务依赖及FS/SS/FF/SF类型）
 - 分析建议扩展为5维度：工期结论/关键路径风险/重叠影响/进度缓冲/多分布对比
 
-### 架构变更
+### 架构更新
 - 工作流重组：4阶段→5阶段（新增Phase 2紧前关系规划，原Phase 2/3→Phase 3/4）
 
 ### 修复

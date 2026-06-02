@@ -1,0 +1,108 @@
+{
+  "name": "立项申请书",
+  "description": "项目立项申请的标准文档模板，适用于向审批方说明项目必要性、方案、资源和风险。",
+  "version": "1.0",
+  "output_filename": "立项申请书_{project_name}.md",
+  "sections": [
+    {
+      "key": "project_info",
+      "title": "项目基本信息",
+      "type": "fields",
+      "description": "项目名称、编号、申请人、申请日期、所属部门等基础信息",
+      "fields": [
+        {"key": "project_name", "label": "项目名称", "type": "text", "hint": "取自项目描述或WBS根节点"},
+        {"key": "project_id", "label": "项目编号", "type": "text", "hint": "按组织规则填写"},
+        {"key": "applicant", "label": "申请人", "type": "text", "hint": "项目发起人姓名"},
+        {"key": "department", "label": "所属部门", "type": "text", "hint": ""},
+        {"key": "date", "label": "申请日期", "type": "date", "hint": ""}
+      ]
+    },
+    {
+      "key": "background",
+      "title": "项目背景与必要性",
+      "type": "rich_text",
+      "description": "说明项目的提出原因、当前业务痛点、市场机会或合规要求。阐述为什么现在需要做这个项目。",
+      "reference_sources": ["project_description", "semantic_analysis"],
+      "hint": "建议从以下几个方面描述：业务现状与痛点、外部环境变化、技术发展驱动、合规或战略要求"
+    },
+    {
+      "key": "objectives",
+      "title": "项目目标",
+      "type": "rich_text",
+      "description": "明确的项目目标，建议使用SMART原则。包括预期成果和量化指标。",
+      "reference_sources": ["wbs_scope"],
+      "hint": "应包括：量化目标（效率提升X%、成本降低Y%）、交付成果清单、里程碑节点"
+    },
+    {
+      "key": "scope",
+      "title": "范围与交付物",
+      "type": "rich_text",
+      "description": "明确项目涵盖的内容和不涵盖的内容。引用WBS分解结果作为范围依据。",
+      "reference_sources": ["wbs_tree"],
+      "hint": "在范围内列出WBS各模块，范围外需明确说明不包含什么，避免范围蔓延",
+      "wbs_ref": true
+    },
+    {
+      "key": "wbs_overview",
+      "title": "工作分解结构（WBS）",
+      "type": "wbs_attachment",
+      "description": "项目的WBS分解层次，展示所有工作包。可引用WBS子技能输出结果。",
+      "reference_sources": ["wbs_json"],
+      "hint": "此处列出WBS树形结构，标注各工作包层级和编码。可附SVG树形图。"
+    },
+    {
+      "key": "schedule",
+      "title": "进度计划",
+      "type": "rich_text",
+      "description": "项目的时间安排，包括里程碑、关键节点、总工期估计。引用CPM和估算结果。",
+      "reference_sources": ["cpm_result", "estimation_result"],
+      "hint": "应包括：关键路径（TF=0的任务列表）、各阶段时间安排、里程碑日期、总工期（P50/P90）"
+    },
+    {
+      "key": "resources",
+      "title": "资源需求",
+      "type": "rich_text",
+      "description": "项目所需的人力、设备、软件、外部服务等资源。",
+      "reference_sources": [],
+      "hint": "应包括：人员角色与数量、设备与软件清单、外协需求、培训需求"
+    },
+    {
+      "key": "budget",
+      "title": "预算估算",
+      "type": "rich_text",
+      "description": "项目的总体预算、成本构成和资金来源。可参考历时估算结果。",
+      "reference_sources": ["estimation_result"],
+      "hint": "应包括：人力成本（人天×单价）、设备采购、外协费用、不可预见费（建议10-15%）"
+    },
+    {
+      "key": "risks",
+      "title": "风险与应对",
+      "type": "rich_text",
+      "description": "识别项目的主要风险，评估影响程度和发生概率，提出应对策略。引用风险登记册。",
+      "reference_sources": ["risk_register"],
+      "hint": "按风险登记册的条目列出，包括：风险描述、影响等级、概率、应对措施、责任人"
+    },
+    {
+      "key": "stakeholders",
+      "title": "相关方分析",
+      "type": "rich_text",
+      "description": "识别项目的关键相关方及其影响力，引用相关方登记册。",
+      "reference_sources": ["stakeholder_register"],
+      "hint": "包括：相关方角色、影响力等级、参与方式、沟通需求"
+    },
+    {
+      "key": "approval",
+      "title": "审批意见",
+      "type": "table",
+      "description": "审批流程记录表，供各级审批人填写意见。",
+      "columns": ["审批人", "角色", "审批意见", "日期"],
+      "rows": 3,
+      "hint": "空表，供各级审批人填写。至少保留3行（部门负责人/财务/分管领导）"
+    }
+  ],
+  "appendix": [
+    {"key": "wbs_attachment", "title": "附件一：WBS工作分解图"},
+    {"key": "schedule_attachment", "title": "附件二：项目进度甘特图"},
+    {"key": "estimation_report", "title": "附件三：历时估算报告"}
+  ]
+}

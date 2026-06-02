@@ -1,18 +1,33 @@
 {
   "name": "activity-duration-estimation",
-  "version": "1.3.2",
+  "version": "1.5.3",
   "author": "Ldxs",
-  "description": "活动历时估算（Activity Duration Estimation）—— 支持三点估算（直接/β分布/正态分布）、蒙特卡洛模拟四种方法。具备语义分析能力，根据任务类型自动推荐最适估算组合，支持外部知识搜索补充，输出自包含HTML评估报告（有图有表有数据有分析）。",
+  "description": "活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。",
   "tags": [
     "duration-estimation",
     "pert",
     "monte-carlo",
     "project-management",
     "semantic-analysis",
-    "html-report"
+    "html-report",
+    "wbs",
+    "work-breakdown",
+    "project-docs"
   ],
   "data_dir": "../.standardization/activity-duration-estimation/",
   "triggers": [
-    "活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析"
-  ]
+    "活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析/WBS/WBS分解/项目规划/工作分解/项目分解/分解任务/立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板"
+  ],
+  "sub_skills": {
+    "wbs": {
+      "name": "WBS工作分解",
+      "description": "WBS工作分解子技能",
+      "trigger": "WBS/工作分解/项目规划/分解任务/模糊需求"
+    },
+    "project-docs": {
+      "name": "项目文档生成",
+      "description": "项目文档双模式生成子技能",
+      "trigger": "立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板"
+    }
+  }
 }
