@@ -1,10 +1,10 @@
 ---
 name: hug-html
-tags: []
-version: 3.0.3
+tags: ['html', 'grid', 'template', 'visual-editor', 'module-library', 'style-presets', 'layout', 'chinese-error-handling']
+version: 3.0.4
 author: Ldxs
 license: MIT
-description: 组件式HTML模块引擎。8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling.
+description: 8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -12,11 +12,13 @@ data_dir: ../.standardization/hug-html/data/
 external_data_dir: true
 trigger: 生成 HTML 模板/编辑 HTML/HTML 模块/网格布局/单元格合并/可视化编辑/输出自包含 HTML
 trigger_negative: 只是简单文本编辑/不涉及 HTML 生成/使用其他框架
+meta_field_sync: true
 ---
 # hug-html
 
 > → 详见 `references/antipatterns.md`
 > → 详见 `references/faq.md`
+> → 详见 `references/architecture.md`
 
 ## 触发场景
 
@@ -40,47 +42,6 @@ trigger_negative: 只是简单文本编辑/不涉及 HTML 生成/使用其他框
 - 用户仅询问 HTML 语法概念，无文件生成需求
 - 用户明确请求其他特定技能
 
-## 四层架构（细化）
-
-```
-骨架 (Skeleton)
-├── 骨架结构 — N×M 网格、行列数、单元格合并(rowspan/colspan)、gap间距
-├── 骨架样式 — 底板背景/渐变/透明度、外阴影、外边框、圆角、内外边距
-└── 约束模式 — fill(完全贴合) / fit(等比缩放) / clip(裁剪遮挡)
-
-模块 (Module)  ← 组件组合 = {组件声明 + 约束 + 比例} 自由搭配
-├── 组件组合 — 8种原子组件自由搭配（text/image/icon/qrcode/table/divider/spacer/group）
-├── 组合逻辑 — 方向(row/column)、比例(ratios)、对齐(align/cross_align)
-└── 约束传递 — 骨架约束模块 → 模块约束组件（递归）
-
-组件 (Component)  ← 8种原子类型
-├── text     — 纯文本（title/body/caption 三种变体）
-├── image    — 图片（支持 fit/cover/fill 填充模式）
-├── icon     — 图标（FontAwesome / SVG内联）
-├── qrcode   — 二维码（API生成）
-├── table    — 数据表格（表头+行）
-├── divider  — 分割线
-├── spacer   — 空白占位
-└── group    — 组合容器（递归包含子组件）
-
-基础样式 (Base)
-└── CSS原语 — 字体/颜色/渐变/圆角/间距/阴影/边框
-```
-
-**编辑粒度**（可视化编辑器内）：
-| 可更新 | 不可更新（需改 Grid Spec） |
-|--------|---------------------------|
-| ✓ 图片内容（点击输入URL / 拖放文件替换） | ✗ 骨架结构（行列数、合并方式、gap） |
-| ✓ 基础样式（每个文字元素独立：字体家族/字重/字号/字色） | ✗ 模块结构（组件的HTML骨架） |
-| ✓ 模块样式（通过 cell style 覆盖背景色/内边距） | ✗ 骨架样式（底板色/外阴影等） |
-
-**大模型使用流程**（自由生成模式）：
-1. 理解用户需求 → 确定骨架结构：几行几列、哪些单元格需要合并
-2. 确定约束模式：fill/fit/clip → 决定骨架对模块、模块对组件的约束
-3. 描述需要的组件 → 从8种原子组件中自由组合，放入对应骨架位置
-4. 配置组合逻辑：方向、比例、对齐方式
-5. 生成 HTML → 可直接用 `module_assembler.py` 或自由生成自包含 HTML
-
 ## 核心能力
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
@@ -100,8 +61,24 @@ trigger_negative: 只是简单文本编辑/不涉及 HTML 生成/使用其他框
 | 11 | **方案模板固化** | `--save-as <名>` 将任意生成固化为用户模板，后续按名引用 |
 | 12 | **自由生成模式** | AI 参考组件库，理解需求确定骨架→组合组件→约束→生成→审计 |
 | 13 | **向后兼容** | 旧格式 `"module": "composite:xxx"` 仍然支持 |
+| 14 | **中文错误处理** | 所有脚本内置中文错误提示、参数校验前置、安全文件操作、调试模式 |
 
-## 能力边界
+### 渐进式文件索引
+
+| 文件名 | 位置 | 说明 |
+|--------|------|------|
+| `references/antipatterns.md` | 反模式 | 常见错误做法及正确做法 |
+| `references/architecture.md` | 架构设计 | 四层架构体系详解 |
+| `references/call-chains.md` | 调用链 | skill-sub 调用链定义 |
+| `references/changelog.md` | 更新日志 | 版本历史变更记录 |
+| `references/examples.md` | 示例 | 使用示例 |
+| `references/faq.md` | FAQ | 常见问题解答 |
+| `references/guide.md` | 使用指南 | 完整使用教程 |
+| `references/module-library.md` | 模块库 | 组件系统 + 约束系统 |
+| `references/permissions.md` | 权限说明 | 权限扫描报告和风险说明 |
+| `references/style-presets.md` | 样式预设 | 样式预设系统说明 |
+
+## 限制
 
 > **明确这个技能能做什么、不能做什么，避免使用时"不知道支不支持"。**
 
@@ -202,44 +179,3 @@ python scripts/grid_builder.py --export-interfaces "data/output/interfaces.json"
 - **不会**访问系统敏感路径或凭证文件
 - **不会**向外部网络发送数据
 - **不会**执行用户 Shell 配置文件
-
-## 错误处理说明
-
-> v2.1.0 起，所有脚本均集成了中文错误处理机制：
-
-1. **所有错误输出中文** — 不再显示英文 Traceback，改为 `❌ [错误类型] 说明 + 💡 修复建议`
-2. **参数校验前置** — 缺少必填参数时会输出中文提示和"--help 查看参数说明"
-3. **文件操作安全** — 文件不存在/编码不对/JSON格式错误，都有详细中文指引
-4. **调试模式** — 添加 `--debug` 参数可显示完整堆栈（仅供开发调试用）
-5. **常见错误快速查** — 见下方"错误排查"章节或 `references/faq.md`
-
-> 如果遇到报错看不懂、或者修复建议不管用的情况，查阅 `references/faq.md` 或直接要求 AI 协助排查。
-
-## 附录：详细文档索引
-
-| 文档 | 内容 |
-|------|------|
-| `references/guide.md` | 完整使用教程（v3 组件式架构） |
-| `references/module-library.md` | 组件系统 + 约束系统 + 组合示例（v3 新版） |
-| `references/permissions.md` | 权限扫描报告和风险说明 |
-| `references/style-presets.md` | 样式预设系统说明 |
-| `references/call-chains.md` | 调用链定义（skill-sub） |
-| `references/antipatterns.md` | 反模式手册 |
-| `references/faq.md` | 常见问题解答 |
-
-## 错误排查（快速入门）
-
-> 脚本报错了？不要慌。所有错误提示已改为中文，并附带修复建议。
-
-| 错误现象 | 可能原因 | 怎么做 |
-|----------|---------|--------|
-| ❌ [文件错误] 找不到文件 | 路径写错了 | 检查路径是否存在，用绝对路径试试 |
-| ❌ [JSON错误] 格式错误 | JSON 语法有问题 | 用 jsonlint.com 校验，或检查多了一个逗号 |
-| ❌ [模板错误] 未知模板 | 模板名写错了 | 用 `--list-templates` 查看所有可用模板 |
-| ❌ [参数错误] 缺参数 | 命令写少了参数 | 用 `--help` 查看完整参数说明 |
-| ⚠️ 审计警告 | HTML 有小问题但不致命 | 检查输出的 [WARN] 内容，逐一修正 |
-| 浏览器打开是空白 | HTML 文件编码问题 | 确认文件是 UTF-8 编码保存的 |
-
-> 完整错误排查指南见 `references/faq.md`。
-
-> 版本 2.1.2 — 全面中文异常处理：所有脚本输出的英文 Traceback 改为中文错误提示+修复建议；新增能力边界定义和错误排查指引。

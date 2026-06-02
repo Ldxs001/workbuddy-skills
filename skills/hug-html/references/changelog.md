@@ -1,8 +1,22 @@
+## 3.0.4 (2026-06-02) -- skill-standardization 改造
+
+### Changed
+- R-10: SKILL.md frontmatter tags 和 description 与 _meta.json 同步一致
+- R-04: description 移除版本号（_meta.json 和 SKILL.md 均去除）
+- R-20: changelog.md 术语统一（移除→删除）
+- **R-17**: SKILL.md 缩减至 181 行，非标章节按 body.json 三层规则处理:
+   - 四层架构（细化）→ 渐进式: references/architecture.md
+   - 能力边界 → 重命名: 限制
+   - 错误处理说明 → 合并: 核心能力第14项
+   - 附录 → 合并: 核心能力 ### 渐进式文件索引
+
+---
+
 ## 3.0.3 (2026-05-31)
 
 ### 修复
 - **R-01/R-07**: frontmatter 补全 trigger 和 trigger_negative 字段
-- **R-04**: description 移除版本号
+- **R-04**: description 删除版本号
 - **R-06**: 补回缺失的 H1 标题
 - **R-10**: changelog 版本号去 v 前缀
 - **R-18/R-19**: SKILL.md 补充 antipatterns/faq 引用
