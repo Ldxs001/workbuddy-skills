@@ -1,3 +1,19 @@
+## 1.3.0 (2026-06-02)
+
+### 新增功能
+- CPM支持四种依赖类型：FS(完成→开始)、SS(开始→开始)、FF(完成→完成)、SF(开始→完成)
+- 新增合理性审查层：validate_cpm_input/validate_cpm_result/validate_mc_input/validate_mc_result/validate_overlap_tasks/validate_all
+- 审查覆盖：工期非负、O≤M≤P、start≤end、无循环依赖、无自引用、P50≤P90、标准差非负
+
+### 修复
+- calc_overlap 空tasks返回缺少duration字段（与空segments返回结构不一致）
+- report-template.md 示例日期硬编码（改为 date.today()）
+
+### 改进
+- calc_cpm 函数签名兼容新旧格式，旧格式 {2:[1]} 隐式FS保留
+
+---
+
 ## 1.2.0 (2026-06-02)
 
 ### 新增功能

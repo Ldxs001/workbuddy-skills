@@ -1,7 +1,7 @@
 ---
 name: activity-duration-estimation
 tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'html-report']
-version: 1.2.0
+version: 1.3.0
 author: Ldxs
 license: MIT
 description: 活动历时估算（Activity Duration Estimation）—— 支持三点估算（直接/β分布/正态分布）、蒙特卡洛模拟四种方法。具备语义分析能力，根据任务类型自动推荐最适估算组合，支持外部知识搜索补充，输出自包含HTML评估报告（有图有表有数据有分析）。

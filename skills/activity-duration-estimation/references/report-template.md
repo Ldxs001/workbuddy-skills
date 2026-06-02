@@ -209,7 +209,7 @@ cpm_table = '<table class="data-table">...' + ''.join(rows) + '</table>'
 data = {
     'title': '项目名称',
     'subtitle': '方法摘要',
-    'date': '2026-06-02',
+    'date': str(date.today()),  # 自动取当天日期
     'methods': [...],
     'phases': [...],
     'results': {...},

@@ -10,6 +10,104 @@ from typing import Any
 
 
 # ═══════════════════════════════════════════════════
+# 0. 合理性审查
+# ═══════════════════════════════════════════════════
+
+class ValidationResult:
+    """审查结果"""
+    def __init__(self):
+        self.passed: bool = True
+        self.issues: list[str] = []
+
+    def add(self, msg: str):
+        self.passed = False
+        self.issues.append(msg)
+
+    def __str__(self):
+        if self.passed:
+            return '✅ 审查通过'
+        return f'❌ {len(self.issues)} 项问题:\n' + '\n'.join(f'  - {s}' for s in self.issues)
+
+
+def validate_cpm_input(durations: dict, dependencies: dict) -> ValidationResult:
+    """CPM输入合理性审查"""
+    r = ValidationResult()
+    for tid, dur in durations.items():
+        if dur < 0:
+            r.add(f'任务{tid} 工期为负 ({dur})')
+        if dur == 0:
+            r.add(f'任务{tid} 工期为0，可能为输入错误')
+    for tid, deps in dependencies.items():
+        if tid in deps:
+            r.add(f'任务{tid} 自引用依赖')
+        for d in deps:
+            dep_id = d[0] if isinstance(d, (list, tuple)) else d
+            if dep_id not in durations:
+                r.add(f'任务{tid} 依赖不存在的任务 {dep_id}')
+    return r
+
+
+def validate_cpm_result(result) -> ValidationResult:
+    """CPM输出合理性审查"""
+    r = ValidationResult()
+    if result.has_cycle:
+        r.add('任务网络存在循环依赖')
+    if result.project_duration <= 0:
+        r.add(f'项目总工期异常 ({result.project_duration})')
+    for tid, cd in result.task_cpm.items():
+        if cd['es'] > cd['ef']:
+            r.add(f'任务{tid} ES({cd["es"]}) > EF({cd["ef"]})')
+        if cd['ls'] > cd['lf']:
+            r.add(f'任务{tid} LS({cd["ls"]}) > LF({cd["lf"]})')
+        if cd['tf'] < -1e-6:
+            r.add(f'任务{tid} 总时差负值 ({cd["tf"]})')
+    return r
+
+
+def validate_mc_input(phases: list) -> ValidationResult:
+    """蒙特卡洛输入合理性审查"""
+    r = ValidationResult()
+    for name, o, m, p in phases:
+        if not (o <= m <= p):
+            r.add(f'{name}: O({o}) M({m}) P({p}) 不满足 O≤M≤P')
+    return r
+
+
+def validate_mc_result(results: dict) -> ValidationResult:
+    """蒙特卡洛输出合理性审查"""
+    r = ValidationResult()
+    for dist_name, data in results.items():
+        s = data['stats']
+        q = data['quantiles']
+        if s['min'] > s['max']:
+            r.add(f'{dist_name}: min({s["min"]}) > max({s["max"]})')
+        if q['p50'] > q['p90']:
+            r.add(f'{dist_name}: P50({q["p50"]}) > P90({q["p90"]})')
+        if s['stddev'] < 0:
+            r.add(f'{dist_name}: 标准差为负 ({s["stddev"]})')
+    return r
+
+
+def validate_overlap_tasks(tasks: list) -> ValidationResult:
+    """重叠分析输入合理性审查"""
+    r = ValidationResult()
+    for t in tasks:
+        if t.get('start', 0) > t.get('end', 0):
+            r.add(f'{t.get("name","?")}: start({t["start"]}) > end({t["end"]})')
+    return r
+
+
+def validate_all(durations: dict, dependencies: dict,
+                 phases: list, tasks: list) -> list[ValidationResult]:
+    """全流程合理性审查——在自动编排后执行"""
+    results = []
+    results.append(validate_cpm_input(durations, dependencies))
+    results.append(validate_mc_input(phases))
+    results.append(validate_overlap_tasks(tasks))
+    return results
+
+
+# ═══════════════════════════════════════════════════
 # 1. CPM关键路径分析
 # ═══════════════════════════════════════════════════
 
@@ -23,10 +121,17 @@ class CPMResult:
         self.has_cycle: bool = False            # 是否存在循环依赖
 
 
-def calc_cpm(durations: dict[int, float], dependencies: dict[int, list[int]]) -> CPMResult:
+def calc_cpm(
+    durations: dict[int, float],
+    dependencies: dict[int, list[tuple[int, str]] | list[int]]
+) -> CPMResult:
     """
     CPM关键路径分析
-    输入: durations = {任务ID: 工期}, dependencies = {任务ID: [前置任务ID列表]}
+    输入:
+      durations = {任务ID: 工期}
+      dependencies = {任务ID: [(前置ID, 关系类型), ...]}
+        关系类型: 'FS' / 'SS' / 'FF' / 'SF'
+        兼容旧格式: {任务ID: [前置ID, ...]} (默认FS)
     返回: CPMResult 包含所有时差和关键路径信息
     """
     result = CPMResult()
@@ -35,25 +140,39 @@ def calc_cpm(durations: dict[int, float], dependencies: dict[int, list[int]]) ->
     if n == 0:
         return result
 
-    # ID -> 索引映射
     id_to_idx = {tid: i for i, tid in enumerate(task_ids)}
 
-    # 构建邻接表
+    # 标准化依赖关系格式
+    dep_list: dict[int, list[tuple[int, str]]] = {}
+    for tid in task_ids:
+        if tid not in dependencies:
+            dep_list[tid] = []
+            continue
+        deps = dependencies[tid]
+        parsed: list[tuple[int, str]] = []
+        for d in deps:
+            if isinstance(d, (list, tuple)) and len(d) >= 2:
+                pred_id, dep_type = d[0], str(d[1]).upper()
+                if dep_type not in ('FS', 'SS', 'FF', 'SF'):
+                    dep_type = 'FS'
+                parsed.append((pred_id, dep_type))
+            elif isinstance(d, (int, float)):
+                parsed.append((int(d), 'FS'))
+        dep_list[tid] = parsed
+
+    # 构建邻接表（仅用于拓扑排序，基于FS关系）
     adj: list[list[int]] = [[] for _ in range(n)]
     indegree = [0] * n
     for tid in task_ids:
-        if tid not in dependencies:
-            continue
-        for dep_id in dependencies[tid]:
-            if dep_id in id_to_idx:
-                adj[id_to_idx[dep_id]].append(id_to_idx[tid])
+        for pred_id, _ in dep_list.get(tid, []):
+            if pred_id in id_to_idx:
+                adj[id_to_idx[pred_id]].append(id_to_idx[tid])
                 indegree[id_to_idx[tid]] += 1
 
     # 拓扑排序
     queue = deque([i for i in range(n) if indegree[i] == 0])
     topo_order: list[int] = []
     indegree_copy = indegree[:]
-
     while queue:
         u = queue.popleft()
         topo_order.append(u)
@@ -66,13 +185,30 @@ def calc_cpm(durations: dict[int, float], dependencies: dict[int, list[int]]) ->
         result.has_cycle = True
         return result
 
-    # 前向传递 — 最早开始(ES)、最早完成(EF)
+    # 前向传递 — 支持四种依赖关系
     es = [0.0] * n
     ef = [0.0] * n
     for u in topo_order:
         ef[u] = es[u] + durations[task_ids[u]]
-        for v in adj[u]:
-            es[v] = max(es[v], ef[u])
+        # FF/SF：前置任务对当前任务的结束时间约束
+        for pred_id, dep_type in dep_list.get(task_ids[u], []):
+            p_idx = id_to_idx[pred_id]
+            if dep_type == 'FF':
+                ef[u] = max(ef[u], ef[p_idx])
+            elif dep_type == 'SF':
+                ef[u] = max(ef[u], es[p_idx])
+        # FF/SF调整后，重新计算ES
+        es[u] = ef[u] - durations[task_ids[u]]
+        # FS/SS：当前任务对后继任务的开始时间约束
+        for v_idx in adj[u]:
+            for pred_id, dep_type in dep_list.get(task_ids[v_idx], []):
+                if pred_id != task_ids[u]:
+                    continue
+                p_idx = id_to_idx[pred_id]
+                if dep_type == 'FS':
+                    es[v_idx] = max(es[v_idx], ef[p_idx])
+                elif dep_type == 'SS':
+                    es[v_idx] = max(es[v_idx], es[p_idx])
 
     project_duration = max(ef)
     result.project_duration = project_duration
@@ -300,7 +436,8 @@ def calc_overlap(
     返回: 最大重叠数区间 + 最长重叠时长区间
     """
     if not tasks:
-        return {'max_count': {'count': 0, 'tasks': [], 'start': 0, 'end': 0}, 'max_duration': {'count': 0, 'tasks': [], 'start': 0, 'end': 0}}
+        return {'max_count': {'count': 0, 'tasks': [], 'start': 0, 'end': 0, 'duration': 0},
+                'max_duration': {'count': 0, 'tasks': [], 'start': 0, 'end': 0, 'duration': 0}}
 
     events: list[tuple[float, int, int]] = []  # (时间, 增量, 任务索引)
     for i, t in enumerate(tasks):
