@@ -1281,8 +1281,8 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
-    R-25: 文档写作格式规范 (v2.44.0, v2.6.0 C-11/C-12, v2.50.0 C-16)
-    16 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测。
+    R-25: 文档写作格式规范 (v2.44.0, v2.6.0 C-11/C-12, v2.50.0 C-16, v2.59.0 C-17/C-18/C-19)
+    19 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测 + C-17 使用示例检查 + C-18 能力边界检查 + C-19 错误处理检查。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
     全部子检查仅作建议标准统一，不强制改造。
     """
@@ -1803,6 +1803,38 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 issues["warn"].append(
                     f"C-16: {_c16_filename}:{_c16_ln} - 发现过时{_c16_label}「{_c16_m.group()[:30]}」（上下文：{_c16_context}）。{_c16_desc}（由全报告LLM精筛确认并更新）"
                 )
+
+    # ════════════════════════════════════════════════════════════
+    # C-17 (WARN): 技能文档是否包含使用示例
+    # ════════════════════════════════════════════════════════════
+    _c17_body = body.lower()
+    _c17_ok = bool(re.search(r'^##\s+.*示例|^##\s+.*example|^##\s+.*使用', body, re.MULTILINE | re.IGNORECASE))
+    _c17_ok = _c17_ok or bool(re.search(r'用户[：:]|输入[：:]|→ →|```.*\n#\s', body))
+    if not _c17_ok:
+        issues["warn"].append("C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个输入→输出对话示例）")
+
+    # ════════════════════════════════════════════════════════════
+    # C-18 (WARN): 技能文档是否声明能力边界
+    # ════════════════════════════════════════════════════════════
+    _c18_ok = bool(re.search(r'^##\s+.*限制|^##\s+.*边界|^##\s+.*约束|^##\s+.*局限', body, re.MULTILINE | re.IGNORECASE))
+    # 也检查FAQ中是否有容量说明
+    _c18_faq = os.path.join(os.path.dirname(filepath), "references", "faq.md")
+    if os.path.isfile(_c18_faq):
+        _c18_ft = open(_c18_faq, encoding="utf-8").read()
+        _c18_ok = _c18_ok or bool(re.search(r'最多|上限|建议不超过|容量|不能超过', _c18_ft))
+    if not _c18_ok:
+        issues["warn"].append("C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）")
+
+    # ════════════════════════════════════════════════════════════
+    # C-19 (WARN): FAQ 是否包含错误处理指导
+    # ════════════════════════════════════════════════════════════
+    _c19_ok = False
+    _c19_faq = os.path.join(os.path.dirname(filepath), "references", "faq.md")
+    if os.path.isfile(_c19_faq):
+        _c19_ft = open(_c19_faq, encoding="utf-8").read()
+        _c19_ok = bool(re.search(r'出错|报错|异常|怎么办|修正|修复建议', _c19_ft))
+    if not _c19_ok:
+        issues["warn"].append("C-19: FAQ缺少错误处理指导（建议新增出错/异常相关的问答条目）")
 
     # ════════════════════════════════════════════════════════════
     # 汇总输出

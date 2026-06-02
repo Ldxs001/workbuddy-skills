@@ -32,7 +32,7 @@ RULES = [
         "id": "R-03",
         "name": "version 字段 (SemVer) + 变更语义规则",
         "severity": "ERROR",
-        "check": "frontmatter 含 version 字段且符合 SemVer（MAJOR.MINOR.PATCH）。变更语义规则：MAJOR=架构级重构/破坏性变更/核心引擎重写；MINOR=新增功能/已有功能重构/大面积描述修正/bug修复；PATCH=单处描述修正/参数拼写/路径修正/文档错别字",
+        "check": "frontmatter 含 version 字段且符合 SemVer（MAJOR.MINOR.PATCH）。变更语义规则——\nMAJOR (breaking/大版本)：架构级重构/核心引擎重写/破坏性API变更/数据格式不兼容。例: 重写整个审计引擎、修改数据目录结构。\nMINOR (feature/中版本)：新增功能/已有功能重构（非bug性质的改进）/新算法/新模块/大面积文档重写/新增审计规则。例: 新增CPM算法、新增合理性审查层、新增R-25子检查。MINOR 累加的可独立发布的变更。\nPATCH (fix/小版本)：单处bug修复/文档错别字/参数拼写/路径修正/配置调整/不超过3行的描述修正。PATCH 不该包含用户可见的新功能。\n同一版本中包含多个独立新功能时必须用 MINOR（feature），不得将多个功能打包为 PATCH（fix）跳过 MINOR 递增。",
         "method": "yaml_has_semver_version",
         "fixable": True,
         "create_template": "version: 遵循 SemVer，MAJOR.MINOR.PATCH，严格按规则使用",

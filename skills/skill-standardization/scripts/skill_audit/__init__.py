@@ -773,7 +773,7 @@ def cmd_bump(args):
         return
     if bump_type == 'fix':
         new_version = f"{major}.{minor}.{patch + 1}"
-        rule_note = "PATCH: 单处描述修正/参数拼写/路径修正"
+        rule_note = "PATCH: 单处bug修复/文档错别字/参数拼写(不含新功能,多变更不得打包为PATCH)"
     elif bump_type == 'feature':
         new_version = f"{major}.{minor + 1}.0"
         rule_note = "MINOR: 新增功能/已有功能重构/大面积描述修正"
