@@ -140,8 +140,33 @@ def validate(steps, skills_dir=None):
     warnings = [i for i in issues if i["severity"] == "WARN"]
     passed = len(errors) == 0
 
+    # 计算 auto_safe：链中无 manual 粘连点且无 ask 模式时 true
+    auto_safe = True
+    for step in steps:
+        if step.get("type", "skill") == "adhesion":
+            adhesion = step.get("adhesion", {})
+            for sol in adhesion.get("solutions", []):
+                if sol.get("mode") == "manual":
+                    auto_safe = False
+                    break
+            if not auto_safe:
+                break
+            # 无 solutions 时也不安全
+            if not adhesion.get("solutions"):
+                auto_safe = False
+                break
+        # failure_mode.on_exhaust = "ask" 也需要人介入
+        fm = step.get("failure_mode", {})
+        if isinstance(fm, dict) and fm.get("on_exhaust") == "ask":
+            auto_safe = False
+            break
+        if isinstance(fm, str) and fm == "ask":
+            auto_safe = False
+            break
+
     return {
         "passed": passed,
+        "auto_safe": auto_safe,
         "issues": issues,
         "summary": {
             "total": total,
@@ -159,7 +184,7 @@ def format_report(result):
     lines = []
     s = result["summary"]
     lines.append(f"校验结果: {'通过' if result['passed'] else '未通过'}")
-    lines.append(f"总步骤: {s['total']} | ERROR: {s['errors']} | WARN: {s['warnings']}")
+    lines.append(f"总步骤: {s['total']} | ERROR: {s['errors']} | WARN: {s['warnings']} | 可自动执行: {'是' if result.get('auto_safe', True) else '否'}")
     if s["adhesion_count"] > 0:
         lines.append(f"粘连点: {s['adhesion_count']} ({s['adhesion_ratio']:.0%})")
 

@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.25.0
+version: 1.26.0
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -222,6 +222,9 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "代码发布" --force
 | 缺少 solutions | adhesion 步骤没有提供方案 | 至少加一个 manual 方案 |
 | 依赖不存在的步骤 | depends_on 引用了无效索引 | 检查依赖步骤的 index 是否正确 |
 | 引用的 skill 不存在 | skill_name 对应的 skill 未安装 | 检查 skill 名称是否正确 |
+| 检测到定时/自动化意图，但未提供 --schedule | 描述中含"每天/每周/定时"等词但没给调度配置 | 添加 --schedule 参数，或移除描述中的时间相关词 |
+
+> **强制规则**：用户描述中包含定时/自动化意图（如"每天"、"每周"、"自动执行"等）时，**必须**提供 `--schedule` 参数配置调度信息，否则链创建被拦截。不依赖 AI 自觉判断。
 
 ## 配置
 

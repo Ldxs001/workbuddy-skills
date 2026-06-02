@@ -420,7 +420,7 @@ class ChainManager:
         index = self.load_index()
         return list(index.keys())
     
-    def create_chain(self, name, description="", purpose="", tags=None, steps=None, user_specified=False):
+    def create_chain(self, name, description="", purpose="", tags=None, steps=None, user_specified=False, schedule=None):
         """创建调用链（v1.25.0：自动调用 flow_validator + structure_checker 校验）"""
         if tags is None:
             tags = []
@@ -463,6 +463,8 @@ class ChainManager:
             "updated_at": datetime.now().isoformat(),
             "exec_count": 0
         }
+        if schedule:
+            chain_data["schedule"] = schedule
         
         success = self.save_chain(chain_data)
         if success:
@@ -634,8 +636,28 @@ class CLIHandler:
                 return 1
 
         user_specified = getattr(args, "user_specified", False) or getattr(args, "user", False)
-        
-        success, message = self.chain_manager.create_chain(name, description, purpose, tags, steps, user_specified=user_specified)
+
+        # 定时/自动化关键字检测 —— 强制提醒，不靠 AI 自觉（v1.25.0）
+        _TIMING_KEYWORDS = ["每天", "每周", "每月", "每年", "定时", "定期", "自动化", "自动执行",
+                            "cron", "每小时", "每分", "每", "定期执行", "周期"]
+        search_text = f"{description} {purpose}".lower()
+        has_timing_intent = any(kw in search_text for kw in _TIMING_KEYWORDS)
+
+        schedule = None
+        if getattr(args, "schedule", ""):
+            try:
+                schedule = json.loads(args.schedule)
+            except json.JSONDecodeError as e:
+                print(f"❌ 调度配置 JSON 解析失败: {e}")
+                return 1
+        elif has_timing_intent:
+            print("⚠️  检测到定时/自动化意图，但未提供 --schedule 参数。")
+            print("   请补充调度配置，例如：")
+            print("   --schedule '{\"type\":\"cron\",\"expression\":\"0 6 * * *\",\"description\":\"每天早上6点\"}'")
+            print("   或取消链创建，移除描述中的时间相关词后重试。")
+            return 1
+
+        success, message = self.chain_manager.create_chain(name, description, purpose, tags, steps, user_specified=user_specified, schedule=schedule)
         if success:
             print(f"✅ {message}")
             return 0
@@ -662,15 +684,68 @@ class CLIHandler:
         chain = self.chain_manager.load_chain(name)
         if not chain:
             print(f"❌ 调用链 '{name}' 不存在")
+        if not chain:
+            print(f"❌ 调用链 '{name}' 不存在")
             return 1
         
         print(f"调用链: {chain['name']}")
         print(f"描述: {chain.get('description', '')}")
         print(f"目的: {chain.get('purpose', '')}")
         print(f"步骤数: {len(chain.get('steps', []))}")
-        
+
+        sched = chain.get("schedule")
+        if sched:
+            print(f"调度: {sched.get('description', '')} ({sched.get('type', '')}: {sched.get('expression', '')})")
+
         return 0
-    
+
+    def cmd_schedule(self, args):
+        """设置/查看/删除调用链调度配置（v1.25.0）"""
+        name = args.name
+        chain = self.chain_manager.load_chain(name)
+        if not chain:
+            print(f"❌ 调用链 '{name}' 不存在")
+            return 1
+
+        if args.remove:
+            if "schedule" in chain:
+                del chain["schedule"]
+                chain["updated_at"] = datetime.now().isoformat()
+                self.chain_manager.save_chain(chain)
+                print(f"✅ 调度配置已删除: {name}")
+            else:
+                print("ℹ️ 无调度配置")
+            return 0
+
+        if args.cron or args.interval or args.once:
+            if args.cron:
+                sched = {"type": "cron", "expression": args.cron}
+            elif args.interval:
+                sched = {"type": "interval", "expression": str(args.interval)}
+            elif args.once:
+                sched = {"type": "once", "expression": args.once}
+
+            if args.desc:
+                sched["description"] = args.desc
+            elif not sched.get("description"):
+                sched["description"] = f"{sched['type']}: {sched['expression']}"
+
+            chain["schedule"] = sched
+            chain["updated_at"] = datetime.now().isoformat()
+            self.chain_manager.save_chain(chain)
+            print(f"✅ 调度配置已设置: {sched['description']}")
+            return 0
+
+        # 无参数则查看
+        sched = chain.get("schedule")
+        if sched:
+            print(f"调度: {sched.get('description', '')}")
+            print(f"  类型: {sched.get('type', '')}")
+            print(f"  表达式: {sched.get('expression', '')}")
+        else:
+            print("ℹ️ 无调度配置")
+        return 0
+
     def cmd_check_gaps(self, args):
         """检查所有调用链的粘连点，尝试用新 skill 填补（v1.25.0）"""
         chains = self.chain_manager.list_chains()
@@ -786,6 +861,7 @@ def main():
     p_create.add_argument("--tags", default="", help="标签 (JSON 数组)")
     p_create.add_argument("--steps", default="", help="步骤 (JSON 数组)")
     p_create.add_argument("--user-specified", action="store_true", help="标记为用户显式指定的 skill，自愈时跳过")
+    p_create.add_argument("--schedule", default="", help="调度配置 (JSON 对象，如 '{\"type\":\"cron\",\"expression\":\"0 6 * * *\"}')")
     
     # list
     subparsers.add_parser("list", help="列出所有调用链")
@@ -802,6 +878,15 @@ def main():
     # check-gaps (v1.25.0)
     subparsers.add_parser("check-gaps", help="检查所有调用链的粘连点，尝试用新 skill 填补")
     
+    # schedule (v1.25.0)
+    p_sched = subparsers.add_parser("schedule", help="设置/查看/删除调用链调度配置")
+    p_sched.add_argument("--name", required=True, help="调用链名称")
+    p_sched.add_argument("--cron", default="", help="cron 表达式（如 '0 6 * * *' 每天早上6点）")
+    p_sched.add_argument("--interval", type=int, default=0, help="间隔秒数（如 86400 每天）")
+    p_sched.add_argument("--once", default="", help="单次执行（ISO 时间，如 '2026-06-03T06:00:00'）")
+    p_sched.add_argument("--desc", default="", help="调度描述（自然语言）")
+    p_sched.add_argument("--remove", action="store_true", help="删除调度配置")
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -817,6 +902,7 @@ def main():
         "show": cli_handler.cmd_show,
         "delete": cli_handler.cmd_delete,
         "check-gaps": cli_handler.cmd_check_gaps,
+        "schedule": cli_handler.cmd_schedule,
     }
     
     cmd_func = commands.get(args.command)

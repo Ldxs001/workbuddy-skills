@@ -15,13 +15,52 @@
   "purpose": "string",        // 核心目的
   "user_intent": "string",    // 用户原始意图（用于意图匹配）
   "tags": ["string"],         // 标签（用于自动匹配）
+  "auto_safe": true,          // 链是否可不经人工介入全自动执行（由 flow_validator 自动计算）
   "user_specified": false,    // 用户是否显式指定了所有 skill（true→自愈时跳过）
+  "schedule": null,           // 调度配置（可选），见下方 Schedule 定义
   "created_at": "datetime",
   "updated_at": "datetime",
   "exec_count": 0,            // 执行次数
   "steps": [ ... ]            // Step 数组，见下文
 }
 ```
+
+---
+
+## Schedule（调度配置）
+
+> 链的调度元数据，任何平台可据此创建定时任务。不绑定具体平台。
+
+```json
+{
+  "type": "cron",              // "cron" | "interval" | "once"
+  "expression": "0 6 * * *",  // cron 表达式 / 间隔秒数 / 触发时间
+  "description": "每天早上6点执行"  // 自然语言描述
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | string | ✅ | `"cron"`（cron 表达式）、`"interval"`（间隔秒数）、`"once"`（单次执行） |
+| `expression` | string | ✅ | cron 格式（如 `"0 6 * * *"`）或间隔秒数（如 `"86400"`）或 ISO 时间（如 `"2026-06-03T06:00:00"`） |
+| `description` | string | ❌ | 自然语言描述，便于跨平台理解 |
+
+### type 说明
+
+| type | expression 示例 | 含义 |
+|------|----------------|------|
+| `cron` | `"0 6 * * *"` | 每天早上 6 点 |
+| `cron` | `"0 0 * * 1"` | 每周一零点 |
+| `cron` | `"0 0 1 * *"` | 每月 1 日零点 |
+| `interval` | `"3600"` | 每小时执行一次 |
+| `interval` | `"86400"` | 每天执行一次 |
+| `once` | `"2026-06-03T06:00:00"` | 2026年6月3日6点执行一次 |
+
+### 使用方式
+
+- **创建链时**：用户在意图中描述定时需求（如「每天早上6点跑这个链」），AI 自动填充 `schedule` 字段
+- **已有链**：通过 `chain_manager.py schedule --name <链名> --cron "0 6 * * *" --desc "每天6点"` 添加/修改
+- **平台侧**：读取 `chain_data.schedule`，按 `type` + `expression` 注册定时任务
 
 ---
 
