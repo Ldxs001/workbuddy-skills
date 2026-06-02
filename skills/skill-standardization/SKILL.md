@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.56.0
+version: 2.58.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -21,7 +21,7 @@ h1_position: true
 
 - **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 `scripts/` 下的 Python 脚本原子写入
 - **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `references/changelog.md`
-- **更新后必须 `audit .` 自审** — 0 ERROR 0 WARN 方可提交
+- **0 ERROR 0 WARN 铁律强制** — 更新后用 `audit --verify` 验证，非误报项必须全部修复，exit(0) 方可提交
 - **`--fix` 自动修正后** — 将 fix_details 转化为可读 changelog 并用 safe_io 写入
 
 ## 触发场景

@@ -213,3 +213,33 @@ skills/
 
 - `structure_checker.py` 的 `check_changelog_progressive()` 函数
 - 正则检测 `## 更新日志` / `## Changelog` / `## vX.Y.Z` 等模式
+
+---
+
+## 铁律 8：0 ERROR 0 WARN 强制验证（R-01~R-25）
+
+> 自 v2.57.1 起，审计后的 0 ERROR 0 WARN 不再依赖 AI 自觉，改为 Python 侧强制。
+
+### 规则内容
+
+- 更新/改造 skill 后，**必须**运行 `python -m scripts.skill_audit audit <skill-dir> --verify`
+- `--verify` 逻辑：
+  1. 运行完整审计 R-01~R-25
+  2. 排除 `_reclassify_false_positive()` 已知的误报项
+  3. 如果有任何非误报的未通过项 → exit(1)，输出每项 rule_id + detail
+  4. 全部通过或仅误报 → exit(0)，输出验证通过消息
+- AI **不得**在 `--verify` 返回非零退出码的情况下声称"审计通过"
+- `--verify` 是强制步骤，不可跳过，不可用 "AI 自觉" 替代
+
+### 设计理由
+
+- 铁律写在 md 里靠 AI 自觉不可靠（本次 #25 的教训）
+- exit code 是 AI 无法忽略的信号——非零退出码意味着验证绝对失败
+- 误报与非误报的区分由 `_reclassify_false_positive()` 统一管理，LLM 不再需要逐条判断
+
+### 修复方法
+
+如果 `--verify` 返回非零：
+1. 查看输出的 rule_id 和 detail
+2. 逐条修复（改文件、调脚本、拆章节等）
+3. 重新运行 `audit --verify` 直到 exit(0)

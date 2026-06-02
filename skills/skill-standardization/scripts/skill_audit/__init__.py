@@ -603,6 +603,26 @@ def cmd_audit(args):
         else:
             print(f"ℹ️  无需修正或所有失败规则暂无自动修复工具")
 
+    # --verify 模式：强制验证是否有非误报的未通过项，有则 exit(1)
+    if getattr(args, 'verify', False):
+        remaining = []
+        for res in result.get("results", []):
+            if not res.get("passed") and not res.get("skipped"):
+                if not _reclassify_false_positive(res):
+                    remaining.append(res)
+        if remaining:
+            print(f"\n{'='*55}")
+            print(f"  [VERIFY] 验证失败：{len(remaining)} 项未修复（非误报，铁律要求 0 ERROR 0 WARN）")
+            for r in remaining:
+                sev = "[ERROR]" if r['severity'] == 'ERROR' else "[WARN]"
+                print(f"    {r['rule_id']} {sev} {r['detail'][:120]}")
+            print(f"{'='*55}")
+            sys.exit(1)
+        else:
+            print(f"\n{'='*55}")
+            print(f"  [VERIFY] 验证通过：所有未通过项均为误报，达到铁律 0 ERROR 0 WARN 要求")
+            print(f"{'='*55}")
+
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
@@ -799,6 +819,7 @@ def main():
     p_audit.add_argument("--manifest-version", metavar="VER", help="manifest 中记录的版本号（用于 R-10）")
     p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
     p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
+    p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
 
     # audit-all 子命令
     p_all = subparsers.add_parser("audit-all", help="批量审查所有 skill")

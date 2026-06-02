@@ -373,58 +373,44 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
     """
     R-17: 渐进加载强制检查 + 非标准章节检测。
     
-    检查 1: SKILL.md > 230 行时必须拆分到 references/。
-    检查 2: 正文中超出 body.json allowed_sections 白名单的非标准 H2 章节，提示拆分到 references/。
+    检查 1: SKILL.md > 230 行时必须拆分到 references/（v2.50.1 修复：移除松散引用检测，超限即 ERROR）。
+    检查 2: 正文中超出 body.json allowed_sections 白名单的非标准 H2 章节，输出 🟡 WARN 供 LLM 精筛。
     """
     if not content:
         return {"passed": True, "detail": f"{filepath}:1 - 无内容，跳过检查"}
 
-    # 从 **kw 提取 skill_dir
     _skill_dir_r17 = kw.get("skill_dir", "")
     lines = content.splitlines()
     line_count = len(lines)
     detail_parts = []
     passed = True
 
-    # ── 检查 1: 行数超过 200 → 必须拆分 ──
-    if line_count > 200:
-        has_references = False
-        for line in lines:
-            if "references/" in line or "→ 详见" in line or "详见 `references/" in line:
-                has_references = True
-                break
+    # ── 检查 1: 行数超过 230 → ERROR（不移除引用检测，超限即强制拆分）──
+    if line_count > 230:
+        passed = False
+        detail_parts.append(
+            f"SKILL.md 共 {line_count} 行，超过 230 行限制，必须将非核心章节拆分到 references/ 并替换为「→ 详见 references/xxx.md」引用"
+        )
 
-        if not has_references:
-            passed = False
-            detail_parts.append(
-                f"SKILL.md 共 {line_count} 行，超过 230 行限制，但未拆分到 references/ 或通过「→ 详见 references/xxx.md」引用"
-            )
-
-    # ── 检查 2: 非标准章节检测（Phase 1 正则粗筛 → LLM  精筛）──
+    # ── 检查 2: 非标准章节检测（Phase 1 正则粗筛 → LLM 精筛）──
     nonstandard = _find_nonstandard_sections(body, _skill_dir_r17)
     if nonstandard:
         phase1_lines = []
         for ln, title, preview in nonstandard:
             phase1_lines.append(f"  {filepath}:{ln} - 「{title}」（内容预览：{preview}...）")
         detail_parts.append(
-            f"ⓘ 粗筛 {len(nonstandard)} 个疑似非标章节，待 LLM 全报告LLM精筛确认（不阻断通过）："
-            f"\n【两阶段】正则粗筛：发现以下 H2 章节不在 allowed_sections 白名单中，"
-            f"需 LLM 全报告LLM精筛判断为真实非标（应拆分到 references/）"
+            f"🟡 粗筛 {len(nonstandard)} 个疑似非标章节，由全报告 LLM 精筛判断应拆分到 references/ 还是合并到标准章节："
+            f"\n【两阶段】正则粗筛：以下 H2 章节不在 allowed_sections 白名单中，"
+            f"需 LLM 精筛判断为真实非标（应拆分到 references/）"
             f"还是应合并到已有标准章节（如「注意事项」→「铁律/规范」）："
             f"\n" + '\n'.join(phase1_lines)
         )
-        # 非标章节仅 Phase 1 粗筛，不设置 passed=False
 
     if not detail_parts:
-        if line_count > 200:
-            return {
-                "passed": True,
-                "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，已超过 230 行但已拆分到 references/（符合渐进加载要求）；无非标章节"
-            }
         return {"passed": True, "detail": f"{filepath}:1 - SKILL.md 共 {line_count} 行，符合渐进加载要求（≤230 行），无非标章节"}
 
     return {
         "passed": passed,
         "detail": f"{filepath}:1 - {'; '.join(detail_parts)}",
-        "suggestion": "LLM 全报告LLM精筛：对 Phase 1 粗筛的疑似非标章节逐条判断。如果内容属于某标准章节（如「注意事项」→「铁律/规范」），合并之；如果确实是非标内容，用 fix_split_nonstandard 拆分到 references/ 并替换为 → 详见引用。"
+        "suggestion": "全报告 LLM 精筛：对上述非标章节逐条判断。如果内容属于某标准章节（如「注意事项」→「铁律/规范」），合并之；如果确实是非标内容，拆分到 references/ 并替换为 → 详见引用。"
     }
