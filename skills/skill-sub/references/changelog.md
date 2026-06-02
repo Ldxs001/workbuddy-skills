@@ -1,3 +1,19 @@
+## 1.27.0 (2026-06-02)
+
+### 新增
+
+- **调度强制注册机制**：创建含 schedule 的链后**立即**输出强制注册提醒（不等执行日）；新增 register-schedule CLI 子命令将 registered 标记置为 true
+- **执行计划注册提醒**：chain_executor.py 检测未注册调度并输出强制提醒
+
+### 变更
+
+- **chain_manager.py**：新增 register-schedule CLI 子命令；创建成功后含 schedule 时立即输出强制注册提醒
+- **chain_executor.py**：新增 unregistered_schedule 检测，计划输出顶部含强制注册提醒
+- **chain_schema.md**：schedule 定义新增 registered 字段，含注册流程说明
+- **SKILL.md**：工作流程步骤 5 改为「立即注册调度」，明确不等手动执行
+
+---
+
 ## 1.26.0 (2026-06-02)
 
 ### 新增
@@ -10,18 +26,20 @@
 - **skill_extractor suggest**：新增 `suggest` 子命令，根据用户意图关键词匹配 skill 并排序候选，检测未匹配缺口（Python 扫描+LLM 选最终集合的混合模式）
 - **能力边界文档**：SKILL.md 新增「能力边界与限制」章节，含适宜/不适宜场景表、硬限制表、常见创建错误速查
 - **FAQ 错误场景**：faq.md 新增 E1~E4 四个常见错误场景（粘连点连续、skill 不存在、步骤失败、校验器阻断），每条报错附原因和解决方法
-- **调度配置系统**：新增 `schedule` 元数据字段（type/expression/description），任何平台可据此创建定时任务；新增 `chain_manager.py schedule` 子命令；创建链时描述含定时关键词（每天/每周/自动等）强制要求 `--schedule` 参数，否则阻断
+- **调度配置系统**：新增 `schedule` 元数据字段（type/expression/description/registered），任何平台可据此创建定时任务；新增 `chain_manager.py schedule` 子命令；创建链时描述含定时关键词（每天/每周/自动等）强制要求 `--schedule` 参数，否则阻断
 - **auto_safe 自动化检测**：`chain_flow_validator` 自动计算链是否可全自动执行（无 manual 粘连点且无 ask 模式），输出 `auto_safe` 布尔字段供平台使用
+- **调度强制注册机制**：创建含 `schedule` 的链后**立即**输出强制注册提醒（不等执行日）；新增 `register-schedule` CLI 子命令将 `registered` 标记置为 `true`；`chain_executor.py` 执行计划检测未注册调度并输出强制提醒
 
 ### 变更
 
-- **`chain_manager.py`**：`validate_chain` 适配 adhesion 类型；新增 `check-gaps` / `schedule` CLI 子命令；`create_chain` 和 `update` 自动调用 `flow_validator` + `structure_checker` 校验；新增 `user_specified`、`schedule` 字段和对应 CLI 参数；新增定时关键词强制检测逻辑
-- **`chain_schema.md`**：新增类型 D 粘连点步骤、`user_specified` 字段、`auto_safe` 字段、`schedule` 字段及 Schedule 定义章节
-- **`chain_flow_validator.py`**：新增 `auto_safe` 自动计算（检测 manual 粘连点和 ask 模式）；新增连续粘连点 ERROR 检查
+- **`chain_manager.py`**：`validate_chain` 适配 adhesion 类型；新增 `check-gaps` / `schedule` / `register-schedule` CLI 子命令；`create_chain` 和 `update` 自动调用 `flow_validator` + `structure_checker` 校验；新增 `user_specified`、`schedule` 字段和对应 CLI 参数；新增定时关键词强制检测逻辑；创建成功后含 schedule 时立即输出强制注册提醒
+- **`chain_schema.md`**：新增类型 D 粘连点步骤、`user_specified` 字段、`auto_safe` 字段、`schedule` 字段（含 `registered`）及 Schedule 定义章节
+- **`chain_executor.py`**：新增 `unregistered_schedule` 检测，计划输出顶部含强制注册提醒（`registered=false` 时）
 - **`workflow.md`**：创建流程从 7 步扩展为 8 步，新增步骤 6 流程+结构双重校验
 - **`adhesion.md`**：补充缺口分析规则、禁止行为清单、连续粘连点合并规则、判定示例
 - **`SKILL.md`**：核心能力新增第 7 项粘连点支持；工作流程新增步骤 3 流程缺口分析；快速开始重写为「三步上手」含完整 JSON 示例；新增「能力边界与限制」章节
 - **`faq.md`**：新增 E1~E4 常见错误场景
+- **`chain_executor.py`**：新增 `unregistered_schedule` 检测，计划输出顶部含强制注册提醒
 
 ---
 

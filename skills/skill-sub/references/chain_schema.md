@@ -35,7 +35,8 @@
 {
   "type": "cron",              // "cron" | "interval" | "once"
   "expression": "0 6 * * *",  // cron 表达式 / 间隔秒数 / 触发时间
-  "description": "每天早上6点执行"  // 自然语言描述
+  "description": "每天早上6点执行",  // 自然语言描述
+  "registered": false          // 是否已在平台注册（创建时为 false，注册后改为 true）
 }
 ```
 
@@ -44,6 +45,14 @@
 | `type` | string | ✅ | `"cron"`（cron 表达式）、`"interval"`（间隔秒数）、`"once"`（单次执行） |
 | `expression` | string | ✅ | cron 格式（如 `"0 6 * * *"`）或间隔秒数（如 `"86400"`）或 ISO 时间（如 `"2026-06-03T06:00:00"`） |
 | `description` | string | ❌ | 自然语言描述，便于跨平台理解 |
+| `registered` | bool | ❌ | 注册标记。创建时默认 `false`，平台注册后改为 `true` |
+
+### 注册流程
+
+1. 链创建时 `schedule.registered = false`
+2. `chain_executor.py plan` 检测到 `registered == false` 时，在计划顶部输出 **强制注册提醒**
+3. 平台读取 `schedule` 字段，完成注册后将 `registered` 置为 `true`
+4. 已注册的链 `plan` 输出不再显示注册提醒
 
 ### type 说明
 

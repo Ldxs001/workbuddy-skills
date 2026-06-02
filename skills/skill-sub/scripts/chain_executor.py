@@ -272,6 +272,24 @@ class InstructionGenerator:
         lines = []
         lines.append(f"# 执行计划：{plan['chain_name']}")
         lines.append(f"# 描述：{plan['chain_description']}")
+
+        # 未注册调度强制提醒（v1.26.0）
+        sched = plan.get("unregistered_schedule")
+        if sched:
+            lines.append("")
+            lines.append("!" * 60)
+            lines.append("!  [强制] 调度尚未在平台注册")
+            lines.append("!  此链配置了定时/自动化任务，但尚未注册到平台。")
+            lines.append(f"!  类型: {sched.get('type', '?')}")
+            lines.append(f"!  表达式: {sched.get('expression', '?')}")
+            lines.append(f"!  描述: {sched.get('description', '无')}")
+            lines.append("!")
+            lines.append("!  AI 必须执行以下操作之一：")
+            lines.append("!    1. 调用平台的调度注册接口完成注册")
+            lines.append("!    2. 或运行: chain_manager.py register-schedule --name <链名>")
+            lines.append("!  未注册前，调度不会生效。")
+            lines.append("!" * 60)
+            lines.append("")
         lines.append(f"# 目的：{plan['chain_purpose']}")
         lines.append(f"# 总步骤：{plan['total_steps']}")
         lines.append("")
@@ -383,7 +401,12 @@ class ExecutionPlanBuilder:
             "all_skill_names": all_skill_names,
             "generated_at": datetime.now().isoformat(),
         }
-        
+
+        # 检测未注册的调度（v1.26.0）
+        sched = chain.get("schedule")
+        if sched and not sched.get("registered", False):
+            plan["unregistered_schedule"] = sched
+
         # 生成 AI 指令
         plan["ai_instructions"] = InstructionGenerator().generate(plan)
         

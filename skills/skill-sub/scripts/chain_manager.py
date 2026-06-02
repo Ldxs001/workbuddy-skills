@@ -464,6 +464,7 @@ class ChainManager:
             "exec_count": 0
         }
         if schedule:
+            schedule["registered"] = schedule.get("registered", False)
             chain_data["schedule"] = schedule
         
         success = self.save_chain(chain_data)
@@ -660,6 +661,20 @@ class CLIHandler:
         success, message = self.chain_manager.create_chain(name, description, purpose, tags, steps, user_specified=user_specified, schedule=schedule)
         if success:
             print(f"✅ {message}")
+            if schedule:
+                print("")
+                print("=" * 60)
+                print("  [强制] 调度尚未注册到平台！")
+                print(f"  链 '{name}' 配置了定时/自动化任务，但尚未注册。")
+                desc = schedule.get("description", "")
+                expr = schedule.get("expression", "")
+                stype = schedule.get("type", "")
+                print(f"  调度: {desc} ({stype}: {expr})")
+                print("")
+                print("  AI 必须立即完成注册，否则调度不会生效：")
+                print(f"    选项1: 调用平台调度注册接口")
+                print(f"    选项2: chain_manager.py register-schedule --name \"{name}\"")
+                print("=" * 60)
             return 0
         else:
             print(f"❌ {message}")
@@ -730,6 +745,7 @@ class CLIHandler:
             elif not sched.get("description"):
                 sched["description"] = f"{sched['type']}: {sched['expression']}"
 
+            sched["registered"] = False  # 新建调度默认未注册
             chain["schedule"] = sched
             chain["updated_at"] = datetime.now().isoformat()
             self.chain_manager.save_chain(chain)
@@ -744,6 +760,29 @@ class CLIHandler:
             print(f"  表达式: {sched.get('expression', '')}")
         else:
             print("ℹ️ 无调度配置")
+        return 0
+
+    def cmd_register_schedule(self, args):
+        """标记调用链的调度已在平台注册（v1.26.0）"""
+        name = args.name
+        chain = self.chain_manager.load_chain(name)
+        if not chain:
+            print(f"❌ 调用链 '{name}' 不存在")
+            return 1
+
+        sched = chain.get("schedule")
+        if not sched:
+            print(f"❌ 调用链 '{name}' 没有调度配置")
+            return 1
+
+        sched["registered"] = True
+        chain["schedule"] = sched
+        chain["updated_at"] = datetime.now().isoformat()
+        self.chain_manager.save_chain(chain)
+
+        print(f"✅ 调度已注册: {name}")
+        print(f"   {sched.get('description', '')} ({sched['type']}: {sched['expression']})")
+        print(f"   平台已确认，将按计划执行")
         return 0
 
     def cmd_check_gaps(self, args):
@@ -887,6 +926,10 @@ def main():
     p_sched.add_argument("--desc", default="", help="调度描述（自然语言）")
     p_sched.add_argument("--remove", action="store_true", help="删除调度配置")
     
+    # register-schedule (v1.26.0)
+    p_reg = subparsers.add_parser("register-schedule", help="标记调度已注册到平台")
+    p_reg.add_argument("--name", required=True, help="调用链名称")
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -903,6 +946,7 @@ def main():
         "delete": cli_handler.cmd_delete,
         "check-gaps": cli_handler.cmd_check_gaps,
         "schedule": cli_handler.cmd_schedule,
+        "register-schedule": cli_handler.cmd_register_schedule,
     }
     
     cmd_func = commands.get(args.command)
