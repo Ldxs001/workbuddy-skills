@@ -1,0 +1,585 @@
+"""
+activity-duration-estimation 分析引擎
+CPM关键路径分析 / 多分布蒙特卡洛模拟 / 任务重叠分析 / SVG图表生成
+"""
+
+import math
+import random
+from collections import defaultdict, deque
+from typing import Any
+
+
+# ═══════════════════════════════════════════════════
+# 1. CPM关键路径分析
+# ═══════════════════════════════════════════════════
+
+class CPMResult:
+    """CPM分析结果"""
+    def __init__(self):
+        self.task_cpm: dict[int, dict] = {}    # task_id -> {es, ef, ls, lf, tf, is_critical}
+        self.critical_ids: set[int] = set()     # 关键任务ID集合
+        self.critical_path: list[int] = []      # 按顺序的关键路径
+        self.project_duration: float = 0.0      # 项目总工期
+        self.has_cycle: bool = False            # 是否存在循环依赖
+
+
+def calc_cpm(durations: dict[int, float], dependencies: dict[int, list[int]]) -> CPMResult:
+    """
+    CPM关键路径分析
+    输入: durations = {任务ID: 工期}, dependencies = {任务ID: [前置任务ID列表]}
+    返回: CPMResult 包含所有时差和关键路径信息
+    """
+    result = CPMResult()
+    task_ids = list(durations.keys())
+    n = len(task_ids)
+    if n == 0:
+        return result
+
+    # ID -> 索引映射
+    id_to_idx = {tid: i for i, tid in enumerate(task_ids)}
+
+    # 构建邻接表
+    adj: list[list[int]] = [[] for _ in range(n)]
+    indegree = [0] * n
+    for tid in task_ids:
+        if tid not in dependencies:
+            continue
+        for dep_id in dependencies[tid]:
+            if dep_id in id_to_idx:
+                adj[id_to_idx[dep_id]].append(id_to_idx[tid])
+                indegree[id_to_idx[tid]] += 1
+
+    # 拓扑排序
+    queue = deque([i for i in range(n) if indegree[i] == 0])
+    topo_order: list[int] = []
+    indegree_copy = indegree[:]
+
+    while queue:
+        u = queue.popleft()
+        topo_order.append(u)
+        for v in adj[u]:
+            indegree_copy[v] -= 1
+            if indegree_copy[v] == 0:
+                queue.append(v)
+
+    if len(topo_order) != n:
+        result.has_cycle = True
+        return result
+
+    # 前向传递 — 最早开始(ES)、最早完成(EF)
+    es = [0.0] * n
+    ef = [0.0] * n
+    for u in topo_order:
+        ef[u] = es[u] + durations[task_ids[u]]
+        for v in adj[u]:
+            es[v] = max(es[v], ef[u])
+
+    project_duration = max(ef)
+    result.project_duration = project_duration
+
+    # 后向传递 — 最晚完成(LF)、最晚开始(LS)
+    lf = [project_duration] * n
+    ls = [0.0] * n
+    for u in reversed(topo_order):
+        if adj[u]:
+            lf[u] = min(ls[v] for v in adj[u])
+        ls[u] = lf[u] - durations[task_ids[u]]
+
+    # 计算总时差、识别关键路径
+    tf = [ls[i] - es[i] for i in range(n)]
+
+    for i, tid in enumerate(task_ids):
+        is_critical = abs(tf[i]) < 1e-6
+        cpm_data = {
+            'id': tid,
+            'es': es[i], 'ef': ef[i],
+            'ls': ls[i], 'lf': lf[i],
+            'tf': tf[i],
+            'is_critical': is_critical
+        }
+        result.task_cpm[tid] = cpm_data
+        if is_critical:
+            result.critical_ids.add(tid)
+
+    # 提取关键路径（按顺序）
+    if result.critical_ids:
+        start_critical = [tid for tid in task_ids
+                          if tid in result.critical_ids
+                          and (tid not in dependencies or not dependencies[tid]
+                               or not any(d in result.critical_ids for d in dependencies[tid]))]
+        if start_critical:
+            current = min(start_critical, key=lambda x: result.task_cpm[x]['es'])
+            visited = set()
+            while current in result.critical_ids and current not in visited:
+                visited.add(current)
+                result.critical_path.append(current)
+                next_tasks = [task_ids[v] for v in adj[id_to_idx[current]]
+                              if task_ids[v] in result.critical_ids]
+                if next_tasks:
+                    current = min(next_tasks, key=lambda x: result.task_cpm[x]['es'])
+                else:
+                    break
+
+    return result
+
+
+# ═══════════════════════════════════════════════════
+# 2. 紧前关系自动规划
+# ═══════════════════════════════════════════════════
+
+def auto_plan_dependencies(phase_count: int) -> dict[int, list[int]]:
+    """
+    自动规划紧前关系：默认按顺序 FS 连接
+    返回: {阶段索引: [前置阶段索引列表]}
+    """
+    deps: dict[int, list[int]] = {}
+    for i in range(1, phase_count + 1):
+        if i > 1:
+            deps[i] = [i - 1]
+        else:
+            deps[i] = []
+    return deps
+
+
+def parse_dependency_string(dep_str: str) -> list[tuple[int, int, str]]:
+    """
+    解析紧前关系字符串
+    格式: "1→2(FS), 2→3(SS), 3→4(FF)"
+    返回: [(前驱ID, 后继ID, 关系类型)]
+    """
+    relations = []
+    parts = [p.strip() for p in dep_str.replace('，', ',').split(',')]
+    for part in parts:
+        if '→' not in part:
+            continue
+        arrow_idx = part.index('→')
+        left = part[:arrow_idx].strip()
+        right = part[arrow_idx + 1:].strip()
+        dep_type = 'FS'  # 默认
+        if '(' in right and ')' in right:
+            paren_start = right.index('(')
+            dep_type = right[paren_start + 1:right.index(')')].strip().upper()
+            right = right[:paren_start].strip()
+        try:
+            pred_id = int(left)
+            succ_id = int(right)
+            if dep_type in ('FS', 'SS', 'FF', 'SF'):
+                relations.append((pred_id, succ_id, dep_type))
+        except ValueError:
+            continue
+    return relations
+
+
+# ═══════════════════════════════════════════════════
+# 3. 多分布蒙特卡洛模拟
+# ═══════════════════════════════════════════════════
+
+def _pert_beta_random(o: float, m: float, p: float) -> float:
+    """PERT-Beta分布随机数"""
+    alpha = 1 + 4 * (m - o) / (p - o) if p > o else 1
+    beta = 1 + 4 * (p - m) / (p - o) if p > o else 1
+    u1 = random.random()
+    u2 = random.random()
+    gamma_a = -math.log(1 - u1 ** (1 / alpha)) if alpha > 0 else 0
+    gamma_b = -math.log(1 - u2 ** (1 / beta)) if beta > 0 else 0
+    total = gamma_a + gamma_b
+    if total > 0:
+        beta_val = gamma_a / total
+    else:
+        beta_val = 0.5
+    return o + beta_val * (p - o)
+
+
+def _triangular_random(o: float, m: float, p: float) -> float:
+    """三角分布随机数"""
+    a, b, c = o, m, p
+    if c == a:
+        return a
+    fc = (b - a) / (c - a)
+    r = random.random()
+    if r < fc:
+        return a + math.sqrt(r * (b - a) * (c - a))
+    else:
+        return c - math.sqrt((1 - r) * (c - a) * (c - b))
+
+
+def _poisson_random(mean_val: float) -> float:
+    """泊松近似随机数"""
+    return max(0, mean_val + (random.random() - 0.5) * mean_val * 0.2)
+
+
+def monte_carlo_multi(
+    phases: list[tuple[str, float, float, float]],
+    iterations: int = 2000,
+    distributions: list[str] = None
+) -> dict:
+    """
+    多分布蒙特卡洛模拟
+    phases: [(名称, 乐观, 最可能, 悲观), ...]
+    iterations: 模拟次数
+    distributions: ['pert', 'triangular', 'poisson'] 默认全部
+    返回: {分布名: {quantiles, stats, samples}}
+    """
+    if distributions is None:
+        distributions = ['pert', 'triangular', 'poisson']
+
+    dist_funcs = {
+        'pert': lambda o, m, p: _pert_beta_random(o, m, p),
+        'triangular': lambda o, m, p: _triangular_random(o, m, p),
+        'poisson': lambda o, m, p: _poisson_random(m),
+    }
+
+    results = {}
+    for dist in distributions:
+        if dist not in dist_funcs:
+            continue
+        func = dist_funcs[dist]
+        samples = []
+        for _ in range(iterations):
+            total = sum(func(o, m, p) for _, o, m, p in phases)
+            samples.append(total)
+
+        samples.sort()
+        mean = sum(samples) / iterations
+        variance = sum((s - mean) ** 2 for s in samples) / iterations
+
+        results[dist] = {
+            'samples': samples[:1000],  # 仅保留1000个用于图表（降采样）
+            'stats': {
+                'min': samples[0],
+                'max': samples[-1],
+                'mean': mean,
+                'stddev': math.sqrt(variance),
+                'median': samples[iterations // 2],
+            },
+            'quantiles': {
+                'p5': samples[int(iterations * 0.05)],
+                'p10': samples[int(iterations * 0.10)],
+                'p25': samples[int(iterations * 0.25)],
+                'p50': samples[int(iterations * 0.50)],
+                'p75': samples[int(iterations * 0.75)],
+                'p90': samples[int(iterations * 0.90)],
+                'p95': samples[int(iterations * 0.95)],
+            },
+            'histogram': _calc_histogram(samples, 25),
+        }
+
+    return results
+
+
+def _calc_histogram(samples: list[float], bins: int) -> dict:
+    """计算直方图数据"""
+    min_val = min(samples)
+    max_val = max(samples)
+    bin_width = (max_val - min_val) / bins if max_val > min_val else 1
+    edges = [min_val + i * bin_width for i in range(bins + 1)]
+    counts = [0] * bins
+    for s in samples:
+        idx = min(int((s - min_val) / bin_width), bins - 1) if bin_width > 0 else 0
+        counts[idx] += 1
+
+    total = len(samples)
+    return {
+        'edges': edges,
+        'counts': counts,
+        'freq': [c / total for c in counts],
+        'cumulative': [],
+    }
+
+
+# ═══════════════════════════════════════════════════
+# 4. 任务重叠分析
+# ═══════════════════════════════════════════════════
+
+def calc_overlap(
+    tasks: list[dict]
+) -> dict:
+    """
+    任务重叠分析
+    tasks: [{name, start, end}, ...]  start/end 为时间戳
+    返回: 最大重叠数区间 + 最长重叠时长区间
+    """
+    if not tasks:
+        return {'max_count': {'count': 0, 'tasks': [], 'start': 0, 'end': 0}, 'max_duration': {'count': 0, 'tasks': [], 'start': 0, 'end': 0}}
+
+    events: list[tuple[float, int, int]] = []  # (时间, 增量, 任务索引)
+    for i, t in enumerate(tasks):
+        events.append((t['start'], 1, i))
+        events.append((t['end'], -1, i))
+    events.sort(key=lambda x: x[0])
+
+    current_count = 0
+    current_tasks: set[int] = set()
+    prev_time: float | None = None
+    segments: list[dict] = []
+
+    for time, delta, task_idx in events:
+        if prev_time is not None and time > prev_time and current_count >= 2:
+            segments.append({
+                'start': prev_time,
+                'end': time,
+                'count': current_count,
+                'tasks': list(current_tasks),
+            })
+        if delta > 0:
+            current_tasks.add(task_idx)
+        else:
+            current_tasks.discard(task_idx)
+        current_count += delta
+        prev_time = time
+
+    if not segments:
+        return {'max_count': {'count': 0, 'tasks': [], 'start': 0, 'end': 0, 'duration': 0}, 'max_duration': {'count': 0, 'tasks': [], 'start': 0, 'end': 0, 'duration': 0}}
+
+    # 合并相邻且任务相同的区间
+    merged: list[dict] = [segments[0]]
+    for seg in segments[1:]:
+        last = merged[-1]
+        if last['count'] == seg['count'] and set(last['tasks']) == set(seg['tasks']):
+            last['end'] = seg['end']
+        else:
+            merged.append(seg)
+
+    # 最大重叠数
+    max_count_seg = max(merged, key=lambda s: (s['count'], s['end'] - s['start']))
+    # 最长持续时间（重叠数>=2）
+    duration_segs = [s for s in merged if s['count'] >= 2]
+    max_dur_seg = max(duration_segs, key=lambda s: s['end'] - s['start']) if duration_segs else merged[0]
+
+    def _make_result(seg: dict, tasks_all: list) -> dict:
+        return {
+            'count': seg['count'],
+            'start': seg['start'],
+            'end': seg['end'],
+            'duration': seg['end'] - seg['start'],
+            'tasks': [tasks_all[i]['name'] for i in seg['tasks']],
+        }
+
+    return {
+        'max_count': _make_result(max_count_seg, tasks),
+        'max_duration': _make_result(max_dur_seg, tasks),
+    }
+
+
+# ═══════════════════════════════════════════════════
+# 5. SVG图表生成
+# ═══════════════════════════════════════════════════
+
+def generate_gantt_svg(
+    tasks: list[dict],
+    cpm_result: CPMResult | None = None,
+    width: int = 800,
+    height: int = 350
+) -> str:
+    """生成甘特图SVG"""
+    if not tasks:
+        return f'<svg width="{width}" height="{height}"><text x="{width//2}" y="{height//2}" text-anchor="middle" fill="#999">暂无任务数据</text></svg>'
+
+    margin = {'top': 50, 'right': 30, 'bottom': 70, 'left': 140}
+    chart_w = width - margin['left'] - margin['right']
+    chart_h = height - margin['top'] - margin['bottom']
+
+    # 时间范围
+    starts = [t['start'] for t in tasks]
+    ends = [t['end'] for t in tasks]
+    min_time = min(starts)
+    max_time = max(ends)
+    time_range = max_time - min_time if max_time > min_time else 1
+
+    colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b',
+              '#f5576c', '#ff9671', '#ffc75f', '#845ec2', '#008f7a']
+
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    svg.append(f'<text x="{width//2}" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">任务甘特图</text>')
+
+    # 坐标轴
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + chart_h}" x2="{margin["left"] + chart_w}" y2="{margin["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
+
+    # Y轴 - 任务名称
+    task_h = min(36, chart_h / max(len(tasks), 1))
+    for i, t in enumerate(tasks):
+        y = margin['top'] + i * task_h + task_h / 2
+        svg.append(f'<text x="{margin["left"] - 10}" y="{y}" text-anchor="end" font-size="12" fill="#333">{t["name"]}</text>')
+
+    # X轴刻度
+    steps = 8
+    for i in range(steps + 1):
+        t = min_time + time_range * i / steps
+        x = margin['left'] + chart_w * i / steps
+        svg.append(f'<line x1="{x}" y1="{margin["top"] + chart_h}" x2="{x}" y2="{margin["top"] + chart_h + 5}" stroke="#333"/>')
+        svg.append(f'<text x="{x}" y="{margin["top"] + chart_h + 18}" text-anchor="middle" font-size="10" fill="#666">{t:.1f}</text>')
+
+    # 绘制任务条
+    for i, t in enumerate(tasks):
+        y = margin['top'] + i * task_h + 6
+        sx = margin['left'] + chart_w * (t['start'] - min_time) / time_range
+        ex = margin['left'] + chart_w * (t['end'] - min_time) / time_range
+        bw = max(3, ex - sx)
+        ci = t.get('id', i) % len(colors)
+
+        is_critical = cpm_result and t.get('id', 0) in (cpm_result.critical_ids or set())
+        stroke_color = '#e74c3c' if is_critical else '#333'
+        stroke_width = 2 if is_critical else 1
+        fill_color = colors[ci]
+
+        svg.append(f'<rect x="{sx:.1f}" y="{y}" width="{bw:.1f}" height="{task_h - 12}" fill="{fill_color}" stroke="{stroke_color}" stroke-width="{stroke_width}" rx="3" ry="3"/>')
+
+        if bw > 50:
+            dur = t['end'] - t['start']
+            svg.append(f'<text x="{sx + bw/2:.1f}" y="{y + (task_h - 12)/2 + 4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="bold">{dur:.1f}h</text>')
+
+    # 关键路径图例
+    if cpm_result and cpm_result.critical_ids:
+        ly = height - 12
+        svg.append(f'<line x1="{margin["left"]}" y1="{ly}" x2="{margin["left"] + 20}" y2="{ly}" stroke="#e74c3c" stroke-width="2"/>')
+        svg.append(f'<text x="{margin["left"] + 25}" y="{ly + 4}" font-size="11" fill="#e74c3c">关键路径</text>')
+        svg.append(f'<text x="{margin["left"] + 160}" y="{ly + 4}" font-size="11" fill="#333">总工期: {cpm_result.project_duration:.1f}h</text>')
+
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
+def generate_mc_svg(
+    results: dict,
+    width: int = 700,
+    height: int = 450
+) -> str:
+    """生成蒙特卡洛多分布对比图SVG"""
+    if not results:
+        return f'<svg width="{width}" height="{height}"><text x="{width//2}" y="{height//2}" text-anchor="middle" fill="#999">暂无模拟数据</text></svg>'
+
+    margin = {'top': 40, 'right': 150, 'bottom': 60, 'left': 70}
+    chart_w = width - margin['left'] - margin['right']
+    chart_h = height - margin['top'] - margin['bottom']
+
+    dist_colors = {'pert': '#667eea', 'triangular': '#f093fb', 'poisson': '#4facfe'}
+    dist_labels = {'pert': 'PERT-Beta', 'triangular': '三角分布', 'poisson': '泊松近似'}
+    dist_markers = {'pert': 'o', 'triangular': 's', 'poisson': '^'}
+
+    # 计算全局范围
+    all_samples = []
+    for dist_name, data in results.items():
+        all_samples.extend(data['samples'])
+    if not all_samples:
+        return ''
+    global_min = min(all_samples)
+    global_max = max(all_samples)
+    range_val = global_max - global_min if global_max > global_min else 1
+
+    svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
+    svg.append(f'<rect width="{width}" height="{height}" fill="#fafbff"/>')
+    svg.append(f'<text x="{width//2}" y="25" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">蒙特卡洛模拟多分布对比</text>')
+
+    # 坐标轴
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
+    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + chart_h}" x2="{margin["left"] + chart_w}" y2="{margin["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
+
+    # X轴
+    for i in range(6):
+        val = global_min + range_val * i / 5
+        x = margin['left'] + chart_w * i / 5
+        svg.append(f'<line x1="{x}" y1="{margin["top"] + chart_h}" x2="{x}" y2="{margin["top"] + chart_h + 5}" stroke="#333"/>')
+        svg.append(f'<text x="{x}" y="{margin["top"] + chart_h + 18}" text-anchor="middle" font-size="10" fill="#666">{val:.1f}</text>')
+    svg.append(f'<text x="{margin["left"] + chart_w//2}" y="{margin["top"] + chart_h + 38}" text-anchor="middle" font-size="11" fill="#333">项目总工期</text>')
+
+    # 绘制各分布的直方图+曲线
+    for idx, (dist_name, data) in enumerate(results.items()):
+        hist = data.get('histogram', {})
+        if not hist or not hist['counts']:
+            continue
+        counts = hist['counts']
+        max_count = max(counts) if max(counts) > 0 else 1
+        color = dist_colors.get(dist_name, '#666')
+        n = len(counts)
+
+        # 直方图（半透明）
+        for i, c in enumerate(counts):
+            if c == 0:
+                continue
+            x = margin['left'] + chart_w * i / n
+            bw = chart_w / n - 1
+            bh = chart_h * c / max_count
+            y = margin['top'] + chart_h - bh
+            svg.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{max(bw, 1):.1f}" height="{bh:.1f}" fill="{color}" opacity="0.25"/>')
+
+        # 均值分位线
+        stats = data.get('stats', {})
+        mean_val = stats.get('mean', 0)
+        mx = margin['left'] + chart_w * (mean_val - global_min) / range_val
+        svg.append(f'<line x1="{mx:.1f}" y1="{margin["top"]}" x2="{mx:.1f}" y2="{margin["top"] + chart_h}" stroke="{color}" stroke-width="1.5" stroke-dasharray="4,3"/>')
+
+        # P50 / P90 标记
+        quants = data.get('quantiles', {})
+        for qname, qx in [('P50', 'p50'), ('P90', 'p90')]:
+            if qx in quants:
+                qv = quants[qx]
+                qx_pos = margin['left'] + chart_w * (qv - global_min) / range_val
+                qy = margin['top'] + chart_h - 8 - idx * 12
+                svg.append(f'<circle cx="{qx_pos:.1f}" cy="{qy}" r="3" fill="{color}"/>')
+                svg.append(f'<text x="{qx_pos + 6:.1f}" y="{qy + 4}" font-size="9" fill="{color}">{qname}</text>')
+
+    # 图例
+    lx = margin['left'] + chart_w + 15
+    ly = margin['top'] + 10
+    svg.append(f'<rect x="{lx - 5}" y="{ly - 5}" width="135" height="{len(results) * 28 + 30}" fill="white" stroke="#ddd" rx="5"/>')
+    svg.append(f'<text x="{lx}" y="{ly + 15}" font-size="12" font-weight="bold" fill="#333">分布统计</text>')
+    for idx, (dist_name, data) in enumerate(results.items()):
+        y = ly + 35 + idx * 28
+        color = dist_colors.get(dist_name, '#666')
+        stats = data.get('stats', {})
+        svg.append(f'<rect x="{lx}" y="{y - 7}" width="12" height="12" fill="{color}" opacity="0.5"/>')
+        label = dist_labels.get(dist_name, dist_name)
+        svg.append(f'<text x="{lx + 18}" y="{y + 2}" font-size="10" fill="#333">{label}</text>')
+        svg.append(f'<text x="{lx + 18}" y="{y + 16}" font-size="9" fill="#888">均值 {stats.get("mean", 0):.1f} σ={stats.get("stddev", 0):.1f}</text>')
+
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
+# ═══════════════════════════════════════════════════
+# 6. 实际工时计算
+# ═══════════════════════════════════════════════════
+
+def calc_real_work_hours(
+    start_ts: float, end_ts: float,
+    work_hours_per_day: float = 8,
+    workdays: set[int] = None
+) -> float:
+    """
+    计算实际工时（排除非工作日）
+    start_ts, end_ts: 时间戳（秒）
+    work_hours_per_day: 每日工作小时
+    workdays: 工作日集合, 默认 1-5 (周一到周五)
+    """
+    if workdays is None:
+        workdays = {1, 2, 3, 4, 5}
+
+    import datetime
+    start_dt = datetime.datetime.fromtimestamp(start_ts)
+    end_dt = datetime.datetime.fromtimestamp(end_ts)
+
+    if start_dt >= end_dt:
+        return 0
+
+    total_hours = 0.0
+    current = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_day = end_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    while current <= end_day:
+        weekday = (current.weekday() + 1) % 7  # 转为 1=周一
+        if weekday in workdays:
+            if current == start_dt.replace(hour=0, minute=0, second=0, microsecond=0):
+                # 第一天
+                day_end = current.replace(hour=23, minute=59, second=59)
+                hours = (min(end_dt, day_end) - start_dt).total_seconds() / 3600
+                total_hours += max(0, min(hours, work_hours_per_day))
+            elif current == end_day:
+                # 最后一天
+                hours = (end_dt - current).total_seconds() / 3600
+                total_hours += max(0, min(hours, work_hours_per_day))
+            else:
+                total_hours += work_hours_per_day
+        current += datetime.timedelta(days=1)
+
+    return total_hours
