@@ -1,7 +1,7 @@
 ---
 name: memory-pet
 version: 0.5.0
-author: your-name-here
+author: wUwproject
 license: MIT
 description: 宠物记忆压缩技能 - 通过文本块宠物交互触发记忆保存。纯ASCII文字图，Python全量管理，亲密度衰减与逃跑机制，跨平台智能体记忆系统。
 tags: ['pet', 'memory', 'context-compression', 'interactive', 'ascii-art']
