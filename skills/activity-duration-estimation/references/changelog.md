@@ -10,7 +10,9 @@
 ### 重构
 - **依赖规划从「代码硬猜/丢异常给用户」改为「LLM自行设计+Python执行」**
   - `scripts/risk_dimensions.py` 重写：维度库只做选择+结构指引，不做硬编码内容。LLM 按实际项目数据生成分析
-- `_build_analysis_section()` 优先使用 `self.risk_analysis`（LLM填充），fallback 只显示维度名称
+- `PipelineState.get_risk_context()` 新增 — 返回结构化项目数据，供LLM生成风险分析
+- `_generate_html_report()` 新增 WARN：LLM未设 `risk_analysis` 时打印用法提示
+- `_build_analysis_section()` fallback 改为红色警告 + 可用数据展示，不再无声无息
   - 删除 `LLMInteractionRequired` 依赖交互（LLM 自己该干的事不要丢给用户）
   - `run_full()` 中若 LLM 已设 `self.dependencies` 则直接跳过
   - `prepare_estimation()` 注释明确：LLM 直接赋值 `state.dependencies`

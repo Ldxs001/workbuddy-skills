@@ -542,6 +542,11 @@ class PipelineState:
         if not self.cpm_result:
             return
 
+        # 警告：若LLM未提供风险分析
+        if not hasattr(self, 'risk_analysis') or not self.risk_analysis:
+            print("  [WARN] LLM未设置 state.risk_analysis，风险分析卡片为空。")
+            print("         应调用 ctx = state.get_risk_context() 生成项目风险分析。")
+
         # 调用analysis_engine生成SVG（MC图表用SVG，甘特图改用HTML）
         mc_svg = ""
         try:
@@ -875,23 +880,83 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
             f'background:#f8f9fa;padding:12px;border-radius:4px">{tree_html}</pre></div>'
         )
 
+    def get_risk_context(self) -> dict:
+        """
+        返回项目风险评估所需的全部数据（供 LLM 用于生成风险分析）。
+        LLM 用法：
+            ctx = state.get_risk_context()
+            state.risk_analysis = llm_generate_risk(ctx)
+        """
+        mc_p50, mc_p90, mc_mean = 0, 0, 0
+        if hasattr(self, 'mc_results') and self.mc_results:
+            pert = self.mc_results.get("pert", {})
+            st = pert.get("stats", {})
+            q = pert.get("quantiles", {})
+            mc_mean = st.get("mean", 0)
+            mc_p50 = q.get("p50", 0)
+            mc_p90 = q.get("p90", 0)
+
+        cp_ids = []
+        cp_names = []
+        if hasattr(self, 'cpm_result') and self.cpm_result:
+            cp_ids = list(self.cpm_result.critical_ids or [])
+            cp_names = [self.phases[t-1]["name"] for t in sorted(cp_ids) if t <= len(self.phases)]
+
+        overlap_info = {}
+        if hasattr(self, 'overlap_results') and self.overlap_results:
+            mc = self.overlap_results.get("max_count", {})
+            overlap_info = {
+                "max_concurrent": mc.get("count", 0),
+                "time_range": f"{mc.get('start',0):.0f}→{mc.get('end',0):.0f}天",
+                "duration": f"{mc.get('duration',0):.0f}天",
+                "tasks": mc.get("tasks", []),
+            }
+
+        integration_tasks = [p.get("name","") for p in (self.phases or [])
+                            if "集成" in p.get("name","") or "对接" in p.get("name","")]
+
+        return {
+            "project_name": getattr(self, 'project_name', ""),
+            "description": getattr(self, 'description', ""),
+            "total_phases": len(self.phases or []),
+            "cpm_duration": self.cpm_result.project_duration if hasattr(self, 'cpm_result') and self.cpm_result else 0,
+            "critical_path_count": len(cp_ids),
+            "critical_path": cp_names,
+            "mc_p50": mc_p50,
+            "mc_p90": mc_p90,
+            "mc_mean": mc_mean,
+            "mc_p90_p50_gap": mc_p90 - mc_p50,
+            "overlap": overlap_info,
+            "integration_tasks": integration_tasks,
+        }
+
     def _build_analysis_section(self) -> str:
         # LLM 提供了自定义风险分析 → 直接使用
         if hasattr(self, 'risk_analysis') and self.risk_analysis:
             return self.risk_analysis
 
-        # fallback: 维度概览（只显示维度名和指引，不硬编内容）
-        context = {
-            "domain": "ai-enterprise",
-            "scale": "large" if len(self.phases) > 20 else "medium",
-            "tech_novelty": "high",
-            "team_size": len(self.phases),
-            "integration_count": sum(1 for p in self.phases if "集成" in p.get("name","") or "对接" in p.get("name","")),
-            "critical_path_len": len(self.cpm_result.critical_ids) if (self.cpm_result and self.cpm_result.critical_ids) else 0,
-            "phases": self.phases,
-        }
+        # fallback: 打印可用数据，提醒 LLM 应调用 get_risk_context() 生成分析
+        ctx = self.get_risk_context()
+        lines = ['<div class="card"><h2>项目风险分析</h2>',
+                 f'<p style="color:#e74c3c;font-weight:bold">⚠️ 风险分析未生成</p>',
+                 f'<p>LLM 生成报告中未调用 get_risk_context() 和设置 state.risk_analysis。</p>',
+                 f'<p style="font-size:12px;color:#666">可用数据：CPM={ctx["cpm_duration"]:.0f}天, '
+                 f'MC P50/P90={ctx["mc_p50"]:.0f}/{ctx["mc_p90"]:.0f}天, '
+                 f'关键路径{ctx["critical_path_count"]}个任务, '
+                 f'最大并发{ctx["overlap"].get("max_concurrent",0)}个任务</p>',
+                 '</div>']
+
+        # 但仍显示维度选择结果（不空手）
         active_dims = select_dimensions(context)
-        return build_minimal_fallback(active_dims)
+        if active_dims:
+            lines.append('<div style="margin:8px 0;padding:8px;border-left:3px solid #e74c3c;background:#fff5f5">')
+            lines.append('<p style="font-size:12px;color:#666">以下维度由系统自动匹配，LLM应根据这些维度+项目数据分析：</p>')
+            for dim in active_dims:
+                lines.append(f'<p><strong>{dim.get("icon","")} {dim["name"]}</strong> — {dim.get("guide","")}</p>')
+            lines.append('</div>')
+
+        lines.append('</div>')
+        return "\n".join(lines)
 
     def _build_html_footer(self) -> str:
         return "</body></html>"
