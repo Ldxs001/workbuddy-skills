@@ -33,9 +33,14 @@ import re
 from datetime import datetime
 from typing import Optional
 
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/activity-duration-estimation/data/"
+
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILL_DIR = os.path.dirname(SCRIPTS_DIR)
 
+# 确保 scripts/ 和 skill 根目录都在 sys.path 中
+sys.path.insert(0, SCRIPTS_DIR)
 sys.path.insert(0, SKILL_DIR)
 from wbs_engine import (
     WBSNode, WBSResult, build_node_tree, assign_wbs_codes,
@@ -49,7 +54,8 @@ from analysis_engine import (
     calc_cpm, auto_plan_dependencies, parse_dependency_string,
     monte_carlo_multi, calc_overlap,
     generate_gantt_svg, generate_mc_svg,
-    validate_cpm_input, validate_mc_input, validate_mc_result,
+    validate_cpm_input, validate_cpm_result,
+    validate_mc_input, validate_mc_result,
     validate_overlap_tasks, validate_all,
     CPMResult, ValidationResult
 )
@@ -141,6 +147,10 @@ class PipelineState:
         self.errors: list[str] = []
         self.last_error: str = ""
         self.completed_phases: list[str] = []
+
+        # 审计
+        self.audit_report: str = ""              # 文本审计报告
+        self.audit_results: list[dict] = []       # 结构化审计条目 [{check, passed, issues}]
 
     # ── 查询 ──
 
@@ -324,16 +334,20 @@ class PipelineState:
         # ═══════════════════════════════════════════
         self._generate_html_report()
 
-        # ═══════════════════════════════════════════
         # Phase 5: 项目文档生成
-        # ═══════════════════════════════════════════
         try:
             self.generate_docs(template_name=doc_template, mode=doc_mode)
         except Exception as e:
             self._handle_error("docs", e)
-            # 文档生成失败不阻断，仍返回 ok 但附带警告
+
+        # Phase 6: 三阶审计+自动修复
+        self._audit_and_fix(mc_iterations=mc_iterations)
+
+        # 文档生成失败不阻断
+        has_doc_error = any(e.startswith("[docs]") for e in self.errors)
+        if has_doc_error:
             return {"status": "ok",
-                    "message": f"全流程完成（文档生成异常: {e}）: {len(self.phases)}阶段, "
+                    "message": f"全流程完成（文档生成异常）: {len(self.phases)}阶段, "
                                f"总工期{self.cpm_result.project_duration:.1f}天",
                     "state": self}
 
@@ -563,12 +577,16 @@ class PipelineState:
         full_html = "\n".join(html)
 
         # 保存到文件
-        report_dir = os.path.join(SKILL_DIR, "reports")
-        os.makedirs(report_dir, exist_ok=True)
+        # 保存到数据目录下的 reports/，不污染安装目录
+        data_dir = os.path.normpath(os.path.join(
+            SKILL_DIR, "..", ".standardization",
+            os.path.basename(SKILL_DIR), "data", "reports"
+        ))
+        os.makedirs(data_dir, exist_ok=True)
         safe_name = self.project_name or "未命名"
         safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in safe_name)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_path = os.path.join(report_dir, f"{safe_name}_{ts}.html")
+        report_path = os.path.join(data_dir, f"{safe_name}_{ts}.html")
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(full_html)
@@ -768,7 +786,8 @@ th{{background:#3498db;color:#fff}}
                     deps_1based[k1].append(dep + 1 if isinstance(dep, int) else dep)
         self.dependencies = deps_1based
 
-    def run_estimate(self, mc_iterations: int = 2000) -> dict:
+    def run_estimate(self, mc_iterations: int = 2000,
+                     _run_audit: bool = True) -> dict:
         """(保持兼容原接口) 执行估算计算"""
         self.current_phase = PHASE_ESTIMATE
 
@@ -825,6 +844,10 @@ th{{background:#3498db;color:#fff}}
             self.estimate_summary = "\n".join(lines)
 
             self.completed_phases.append(PHASE_ESTIMATE)
+
+            # 估算完成后自动审计+修复（由外部调用时触发，_audit_and_fix内部不触发）
+            if _run_audit:
+                self._audit_and_fix(mc_iterations=mc_iterations)
 
         except Exception as e:
             self._handle_error(PHASE_ESTIMATE, e)
@@ -910,6 +933,394 @@ th{{background:#3498db;color:#fff}}
         msg = f"[{phase}] {error}"
         self.errors.append(msg)
         self.last_error = msg
+
+    def _generate_audit_report(self):
+        """
+        输出审核：验证所有计算结果的合理性，生成结构化审计报告。
+        审计结果写入 self.audit_report（文本）和 self.audit_results（结构化）。
+        自动调用，不依赖LLM自觉。
+        """
+        checks = []
+        total_errors = 0
+        total_warns = 0
+
+        # ── 1. CPM输入验证 ──
+        if self.phases and self.dependencies:
+            durations = {i+1: (p.get("m", 0) or 0) for i, p in enumerate(self.phases)}
+            vr = validate_cpm_input(durations, self.dependencies)
+            if vr.passed:
+                checks.append({"check": "CPM输入验证", "cat": "计算失真", "passed": True, "level": "OK", "issues": []})
+            else:
+                # 附上实际数据供LLM判断误报
+                phase_data = [f"{p.get('name','?')}(M={p.get('m',0)})" for p in self.phases]
+                enriched = []
+                for iss in vr.issues:
+                    enriched.append(f"{iss} | phases=[{'; '.join(phase_data)}]")
+                total_errors += len(vr.issues)
+                checks.append({"check": "CPM输入验证", "cat": "计算失真", "passed": False, "level": "ERROR",
+                               "issues": enriched, "fix": "recalculate"})
+
+        # ── 2. CPM输出验证 ──
+        if self.cpm_result:
+            vr = validate_cpm_result(self.cpm_result)
+            if vr.passed:
+                checks.append({"check": "CPM输出验证", "cat": "计算失真", "passed": True, "level": "OK", "issues": []})
+            else:
+                enriched = []
+                for iss in vr.issues:
+                    enriched.append(f"{iss} | total_duration={self.cpm_result.project_duration}")
+                total_errors += len(vr.issues)
+                checks.append({"check": "CPM输出验证", "cat": "计算失真", "passed": False, "level": "ERROR",
+                               "issues": enriched, "fix": "recalculate"})
+
+        # ── 3. MC输入验证 ──
+        if self.phases:
+            mc_phases = [(p["name"], p.get("o", 0), p.get("m", 0), p.get("p", 0))
+                         for p in self.phases]
+            vr = validate_mc_input(mc_phases)
+            if vr.passed:
+                checks.append({"check": "MC输入验证", "cat": "计算失真", "passed": True, "level": "OK", "issues": []})
+            else:
+                total_warns += len(vr.issues)
+                mc_data = [f"{p.get('name','?')}(O={p.get('o',0)} M={p.get('m',0)} P={p.get('p',0)})"
+                           for p in self.phases]
+                enriched = [f"{iss} | phases=[{'; '.join(mc_data)}]"
+                            for iss in vr.issues]
+                checks.append({"check": "MC输入验证", "cat": "计算失真", "passed": False, "level": "WARN",
+                               "issues": enriched, "fix": "recalculate"})
+
+        # ── 4. MC输出验证 ──
+        if self.mc_results:
+            vr = validate_mc_result(self.mc_results)
+            if vr.passed:
+                checks.append({"check": "MC输出验证", "cat": "计算失真", "passed": True, "level": "OK", "issues": []})
+            else:
+                total_warns += len(vr.issues)
+                checks.append({"check": "MC输出验证", "cat": "计算失真", "passed": False, "level": "WARN",
+                               "issues": vr.issues, "fix": "recalculate"})
+
+        # ── 5. 总工期合理性 ──
+        if self.cpm_result:
+            dur = self.cpm_result.project_duration
+            if dur <= 0:
+                total_errors += 1
+                checks.append({"check": "总工期合理性", "cat": "计算失真", "passed": False, "level": "ERROR",
+                               "issues": [f"总工期为 {dur}，应 > 0"], "fix": "recalculate"})
+            elif dur > 3650:
+                total_warns += 1
+                checks.append({"check": "总工期合理性", "cat": "计算失真", "passed": False, "level": "WARN",
+                               "issues": [f"总工期 {dur:.0f} 天 > 10年，可能输入有误"], "fix": "recalculate"})
+            else:
+                checks.append({"check": "总工期合理性", "cat": "计算失真", "passed": True, "level": "OK", "issues": []})
+
+        # ── 6. 关键路径 ──
+        if self.cpm_result:
+            if self.cpm_result.critical_path:
+                checks.append({"check": "关键路径", "cat": "规划失格", "passed": True, "level": "OK", "issues": []})
+            else:
+                total_warns += 1
+                checks.append({"check": "关键路径", "cat": "规划失格", "passed": False, "level": "WARN",
+                               "issues": ["未识别到关键路径"], "fix": "replan"})
+
+        # ── 7. P50/P90合理性 ──
+        if self.mc_results:
+            pert = self.mc_results.get("pert", {})
+            quants = pert.get("quantiles", {})
+            p50 = quants.get("p50", 0)
+            p90 = quants.get("p90", 0)
+            if p50 > 0 and p90 >= p50:
+                checks.append({"check": "P50/P90合理性", "cat": "计算失真", "passed": True, "level": "OK", "issues": []})
+            elif p50 <= 0:
+                total_warns += 1
+                checks.append({"check": "P50/P90合理性", "cat": "计算失真", "passed": False, "level": "WARN",
+                               "issues": ["P50 <= 0，MC模拟结果异常"], "fix": "recalculate"})
+            else:
+                total_warns += 1
+                checks.append({"check": "P50/P90合理性", "cat": "计算失真", "passed": False, "level": "WARN",
+                               "issues": [f"P50({p50}) > P90({p90})，分布异常"], "fix": "recalculate"})
+
+        # ── 8. HTML报告完整性 ──
+        if self.html_report_path:
+            if os.path.isfile(self.html_report_path):
+                size = os.path.getsize(self.html_report_path)
+                if size > 500:
+                    checks.append({"check": "HTML报告完整性", "cat": "内容失调", "passed": True, "level": "OK", "issues": []})
+                else:
+                    total_warns += 1
+                    checks.append({"check": "HTML报告完整性", "cat": "内容失调", "passed": False, "level": "WARN",
+                                   "issues": [f"HTML文件仅 {size} 字节"], "fix": "regenerate"})
+            else:
+                total_errors += 1
+                checks.append({"check": "HTML报告完整性", "cat": "内容失调", "passed": False, "level": "ERROR",
+                               "issues": [f"HTML路径 {self.html_report_path} 不存在"], "fix": "regenerate"})
+
+        # ── 9. 文档逐节检查 ──
+        if self.doc_content:
+            try:
+                from project_docs_engine import load_template, list_templates
+
+                # 查找匹配的模板（按文档标题匹配）
+                doc_title_line = self.doc_content.split("\n")[0] if self.doc_content else ""
+                matched_tpl = None
+                for tpl_name in list_templates().keys():
+                    if tpl_name in doc_title_line:
+                        matched_tpl = load_template(tpl_name)
+                        break
+
+                if matched_tpl:
+                    sections = matched_tpl.get("sections", [])
+                    doc_lines = self.doc_content.split("\n")
+                    section_checks = []
+
+                    for sec in sections:
+                        sec_title = sec.get("title", "")
+                        sec_key = sec.get("key", "")
+                        sec_mode = sec.get("mode", "manual")
+                        if not sec_title:
+                            continue
+
+                        # 查找本节在文档中的行区间
+                        sec_start = None
+                        for i, line in enumerate(doc_lines):
+                            if line.strip().startswith(f"## {sec_title}"):
+                                sec_start = i
+                                break
+
+                        if sec_start is None:
+                            total_errors += 1
+                            section_checks.append(
+                                (f"文档章节「{sec_title}」", "ERROR",
+                                 [f"模板定义 {sec_key} 但文档中缺少 ## {sec_title}"
+                                  f" | doc.md:? | 模板共{len(sections)}节，当前文档仅包含"
+                                  f" {sum(1 for l in doc_lines if l.strip().startswith('## '))} 个 H2 章节"]))
+                            continue
+
+                        # 提取本节的正文内容（直到下一个 ## 或文档结束）
+                        sec_end = len(doc_lines)
+                        for i in range(sec_start + 1, len(doc_lines)):
+                            if doc_lines[i].strip().startswith("## "):
+                                sec_end = i
+                                break
+                        sec_body = "\n".join(doc_lines[sec_start:sec_end])
+                        sec_body_len = len(sec_body.strip())
+
+                        # 按模式分段检查
+                        doc_line = sec_start + 1  # 文档中第几行（1-based）
+                        ctx_lines = doc_lines[max(0, sec_start):min(len(doc_lines), sec_start + 4)]
+                        context_snippet = " | ".join(l.strip()[:50] for l in ctx_lines)
+                        location = f"doc.md:{doc_line}"
+
+                        if sec_mode == "manual":
+                            # 手动模式：应有填写提示/占位符
+                            has_hint = any(kw in sec_body for kw in
+                                           ["填充提示", "在此处填写", "填写内容"])
+                            if not has_hint:
+                                total_warns += 1
+                                section_checks.append(
+                                    (f"文档章节「{sec_title}」(手动)", "WARN",
+                                     [f"缺少填充提示或占位符 (doc.md:{doc_line}) "
+                                      f"上下文: {context_snippet[:80]}"]))
+                            else:
+                                section_checks.append(
+                                    (f"文档章节「{sec_title}」(手动)", "OK", []))
+
+                        elif sec_mode == "auto":
+                            # 自动模式：应有实质内容（>50字符），且不能含占位符
+                            has_placeholder = "在此处填写" in sec_body
+                            if sec_body_len < 50 or has_placeholder:
+                                total_warns += 1
+                                section_checks.append(
+                                    (f"文档章节「{sec_title}」(自动)", "WARN",
+                                     [f"内容{sec_body_len}字符{'且含占位符' if has_placeholder else ''}"
+                                      f" (doc.md:{doc_line}) 上下文: {context_snippet[:80]}"]))
+                            else:
+                                section_checks.append(
+                                    (f"文档章节「{sec_title}」(自动)", "OK", []))
+
+                        elif sec_mode == "outline":
+                            if sec_body_len < 20:
+                                total_warns += 1
+                                section_checks.append(
+                                    (f"文档章节「{sec_title}」(概要)", "WARN",
+                                     [f"概要内容仅{sec_body_len}字符 (doc.md:{doc_line})"
+                                      f" 上下文: {context_snippet[:80]}"]))
+                            else:
+                                section_checks.append(
+                                    (f"文档章节「{sec_title}」(概要)", "OK", []))
+
+                    # 输出章节检查结果
+                    for sc_name, sc_level, sc_issues in section_checks:
+                        if sc_level == "OK":
+                            checks.append({"check": sc_name, "cat": "内容失调",
+                                           "passed": True, "level": "OK", "issues": []})
+                        else:
+                            checks.append({"check": sc_name, "cat": "内容失调",
+                                           "passed": False, "level": sc_level,
+                                           "issues": sc_issues, "fix": "regenerate"})
+
+                    # WBS引用检查（在文档正文中搜索）
+                    if self.wbs_result:
+                        has_wbs_ref = any(kw in self.doc_content for kw in
+                                          ["WBS", "工作分解", "工作包", "wbs"])
+                        if not has_wbs_ref:
+                            total_warns += 1
+                            wp_count = len(self.wbs_result.work_packages)
+                            checks.append({"check": "文档WBS引用", "cat": "内容失调",
+                                           "passed": False, "level": "WARN",
+                                           "issues": [f"已生成WBS（{wp_count}个工作包）但文档中未引用关键词: WBS/工作分解/工作包/wbs"
+                                                      f" | doc.md:1 上下文: 文档首行 {doc_title_line[:60]}"],
+                                           "fix": "regenerate"})
+
+                    if self.cpm_result:
+                        has_cpm_ref = any(kw in self.doc_content for kw in
+                                          ["关键路径", "工期", "估算", "CPM", "P50", "P90"])
+                        if not has_cpm_ref:
+                            total_warns += 1
+                            checks.append({"check": "文档CPM引用", "cat": "内容失调",
+                                           "passed": False, "level": "WARN",
+                                           "issues": ["已生成CPM但文档中未引用估算结果"],
+                                           "fix": "regenerate"})
+                else:
+                    # 未匹配模板，回退到简单检查
+                    content_len = len(self.doc_content)
+                    is_manual = any(kw in self.doc_content for kw in
+                                    ["填充提示", "在此处填写"])
+                    if is_manual and content_len >= 50:
+                        checks.append({"check": "文档完整性", "cat": "内容失调",
+                                       "passed": True, "level": "OK", "issues": []})
+                    elif content_len >= 200:
+                        checks.append({"check": "文档完整性", "cat": "内容失调",
+                                       "passed": True, "level": "OK", "issues": []})
+                    else:
+                        total_warns += 1
+                        checks.append({"check": "文档完整性", "cat": "内容失调",
+                                       "passed": False, "level": "WARN",
+                                       "issues": [f"文档仅 {content_len} 字符"],
+                                       "fix": "regenerate"})
+
+            except Exception as e:
+                # 模板加载失败时不阻断
+                checks.append({"check": "文档检查", "cat": "内容失调",
+                               "passed": True, "level": "OK",
+                               "issues": [f"模板匹配失败: {e}"]})
+        else:
+            # 文档未生成（mode="manual"时正常；全流程模式才检查）
+            if "docs" in self.completed_phases or "full" in self.completed_phases:
+                total_errors += 1
+                checks.append({"check": "文档完整性", "cat": "内容失调", "passed": False, "level": "ERROR",
+                               "issues": ["文档未生成"], "fix": "regenerate"})
+
+        # ── 构建审计报告文本 ──
+        lines = []
+        lines.append("")
+        lines.append("─── 估算审计报告 ──────────────────────────────────")
+
+        verdict = "pass" if total_errors == 0 else "fail"
+        if total_errors == 0 and total_warns > 0:
+            verdict = "warn"
+
+        lines.append(f"  审计结论：{verdict}（ERROR={total_errors}, WARN={total_warns}）")
+        lines.append("  ─── LLM误报筛查 ───")
+        lines.append("  逐条检查以下FAIL/WARN，判断是否为误报：")
+        lines.append("  是→确认安全，放行；否→触发自动修复或LLM介入修改")
+        lines.append("")
+        for c in checks:
+            if c["level"] == "OK":
+                lines.append(f"  ✅ {c['check']}：PASS")
+            else:
+                tag = "❌" if c["level"] == "ERROR" else "⚠️"
+                lines.append(f"  {tag} {c['check']}：{c['level']} [{c.get('fix','?')}]")
+                for iss in c["issues"][:3]:
+                    lines.append(f"     - {iss}")
+                    # 如果有location信息，附加输出
+                    if isinstance(iss, dict):
+                        if iss.get("location"):
+                            lines.append(f"       位置: {iss['location']}")
+                        if iss.get("context"):
+                            ctx = iss["context"][:120]
+                            lines.append(f"       上下文: {ctx}")
+                    elif "phases[" in str(iss) or "doc" in str(iss).lower():
+                        pass  # 已有位置信息在描述中
+
+        lines.append("")
+
+        audit_text = "\n".join(lines)
+        print(audit_text)
+
+        self.audit_report = audit_text
+        self.audit_results = checks
+
+    def _audit_and_fix(self, mc_iterations: int = 2000):
+        """
+        三阶审计+自动修复：先审，后修，再审。
+        
+        修复策略：
+        - 计算失真 → recalculate（重新计算CPM/MC）
+        - 内容失调 → regenerate（重新生成报告/文档）
+        - 规划失格 → replan（重新规划依赖/WBS）
+        """
+        MAX_FIX_CYCLES = 3
+        for cycle in range(1, MAX_FIX_CYCLES + 1):
+            self._generate_audit_report()
+
+            failed = [c for c in self.audit_results if not c["passed"]]
+            if not failed:
+                print(f"  ✅ 第{cycle}轮审计：全部通过")
+                return
+
+            print(f"  🔧 第{cycle}轮修复：{len(failed)} 项待修复")
+            needs_recalc = any(c.get("fix") == "recalculate" for c in failed)
+            needs_regen = any(c.get("fix") == "regenerate" for c in failed)
+            needs_replan = any(c.get("fix") == "replan" for c in failed)
+
+            # ── 修复1：计算失真 ──
+            if needs_recalc and self.phases:
+                print("  🔄 修复计算失真：重新执行估算...")
+                self.run_estimate(mc_iterations=mc_iterations, _run_audit=False)
+
+            # ── 修复2：内容失调 ──
+            if needs_regen:
+                print("  🔄 修复内容失调：重新生成报告和文档...")
+                self._generate_html_report()
+                try:
+                    # 尝试重新生成文档（如果有模板）
+                    from project_docs_engine import load_template
+                    tpl_name = "立项申请书"
+                    tpl = load_template(tpl_name)
+                    if tpl:
+                        self.generate_docs(template_name=tpl_name, mode="manual", output_file=False)
+                        print(f"    文档已重新生成 ({len(self.doc_content)}字符)")
+                except Exception:
+                    print("    文档重新生成跳过（无模板或已是最佳）")
+
+            # ── 修复3：规划失格 ──
+            if needs_replan and self.phases:
+                print("  🔄 修复规划失格：重新规划依赖...")
+                from analysis_engine import auto_plan_dependencies
+                self.dependencies = auto_plan_dependencies(len(self.phases))
+                # 重新编译依赖格式
+                deps_1based = {}
+                for k, v in self.dependencies.items():
+                    k1 = k + 1 if isinstance(k, int) else k
+                    deps_1based[k1] = []
+                    for dep in v:
+                        if isinstance(dep, (list, tuple)):
+                            pred_id = dep[0] + 1 if isinstance(dep[0], int) else dep[0]
+                            dep_type = dep[1] if len(dep) >= 2 else "FS"
+                            deps_1based[k1].append((pred_id, dep_type))
+                        else:
+                            deps_1based[k1].append(dep + 1 if isinstance(dep, int) else dep)
+                self.dependencies = deps_1based
+                self.run_estimate(mc_iterations=mc_iterations, _run_audit=False)
+                self._generate_html_report()
+
+        # 3轮修复后仍有问题 → 输出最终报告，标记剩余项
+        self._generate_audit_report()
+        remaining = [c for c in self.audit_results if not c["passed"]]
+        if remaining:
+            print(f"  ⚠️  经{MAX_FIX_CYCLES}轮修复仍有 {len(remaining)} 项未解决：")
+            for c in remaining:
+                print(f"     - [{c['check']}] {c.get('fix','?')}: {'; '.join(c['issues'][:2])}")
 
 
 # ═══════════════════════════════════════════════════

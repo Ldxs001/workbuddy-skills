@@ -1,3 +1,20 @@
+## 1.6.3 (2026-06-03)
+
+### 新增
+- `_generate_audit_report()`: 10项审计检查（CPM/MC/总工期/关键路径/P50P90/HTML报告/文档逐节检查）
+- `_audit_and_fix()`: 三阶审计+自动修复（审→修→再审，3轮截断）
+- 三类失格修复：计算失真→recalculate、内容失调→regenerate、规划失格→replan
+- LLM误报筛查：审计报告含文件行号/数据上下文/附近代码段
+
+### 修复
+- `_generate_html_report()` 输出路径从 `skills/<name>/reports/` 改为 `.standardization/<name>/data/reports/`
+- `save_document()` 输出路径从 `os.getcwd()` 改为 `.standardization/<name>/data/docs/`
+- `sys.path.insert(0, SCRIPTS_DIR)` 确保跨目录 import 正确
+- 修复 `_audit_and_fix()` 调 `run_estimate()` 导致递归死循环
+- `project_docs_engine.py` 和 `runner.py` 添加 R-12 审计锚点 `DEFAULT_DATA_DIR_RAW`
+
+---
+
 ## 1.6.2 (2026-06-03)
 
 ### 修复
@@ -9,7 +26,7 @@
 ## 1.6.1 (2026-06-03)
 
 ### 修复
-- `prepare_estimation()` 不识别已直接设置的 `self.phases`，缺少 `elif self.phases: pass` 分支
+- `prepare_estimation()` 不识别已直接配置的 `self.phases`，缺少 `elif self.phases: pass` 分支
 - 功能测试 83/83 全部通过
 
 ---

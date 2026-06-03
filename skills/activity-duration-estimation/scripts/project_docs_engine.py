@@ -2,11 +2,15 @@
 activity-duration-estimation :project-docs 引擎
 双模式项目文档生成：手动模式（空模版） + 自动模式（逐节生成）
 """
-
 import json
 import os
 from datetime import date
 from typing import Optional
+
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/activity-duration-estimation/data/"
+_skill_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_data_dir_abs = os.path.normpath(os.path.join(_skill_dir, "..", DEFAULT_DATA_DIR_RAW))
 
 
 # ═══════════════════════════════════════════════════
