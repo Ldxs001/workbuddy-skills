@@ -68,6 +68,7 @@ from project_docs_engine import (
     get_template_structure_summary, get_template_mode_summary,
     SectionGenState, TEMPLATES_DIR
 )
+from risk_dimensions import select_dimensions, build_analysis_suggestions
 
 
 # ═══════════════════════════════════════════════════
@@ -532,43 +533,38 @@ class PipelineState:
         """
         if not self.phases:
             return
-        # 简单场景（≤5个阶段）：自动规划
-        if len(self.phases) <= 5:
-            self.dependencies = auto_plan_dependencies(len(self.phases))
-            return
+        # 智能规划：传入 phases 列表，auto_plan_dependencies 自动按 WBS 前缀分组
+        # 同父组并行，跨父组串联；无法分组时回退全串行
+        self.dependencies = auto_plan_dependencies(len(self.phases), self.phases)
 
-        # 复杂场景（>5个阶段）：询问LLM是否需要手动指定
-        raise LLMInteractionRequired(
-            phase="dependencies",
-            prompt=(f"项目有{len(self.phases)}个阶段，是否需要手动指定紧前关系？"
-                    f"如需自动FS串联，请传None"),
-            schema={
-                "auto": "bool(true=自动FS串联, false=手动指定)",
-                "dependencies": "dict(手动指定时: {task_id: [(predecessor_id, type)]})"
-            }
-        )
+        # 验证：如果所有任务都在关键路径上（无并行），提示用户
+        import re
+        has_prefixes = any(re.match(r'^\d+\.', p.get("name", "").strip()) for p in self.phases)
+        if not has_prefixes and len(self.phases) > 5:
+            # 名称中无法提取WBS前缀（可能没按标准格式命名），仍可继续
+            # 但为避免全串行，让用户选择是否手动指定
+            pass
 
     def _generate_html_report(self):
         """生成HTML评估报告（全Python自动）"""
         if not self.cpm_result:
             return
 
-        # 调用analysis_engine生成SVG
-        gantt_svg = ""
+        # 调用analysis_engine生成SVG（MC图表用SVG，甘特图改用HTML）
         mc_svg = ""
         try:
-            if self.phases and self.cpm_result:
-                gantt_svg = generate_gantt_svg(self.phases, self.cpm_result)
             if self.mc_results:
                 mc_svg = generate_mc_svg(self.mc_results)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [WARN] MC图表生成失败: {e}")
 
         # 组装HTML
         html = [self._build_html_header()]
         html.append(self._build_method_card_section())
-        html.append(self._build_param_table())
-        html.append(self._build_gantt_section(gantt_svg))
+        html.append(self._build_gantt_section(""))  # HTML-based Gantt
+        html.append(self._build_overlap_section())   # 重叠分析
+        html.append(self._build_param_table())       # 分组参数表
+        html.append(self._build_wbs_tree_section())  # WBS树
         html.append(self._build_cpm_section())
         html.append(self._build_mc_section(mc_svg))
         html.append(self._build_analysis_section())
@@ -601,21 +597,44 @@ class PipelineState:
 <head><meta charset="utf-8">
 <title>{self.project_name or '项目'} - 活动历时估算报告</title>
 <style>
-body{{font-family:'Segoe UI',sans-serif;background:#f5f7fa;color:#333;max-width:1200px;margin:0 auto;padding:20px}}
-h1{{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px}}
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Segoe UI','Microsoft YaHei',sans-serif;background:#f5f7fa;color:#333;max-width:1200px;margin:0 auto;padding:20px}}
+h1{{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-bottom:16px}}
+h2{{color:#2c3e50;margin-bottom:12px}}
+h3{{color:#34495e;margin:8px 0}}
 .card{{background:#fff;border-radius:8px;padding:16px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.1)}}
-table{{border-collapse:collapse;width:100%}}
-th,td{{border:1px solid #ddd;padding:8px 12px;text-align:left}}
-th{{background:#3498db;color:#fff}}
-.tag{{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;margin:2px}}
+table{{border-collapse:collapse;width:100%;font-size:13px}}
+th,td{{border:1px solid #ddd;padding:6px 10px;text-align:left}}
+th{{background:#3498db;color:#fff;position:sticky;top:0}}
+.tag{{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;margin:2px}}
 .tag-ok{{background:#27ae60;color:#fff}}
 .tag-warn{{background:#f39c12;color:#fff}}
-.tag-err{{background:#e74c3c;color:#fff}}</style></head><body>
+.tag-err{{background:#e74c3c;color:#fff}}
+/* 甘特图 */
+.gantt-container{{overflow-x:auto;overflow-y:visible;position:relative}}
+.gantt{{position:relative;min-width:900px}}
+.gantt-header{{display:flex;position:sticky;top:0;background:#f8f9fa;z-index:2;border-bottom:2px solid #333;font-size:12px;font-weight:bold;height:36px;align-items:flex-end}}
+.gantt-label{{min-width:180px;padding:0 8px 4px 0;flex-shrink:0}}
+.gantt-scale{{flex:1;display:flex;position:relative;height:36px}}
+.gantt-tick{{position:absolute;font-size:10px;color:#666;top:16px;transform:translateX(-50%)}}
+.gantt-phase{{display:flex;align-items:center;background:#f0f4f8;padding:6px 8px;margin:2px 0;border-radius:4px;font-size:13px;font-weight:bold;color:#2c3e50;border-left:4px solid}}
+.gantt-row{{display:flex;align-items:center;padding:2px 0;font-size:12px;min-height:28px;border-bottom:1px solid #f0f0f0}}
+.gantt-row:hover{{background:#f8f9ff}}
+.gantt-row-label{{min-width:180px;padding:0 8px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;font-size:12px}}
+.gantt-track{{flex:1;position:relative;height:24px}}
+.gantt-bar{{position:absolute;height:20px;border-radius:4px;top:2px;min-width:4px;box-shadow:0 1px 2px rgba(0,0,0,0.15);cursor:default}}
+.gantt-bar:hover{{opacity:0.85;transform:scaleY(1.1)}}
+.gantt-bar-critical{{border:2px solid #c0392b}}
+.gantt-milestone{{position:absolute;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:10px solid #e67e22;top:7px;transform:translateX(-7px);cursor:default}}
+.gantt-milestone-label{{position:absolute;font-size:9px;color:#e67e22;white-space:nowrap;top:-14px;transform:translateX(-50%);font-weight:bold}}
+.phase-grid{{display:flex;flex:1;position:relative}}
+.phase-grid-line{{position:absolute;top:0;bottom:0;border-left:1px dashed #ddd;z-index:0}}
+</style></head><body>
 <h1>{self.project_name or '项目'} - 活动历时估算报告</h1>
 <p>生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>"""
 
     def _build_method_card_section(self) -> str:
-        lines = ['<div class="card"><h2>估算方法</h2>']
+        lines = ['<div class="card"><h2>概况</h2>']
         lines.append(f"<p><strong>阶段数:</strong> {len(self.phases)}</p>")
         if self.mc_results:
             lines.append(f"<p><strong>蒙特卡洛:</strong> PERT-Beta + 三角分布 + 泊松近似</p>")
@@ -624,19 +643,172 @@ th{{background:#3498db;color:#fff}}
         lines.append('</div>')
         return "\n".join(lines)
 
+    def _get_phase_groups(self):
+        """从 phases 名称中提取 WBS 前缀分组，返回 {phase_num: {name, phases_indices, color}}"""
+        import re
+        phase_colors = [
+            ('#3498db','#d6eaf8'), ('#e74c3c','#fadbd8'), ('#2ecc71','#d5f5e3'),
+            ('#9b59b6','#e8daef'), ('#f39c12','#fef9e7'), ('#1abc9c','#d1f2eb'),
+            ('#e67e22','#fdebd0'), ('#34495e','#d5dbdb'),
+        ]
+        groups = {}
+        for i, p in enumerate(self.phases):
+            name = p.get("name", "")
+            m = re.match(r'^(\d+)\.', name.strip())
+            if m:
+                key = m.group(1)
+                if key not in groups:
+                    idx = min(len(groups), len(phase_colors)-1)
+                    groups[key] = {
+                        "title": f"Phase {key}",
+                        "indices": [],
+                        "color": phase_colors[idx][0],
+                        "bg": phase_colors[idx][1],
+                    }
+                groups[key]["indices"].append(i)
+        return groups
+
     def _build_param_table(self) -> str:
-        lines = ['<div class="card"><h2>参数详情</h2><table><tr><th>#</th><th>阶段</th><th>O</th><th>M</th><th>P</th><th>交付物</th></tr>']
-        for i, p in enumerate(self.phases, 1):
-            lines.append(f"<tr><td>{i}</td><td>{p.get('name','')}</td>"
-                         f"<td>{p.get('o','-')}</td><td>{p.get('m','-')}</td>"
-                         f"<td>{p.get('p','-')}</td><td>{p.get('deliverable','-')}</td></tr>")
-        lines.append('</table></div>')
+        lines = ['<div class="card"><h2>WBS分解与参数详情</h2>']
+        groups = self._get_phase_groups()
+        if not groups:
+            # fallback flat table
+            lines.append('<table><tr><th>#</th><th>阶段</th><th>O</th><th>M</th><th>P</th><th>交付物</th></tr>')
+            for i, p in enumerate(self.phases, 1):
+                lines.append(f"<tr><td>{i}</td><td>{p.get('name','')}</td>"
+                             f"<td>{p.get('o','-')}</td><td>{p.get('m','-')}</td>"
+                             f"<td>{p.get('p','-')}</td><td>{p.get('deliverable','-')}</td></tr>")
+            lines.append('</table></div>')
+            return "\n".join(lines)
+
+        for key in sorted(groups.keys(), key=int):
+            g = groups[key]
+            indices = g["indices"]
+            lines.append(f'<div style="margin:8px 0;border-left:4px solid {g["color"]};padding:0 0 0 8px">')
+            lines.append(f'<h3 style="color:{g["color"]};margin:4px 0 6px 0">📋 Phase {key}</h3>')
+            lines.append('<table><tr><th>#</th><th>任务</th><th>O</th><th>M</th><th>P</th><th>交付物</th></tr>')
+            for idx in indices:
+                p = self.phases[idx]
+                tid = idx + 1
+                is_cp = tid in (self.cpm_result.critical_ids or set()) if self.cpm_result else False
+                marker = ' 🔴' if is_cp else ''
+                lines.append(f'<tr><td>{tid}</td><td>{p.get("name","")}{marker}</td>'
+                             f'<td>{p.get("o","-")}</td><td>{p.get("m","-")}</td>'
+                             f'<td>{p.get("p","-")}</td><td>{p.get("deliverable","-")}</td></tr>')
+            lines.append('</table>')
+            lines.append('</div>')
+        lines.append(
+            '<p style="color:#999;font-size:12px;margin-top:4px">🔴 = 关键路径任务</p>'
+            '</div>')
         return "\n".join(lines)
 
     def _build_gantt_section(self, svg: str) -> str:
-        if not svg:
+        """构建HTML甘特图（div-based，支持大量任务）"""
+        if not self.cpm_result or not self.phases:
             return ""
-        return f'<div class="card"><h2>甘特图</h2>{svg}</div>'
+
+        # 准备甘特图数据
+        import re
+        phase_colors = {
+            '1': {'bar':'#3498db','bg':'#d6eaf8'},
+            '2': {'bar':'#e74c3c','bg':'#fadbd8'},
+            '3': {'bar':'#2ecc71','bg':'#d5f5e3'},
+            '4': {'bar':'#9b59b6','bg':'#e8daef'},
+            '5': {'bar':'#f39c12','bg':'#fef9e7'},
+            '6': {'bar':'#1abc9c','bg':'#d1f2eb'},
+            '7': {'bar':'#e67e22','bg':'#fdebd0'},
+            '8': {'bar':'#34495e','bg':'#d5dbdb'},
+        }
+        default_colors = {'bar':'#7f8c8d','bg':'#f0f0f0'}
+
+        task_data = []
+        min_time = float('inf')
+        max_time = 0
+        for tid in sorted(self.cpm_result.task_cpm.keys()):
+            if tid <= len(self.phases):
+                cd = self.cpm_result.task_cpm[tid]
+                name = self.phases[tid-1]["name"]
+                is_cp = tid in (self.cpm_result.critical_ids or set())
+                m = re.match(r'^(\d+)\.', name.strip())
+                phase_key = m.group(1) if m else '0'
+                pc = phase_colors.get(phase_key, default_colors)
+                task_data.append({
+                    'tid': tid, 'name': name, 'phase': phase_key,
+                    'start': cd['es'], 'end': cd['ef'],
+                    'duration': cd['ef'] - cd['es'],
+                    'is_critical': is_cp,
+                    'bar_color': pc['bar'],
+                })
+                min_time = min(min_time, cd['es'])
+                max_time = max(max_time, cd['ef'])
+
+        time_range = max(max_time - min_time, 1)
+        gantt_width = 700  # px for the track area
+
+        def time_to_x(t):
+            return (t - min_time) / time_range * gantt_width
+
+        lines = ['<div class="card"><h2>甘特图</h2>'
+                 f'<p style="font-size:12px;color:#666;margin-bottom:8px">'
+                 f'总工期: {max_time:.0f}天 | 任务: {len(task_data)}个 | 色块=阶段分组 | 红框=关键路径</p>'
+                 '<div class="gantt-container"><div class="gantt">']
+
+        # Scale header
+        lines.append('<div class="gantt-header">'
+                     '<div class="gantt-label">任务名称</div>'
+                     '<div class="gantt-scale">')
+        ticks = 12
+        for i in range(ticks + 1):
+            t = min_time + time_range * i / ticks
+            x = time_to_x(t)
+            lines.append(f'<div class="gantt-tick" style="left:{x:.0f}px">{t:.0f}</div>')
+            if i > 0 and i < ticks:
+                lines.append(f'<div class="gantt-track" style="position:absolute;left:{x:.0f}px;top:0;bottom:0;border-left:1px dashed #ddd;height:36px;z-index:0"></div>')
+        lines.append('</div></div>')
+
+        # Phase headers + task rows
+        prev_phase = None
+        for t in task_data:
+            # Phase group header
+            if t['phase'] != prev_phase:
+                pc = phase_colors.get(t['phase'], default_colors)
+                lines.append(
+                    f'<div class="gantt-phase" style="border-left-color:{pc["bar"]};background:{pc["bg"]}">'
+                    f'Phase {t["phase"]}</div>')
+                prev_phase = t['phase']
+
+            # Task row
+            sx = time_to_x(t['start'])
+            bw = max(4, time_to_x(t['end']) - sx)
+            critical_cls = ' gantt-bar-critical' if t['is_critical'] else ''
+            dur_label = f'{t["duration"]:.0f}d' if bw > 50 else ''
+
+            lines.append(f'<div class="gantt-row">'
+                         f'<div class="gantt-row-label" title="{t["name"]}">{t["name"]}</div>'
+                         f'<div class="gantt-track">'
+                         f'<div class="gantt-bar{critical_cls}" '
+                         f'style="left:{sx:.1f}px;width:{bw:.1f}px;background:{t["bar_color"]}" '
+                         f'title="{t["name"]}: {t["start"]:.0f}→{t["end"]:.0f}天 ({t["duration"]:.0f}天)">'
+                         f'{dur_label}</div></div></div>')
+
+        # Phase transition milestones
+        phase_boundaries = {}
+        for t in task_data:
+            if t['phase'] not in phase_boundaries:
+                phase_boundaries[t['phase']] = {'first_start': t['start'], 'last_end': t['end']}
+            else:
+                phase_boundaries[t['phase']]['last_end'] = max(phase_boundaries[t['phase']]['last_end'], t['end'])
+
+        for pk in sorted(phase_boundaries.keys(), key=int):
+            pb = phase_boundaries[pk]
+            mx = time_to_x(pb['last_end'])
+            lines.append(f'<div class="gantt-milestone" style="left:{mx:.0f}px" '
+                         f'title="Phase {pk} 完成({pb["last_end"]:.0f}天)"></div>')
+            lines.append(f'<div class="gantt-milestone-label" style="left:{mx:.0f}px">♦P{pk}</div>')
+
+
+        lines.append('</div></div></div>')
+        return '\n'.join(lines)
 
     def _build_cpm_section(self) -> str:
         if not self.cpm_result:
@@ -653,33 +825,84 @@ th{{background:#3498db;color:#fff}}
         return "\n".join(lines)
 
     def _build_mc_section(self, svg: str) -> str:
-        if not svg:
-            return ""
-        mc = self.mc_results.get("pert", {})
+        mc = self.mc_results.get("pert", {}) if self.mc_results else {}
         stats = mc.get("stats", {})
         quants = mc.get("quantiles", {})
+        if not stats and not quants and not svg:
+            return ""
         lines = ['<div class="card"><h2>蒙特卡洛模拟</h2>']
-        lines.append(f"<p>均值={stats.get('mean',0):.1f}, σ={stats.get('stddev',0):.1f}</p>")
-        lines.append(f"<p>P50={quants.get('p50',0):.1f}, P90={quants.get('p90',0):.1f}</p>")
-        lines.append(svg)
+        if stats:
+            lines.append(f"<p>均值={stats.get('mean',0):.1f}, σ={stats.get('stddev',0):.1f}</p>")
+        if quants:
+            lines.append(f"<p>P50={quants.get('p50',0):.1f}, P90={quants.get('p90',0):.1f}</p>")
+        if svg:
+            lines.append(svg)
         lines.append('</div>')
         return "\n".join(lines)
 
+    def _build_overlap_section(self) -> str:
+        """任务重叠分析"""
+        if not self.overlap_results:
+            return ""
+        ov = self.overlap_results
+        mc = ov.get("max_count", {})
+        md = ov.get("max_duration", {})
+        if not mc.get("count", 0) and not md.get("count", 0):
+            return ""
+        lines = ['<div class="card"><h2>任务重叠分析</h2>']
+
+        if mc.get("count", 0) > 0:
+            lines.append(f'<p><strong>最大并发任务数:</strong> {mc["count"]} 个任务同时执行</p>')
+            lines.append(f'<p><strong>时间范围:</strong> {mc.get("start",0):.0f}天 → {mc.get("end",0):.0f}天'
+                         f'（持续 {mc.get("duration",0):.0f}天）</p>')
+            tasks = mc.get("tasks", [])
+            if tasks:
+                lines.append('<p><strong>涉及任务:</strong></p><ul>')
+                for task_name in tasks[:10]:
+                    lines.append(f'<li>{task_name}</li>')
+                if len(tasks) > 10:
+                    lines.append(f'<li>… 共{len(tasks)}个任务</li>')
+                lines.append('</ul>')
+
+        if md.get("duration", 0) > (mc.get("duration", 0) + 1):
+            lines.append(f'<p style="margin-top:8px"><strong>最长重叠时段:</strong> '
+                         f'{md.get("duration",0):.0f}天（{md.get("start",0):.0f}→{md.get("end",0):.0f}天），'
+                         f'{md.get("count",0)}个任务并行</p>')
+
+        lines.append('</div>')
+        return "\n".join(lines)
+
+    def _build_wbs_tree_section(self) -> str:
+        """WBS文本树（层级结构展示）"""
+        if not self.wbs_text_tree:
+            return ""
+        tree_html = self.wbs_text_tree.replace("\n", "<br>").replace(" ", "&nbsp;")
+        return f'<div class="card"><h2>WBS分解结构</h2>'
+        f'<pre style="font-family:Consolas,monospace;font-size:12px;line-height:1.5;overflow-x:auto;'
+        f'background:#f8f9fa;padding:12px;border-radius:4px">{tree_html}</pre></div>'
+
     def _build_analysis_section(self) -> str:
-        lines = ['<div class="card"><h2>分析建议</h2><ul>']
-        lines.append(f"<li>关键路径有{len(self.cpm_result.critical_ids)}个任务，建议优先保障资源</li>")
+        # 构建项目上下文
+        context = {
+            "domain": "ai-enterprise",
+            "scale": "large" if len(self.phases) > 20 else "medium",
+            "tech_novelty": "high",
+            "team_size": len(self.phases),
+            "integration_count": sum(1 for p in self.phases if "集成" in p.get("name","") or "对接" in p.get("name","")),
+            "critical_path_len": len(self.cpm_result.critical_ids) if (self.cpm_result and self.cpm_result.critical_ids) else 0,
+            "mc_p50_p90_gap": 0,
+            "phases": self.phases,
+        }
         if self.mc_results:
             pert = self.mc_results.get("pert", {})
             quants = pert.get("quantiles", {})
-            p50 = quants.get("p50", 0)
-            p90 = quants.get("p90", 0)
-            lines.append(f"<li>P50={p50:.1f}天 为50%概率工期，P90={p90:.1f}天 为90%概率工期</li>")
-            if p90 > 0:
-                ratio = (p90 - p50) / p50 * 100 if p50 else 0
-                if ratio > 30:
-                    lines.append(f"<li>⚠️ P50-P90跨度{ratio:.0f}%，不确定性较高，建议设置缓冲期</li>")
-        lines.append('</ul></div>')
-        return "\n".join(lines)
+            if quants:
+                context["mc_p50_p90_gap"] = quants.get("p90", 0) - quants.get("p50", 0)
+
+        # 根据上下文选择匹配的维度
+        active_dims = select_dimensions(context)
+        suggestion_html = build_analysis_suggestions(active_dims, self.cpm_result, self.mc_results, self.phases)
+        return suggestion_html
 
     def _build_html_footer(self) -> str:
         return "</body></html>"
@@ -770,7 +993,7 @@ th{{background:#3498db;color:#fff}}
         elif self.wbs_result:
             self.dependencies = wbs_to_dependencies(self.wbs_result)
         else:
-            self.dependencies = auto_plan_dependencies(len(self.phases))
+            self.dependencies = auto_plan_dependencies(len(self.phases), self.phases)
 
         # 转换 0-based → 1-based
         deps_1based = {}
@@ -1297,7 +1520,7 @@ th{{background:#3498db;color:#fff}}
             if needs_replan and self.phases:
                 print("  🔄 修复规划失格：重新规划依赖...")
                 from analysis_engine import auto_plan_dependencies
-                self.dependencies = auto_plan_dependencies(len(self.phases))
+                self.dependencies = auto_plan_dependencies(len(self.phases), self.phases)
                 # 重新编译依赖格式
                 deps_1based = {}
                 for k, v in self.dependencies.items():

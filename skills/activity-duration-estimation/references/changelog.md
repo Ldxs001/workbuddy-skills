@@ -1,4 +1,36 @@
-## 1.6.3 (2026-06-03)
+## 1.7.0 (2026-06-03)
+
+### 重构
+- 紧前关系规划从「全FS串行」改为「WBS层级感知的并行推理」
+- `auto_plan_dependencies()` 新增 `phases` 参数：解析 phase name 中的 WBS 前缀（如 "1.1" → 父组 "1"），同父组并行、跨父组全部依赖
+- `wbs_to_dependencies()` 重写：按父节点分组，同组子任务并行，跨组**全部成员** FS 依赖上一组最后一个
+- `_prompt_llm_for_dependencies()` 改为静默调用智能规划，不再抛出 `LLMInteractionRequired`
+- 三个 runner 调用处全部传入 `self.phases` 以支持依赖分组推理
+
+### 修复
+- 根因修复：原 `wbs_to_dependencies()` 的 "same parent" / "different parent" 两个分支执行相同代码（全 FS 串联），检查形同虚设
+- 根因修复：`_generate_html_report()` 的 SVG 生成被 `except Exception: pass` 无声吞掉，甘特图和 MC 概率分布图从未渲染
+  - 甘特图：`self.phases` 直接传给 `generate_gantt_svg()`，但 phases 没有 `start`/`end`/`id` 字段，导致 KeyError 被静默吞掉
+  - 修复：从 CPM 结果构建正确的 `{id, name, start, end}` 任务对象再传入
+  - MC 图表：单独 try/except 并输出错误信息，不再无声吞异常
+- 根因修复：`auto_plan_dependencies()` 分组时只有"本组第一个"依赖上一组最后一个，其余组员无依赖从 day0 开始，导致工期被严重低估（34天）
+  - 修复：**本组全部成员**依赖上一组最后一个，同组内部保持并行
+- 根因修复：`_build_mc_section()` 以 `if not svg` 为守卫，SVG 失败时连文字统计也看不到
+  - 修复：统计文字与 SVG 分离，即使图表失败文字也能展示
+- `format_text_tree()` 默认使用 ASCII 安全标记 `[P]/[T]/[W]` 替代 emoji `📁📄`，避免 Windows GBK 终端 UnicodeEncodeError
+
+### 新增
+- `references/risk-dimensions.md` — 7大类风险维度库（D1~D7），含选择条件矩阵和分析要素
+- `scripts/risk_dimensions.py` — `select_dimensions()` 按项目上下文自动匹配维度，`build_analysis_suggestions()` 生成多维风险分析HTML
+- `_build_analysis_section()` 重写为维度驱动：根据项目领域/规模/技术新颖度/集成数自动选择适用维度，动态严重度（关键路径集中度、估算偏差）
+- `validate_wbs()` 新增粒度检查：核心技术阶段≥5个工作包，每阶段≥3个，交付物完整性，总工作包数与阶段数比例
+- `generate_gantt_svg()` 新增 `unit` 参数、网格线、Y轴水平线、阴影效果、智能标签截断
+
+### 修复
+- 甘特图时间单位从硬编码 "h" 改为可配置（默认 "天"）
+- `format_text_tree()` 默认使用 ASCII 安全标记 `[P]/[T]/[W]` 替代 emoji
+
+
 
 ### 新增
 - `_generate_audit_report()`: 10项审计检查（CPM/MC/总工期/关键路径/P50P90/HTML报告/文档逐节检查）

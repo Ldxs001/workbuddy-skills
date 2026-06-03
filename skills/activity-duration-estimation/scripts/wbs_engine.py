@@ -330,6 +330,50 @@ def validate_wbs(result: WBSResult, max_depth: int = 4) -> WBSResult:
     if result.max_depth > max_depth:
         issues.append(f"最大深度 {result.max_depth} 超过限制 {max_depth}")
 
+    # ── WBS粒度检查 ──
+    if result.root and result.root.children:
+        # 收集所有L2节点（根节点的直接子节点）
+        l2_nodes = [c for c in result.root.children if c.level <= 2]
+        for node in l2_nodes:
+            name_lower = node.name.lower()
+            # 识别核心技术类阶段（AI/ML/Skill/Engine等）
+            core_keywords = ["ai", "智能体", "agent", "skill", "引擎", "engine",
+                             "模型", "model", "learning", "算法", "algorithm"]
+            is_core = any(k in name_lower for k in core_keywords)
+
+            # 收集该阶段下的工作包（叶节点）
+            def count_work_packages(n: WBSNode) -> int:
+                if n.is_work_package:
+                    return 1
+                return sum(count_work_packages(c) for c in n.children)
+
+            wp_count = count_work_packages(node)
+
+            if is_core and wp_count < 5:
+                issues.append(
+                    f"「{node.name}」为核心技术阶段，仅{wp_count}个工作包，"
+                    f"建议至少分解为5个以上子任务"
+                )
+            elif wp_count < 3:
+                issues.append(
+                    f"「{node.name}」仅{wp_count}个工作包，"
+                    f"建议至少分解为3个以上子任务"
+                )
+
+        # 检查总工作包数是否与项目规模匹配
+        total_wps = len(result.work_packages) if result.work_packages else 0
+        total_l2 = len(l2_nodes)
+        if total_l2 >= 5 and total_wps < total_l2 * 2:
+            issues.append(
+                f"项目共{total_l2}个阶段，仅{total_wps}个工作包，"
+                f"平均每阶段{total_wps/total_l2:.1f}个，建议每阶段至少2-3个工作包"
+            )
+
+        # 检查交付物完整性
+        for wp in (result.work_packages or []):
+            if not wp.deliverable or len(wp.deliverable.strip()) < 2:
+                issues.append(f"工作包「{wp.name}」缺少交付物描述")
+
     result.validation_issues = issues
     result.is_valid = len(issues) == 0
     return result
@@ -367,8 +411,8 @@ def wbs_to_dependencies(result: WBSResult) -> dict[int, list[tuple[int, str]]]:
     根据WBS层级结构自动推演紧前关系
 
     规则：
-    - 同一父节点的子节点：从左到右 FS 串联（1→2→3...）
-    - 子节点完成后，父节点同级的下一个父节点才能开始
+    - 同一父节点的子节点（同组）：并行（互不依赖）
+    - 跨父节点边界：本组**全部任务**依赖上一组最后一个，同组内部保持并行
     """
     result.collect_work_packages()
     wps = result.work_packages
@@ -377,17 +421,38 @@ def wbs_to_dependencies(result: WBSResult) -> dict[int, list[tuple[int, str]]]:
     sorted_wps = sorted(enumerate(wps), key=lambda x: x[1].code)
 
     deps: dict[int, list[tuple[int, str]]] = {}
-    prev_idx = -1
 
-    for i, (idx, wp) in enumerate(sorted_wps):
-        if i == 0:
-            deps[idx] = []
+    # 按父节点分组
+    groups: list[list[tuple[int, 'WBSNode']]] = []
+    current_group: list[tuple[int, 'WBSNode']] = []
+
+    for item in sorted_wps:
+        if not current_group:
+            current_group.append(item)
         else:
-            # 如果和前一个工作包同一父节点 → FS串联
-            if wp.parent and wp.parent == sorted_wps[i-1][1].parent:
-                deps[idx] = [(sorted_wps[i-1][0], "FS")]
+            _, prev_wp = current_group[-1]
+            _, wp = item
+            if wp.parent and prev_wp.parent and wp.parent == prev_wp.parent:
+                current_group.append(item)
             else:
-                deps[idx] = [(sorted_wps[i-1][0], "FS")]
+                groups.append(current_group)
+                current_group = [item]
+    if current_group:
+        groups.append(current_group)
+
+    for g_idx, group in enumerate(groups):
+        if g_idx == 0:
+            for item in group:
+                idx, _ = item
+                deps[idx] = []
+        else:
+            # 找到上一组中 M 值最大的工作包作为约束
+            prev_group = groups[g_idx - 1]
+            prev_constraint = max(prev_group, key=lambda x: x[1].m or 0)
+            prev_constraint_idx = prev_constraint[0]
+            for item in group:
+                idx, _ = item
+                deps[idx] = [(prev_constraint_idx, "FS")]
 
     return deps
 
@@ -396,17 +461,22 @@ def wbs_to_dependencies(result: WBSResult) -> dict[int, list[tuple[int, str]]]:
 # 6. 输出格式化
 # ═══════════════════════════════════════════════════
 
-def format_text_tree(result: WBSResult) -> str:
-    """格式A: 缩进文本树（控制台快速展示）"""
+def format_text_tree(result: WBSResult, use_emoji: bool = False) -> str:
+    """格式A: 缩进文本树（控制台快速展示）
+    use_emoji: True 时使用 📁📄 图标（仅限 UTF-8 终端）
+               False 时使用 [P] [T] [W] ASCII 安全标记
+    """
     if not result.root:
         return "[空WBS]"
 
     lines = []
-    project_icon = "📁"
+    project_icon = "📁" if use_emoji else "[P]"
+    wp_icon = "📄" if use_emoji else "[W]"
+    task_icon = "📁" if use_emoji else "[T]"
 
     def _walk(node: WBSNode, prefix: str, is_last: bool):
         connector = "└── " if is_last else "├── "
-        icon = "📄" if node.is_work_package else "📁"
+        icon = wp_icon if node.is_work_package else task_icon
 
         name_part = f"{icon} {node.name}"
         if node.code:

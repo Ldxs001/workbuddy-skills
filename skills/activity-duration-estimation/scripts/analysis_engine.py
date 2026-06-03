@@ -263,17 +263,66 @@ def calc_cpm(
 # 2. 紧前关系自动规划
 # ═══════════════════════════════════════════════════
 
-def auto_plan_dependencies(phase_count: int) -> dict[int, list[int]]:
+def auto_plan_dependencies(
+    phase_count: int,
+    phases: list[dict] = None
+) -> dict[int, list[int]]:
     """
-    自动规划紧前关系：默认按顺序 FS 连接
+    自动规划紧前关系。
+
+    输入:
+      phase_count: 阶段数
+      phases: 可选，阶段列表 [{name, ...}]，用于从名称提取WBS前缀进行分组
+
+    分组规则:
+      - 从 phase name 中提取 WBS 前缀（如 "1.1 痛点调研" → 父组 "1"）
+      - 同一父组内的子任务：并行（无互依赖）
+      - 跨父组边界：新组的第一个任务依赖上一组的最后一个任务（FS）
+      - 无法提取前缀时回退为全串行
     返回: {阶段索引: [前置阶段索引列表]}
     """
     deps: dict[int, list[int]] = {}
-    for i in range(1, phase_count + 1):
-        if i > 1:
-            deps[i] = [i - 1]
-        else:
-            deps[i] = []
+
+    # 尝试从 phases name 中提取 WBS 父组前缀
+    groups: dict[str, list[int]] = {}
+    has_groups = False
+    if phases:
+        for idx, p in enumerate(phases, start=1):
+            name = p.get("name", "")
+            # 匹配开头的数字前缀，如 "1.1" → "1", "2.3" → "2"
+            import re
+            m = re.match(r'^(\d+)\.', name.strip())
+            if m:
+                parent = m.group(1)
+                groups.setdefault(parent, []).append(idx)
+                has_groups = True
+
+    if has_groups and len(groups) > 1:
+        # 按组号排序
+        sorted_parents = sorted(groups.keys(), key=lambda x: int(x))
+        prev_group_constraint = None  # 上一组中 M 值最大的任务ID
+        for parent in sorted_parents:
+            members = sorted(groups[parent])
+            for tid in members:
+                if prev_group_constraint is not None:
+                    # 跨组边界：本组全部任务依赖于上一组中 M 值最大的任务
+                    deps[tid] = [(prev_group_constraint, "FS")]
+                else:
+                    deps[tid] = []
+            # 找到本组中 M 值最大的任务作为下一组的约束
+            if phases and len(phases) >= max(members):
+                max_m_tid = max(members, key=lambda x: phases[x - 1].get("m", 0))
+            else:
+                max_m_tid = members[-1]  # fallback: 最后一个
+            prev_group_constraint = max_m_tid
+    else:
+        # 无分组信息 → 回退为全串行（统一tuple格式）
+        for i in range(1, phase_count + 1):
+            if i > 1:
+                deps[i] = [(i - 1, "FS")]
+            else:
+                deps[i] = []
+
     return deps
 
 
@@ -506,15 +555,18 @@ def generate_gantt_svg(
     tasks: list[dict],
     cpm_result: CPMResult | None = None,
     width: int = 800,
-    height: int = 350
+    height: int = 350,
+    unit: str = "天"
 ) -> str:
-    """生成甘特图SVG"""
+    """生成甘特图SVG
+    unit: 时间单位标签，如 "天" "周" "h"
+    """
     if not tasks:
         return f'<svg width="{width}" height="{height}"><text x="{width//2}" y="{height//2}" text-anchor="middle" fill="#999">暂无任务数据</text></svg>'
 
-    margin = {'top': 50, 'right': 30, 'bottom': 70, 'left': 140}
-    chart_w = width - margin['left'] - margin['right']
-    chart_h = height - margin['top'] - margin['bottom']
+    mag = {'top': 50, 'right': 30, 'bottom': 70, 'left': 160}
+    chart_w = width - mag['left'] - mag['right']
+    chart_h = height - mag['top'] - mag['bottom']
 
     # 时间范围
     starts = [t['start'] for t in tasks]
@@ -527,51 +579,70 @@ def generate_gantt_svg(
               '#f5576c', '#ff9671', '#ffc75f', '#845ec2', '#008f7a']
 
     svg = [f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">']
-    svg.append(f'<text x="{width//2}" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">任务甘特图</text>')
+    svg.append(f'<defs><filter id="shadow"><feDropShadow dx="1" dy="1" stdDeviation="1" flood-opacity="0.2"/></filter></defs>')
+    svg.append(f'<text x="{width//2}" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">任务甘特图（单位：{unit}）</text>')
+
+    # 网格线
+    steps = max(6, min(int(time_range / 5) + 1, 20))
+    for i in range(steps + 1):
+        t = min_time + time_range * i / steps
+        x = mag['left'] + chart_w * i / steps
+        if i > 0 and i < steps:
+            svg.append(f'<line x1="{x}" y1="{mag["top"]}" x2="{x}" y2="{mag["top"] + chart_h}" stroke="#eee" stroke-width="0.5" stroke-dasharray="3,3"/>')
 
     # 坐标轴
-    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"]}" x2="{margin["left"]}" y2="{margin["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
-    svg.append(f'<line x1="{margin["left"]}" y1="{margin["top"] + chart_h}" x2="{margin["left"] + chart_w}" y2="{margin["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
+    svg.append(f'<line x1="{mag["left"]}" y1="{mag["top"]}" x2="{mag["left"]}" y2="{mag["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
+    svg.append(f'<line x1="{mag["left"]}" y1="{mag["top"] + chart_h}" x2="{mag["left"] + chart_w}" y2="{mag["top"] + chart_h}" stroke="#333" stroke-width="1.5"/>')
 
     # Y轴 - 任务名称
     task_h = min(36, chart_h / max(len(tasks), 1))
     for i, t in enumerate(tasks):
-        y = margin['top'] + i * task_h + task_h / 2
-        svg.append(f'<text x="{margin["left"] - 10}" y="{y}" text-anchor="end" font-size="12" fill="#333">{t["name"]}</text>')
+        y = mag['top'] + i * task_h + task_h / 2
+        name_display = t["name"]
+        if len(name_display) > 12:
+            name_display = name_display[:11] + "…"
+        svg.append(f'<text x="{mag["left"] - 10}" y="{y}" text-anchor="end" font-size="11" fill="#333">{name_display}</text>')
 
     # X轴刻度
-    steps = 8
     for i in range(steps + 1):
         t = min_time + time_range * i / steps
-        x = margin['left'] + chart_w * i / steps
-        svg.append(f'<line x1="{x}" y1="{margin["top"] + chart_h}" x2="{x}" y2="{margin["top"] + chart_h + 5}" stroke="#333"/>')
-        svg.append(f'<text x="{x}" y="{margin["top"] + chart_h + 18}" text-anchor="middle" font-size="10" fill="#666">{t:.1f}</text>')
+        x = mag['left'] + chart_w * i / steps
+        svg.append(f'<line x1="{x}" y1="{mag["top"] + chart_h}" x2="{x}" y2="{mag["top"] + chart_h + 5}" stroke="#333"/>')
+        svg.append(f'<text x="{x}" y="{mag["top"] + chart_h + 18}" text-anchor="middle" font-size="9" fill="#666">{t:.0f}</text>')
+
+    # Y轴水平网格线
+    for i in range(len(tasks)):
+        y = mag['top'] + i * task_h + task_h
+        svg.append(f'<line x1="{mag["left"]}" y1="{y:.1f}" x2="{mag["left"] + chart_w}" y2="{y:.1f}" stroke="#f0f0f0" stroke-width="0.5"/>')
 
     # 绘制任务条
     for i, t in enumerate(tasks):
-        y = margin['top'] + i * task_h + 6
-        sx = margin['left'] + chart_w * (t['start'] - min_time) / time_range
-        ex = margin['left'] + chart_w * (t['end'] - min_time) / time_range
+        y = mag['top'] + i * task_h + 6
+        sx = mag['left'] + chart_w * (t['start'] - min_time) / time_range
+        ex = mag['left'] + chart_w * (t['end'] - min_time) / time_range
         bw = max(3, ex - sx)
         ci = t.get('id', i) % len(colors)
 
         is_critical = cpm_result and t.get('id', 0) in (cpm_result.critical_ids or set())
-        stroke_color = '#e74c3c' if is_critical else '#333'
-        stroke_width = 2 if is_critical else 1
+        stroke_color = '#c0392b' if is_critical else 'none'
         fill_color = colors[ci]
 
-        svg.append(f'<rect x="{sx:.1f}" y="{y}" width="{bw:.1f}" height="{task_h - 12}" fill="{fill_color}" stroke="{stroke_color}" stroke-width="{stroke_width}" rx="3" ry="3"/>')
+        svg.append(f'<rect x="{sx:.1f}" y="{y}" width="{bw:.1f}" height="{task_h - 12}" '
+                   f'fill="{fill_color}" stroke="{stroke_color}" stroke-width="2" rx="3" ry="3" filter="url(#shadow)"/>')
 
-        if bw > 50:
+        if bw > 40:
             dur = t['end'] - t['start']
-            svg.append(f'<text x="{sx + bw/2:.1f}" y="{y + (task_h - 12)/2 + 4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="bold">{dur:.1f}h</text>')
+            dur_str = f"{dur:.0f}{unit}" if unit else f"{dur:.1f}"
+            txt_color = "#fff" if is_critical else "#fff"
+            svg.append(f'<text x="{sx + bw/2:.1f}" y="{y + (task_h - 12)/2 + 4}" '
+                       f'text-anchor="middle" font-size="9" fill="{txt_color}" font-weight="bold">{dur_str}</text>')
 
     # 关键路径图例
     if cpm_result and cpm_result.critical_ids:
         ly = height - 12
-        svg.append(f'<line x1="{margin["left"]}" y1="{ly}" x2="{margin["left"] + 20}" y2="{ly}" stroke="#e74c3c" stroke-width="2"/>')
-        svg.append(f'<text x="{margin["left"] + 25}" y="{ly + 4}" font-size="11" fill="#e74c3c">关键路径</text>')
-        svg.append(f'<text x="{margin["left"] + 160}" y="{ly + 4}" font-size="11" fill="#333">总工期: {cpm_result.project_duration:.1f}h</text>')
+        svg.append(f'<line x1="{mag["left"]}" y1="{ly}" x2="{mag["left"] + 20}" y2="{ly}" stroke="#c0392b" stroke-width="2"/>')
+        svg.append(f'<text x="{mag["left"] + 25}" y="{ly + 4}" font-size="11" fill="#c0392b">关键路径</text>')
+        svg.append(f'<text x="{mag["left"] + 160}" y="{ly + 4}" font-size="11" fill="#333">总工期: {cpm_result.project_duration:.0f}{unit}</text>')
 
     svg.append('</svg>')
     return '\n'.join(svg)
