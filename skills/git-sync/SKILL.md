@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.8.1
+version: 2.8.2
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复跳过同步时状态显示「成功」的误导问题，改为跳过。修复审计问题，统一术语，修正自审粒度。
@@ -85,16 +85,20 @@ python scripts/git-sync.py <skill-name> [version] [--skip-scan]
 
 ### AI 执行后必须输出（非可选）
 
-脚本已自动输出完整报告（推送状态表 + 审计结论 + ZIP/HTML 路径），
-AI **无需**手动提取终端输出重新格式化。
+脚本已自动输出完整报告到终端（推送状态表 + 审计结论 + ZIP/HTML 路径）。
 
-脚本运行完毕后，AI 必须执行以下 3 点：
+脚本运行完毕后，AI 必须执行以下 4 点：
 
-#### 1. [工具] deliver_attachments — 交付 ZIP 包
+#### 1. [文本] 将终端输出的完整报告原文放入回复中
 
-#### 2. [工具] preview_url — 打开 `.dist/index.html`
+**不要重新格式化、不要摘录、不要加工** — 直接从终端输出原文粘贴。
+（终端输出在工具结果中，用户看不到，必须由 AI 显式放入回复文本。）
 
-#### 3. [文本] 如果 GitHub 推送失败（443 超时），必须询问用户是否重试
+#### 2. [工具] deliver_attachments — 交付 ZIP 包
+
+#### 3. [工具] preview_url — 打开 `.dist/index.html`
+
+#### 4. [文本] 如果 GitHub 推送失败（443 超时），必须询问用户是否重试
 
 
 ## 渐进式加载说明
