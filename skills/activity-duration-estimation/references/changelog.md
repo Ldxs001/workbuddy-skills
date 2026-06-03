@@ -1,3 +1,34 @@
+## 1.6.1 (2026-06-03)
+
+### 修复
+- `prepare_estimation()` 不识别已直接设置的 `self.phases`，缺少 `elif self.phases: pass` 分支
+- 功能测试 83/83 全部通过
+
+---
+
+## 1.6.0 (2026-06-03)
+
+### 新增
+- `scripts/runner.py`: 新增 `LLMInteractionRequired` 异常类，流程需要LLM推理时抛出（WBS/依赖/OMP三个交互点）
+- `PipelineState.run_full()`: 强制全流程入口（WBS→估算→HTML报告→文档），WBS全程模式下必做
+- `_needs_wbs()`: 分支逻辑（含OMP时自动跳过WBS交互，仅用于单模式入口）
+- `_wbs_passes_estimation_gate()`: WBS进入估算门控校验（缺OMP/违反O≤M≤P→阻塞）
+- `_prompt_llm_for_*()`: 三个LLM交互点封装（wbs/omp/dependencies）
+- `_generate_html_report()`: 自包含HTML评估报告自动生成（甘特图/CPM/MC/分析建议）
+- Phase 5: 项目文档生成纳入全流程（WBS→估算→报告→文档完整闭环）
+
+### 重构
+- H1 标题改为 `activity-duration-estimation — 全周期项目管理`，体现全周期定位
+- SKILL.md 从303行精简至193行（≤230行限制），Phase 0-4详细内容移至 references/
+- `runner.py` 完全重写，流程控制从 Markdown 转移到 Python 代码
+
+### 修复
+- 修复 `_meta.json` 非标字段 `sub_skills`
+- 修复 SKILL.md 非标 frontmatter 字段 `antipattern_count`, `faq_quality`
+- 0 ERROR 2 WARN（WARN: R-19 FAQ质量 + R-23 文档代码一致性）
+
+---
+
 ## 1.5.3 (2026-06-02)
 
 ### 修复

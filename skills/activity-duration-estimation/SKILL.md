@@ -1,7 +1,7 @@
 ---
 name: activity-duration-estimation
 tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report']
-version: 1.5.3
+version: 1.6.1
 author: Ldxs
 license: MIT
 description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。
@@ -12,12 +12,14 @@ data_dir: ../.standardization/activity-duration-estimation/
 external_data_dir: true
 trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析/WBS/WBS分解/项目规划/工作分解/项目分解/分解任务/立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板
 trigger_negative: 只是询问概念不执行估算/纯数学公式讨论不含实际任务
-antipattern_count: add_examples
 faq_quality: improve_qa
 ---
-# Activity Duration Estimation — 活动历时估算
+# activity-duration-estimation — 全周期项目管理
 
-> 本技能提供**活动历时估算 + WBS工作分解 + 项目文档生成**。包含四种估算方法、语义分析、外部知识搜索、HTML报告、WBS项目规划与分解、项目文档双模式生成。全流程由 `scripts/runner.py` 编排，LLM只需调用 `run_pipeline()` 即可一键执行 WBS→估算→文档。详细内容拆分到 `references/*.md` 按需加载。
+> **WBS项目规划 → 活动历时估算 → 项目文档生成**，三环节完整闭环。
+> 全流程由 `scripts/runner.py` 的 `run_full()` 自动编排，
+> LLM 只需调用一个函数即可完成项目从分解到文档的全部工作。
+> 详细内容拆分到 `references/*.md` 按需加载。
 
 ---
 
@@ -37,14 +39,15 @@ faq_quality: improve_qa
 | 0 | **WBS工作分解** (子技能) | 基于3个参考模板+LLM自适应填充，支持4种分解方法，100%规则验证，自动衔接估算 |
 | 1 | **项目文档生成** (子技能) | 双模式：手动模式输出特化空模版（token≈0）/ 自动模式逐节生成，4个预置模板（立项/结项/相关方/风险） |
 | 2 | **四种估算方法** | 直接估算法 / β分布（PERT）估算法 / 正态分布估算法 / 蒙特卡洛模拟法 |
-| 2 | **语义分析推荐** | 根据任务类型（建筑/制造/软件/科研/农业等）自动推荐最适估算方法组合 |
-| 3 | **外部知识搜索** | 两阶段搜索流程：大模型自判→搜索补充→汇总推荐 |
+| 3 | **语义分析推荐** | 根据任务类型（建筑/制造/软件/科研/农业等）自动推荐最适估算方法组合 |
+| 4 | **外部知识搜索** | 两阶段搜索流程：大模型自判→搜索补充→汇总推荐 |
 | 4 | **CPM关键路径分析** | 基于紧前关系的关键路径计算，含ES/EF/LS/LF/总时差，自动识别关键任务 |
 | 5 | **多分布蒙特卡洛** | 支持PERT-Beta、三角分布、泊松近似三种分布并行模拟，提供多维度概率评估 |
 | 6 | **任务重叠分析** | 自动检测任务时间重叠，输出最大重叠数和最长重叠时段 |
 | 7 | **甘特图可视化** | 基于CPM结果的甘特图（SVG），关键路径高亮标注 |
 | 8 | **紧前关系规划** | 手动指定/自动规划两种模式，支持FS/SS/FF/SF四种依赖关系 |
 | 9 | **HTML评估报告** | 自包含HTML，含甘特图/概率分布/重叠分析图表，有图有表有数据有分析 |
+| 10 | **项目文档生成** | 双模式：手动空模版/混合逐节生成；4个P0模板（立项/结项/相关方/风险） |
 
 ### 渐进式文件索引
 
@@ -64,54 +67,55 @@ faq_quality: improve_qa
 
 ---
 
-## 工作流程总览
+## 工作流程
 
-```text
-用户输入任务信息（有明确任务 / 模糊需求）
-  ↓
-┌─────────────────────────────────────────────┐
-│ Phase -1：WBS项目规划（模糊需求时激活）      │
-│ ①需求澄清→②模板匹配+LLM定制化→③100%验证    │
-│ ④输出WBS（text/md/json/svg可选）→⑤确认入估算  │
-└─────────────────────────────────────────────┘
-  ↓
-┌─────────────────────────────────────────────┐
-│ Phase 0：语义分析与方法推荐                   │
-│ ① 提取任务参数（支持WBS自动导入）            │
-│ ② 任务类型分类                               │
-│ ③ 推荐最适估算方法组合                       │
-└─────────────────────────────────────────────┘
-  ↓
-┌─────────────────────────────────────────────┐
-│ Phase 1：外部知识搜索（按需）                │
-│ ① 大模型自判是否足够支持                    │
-│ ② 不足 → 询问用户 → 搜索                   │
-│ ③ 汇总 → 确认是否执行                       │
-└─────────────────────────────────────────────┘
-  ↓
-┌─────────────────────────────────────────────┐
-│ Phase 2：紧前关系规划                        │
-│ ① 手动指定任务依赖关系                      │
-│ ② 自动规划FS顺序连接                        │
-│ ③ 输出依赖关系图                            │
-└─────────────────────────────────────────────┘
-  ↓
-┌─────────────────────────────────────────────┐
-│ Phase 3：执行估算计算                        │
-│ ① 三点估算（直接/β分布/正态分布）           │
-│ ② CPM关键路径分析（基于紧前关系）           │
-│ ③ 蒙特卡洛模拟（多分布并行）               │
-│ ④ 任务重叠分析                              │
-└─────────────────────────────────────────────┘
-  ↓
-┌─────────────────────────────────────────────┐
-│ Phase 4：生成HTML评估报告                    │
-│ ① 甘特图（CPM+关键路径）                   │
-│ ② 概率分布（MC密度+累计+多分布对比）       │
-│ ③ 重叠分析面板                              │
-│ ④ 分析建议（5维度LLM生成）                  │
-└─────────────────────────────────────────────┘
+工作流程由 `scripts/runner.py` 自动编排，LLM 无需关心内部阶段顺序。
+
+```python
+# 推荐：一键全流程（WBS → 估算 → 报告 → 文档，全环节必做）
+from scripts.runner import run_full, PipelineState
+result = run_full("帮我规划并估算一个电商后台管理系统")
+
+if result["status"] == "ok":
+    state = result["state"]
+    print(state.wbs_text_tree)      # ① WBS文本树
+    print(state.estimate_summary)   # ② 估算摘要
+    print(state.html_report_path)   # ③ HTML报告路径
+    print(state.doc_content)        # ④ 项目文档
+elif result["status"] == "blocked":
+    # 需要LLM提供WBS数据（即使已有OMP参数，WBS也是必做的）
+    wbs_data = {"name": "电商后台", "children": [...]}  # LLM提供
+    state = PipelineState("帮我规划并估算一个电商后台管理系统")
+    state.run_wbs(custom_data=wbs_data)
+    result = state.run_full()  # 继续执行估算→报告→文档
+else:
+    print(result["message"])        # 错误信息
 ```
+
+**全流程阶段（代码硬编码，不可跳过）：**
+1. WBS分解 → `run_wbs()`（全流程模式下必做，LLM提供结构化数据）
+2. WBS进入估算门控 → `_wbs_passes_estimation_gate()` 硬校验
+3. 紧前关系规划 → `_prompt_llm_for_dependencies()` / 自动FS串联
+4. 估算计算 → `run_estimate()`（全Python自动：CPM + MC + 重叠分析）
+5. HTML评估报告 → `_generate_html_report()`（全Python自动）
+6. 项目文档 → `generate_docs()`（按模板生成立项/结项/风险/相关方文档）
+
+**各环节也可单独调用**（不经过`run_full()`全流程时）：
+- 仅有估算需求 → `run_pipeline(mode="estimate")` 或 `state.run_estimate()`
+- 仅需文档 → `run_pipeline(mode="docs")` 或 `state.generate_docs()`
+- 仅WBS → `run_pipeline(mode="wbs")` 或 `state.run_wbs()`
+
+### LLM交互点
+
+当流程需要LLM推理时，`runner.py` 会抛出 `LLMInteractionRequired` 异常：
+
+| 交互点 | 触发条件 | LLM需提供 |
+|--------|---------|-----------|
+| `_prompt_llm_for_wbs()` | 模糊需求 | WBS结构化数据 `{name, children: [...]}` |
+| `_prompt_llm_for_omp()` | 阶段缺OMP | OMP值 `{o, m, p}` |
+| `_prompt_llm_for_dependencies()` | >5个阶段 | 紧前关系或确认自动规划 |
+
+LLM看到异常后按提示提供数据，然后继续执行即可。
 
 ---
 
@@ -130,13 +134,7 @@ faq_quality: improve_qa
 ## WBS子技能 — Phase -1：项目规划与工作分解
 
 > 详见 `references/wbs-methodology.md` | `scripts/wbs_engine.py`
-> 激活：模糊需求（无任务列表/OMP）| 跳过：已有明确任务参数
-
-**7步流程**：①需求澄清 → ②方法推荐（交付/生命周期/模块）→ ③模板匹配+LLM定制 → ④递归分解至终止（可估算/可分配/可验证/可控制）→ ⑤100%规则验证（仅标记不更新）→ ⑥用户确认（可更新/补OMP）→ ⑦输出
-
-**输出可选**：文本树（默认，确认后自动入Phase 0）/ JSON字典 / SVG树形图 / Markdown文档。用户也可选"仅做WBS不做估算"。
-
-**WBS→估算映射**：工作包→阶段名称+OMP；层级→紧前关系（FS串联）；交付物→报告字段。
+> 全流程模式下必做，由 `run_full()` 自动触发。
 
 ---
 
@@ -144,71 +142,36 @@ faq_quality: improve_qa
 
 > 详见 `references/project-docs-methodology.md` | `scripts/project_docs_engine.py`
 
-**双模式**：手动模式→输出特化空模版（token≈0，含结构+提示+已有资料引用），用户手动填或单独调LLM填 | 自动模式→逐节生成+逐节确认，不满意只重算那节
-**模板定制**：增/删/改/重排章节 + 每节独立模式（auto/manual/outline）+ 另存为新模板重复使用
-**可用模板**：`立项申请书`(11节) / `结项报告书`(10节) / `相关方登记册`(4节) / `风险登记册`(5节)
----
-
-## Phase 0：语义分析与方法推荐
-
-类型映射：软件/建筑→β+MC | 制造→直接+正态 | 科研→MC | 农业→直接+β | 活动→β | 高不确定性→MC
-
----
-
-## Phase 1：外部知识搜索（按需）
-
-> 详见 `references/search-integration.md`
-
-```text
-常见任务 + 明确OMP → 直接执行
-常见任务但缺少分布建议 → 搜索确认
-非典型任务 → 必须搜索
-任务/参数都不确定 → 先搜索做规划
-
-搜索后汇总信息 → 告知推荐方案 → 用户确认后执行
-```
-
----
-
-## Phase 2：紧前关系规划
-
-> 详见 `references/methods.md#方法五CPM关键路径分析`
-
-CPM分析的前提。手动指定 `"1→2(FS),2→3(SS)"` 或自动规划（默认FS连接）。支持FS/SS/FF/SF四种类型。
-
----
-
-## Phase 3：执行估算计算
-
-> 详见 `references/methods.md`
-
-### 单阶段快速计算
+三种模式：`manual`（空模板，token≈0）/ `mixed`（按章节设 auto/outline/manual，推荐）/ `全自动`（所有节 auto）。
+支持模板定制：增/删/改/重排章节、每节独立模式、另存为新模板。
 
 ```python
-direct = (O + M + P) / 3
-beta = (O + 4 * M + P) / 6
-sigma = (P - O) / 6
+from project_docs_engine import set_section_mode
+tpl = load_template("立项申请书")
+tpl = set_section_mode(tpl, "项目背景", "auto")    # 自动生成
+tpl = set_section_mode(tpl, "预算", "manual")       # 留空手动填
+state.generate_docs(mode="mixed", filled_sections={"project_background": "..."})
+save_template(tpl, "我的模板", overwrite=True)       # 另存自定义模板
 ```
 
-### 蒙特卡洛模拟
-
-```text
-α = 1 + 4 × (M - O) / (P - O)
-β = 1 + 4 × (P - M) / (P - O)
-每阶段 ≥2000 次 → BETA.INV(RAND(), α, β, O, P)
-```
-
-### CPM关键路径
-
-基于 Phase 2 的紧前关系计算 ES/EF/LS/LF/TF，识别关键任务。
-
+**内置模板**：`立项申请书`(11节) / `结项报告书`(10节) / `相关方登记册`(4节) / `风险登记册`(5节)
 ---
 
-## Phase 4：生成HTML评估报告
+## 子模块详解
 
-> 详见 `references/report-template.md`
+各子模块详细说明见 `references/`：
+- **Phase 0**: 语义分析与方法推荐 → `references/semantic-analysis.md`
+- **Phase 1**: 外部知识搜索 → `references/search-integration.md`
+- **Phase 2-3**: 紧前关系规划 + 估算计算（CPM/MC/重叠分析）→ `references/methods.md`
+- **Phase 4**: HTML评估报告 → `references/report-template.md`
+- **WBS方法论**: → `references/wbs-methodology.md`
+- **项目文档**: → `references/project-docs-methodology.md`
 
-报告结构：方法卡片 → 参数表 → 柱状图 → MC双图 → 多分布SVG → 甘特图 → CPM表 → 重叠面板 → P50/P90 → 分析建议
+| 估算方法 | 公式 | 适用场景 |
+|---------|------|---------|
+| 三点直接 | (O+M+P)/3 | 快速估算 |
+| β分布(PERT) | (O+4M+P)/6, σ=(P-O)/6 | 标准项目管理 |
+| 蒙特卡洛 | 2000+次模拟, 多分布并行 | 高不确定性项目 |
 
 ---
 

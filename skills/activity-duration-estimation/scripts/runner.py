@@ -1,31 +1,35 @@
 """
 activity-duration-estimation 全流程编排层
 
-Python 驱动三子技能的完整执行流程。LLM 只需调用 run_pipeline() 主入口，
+Python 驱动三子技能的完整执行流程。LLM 只需调用 run_full() 主入口，
 所有阶段顺序、验证、数据流转由代码硬编码保障，不依赖 LLM 自觉执行。
 
 用法（LLM调用）：
-    from scripts.runner import run_pipeline, PipelineState
+    from scripts.runner import run_full, run_pipeline, PipelineState
 
-    # 全流程一键执行
-    state = run_pipeline("帮我规划并估算一个电商后台管理系统", mode="full")
+    # 一键全流程（推荐）
+    state = run_full("帮我规划并估算一个电商后台管理系统")
 
-    # 只做WBS
-    state = run_pipeline("电商后台", mode="wbs")
-    print(state.wbs_text_tree)
+    # output: state.wbs_text_tree / state.estimate_summary / state.doc_content
+    # blocked: state.errors / state.status()
 
-    # 分步交互（LLM在每一步介入决策）
+    # 传统入口（保持兼容）
+    state = run_pipeline("电商后台", mode="full")
+
+    # 分步交互
     state = PipelineState("电商后台")
     state.run_wbs(template="deliverable", custom_data={...})
-    state.prepare_estimation()     # WBS→估算参数
-    state.run_estimate()            # 执行估算
+    state.prepare_estimation()
+    state.run_estimate()
     state.generate_docs("立项申请书", mode="manual")
+    state._generate_html_report()
 """
 
 import os
 import sys
 import json
 import traceback
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -61,16 +65,43 @@ from project_docs_engine import (
 
 
 # ═══════════════════════════════════════════════════
+# LLM交互点 — 需要LLM推理时抛出此异常
+# ═══════════════════════════════════════════════════
+
+class LLMInteractionRequired(Exception):
+    """
+    需要LLM进行推理/决策时抛出。
+    LLM捕获此异常后，应按 prompt 要求提供数据，然后重试。
+    """
+    def __init__(self, phase: str, prompt: str, schema: dict = None, context: str = None):
+        self.phase = phase
+        self.prompt = prompt
+        self.schema = schema or {}
+        self.context = context or ""
+        super().__init__(f"[LLM交互] 阶段={phase}: {prompt}")
+
+
+# ═══════════════════════════════════════════════════
 # 阶段枚举
 # ═══════════════════════════════════════════════════
 
 PHASE_WBS = "wbs"
 PHASE_ESTIMATE = "estimate"
 PHASE_DOCS = "docs"
+PHASE_FULL = "full"
+
+# 全流程阶段列表（强制顺序）
+FULL_PHASE_SEQUENCE = [
+    ("wbs", "WBS分解"),
+    ("estimation_prep", "估算参数准备"),
+    ("dependencies", "紧前关系规划"),
+    ("estimation", "估算计算"),
+    ("report", "报告生成"),
+]
 
 
 # ═══════════════════════════════════════════════════
-# PipelineState — 全流程状态管理
+# PipelineState — 全流程状态管理（增强版）
 # ═══════════════════════════════════════════════════
 
 class PipelineState:
@@ -99,6 +130,7 @@ class PipelineState:
         self.mc_results: dict = {}
         self.overlap_results: dict = {}
         self.estimate_summary: str = ""
+        self.html_report_path: str = ""
 
         # 文档阶段产出
         self.doc_content: str = ""
@@ -139,6 +171,21 @@ class PipelineState:
             lines.append(f"  错误: {len(self.errors)}个")
         return "\n".join(lines)
 
+    def full_status(self) -> dict:
+        """结构化状态，供LLM判断下一步"""
+        return {
+            "project_name": self.project_name,
+            "completed_phases": self.completed_phases.copy(),
+            "pending_phases": [p[1] for p in FULL_PHASE_SEQUENCE if p[0] not in self.completed_phases],
+            "wbs_valid": self.wbs_valid,
+            "wbs_issues": self.wbs_issues.copy(),
+            "num_phases": len(self.phases),
+            "has_cpm": self.cpm_result is not None,
+            "has_report": bool(self.html_report_path),
+            "errors": self.errors.copy(),
+            "blocked": len(self.errors) > 0,
+        }
+
     # ── 重置 ──
 
     def reset(self, phase: str = None):
@@ -157,6 +204,7 @@ class PipelineState:
             self.mc_results = {}
             self.overlap_results = {}
             self.estimate_summary = ""
+            self.html_report_path = ""
         if phase is None or phase == PHASE_DOCS:
             self.doc_content = ""
             self.doc_path = ""
@@ -165,17 +213,467 @@ class PipelineState:
 
 
     # ═══════════════════════════════════════════════
+    # 强制全流程编排
+    # ═══════════════════════════════════════════════
+
+    def run_full(self, description: str = None,
+                 project_name: str = None,
+                 doc_template: str = "立项申请书",
+                 doc_mode: str = "manual",
+                 mc_iterations: int = 2000) -> dict:
+        """
+        强制全流程：WBS分解 → 估算参数准备 → 紧前关系 → 估算计算 → 
+        HTML报告 → 项目文档。
+        
+        WBS是新项目必做的第一步，项目文档是收尾的最终产出。
+        全流程由代码硬编码顺序执行，不可跳过。
+
+        这是推荐的主入口。所有阶段由代码硬编码顺序执行，不可跳过。
+        LLM只需调用此函数，无需关心内部流程。
+
+        参数:
+            description: 项目描述（为空则使用self.description）
+            project_name: 项目名（自动提取或手动指定）
+
+        返回:
+            {"status": "ok" | "blocked" | "error",
+             "message": "...",
+             "state": self}  # 读取state.get()获取详情
+        """
+        if description:
+            self.description = description
+        if project_name:
+            self.project_name = project_name
+        elif not self.project_name:
+            self.project_name = _extract_project_name(self.description)
+
+        self.current_phase = PHASE_FULL
+
+        # ═══════════════════════════════════════════
+        # Phase -1: WBS分解 — 全流程模式下必做
+        # ═══════════════════════════════════════════
+        # 全流程模式下WBS是必做的项目规划步骤，不可跳过。
+        # 如果已有WBS结果（来自上一次调用），直接进入估算准备。
+        # 如果描述中已有OMP信息，作为上下文传递给LLM参考。
+        try:
+            if self.wbs_result:
+                # 已有WBS（来自LLM提供数据后重试），跳过此阶段
+                pass
+            else:
+                # 尝试从描述中提取已有阶段参数作为上下文
+                self._extract_phases_from_description()
+                context = self.description
+                if self.phases:
+                    context += (f"\n（已从描述中识别出阶段信息: "
+                                f"{[p['name'] for p in self.phases]}，"
+                                f"请体现在WBS分解中）")
+
+                raise LLMInteractionRequired(
+                    phase="wbs",
+                    prompt=(f"项目「{self.project_name}」全流程规划："
+                            f"请提供WBS结构化分解数据。\n"
+                            f"项目描述: {context[:400]}"),
+                    schema={
+                        "name": "项目名称",
+                        "children": "[{name, children?, o?, m?, p?, deliverable?}]"
+                    },
+                )
+
+            # 有WBS但还没准备估算参数 → 自动转换
+            if self.wbs_result and not self.phases:
+                self.prepare_estimation()
+        except LLMInteractionRequired:
+            raise  # 让顶层捕获，LLM提供数据后重试
+        except Exception as e:
+            self._handle_error("wbs_decision", e)
+            return {"status": "error", "message": str(e), "state": self}
+
+        if self.wbs_result and not self.phases:
+            self.prepare_estimation()
+
+        # ═══════════════════════════════════════════
+        # WBS进入估算门控校验
+        # ═══════════════════════════════════════════
+        gate = self._wbs_passes_estimation_gate()
+        if not gate["passed"]:
+            return {"status": "blocked",
+                    "message": f"WBS不满足进入估算条件: {'; '.join(gate['issues'])}",
+                    "issues": gate["issues"],
+                    "state": self}
+
+        # ═══════════════════════════════════════════
+        # Phase 2: 紧前关系规划（需要LLM推理时触发交互点）
+        # ═══════════════════════════════════════════
+        if not self.dependencies:
+            try:
+                self._prompt_llm_for_dependencies()
+            except LLMInteractionRequired:
+                raise  # 让顶层捕获
+
+        # ═══════════════════════════════════════════
+        # Phase 3: 估算计算（全Python自动）
+        # ═══════════════════════════════════════════
+        try:
+            self.run_estimate(mc_iterations=mc_iterations)
+        except Exception as e:
+            self._handle_error("estimation", e)
+            return {"status": "error", "message": str(e), "state": self}
+
+        # ═══════════════════════════════════════════
+        # Phase 4: HTML报告生成
+        # ═══════════════════════════════════════════
+        self._generate_html_report()
+
+        # ═══════════════════════════════════════════
+        # Phase 5: 项目文档生成
+        # ═══════════════════════════════════════════
+        try:
+            self.generate_docs(template_name=doc_template, mode=doc_mode)
+        except Exception as e:
+            self._handle_error("docs", e)
+            # 文档生成失败不阻断，仍返回 ok 但附带警告
+            return {"status": "ok",
+                    "message": f"全流程完成（文档生成异常: {e}）: {len(self.phases)}阶段, "
+                               f"总工期{self.cpm_result.project_duration:.1f}天",
+                    "state": self}
+
+        return {"status": "ok",
+                "message": f"全流程完成: {len(self.phases)}阶段, "
+                           f"总工期{self.cpm_result.project_duration:.1f}天, "
+                           f"文档已生成: {self.doc_path or self.project_name}",
+                "state": self}
+
+
+    # ═══════════════════════════════════════════════
+    # 分支逻辑 & LLM交互点
+    # ═══════════════════════════════════════════════
+
+    def _needs_wbs(self) -> bool:
+        """
+        判断是否需要WBS分解（仅用于单模式入口，如 run_pipeline(mode="estimate")）。
+        run_full() 全流程模式下WBS必做，不经过此判断。
+        
+        规则（代码硬编码，不依赖LLM自觉）：
+        - 描述含明确OMP模式（如"3天、5天、10天"）→ 不需要WBS
+        - 描述含"帮我规划/分解/做个WBS"关键词 → 需要WBS
+        - 描述只有领域名+模糊需求 → 需要WBS
+        """
+        desc = self.description.lower()
+
+        # 关键词匹配：明确要求WBS
+        wbs_keywords = ["帮我规划", "工作分解", "做个计划", "wbs"]
+        for kw in wbs_keywords:
+            if kw in desc:
+                return True
+
+        # OMP模式检测：描述中含 数字+天 模式且看起来像OMP
+        omp_patterns = re.findall(r'(\d+)\s*天', desc)
+        if len(omp_patterns) >= 3:
+            # 描述里出现3个以上"X天" → 已经有OMP了，跳过WBS
+            return False
+
+        # 模糊需求检测：只有项目名/领域名，无具体参数
+        has_task_params = any(kw in desc for kw in ["乐观", "悲观", "最可能", "o=", "m=", "p="])
+        if has_task_params:
+            return False
+
+        # 简短描述（≤20字）→ 需要WBS来展开
+        if len(desc.strip().split()) <= 5:
+            return True
+
+        # 默认：有OMP数据就跳过，否则做WBS
+        return True
+
+    def _extract_phases_from_description(self):
+        """
+        从描述中提取已有阶段参数。
+        支持格式：
+        - "前端3-5-8天，后端2-4-6天" → OMP模式
+        - "前端5天，后端8天" → 只有M值
+        """
+        desc = self.description
+        phases = []
+
+        # 尝试匹配阶段模式：名称+OMP（如"前端 3/5/8"或"前端3-5-8"）
+        segment_pattern = re.findall(
+            r'([\u4e00-\u9fff\w]+)\s*(?:[:：])?\s*'
+            r'(?:乐观)?(\d+)(?:[~/天,，\s]*)?'
+            r'(?:最可能)?(\d+)?(?:[~/天,，\s]*)?'
+            r'(?:悲观)?(\d+)?',
+            desc
+        )
+
+        for match in segment_pattern:
+            name = match[0].strip()
+            if len(name) < 2:
+                continue
+            try:
+                o = float(match[1]) if match[1] else None
+                m = float(match[2]) if match[2] else o
+                p = float(match[3]) if match[3] else (m or o)
+            except (ValueError, IndexError):
+                o = m = p = None
+
+            if o is not None:
+                phases.append({
+                    "name": name, "o": o, "m": m or o, "p": p or (m or o)
+                })
+
+        if phases:
+            self.phases = phases
+
+    def _wbs_passes_estimation_gate(self) -> dict:
+        """
+        WBS进入估算的门控校验。
+        不满足条件则阻塞流程，不进入估算。
+        
+        返回: {"passed": bool, "issues": [str]}
+        """
+        issues = []
+
+        if self.phases:
+            # 已有phases（非WBS路径）
+            for i, p in enumerate(self.phases):
+                name = p.get("name", f"阶段{i+1}")
+                o, m_val, p_val = p.get("o"), p.get("m"), p.get("p")
+                if not any([o, m_val, p_val]):
+                    issues.append(f"「{name}」缺少OMP值")
+                elif o and p_val and o > p_val:
+                    issues.append(f"「{name}」O({o}) > P({p_val}), 违反O≤P")
+                elif o and m_val and o > m_val:
+                    issues.append(f"「{name}」O({o}) > M({m_val}), 违反O≤M")
+                elif m_val and p_val and m_val > p_val:
+                    issues.append(f"「{name}」M({m_val}) > P({p_val}), 违反M≤P")
+            return {"passed": len(issues) == 0, "issues": issues}
+
+        if not self.wbs_result:
+            return {"passed": False, "issues": ["WBS结果为空"]}
+
+        wps = self.wbs_result.work_packages
+
+        if len(wps) == 0:
+            issues.append("WBS无工作包（叶节点），请补充细项")
+
+        if self.wbs_result.max_depth < 1:
+            issues.append("WBS层级过浅（至少需要2层：根→工作包）")
+
+        for wp in wps:
+            if not any([wp.o, wp.m, wp.p]):
+                issues.append(f"工作包「{wp.name}」缺少OMP值"
+                              "（LLM请根据上下文估算）")
+            elif wp.o and wp.p and wp.o > wp.p:
+                issues.append(f"工作包「{wp.name}」O({wp.o}) > P({wp.p})")
+
+        # 验证结果整合
+        if not self.wbs_valid:
+            for iss in (self.wbs_result.validation_issues or []):
+                issues.append(f"WBS验证: {iss}")
+
+        return {"passed": len(issues) == 0, "issues": issues}
+
+    def _prompt_llm_for_wbs(self, description: str = None) -> dict:
+        """
+        LLM交互点：根据项目描述生成WBS结构化数据。
+        抛出LLMInteractionRequired，由顶层捕获后等待LLM填充。
+        
+        返回格式:
+            {"name": "项目名", "children": [
+                {"name": "阶段1", "children": [
+                    {"name": "任务1.1", "o": 3, "m": 5, "p": 8},
+                    ...
+                ]}
+            ]}
+        """
+        desc = description or self.description
+        raise LLMInteractionRequired(
+            phase="wbs",
+            prompt=(f"请为项目「{self.project_name or '未命名'}」提供WBS结构化数据。"
+                    f"项目描述: {desc[:200]}"),
+            schema={
+                "name": "str, 项目名称",
+                "children": "list, 子节点，每项含 name(必填)/children(可选)/o(可选)/m(可选)/p(可选)/deliverable(可选)"
+            }
+        )
+
+    def _prompt_llm_for_omp(self, phase_name: str, context: str = "") -> dict:
+        """
+        LLM交互点：根据阶段名称估算OMP。
+        抛出LLMInteractionRequired，由顶层捕获后等待LLM填充。
+        
+        返回: {"o": int, "m": int, "p": int}
+        """
+        raise LLMInteractionRequired(
+            phase="omp",
+            prompt=(f"请为阶段「{phase_name}」估算OMP（乐观/最可能/悲观 天数）。"
+                    f"上下文: {context or self.description[:100]}"),
+            schema={"o": "float(乐观天数)", "m": "float(最可能天数)", "p": "float(悲观天数)"}
+        )
+
+    def _prompt_llm_for_dependencies(self):
+        """
+        LLM交互点：确认或自定义紧前关系。
+        只有需要手动指定复杂依赖时才抛出异常；默认使用auto_plan。
+        
+        返回: {task_id: [(predecessor_id, type)]}
+        """
+        if not self.phases:
+            return
+        # 简单场景（≤5个阶段）：自动规划
+        if len(self.phases) <= 5:
+            self.dependencies = auto_plan_dependencies(len(self.phases))
+            return
+
+        # 复杂场景（>5个阶段）：询问LLM是否需要手动指定
+        raise LLMInteractionRequired(
+            phase="dependencies",
+            prompt=(f"项目有{len(self.phases)}个阶段，是否需要手动指定紧前关系？"
+                    f"如需自动FS串联，请传None"),
+            schema={
+                "auto": "bool(true=自动FS串联, false=手动指定)",
+                "dependencies": "dict(手动指定时: {task_id: [(predecessor_id, type)]})"
+            }
+        )
+
+    def _generate_html_report(self):
+        """生成HTML评估报告（全Python自动）"""
+        if not self.cpm_result:
+            return
+
+        # 调用analysis_engine生成SVG
+        gantt_svg = ""
+        mc_svg = ""
+        try:
+            if self.phases and self.cpm_result:
+                gantt_svg = generate_gantt_svg(self.phases, self.cpm_result)
+            if self.mc_results:
+                mc_svg = generate_mc_svg(self.mc_results)
+        except Exception:
+            pass
+
+        # 组装HTML
+        html = [self._build_html_header()]
+        html.append(self._build_method_card_section())
+        html.append(self._build_param_table())
+        html.append(self._build_gantt_section(gantt_svg))
+        html.append(self._build_cpm_section())
+        html.append(self._build_mc_section(mc_svg))
+        html.append(self._build_analysis_section())
+        html.append(self._build_html_footer())
+
+        full_html = "\n".join(html)
+
+        # 保存到文件
+        report_dir = os.path.join(SKILL_DIR, "reports")
+        os.makedirs(report_dir, exist_ok=True)
+        safe_name = self.project_name or "未命名"
+        safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in safe_name)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = os.path.join(report_dir, f"{safe_name}_{ts}.html")
+
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(full_html)
+
+        self.html_report_path = report_path
+        self.completed_phases.append("report")
+        print(f"[OK] HTML报告已生成: {report_path}")
+
+    def _build_html_header(self) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8">
+<title>{self.project_name or '项目'} - 活动历时估算报告</title>
+<style>
+body{{font-family:'Segoe UI',sans-serif;background:#f5f7fa;color:#333;max-width:1200px;margin:0 auto;padding:20px}}
+h1{{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px}}
+.card{{background:#fff;border-radius:8px;padding:16px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.1)}}
+table{{border-collapse:collapse;width:100%}}
+th,td{{border:1px solid #ddd;padding:8px 12px;text-align:left}}
+th{{background:#3498db;color:#fff}}
+.tag{{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;margin:2px}}
+.tag-ok{{background:#27ae60;color:#fff}}
+.tag-warn{{background:#f39c12;color:#fff}}
+.tag-err{{background:#e74c3c;color:#fff}}</style></head><body>
+<h1>{self.project_name or '项目'} - 活动历时估算报告</h1>
+<p>生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>"""
+
+    def _build_method_card_section(self) -> str:
+        lines = ['<div class="card"><h2>估算方法</h2>']
+        lines.append(f"<p><strong>阶段数:</strong> {len(self.phases)}</p>")
+        if self.mc_results:
+            lines.append(f"<p><strong>蒙特卡洛:</strong> PERT-Beta + 三角分布 + 泊松近似</p>")
+        if self.cpm_result:
+            lines.append(f"<p><strong>CPM关键路径:</strong> {len(self.cpm_result.critical_ids)}个关键任务</p>")
+        lines.append('</div>')
+        return "\n".join(lines)
+
+    def _build_param_table(self) -> str:
+        lines = ['<div class="card"><h2>参数详情</h2><table><tr><th>#</th><th>阶段</th><th>O</th><th>M</th><th>P</th><th>交付物</th></tr>']
+        for i, p in enumerate(self.phases, 1):
+            lines.append(f"<tr><td>{i}</td><td>{p.get('name','')}</td>"
+                         f"<td>{p.get('o','-')}</td><td>{p.get('m','-')}</td>"
+                         f"<td>{p.get('p','-')}</td><td>{p.get('deliverable','-')}</td></tr>")
+        lines.append('</table></div>')
+        return "\n".join(lines)
+
+    def _build_gantt_section(self, svg: str) -> str:
+        if not svg:
+            return ""
+        return f'<div class="card"><h2>甘特图</h2>{svg}</div>'
+
+    def _build_cpm_section(self) -> str:
+        if not self.cpm_result:
+            return ""
+        lines = ['<div class="card"><h2>CPM关键路径</h2><table><tr><th>#</th><th>名称</th><th>ES</th><th>EF</th><th>LS</th><th>LF</th><th>TF</th><th>关键?</th></tr>']
+        for tid, cd in self.cpm_result.task_cpm.items():
+            name = self.phases[tid-1]["name"] if tid <= len(self.phases) else f"任务{tid}"
+            is_critical = "✅" if tid in self.cpm_result.critical_ids else ""
+            lines.append(f"<tr><td>{tid}</td><td>{name}</td><td>{cd['es']:.1f}</td>"
+                         f"<td>{cd['ef']:.1f}</td><td>{cd['ls']:.1f}</td>"
+                         f"<td>{cd['lf']:.1f}</td><td>{cd['tf']:.1f}</td><td>{is_critical}</td></tr>")
+        lines.append(f'<tr><td colspan="8"><strong>总工期: {self.cpm_result.project_duration:.1f}</strong></td></tr>')
+        lines.append('</table></div>')
+        return "\n".join(lines)
+
+    def _build_mc_section(self, svg: str) -> str:
+        if not svg:
+            return ""
+        mc = self.mc_results.get("pert", {})
+        stats = mc.get("stats", {})
+        quants = mc.get("quantiles", {})
+        lines = ['<div class="card"><h2>蒙特卡洛模拟</h2>']
+        lines.append(f"<p>均值={stats.get('mean',0):.1f}, σ={stats.get('stddev',0):.1f}</p>")
+        lines.append(f"<p>P50={quants.get('p50',0):.1f}, P90={quants.get('p90',0):.1f}</p>")
+        lines.append(svg)
+        lines.append('</div>')
+        return "\n".join(lines)
+
+    def _build_analysis_section(self) -> str:
+        lines = ['<div class="card"><h2>分析建议</h2><ul>']
+        lines.append(f"<li>关键路径有{len(self.cpm_result.critical_ids)}个任务，建议优先保障资源</li>")
+        if self.mc_results:
+            pert = self.mc_results.get("pert", {})
+            quants = pert.get("quantiles", {})
+            p50 = quants.get("p50", 0)
+            p90 = quants.get("p90", 0)
+            lines.append(f"<li>P50={p50:.1f}天 为50%概率工期，P90={p90:.1f}天 为90%概率工期</li>")
+            if p90 > 0:
+                ratio = (p90 - p50) / p50 * 100 if p50 else 0
+                if ratio > 30:
+                    lines.append(f"<li>⚠️ P50-P90跨度{ratio:.0f}%，不确定性较高，建议设置缓冲期</li>")
+        lines.append('</ul></div>')
+        return "\n".join(lines)
+
+    def _build_html_footer(self) -> str:
+        return "</body></html>"
+
+
+    # ═══════════════════════════════════════════════
     # WBS 阶段
     # ═══════════════════════════════════════════════
 
     def run_wbs(self, template: str = "deliverable",
                 custom_data: dict = None) -> WBSResult:
-        """
-        执行WBS分解。
-        template: "deliverable" | "lifecycle" | "modular"
-        custom_data: LLM可传入已结构化的WBS数据
-        返回: WBSResult (self.wbs_result 同步更新)
-        """
+        """(保持兼容原接口) 执行WBS分解"""
         self.current_phase = PHASE_WBS
         self.reset(PHASE_WBS)
 
@@ -185,30 +683,24 @@ class PipelineState:
             result.method_name = WBS_TEMPLATES.get(template, {}).get("name", "交付成果式")
 
             if custom_data and "children" in custom_data:
-                # LLM已提供结构化数据 → 直接构建
                 root = WBSNode(name=result.project_name, level=0)
                 skeleton = custom_data.get("children", {})
                 build_node_tree(skeleton, root)
                 result.root = root
             else:
-                # 无数据 → 创建单根节点占位（由LLM后续填充）
                 root = WBSNode(name=result.project_name, level=0)
                 result.root = root
 
-            # 编码 & 深度
             if result.root:
                 assign_wbs_codes(result.root)
                 result.max_depth = calc_max_depth(result.root)
 
-            # 收集工作包
             result.collect_work_packages()
 
-            # 100%规则验证（自动、不可跳过）
             validate_wbs(result)
             self.wbs_valid = result.is_valid
             self.wbs_issues = result.validation_issues
 
-            # 多格式输出（自动生成）
             self.wbs_text_tree = format_text_tree(result)
             self.wbs_json_str = format_json(result)
             self.wbs_svg = format_svg_tree(result)
@@ -222,10 +714,7 @@ class PipelineState:
         return self.wbs_result
 
     def wbs_add_nodes(self, children_data: dict):
-        """
-        向已存在的WBS根节点追加子节点（增量式构建）。
-        LLM可在run_wbs()后逐步添加节点。
-        """
+        """(保持兼容原接口) 向已存在的WBS追加节点"""
         if not self.wbs_result or not self.wbs_result.root:
             self.run_wbs()
         build_node_tree(children_data, self.wbs_result.root)
@@ -244,16 +733,13 @@ class PipelineState:
 
     def prepare_estimation(self, custom_phases: list[dict] = None,
                            custom_deps: dict = None):
-        """
-        准备估算参数。
-        - 有WBS时：自动从WBS工作包转换阶段参数
-        - 无WBS时：使用custom_phases（由LLM提供）
-        - 紧前关系：自动从WBS层级推演，或使用custom_deps
-        """
+        """(保持兼容原接口) 准备估算参数"""
         self.current_phase = PHASE_ESTIMATE
 
         if custom_phases:
             self.phases = custom_phases
+        elif self.phases:
+            pass  # 已通过 _extract_phases_from_description() 或直接赋值设置
         elif self.wbs_result:
             self.phases = wbs_to_phases(self.wbs_result)
         else:
@@ -261,12 +747,14 @@ class PipelineState:
 
         if custom_deps:
             self.dependencies = custom_deps
+        elif self.dependencies:
+            pass  # 已设置
         elif self.wbs_result:
             self.dependencies = wbs_to_dependencies(self.wbs_result)
         else:
             self.dependencies = auto_plan_dependencies(len(self.phases))
 
-        # 转换 0-based → 1-based（calc_cpm 需要 task_id 从1开始）
+        # 转换 0-based → 1-based
         deps_1based = {}
         for k, v in self.dependencies.items():
             k1 = k + 1 if isinstance(k, int) else k
@@ -281,46 +769,34 @@ class PipelineState:
         self.dependencies = deps_1based
 
     def run_estimate(self, mc_iterations: int = 2000) -> dict:
-        """
-        执行估算计算（自动运行CPM + MC + 重叠分析）。
-        prepare_estimation() 必须已调用。
-        返回: 估算结果摘要 dict
-        """
+        """(保持兼容原接口) 执行估算计算"""
         self.current_phase = PHASE_ESTIMATE
 
         if not self.phases:
             raise ValueError("run_estimate: 请先调用prepare_estimation()")
 
-        # 只重置计算结果，不清除已设置的参数
         self.cpm_result = None
         self.mc_results = {}
         self.overlap_results = {}
         self.estimate_summary = ""
 
         try:
-            # 准备数据
             durations = {i+1: (p.get("m", 0) or 0) for i, p in enumerate(self.phases)}
             mc_phases = [(p["name"], p.get("o", 0), p.get("m", 0), p.get("p", 0))
                          for p in self.phases]
-
-            # 依赖已是1-based（prepare_estimation中已转换）
             deps_formatted = self.dependencies
 
-            # ── 自动验证（不可跳过） ──
             vr_input = validate_cpm_input(durations, deps_formatted)
             vr_mc = validate_mc_input(mc_phases)
 
-            # ── CPM ──
             self.cpm_result = calc_cpm(durations, deps_formatted)
 
-            # ── 蒙特卡洛 ──
             if len(self.phases) >= 1:
                 self.mc_results = monte_carlo_multi(
                     mc_phases, mc_iterations,
                     ['pert', 'triangular', 'poisson']
                 )
 
-            # ── 重叠分析 ──
             overlap_tasks = []
             if self.cpm_result:
                 for tid, cd in self.cpm_result.task_cpm.items():
@@ -333,12 +809,10 @@ class PipelineState:
             if overlap_tasks:
                 self.overlap_results = calc_overlap(overlap_tasks)
 
-            # ── 自动验证输出 ──
             vr_cpm = validate_cpm_input(durations, deps_formatted)
             if self.mc_results:
                 vr_mc_out = validate_mc_result(self.mc_results)
 
-            # ── 构建摘要 ──
             lines = [f"项目总工期: {self.cpm_result.project_duration:.1f}"]
             if self.cpm_result.critical_path:
                 lines.append(f"关键路径: {' → '.join(str(t) for t in self.cpm_result.critical_path)}")
@@ -371,22 +845,13 @@ class PipelineState:
                       mode: str = "manual",
                       filled_sections: dict[str, str] = None,
                       output_file: bool = True) -> str:
-        """
-        生成项目文档。
-
-        template_name: 模板名（预设或自定义）
-        mode: "manual" → 输出空模版 | "mixed" → 按章节模式混合组装
-        filled_sections: {section_key: content} — auto/outline模式的填充内容
-        output_file: 是否保存到文件
-        返回: 文档内容字符串
-        """
+        """(保持兼容原接口) 生成项目文档"""
         self.current_phase = PHASE_DOCS
         self.reset(PHASE_DOCS)
 
         try:
             tpl = load_template(template_name)
 
-            # 构建ProjectData
             pd = ProjectData()
             pd.project_name = self.project_name
             pd.project_description = self.description
@@ -414,7 +879,6 @@ class PipelineState:
                 pd.p90 = quants.get("p90", 0)
                 pd.estimation_result = f"P50={pd.p50}, P90={pd.p90}, 均值={stats.get('mean',0):.1f}±{stats.get('stddev',0):.1f}"
 
-            # 生成文档
             if mode == "manual":
                 self.doc_content = output_manual(tpl, pd)
             elif mode == "mixed":
@@ -422,7 +886,6 @@ class PipelineState:
             else:
                 raise ValueError(f"不支持的模式: {mode}。可选: manual, mixed")
 
-            # 保存文件
             if output_file:
                 filename = tpl.get("output_filename", "{project_name}_文档.md")
                 filename = filename.replace("{project_name}", self.project_name or "未命名项目")
@@ -442,17 +905,59 @@ class PipelineState:
     # ═══════════════════════════════════════════════
 
     def _handle_error(self, phase: str, error: Exception):
-        """统一错误处理"""
+        """统一错误处理（不抛出异常，由LLM读取state.errors）"""
         tb = traceback.format_exc()
         msg = f"[{phase}] {error}"
         self.errors.append(msg)
         self.last_error = msg
-        # 不抛出异常，由LLM读取state.errors并决定如何处理
 
 
 # ═══════════════════════════════════════════════════
-# 全流程一键入口
+# 全流程一键入口（增强版）
 # ═══════════════════════════════════════════════════
+
+def run_full(description: str,
+             project_name: str = None,
+             doc_template: str = "立项申请书",
+             doc_mode: str = "manual",
+             mc_iterations: int = 2000) -> dict:
+    """
+    全流程一键执行（推荐入口）。
+    项目管理的完整三环节：WBS分解 → 活动历时估算 → 项目文档生成。
+    
+    WBS 是新项目必做的第一步，即使已有OMP参数也需先分解。
+    
+    所有阶段由代码硬编码顺序驱动，不依赖LLM自觉。
+    如果触发 LLMInteractionRequired，LLM 提供数据后再次调用 run_full() 即可继续。
+    
+    用法（LLM）:
+        result = run_full("电商后台管理系统")
+        # → 如果抛出 LLMInteractionRequired，提供WBS数据后重试：
+        # state = PipelineState("电商后台")
+        # state.run_wbs(custom_data={...})
+        # result = state.run_full()  # 继续执行后续阶段
+    
+    返回:
+        {"status": "ok" | "blocked" | "error",
+         "message": str,
+         "state": PipelineState}
+    
+    读取结果:
+        state = result["state"]
+        state.wbs_text_tree      → WBS文本树
+        state.estimate_summary   → 估算摘要
+        state.html_report_path   → HTML报告路径
+        state.doc_content        → 文档内容
+        state.doc_path           → 文档文件路径
+    """
+    state = PipelineState(description)
+    state.project_name = project_name or _extract_project_name(description)
+    return state.run_full(
+        doc_template=doc_template,
+        doc_mode=doc_mode,
+        mc_iterations=mc_iterations
+    )
+
 
 def run_pipeline(
     description: str,
@@ -467,28 +972,8 @@ def run_pipeline(
     custom_phases: list[dict] = None,
 ) -> PipelineState:
     """
-    全流程一键执行。LLM 只需调这一个入口。
-
-    参数:
-        description: 项目描述
-        mode: "full" → 全部执行 | "wbs" → 仅WBS | "estimate" → 仅估算 | "docs" → 仅文档
-        project_name: 项目名（自动从description提取或手动指定）
-        wbs_template: WBS模板 deliverable/lifecycle/modular
-        wbs_custom_data: WBS结构化数据（由LLM提供，可略过）
-        doc_template: 文档模板名
-        doc_mode: manual/mixed
-        doc_filled: 文档填充内容 {section_key: content}
-        mc_iterations: MC模拟次数
-        custom_phases: 自定义估算阶段（有WBS时自动转换）
-
-    返回:
-        PipelineState 对象，读取其字段获取各阶段结果
-
-    用法（LLM）:
-        state = run_pipeline("电商后台管理系统")
-        print(state.wbs_text_tree)        # WBS文本树
-        print(state.estimate_summary)     # 估算摘要
-        print(state.doc_content)          # 文档内容
+    传统全流程一键执行（保持向后兼容）。
+    参见 run_full() 为新推荐入口。
     """
     state = PipelineState(description)
     state.project_name = project_name or _extract_project_name(description)
@@ -496,8 +981,6 @@ def run_pipeline(
     try:
         if mode in ("full", "wbs"):
             state.run_wbs(template=wbs_template, custom_data=wbs_custom_data)
-
-            # 如果用户提供了阶段参数，直接使用
             if custom_phases:
                 state.phases = custom_phases
 
@@ -505,9 +988,9 @@ def run_pipeline(
             if custom_phases:
                 state.prepare_estimation(custom_phases=custom_phases)
             elif state.phases:
-                pass  # already set by user
+                pass
             elif state.wbs_result:
-                state.prepare_estimation()  # auto from WBS
+                state.prepare_estimation()
             state.run_estimate(mc_iterations=mc_iterations)
 
         if mode in ("full", "docs"):
@@ -525,19 +1008,16 @@ def run_pipeline(
 
 def _extract_project_name(description: str) -> str:
     """从项目描述中提取项目名（启发式）"""
-    # 去掉常见前缀
     text = description.strip()
     prefixes = ["帮我", "请", "规划", "估算", "生成", "做", "搞", "开发", "做一个"]
     for p in prefixes:
         if text.startswith(p):
             text = text[len(p):].strip()
-    # 取关键短语
     for suffix in ["项目", "系统", "平台", "应用", "工具", "网站", "App"]:
         if suffix in text:
             idx = text.index(suffix)
             start = max(0, idx - 8)
             return text[start:idx + len(suffix)]
-    # 截取前12字
     return text[:12] or "未命名项目"
 
 
@@ -557,29 +1037,32 @@ def list_available_templates() -> str:
 
 
 def get_pipeline_help() -> str:
-    """输出run_pipeline的使用说明"""
+    """输出run_pipeline/run_full的使用说明"""
     return """
-run_pipeline(description, mode="full", ...) — 全流程入口
+===== 推荐入口 =====
+run_full(description, ...) → {"status", "message", "state"}
+
+自动判断是否需要WBS → 提取参数 → 紧前关系 → 估算 → 报告。
+如触发 LLMInteractionRequired，按提示提供数据后重试。
+
+参数:
+  description: 项目描述（必填）
+  project_name: 项目名（可选）
+
+读取结果:
+  result["state"].wbs_text_tree      → WBS文本树
+  result["state"].estimate_summary   → 估算摘要
+  result["state"].html_report_path   → HTML报告路径
+  result["state"].doc_content        → 文档内容
+  result["state"].errors             → 错误列表
+  result["state"].status()           → 当前状态
+
+===== 传统入口 =====
+run_pipeline(description, mode="full", ...) → PipelineState
 
 mode:
-  "full"      → WBS + 估算 + 文档 （全自动串联）
-  "wbs"       → 仅WBS分解
-  "estimate"  → 仅估算（需已有阶段参数）
-  "docs"      → 仅文档生成（需已有项目资料）
-
-返回 PipelineState 对象，读取字段:
-  state.wbs_text_tree      → WBS文本树
-  state.wbs_json_str       → WBS字典JSON
-  state.estimate_summary   → 估算摘要
-  state.cpm_result         → CPM完整结果
-  state.mc_results          → MC模拟结果
-  state.doc_content         → 文档内容
-  state.errors              → 错误列表
-  state.status()            → 当前状态摘要
-
-示例:
-  state = run_pipeline("电商后台管理系统", mode="full")
-  print(state.wbs_text_tree)
-  print(state.estimate_summary)
-  print(state.doc_content)
+  "full"      → WBS + 估算 + 文档（兼容原行为）
+  "wbs"       → 仅WBS
+  "estimate"  → 仅估算
+  "docs"      → 仅文档
 """
