@@ -1,3 +1,11 @@
+## 1.6.2 (2026-06-03)
+
+### 修复
+- `save_document()` 使用 `os.getcwd()` 导致文档产物写到技能安装目录
+  改为输出到 `.standardization/activity-duration-estimation/data/docs/` 数据目录
+
+---
+
 ## 1.6.1 (2026-06-03)
 
 ### 修复

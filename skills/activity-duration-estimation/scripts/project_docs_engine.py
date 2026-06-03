@@ -752,12 +752,20 @@ def assemble_mixed_document(
 
 
 def save_document(content: str, template: dict, project: ProjectData) -> str:
-    """保存文档到文件，返回文件路径"""
+    """保存文档到文件（数据目录下），返回文件路径"""
     filename = template.get("output_filename", "{project_name}_文档.md")
     filename = filename.replace("{project_name}", project.project_name or "未命名项目")
 
-    output_dir = os.getcwd()
-    fpath = os.path.join(output_dir, filename)
+    # 保存到数据目录下的 docs/，不污染安装目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    skill_dir = os.path.dirname(script_dir)
+    data_dir = os.path.normpath(os.path.join(
+        skill_dir, "..", ".standardization",
+        os.path.basename(skill_dir), "data", "docs"
+    ))
+    os.makedirs(data_dir, exist_ok=True)
+
+    fpath = os.path.join(data_dir, filename)
 
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(content)
