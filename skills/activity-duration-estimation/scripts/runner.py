@@ -1126,7 +1126,9 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
             if len(self.phases) >= 1:
                 self.mc_results = monte_carlo_multi(
                     mc_phases, mc_iterations,
-                    ['pert', 'triangular', 'poisson']
+                    ['pert', 'triangular', 'poisson'],
+                    dependencies=deps_formatted,
+                    task_count=len(self.phases),
                 )
 
             overlap_tasks = []

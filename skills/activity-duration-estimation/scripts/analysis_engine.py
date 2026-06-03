@@ -427,17 +427,26 @@ def _poisson_random(mean_val: float) -> float:
 def monte_carlo_multi(
     phases: list[tuple[str, float, float, float]],
     iterations: int = 2000,
-    distributions: list[str] = None
+    distributions: list[str] = None,
+    dependencies: dict = None,
+    task_count: int = 0,
 ) -> dict:
     """
     多分布蒙特卡洛模拟
+
     phases: [(名称, 乐观, 最可能, 悲观), ...]
     iterations: 模拟次数
     distributions: ['pert', 'triangular', 'poisson'] 默认全部
+    dependencies: 紧前关系 {任务ID: [(前驱ID, 类型)]}（1-based），
+                  传入后每次模拟走 CPM 计算真实工期而非简单求和
+    task_count: 任务总数（与 dependencies 对应，传了 dependencies 时必须）
     返回: {分布名: {quantiles, stats, samples}}
     """
     if distributions is None:
         distributions = ['pert', 'triangular', 'poisson']
+
+    if dependencies and not task_count:
+        task_count = len(phases)
 
     dist_funcs = {
         'pert': lambda o, m, p: _pert_beta_random(o, m, p),
@@ -452,7 +461,17 @@ def monte_carlo_multi(
         func = dist_funcs[dist]
         samples = []
         for _ in range(iterations):
-            total = sum(func(o, m, p) for _, o, m, p in phases)
+            # 为每个任务生成随机工期
+            random_durs = {i+1: func(o, m, p) for i, (_, o, m, p) in enumerate(phases)}
+
+            if dependencies and task_count > 0:
+                # 走 CPM 计算真实工期（考虑并行）
+                cpm_result = calc_cpm(random_durs, dependencies)
+                total = cpm_result.project_duration
+            else:
+                # 无依赖时简单求和（等价于全串行）
+                total = sum(random_durs.values())
+
             samples.append(total)
 
         samples.sort()
