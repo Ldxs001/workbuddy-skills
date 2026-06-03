@@ -1,7 +1,7 @@
 ---
 name: activity-duration-estimation
 tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report']
-version: 1.7.0
+version: 1.8.0
 author: Ldxs
 license: MIT
 description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。
@@ -190,7 +190,7 @@ save_template(tpl, "我的模板", overwrite=True)       # 另存自定义模板
 
 ## 版本
 
-**v1.7.0** — 紧前关系规划从「全FS串行」重构为「WBS层级感知并行推理」
+**v1.8.0** — 全体系重构：依赖智能规划 + HTML 甘特图 + 多维风险分析 + WBS 深度校验
 - `auto_plan_dependencies()`: 接收 phases 列表，解析 WBS 前缀分组
 - `wbs_to_dependencies()`: 同父组并行，跨父组串联
 - 三个 runner 调用处全部传入 phases 支持智能分组

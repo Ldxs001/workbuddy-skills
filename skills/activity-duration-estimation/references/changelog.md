@@ -26,12 +26,36 @@
 - `validate_wbs()` 新增粒度检查：核心技术阶段≥5个工作包，每阶段≥3个，交付物完整性，总工作包数与阶段数比例
 - `generate_gantt_svg()` 新增 `unit` 参数、网格线、Y轴水平线、阴影效果、智能标签截断
 
+## 1.8.0 (2026-06-03)
+
+### 重构
+- 紧前关系规划从「全FS串行」改为「WBS层级感知的并行推理」
+- `auto_plan_dependencies()` 新增 phases 参数：解析 WBS 前缀分组，同组并行，跨组 max-M 约束
+- `wbs_to_dependencies()` 重写：按父节点分组，同组并行，跨组 max-M 约束
+- `_prompt_llm_for_dependencies()` 改为静默调用智能规划，废弃 LLMInteractionRequired
+- **甘特图 SVG → HTML div-based**：支持46+任务，阶段性色块，关键路径红框，持续天数标签
+- **参数表按 Phase 分组**：从平铺改为 Phase1~8 分组展现
+- `_build_analysis_section()` 重写为维度驱动：自动匹配风险维度
+
+### 新增
+- `references/risk-dimensions.md` — 7大类风险维度库（D1~D7）
+- `scripts/risk_dimensions.py` — 按上下文自动匹配维度，生成多维风险分析
+- **任务重叠分析卡片**：最大并发数 + 时间范围 + 涉及任务 + 最长重叠时段
+- **里程碑标记**：甘特图 ♦P1~P8 Phase 完成点
+- **WBS 树卡片**：HTML 报告中展示层级结构
+- `validate_wbs()` 粒度检查：核心阶段≥5 WP，每阶段≥3，交付物完整性
+- `generate_gantt_svg()` 新增 unit 参数、网格线、阴影
+
 ### 修复
-- 甘特图时间单位从硬编码 "h" 改为可配置（默认 "天"）
-- `format_text_tree()` 默认使用 ASCII 安全标记 `[P]/[T]/[W]` 替代 emoji
+- `wbs_to_dependencies()` 双分支同代码（全 FS），父节点检查形同虚设
+- `_generate_html_report()` SVG 被 `except Exception: pass` 无声吞掉，甘特图/MC 从未渲染
+- `auto_plan_dependencies()` 仅首组员有依赖，其余从 day0（工期 34 天）
+- `_build_mc_section()` SVG 失败时连文字也看不到
+- 甘特图时间单位硬编码 "h" → 默认 "天"
+- `format_text_tree()` emoji → ASCII 标记，防 GBK 崩溃
+- 跨组依赖：从依赖"最后一个成员"改为"max-M 成员"
 
-
-
+---
 ### 新增
 - `_generate_audit_report()`: 10项审计检查（CPM/MC/总工期/关键路径/P50P90/HTML报告/文档逐节检查）
 - `_audit_and_fix()`: 三阶审计+自动修复（审→修→再审，3轮截断）
