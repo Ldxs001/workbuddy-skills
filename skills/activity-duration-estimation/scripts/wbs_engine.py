@@ -411,8 +411,8 @@ def wbs_to_dependencies(result: WBSResult) -> dict[int, list[tuple[int, str]]]:
     根据WBS层级结构自动推演紧前关系
 
     规则：
-    - 同一父节点的子节点（同组）：并行（互不依赖）
-    - 跨父节点边界：本组**全部任务**依赖上一组最后一个，同组内部保持并行
+    - 同一父节点的子节点（同组）：按 WBS 编码顺序 FS 串联
+    - 跨父节点边界：本组第一个任务依赖上一组中 M 值最大的任务（FS）
     """
     result.collect_work_packages()
     wps = result.work_packages
@@ -441,18 +441,31 @@ def wbs_to_dependencies(result: WBSResult) -> dict[int, list[tuple[int, str]]]:
         groups.append(current_group)
 
     for g_idx, group in enumerate(groups):
-        if g_idx == 0:
-            for item in group:
-                idx, _ = item
+        for i, item in enumerate(group):
+            idx, wp = item
+            if g_idx == 0 and i == 0:
+                # 第一组第一个任务：无前置
                 deps[idx] = []
-        else:
-            # 找到上一组中 M 值最大的工作包作为约束
-            prev_group = groups[g_idx - 1]
-            prev_constraint = max(prev_group, key=lambda x: x[1].m or 0)
-            prev_constraint_idx = prev_constraint[0]
-            for item in group:
-                idx, _ = item
-                deps[idx] = [(prev_constraint_idx, "FS")]
+            elif g_idx > 0 and i == 0:
+                # 跨组边界：本组第一个依赖上一组 max-M 任务
+                prev_group = groups[g_idx - 1]
+                prev_constraint = max(prev_group, key=lambda x: x[1].m or 0)
+                deps[idx] = [(prev_constraint[0], "FS")]
+            elif i > 0:
+                # 组内串联：前一个 → 当前，用 infer_dep_type
+                prev_idx, prev_wp = group[i - 1]
+                dep_type = "FS"
+                try:
+                    from analysis_engine import infer_dep_type
+                    dep_type = infer_dep_type(
+                        prev_wp.name or "",
+                        wp.name or ""
+                    )
+                except ImportError:
+                    pass
+                deps[idx] = [(prev_idx, dep_type)]
+            else:
+                deps[idx] = []
 
     return deps
 

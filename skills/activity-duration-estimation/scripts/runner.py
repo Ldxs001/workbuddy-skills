@@ -68,7 +68,7 @@ from project_docs_engine import (
     get_template_structure_summary, get_template_mode_summary,
     SectionGenState, TEMPLATES_DIR
 )
-from risk_dimensions import select_dimensions, build_analysis_suggestions
+from risk_dimensions import select_dimensions, build_dimension_prompt, build_minimal_fallback
 
 
 # ═══════════════════════════════════════════════════
@@ -136,6 +136,7 @@ class PipelineState:
         self.cpm_result: Optional[CPMResult] = None
         self.mc_results: dict = {}
         self.overlap_results: dict = {}
+        self.risk_analysis: str = ""  # LLM可设自定义风险分析（防模板套话）
         self.estimate_summary: str = ""
         self.html_report_path: str = ""
 
@@ -313,13 +314,10 @@ class PipelineState:
                     "state": self}
 
         # ═══════════════════════════════════════════
-        # Phase 2: 紧前关系规划（需要LLM推理时触发交互点）
+        # Phase 2: 紧前关系规划 → 若 LLM 已设置则跳过
         # ═══════════════════════════════════════════
         if not self.dependencies:
-            try:
-                self._prompt_llm_for_dependencies()
-            except LLMInteractionRequired:
-                raise  # 让顶层捕获
+            self._prompt_llm_for_dependencies()
 
         # ═══════════════════════════════════════════
         # Phase 3: 估算计算（全Python自动）
@@ -526,24 +524,18 @@ class PipelineState:
 
     def _prompt_llm_for_dependencies(self):
         """
-        LLM交互点：确认或自定义紧前关系。
-        只有需要手动指定复杂依赖时才抛出异常；默认使用auto_plan。
-        
-        返回: {task_id: [(predecessor_id, type)]}
+        LLM交互点（占位）。
+
+        LLM 在调用 run_estimate / prepare_estimation 之前，
+        应直接设置 self.dependencies = {...}。
+        此处仅做 fallback：若 LLM 未设置，用 wbs_to_dependencies。
         """
         if not self.phases:
             return
-        # 智能规划：传入 phases 列表，auto_plan_dependencies 自动按 WBS 前缀分组
-        # 同父组并行，跨父组串联；无法分组时回退全串行
-        self.dependencies = auto_plan_dependencies(len(self.phases), self.phases)
-
-        # 验证：如果所有任务都在关键路径上（无并行），提示用户
-        import re
-        has_prefixes = any(re.match(r'^\d+\.', p.get("name", "").strip()) for p in self.phases)
-        if not has_prefixes and len(self.phases) > 5:
-            # 名称中无法提取WBS前缀（可能没按标准格式命名），仍可继续
-            # 但为避免全串行，让用户选择是否手动指定
-            pass
+        if self.dependencies:
+            return  # LLM 已提供
+        if self.wbs_result:
+            self.dependencies = wbs_to_dependencies(self.wbs_result)
 
     def _generate_html_report(self):
         """生成HTML评估报告（全Python自动）"""
@@ -877,12 +869,18 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
         if not self.wbs_text_tree:
             return ""
         tree_html = self.wbs_text_tree.replace("\n", "<br>").replace(" ", "&nbsp;")
-        return f'<div class="card"><h2>WBS分解结构</h2>'
-        f'<pre style="font-family:Consolas,monospace;font-size:12px;line-height:1.5;overflow-x:auto;'
-        f'background:#f8f9fa;padding:12px;border-radius:4px">{tree_html}</pre></div>'
+        return (
+            f'<div class="card"><h2>WBS分解结构</h2>'
+            f'<pre style="font-family:Consolas,monospace;font-size:12px;line-height:1.5;overflow-x:auto;'
+            f'background:#f8f9fa;padding:12px;border-radius:4px">{tree_html}</pre></div>'
+        )
 
     def _build_analysis_section(self) -> str:
-        # 构建项目上下文
+        # LLM 提供了自定义风险分析 → 直接使用
+        if hasattr(self, 'risk_analysis') and self.risk_analysis:
+            return self.risk_analysis
+
+        # fallback: 维度概览（只显示维度名和指引，不硬编内容）
         context = {
             "domain": "ai-enterprise",
             "scale": "large" if len(self.phases) > 20 else "medium",
@@ -890,19 +888,10 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
             "team_size": len(self.phases),
             "integration_count": sum(1 for p in self.phases if "集成" in p.get("name","") or "对接" in p.get("name","")),
             "critical_path_len": len(self.cpm_result.critical_ids) if (self.cpm_result and self.cpm_result.critical_ids) else 0,
-            "mc_p50_p90_gap": 0,
             "phases": self.phases,
         }
-        if self.mc_results:
-            pert = self.mc_results.get("pert", {})
-            quants = pert.get("quantiles", {})
-            if quants:
-                context["mc_p50_p90_gap"] = quants.get("p90", 0) - quants.get("p50", 0)
-
-        # 根据上下文选择匹配的维度
         active_dims = select_dimensions(context)
-        suggestion_html = build_analysis_suggestions(active_dims, self.cpm_result, self.mc_results, self.phases)
-        return suggestion_html
+        return build_minimal_fallback(active_dims)
 
     def _build_html_footer(self) -> str:
         return "</body></html>"
@@ -989,9 +978,11 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
         if custom_deps:
             self.dependencies = custom_deps
         elif self.dependencies:
-            pass  # 已设置
+            pass  # 已通过直接赋值设置（LLM自行设计）
         elif self.wbs_result:
+            # 有 WBS 数据 → 让 LLM 设计合理的依赖关系
             self.dependencies = wbs_to_dependencies(self.wbs_result)
+            # 但给 LLM 一个机会来覆盖（由 run_full 中的 _prompt_llm_for_dependencies 触发）
         else:
             self.dependencies = auto_plan_dependencies(len(self.phases), self.phases)
 
@@ -1008,6 +999,105 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
                 else:
                     deps_1based[k1].append(dep + 1 if isinstance(dep, int) else dep)
         self.dependencies = deps_1based
+
+        # ── 校验 LLM 设计的依赖（防幻觉） ──
+        self._validate_dependencies()
+
+    def _validate_dependencies(self):
+        """校验依赖设计的合理性，防 LLM 幻觉"""
+        if not self.dependencies or not self.phases:
+            return
+
+        n = len(self.phases)
+        issues = []
+
+        # 1. 可达性检查：所有任务（除1号）应为前驱或后继
+        #    任务可能是前驱（被其他任务依赖）而不需要自己有dep定义
+        all_referenced_as_pred = set()
+        for tid, deps in self.dependencies.items():
+            for dep, *_ in (deps if isinstance(deps, list) else [deps]):
+                pd = dep[0] if isinstance(dep, (list, tuple)) else dep
+                all_referenced_as_pred.add(pd)
+
+        has_deps_defined = set(self.dependencies.keys())
+        all_connected = has_deps_defined | all_referenced_as_pred
+
+        disconnected = [tid for tid in range(1, n + 1)
+                        if tid not in all_connected]
+        if disconnected:
+            names = [self.phases[tid-1]["name"] for tid in disconnected[:5]]
+            issues.append(f"⚠️ {len(disconnected)}个任务既无前驱也无后继（孤立任务）: {', '.join(names)}")
+
+        # 2. 自引用检查
+        for tid, deps in self.dependencies.items():
+            for dep, *_ in (deps if isinstance(deps, list) else [deps]):
+                pd = dep[0] if isinstance(dep, (list, tuple)) else dep
+                if pd == tid:
+                    issues.append(f"❌ 任务 {tid} 依赖自身，死循环")
+
+        # 3. 关键路径占比分析（估算CPM后才有意义，但可提前检查并行度）
+        # 统计：有多少任务同时依赖同一个前驱（扇出 >3 说明有并行分支）
+        fan_out = {}
+        for tid, deps in self.dependencies.items():
+            for dep, *_ in (deps if isinstance(deps, list) else [deps]):
+                pd = dep[0] if isinstance(dep, (list, tuple)) else dep
+                fan_out.setdefault(pd, []).append(tid)
+        high_fan = {k: v for k, v in fan_out.items() if len(v) > 3}
+        if high_fan:
+            for pred_id, succs in high_fan.items():
+                name = self.phases[pred_id-1]["name"] if pred_id <= n else f"任务{pred_id}"
+                succ_names = [self.phases[s-1]["name"] for s in succs[:5] if s <= n]
+                issues.append(f"ℹ️  {name} 完成后有 {len(succs)} 个并行分支: {', '.join(succ_names)}")
+
+        # 4. 检查是否有任务被过度依赖（多个前置同时依赖同一个，可能是合并点）
+        fan_in = {}
+        for tid, deps in self.dependencies.items():
+            for dep, *_ in (deps if isinstance(deps, list) else [deps]):
+                pd = dep[0] if isinstance(dep, (list, tuple)) else dep
+                fan_in.setdefault(tid, set()).add(pd)
+        merge_points = {k: v for k, v in fan_in.items() if len(v) >= 3}
+        for tid, preds in merge_points.items():
+            name = self.phases[tid-1]["name"] if tid <= n else f"任务{tid}"
+            pred_names = [self.phases[p-1]["name"] for p in preds if p <= n]
+            issues.append(f"🔀 {name} 等待 {len(preds)} 个前置汇合: {', '.join(pred_names)}")
+
+        # 5. 懒惰检测：全FS串联无并行 → 极可能是LLM偷懒没设计
+        all_fs_chain = True
+        seen = set()
+        for tid in sorted(self.dependencies.keys()):
+            deps = self.dependencies.get(tid, [])
+            if not deps:
+                continue  # 无前置的任务（如第一组的第一个）不算
+            if len(deps) != 1:
+                all_fs_chain = False
+                break
+            d = deps[0]
+            pd = d[0] if isinstance(d, (list, tuple)) else d
+            dep_type = d[1] if isinstance(d, (list, tuple)) and len(d) >= 2 else "FS"
+            if dep_type != "FS":
+                all_fs_chain = False
+                break
+            if pd != tid - 1:
+                all_fs_chain = False
+                break
+            seen.add(pd)
+        
+        # 超过 5 个任务：有一个组无前置，其余全 FS i→i-1 → 懒惰
+        has_root = any(not self.dependencies.get(tid, []) for tid in range(1, n+1))
+        if all_fs_chain and has_root and n > 5:
+            issues.append(
+                f"❌ 全 FS 串行（{n}个任务全部1→2→3→...N），"
+                f"无任何并行分支。这是 fallback 默认行为，不是 LLM 设计的依赖。"
+                f"请根据项目经验重新设计依赖关系（设定并行分支、SS/FF 关系等）。"
+            )
+
+        if issues:
+            print("\n─── 依赖合理性检查 ───")
+            for iss in issues:
+                print(f"  {iss}")
+            print("")
+        else:
+            print("  ✅ 依赖检查通过（无异常）")
 
     def run_estimate(self, mc_iterations: int = 2000,
                      _run_audit: bool = True) -> dict:

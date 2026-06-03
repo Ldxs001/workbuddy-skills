@@ -1,59 +1,59 @@
-## 1.7.0 (2026-06-03)
-
-### 重构
-- 紧前关系规划从「全FS串行」改为「WBS层级感知的并行推理」
-- `auto_plan_dependencies()` 新增 `phases` 参数：解析 phase name 中的 WBS 前缀（如 "1.1" → 父组 "1"），同父组并行、跨父组全部依赖
-- `wbs_to_dependencies()` 重写：按父节点分组，同组子任务并行，跨组**全部成员** FS 依赖上一组最后一个
-- `_prompt_llm_for_dependencies()` 改为静默调用智能规划，不再抛出 `LLMInteractionRequired`
-- 三个 runner 调用处全部传入 `self.phases` 以支持依赖分组推理
+## 1.8.1 (2026-06-03)
 
 ### 修复
-- 根因修复：原 `wbs_to_dependencies()` 的 "same parent" / "different parent" 两个分支执行相同代码（全 FS 串联），检查形同虚设
-- 根因修复：`_generate_html_report()` 的 SVG 生成被 `except Exception: pass` 无声吞掉，甘特图和 MC 概率分布图从未渲染
-  - 甘特图：`self.phases` 直接传给 `generate_gantt_svg()`，但 phases 没有 `start`/`end`/`id` 字段，导致 KeyError 被静默吞掉
-  - 修复：从 CPM 结果构建正确的 `{id, name, start, end}` 任务对象再传入
-  - MC 图表：单独 try/except 并输出错误信息，不再无声吞异常
-- 根因修复：`auto_plan_dependencies()` 分组时只有"本组第一个"依赖上一组最后一个，其余组员无依赖从 day0 开始，导致工期被严重低估（34天）
-  - 修复：**本组全部成员**依赖上一组最后一个，同组内部保持并行
-- 根因修复：`_build_mc_section()` 以 `if not svg` 为守卫，SVG 失败时连文字统计也看不到
-  - 修复：统计文字与 SVG 分离，即使图表失败文字也能展示
-- `format_text_tree()` 默认使用 ASCII 安全标记 `[P]/[T]/[W]` 替代 emoji `📁📄`，避免 Windows GBK 终端 UnicodeEncodeError
+- audit --fix 自动修正: artifact_paths, external_data_dir, writing_standards
 
-### 新增
-- `references/risk-dimensions.md` — 7大类风险维度库（D1~D7），含选择条件矩阵和分析要素
-- `scripts/risk_dimensions.py` — `select_dimensions()` 按项目上下文自动匹配维度，`build_analysis_suggestions()` 生成多维风险分析HTML
-- `_build_analysis_section()` 重写为维度驱动：根据项目领域/规模/技术新颖度/集成数自动选择适用维度，动态严重度（关键路径集中度、估算偏差）
-- `validate_wbs()` 新增粒度检查：核心技术阶段≥5个工作包，每阶段≥3个，交付物完整性，总工作包数与阶段数比例
-- `generate_gantt_svg()` 新增 `unit` 参数、网格线、Y轴水平线、阴影效果、智能标签截断
+---
 
 ## 1.8.0 (2026-06-03)
 
 ### 重构
-- 紧前关系规划从「全FS串行」改为「WBS层级感知的并行推理」
-- `auto_plan_dependencies()` 新增 phases 参数：解析 WBS 前缀分组，同组并行，跨组 max-M 约束
-- `wbs_to_dependencies()` 重写：按父节点分组，同组并行，跨组 max-M 约束
-- `_prompt_llm_for_dependencies()` 改为静默调用智能规划，废弃 LLMInteractionRequired
-- **甘特图 SVG → HTML div-based**：支持46+任务，阶段性色块，关键路径红框，持续天数标签
-- **参数表按 Phase 分组**：从平铺改为 Phase1~8 分组展现
-- `_build_analysis_section()` 重写为维度驱动：自动匹配风险维度
+- **依赖规划从「代码硬猜/丢异常给用户」改为「LLM自行设计+Python执行」**
+  - `scripts/risk_dimensions.py` 重写：维度库只做选择+结构指引，不做硬编码内容。LLM 按实际项目数据生成分析
+- `_build_analysis_section()` 优先使用 `self.risk_analysis`（LLM填充），fallback 只显示维度名称
+  - 删除 `LLMInteractionRequired` 依赖交互（LLM 自己该干的事不要丢给用户）
+  - `run_full()` 中若 LLM 已设 `self.dependencies` 则直接跳过
+  - `prepare_estimation()` 注释明确：LLM 直接赋值 `state.dependencies`
+- 组内子任务从「全部并行」改为「FS串联」（安全默认）
+- `infer_dep_type()` 简化：默认返回 FS
 
 ### 新增
-- `references/risk-dimensions.md` — 7大类风险维度库（D1~D7）
-- `scripts/risk_dimensions.py` — 按上下文自动匹配维度，生成多维风险分析
-- **任务重叠分析卡片**：最大并发数 + 时间范围 + 涉及任务 + 最长重叠时段
-- **里程碑标记**：甘特图 ♦P1~P8 Phase 完成点
-- **WBS 树卡片**：HTML 报告中展示层级结构
+- `scripts/knowledge_schema.py` — **知识库标准化接口**
+  - **标准格式**: 知识条目 = YAML frontmatter + Markdown（与 Obsidian/Hugo/Jekyll/Notion 同一格式）
+  - **项目数据**: JSON 自描述格式 (`format: wbs-v1`)
+  - `entry_to_markdown()` — 知识条目 → 标准化 YAML+MD
+  - `parse_markdown_entry()` — 标准格式 → 知识条目（兼容 Obsidian/Hugo 风格 frontmatter）
+  - `project_to_json()` — PipelineState → 标准 JSON
+  - `parse_project_json()` — 标准 JSON → (phases, deps) 元组
+  - **外部对接**: `detect_table_mapping()` 自动检测字段映射
+  - **预置映射**: Obsidian / Notion 导出 / Hugo / Jira 导出
+  - `generate_mapping_guide()` — 给 LLM 的字段映射指南
+  - `validate_entry()` / `validate_project_json()` — 格式校验
+- `scripts/project_knowledge.py` — 通用知识库引擎（SQLite + FTS5）
+  - 搜索中文退化 LIKE 兜底
+- 甘特图 SVG → HTML div-based：阶段性色块，关键路径红框，持续天数标签
+- 参数表从平铺改为按 Phase 分组展现
+- `_build_analysis_section()` 重写为维度驱动
+
+### 新增
+- `scripts/analysis_engine.py`: `infer_dep_type()` — 默认返回 FS。串行/并行取决于资源、能力、工期等现实约束，无法从名称可靠推断
+- `references/risk-dimensions.md` — 7 类风险维度库（D1~D7）
+- `scripts/risk_dimensions.py` — 按上下文自动匹配维度
+- 任务重叠分析卡片 + 里程碑标记 + WBS 树卡片
 - `validate_wbs()` 粒度检查：核心阶段≥5 WP，每阶段≥3，交付物完整性
-- `generate_gantt_svg()` 新增 unit 参数、网格线、阴影
 
 ### 修复
-- `wbs_to_dependencies()` 双分支同代码（全 FS），父节点检查形同虚设
-- `_generate_html_report()` SVG 被 `except Exception: pass` 无声吞掉，甘特图/MC 从未渲染
-- `auto_plan_dependencies()` 仅首组员有依赖，其余从 day0（工期 34 天）
+- `_build_wbs_tree_section()` 字符串拼接缺括号→WBS树内容被Python丢弃成空卡片
+- `_build_analysis_section()` 新增 `self.risk_analysis`：LLM可设自定义风险分析，模板仅作fallback
+- 根因：`wbs_to_dependencies()` 双分支同代码（全 FS），父节点检查形同虚设
+- 根因：HTML 报告 SVG 被 `except: pass` 吞异常，甘特图/MC 从未渲染
+- 根因：组内并行导致甘特图全部任务相同起点、不符合实际
+- 根因：组内并行 + 仅首组员依赖导致工期被低估（34天）
 - `_build_mc_section()` SVG 失败时连文字也看不到
-- 甘特图时间单位硬编码 "h" → 默认 "天"
+- 甘特图单位硬编码 "h" → 可配置默认"天"
 - `format_text_tree()` emoji → ASCII 标记，防 GBK 崩溃
-- 跨组依赖：从依赖"最后一个成员"改为"max-M 成员"
+
+---
 
 ---
 ### 新增

@@ -1,16 +1,24 @@
 """
-风险维度库 — 按项目上下文自动匹配分析维度
+风险维度库 — 按项目上下文自动匹配分析维度 + 生成LLM提示
 
 用法：
-    from risk_dimensions import select_dimensions, build_analysis_suggestions
+    from risk_dimensions import select_dimensions, build_dimension_prompt
+    
+    # 1. 选维度
     dims = select_dimensions(context)
-    suggestions = build_analysis_suggestions(dims, cpm_result, mc_results, phases)
+    
+    # 2. 生成维度简报（给LLM的结构指引，不是硬编码内容）
+    prompt = build_dimension_prompt(dims, cpm_result, mc_results, phases)
+    
+    # 3. LLM根据简报写具体的风险分析
+    state.risk_analysis = llm_generate(prompt)
 """
 
 import re
 
+
 # ═══════════════════════════════════════════════════
-# 风险维度定义
+# 维度定义（只含选择条件和结构指引，不含硬编码内容）
 # ═══════════════════════════════════════════════════
 
 DIMENSIONS = {
@@ -20,29 +28,7 @@ DIMENSIONS = {
         "icon": "🛠️",
         "condition": lambda ctx: ctx.get("tech_novelty", "medium") in ("high", "medium")
                                   or "ai" in ctx.get("domain", "").lower(),
-        "analysis_template": {
-            "title": "技术风险分析",
-            "sub_risks": [
-                {
-                    "name": "技术选型风险",
-                    "description": "LLM模型选择（开源vs闭源）、框架版本锁定、API兼容性",
-                    "severity": "high",
-                    "mitigation": "设置PoC验证周期，核心模块与API调用层解耦"
-                },
-                {
-                    "name": "技术实现复杂度",
-                    "description": "RAG准确性、Agent幻觉率、多智能体协调",
-                    "severity": "high",
-                    "mitigation": "分阶段验证AI能力，先PoC后规模化"
-                },
-                {
-                    "name": "集成风险",
-                    "description": "企业系统API兼容性、数据格式转换、认证集成",
-                    "severity": "medium",
-                    "mitigation": "集成测试前置到开发中期，Mock接口先行"
-                },
-            ]
-        }
+        "guide": "技术选型、实现复杂度、集成难度、性能扩展性、安全合规",
     },
     "D2": {
         "id": "D2",
@@ -50,29 +36,7 @@ DIMENSIONS = {
         "icon": "🔗",
         "condition": lambda ctx: ctx.get("domain", "") in ("ai-enterprise", "saas", "platform")
                                   or ctx.get("integration_count", 0) > 2,
-        "analysis_template": {
-            "title": "供应商与外部依赖风险",
-            "sub_risks": [
-                {
-                    "name": "API依赖风险",
-                    "description": "LLM供应商定价变化、服务中断、模型版本淘汰",
-                    "severity": "high",
-                    "mitigation": "核心功能与API调用层抽象解耦，准备多模型备选方案"
-                },
-                {
-                    "name": "开源组件风险",
-                    "description": "许可变更、社区活跃度下降、安全漏洞",
-                    "severity": "medium",
-                    "mitigation": "定期评估依赖健康状况，锁定关键版本"
-                },
-                {
-                    "name": "供应商锁定",
-                    "description": "难以迁移的自定义接口、专属格式",
-                    "severity": "medium",
-                    "mitigation": "设计时考虑可替换性，使用开放标准"
-                },
-            ]
-        }
+        "guide": "第三方API依赖、开源组件、供应商锁定、生态兼容性",
     },
     "D3": {
         "id": "D3",
@@ -80,58 +44,14 @@ DIMENSIONS = {
         "icon": "👥",
         "condition": lambda ctx: ctx.get("scale", "medium") in ("large", "enterprise")
                                   or ctx.get("integration_count", 0) > 3,
-        "analysis_template": {
-            "title": "相关方风险与变革管理",
-            "sub_risks": [
-                {
-                    "name": "用户接受度",
-                    "description": "AI辅助决策的信任建立、工作流变更适应",
-                    "severity": "high",
-                    "mitigation": "渐进式上线，先辅助模式后自动模式"
-                },
-                {
-                    "name": "管理层支持",
-                    "description": "预算持续保障、组织优先级变化",
-                    "severity": "medium",
-                    "mitigation": "分层沟通策略，C-level关注ROI指标"
-                },
-                {
-                    "name": "跨部门协作",
-                    "description": "数据共享壁垒、流程所有权模糊",
-                    "severity": "medium",
-                    "mitigation": "明确数据所有权和流程RACI矩阵"
-                },
-            ]
-        }
+        "guide": "用户接受度、管理层支持、跨部门协作、变革阻力",
     },
     "D4": {
         "id": "D4",
         "name": "进度风险",
         "icon": "📅",
         "condition": lambda ctx: True,  # 总是启用
-        "analysis_template": {
-            "title": "进度与关键路径风险",
-            "sub_risks": [
-                {
-                    "name": "关键路径集中度",
-                    "description": "",
-                    "severity": "dynamic",
-                    "mitigation": ""
-                },
-                {
-                    "name": "并行执行依赖",
-                    "description": "多分支汇合点的阻塞风险",
-                    "severity": "medium",
-                    "mitigation": "合并点设置明确Owner和deadline"
-                },
-                {
-                    "name": "估算偏差",
-                    "description": "",
-                    "severity": "dynamic",
-                    "mitigation": ""
-                },
-            ]
-        }
+        "guide": "关键路径集中度、并行分支汇合、估算偏差、资源争用",
     },
     "D5": {
         "id": "D5",
@@ -139,23 +59,7 @@ DIMENSIONS = {
         "icon": "💰",
         "condition": lambda ctx: ctx.get("is_commercial", False)
                                   or "roi" in str(ctx.get("phases", "")).lower(),
-        "analysis_template": {
-            "title": "商务与投资风险",
-            "sub_risks": [
-                {
-                    "name": "ROI不确定性",
-                    "description": "AI效率提升的可衡量性",
-                    "severity": "high",
-                    "mitigation": "设置明确ROI指标（工时节省/错误率降低）"
-                },
-                {
-                    "name": "预算超支",
-                    "description": "技术探索成本不可预测",
-                    "severity": "medium",
-                    "mitigation": "总预算保留15%-20%应急储备"
-                },
-            ]
-        }
+        "guide": "ROI不确定性、市场时机、预算超支、商业可持续性",
     },
     "D6": {
         "id": "D6",
@@ -163,29 +67,7 @@ DIMENSIONS = {
         "icon": "👤",
         "condition": lambda ctx: "ai" in ctx.get("domain", "").lower()
                                   or ctx.get("tech_novelty", "medium") == "high",
-        "analysis_template": {
-            "title": "人力资源风险",
-            "sub_risks": [
-                {
-                    "name": "关键人才获取",
-                    "description": "AI工程师、提示工程师的市场供给不足",
-                    "severity": "high",
-                    "mitigation": "提前启动招聘，保留外部顾问管道"
-                },
-                {
-                    "name": "团队技能匹配",
-                    "description": "现有团队与新技术栈的差距",
-                    "severity": "medium",
-                    "mitigation": "提前规划2-4周培训周期"
-                },
-                {
-                    "name": "关键人员流失",
-                    "description": "核心模块知识集中",
-                    "severity": "medium",
-                    "mitigation": "核心模块安排两人交叉了解（Bus Factor>1）"
-                },
-            ]
-        }
+        "guide": "关键人才获取、团队技能匹配、人员流失风险、培训成本",
     },
     "D7": {
         "id": "D7",
@@ -193,29 +75,7 @@ DIMENSIONS = {
         "icon": "🔄",
         "condition": lambda ctx: ctx.get("integration_count", 0) > 2
                                   or ctx.get("critical_path_len", 0) > 10,
-        "analysis_template": {
-            "title": "实施路径与技术债务风险",
-            "sub_risks": [
-                {
-                    "name": "架构演进风险",
-                    "description": "微服务拆分粒度的反复调整",
-                    "severity": "medium",
-                    "mitigation": "架构决策记录（ADR），追踪每次关键选择"
-                },
-                {
-                    "name": "技术债务",
-                    "description": "快速原型阶段遗留的临时方案",
-                    "severity": "medium",
-                    "mitigation": "每3-4个迭代预留1个技术债偿还周期"
-                },
-                {
-                    "name": "集成爆炸",
-                    "description": "多系统对接的测试复杂度",
-                    "severity": "high",
-                    "mitigation": "集成测试自动化覆盖率目标>80%"
-                },
-            ]
-        }
+        "guide": "架构演进、技术债务、回溯兼容、集成测试复杂度",
     },
 }
 
@@ -232,119 +92,67 @@ def select_dimensions(context: dict) -> list[dict]:
     return active
 
 
-def build_analysis_suggestions(
+def build_dimension_prompt(
     active_dims: list[dict],
     cpm_result=None,
     mc_results=None,
     phases: list[dict] = None
 ) -> str:
-    """根据激活的维度构建HTML分析建议内容"""
-    lines = ['<div class="card"><h2>多维风险分析</h2>']
+    """
+    为LLM生成维度简报（结构指引，非硬编码内容）。
+    LLM根据此简报 + 自身经验 + 项目数据 生成具体风险分析。
+    """
+    lines = []
+    lines.append("# 风险分析框架\n")
+    lines.append("请根据以下选中的风险维度，结合项目实际数据生成风险分析。")
+    lines.append("不要写泛泛的套话——每一条都要有具体的项目背景。\n")
 
-    # 关键数字摘要
-    mc_stats = ""
-    p50_p90_gap = 0
+    # 关键数据
+    lines.append("## 项目关键数据")
+    lines.append(f"- CPM总工期: {cpm_result.project_duration:.0f}天" if cpm_result else "")
+    if cpm_result and cpm_result.critical_ids:
+        cp_names = [phases[t-1]["name"] for t in sorted(cpm_result.critical_ids) if t <= len(phases)]
+        lines.append(f"- 关键路径 ({len(cp_names)}个任务): {' → '.join(cp_names[:5])}{'...' if len(cp_names) > 5 else ''}")
     if mc_results:
-        pert = mc_results.get("pert", {})
-        stats = pert.get("stats", {})
-        quants = pert.get("quantiles", {})
-        if stats and quants:
-            mean = stats.get("mean", 0)
-            std = stats.get("stddev", 0)
-            p50 = quants.get("p50", 0)
-            p90 = quants.get("p90", 0)
-            p50_p90_gap = p90 - p50
-            mc_stats = f"P50={p50:.1f}天 / P90={p90:.1f}天 / P90-P50跨度={p50_p90_gap:.1f}天"
+        q = mc_results.get("pert", {}).get("quantiles", {})
+        if q:
+            p50, p90 = q.get("p50",0), q.get("p90",0)
+            lines.append(f"- P50={p50:.0f}天, P90={p90:.0f}天, 跨度={p90-p50:.0f}天")
 
-    cp_len = len(cpm_result.critical_ids) if (cpm_result and cpm_result.critical_ids) else 0
-    project_dur = cpm_result.project_duration if cpm_result else 0
-
-    # 概览条
-    gap_risk = ""
-    if p50_p90_gap > 0:
-        ratio = (p50_p90_gap / max(project_dur, 1)) * 100
-        if ratio > 30:
-            gap_risk = f'<span class="tag tag-err">⚠️ 进度不确定性高 (P50-P90跨度{ratio:.0f}%)</span>'
-        elif ratio > 15:
-            gap_risk = f'<span class="tag tag-warn">进度不确定性中等 (P50-P90跨度{ratio:.0f}%)</span>'
-        else:
-            gap_risk = f'<span class="tag tag-ok">进度不确定性可控</span>'
-
-    lines.append(f'<p><strong>项目总工期:</strong> {project_dur:.1f}天 | '
-                 f'<strong>关键路径:</strong> {cp_len}个任务 | '
-                 f'{mc_stats}</p>')
-    if gap_risk:
-        lines.append(f'<p>{gap_risk}</p>')
-
-    # 各维度详细分析
+    lines.append("")
+    lines.append(f"## 选中维度 ({len(active_dims)}个)")
+    lines.append("")
     for dim in active_dims:
-        template = dim.get("analysis_template", {})
-        sub_risks = template.get("sub_risks", [])
+        lines.append(f"### {dim.get('icon','')} {dim['name']}")
+        lines.append(f"分析要点: {dim.get('guide', '')}")
+        lines.append("针对此项目实际情况写1-3条具体风险，包括：")
+        lines.append("- 风险描述（基于实际项目任务和数据）")
+        lines.append("- 严重程度（高/中/低，结合数据判断）")
+        lines.append("- 具体缓解措施（针对此项目，非通用套话）")
+        lines.append("")
 
-        lines.append(f'<div style="margin:12px 0;padding:10px;border-left:4px solid #3498db;'
-                     f'background:#f8f9fa;border-radius:4px">')
-        lines.append(f'<h3 style="margin:0 0 8px 0">{dim.get("icon","")} {template.get("title", dim["name"])}</h3>')
+    lines.append("## 输出格式")
+    lines.append("请输出完整的HTML片段（不含<html>/<head>/<body>标签），")
+    lines.append("每条风险用卡片样式展示。\n")
+    lines.append("## 要求")
+    lines.append("- 不写泛泛的通用建议")
+    lines.append("- 每条风险都关联到具体项目数据或任务")
+    lines.append("- 如果项目数据支持量化判断，给出量化结论")
 
-        for sr in sub_risks:
-            name = sr.get("name", "")
-            desc = sr.get("description", "")
-            sev = sr.get("severity", "medium")
-            mitigation = sr.get("mitigation", "")
+    return "\n".join(lines)
 
-            # 动态严重度替换
-            if sev == "dynamic":
-                if name == "关键路径集中度":
-                    if cp_len > 15:
-                        sev = "high"
-                        desc = f"关键路径上有{cp_len}个任务，路径集中度高，任一延迟将直接影响总工期"
-                        mitigation = "为关键路径每个任务分配明确Owner，每日站会跟踪"
-                    elif cp_len > 8:
-                        sev = "medium"
-                        desc = f"关键路径上有{cp_len}个任务，需要关注"
-                        mitigation = "关键路径任务设置里程碑检查点"
-                    else:
-                        sev = "low"
-                        desc = f"关键路径仅{cp_len}个任务，路径较分散"
-                        mitigation = "保持常规跟踪即可"
-                elif name == "估算偏差":
-                    if p50_p90_gap > project_dur * 0.3:
-                        sev = "high"
-                        desc = f"P50-P90跨度{p50_p90_gap:.1f}天，不确定性显著"
-                        mitigation = "建议设置项目总工期10%-15%的缓冲期"
-                    elif p50_p90_gap > project_dur * 0.15:
-                        sev = "medium"
-                        desc = f"P50-P90跨度{p50_p90_gap:.1f}天"
-                        mitigation = "建议设置5%-10%缓冲期"
-                    else:
-                        sev = "low"
-                        desc = f"P50-P90跨度{p50_p90_gap:.1f}天，估算较为稳定"
-                        mitigation = "保持现有计划"
 
-            sev_tag = {"high": "高危", "medium": "中危", "low": "低危"}
-            sev_color = {"high": "#e74c3c", "medium": "#f39c12", "low": "#27ae60"}
-            lines.append(f'<p style="margin:6px 0">'
-                         f'<span class="tag" style="background:{sev_color.get(sev,"#999")};color:#fff">'
-                         f'{sev_tag.get(sev, sev)}</span> '
-                         f'<strong>{name}</strong>：{desc}')
-            if mitigation:
-                lines.append(f'<br><span style="color:#666;font-size:0.9em">→ 建议：{mitigation}</span>')
-            lines.append('</p>')
-
+def build_minimal_fallback(active_dims: list[dict]) -> str:
+    """
+    极简fallback（仅当LLM未提供风险分析时使用）。
+    只显示维度标题和说明，不留空，不让用户看到空白块。
+    """
+    lines = ['<div class="card"><h2>项目风险维度概览</h2>']
+    lines.append('<p>以下风险维度根据项目特征自动匹配。详细分析由项目管理顾问生成。</p>')
+    for dim in active_dims:
+        lines.append(f'<div style="margin:8px 0;padding:8px;border-left:3px solid #3498db;background:#f8f9fa">')
+        lines.append(f'<strong>{dim.get("icon","")} {dim["name"]}</strong>')
+        lines.append(f'<p style="color:#666;font-size:0.9em;margin:4px 0 0 0">{dim.get("guide","")}</p>')
         lines.append('</div>')
-
-    # 综合建议
-    lines.append('<h3>综合行动建议</h3><ul>')
-    if cp_len > 10:
-        lines.append(f'<li>关键路径{cp_len}个任务建议每日跟踪，设置明确的里程碑Owner</li>')
-    if p50_p90_gap > project_dur * 0.3 if project_dur > 0 else False:
-        lines.append(f'<li>P50-P90跨度较大，建议在关键路径末端设置{p50_p90_gap:.0f}天缓冲期</li>')
-    if any(d["id"] == "D1" for d in active_dims):
-        lines.append('<li>技术风险较高，建议AI核心模块先做技术验证(PoC)再进入正式开发</li>')
-    if any(d["id"] == "D3" for d in active_dims):
-        lines.append('<li>相关方影响面大，建议制定分层沟通计划和变革管理策略</li>')
-    if any(d["id"] == "D6" for d in active_dims):
-        lines.append('<li>稀缺人才风险需提前布局，建议招聘与培训并行</li>')
-    lines.append('</ul>')
-
     lines.append('</div>')
     return "\n".join(lines)

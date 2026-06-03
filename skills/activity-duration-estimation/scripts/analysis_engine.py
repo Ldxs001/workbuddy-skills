@@ -263,6 +263,17 @@ def calc_cpm(
 # 2. 紧前关系自动规划
 # ═══════════════════════════════════════════════════
 
+def infer_dep_type(name_prev: str, name_curr: str) -> str:
+    """
+    依赖类型推断。
+
+    串行还是并行取决于资源、能力、工期安排等现实约束，
+    无法从任务名称可靠推断（刷三遍油漆都叫"油漆"，但不能并行）。
+    默认统一返回 FS，用户可手动指定 SS/FF/SF。
+    """
+    return "FS"
+
+
 def auto_plan_dependencies(
     phase_count: int,
     phases: list[dict] = None
@@ -274,12 +285,13 @@ def auto_plan_dependencies(
       phase_count: 阶段数
       phases: 可选，阶段列表 [{name, ...}]，用于从名称提取WBS前缀进行分组
 
-    分组规则:
+    规则:
       - 从 phase name 中提取 WBS 前缀（如 "1.1 痛点调研" → 父组 "1"）
-      - 同一父组内的子任务：并行（无互依赖）
-      - 跨父组边界：新组的第一个任务依赖上一组的最后一个任务（FS）
+      - 同一父组内的子任务：按 WBS 编码顺序 FS 串联（反映实际工作流）
+        → 依赖类型通过 infer_dep_type() 语义推断（FS/SS/FF/SF）
+      - 跨父组边界：新组的第一个任务依赖上一组中 M 值最大的任务（FS）
       - 无法提取前缀时回退为全串行
-    返回: {阶段索引: [前置阶段索引列表]}
+    返回: {阶段索引: [(前置阶段索引, 关系类型), ...]}
     """
     deps: dict[int, list[int]] = {}
 
@@ -289,7 +301,6 @@ def auto_plan_dependencies(
     if phases:
         for idx, p in enumerate(phases, start=1):
             name = p.get("name", "")
-            # 匹配开头的数字前缀，如 "1.1" → "1", "2.3" → "2"
             import re
             m = re.match(r'^(\d+)\.', name.strip())
             if m:
@@ -301,25 +312,45 @@ def auto_plan_dependencies(
         # 按组号排序
         sorted_parents = sorted(groups.keys(), key=lambda x: int(x))
         prev_group_constraint = None  # 上一组中 M 值最大的任务ID
+
         for parent in sorted_parents:
             members = sorted(groups[parent])
-            for tid in members:
-                if prev_group_constraint is not None:
-                    # 跨组边界：本组全部任务依赖于上一组中 M 值最大的任务
+
+            for i, tid in enumerate(members):
+                if prev_group_constraint is not None and i == 0:
+                    # 跨组边界：本组第一个任务依赖上一组 M 值最大的任务
                     deps[tid] = [(prev_group_constraint, "FS")]
+                elif i > 0:
+                    # 组内串联：前一个任务 → 当前任务，语义推断类型
+                    prev_tid = members[i - 1]
+                    dep_type = "FS"
+                    if phases and prev_tid <= len(phases) and tid <= len(phases):
+                        dep_type = infer_dep_type(
+                            phases[prev_tid - 1].get("name", ""),
+                            phases[tid - 1].get("name", "")
+                        )
+                    deps[tid] = [(prev_tid, dep_type)]
                 else:
+                    # 第一组的第一个任务：无前置
                     deps[tid] = []
+
             # 找到本组中 M 值最大的任务作为下一组的约束
             if phases and len(phases) >= max(members):
                 max_m_tid = max(members, key=lambda x: phases[x - 1].get("m", 0))
             else:
-                max_m_tid = members[-1]  # fallback: 最后一个
+                max_m_tid = members[-1]
             prev_group_constraint = max_m_tid
     else:
-        # 无分组信息 → 回退为全串行（统一tuple格式）
+        # 无分组信息 → 回退为全串行，语义推断类型
         for i in range(1, phase_count + 1):
             if i > 1:
-                deps[i] = [(i - 1, "FS")]
+                dep_type = "FS"
+                if phases and i <= len(phases) and (i - 1) <= len(phases):
+                    dep_type = infer_dep_type(
+                        phases[i - 2].get("name", ""),
+                        phases[i - 1].get("name", "")
+                    )
+                deps[i] = [(i - 1, dep_type)]
             else:
                 deps[i] = []
 
