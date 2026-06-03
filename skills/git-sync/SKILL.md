@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.8.0
+version: 2.8.1
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复跳过同步时状态显示「成功」的误导问题，改为跳过。修复审计问题，统一术语，修正自审粒度。
@@ -85,35 +85,16 @@ python scripts/git-sync.py <skill-name> [version] [--skip-scan]
 
 ### AI 执行后必须输出（非可选）
 
-脚本运行完毕后，**AI 必须执行以下 4 点**：
+脚本已自动输出完整报告（推送状态表 + 审计结论 + ZIP/HTML 路径），
+AI **无需**手动提取终端输出重新格式化。
 
-#### 1. [文本] 完整推送报告
+脚本运行完毕后，AI 必须执行以下 3 点：
 
-从终端输出提取以下**全部**内容，结构化呈现：
+#### 1. [工具] deliver_attachments — 交付 ZIP 包
 
-```
-📦 git-sync 执行报告：<skill-name> v<version>
+#### 2. [工具] preview_url — 打开 `.dist/index.html`
 
-| 平台 | 状态 | 版本 |
-|------|------|------|
-| 码云 | ✅/❌ | x.x.x |
-| GitHub | ✅/❌ | x.x.x |
-
-─── 审计报告 ───
-  结论：pass/fail（ERROR=N, WARN=N）
-  [逐条列出审计结果]
-
-ZIP 包：<完整路径>（<大小> / <文件数> 文件）
-HTML 索引：<完整路径>
-```
-
-**必须包含**：推送状态表 + 审计结论 + ZIP 路径/大小/文件数 + HTML 索引路径。
-
-#### 2. [工具] deliver_attachments — 交付 ZIP 包
-
-#### 3. [工具] preview_url — 打开 `.dist/index.html`
-
-#### 4. [文本] 如果 GitHub 推送失败（443 超时），必须询问用户是否重试
+#### 3. [文本] 如果 GitHub 推送失败（443 超时），必须询问用户是否重试
 
 
 ## 渐进式加载说明

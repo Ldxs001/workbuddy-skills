@@ -137,7 +137,7 @@ def generate_readme(repo_path, readme_path):
 > **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：{today}
 
-本仓库托管 [username-redacted] 技能合集，码云（Gitee）和 GitHub 双平台同步。
+本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
 
 ---
 

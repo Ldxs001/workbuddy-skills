@@ -794,15 +794,17 @@ def main():
         repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
 
     desensitized_files = step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
+    step_update_readme()
+
+    gitee_ok, github_ok = step_commit_and_push(skill_name, version)
+    step_update_manifest_uploaded(skill_name, version, gitee_ok, github_ok)
+
+    # 审计放在 manifest 更新之后，确保版本一致性检查使用最终数据
     audit_result = step_skill_audit(
         skill_name, SKILLS_DIR, MANIFEST_FILE,
         desensitized_files=desensitized_files,
         repo_skill_dir=repo_skill_dir
     )
-    step_update_readme()
-
-    gitee_ok, github_ok = step_commit_and_push(skill_name, version)
-    step_update_manifest_uploaded(skill_name, version, gitee_ok, github_ok)
 
     zip_file = step_pack_zip(skill_name, version, SKILLS_DIR, skip_scan)
     step_build_index()
