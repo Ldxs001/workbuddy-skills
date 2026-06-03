@@ -1,3 +1,12 @@
+## 2.61.1 (2026-06-03)
+
+### 修复
+- `updater.py` / `refactor.py` / `skill_builder/updater.py` / `skill_builder/refactor.py`:
+  移除 `--inject-auth` 条件门控，update/refactor 模式默认执行权限扫描和 permissions.md 写入
+  （原行为：不传 --inject-auth 则跳过权限扫描；现行为：默认执行）
+
+---
+
 ## 2.61.0 (2026-06-02)
 
 ### 改进

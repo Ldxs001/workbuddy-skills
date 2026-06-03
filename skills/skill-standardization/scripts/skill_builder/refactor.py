@@ -81,10 +81,9 @@ class Refactor:
         # 5. 验证总字节一致性
         self._verify_migration(skill_dir, backup_dir, migration_plan)
 
-        # ★ 新增：注入授权要求章节
-        if getattr(args, "inject_auth", False):
-            report = self._run_permission_checker(skill_dir)
-            self._inject_auth_section(skill_dir, report)
+        # 权限扫描 + 写入 permissions.md + 注入授权要求章节
+        report = self._run_permission_checker(skill_dir)
+        self._inject_auth_section(skill_dir, report)
 
         # ★ 新增：版本号 bump + 进度管理
         self._bump_version(skill_dir, "patch", {})

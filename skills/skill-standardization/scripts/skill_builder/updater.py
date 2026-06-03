@@ -374,10 +374,9 @@ class SkillUpdater:
         if hasattr(args, 'version_bump') and args.version_bump:
             self._bump_version(skill_dir, args.version_bump, results)
 
-        # ★ 新增：注入授权要求章节
-        if getattr(args, "inject_auth", False):
-            report = self._run_permission_checker(skill_dir)
-            self._inject_auth_section(skill_dir, report)
+        # 权限扫描 + 写入 permissions.md + 注入授权要求章节
+        report = self._run_permission_checker(skill_dir)
+        self._inject_auth_section(skill_dir, report)
 
         # 输出报告
         self._print_report(skill_dir, results)
