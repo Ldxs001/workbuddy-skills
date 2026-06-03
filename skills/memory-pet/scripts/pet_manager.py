@@ -341,11 +341,13 @@ def cmd_wake(pet_id: str):
 
 def cmd_interact(pet_id: str, interact_type: str, delta: int,
                  food: str = "", taste: str = "",
-                 scene: str = "", keywords: Optional[list] = None):
+                 scene: str = "", keywords: Optional[list] = None,
+                 context_summary: str = "", context_keywords: Optional[list] = None):
     """
     记录交互并更新亲密度。
     如果亲密度归零则触发逃跑。
     自动保存记忆。
+    context_summary/context_keywords: 真实上下文压缩内容（干饭核心）
     """
     if interact_type not in ("eat", "walk", "cuddle"):
         print(_make_err(f"未知交互类型: {interact_type}"))
@@ -385,6 +387,10 @@ def cmd_interact(pet_id: str, interact_type: str, delta: int,
         memory["scene"] = scene
     if keywords:
         memory["keywords"] = keywords[:15]
+    if context_summary:
+        memory["context_summary"] = context_summary
+    if context_keywords:
+        memory["context_keywords"] = context_keywords[:15]
 
     mem = _read_pet_memories(pet_id)
     mem.append(memory)
@@ -741,7 +747,9 @@ def main():
     p_int.add_argument("--food", default="", help="食物名（干饭时）")
     p_int.add_argument("--taste", default="", help="味道评价")
     p_int.add_argument("--scene", default="", help="场景描述")
-    p_int.add_argument("--keywords", default="", help="逗号分隔的关键词")
+    p_int.add_argument("--keywords", default="", help="逗号分隔的关键词（宠物相关）")
+    p_int.add_argument("--context-summary", default="", help="真实上下文摘要（干饭核心）")
+    p_int.add_argument("--context-keywords", default="", help="逗号分隔的真实上下文关键词（干饭核心）")
 
     # add
     p_add = subparsers.add_parser("add", help="添加新宠物（随机亲密度 ≤40）")
@@ -791,7 +799,8 @@ def main():
         cmd_wake(args.pet_id)
     elif args.command == "interact":
         kw = [w.strip() for w in args.keywords.split(",") if w.strip()] if args.keywords else None
-        cmd_interact(args.pet_id, args.type, args.delta, args.food, args.taste, args.scene, kw)
+        ckw = [w.strip() for w in args.context_keywords.split(",") if w.strip()] if args.context_keywords else None
+        cmd_interact(args.pet_id, args.type, args.delta, args.food, args.taste, args.scene, kw, args.context_summary, ckw)
     elif args.command == "add":
         cmd_add(args.key, args.name)
     elif args.command == "rename":
