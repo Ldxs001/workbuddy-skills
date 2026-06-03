@@ -1,0 +1,9 @@
+{
+  "name": "memory-pet",
+  "version": "0.3.1",
+  "description": "宠物记忆压缩技能 - 通过文本块宠物交互触发上下文压缩与记忆保存。每只宠物独立记忆文件，亲密度衰减与逃跑机制，Python 全程管理。",
+  "author": "your-name-here",
+  "tags": ["pet", "memory", "context-compression", "interactive", "ascii-art"],
+  "data_dir": "skills/.standardization/memory-pet/data/",
+  "triggers": ["召唤宠物", "干饭/散步/贴贴/回忆", "上下文压缩", "记忆保存"]
+}
