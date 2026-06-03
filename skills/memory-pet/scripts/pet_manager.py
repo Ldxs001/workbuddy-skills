@@ -421,6 +421,35 @@ def cmd_interact(pet_id: str, interact_type: str, delta: int,
     }, events))
 
 
+def cmd_food_log(step_a: bool, compressed: str, summary: str = "", keywords: str = ""):
+    """
+    记录干饭执行日志（Python 审计追踪）。
+    step_a: AI 记忆保存是否完成
+    compressed: yes/no/unsupported
+    summary: 上下文摘要
+    keywords: 关键词（逗号分隔）
+    """
+    log_entry = {
+        "timestamp": _now_str(),
+        "step_a_completed": step_a,
+        "compression_status": compressed,
+        "summary": summary,
+        "keywords": [w.strip() for w in keywords.split(",") if w.strip()] if keywords else [],
+    }
+
+    food_log_path = os.path.join(_dir_abs, "food_log.json")
+    logs = _read_json(food_log_path, [])
+    logs.append(log_entry)
+    _write_json(food_log_path, logs)
+
+    print(_make_ok({
+        "entry_index": len(logs) - 1,
+        "step_a": step_a,
+        "compressed": compressed,
+        "message": f"干饭审计记录 #{len(logs)} 已保存（步骤A={'完成' if step_a else '未完成'}, 压缩={compressed}）",
+    }))
+
+
 def cmd_add(pet_key: str, custom_name: str = ""):
     """添加新宠物，随机初始亲密度 ≤40"""
     if pet_key not in BASE_PET_KEYS:
@@ -751,6 +780,13 @@ def main():
     p_int.add_argument("--context-summary", default="", help="真实上下文摘要（干饭核心）")
     p_int.add_argument("--context-keywords", default="", help="逗号分隔的真实上下文关键词（干饭核心）")
 
+    # food-log
+    p_fl = subparsers.add_parser("food-log", help="记录干饭执行审计日志")
+    p_fl.add_argument("--step-a", default="true", choices=["true", "false"], help="步骤A是否完成")
+    p_fl.add_argument("--compressed", default="unsupported", choices=["yes", "no", "unsupported"], help="上下文压缩状态")
+    p_fl.add_argument("--summary", default="", help="上下文摘要")
+    p_fl.add_argument("--keywords", default="", help="逗号分隔的关键词")
+
     # add
     p_add = subparsers.add_parser("add", help="添加新宠物（随机亲密度 ≤40）")
     p_add.add_argument("key", choices=BASE_PET_KEYS, help="宠物类型")
@@ -801,6 +837,8 @@ def main():
         kw = [w.strip() for w in args.keywords.split(",") if w.strip()] if args.keywords else None
         ckw = [w.strip() for w in args.context_keywords.split(",") if w.strip()] if args.context_keywords else None
         cmd_interact(args.pet_id, args.type, args.delta, args.food, args.taste, args.scene, kw, args.context_summary, ckw)
+    elif args.command == "food-log":
+        cmd_food_log(args.step_a == "true", args.compressed, args.summary, args.keywords)
     elif args.command == "add":
         cmd_add(args.key, args.name)
     elif args.command == "rename":
