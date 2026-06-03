@@ -50,10 +50,11 @@ class C:
     R = "\033[0;31m"; G = "\033[0;32m"; Y = "\033[1;33m"
     B = "\033[0;34m"; C = "\033[0;36m"; W = "\033[1;37m"; N = "\033[0m"
 
+LOG_BUFFER = []  # 全局日志缓冲
+
 def log(step, total, msg, level="info"):
     tag = {"info":"[i]","ok":"[OK]","warn":"[!]","err":"[X]","skip":"[-]"}.get(level,"[i]")
-    color = {"info":C.C,"ok":C.G,"warn":C.Y,"err":C.R,"skip":C.W}.get(level,"")
-    print(f"{color}[{step}/{total}] {tag} {msg}{C.N}")
+    LOG_BUFFER.append(f"[{step}/{total}] {tag} {msg}")
 
 def _git_env(base_env: dict = None) -> dict:
     """
@@ -68,11 +69,16 @@ def _git_env(base_env: dict = None) -> dict:
     env["GIT_CONFIG_VALUE_0"] = ""
     return env
 
+QUIET_MODE = False  # 静默模式标记
+
 def run_python(script: Path, *args, capture=False, check=True):
     """运行 scripts/ 下的 Python 辅助脚本"""
     env = _git_env()
     env["PYTHONUTF8"] = "1"
     cmd = [sys.executable, str(script), *[str(a) for a in args]]
+    # 静默模式下强制捕获子进程输出
+    if QUIET_MODE:
+        capture = True
     return subprocess.run(cmd, capture_output=capture, encoding="utf-8",
                          check=check, env=env,
                          stdin=subprocess.DEVNULL)
@@ -775,39 +781,45 @@ def main():
             print("❌ 无法读取版本号，请手动指定")
             sys.exit(1)
 
-    print("=" * 50)
-    print(f"  git-sync.py: {skill_name} v{version}")
-    print("=" * 50)
+    # 静默执行各步骤，收集日志
+    global QUIET_MODE
+    QUIET_MODE = True
+    import contextlib
+    with open(os.devnull, 'w', encoding='utf-8') as _null:
+        with contextlib.redirect_stdout(_null), contextlib.redirect_stderr(_null):
+            step_manifest(skill_name, version)
+            compare_result = step_version_compare(skill_name, version)
+            step_normalize_meta(meta_file, skill_name, version)
 
-    # 执行各步骤
-    step_manifest(skill_name, version)
-    compare_result = step_version_compare(skill_name, version)
-    step_normalize_meta(meta_file, skill_name, version)
+            # 步骤 4：同步文件（版本相同时跳过）
+            skipped_sync = (compare_result == "skip_sync")
+            if skipped_sync:
+                log(4, 8, "跳过文件同步（版本相同）", "skip")
+                repo_skill_dir = WORK_REPO / "skills" / skill_name
+            else:
+                log(4, 8, "同步文件到工作仓库...")
+                repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
 
-    # 步骤 4：同步文件（版本相同时跳过）
-    skipped_sync = (compare_result == "skip_sync")
-    if skipped_sync:
-        log(4, 8, "跳过文件同步（版本相同）", "skip")
-        repo_skill_dir = WORK_REPO / "skills" / skill_name
-    else:
-        log(4, 8, "同步文件到工作仓库...")
-        repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
+            desensitized_files = step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
+            step_update_readme()
 
-    desensitized_files = step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
-    step_update_readme()
+            gitee_ok, github_ok = step_commit_and_push(skill_name, version)
+            step_update_manifest_uploaded(skill_name, version, gitee_ok, github_ok)
 
-    gitee_ok, github_ok = step_commit_and_push(skill_name, version)
-    step_update_manifest_uploaded(skill_name, version, gitee_ok, github_ok)
+            # 审计放在 manifest 更新之后
+            audit_result = step_skill_audit(
+                skill_name, SKILLS_DIR, MANIFEST_FILE,
+                desensitized_files=desensitized_files,
+                repo_skill_dir=repo_skill_dir
+            )
 
-    # 审计放在 manifest 更新之后，确保版本一致性检查使用最终数据
-    audit_result = step_skill_audit(
-        skill_name, SKILLS_DIR, MANIFEST_FILE,
-        desensitized_files=desensitized_files,
-        repo_skill_dir=repo_skill_dir
-    )
+            zip_file = step_pack_zip(skill_name, version, SKILLS_DIR, skip_scan)
+            step_build_index()
 
-    zip_file = step_pack_zip(skill_name, version, SKILLS_DIR, skip_scan)
-    step_build_index()
+    # ── 打印步骤日志 ─────────────────────────────────────────────────
+    QUIET_MODE = False
+    for line in LOG_BUFFER:
+        print(line)
 
     # ── 固定格式输出报告 ─────────────────────────────────────────────
     print()
