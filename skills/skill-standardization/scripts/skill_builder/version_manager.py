@@ -53,7 +53,7 @@ class VersionManager:
         # 2. 更新 SKILL.md frontmatter version
         new_content = re.sub(
             r'(^version:\s*)[\d.]+',
-            rf'\1{new_ver}',
+            rf'\g<1>{new_ver}',
             content,
             count=1,
             flags=re.MULTILINE
