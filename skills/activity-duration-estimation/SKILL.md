@@ -1,7 +1,7 @@
 ---
 name: activity-duration-estimation
 tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report', 'settings', 'knowledge-base']
-version: 1.9.0
+version: 1.10.0
 author: wUwproject
 license: MIT
 description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。支持5项全局设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），提供HTML可视化设置面板。
@@ -138,6 +138,20 @@ LLM看到异常后按提示提供数据，然后继续执行即可。
 场景3：搜索辅助 — "装配式建筑施工，无OMP，3阶段" → 自判不足→搜索同类→给出典型值→用户确认后估算
 场景4：WBS→估算 — "帮我规划并估算一个电商后台管理系统" → Phase -1激活→模板匹配→分解→文本树确认→自动入Phase 0→HTML报告
 场景5：项目文档 — "针对电商项目生成立项申请书，手动模式" → 加载模板→特化（填入WBS/CPM引用）→输出空模板MD；或"自动模式，从项目背景开始" → 逐节生成→确认→拼合
+
+
+## 常用操作速查
+
+| 我想... | 一句话答案 |
+|---------|-----------|
+| 快速估算一个项目工期 | 调用 `from scripts.runner import run_full; result = run_full("项目描述")` — AI 自动拆解+估算+出报告 |
+| 只用 WBS 不做估算 | `state.run_wbs()` — 只做工作分解，不进估算流程 |
+| 指定每个任务的 OMP | 在 WBS 数据结构中填写 `{"o": 3, "m": 5, "p": 8}` 字段 |
+| 用我自己的文档模板 | `load_template() → customize_sections() → save_template()` — 增删改排章节后另存 |
+| 修改全局设置 | `python scripts/settings_manager.py set <key> <value>` — 纯 CLI，无需 LLM 参与 |
+| HTML 报告打不开 | 报告是自包含 HTML，直接用浏览器打开 state.html_report_path |
+| 调整蒙特卡洛模拟次数 | `run_full(mc_iterations=5000)` — 默认 2000，数值越高越精确但越慢 |
+| 从历史项目参考数据 | 告诉 LLM「查一下同类项目的基准数据」— 会自动搜索 SQLite 知识库 |
 ```
 
 ---

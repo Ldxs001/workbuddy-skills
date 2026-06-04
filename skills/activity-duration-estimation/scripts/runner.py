@@ -326,7 +326,9 @@ class PipelineState:
             return {"status": "blocked",
                     "message": f"WBS不满足进入估算条件: {'; '.join(gate['issues'])}",
                     "issues": gate["issues"],
-                    "state": self}
+                    "state": self,
+                    "hint": "WBS门控校验未通过：请检查各阶段是否有OMP值和交付物描述，"
+                            "补充缺失信息后重新调用 run_full()"}
 
         # ═══════════════════════════════════════════
         # Phase 2: 紧前关系规划 → 若 LLM 已设置则跳过
@@ -1344,8 +1346,17 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
     def _handle_error(self, phase: str, error: Exception):
         """统一错误处理（不抛出异常，由LLM读取state.errors）"""
         tb = traceback.format_exc()
+        # 根据阶段给出解决指引
+        hints = {
+            "wbs": "WBS分解出错：请确认项目描述是否完整，或手动提供WBS结构化数据",
+            "estimate": "估算计算出错：检查OMP值是否满足O≤M≤P，任务数量建议≤50",
+            "docs": "文档生成出错：确认模板文件是否存在，或切换到手动模式 (`mode=\"manual\"`)",
+            PHASE_WBS: "WBS执行异常：检查自定义数据格式是否正确",
+        }
+        hint = hints.get(phase, f"阶段「{phase}」执行异常")
         msg = f"[{phase}] {error}"
         self.errors.append(msg)
+        self.errors.append(f"  💡 {hint}")
         self.last_error = msg
 
     def _generate_audit_report(self):
