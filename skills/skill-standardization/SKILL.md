@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.61.1
+version: 2.62.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -77,8 +77,9 @@ h1_position: true
 1. 读取目标 skill 的 SKILL.md
 2. 执行 R-01~R-25 规则检查
 3. 输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
-4. 若传了 --fix，自动修正可修复项（R-01/R-03/R-11/R-12/R-22 等）
-5. 调用 `fix.py` 按规则 ID 分派自动修复（推荐：审计后自动修复 WARN/ERROR 项）
+4. **LLM 二段筛查**：逐条审查所有 FAIL 项（包含上下文），真问题→修复，误判→直接放过（无需匹配白名单，LLM 的语义判断即是依据）
+5. 若传了 --fix，自动修正可修复项（R-01/R-03/R-11/R-12/R-22 等）
+6. 调用 `fix.py` 按规则 ID 分派自动修复（推荐：审计后自动修复 WARN/ERROR 项）
 
 **create 模式**（创建新技能）：
 1. `python -m scripts.skill_builder create <name> --desc "描述"` — 从模板生成标准骨架
@@ -94,7 +95,8 @@ h1_position: true
 2. **★ 强制 inspect 蓝皮书扫描** — 输出技能结构、AST 函数签名、引用链路
 3. 执行 audit（R-01~R-25）或 refactor 改造步骤
 4. 调用 fix.py 自动修复（规则 ID 分派）
-5. **再次审计确认 0 ERROR 0 WARN**
+5. **运行 `audit --verify` 验证**（不设白名单预筛，LLM 自行逐条判断所有 FAIL 项：真问题→修复，误判→放过，修复后重新 `--verify` 直到 exit(0)）
+6. LLM 阅读 `--verify` 输出的 FAIL 项（含上下文），逐条执行二段筛查后进入下一轮或完成
 6. **bump 版本号**（三端同步 SKILL.md / _meta.json / changelog）
 7. **cleanup 清理** — manifest 驱动删除临时文件、过期备份
 

@@ -1,3 +1,30 @@
+## 2.62.0 (2026-06-04)
+
+### 重构
+- **`--verify` 移除白名单预筛**：`_reclassify_false_positive()` 不再影响 exit code，所有 FAIL 项全量输出给 LLM
+  - 之前：白名单匹配的误报提前过滤，LLM 只看"剩余项"（可能漏看边界误报）
+  - 之后：LLM 逐条审查所有 FAIL 项（含上下文），语义判断即误报依据，无需匹配白名单
+- `rules.md` 铁律 8 移除"新误报"概念，改为 LLM 全量审查
+- `rules.md` 铁律 9 同步更新 `--verify` 逻辑说明
+- `_reclassify_false_positive()` 降级为仅报告显示标记（ⓘ），不影响决策流程
+
+---
+
+## 2.61.2 (2026-06-04)
+
+### 修复
+- `scripts/skill_audit/_tree_scanner.py` `_check_directory_tree()`: 目录树扫描中添加非文件路径条目筛选
+  - 根因：R-23 的目录树一致性检查将概念图条目（如 `├── 联网搜索（参见 search-integration.md）`）误判为文件路径
+  - 修复：扫描时跳过含中文文字、中文括号、无扩展名非目录的条目，避免概念图/流程图误报
+- `scripts/skill_audit/__init__.py` `_reclassify_false_positive()`:
+  - 同步为 R-20 风格建议（术语偏好、模糊表述）添加误判标记
+  - 为 R-23 中文目录树模式保留双保险规则
+- `SKILL.md` 工作流程：
+  - audit 模式：新增 LLM 二段误判筛查步骤（铁律 8），位于输出审查报告之后
+  - update/refactor 模式：将"再次审计确认"改为具体命令 `audit --verify` + exit(0) 达标条件 + 修复循环
+
+---
+
 ## 2.61.1 (2026-06-03)
 
 ### 修复

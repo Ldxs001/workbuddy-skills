@@ -1199,7 +1199,7 @@ def fix_frontmatter_fields(skill_dir, **kw):
         'name': f'name: {skill_name}',
         'version': 'version: 1.0.0',
         'description': 'description: ',
-        'author': 'author: wUwproject',
+        'author': 'author: [username-redacted]',
         'license': 'license: MIT',
         'tags': 'tags: []',
         'data_dir': f'data_dir: ../.standardization/{skill_name}/',

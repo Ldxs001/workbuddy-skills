@@ -233,21 +233,23 @@ skills/
 ## 铁律 8：全报告 LLM 细筛（R-01~R-25 审计后强制）
 
 > 自 v2.58.1 起新增。审计报告输出后，LLM 必须逐条阅读并处理。
+> v2.61.2 更新：移除"新误报"概念，LLM 审查所有 FAIL 项，不做白名单预筛。
 
 ### 规则内容
 
-- `run_audit audit` 输出审计报告后，LLM **必须**逐条阅读每条结果
-- `_reclassify_false_positive()` 已在 Python 侧自动过滤已知误报
-- 过滤后的剩余项，LLM **必须**逐条判断：
+- `run_audit audit` 输出审计报告后，LLM **必须**逐条阅读每条结果（含上下文行）
+- **不做白名单预筛**：`_reclassify_false_positive()` 仅用于报告显示时的 ⓘ 视觉标记，不影响 LLM 审查范围
+- LLM **必须**逐条判断所有 FAIL 项：
   - **真问题** → 立即修复
-  - **误判** → 属于 `_reclassify_false_positive()` 未覆盖的新误报模式，LLM 直接放过（后续由开发者按需补充到函数中）
+  - **误判** → 直接放过（LLM 的语义判断即是依据，无需匹配任何白名单）
 - 全报告处理完毕后，才能进入下一步验证
 
 ### 设计理由
 
 - 审计工具是机械规则引擎，只能做格式/结构检查
-- `_reclassify_false_positive()` 处理已知误报，但无法覆盖所有场景
-- LLM 负责剩余项的语义判断——是真问题就修，是新误报就过
+- 白名单（_reclassify_false_positive()）永远无法覆盖所有场景，而且维护成本高
+- LLM 的语义判断能力远超规则引擎，且审计输出带有完整上下文（ctx_lines），判断误报几乎不消耗额外 token
+- LLM 审查所有 FAIL 项 = 一条不漏，比"白名单过滤后看剩余项"更可靠
 
 ---
 
@@ -260,9 +262,10 @@ skills/
 - 更新/改造 skill 后，**必须**运行 `python -m scripts.skill_audit audit <skill-dir> --verify`
 - `--verify` 逻辑：
   1. 运行完整审计 R-01~R-25
-  2. 排除 `_reclassify_false_positive()` 已知的误报项
-  3. 如果有任何非误报的未通过项 → exit(1)，输出每项 rule_id + detail
-  4. 全部通过或仅误报 → exit(0)，输出验证通过消息
+  2. **不设白名单预筛**：`_reclassify_false_positive()` 仅用于报告显示标记，不影响 exit code
+  3. 输出所有 FAIL 项（含上下文），供 LLM 逐条审查
+  4. 有 FAIL 项 → exit(1)，LLM 执行铁律 8 二段筛查后修复/放过
+  5. 无 FAIL 项 → exit(0)，验证通过
 - AI **不得**在 `--verify` 返回非零退出码的情况下声称"审计通过"
 - `--verify` 是强制步骤，不可跳过，不可用 "AI 自觉" 替代
 
@@ -270,7 +273,10 @@ skills/
 
 - 铁律写在 md 里靠 AI 自觉不可靠（本次 #25 的教训）
 - exit code 是 AI 无法忽略的信号——非零退出码意味着验证绝对失败
-- 误报与非误报的区分由 `_reclassify_false_positive()` 统一管理，LLM 不再需要逐条判断
+- 白名单预筛改为 LLM 全量审查：LLM 语义判断 > 机械规则引擎，且审计输出含完整上下文（ctx_lines），判断误报成本极低
+- LLM 看到所有 FAIL 项 = 一条不漏，比白名单过滤更可靠
+
+### 修复方法
 
 ### 修复方法
 

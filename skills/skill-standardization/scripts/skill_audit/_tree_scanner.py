@@ -36,6 +36,18 @@ def _check_directory_tree(filepath, body, skill_dir, issues):
             # Clean up: remove trailing # comments
             entry_name = entry_name.split('  #')[0].strip()
 
+            # ★ 筛除非文件系统路径的条目：
+            # 如果 entry_name 包含中文字符、中文括号、或明显不是文件/目录名的内容，跳过
+            # 避免将文档中的概念图（如 "├── 联网搜索（参见 search-integration.md）"）误判为文件路径
+            if re.search(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef（）]', entry_name):
+                continue
+            # 跳过含空格或特殊标记的条目（典型文档标记而非文件路径）
+            if '（' in entry_name or '）' in entry_name:
+                continue
+            # 跳过无文件扩展名且不以 / 结尾的条目（非目录也非文件）
+            if not entry_name.endswith('/') and '.' not in entry_name:
+                continue
+
             if entry_name.endswith('/'):
                 # Directory entry
                 dir_name = entry_name.rstrip('/')

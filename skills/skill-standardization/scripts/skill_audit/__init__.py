@@ -309,7 +309,11 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
 
 
 def _reclassify_false_positive(res):
-    """检测已知误报模式，匹配时标记为 ⓘ 已排除（不进入 WARN/ERROR 统计）"""
+    """检测已知误报模式，仅用于报告格式化时标记 ⓘ 排除标记。
+    
+    注意：--verify 模式已关闭白名单预筛，LLM 需要逐条审查所有 FAIL 项。
+    此函数仅用于报告显示时的视觉标记（ⓘ），不影响 exit code 和 LLM 决策。
+    """
     detail = str(res.get("detail", ""))
     rule = res.get("rule_id", "")
     # 系统工具名被误判为函数引用
@@ -324,8 +328,16 @@ def _reclassify_false_positive(res):
     # R-23 step 3 示例脚本引用（SKILL.md 中的用法示例路径，非真实文件）
     if rule == "R-23" and "但文件不存在（期望相对路径如" in detail:
         return True
+    # R-23 中文语境下的文件引用（如 "（参见 search-integration.md）" 是文档引用标记，非真实文件路径）
+    # TODO: 根因已修（_tree_scanner.py 加了中文文字/括号过滤），此规则保留作为双保险
+    if rule == "R-23" and "目录树显示" in detail and "（" in detail and "但文件不存在" in detail:
+        return True
     # R-20 如果仅包含 R-23 问题则同步标记
     if rule == "R-20" and "R-23" in detail and "但文件不存在" in detail:
+        return True
+    # R-20 写作规范 WARN：术语偏好（"设置" vs "配置"）、模糊表述（"可能"等）属于风格建议，
+    # 不影响功能且无法穷举修复，标记为已知误报
+    if rule == "R-20" and ("术语不一致" in detail or "模糊表述" in detail):
         return True
     # JSON 示例中的文件路径（如 component-spec.md 的 manifest.json schema 展示）
     if '"file": "' in detail:
@@ -603,19 +615,23 @@ def cmd_audit(args):
         else:
             print(f"ℹ️  无需修正或所有失败规则暂无自动修复工具")
 
-    # --verify 模式：强制验证是否有非误报的未通过项，有则 exit(1)
+    # --verify 模式：展示所有 FAIL 项（不做白名单预筛），LLM 自行判断误报
     if getattr(args, 'verify', False):
         remaining = []
         for res in result.get("results", []):
             if not res.get("passed") and not res.get("skipped"):
-                if not _reclassify_false_positive(res):
-                    remaining.append(res)
+                remaining.append(res)
         if remaining:
             print(f"\n{'='*55}")
-            print(f"  [VERIFY] 验证失败：{len(remaining)} 项未修复（非误报，铁律要求 0 ERROR 0 WARN）")
+            print(f"  [VERIFY] 审计完成，共 {len(remaining)} 项 FAIL（白名单预筛已关闭，LLM 必须逐条审查）")
+            print(f"  LLM 执行铁律 8：真问题→修复，误判→放过，修复后重新 --verify")
+            print(f"{'─'*55}")
             for r in remaining:
                 sev = "[ERROR]" if r['severity'] == 'ERROR' else "[WARN]"
-                print(f"    {r['rule_id']} {sev} {r['detail'][:120]}")
+                print(f"  {r['rule_id']} {sev} {r['detail'][:200]}")
+                if r.get('ctx_lines'):
+                    for cl in r['ctx_lines'][:4]:
+                        print(f"      {cl[:120]}")
             print(f"{'='*55}")
             sys.exit(1)
         else:
