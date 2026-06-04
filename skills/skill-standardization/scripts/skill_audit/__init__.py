@@ -499,7 +499,12 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级'):
 
     meta_path = os.path.join(skill_dir, '_meta.json')
     if not os.path.isfile(meta_path):
-        raise FileNotFoundError(f"未找到 _meta.json: {meta_path}")
+        raise FileNotFoundError(
+            f"未找到 `_meta.json`（位置：{meta_path}）。\n"
+            f"  原因：目标目录可能不是标准 skill 结构，缺少技能元数据文件。\n"
+            f"  解决：确认目标路径是一个完整的 skill 目录（含 SKILL.md 和 _meta.json），\n"
+            f"        或使用 `python -m scripts.skill_builder create <name>` 创建新 skill。"
+        )
 
     with open(meta_path, 'r', encoding='utf-8') as f:
         current_version = str(json.load(f).get('version', '0.0.0'))
@@ -613,7 +618,9 @@ def cmd_audit(args):
             print(f"  4. 确认 SKILL.md version == _meta.json version == changelog 版本号（三端一致）")
             print(f"{'='*70}")
         else:
-            print(f"ℹ️  无需修正或所有失败规则暂无自动修复工具")
+            print(f"ℹ️  没有发现可通过 --fix 自动修复的规则违规项。")
+            print(f"    - 如果有 FAIL 项，请参考上方报告逐条处理（LLM 二段筛查 → 真问题修复 / 误判放过）")
+            print(f"    - 想查看完整 FAIL 明细，运行 `--verify` 获得带上下文的详细输出")
 
     # --verify 模式：展示所有 FAIL 项（不做白名单预筛），LLM 自行判断误报
     if getattr(args, 'verify', False):
@@ -785,7 +792,8 @@ def cmd_bump(args):
     try:
         major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
     except (ValueError, IndexError):
-        print(f"[ERROR] 无法解析版本号: {current_version}")
+        print(f"[ERROR] 无法解析版本号「{current_version}」—— 期望格式如「1.2.3」（三位数字以点分隔）")
+        print(f"       请检查 `_meta.json` 和 `SKILL.md` 中的 version 字段是否正确")
         return
     if bump_type == 'fix':
         new_version = f"{major}.{minor}.{patch + 1}"

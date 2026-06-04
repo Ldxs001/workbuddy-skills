@@ -1,10 +1,31 @@
+## 2.62.2 (2026-06-04)
+
+### 改进
+- SKILL.md 新增「能力与限制」章节（能力边界定义 3.8→预估 4.5+）
+  - 明确列出 6 项核心能力的适用范围和限制条件
+  - 审计/创建/改造/批量审计/自动修复/权限安全扫描 各一条
+  - 触发后立即可见的输出内容说明
+- 错误消息人性化改进（异常处理 4.0→预估 4.3+）
+  - `_meta.json` 未找到：给出可能原因和解决步骤
+  - `--fix` 无自动修复项：提示查看 FAIL 报告和 --verify
+  - 版本号解析失败：给出期望格式和检查建议
+
+---
+
+## 2.62.1 (2026-06-04)
+
+### 修复
+- audit --fix 自动修正: writing_standards
+
+---
+
 ## 2.62.0 (2026-06-04)
 
 ### 重构
-- **`--verify` 移除白名单预筛**：`_reclassify_false_positive()` 不再影响 exit code，所有 FAIL 项全量输出给 LLM
+- **`--verify` 删除白名单预筛**：`_reclassify_false_positive()` 不再影响 exit code，所有 FAIL 项全量输出给 LLM
   - 之前：白名单匹配的误报提前过滤，LLM 只看"剩余项"（可能漏看边界误报）
   - 之后：LLM 逐条审查所有 FAIL 项（含上下文），语义判断即误报依据，无需匹配白名单
-- `rules.md` 铁律 8 移除"新误报"概念，改为 LLM 全量审查
+- `rules.md` 铁律 8 删除"新误报"概念，改为 LLM 全量审查
 - `rules.md` 铁律 9 同步更新 `--verify` 逻辑说明
 - `_reclassify_false_positive()` 降级为仅报告显示标记（ⓘ），不影响决策流程
 
@@ -29,7 +50,7 @@
 
 ### 修复
 - `updater.py` / `refactor.py` / `skill_builder/updater.py` / `skill_builder/refactor.py`:
-  移除 `--inject-auth` 条件门控，update/refactor 模式默认执行权限扫描和 permissions.md 写入
+  删除 `--inject-auth` 条件门控，update/refactor 模式默认执行权限扫描和 permissions.md 写入
   （原行为：不传 --inject-auth 则跳过权限扫描；现行为：默认执行）
 
 ---
@@ -63,7 +84,7 @@
 - R-25 新增 C-17（使用示例检查）、C-18（能力边界检查）、C-19（错误处理检查）
 
 ### 改进
-- 更新 SemVer 变更语义规则：明确 PATCH 不含新功能、多变更不得打包为 PATCH、新增审计规则属于 MINOR
+- 更新 SemVer 更新语义规则：明确 PATCH 不含新功能、多更新不得打包为 PATCH、新增审计规则属于 MINOR
 - 新增 SemVer 示例表格（MAJOR/MINOR/PATCH 三种级别+示例+核心约束4条）
 - 更新 bump --type fix 的描述为"单处bug修复/文档错别字/参数拼写(不含新功能)"
 
@@ -312,7 +333,7 @@
 - **蓝皮书 Windows 兼容**: root_py/root_md 路径分隔符修复
 - **C-07 代码块计数修正**: 排除闭合 ``` 被误计为"缺少语言标识"，改用成对算法
 - **create 模板对齐新审计**: 新增 `## 约束` must_have 章节 + 渐进式索引表（替代旧附录）+ 清理过时引用
-- **create 模板清理**: 移除硬编码权限说明章节（应由 AI 按需生成）
+- **create 模板清理**: 删除硬编码权限说明章节（应由 AI 按需生成）
 - **C-07/C-08 输出增强**: 代码块缺语言标识和 checklist 检测现在包含行号 + 触发文本
 - **C-08 正则收紧**: 避免"确认无异常后"等非 checklist 文本误报
 - **R-20 输出增强**: changelog 术语一致性检查的 fix 描述不再自触发 WARN
@@ -322,7 +343,7 @@
 - **section_order**: 补充 数据目录说明、临时文件与备份管理 条目
 - **C-14 工作流程步骤完整性**: 新增 WARN 级审计，检测工作流程步骤数 + 混入的版本标记内容（类似更新日志的行文应移至 changelog.md）
 - **C-14 审计输出全部可见**: R-25 汇总显示上限从 4→20 条，LLM 不再需要翻文件查看被截断的 WARN
-- **工作流程清理**: 移除混入的更新日志内容（v2.38.2/v2.38.5 版本标注 + 排错止损规则），改为 `→ 详见 references/guide.md`，仅保留 5 步核心流程
+- **工作流程清理**: 删除混入的更新日志内容（v2.38.2/v2.38.5 版本标注 + 排错止损规则），改为 `→ 详见 references/guide.md`，仅保留 5 步核心流程
 - **根目录垃圾文件**: 清理 8 个 0 字节残留文件
 - **_record_backup**: 改为调用 cleanup_manager.register_backup()，放弃 manifest.txt
 - **skill_rollback.py**: load_manifest() 从 data/manifests/*.json 读取 + 兼容旧 manifest.txt

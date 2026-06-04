@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.62.0
+version: 2.62.2
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -48,6 +48,22 @@ h1_position: true
 - 用户只是问[你有什么技能]——这是闲聊，不是真的要审计/改造
 - 用户要求执行某个 skill 的常规功能——应直接调用该 skill 本身，而不是先审计它
 - 用户只是提到[skill]这个词，但没有明确的审计/创建/改造意图
+
+
+## 能力与限制
+
+本技能能做什么、不能做什么，一目了然：
+
+| 能力 | 说明 | 限制 |
+|------|------|------|
+| **审计现有 skill** | R-01~R-25 全量检查，输出 PASS/WARN/FAIL 逐条明细及上下文行 | 仅检查 SKILL.md + _meta.json + scripts/ 文件结构和代码静态分析，不检查 Python 运行时行为 |
+| **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ / scripts/） | 只生成结构模板和占位符，功能代码需要手动填充 |
+| **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码 |
+| **批量审计** | `--audit-all` 参数扫描 skills/ 下多个 skill | 仅支持 skills/ 目录下的一级子目录（不支持嵌套目录） |
+| **自动修复** | `--fix` 自动修正 frontmatter/版本号/数据目录/写作规范等 | 自动修复范围默认覆盖 R-01/R-03/R-11/R-12/R-22，其他规则需手动处理 |
+| **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析，无法检测动态代码执行的权限需求 |
+
+> 触发本技能后立即可见的能力输出：读取目标 SKILL.md 中的 frontmatter/正文/references/scripts → 执行 R-01~R-25 规则审查 → 输出审查报告（含每条规则的 PASS/WARN/FAIL 状态 + 详细原因 + 附近代码上下文）。
 
 ## 核心能力
 
