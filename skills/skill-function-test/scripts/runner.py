@@ -25,12 +25,13 @@ STAGES = {
     2: "蓝皮书扫描",
     3: "询问测试计划",
     4: "场景+功能测试",
-    5: "修复",
-    6: "回归循环",
-    7: "回归确认",
-    8: "LLM 后处理过滤",
+    5: "LLM 后处理过滤",
+    6: "修复",
+    7: "回归循环",
+    8: "回归确认",
     9: "报告输出",
-    10: "清理",
+    10: "自动版本号更新",
+    11: "清理",
 }
 
 # ═══════════════════════════════════════════════════════
@@ -208,17 +209,84 @@ def stage_4_test(state: PipelineState) -> PipelineState:
     return state
 
 
-def stage_5_fix(state: PipelineState, fix_mode: int = 0) -> PipelineState:
+# ═══════════════════════════════════════════════════════
+# LLM 后处理过滤（阶段5：在修复之前）
+# ═══════════════════════════════════════════════════════
+
+def stage_5_llm_filter(state: PipelineState) -> PipelineState:
     """
-    阶段5: 修复
-    LLM 交互点 — 根据 fix_mode 决定行为
+    阶段5: LLM 后处理过滤
+
+    在修复之前对测试结果进行 LLM 判断，区分误报(FP)和真问题。
+    只修真问题，不修误报。
+
+    输出格式: 每条问题附带源代码上下文、规则名、判断依据
     """
     print(f"\n{'='*50}")
-    print(f"  阶段5/8: 修复")
+    print(f"  阶段5/11: LLM 后处理过滤")
     print(f"{'='*50}")
 
-    mode_names = {0: "仅报告", 1: "直接修复", 2: "询问后修复"}
-    print(f"  修复模式: {mode_names.get(fix_mode, '?')}")
+    all_issues = []
+    for src, data in [("场景", state.scenario_report), ("功能", state.function_report)]:
+        for r in data.get("results", []):
+            if r.get("level") in ("block", "warn") and r.get("status") == "fail":
+                issue = {
+                    "source": src,
+                    "dim": r.get("sid", r.get("dim", "?")),
+                    "level": r.get("level"),
+                    "name": r.get("name", ""),
+                    "message": r.get("message", ""),
+                    "file": r.get("file", ""),
+                    "lineno": r.get("lineno", 0),
+                    "suggestion": r.get("suggestion", ""),
+                    "llm_judgment": "",  # LLM 填写: FP / 真问题
+                }
+                if issue["file"] and issue["lineno"]:
+                    fpath = os.path.join(state.skill_dir, issue["file"]) \
+                        if not os.path.isabs(issue["file"]) else issue["file"]
+                    if os.path.exists(fpath):
+                        try:
+                            with open(fpath, "r", encoding="utf-8") as f:
+                                src_lines = f.read().split("\n")
+                            start = max(0, issue["lineno"] - 4)
+                            end = min(len(src_lines), issue["lineno"] + 3)
+                            ctx = []
+                            for i in range(start, end):
+                                marker = "→" if i == issue["lineno"] - 1 else " "
+                                ctx.append(f"{marker} {i+1:4d}| {src_lines[i]}")
+                            issue["source_context"] = "\n".join(ctx)
+                        except Exception:
+                            issue["source_context"] = "(无法读取)"
+                all_issues.append(issue)
+
+    state.fix_results = all_issues
+
+    if not all_issues:
+        print("  无待判断问题，无需过滤")
+        state.log_stage(5, "ok", "无问题")
+        return state
+
+    print(f"  共 {len(all_issues)} 条问题待 LLM 判断（FP/真问题）:")
+    for i, issue in enumerate(all_issues, 1):
+        print(f"\n  [{i}/{len(all_issues)}] {'⚠️' if issue['level']=='warn' else '🔴'} "
+              f"[{issue['source']}:{issue['dim']}] {issue['name']}")
+        print(f"    级别: F-{'0 BLOCK' if issue['level']=='block' else '1 WARN'}")
+        print(f"    文件: {issue['file']}:{issue['lineno']}")
+        print(f"    信息: {issue['message']}")
+        if issue.get("source_context"):
+            print(f"    代码上下文:\n{issue['source_context']}")
+        print(f"    建议: {issue['suggestion']}")
+        print(f"    ── LLM 判断: [FP] 误报 / [FIX] 真问题 ──")
+
+    state.log_stage(5, "ok", f"待判断: {len(all_issues)} 条")
+    return state
+
+
+# ═══════════════════════════════════════════════════════
+# 修复（阶段6：只修真问题）
+# ═══════════════════════════════════════════════════════
+
+def stage_6_fix(state: PipelineState, fix_mode: int = 0) -> PipelineState:
 
     # 收集所有 F-0 和 F-1 问题
     all_issues = []
@@ -259,12 +327,50 @@ def stage_5_fix(state: PipelineState, fix_mode: int = 0) -> PipelineState:
     return state
 
 
-def stage_6_regression_loop(state: PipelineState, max_loops: int = 3) -> PipelineState:
+def stage_10_bump(state: PipelineState) -> PipelineState:
+    """
+    阶段 5.5: 自动版本号 bump
+
+    如果修复模式是 1（直接修复）且有修复记录，自动执行 PATCH bump。
+    三端同步：SKILL.md frontmatter → _meta.json → CHANGELOG.md
+    """
+    print(f"\n{'='*50}")
+    print(f"  阶段10/11: 自动版本号更新")
+    print(f"{'='*50}")
+
+    fix_mode = state.test_plan.get("fix_mode", 0)
+    if fix_mode != 1:
+        print("  仅报告/询问模式，跳过自动 bump")
+        state.log_stage(5, "ok", "跳过 bump（非修复模式）")
+        return state
+
+    try:
+        from bump_version import auto_bump, get_current_version, detect_bump_type
+        old = get_current_version(state.skill_dir)
+        if not old:
+            print("  [BUMP] 无法读取版本号，跳过")
+            return state
+
+        btype = detect_bump_type(state.skill_dir)
+        print(f"  当前版本: {old}, 检测变更类型: {btype}")
+        new_ver = auto_bump(state.skill_dir, btype,
+                           ["场景测试修复后自动版本更新"])
+        if new_ver:
+            print(f"  [BUMP] ✅ 版本已更新: {old} → {new_ver}")
+        else:
+            print(f"  [BUMP] ⚠️ 版本更新失败")
+    except Exception as e:
+        print(f"  [BUMP] 自动版本更新异常: {e}")
+
+    return state
+
+
+def stage_7_regression_loop(state: PipelineState, max_loops: int = 3) -> PipelineState:
     """
     阶段6: 回归循环 — 修复→重测，直到 F-0=0 且无新增
     """
     print(f"\n{'='*50}")
-    print(f"  阶段6/8: 回归循环")
+    print(f"  阶段7/11: 回归循环")
     print(f"{'='*50}")
 
     for loop in range(1, max_loops + 1):
@@ -301,13 +407,13 @@ def stage_6_regression_loop(state: PipelineState, max_loops: int = 3) -> Pipelin
     return state
 
 
-def stage_7_regression_confirm(state: PipelineState) -> PipelineState:
+def stage_8_regression_confirm(state: PipelineState) -> PipelineState:
     """
     阶段7: 回归确认
     与修复前的基线对比，确认无功能损伤
     """
     print(f"\n{'='*50}")
-    print(f"  阶段7/8: 回归确认")
+    print(f"  阶段8/11: 回归确认")
     print(f"{'='*50}")
 
     # 获取修复前的统计（从 stage 4 的报告）
@@ -353,7 +459,7 @@ def stage_7_regression_confirm(state: PipelineState) -> PipelineState:
 # LLM 后处理过滤
 # ═══════════════════════════════════════════════════════
 
-def stage_7b_llm_filter(state: PipelineState) -> PipelineState:
+def stage_5_llm_filter(state: PipelineState) -> PipelineState:
     """
     阶段7.5: LLM 后处理 — 过滤误报
 
@@ -438,7 +544,7 @@ def stage_7b_llm_filter(state: PipelineState) -> PipelineState:
 # 阶段9: 清理
 # ═══════════════════════════════════════════════════════
 
-def stage_9_cleanup(state: PipelineState) -> PipelineState:
+def stage_11_cleanup(state: PipelineState) -> PipelineState:
     """
     阶段9: 清理测试残留文件和管理备份
 
@@ -452,7 +558,7 @@ def stage_9_cleanup(state: PipelineState) -> PipelineState:
     """
     import glob as _glob
     print(f"\n{'='*50}")
-    print(f"  阶段9/9: 清理")
+    print(f"  阶段11/11: 清理")
     print(f"{'='*50}")
 
     # 1. 清理目标技能目录的测试残留
@@ -483,10 +589,10 @@ def stage_9_cleanup(state: PipelineState) -> PipelineState:
     return state
 
 
-def stage_8_report(state: PipelineState) -> PipelineState:
+def stage_9_report(state: PipelineState) -> PipelineState:
     """阶段8: 输出完整报告"""
     print(f"\n{'='*50}")
-    print(f"  阶段8/10: 输出报告")
+    print(f"  阶段9/11: 输出报告")
     print(f"{'='*50}")
 
     lines = []
@@ -525,33 +631,29 @@ def stage_8_report(state: PipelineState) -> PipelineState:
 
 def run_full(skill_dir: str, dimensions: str = "all", fix_mode: int = 0) -> PipelineState:
     """
-    全流程一键执行（8 阶段，代码硬编码，不可跳过）
+    全流程一键执行（11 阶段，代码硬编码，不可跳过）
 
-    参数:
-        skill_dir: 目标技能目录
-        dimensions: "all" 或 "1,2,3,4,5,6,7,8,9"
-        fix_mode: 0=仅报告, 1=直接修复, 2=询问后修复
+    阶段顺序:
+      1 备份 → 2 蓝皮书 → 3 询问 → 4 测试 →
+      5 LLM后处理过滤 → 6 修复 → 7 回归循环 → 8 回归确认 →
+      9 报告输出 → 10 自动bump → 11 清理
+
+    LLM 后处理在修复之前，确保只修真问题、不修误报。
     """
     state = PipelineState(skill_dir)
     state.test_plan = {"dimensions": dimensions, "fix_mode": fix_mode}
 
-    # 阶段 1: 备份
     state = stage_1_backup(state)
-    # 阶段 2: 蓝皮书
     state = stage_2_blueprint(state)
-    # 阶段 3: 询问（LLM 交互点，此处设置默认值）
     state = stage_3_ask(state)
-    # 阶段 4: 测试
     state = stage_4_test(state)
-    # 阶段 5: 修复
-    state = stage_5_fix(state, fix_mode)
-    # 阶段 6: 回归循环
-    state = stage_6_regression_loop(state)
-    # 阶段 7: 回归确认
-    state = stage_7_regression_confirm(state)
-    state = stage_7b_llm_filter(state)
-    state = stage_8_report(state)
-    state = stage_9_cleanup(state)
+    state = stage_5_llm_filter(state)
+    state = stage_6_fix(state, fix_mode)
+    state = stage_7_regression_loop(state)
+    state = stage_8_regression_confirm(state)
+    state = stage_9_report(state)
+    state = stage_10_bump(state)
+    state = stage_11_cleanup(state)
     return state
 
 
@@ -572,11 +674,12 @@ def run_pipeline(skill_dir: str, mode: str = "full", dimensions: str = "all", fi
 
     if mode == "full":
         state = stage_5_fix(state, fix_mode)
+        state = stage_5b_auto_bump(state)
         state = stage_6_regression_loop(state)
         state = stage_7_regression_confirm(state)
+        state = stage_7b_llm_filter(state)
         state = stage_8_report(state)
-
-    return state
+        state = stage_9_cleanup(state)
 
 
 if __name__ == "__main__":
