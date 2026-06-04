@@ -369,8 +369,8 @@ class TestRunner:
             "results": [r.to_dict() for r in self.results],
         }
 
-    def print_report(self) -> str:
-        """打印人类可读的报告"""
+    def print_report(self, skill_dir: str = None) -> str:
+        """打印人类可读的报告，包含源文件上下文"""
         report = self.generate_report()
         s = report["summary"]
 
@@ -393,10 +393,46 @@ class TestRunner:
 
         lines.append("")
         lines.append("── 详细结果:")
+
+        # 读取源文件上下文
+        context_cache = {}
+
+        def _read_context(filepath: str, lineno: int, context_lines: int = 3) -> str:
+            if not filepath or not lineno:
+                return ""
+            abs_path = os.path.join(skill_dir, filepath) if skill_dir and not os.path.isabs(filepath) else filepath
+            if not os.path.exists(abs_path):
+                return ""
+            if abs_path not in context_cache:
+                try:
+                    with open(abs_path, "r", encoding="utf-8") as f:
+                        context_cache[abs_path] = f.read().split("\n")
+                except Exception:
+                    context_cache[abs_path] = []
+            source_lines = context_cache[abs_path]
+            start = max(0, lineno - context_lines - 1)
+            end = min(len(source_lines), lineno + context_lines)
+            ctx = []
+            for i in range(start, end):
+                marker = "→" if i == lineno - 1 else " "
+                ctx.append(f"      {marker} {i+1:4d}| {source_lines[i]}")
+            return "\n".join(ctx)
+
         for r in self.results:
             lines.append(str(r))
             if r.detail and r.status in ("fail", "error"):
                 lines.append(f"    上下文: {r.detail[:200]}")
+            if r.status in ("fail", "error") and r.file and r.lineno:
+                ctx = _read_context(r.file, r.lineno)
+                if ctx:
+                    lines.append(f"    代码上下文:")
+                    lines.append(ctx)
+            if r.suggestion:
+                lines.append(f"    建议: {r.suggestion[:150]}")
+            if r.level in ("block", "warn") and r.status == "fail":
+                lines.append(f"    供LLM判断: 此问题是否属于误报？")
+                lines.append(f"      - 若为误报（如字符串字面量检测），标记为 FP 后跳过")
+                lines.append(f"      - 若为真问题，执行修复或生成修复建议")
             if r.suggestion:
                 lines.append(f"    建议: {r.suggestion[:150]}")
 
@@ -431,7 +467,8 @@ def run_full_test(skill_dir: str, dimensions: list[str] = None) -> tuple[dict, s
 
     # 3. 生成报告
     report = runner.generate_report()
-    return report, runner.print_report()
+    report_text = runner.print_report(skill_dir=skill_dir)
+    return report, report_text
 
 
 if __name__ == "__main__":

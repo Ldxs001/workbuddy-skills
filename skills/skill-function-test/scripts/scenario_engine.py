@@ -16,6 +16,9 @@ import re
 import sys
 from typing import Optional
 
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
+
 
 class ScenarioResult:
     def __init__(self, sid: str, name: str, status: str = "pass",
@@ -302,13 +305,14 @@ class ScenarioRunner:
         # 检查数据目录路径一致性
         py_files = self.blueprint.get("file_manifest", {}).get("python", [])
         data_dirs = set()
+        data_re = re.compile(r'\.standardization/([^/]+)/data/')
         for relpath in py_files:
             abspath = os.path.join(self.skill_dir, relpath)
             try:
                 with open(abspath, "r", encoding="utf-8") as f:
                     for line in f:
                         if ".standardization" in line and "data" in line:
-                            m = re.search(r'skills/\.standardization/[^/]+/data/', line)
+                            m = data_re.search(line)
                             if m:
                                 data_dirs.add(m.group())
             except Exception:

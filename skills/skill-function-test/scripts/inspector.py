@@ -15,6 +15,9 @@ import os
 import re
 from typing import Optional
 
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
+
 
 class BlueBook:
     """蓝皮书数据结构"""

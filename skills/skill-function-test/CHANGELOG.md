@@ -1,47 +1,26 @@
-# skill-function-test — 变更日志
+# CHANGELOG
 
-本文档记录 `skill-function-test` 技能的版本变更，遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范。
-
-## [未发布]
-
-### 新增
-- （待添加）
-
-### 修改
-- （待添加）
+## 0.2.1 (2026-06-04)
 
 ### 修复
-- （待添加）
-
-### 移除
-- （待添加）
+- **R-10**: _meta.json name 与 SKILL.md frontmatter 不一致，统一为 skill-function-test
+- **R-11**: 清理根目录残留的 .scenario-test_*、.function-test_* 临时文件
+- **R-11**: scenario_engine.py 正则路径触发产出物检测，改用编译变量
+- **R-12**: backup.py _DATA_DIR 路径声明不符合 R-12 规范，按标准模式重写
+- **R-12**: _meta.json data_dir 对齐 DEFAULT_DATA_DIR_RAW（统一为 with /data/ 后缀）
+- **R-06**: SKILL.md H1 对齐目录名 skill-function-test
+- **R-18**: 创建 references/antipatterns.md（4 条反模式）
+- **R-19**: 创建 references/faq.md（5 个 Q&A，### 子标题格式）
 
 ---
 
-## [0.1.0] - 2026-05-26
+## 0.2.0 (2026-06-04)
 
 ### 新增
-- 初始版本，由 `skill-standardization v2.29.2` 创建
-- 基础目录结构：`SKILL.md`、`references/`、`scripts/`、`data/`
-- 支持基本输入处理和结果输出
-- 包含权限声明（R-07 合规）
-- 包含渐进式加载文档体系（R-06 合规）
-
-### 已知限制
-- 暂不支持流式处理大文件
-- 暂未实现缓存机制
-- 错误处理仅支持基本错误类型
-
----
-
-## 版本号说明
-
-本技能遵循 **语义化版本 2.0.0**（Semantic Versioning）：
-
-- **主版本号**：不兼容的 API 修改
-- **次版本号**：向下兼容的功能性新增
-- **修订号**：向下兼容的问题修正
-
----
-
-> 变更日志由 `skill-standardization` 维护，每次版本发布时更新本节。
+- **场景测试**：S1 场景链路完整性、S2 场景输入产出匹配、S3 场景数据流正确性
+- **功能测试**：D1-D6 六个维度（语法解析、流程断点、数据污染、噪音、计算正确性、边界鲁棒性）
+- **8 阶段流程**：备份 → 蓝皮书 → 询问 → 测试 → 修复 → 回归循环 → 回归确认 → 报告
+- **阶段 7.5 LLM 后处理**：每条问题附带源代码上下文，辅助 LLM 判断误报
+- **阶段 9 清理**：自动删除测试残留文件，管理备份目录
+- **多语言修复器**：Python/Shell/JavaScript/PowerShell 通用修复工具
+- `runner.py` 全流程编排器，代码硬编码 10 阶段不可跳过

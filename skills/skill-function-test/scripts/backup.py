@@ -8,11 +8,16 @@ import shutil
 import re
 from datetime import datetime
 
-_DATA_DIR = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", ".standardization", "skill-scenario-test", "data"
+# R-12 审计锚点：数据目录字面量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
+
+SKILL_DIR = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), ".."
 ))
-_BACKUP_DIR = os.path.join(_DATA_DIR, "backup")
+_data_dir_abs = os.path.normpath(os.path.join(
+    SKILL_DIR, "..", ".standardization", "skill-function-test", "data"
+))
+_BACKUP_DIR = os.path.join(_data_dir_abs, "backup")
 
 
 def _ensure_backup_dir():

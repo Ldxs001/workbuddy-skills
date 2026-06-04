@@ -1,6 +1,6 @@
 ---
-name: skill-scenario-test
-version: 0.2.0
+name: skill-function-test
+version: 0.2.1
 author: wUwproject
 license: MIT
 description: 技能场景测试套件 —— 备份 → 蓝皮书 → 场景+功能双轨测试 → 修复循环 → 回归确认 → 分级报告。场景驱动：从 SKILL.md 解析触发场景和核心能力，构造端到端场景测试链路。包含 D1-D6 功能测试作为底座。
@@ -8,13 +8,16 @@ tags: ['scenario-test', 'regression-test', 'backup', 'bluebook', 'smoke-test', '
 data_dir: ../.standardization/skill-scenario-test/
 external_data_dir: true
 sensitive_access: false
-critical_write: true
+critical_write: false
 permission_weight: LOW
 trigger: 场景测试/回归测试/功能体检/技能体检/跑通测试/端到端测试/E2E测试/场景链路检测/备份测试/修复回归/冒烟测试
 trigger_negative: 仅概念询问不执行测试/代码审查/语法检查/安全审计
+h1_position: true
+meta_field_sync: true
+faq_unparsable: reformat
+faq_quality: improve_qa
 ---
-
-# skill-scenario-test — 技能场景测试套件
+# skill-function-test — 技能场景测试套件
 
 > 备份 → 蓝皮书 → 场景+功能双轨测试 → 修复循环 → 回归确认 → 分级报告
 
@@ -68,7 +71,9 @@ trigger_negative: 仅概念询问不执行测试/代码审查/语法检查/安�
 
 | 文件 | 位置 | 说明 |
 |------|------|------|
-| `references/guide.md` | 完整使用指南 | 8 阶段工作流程 + 备份/恢复说明 + 场景解析规则 |
+| `references/guide.md` | 完整使用指南 | 10 阶段工作流程 + 备份/恢复说明 + 场景解析规则 |
+| `references/antipatterns.md` | 反模式 | 常见错误和注意事项 |
+| `references/faq.md` | FAQ | 常见问题 |
 | `references/examples.md` | 示例集合 | 完整执行示例 |
 | `scripts/backup.py` | 备份与恢复 | 完整目录备份 + 时间戳 + 恢复回滚 |
 | `scripts/inspector.py` | 蓝皮书扫描器 | AST + 文件清单 + 函数签名 + 引用链路 + 场景解析 |
@@ -111,6 +116,8 @@ python scripts/test_engine.py /path/to/target-skill
 ```
 
 ---
+
+> 反模式详见 `references/antipatterns.md`，常见问题详见 `references/faq.md`
 
 ## 版本
 
