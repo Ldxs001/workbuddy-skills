@@ -1,10 +1,10 @@
 ---
 name: activity-duration-estimation
-tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report']
-version: 1.8.4
+tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report', 'settings', 'knowledge-base']
+version: 1.9.0
 author: wUwproject
 license: MIT
-description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。
+description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。支持5项全局设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），提供HTML可视化设置面板。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -13,6 +13,7 @@ external_data_dir: true
 trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析/WBS/WBS分解/项目规划/工作分解/项目分解/分解任务/立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板
 trigger_negative: 只是询问概念不执行估算/纯数学公式讨论不含实际任务
 faq_quality: improve_qa
+meta_field_sync: true
 ---
 # activity-duration-estimation — 全周期项目管理
 
@@ -41,13 +42,15 @@ faq_quality: improve_qa
 | 2 | **四种估算方法** | 直接估算法 / β分布（PERT）估算法 / 正态分布估算法 / 蒙特卡洛模拟法 |
 | 3 | **语义分析推荐** | 根据任务类型（建筑/制造/软件/科研/农业等）自动推荐最适估算方法组合 |
 | 4 | **外部知识搜索** | 两阶段搜索流程：大模型自判→搜索补充→汇总推荐 |
-| 4 | **CPM关键路径分析** | 基于紧前关系的关键路径计算，含ES/EF/LS/LF/总时差，自动识别关键任务 |
-| 5 | **多分布蒙特卡洛** | 支持PERT-Beta、三角分布、泊松近似三种分布并行模拟，提供多维度概率评估 |
-| 6 | **任务重叠分析** | 自动检测任务时间重叠，输出最大重叠数和最长重叠时段 |
-| 7 | **甘特图可视化** | 基于CPM结果的甘特图（SVG），关键路径高亮标注 |
-| 8 | **紧前关系规划** | 手动指定/自动规划两种模式，支持FS/SS/FF/SF四种依赖关系 |
-| 9 | **HTML评估报告** | 自包含HTML，含甘特图/概率分布/重叠分析图表，有图有表有数据有分析 |
-| 10 | **项目文档生成** | 双模式：手动空模版/混合逐节生成；4个P0模板（立项/结项/相关方/风险） |
+| 5 | **知识库查询/写入** (新增) | 按需信息通道，与联网搜索平行。标准字段硬编码，LLM做格式翻译入库。支持历史项目查询、OMP基准检索、外部数据库/文件（SQLite/CSV/MD/DOCX/JSON）按标准导入 |
+| 6 | **CPM关键路径分析** | 基于紧前关系的关键路径计算，含ES/EF/LS/LF/总时差，自动识别关键任务 |
+| 7 | **多分布蒙特卡洛** | 支持PERT-Beta、三角分布、泊松近似三种分布并行模拟，提供多维度概率评估 |
+| 8 | **任务重叠分析** | 自动检测任务时间重叠，输出最大重叠数和最长重叠时段 |
+| 9 | **甘特图可视化** | 基于CPM结果的甘特图（SVG），关键路径高亮标注 |
+| 10 | **紧前关系规划** | 手动指定/自动规划两种模式，支持FS/SS/FF/SF四种依赖关系 |
+| 11 | **HTML评估报告** | 自包含HTML，含甘特图/概率分布/重叠分析图表，有图有表有数据有分析 |
+| 12 | **项目文档生成** | 双模式：手动空模版/混合逐节生成；4个P0模板（立项/结项/相关方/风险） |
+| 13 | **全局设置系统** | 5项可调整设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），每项可选 auto/manual。`scripts/settings_server.py` 提供 HTML 可视化设置面板。设置通过 `state.settings` 注入流程，LLM 可读取 `_get_setting()` 决定行为。 |
 
 ### 渐进式文件索引
 
@@ -60,10 +63,18 @@ faq_quality: improve_qa
 | `references/search-integration.md` | 搜索集成 | 两阶段外部知识搜索流程 |
 | `references/report-template.md` | 报告模板 | HTML评估报告模板说明 |
 | `references/antipatterns.md` | 反模式 | WBS+项目文档反模式 |
+| `references/risk-dimensions.md` | 风险维度 | D1~D7七类风险维度选择条件和缓解措施 |
+| `references/thinking-tools.md` | 思维工具 | SWOT/SMART/PDCA/RACI等12个项目管理思维工具 |
 | `references/faq.md` | FAQ | WBS+项目文档相关 |
 | `references/changelog.md` | 更新日志 | 版本更新记录 |
 | `references/templates/` | 模板目录 | 4个预置JSON模板文件 |
+| `references/knowledge-interface.md` | 知识库接口 | 按需信息通道设计、标准字段定义、LLM格式解析指引、外部数据对接规范 |
 | `scripts/runner.py` | 编排层 | PipelineState + run_pipeline() 全流程Python驱动 |
+| `scripts/knowledge_schema.py` | 知识库标准 | 标准字段定义、格式转换器、外部数据库映射规则 |
+| `scripts/project_knowledge.py` | 知识库引擎 | SQLite+FTS5实现：查询/写入/外部对接/基准积累 |
+| `scripts/settings_manager.py` | 全局设置管理 | 5项设置（web_search/kb_collect/kb_query/doc_template/doc_write）读/写/校验/CLI |
+| `scripts/settings_server.py` | 设置可视化服务 | HTTP服务器，浏览器打开即可可视化更新全部设置，更新后立即生效 |
+| `scripts/templates/settings.html` | 设置面板UI | 自包含HTML设置界面，约束联动（文档指定为空时禁用模板要求选项） |
 
 ---
 

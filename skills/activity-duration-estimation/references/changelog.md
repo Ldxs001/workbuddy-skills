@@ -1,3 +1,57 @@
+## 1.9.0 (2026-06-04)
+
+### 新增
+- **全局设置系统** `scripts/settings_manager.py` — 5项可调运行时设置
+  - `web_search_mode`: 联网搜索（auto / manual）
+  - `kb_collect_mode`: 知识库采集（auto / manual）
+  - `kb_query_mode`: 知识库调用（auto / manual）
+  - `doc_template`: 文档指定（null / 模板名）
+  - `doc_write_mode`: 文档撰写（auto / manual / template）
+- 设置持久化到 `skills/.standardization/activity-duration-estimation/data/settings.json`
+- **纯文本 CLI 交互**：`python scripts/settings_manager.py` 直接管理，无需 LLM 参与
+  - `show` — 查看当前设置
+  - `list` — 列出所有可设项及说明
+  - `set <key> <value>` — 更新单条设置
+  - `reset` — 恢复默认
+  - `validate` — 校验合法性
+  - `import <file>` — 从 JSON 文件批量导入
+  - `export [file]` — 导出为 JSON 文件
+  - `server [port]` — 启动 HTML 可视化面板
+  - `help` — 完整帮助
+- `scripts/settings_server.py` — HTTP设置可视化服务，启动后浏览器打开即可可视化更新
+- `scripts/templates/settings.html` — 自包含HTML设置面板，含约束联动（doc_template为空时禁用doc_write_mode的template选项）
+- `validate()` 校验器：枚举值检查、约束联动检查（doc_template为空时doc_write_mode不能为template）
+- 默认值：全部 manual，仅 doc_write_mode 默认 auto
+
+### 改进
+- `runner.py` PipelineState 初始化时自动加载设置到 `state.settings`
+- `run_full()` 从设置读取 doc_template 和 doc_write_mode（显式传参时优先）
+- `_resolve_doc_mode()` 设置→模式翻译逻辑（template→mixed，无模板时降级）
+- SKILL.md 核心能力#13 全局设置系统 + 文件索引新增3项
+
+---
+
+
+## v1.9.1 (2026-06-04) — 自动版本升级
+
+### Changed
+- 版本号 1.9.0 → 1.9.1（`update --fix` 自动 bump）
+## 1.8.5 (2026-06-04)
+
+### 新增
+- `references/knowledge-interface.md` — 知识库接口设计文档
+  - 按需信息通道定义（与联网搜索平行，遵循 search-integration.md 按需模式）
+  - 标准字段定义（来自 knowledge_schema.py 硬编码规范）
+  - LLM格式解析指引：SQLite/CSV/MD/JSON/DOCX/XLSX/纯文本七种格式
+  - 字段映射规则：标准字段固定，LLM负责从外部列名→标准字段的翻译
+  - 写入/读取/外部对接三组接口函数定义
+
+### 改进
+- SKILL.md 核心能力表新增「知识库查询/写入」能力（#5），重新编号至12项
+- SKILL.md 渐进式文件索引新增 knowledge-interface.md / knowledge_schema.py / project_knowledge.py 三项引用
+
+---
+
 ## 1.8.1 (2026-06-03)
 
 ### 修复

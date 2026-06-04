@@ -23,6 +23,10 @@ Python 驱动三子技能的完整执行流程。LLM 只需调用 run_full() 主
     state.run_estimate()
     state.generate_docs("立项申请书", mode="manual")
     state._generate_html_report()
+
+读取当前全局设置：
+    state.settings  → dict  # 5项设置值
+    state.settings_manager  → settings_manager 模块引用
 """
 
 import os
@@ -69,6 +73,7 @@ from project_docs_engine import (
     SectionGenState, TEMPLATES_DIR
 )
 from risk_dimensions import select_dimensions, build_dimension_prompt, build_minimal_fallback
+from settings_manager import load as load_settings
 
 
 # ═══════════════════════════════════════════════════
@@ -154,6 +159,10 @@ class PipelineState:
         self.audit_report: str = ""              # 文本审计报告
         self.audit_results: list[dict] = []       # 结构化审计条目 [{check, passed, issues}]
 
+        # 全局设置（读取 skills/.standardization/.../data/settings.json）
+        self.settings: dict = load_settings()
+        self.settings_manager = __import__("settings_manager", fromlist=[""])
+
     # ── 查询 ──
 
     @property
@@ -230,8 +239,8 @@ class PipelineState:
 
     def run_full(self, description: str = None,
                  project_name: str = None,
-                 doc_template: str = "立项申请书",
-                 doc_mode: str = "manual",
+                 doc_template: str = None,
+                 doc_mode: str = None,
                  mc_iterations: int = 2000) -> dict:
         """
         强制全流程：WBS分解 → 估算参数准备 → 紧前关系 → 估算计算 → 
@@ -258,6 +267,12 @@ class PipelineState:
             self.project_name = project_name
         elif not self.project_name:
             self.project_name = _extract_project_name(self.description)
+
+        # 若未显式传参，从全局设置读取文档参数
+        if doc_template is None:
+            doc_template = self.settings.get("doc_template") or None
+        if doc_mode is None:
+            doc_mode = self._resolve_doc_mode()
 
         self.current_phase = PHASE_FULL
 
@@ -1239,6 +1254,25 @@ th{{background:#3498db;color:#fff;position:sticky;top:0}}
             "overlap": self.overlap_results,
         }
 
+
+    # ═══════════════════════════════════════════════
+    # 设置集成
+    # ═══════════════════════════════════════════════
+
+    def _resolve_doc_mode(self) -> str:
+        """根据全局设置解析文档撰写模式"""
+        mode = self.settings.get("doc_write_mode", "auto")
+        tpl = self.settings.get("doc_template")
+        if mode == "template" and not tpl:
+            # 设置了 template 但 doc_template 为空 → 降级为 auto
+            return "manual"
+        if mode == "template":
+            return "mixed"  # 有模板时按模板要求走混合模式
+        return mode  # auto / manual
+
+    def _get_setting(self, key: str) -> object:
+        """快速获取设置值"""
+        return self.settings.get(key)
 
     # ═══════════════════════════════════════════════
     # 文档阶段

@@ -1,7 +1,7 @@
 # WorkBuddy Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-06-03
+> 最后更新：2026-06-04
 
 本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
 
@@ -13,7 +13,7 @@
 
 | 技能名 | 描述 |
 |--------|------|
-| `activity-duration-estimation` | 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。 |
+| `activity-duration-estimation` | 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。支持5项全局设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），提供HTML可视化设置面板。 |
 | `color-toolkit` | 专业颜色工具集 - HEX/RGB/HSL/HSV/CMYK转换、四种对比度算法、智能配色推荐 |
 | `drawiodo` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。 |
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
