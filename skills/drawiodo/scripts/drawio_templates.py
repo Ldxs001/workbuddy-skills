@@ -3,6 +3,7 @@ drawio_templates - 常用图表模板生成器
 基于drawio_gen核心库，提供流程图、架构图、UML类图、ER图、树形图、时序图等快捷生成
 """
 
+import math
 from drawio_gen import DrawIOBuilder, Styles, Node, Edge, NodeStyle, EdgeStyle
 
 
@@ -857,4 +858,3 @@ def create_network_topology(devices: list[dict], connections: list[dict],
     return builder
 
 
-import math

@@ -18,9 +18,9 @@ import json
 import re
 
 # 确保能找到核心库
-LIB_DIR = r"C:\Users\sm001\WorkBuddy\2026-05-13-task-1"
-if LIB_DIR not in sys.path:
-    sys.path.insert(0, LIB_DIR)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
 from drawio_gen import DrawIOBuilder, Styles, NodeStyle, EdgeStyle
 from drawio_templates import (
@@ -29,10 +29,9 @@ from drawio_templates import (
     create_mindmap, create_network_topology,
     horizontal_layout, vertical_layout, auto_size_node,
 )
-import math
 
 DRAWIO_EXE = r"C:\Program Files\draw.io\draw.io.exe"
-OUT_DIR = LIB_DIR
+OUT_DIR = os.getcwd()
 
 
 def open_file(filepath: str):
