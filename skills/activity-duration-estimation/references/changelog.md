@@ -1,3 +1,30 @@
+## 1.11.0 (2026-06-04)
+
+### 新增
+- **经济效益分析子技能**（独立分支，不加入全流程）
+  - `scripts/economic_analysis_engine.py` — ROI/NPV/IRR/BCR/PBP 完整计算引擎（验证通过小作坊例子）
+  - `scripts/economic_knowledge.py` — economic.db 独立知识库（三库隔离架构）
+  - `references/economic-analysis-methodology.md` — 方法论文档
+  - `scripts/templates/economic-report.html` — 自包含 HTML 报告（Chart.js 图表）
+  - 立项申请书模板新增「经济效益分析」可选章节
+- **挣值管理子技能**（独立分支，不加入全流程）
+  - `scripts/evm_engine.py` — PV/EV/AC/SPI/CPI/EAC 完整计算引擎（验证通过 D 阶段例子）
+  - `scripts/evm_knowledge.py` — evm.db 独立知识库（三库隔离架构）
+  - `references/evm-methodology.md` — 方法论文档
+  - `scripts/templates/evm-report.html` — 自包含 HTML 报告（SPI/CPI 趋势图）
+  - 结项报告书模板新增「挣值分析」可选章节
+- **三库隔离基础设施**
+  - `scripts/knowledge_schema.py` — 增加 ECONOMIC_FIELDS/EVM_FIELDS/REGISTRY_FIELDS 字段定义
+  - `skill_registry` 跨库注册表：shared.db → economic.db/evm.db 标准路由
+  - 独立索引查询（npv/irr/spi/cpi 走索引，不走 FTS/LIKE）
+- `scripts/full_test.py` — 全功能模拟测试套件（100/100 PASS）
+
+### 修复
+- `scripts/evm_knowledge.py` — 补充缺失的 `from typing import Optional`
+- `scripts/economic_analysis_engine.py` — calc_roi 系列增加零除保护
+
+---
+
 ## 1.10.0 (2026-06-04)
 
 ### 改进

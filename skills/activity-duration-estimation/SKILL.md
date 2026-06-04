@@ -1,16 +1,16 @@
 ---
 name: activity-duration-estimation
-tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report', 'settings', 'knowledge-base']
-version: 1.10.0
+tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report', 'settings', 'knowledge-base', 'economic-analysis', 'evm', 'earned-value']
+version: 1.11.0
 author: wUwproject
 license: MIT
-description: 活动历时估算 + WBS工作分解 + 项目文档生成（Activity Duration Estimation & WBS & Project Docs）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）。输出自包含HTML评估报告和项目文档。支持5项全局设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），提供HTML可视化设置面板。
+description: 活动历时估算 + WBS工作分解 + 项目文档生成 + 经济效益分析 + 挣值管理（Activity Duration Estimation & WBS & Project Docs & Economic Analysis & EVM）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）+ ROI/NPV/IRR/BCR 经济效益分析 + PV/EV/AC/SPI/CPI 挣值管理。三库隔离架构：shared.db + economic.db + evm.db。输出自包含HTML评估报告、经济效益分析报告和挣值分析报告。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/activity-duration-estimation/
 external_data_dir: true
-trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析/WBS/WBS分解/项目规划/工作分解/项目分解/分解任务/立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板
+trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/任务历时/概率估算/β分布/正态分布/历时分析/WBS/WBS分解/项目规划/工作分解/项目分解/分解任务/立项申请书/结项报告/相关方登记册/风险登记册/项目文档/项目模板/经济效益分析/投资回报/ROI/NPV/IRR/BCR/投资回收期/可行性分析/项目经济效益/折现分析/多折现率对比/挣值管理/EVM/PV/EV/AC/SPI/CPI/成本绩效/进度偏差/挣得值/EAC/挣值分析
 trigger_negative: 只是询问概念不执行估算/纯数学公式讨论不含实际任务
 faq_quality: improve_qa
 meta_field_sync: true
@@ -51,6 +51,8 @@ meta_field_sync: true
 | 11 | **HTML评估报告** | 自包含HTML，含甘特图/概率分布/重叠分析图表，有图有表有数据有分析 |
 | 12 | **项目文档生成** | 双模式：手动空模版/混合逐节生成；4个P0模板（立项/结项/相关方/风险） |
 | 13 | **全局设置系统** | 5项可调整设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），每项可选 auto/manual。`scripts/settings_server.py` 提供 HTML 可视化设置面板。设置通过 `state.settings` 注入流程，LLM 可读取 `_get_setting()` 决定行为。 |
+| 14 | **经济效益分析** (分支子技能) | 独立于全流程，单独触发。ROI/NPV/IRR/BCR/PBP 计算引擎 + HTML 报告 + 独立 economic.db 知识库。可插入立项申请书模板。 |
+| 15 | **挣值管理** (分支子技能) | 独立于全流程，单独触发。PV/EV/AC/SPI/CPI/EAC 计算引擎 + HTML 报告 + 独立 evm.db 知识库。可插入结项报告书模板。 |
 
 ### 渐进式文件索引
 
@@ -67,14 +69,22 @@ meta_field_sync: true
 | `references/thinking-tools.md` | 思维工具 | SWOT/SMART/PDCA/RACI等12个项目管理思维工具 |
 | `references/faq.md` | FAQ | WBS+项目文档相关 |
 | `references/changelog.md` | 更新日志 | 版本更新记录 |
-| `references/templates/` | 模板目录 | 4个预置JSON模板文件 |
+| `references/economic-analysis-methodology.md` | 经济效益分析方法论 | ROI/NPV/IRR/BCR/PBP 公式、计算引擎 API、知识库字段、跨库引用规则 |
+| `references/evm-methodology.md` | 挣值管理方法论 | PV/EV/AC/SPI/CPI/EAC 公式、计算引擎 API、知识库字段、跨库引用规则 |
+| `references/templates/` | 模板目录 | 4个预置JSON模板文件（立项/结项/相关方/风险） |
 | `references/knowledge-interface.md` | 知识库接口 | 按需信息通道设计、标准字段定义、LLM格式解析指引、外部数据对接规范 |
 | `scripts/runner.py` | 编排层 | PipelineState + run_pipeline() 全流程Python驱动 |
-| `scripts/knowledge_schema.py` | 知识库标准 | 标准字段定义、格式转换器、外部数据库映射规则 |
-| `scripts/project_knowledge.py` | 知识库引擎 | SQLite+FTS5实现：查询/写入/外部对接/基准积累 |
+| `scripts/knowledge_schema.py` | 知识库标准 | 标准字段定义、格式转换器、外部数据库映射规则 + economic/evm/registry 字段定义 |
+| `scripts/project_knowledge.py` | 共享知识库引擎 | shared.db：SQLite+FTS5实现：查询/写入/外部对接/基准积累 |
+| `scripts/economic_knowledge.py` | 经济效益知识库引擎 | economic.db：独立CRUD、索引查询、跨库ATTACH shared.db |
+| `scripts/evm_knowledge.py` | 挣值管理知识库引擎 | evm.db：独立CRUD、索引查询、跨库ATTACH shared.db |
+| `scripts/economic_analysis_engine.py` | 经济效益分析引擎 | ROI/NPV/IRR/BCR 完整计算 + 多折现率对比 + 逐年现金流 |
+| `scripts/evm_engine.py` | 挣值管理引擎 | PV/EV/AC/SPI/CPI/EAC 完整计算 + 修正/不修正两模式 |
 | `scripts/settings_manager.py` | 全局设置管理 | 5项设置（web_search/kb_collect/kb_query/doc_template/doc_write）读/写/校验/CLI |
 | `scripts/settings_server.py` | 设置可视化服务 | HTTP服务器，浏览器打开即可可视化更新全部设置，更新后立即生效 |
 | `scripts/templates/settings.html` | 设置面板UI | 自包含HTML设置界面，约束联动（文档指定为空时禁用模板要求选项） |
+| `scripts/templates/economic-report.html` | 经济效益报告模板 | 自包含HTML：多折现率对比、NPV曲线图、逐年现金流、ROI/IRR/BCR卡片 |
+| `scripts/templates/evm-report.html` | 挣值分析报告模板 | 自包含HTML：SPI/CPI趋势图、绩效快照卡片、完工预测表 |
 
 ---
 
@@ -103,7 +113,8 @@ else:
     print(result["message"])        # 错误信息
 ```
 
-**全流程阶段（代码硬编码，不可跳过）：**
+**全流程阶段（代码硬编码，不可跳过，与 runner.py 中 6 个阶段一一对应）：**
+
 1. WBS分解 → `run_wbs()`（全流程模式下必做，LLM提供结构化数据）
 2. WBS进入估算门控 → `_wbs_passes_estimation_gate()` 硬校验
 3. 紧前关系规划 → `_prompt_llm_for_dependencies()` / 自动FS串联
@@ -111,10 +122,13 @@ else:
 5. HTML评估报告 → `_generate_html_report()`（全Python自动）
 6. 项目文档 → `generate_docs()`（按模板生成立项/结项/风险/相关方文档）
 
-**各环节也可单独调用**（不经过`run_full()`全流程时）：
-- 仅有估算需求 → `run_pipeline(mode="estimate")` 或 `state.run_estimate()`
-- 仅需文档 → `run_pipeline(mode="docs")` 或 `state.generate_docs()`
-- 仅WBS → `run_pipeline(mode="wbs")` 或 `state.run_wbs()`
+**单独调用模式**（不经过`run_full()`全流程，按需使用）：
+
+| 需求 | 调用方式 |
+|------|---------|
+| 仅有估算需求 | `run_pipeline(mode="estimate")` 或 `state.run_estimate()` |
+| 仅需文档 | `run_pipeline(mode="docs")` 或 `state.generate_docs()` |
+| 仅WBS分解 | `run_pipeline(mode="wbs")` 或 `state.run_wbs()` |
 
 ### LLM交互点
 
@@ -133,12 +147,14 @@ LLM看到异常后按提示提供数据，然后继续执行即可。
 ## 快速开始
 
 ```text
-场景1：直接估算 — "单阶段任务，乐观3天、最可能6天、悲观15天" → β分布：(3+4×6+15)/6=7天，σ=2天 → 68%概率5~9天
-场景2：多阶段CPM — "前端(5/10/20)→后端(8/15/25)→测试(10/20/35)，依赖FS串联" → 总工期~47天，关键路径3任务TF=0 → 出HTML报告
-场景3：搜索辅助 — "装配式建筑施工，无OMP，3阶段" → 自判不足→搜索同类→给出典型值→用户确认后估算
-场景4：WBS→估算 — "帮我规划并估算一个电商后台管理系统" → Phase -1激活→模板匹配→分解→文本树确认→自动入Phase 0→HTML报告
-场景5：项目文档 — "针对电商项目生成立项申请书，手动模式" → 加载模板→特化（填入WBS/CPM引用）→输出空模板MD；或"自动模式，从项目背景开始" → 逐节生成→确认→拼合
-
+场景1：直接估算 — "乐观3天、最可能6天、悲观15天" → β分布7天, σ=2天 → 68%概率5~9天
+场景2：多阶段CPM — "前端(5/10/20)→后端(8/15/25)→测试(10/20/35), FS" → 总工期47天 →出HTML报告
+场景3：搜索辅助 — "装配式建筑施工" → 搜索同类→给出典型OMP→确认→估算
+场景4：WBS→估算 — "帮我规划并估算电商后台" → 分解→确认→HTML报告
+场景5：项目文档 — "生成立项申请书, 手动模式" → 空模板→"自动填充背景"→逐节生成→拼合
+场景6：经济效益分析 — "初始100万, 年收益12万, 年支出5万, 5年, 终值200万, 折现率10%" → NPV=50.72, IRR=20.35%
+场景7：挣值管理 — "项目到D阶段, 做挣值分析" → EV=320.27, SPI=1.01, CPI=1.07, EAC=379.73
+```
 
 ## 常用操作速查
 
@@ -152,21 +168,17 @@ LLM看到异常后按提示提供数据，然后继续执行即可。
 | HTML 报告打不开 | 报告是自包含 HTML，直接用浏览器打开 state.html_report_path |
 | 调整蒙特卡洛模拟次数 | `run_full(mc_iterations=5000)` — 默认 2000，数值越高越精确但越慢 |
 | 从历史项目参考数据 | 告诉 LLM「查一下同类项目的基准数据」— 会自动搜索 SQLite 知识库 |
-```
 
 ---
 
 ## WBS子技能 — Phase -1：项目规划与工作分解
-
 > 详见 `references/wbs-methodology.md` | `scripts/wbs_engine.py`
 > 全流程模式下必做，由 `run_full()` 自动触发。
 
 ---
-
 ## 项目文档生成子技能 — :project-docs
 
 > 详见 `references/project-docs-methodology.md` | `scripts/project_docs_engine.py`
-
 三种模式：`manual`（空模板，token≈0）/ `mixed`（按章节设 auto/outline/manual，推荐）/ `全自动`（所有节 auto）。
 支持模板定制：增/删/改/重排章节、每节独立模式、另存为新模板。
 
@@ -215,7 +227,4 @@ save_template(tpl, "我的模板", overwrite=True)       # 另存自定义模板
 
 ## 版本
 
-**v1.8.0** — 全体系重构：依赖智能规划 + HTML 甘特图 + 多维风险分析 + WBS 深度校验
-- `auto_plan_dependencies()`: 接收 phases 列表，解析 WBS 前缀分组
-- `wbs_to_dependencies()`: 同父组并行，跨父组串联
-- 三个 runner 调用处全部传入 phases 支持智能分组
+当前版本 **v1.11.0** — 详见 `references/changelog.md`

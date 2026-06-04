@@ -386,3 +386,170 @@ def validate_project_json(json_str: str) -> list[str]:
                 errors.append(f"work_packages 中存在无名条目 (id={wp.get('id')})")
     
     return errors
+
+
+# ═══════════════════════════════════════════════════════
+# 跨子技能注册表
+# ═══════════════════════════════════════════════════════
+
+SKILL_REGISTRY_TABLE = """
+CREATE TABLE IF NOT EXISTS skill_registry (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    skill_name      TEXT NOT NULL,       -- estimation / economic / evm
+    project_id      INTEGER,             -- shared.db.projects(id)
+    project_name    TEXT DEFAULT '',
+    record_id       INTEGER,             -- 子技能自己库里的主键ID
+    db_path         TEXT NOT NULL,       -- 数据文件相对/绝对路径
+    meta_json       TEXT DEFAULT '{}',   -- {"mc_p50": 47.2, "discount_rate": 10}
+    created_at      TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_registry_skill ON skill_registry(skill_name);
+CREATE INDEX IF NOT EXISTS idx_registry_project ON skill_registry(project_id);
+"""
+
+REGISTRY_FIELDS = {
+    "skill_name":    "子技能名: estimation(活动历时估算) / economic(经济效益分析) / evm(挣值管理)",
+    "project_id":    "shared.projects(id)，可为空（独立运行时）",
+    "project_name":  "项目名称",
+    "record_id":     "子技能自己库里的主键ID",
+    "db_path":       "数据文件路径（相对/绝对）",
+    "meta_json":     "关键指标摘要 JSON，如 {\"npv\": 50.72, \"irr\": 20.39}",
+}
+
+# ═══════════════════════════════════════════════════════
+# 经济效益分析标准字段定义
+# ═══════════════════════════════════════════════════════
+
+ECONOMIC_FIELDS = {
+    "project_name":        "项目名称",
+    "discount_rate":       "基准折现率（%）",
+    "periods":             "运营周期（年）",
+    "initial_investment":  "初始投资额",
+    "annual_revenue":      "年收益",
+    "annual_cost":         "年支出",
+    "terminal_value":      "终值/残值（期末处置收入）",
+    "currency":            "货币单位（默认 ¥）",
+    "npv":                 "净现值",
+    "irr":                 "内部收益率（%）",
+    "bcr":                 "效益成本比",
+    "roi_static":          "静态投资回报率（%）",
+    "roi_weighted":        "加权投资回报率（%，考虑终值）",
+    "pbp_static":          "静态投资回收期（年）",
+    "pbp_dynamic":         "动态投资回收期（年）",
+    "discount_rates_json": "多折现率对比数据 JSON",
+    "cashflows_json":      "逐年现金流明细 JSON",
+}
+
+ECONOMIC_DB_CREATE = """
+CREATE TABLE IF NOT EXISTS economic_analyses (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id      INTEGER,              -- shared.projects(id)，可为空
+    project_name    TEXT NOT NULL,
+    discount_rate   REAL NOT NULL,
+    periods         INTEGER NOT NULL,
+    initial_investment REAL NOT NULL,
+    annual_revenue REAL NOT NULL,
+    annual_cost    REAL NOT NULL,
+    terminal_value REAL DEFAULT 0,
+    currency       TEXT DEFAULT '¥',
+    npv            REAL,
+    irr            REAL,
+    bcr            REAL,
+    roi_static     REAL,
+    roi_weighted   REAL,
+    pbp_static     REAL,
+    pbp_dynamic    REAL,
+    cashflows_json TEXT,                   -- 逐年明细
+    params_json    TEXT,                   -- 完整输入参数
+    created_at     TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_economic_project ON economic_analyses(project_id);
+CREATE INDEX IF NOT EXISTS idx_economic_npv   ON economic_analyses(npv);
+CREATE INDEX IF NOT EXISTS idx_economic_irr   ON economic_analyses(irr);
+
+CREATE TABLE IF NOT EXISTS economic_cashflows (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id     INTEGER NOT NULL REFERENCES economic_analyses(id),
+    year            INTEGER NOT NULL,
+    revenue         REAL NOT NULL,
+    cost            REAL NOT NULL,
+    net_cashflow    REAL NOT NULL,
+    net_discounted  REAL NOT NULL,
+    discounted_cost REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cf_analysis ON economic_cashflows(analysis_id);
+"""
+
+# ═══════════════════════════════════════════════════════
+# 挣值管理标准字段定义
+# ═══════════════════════════════════════════════════════
+
+EVM_FIELDS = {
+    "project_name":        "项目名称",
+    "bac":                 "总预算（Budget at Completion）",
+    "total_plan_duration": "计划总工期",
+    "analysis_period":     "分析节点（如 D 阶段）",
+    "plan_progress":       "计划累计进度（%）",
+    "actual_progress":     "实际累计进度（%）",
+    "ev":                  "挣值（Earned Value）",
+    "pv":                  "计划成本（Planned Value）",
+    "ac":                  "实际成本（Actual Cost）",
+    "sv":                  "进度偏差（Schedule Variance）",
+    "spi":                 "进度绩效指数（Schedule Performance Index）",
+    "cv":                  "成本偏差（Cost Variance）",
+    "cpi":                 "成本绩效指数（Cost Performance Index）",
+    "eac_uncorrected":     "完工估算-不修正（Estimate at Completion）",
+    "eac_corrected":       "完工估算-修正",
+    "etc_uncorrected":     "剩余成本估算-不修正",
+    "etc_corrected":       "剩余成本估算-修正",
+    "vac_uncorrected":     "预算偏差-不修正（Variance at Completion）",
+    "vac_corrected":       "预算偏差-修正",
+    "phases_json":         "各阶段 PV/AC/进度% 明细 JSON",
+}
+
+EVM_DB_CREATE = """
+CREATE TABLE IF NOT EXISTS evm_analyses (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id      INTEGER,               -- shared.projects(id)，可为空
+    project_name    TEXT NOT NULL,
+    bac             REAL NOT NULL,
+    total_plan_duration REAL NOT NULL,
+    analysis_period TEXT,
+    plan_progress   REAL,
+    actual_progress REAL,
+    ev              REAL,
+    pv              REAL,
+    ac              REAL,
+    sv              REAL,
+    spi             REAL,
+    cv              REAL,
+    cpi             REAL,
+    eac_uncorrected REAL,
+    eac_corrected   REAL,
+    etc_uncorrected REAL,
+    etc_corrected   REAL,
+    vac_uncorrected REAL,
+    vac_corrected   REAL,
+    phases_json     TEXT,
+    created_at      TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_evm_project ON evm_analyses(project_id);
+CREATE INDEX IF NOT EXISTS idx_evm_spi     ON evm_analyses(spi);
+CREATE INDEX IF NOT EXISTS idx_evm_cpi     ON evm_analyses(cpi);
+
+CREATE TABLE IF NOT EXISTS evm_periods (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id     INTEGER NOT NULL REFERENCES evm_analyses(id),
+    phase_name      TEXT NOT NULL,
+    cumulative_days REAL NOT NULL,
+    pv              REAL,
+    ac              REAL,
+    plan_progress   REAL,
+    actual_progress REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evmp_analysis ON evm_periods(analysis_id);
+"""

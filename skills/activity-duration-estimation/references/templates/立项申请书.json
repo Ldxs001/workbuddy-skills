@@ -75,6 +75,27 @@
       "hint": "应包括：人力成本（人天×单价）、设备采购、外协费用、不可预见费（建议10-15%）"
     },
     {
+      "key": "economic_analysis",
+      "title": "经济效益分析（可选）",
+      "type": "fields",
+      "description": "基于投资总额、年收益和年支出计算 ROI/NPV/IRR/BCR 等经济效益指标。默认不启用，需通过 add_section 手动添加。",
+      "fields": [
+        {"key": "initial_investment", "label": "初始投资总额", "type": "text", "hint": "一次性资本投入"},
+        {"key": "annual_revenue", "label": "年收益（持续运营）", "type": "text", "hint": "预计年运营收入"},
+        {"key": "annual_cost", "label": "年支出（持续运营）", "type": "text", "hint": "预计年运营成本"},
+        {"key": "discount_rate", "label": "折现率", "type": "text", "hint": "基准折现率（%）"},
+        {"key": "periods", "label": "计算周期", "type": "text", "hint": "项目运营年数"},
+        {"key": "terminal_value", "label": "终值/残值", "type": "text", "hint": "期末资产处置收入（可选）"},
+        {"key": "npv", "label": "净现值（NPV）", "type": "text", "hint": "由经济效益分析引擎自动生成"},
+        {"key": "irr", "label": "内部收益率（IRR）", "type": "text", "hint": "由经济效益分析引擎自动生成"},
+        {"key": "bcr", "label": "效益成本比（BCR）", "type": "text", "hint": "由经济效益分析引擎自动生成"},
+        {"key": "pbp_static", "label": "静态投资回收期", "type": "text", "hint": "由经济效益分析引擎自动生成"},
+        {"key": "pbp_dynamic", "label": "动态投资回收期", "type": "text", "hint": "由经济效益分析引擎自动生成"}
+      ],
+      "reference_sources": ["estimation_result"],
+      "hint": "此章节默认不启用。如需使用，通过模板定制 add_section 添加到模板中。填完基础数据后，LLM 会调用 economic_analysis_engine 自动计算各项指标。"
+    },
+    {
       "key": "risks",
       "title": "风险与应对",
       "type": "rich_text",
@@ -103,6 +124,7 @@
   "appendix": [
     {"key": "wbs_attachment", "title": "附件一：WBS工作分解图"},
     {"key": "schedule_attachment", "title": "附件二：项目进度甘特图"},
-    {"key": "estimation_report", "title": "附件三：历时估算报告"}
+    {"key": "estimation_report", "title": "附件三：历时估算报告"},
+    {"key": "economic_report", "title": "附件四：经济效益分析报告（可选）"}
   ]
 }
