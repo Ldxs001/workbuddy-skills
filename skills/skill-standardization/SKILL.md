@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.62.2
+version: 2.63.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -60,7 +60,7 @@ h1_position: true
 | **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ / scripts/） | 只生成结构模板和占位符，功能代码需要手动填充 |
 | **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码 |
 | **批量审计** | `--audit-all` 参数扫描 skills/ 下多个 skill | 仅支持 skills/ 目录下的一级子目录（不支持嵌套目录） |
-| **自动修复** | `--fix` 自动修正 frontmatter/版本号/数据目录/写作规范等 | 自动修复范围默认覆盖 R-01/R-03/R-11/R-12/R-22，其他规则需手动处理 |
+| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 写作规范等格式问题 | 仅修复格式/结构/路径类问题（R-01/R-03/R-11/R-12/R-22），**不修复代码逻辑错误**（R-23 也只检查文件存在性/参数一致性，不验证示例是否能运行） |
 | **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析，无法检测动态代码执行的权限需求 |
 
 > 触发本技能后立即可见的能力输出：读取目标 SKILL.md 中的 frontmatter/正文/references/scripts → 执行 R-01~R-25 规则审查 → 输出审查报告（含每条规则的 PASS/WARN/FAIL 状态 + 详细原因 + 附近代码上下文）。
@@ -106,6 +106,16 @@ h1_position: true
 6. 按需补充 scripts/ 功能代码 + references/ 渐进式文档
 7. **cleanup 清理** — 操作完成后清除生成过程中的临时文件
 
+
+
+> 生成后目录结构：
+> ```
+> <skill-name>/
+> ├── SKILL.md          # 含 frontmatter + TODO 占位符
+> ├── _meta.json        # {name, version, description, author, tags}
+> ├── references/       # 渐进式文档目录（含 .gitkeep）
+> └── scripts/          # 功能代码目录（含 .gitkeep）
+> ```
 **update/refactor 模式**（改造+审查）：
 1. 操作前整体备份（时间戳命名）
 2. **★ 强制 inspect 蓝皮书扫描** — 输出技能结构、AST 函数签名、引用链路
