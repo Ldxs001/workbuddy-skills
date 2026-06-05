@@ -8,6 +8,10 @@ inspector.py — 技能功能蓝皮书扫描器
 - 引用链路（MD 中引用的脚本、函数、文件）
 - 安全数据（敏感操作：文件删除、网络请求、subprocess）
 - 模块依赖关系（import 关系图）
+- 约束提取（从 SKILL.md 提取"必须/禁止/铁律/应/不得"等约束关键词）
+
+S4 阶段A：约束提取由 extract_constraints() 函数完成，
+产出结构化约束清单供 S4 引擎使用。
 """
 import ast
 import json
@@ -53,6 +57,35 @@ class BlueBook:
             "import_chain": self.import_chain,
             "total_size_bytes": self.total_size_bytes,
             "file_count": self.file_count,
+        }
+
+
+class ConstraintItem:
+    """从 SKILL.md 中提取的单条约束"""
+    def __init__(self, cid: str, text: str, lineno: int,
+                 strength: str, has_script: bool = False,
+                 script_path: str = ""):
+        self.cid = cid          # C-01, C-02...
+        self.text = text        # 约束原文
+        self.lineno = lineno    # 在 SKILL.md 中的行号
+        self.strength = strength  # 必须/禁止/铁律/应/不得/建议/推荐
+        self.has_script = has_script   # 是否有对应脚本支撑
+        self.script_path = script_path  # 脚本路径（如果有）
+        self.category = ""      # LLM 推理后填写: 脚本强制 / MD软约束
+        self.noise_tolerance = ""  # LLM 推理后填写: 高/中/低
+        self.design_note = ""   # LLM 推理后填写的噪音设计说明
+
+    def to_dict(self) -> dict:
+        return {
+            "cid": self.cid,
+            "text": self.text,
+            "lineno": self.lineno,
+            "strength": self.strength,
+            "has_script": self.has_script,
+            "script_path": self.script_path,
+            "category": self.category,
+            "noise_tolerance": self.noise_tolerance,
+            "design_note": self.design_note,
         }
 
 
@@ -230,11 +263,118 @@ def _scan_md_references(filepath: str) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════
+# S4 阶段A：约束提取
+# ═══════════════════════════════════════════════════════
+
+# 约束关键词权重映射
+CONSTRAINT_KEYWORDS = {
+    "铁律": "铁律",
+    "必须": "必须",
+    "禁止": "禁止",
+    "严禁": "禁止",
+    "不得": "禁止",
+    "不允许": "禁止",
+    "应": "应",
+    "不应": "禁止",
+    "不要": "禁止",
+    "建议": "建议",
+    "推荐": "推荐",
+    "可以": "建议",
+}
+
+# 脚本文件后缀列表（用于检测约束是否关联脚本）
+SCRIPT_EXTS = {".py", ".sh", ".bat", ".ps1", ".js"}
+
+
+def extract_constraints(skill_dir: str) -> list[dict]:
+    """
+    S4 阶段A：从目标技能的 SKILL.md 提取结构化约束清单。
+
+    扫描 SKILL.md 全文，提取包含约束关键词的行，
+    分析其语义强度、是否关联脚本、脚本路径。
+
+    返回:
+        list[dict]: 约束清单，每个元素为 ConstraintItem.to_dict()
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.exists(skill_md):
+        return []
+
+    with open(skill_md, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # 收集所有脚本文件路径
+    all_scripts = set()
+    for root, dirs, files in os.walk(skill_dir):
+        dirs[:] = [d for d in dirs if d.startswith(".") or d == "__pycache__"]
+        for f in files:
+            ext = os.path.splitext(f)[1].lower()
+            if ext in SCRIPT_EXTS:
+                rel = os.path.relpath(os.path.join(root, f), skill_dir)
+                all_scripts.add(rel)
+
+    constraints = []
+    cid_counter = 0
+
+    for lineno, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # 跳过 frontmatter、注释行、空行、表格分隔行
+        if not stripped or stripped.startswith("---") or stripped.startswith("#") or \
+           stripped.startswith("<!--") or stripped.startswith("|--"):
+            continue
+
+        # 检测约束关键词
+        found_strength = None
+        for kw, strength in CONSTRAINT_KEYWORDS.items():
+            if kw in stripped:
+                found_strength = strength
+                break
+
+        if not found_strength:
+            continue
+
+        # 检测是否关联脚本
+        has_script = False
+        script_path = ""
+        for sp in all_scripts:
+            if sp in stripped or sp.split("/")[-1] in stripped:
+                has_script = True
+                script_path = sp
+                break
+
+        # 再检查该行后面几行是否有脚本引用
+        if not has_script:
+            for lookahead in range(1, 4):
+                if lineno + lookahead <= len(lines):
+                    next_line = lines[lineno + lookahead - 1]
+                    for sp in all_scripts:
+                        if sp in next_line or sp.split("/")[-1] in next_line:
+                            has_script = True
+                            script_path = sp
+                            break
+                    if has_script:
+                        break
+
+        cid_counter += 1
+        item = ConstraintItem(
+            cid=f"C-{cid_counter:02d}",
+            text=stripped[:120],
+            lineno=lineno,
+            strength=found_strength,
+            has_script=has_script,
+            script_path=script_path,
+        )
+        constraints.append(item.to_dict())
+
+    return constraints
+
+
+# ═══════════════════════════════════════════════════════
 # 主入口
 # ═══════════════════════════════════════════════════════
 
 def scan(skill_dir: str) -> BlueBook:
-    """对目标技能执行完整蓝皮书扫描"""
+    """对目标技能执行完整蓝皮书扫描（含 S4 阶段A 约束提取）"""
     bb = BlueBook()
 
     # 读取 _meta.json
@@ -351,6 +491,15 @@ if __name__ == "__main__":
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(bb.to_dict(), f, ensure_ascii=False, indent=2)
             print(f"\n蓝皮书 JSON 已保存: {json_path}")
+
+            # S4 阶段A：约束提取
+            constraints = extract_constraints(target)
+            data_dir = os.path.join(target, ".standardization", "skill-function-test", "data")
+            os.makedirs(data_dir, exist_ok=True)
+            cpath = os.path.join(data_dir, ".constraint-list.json")
+            with open(cpath, "w", encoding="utf-8") as f:
+                json.dump(constraints, f, ensure_ascii=False, indent=2)
+            print(f"约束清单已保存: {cpath} ({len(constraints)} 条)")
         else:
             print(f"错误: 目录不存在 {target}")
     else:

@@ -22,17 +22,20 @@ from datetime import datetime
 
 STAGES = {
     1: "备份",
-    2: "蓝皮书扫描",
+    2: "蓝皮书扫描 + 约束提取",
     3: "询问测试计划",
-    4: "场景+功能测试",
+    4: "场景+功能+S4脏环境测试",
     5: "LLM 后处理过滤",
     6: "修复",
     7: "回归循环",
     8: "回归确认",
-    9: "报告输出",
+    9: "报告输出 + S4 坚守率矩阵",
     10: "自动版本号更新",
     11: "清理",
 }
+
+# 数据目录常量（R-12 合规）
+DATA_DIR = os.path.join(".standardization", "skill-function-test", "data")
 
 # ═══════════════════════════════════════════════════════
 # 流程状态
@@ -50,11 +53,14 @@ class PipelineState:
         self.backup_path: str = ""
         self.blueprint: dict = {}
         self.blueprint_text: str = ""
-        self.test_plan: dict = {}        # {dimensions: [], fix_mode: str}
+        self.constraints: list[dict] = []   # S4 阶段A：约束清单
+        self.test_plan: dict = {}        # {dimensions: [], fix_mode: str, s4_enabled: bool}
         self.scenario_report: dict = {}
         self.function_report: dict = {}
         self.scenario_text: str = ""
         self.function_text: str = ""
+        self.s4_matrix: dict = {}        # S4 坚守率矩阵
+        self.s4_matrix_text: str = ""    # S4 坚守率矩阵可读文本
         self.fix_results: list[dict] = []  # [{type, file, success, detail}]
         self.regression_report: dict = {}
         self.regression_text: str = ""
@@ -99,10 +105,10 @@ def stage_1_backup(state: PipelineState) -> PipelineState:
 
 
 def stage_2_blueprint(state: PipelineState) -> PipelineState:
-    """阶段2: 蓝皮书扫描"""
-    from inspector import scan, print_bluebook
+    """阶段2: 蓝皮书扫描 + S4 阶段A 约束提取"""
+    from inspector import scan, print_bluebook, extract_constraints
     print(f"\n{'='*50}")
-    print(f"  阶段2/8: 蓝皮书扫描")
+    print(f"  阶段2/8: 蓝皮书扫描 + 约束提取")
     print(f"{'='*50}")
 
     bb = scan(state.skill_dir)
@@ -111,29 +117,52 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
     print(state.blueprint_text)
 
     # 保存到目标技能目录
-    bp_path = os.path.join(state.skill_dir, ".scenario-test_blueprint.json")
+    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+    os.makedirs(s4_data_dir, exist_ok=True)
+
+    bp_path = os.path.join(s4_data_dir, ".scenario-test_blueprint.json")
     with open(bp_path, "w", encoding="utf-8") as f:
         json.dump(state.blueprint, f, ensure_ascii=False, indent=2)
     print(f"\n  蓝皮书已保存: {bp_path}")
 
+    # S4 阶段A：约束提取
+    print("\n  [S4 阶段A] 提取约束...")
+    constraints = extract_constraints(state.skill_dir)
+    state.constraints = constraints
+    cpath = os.path.join(s4_data_dir, ".constraint-list.json")
+    with open(cpath, "w", encoding="utf-8") as f:
+        json.dump(constraints, f, ensure_ascii=False, indent=2)
+    print(f"  [S4] 约束清单已保存: {cpath} ({len(constraints)} 条)")
+
+    # 打印约束摘要
+    if constraints:
+        from s4_engine import print_constraint_summary
+        print(print_constraint_summary(constraints))
+
     state.log_stage(2, "ok",
-        f"文件: {state.blueprint['file_count']} | 函数: {len(state.blueprint.get('functions',[]))}")
+        f"文件: {state.blueprint['file_count']} | 函数: {len(state.blueprint.get('functions',[]))} | "
+        f"约束: {len(constraints)} 条")
     return state
 
 
 def stage_3_ask(state: PipelineState) -> PipelineState:
     """
-    阶段3: 询问测试计划
-    LLM 交互点 — 展示给用户，收集输入后返回
+    阶段3: 展示配置计划（LLM 交互点）
+    基于 .test-config.json 展示当前配置，允许修改
     """
     print(f"\n{'='*50}")
-    print(f"  阶段3/8: 询问测试计划（LLM 交互点）")
+    print(f"  阶段3/8: 展示配置计划（LLM 交互点）")
     print(f"{'='*50}")
 
     bp = state.blueprint
     func_count = len(bp.get("functions", []))
     class_count = len(bp.get("classes", []))
     file_count = bp.get("file_count", 0)
+
+    # 读取配置文件
+    from test_config import load_config, format_config, _fix_mode_text_scenario, _fix_mode_text_function
+
+    cfg = load_config(state.skill_dir)
 
     print(f"""
 ╔══════════════════════════════════════════════╗
@@ -144,45 +173,71 @@ def stage_3_ask(state: PipelineState) -> PipelineState:
 ║  文件: {file_count:<4d} 个                  ║
 ║  函数: {func_count:<4d} 个                  ║
 ║  类:   {class_count:<4d} 个                  ║
+║  约束: {len(state.constraints):<4d} 条 (S4)  ║
 ╚══════════════════════════════════════════════╝
 
-=== 可测试的场景和维度 ===
-序号 | 代号                     | 说明
------|--------------------------|------------------------------------------
-1    | S1 场景链路完整性         | 触发词→能力→流程→代码是否完整匹配
-2    | S2 场景输入产出匹配       | 场景输入是否有对应函数实现
-3    | S3 场景数据流正确性       | 步骤间数据传递是否连续
-4    | D1 基础功能完整性         | 语法解析、函数存在性
-5    | D2 流程断点检测           | 文件引用、import 链
-6    | D3 数据污染检测           | 硬编码路径、DB 交叉
-7    | D4 噪音/干扰检测          | 裸 print、副效应
-8    | D5 计算正确性             | 零除风险、数值精度
-9    | D6 边界鲁棒性             | 异常处理、空值保护
+=== 当前配置（来自 .test-config.json）===
+""".strip())
 
-请选择测试范围（逗号分隔序号如 "1,2,3,4,5" 或 "all"）:
-修复模式: [0] 仅报告 / [1] 直接修复 / [2] 询问后修复
-    """.strip())
+    print(format_config(cfg))
 
-    # LLM 在此收集用户输入并设置 state.test_plan
-    # test_plan = {"dimensions": [...], "fix_mode": 0/1/2}
+    print("""
+── 允许以下操作 ──
+  • 直接按当前配置执行（输入 yes/y）
+  • 修改配置（输入 cfg <命令>）:
+       cfg show                       — 查看配置
+       cfg rounds <N>                 — 设置全局轮数
+       cfg fix_mode scenario <0|1>    — 场景修复模式
+       cfg fix_mode function <0|1|2>  — 功能修复模式
+       cfg s4 on/off                  — 开启/关闭 S4
+       cfg s4 rounds <N>              — S4独立轮数
+       cfg <dim> on/off               — 开关某个维度
+       cfg reset                      — 重置默认
+       cfg html                       — 打开 HTML 配置界面
+  • 取消（输入 no/n）
+""")
 
-    state.log_stage(3, "pending", "等待 LLM 收集用户选择")
+    # 更新 state.test_plan 中的配置字段
+    from test_config import get_active_tests, get_s4_rounds
+    active = get_active_tests(cfg)
+    fm = cfg.get("fix_mode", {})
+    state.test_plan = {
+        "dimensions": active,
+        "fix_mode": fm,
+        "rounds": cfg.get("rounds", 3),
+        "s4_enabled": cfg.get("s4", {}).get("enabled", True),
+        "s4_rounds": get_s4_rounds(cfg),
+    }
+
+    state.log_stage(3, "pending", "等待 LLM 收集用户选择/修改配置")
     return state
 
 
 def stage_4_test(state: PipelineState) -> PipelineState:
-    """阶段4: 执行场景+功能测试"""
+    """阶段4: 执行场景+功能+S4脏环境测试（按配置，多轮）"""
     from scenario_engine import run_scenario_test
     from test_engine import run_full_test as run_function_test
+    from s4_engine import load_trace, generate_fidelity_matrix, print_fidelity_matrix
+    from test_config import load_config
     print(f"\n{'='*50}")
-    print(f"  阶段4/8: 执行测试")
+    print(f"  阶段4/8: 执行测试（场景+功能+S4）")
     print(f"{'='*50}")
 
     plan = state.test_plan
     dims = plan.get("dimensions", "all")
+    config = load_config(state.skill_dir)
+
+    # 辅助：判断维度是否启用（支持 "all" 字符串 或 数组 或 逗号字符串）
+    def _has_dim(name: str, alt_id: str = None) -> bool:
+        if dims == "all": return True
+        if isinstance(dims, str):
+            return name in dims or (alt_id and alt_id in dims)
+        if isinstance(dims, list):
+            return name in dims or (alt_id and alt_id in dims)
+        return False
 
     # 场景测试
-    if dims == "all" or any(d in dims for d in ["1", "2", "3"]):
+    if _has_dim("S1", "1") or _has_dim("S2", "2") or _has_dim("S3", "3"):
         print("  [RUN] 场景测试 (S1-S3)...")
         s_report, s_text = run_scenario_test(state.skill_dir, state.blueprint)
         state.scenario_report = s_report
@@ -190,22 +245,67 @@ def stage_4_test(state: PipelineState) -> PipelineState:
         print(s_text)
         print()
 
-    # 功能测试
-    dim_map = {"4": "d1_smoke", "5": "d2_breakpoint", "6": "d3_contamination",
-               "7": "d4_noise", "8": "d5_correctness", "9": "d6_robustness"}
-    if dims == "all":
-        func_dims = None
+    # 功能测试（从配置读取启用的维度）
+    dim_map = {"D1": "d1_smoke", "D2": "d2_breakpoint", "D3": "d3_contamination",
+               "D4": "d4_noise", "D5": "d5_correctness", "D6": "d6_robustness"}
+    func_dims_to_run = []
+    for name, engine_dim in dim_map.items():
+        if _has_dim(name):
+            func_dims_to_run.append(engine_dim)
+
+    if func_dims_to_run:
+        print(f"  [RUN] 功能测试 ({', '.join(dim_map.keys())})...")
+        f_report, f_text = run_function_test(state.skill_dir, func_dims_to_run or None)
+        state.function_report = f_report
+        state.function_text = f_text
+        print(f_text)
     else:
-        func_dims = [dim_map[d] for d in dims if d in dim_map]
+        print("  [SKIP] 功能测试维度未启用")
 
-    print("  [RUN] 功能测试 (D1-D6)...")
-    f_report, f_text = run_function_test(state.skill_dir, func_dims)
-    state.function_report = f_report
-    state.function_text = f_text
-    print(f_text)
+    # S4 脏环境测试（多轮）
+    s4_enabled = config.get("s4", {}).get("enabled", plan.get("s4_enabled", True))
+    if s4_enabled and _has_dim("S4", "10"):
+        s4_rounds = config.get("s4", {}).get("rounds", plan.get("s4_rounds", config.get("rounds", 3)))
+        print(f"\n  [RUN] S4 脏环境忠实度测试 ({s4_rounds} 轮)...")
 
+        all_s4_rounds = []
+        s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+        os.makedirs(s4_data_dir, exist_ok=True)
+
+        for r in range(1, s4_rounds + 1):
+            print(f"\n  ── S4 第 {r}/{s4_rounds} 轮 ──")
+            # 读取分轮 trace（每轮由 LLM 执行时写入圆括号文件）
+            round_file = os.path.join(s4_data_dir, f".s4_trace_r{r}.json")
+            if os.path.exists(round_file):
+                with open(round_file, "r", encoding="utf-8") as f:
+                    round_trace = json.load(f)
+            else:
+                round_trace = load_trace(state.skill_dir)
+                if round_trace and s4_rounds > 1:
+                    trace_backup = os.path.join(s4_data_dir, f".s4_trace_round{r}.json")
+                    with open(trace_backup, "w", encoding="utf-8") as fb:
+                        json.dump(round_trace, fb, ensure_ascii=False, indent=2)
+
+            if round_trace:
+                all_s4_rounds.extend(round_trace)
+                print(f"  [S4] 第 {r} 轮完成: {len(round_trace)} 条噪音")
+            else:
+                print(f"  [S4] 第 {r} 轮: ⚠️ 无执行记录（需 LLM 完成阶段C 噪音执行）")
+
+        # 聚合所有轮次
+        if all_s4_rounds:
+            s4_matrix = generate_fidelity_matrix(all_s4_rounds)
+            state.s4_matrix = s4_matrix
+            state.s4_matrix_text = print_fidelity_matrix(s4_matrix)
+            print(state.s4_matrix_text)
+            print(f"\n  [S4] 坚守率: {all_s4_rounds}: "
+                  f"{sum(1 for t in all_s4_rounds if t.get('llm_behavior')=='坚守')}/{len(all_s4_rounds)}")
+
+    # 更新 state 记录
     state.log_stage(4, "ok",
-        f"场景: {s_report['summary']['total']}项 | 功能: {f_report['summary']['total']}项")
+        f"{'场景已跑' if state.scenario_report else '场景跳过'} | "
+        f"{'功能已跑' if state.function_report else '功能跳过'} | "
+        f"{'S4矩阵' if state.s4_matrix else 'S4跳过'}")
     return state
 
 
@@ -561,16 +661,18 @@ def stage_11_cleanup(state: PipelineState) -> PipelineState:
     print(f"  阶段11/11: 清理")
     print(f"{'='*50}")
 
-    # 1. 清理目标技能目录的测试残留
+    # 1. 清理目标技能目录的测试残留（data 目录中）
+    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
     patterns = [".scenario-test_blueprint.json", ".scenario-test_report.json",
                 ".function-test_blueprint.json", ".function-test_report.json"]
     removed = 0
     for pattern in patterns:
-        fpath = os.path.join(state.skill_dir, pattern)
-        if os.path.exists(fpath):
-            os.remove(fpath)
-            removed += 1
-            print(f"  [CLEAN] 已删除: {pattern}")
+        for base in [state.skill_dir, s4_data_dir]:
+            fpath = os.path.join(base, pattern)
+            if os.path.exists(fpath):
+                os.remove(fpath)
+                removed += 1
+                print(f"  [CLEAN] 已删除: {pattern}")
 
     # 2. 清理备份目录中的旧备份（保留最近 5 个）
     from backup import list_backups
@@ -590,9 +692,9 @@ def stage_11_cleanup(state: PipelineState) -> PipelineState:
 
 
 def stage_9_report(state: PipelineState) -> PipelineState:
-    """阶段8: 输出完整报告"""
+    """阶段8: 输出完整报告（含 S4 坚守率矩阵）"""
     print(f"\n{'='*50}")
-    print(f"  阶段9/11: 输出报告")
+    print(f"  阶段9/11: 输出报告 + S4 坚守率矩阵")
     print(f"{'='*50}")
 
     lines = []
@@ -608,6 +710,10 @@ def stage_9_report(state: PipelineState) -> PipelineState:
     if state.function_text:
         lines.append("── 功能测试结果 ──")
         lines.append(state.function_text[:500])
+    if state.s4_matrix_text:
+        lines.append("")
+        lines.append("── S4 脏环境忠实度 ──")
+        lines.append(state.s4_matrix_text)
     if state.regression_text:
         lines.append("")
         lines.append(state.regression_text)
@@ -629,19 +735,49 @@ def stage_9_report(state: PipelineState) -> PipelineState:
 # 全流程一键执行
 # ═══════════════════════════════════════════════════════
 
-def run_full(skill_dir: str, dimensions: str = "all", fix_mode: int = 0) -> PipelineState:
+def run_full(skill_dir: str, dimensions: list = None, fix_mode: dict = None) -> PipelineState:
     """
-    全流程一键执行（11 阶段，代码硬编码，不可跳过）
+    全流程一键执行（11 阶段，基于 .test-config.json 配置）
 
     阶段顺序:
-      1 备份 → 2 蓝皮书 → 3 询问 → 4 测试 →
+      1 备份 → 2 蓝皮书+约束 → 3 询问 → 4 测试(按配置+多轮) →
       5 LLM后处理过滤 → 6 修复 → 7 回归循环 → 8 回归确认 →
-      9 报告输出 → 10 自动bump → 11 清理
+      9 报告输出+S4矩阵 → 10 自动bump → 11 清理
 
-    LLM 后处理在修复之前，确保只修真问题、不修误报。
+    参数:
+      skill_dir: 目标技能目录
+      dimensions: 覆盖配置的维度（None=使用配置）
+      fix_mode: 覆盖配置的修复模式 dict，如 {"scenario":0, "function":1}
+
+    配置文件 .test-config.json 控制所有行为。
     """
+    from test_config import load_config, get_active_tests, format_config
+
     state = PipelineState(skill_dir)
-    state.test_plan = {"dimensions": dimensions, "fix_mode": fix_mode}
+
+    # 从配置文件加载测试计划
+    cfg = load_config(skill_dir)
+    active_dims = get_active_tests(cfg)
+
+    state.test_plan = {
+        "dimensions": dimensions or active_dims,
+        "fix_mode": fix_mode if fix_mode is not None else cfg.get("fix_mode", {"scenario": 0, "function": 0}),
+        "rounds": cfg.get("rounds", 3),
+        "s4_enabled": cfg.get("s4", {}).get("enabled", True),
+        "s4_rounds": cfg.get("s4", {}).get("rounds", cfg.get("rounds", 3)),
+    }
+
+    print(f"\n{'='*50}")
+    print(f"  全流程启动 — 基于 .test-config.json")
+    print(f"{'='*50}")
+    print(f"  维度: {', '.join(active_dims)}")
+    fm = state.test_plan['fix_mode']
+    print(f"  场景修复: {['仅报告','尝试修复'][fm.get('scenario',0)]}")
+    print(f"  功能修复: {['仅报告','直接修复','询问后修复'][fm.get('function',0)]}")
+    s4_r = state.test_plan['s4_rounds']
+    print(f"  S4: {'开启' if cfg['s4']['enabled'] else '关闭'} ({s4_r}轮, 仅报告)")
+    print(f"  配置命令: cfg show/reset/rounds/fix_mode/s4/<dim>")
+    print()
 
     state = stage_1_backup(state)
     state = stage_2_blueprint(state)
@@ -678,8 +814,8 @@ def run_pipeline(skill_dir: str, mode: str = "full", dimensions: str = "all", fi
         state = stage_6_regression_loop(state)
         state = stage_7_regression_confirm(state)
         state = stage_7b_llm_filter(state)
-        state = stage_8_report(state)
-        state = stage_9_cleanup(state)
+        state = stage_9_report(state)
+        state = stage_11_cleanup(state)
 
 
 if __name__ == "__main__":

@@ -33,9 +33,9 @@
 ## 风险缓解措施
 
 1. **输入验证**：所有用户输入都经过格式和范围验证
-2. **输出隔离**：输出文件限制在 `data/output/` 目录内
+2. **输出隔离**：输出文件限制在 `.standardization/skill-function-test/data/output/` 目录内
 3. **错误隔离**：单个文件处理失败不影响整体流程
-4. **审计日志**：所有操作记录到 `data/logs/audit.log`
+4. **审计日志**：所有操作记录到 `.standardization/skill-function-test/data/logs/audit.log`
 
 ## 授权方式说明
 

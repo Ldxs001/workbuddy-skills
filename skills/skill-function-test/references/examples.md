@@ -27,7 +27,7 @@
 ### 执行命令
 
 ```bash
-python scripts/skill-function-test_main.py --input input.txt --output output/
+python scripts/runner.py --input input.txt --output output/
 ```
 
 ### 预期输出
@@ -59,7 +59,7 @@ inputs/
 
 ```bash
 for file in inputs/*.txt; do
-  python scripts/skill-function-test_main.py --input "$file" --output output/
+  python scripts/runner.py --input "$file" --output output/
 done
 ```
 
@@ -94,7 +94,7 @@ output/
 ### 执行命令
 
 ```bash
-python scripts/skill-function-test_main.py --input input.txt --config references/config.json
+python scripts/runner.py --input input.txt --config references/config.json
 ```
 
 ---
@@ -115,7 +115,7 @@ python scripts/skill-function-test_main.py --input input.txt --config references
 ### 执行命令
 
 ```bash
-python scripts/skill-function-test_main.py --input bad_input.txt --output output/
+python scripts/runner.py --input bad_input.txt --output output/
 ```
 
 ### 预期错误输出
@@ -132,7 +132,7 @@ python scripts/skill-function-test_main.py --input bad_input.txt --output output
 
 ```bash
 # 修复输入文件后重试
-python scripts/skill-function-test_main.py --input fixed_input.txt --output output/ --retry
+python scripts/runner.py --input fixed_input.txt --output output/ --retry
 ```
 
 ---
