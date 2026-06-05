@@ -479,8 +479,11 @@ if __name__ == "__main__":
         if os.path.isdir(target):
             report, text = run_full_test(target, dims)
             print(text)
-            # 保存报告
-            report_path = os.path.join(target, ".function-test_report.json")
+            # 保存报告到数据目录（R-12 合规）
+            from test_config import config_path as _cfg
+            _rd = os.path.dirname(_cfg(target))
+            os.makedirs(_rd, exist_ok=True)
+            report_path = os.path.join(_rd, ".function-test_report.json")
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(report, f, ensure_ascii=False, indent=2)
             print(f"\n报告 JSON 已保存: {report_path}")

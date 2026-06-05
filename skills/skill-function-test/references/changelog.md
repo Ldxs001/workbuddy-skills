@@ -1,5 +1,8 @@
+## 0.2.21 (2026-06-05)
+- [fix] test_engine.py/scenario_engine.py: CLI 报告保存路径改为 DATA_DIR（非 skill 根目录），R-11 合规
+
 ## 0.2.20 (2026-06-05)
-- [fix] test_config.py: format_config 移除未定义变量 s4 引用（第176行 UnboundLocalError），修复 LLM 交互管道 Stage 3 崩溃
+- [fix] test_config.py: format_config 删除未定义变量 s4 引用（第176行 UnboundLocalError），修复 LLM 交互管道 Stage 3 崩溃
 
 ## 0.2.19 (2026-06-05)
 
