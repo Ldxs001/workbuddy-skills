@@ -638,6 +638,79 @@ class CLIHandler:
 
         user_specified = getattr(args, "user_specified", False) or getattr(args, "user", False)
 
+        # ═══════════════════════════════════════════════════
+        # [强制钩子] 技能能力扫描 — 创建链前必须扫描每个引用的技能
+        # ═══════════════════════════════════════════════════
+        skill_names_in_chain = set()
+        for s in steps:
+            if s.get("type") == "skill":
+                skill_names_in_chain.add(s.get("skill_name", ""))
+            elif s.get("type") == "branch":
+                for ss in s.get("branch", {}).get("if_steps", []):
+                    if ss.get("type") == "skill":
+                        skill_names_in_chain.add(ss.get("skill_name", ""))
+                for ss in s.get("branch", {}).get("else_steps", []):
+                    if ss.get("type") == "skill":
+                        skill_names_in_chain.add(ss.get("skill_name", ""))
+
+        if skill_names_in_chain:
+            print(f"\n{'='*55}")
+            print(f"  [能力扫描] 分析链路中引用的技能")
+            print(f"{'='*55}")
+            from skill_extractor import extract_all as extract_skill_info
+            skills_dir = self.chain_manager.skills_dir if hasattr(self.chain_manager, 'skills_dir') else Path.home() / ".workbuddy" / "skills"
+            for sname in sorted(skill_names_in_chain):
+                sk_path = Path(skills_dir) / sname
+                if not sk_path.exists():
+                    print(f"  ⚠️  技能目录不存在: {sname}")
+                    continue
+                info = extract_skill_info(sname, skill_path=sk_path, use_cache=False)
+                if info.get("error"):
+                    print(f"  ⚠️  {sname}: {info['error']}")
+                    continue
+                triggers = info.get("trigger_keywords", [])
+                desc = info.get("description", "")[:80]
+                ver = info.get("version", "?")
+                cmds = info.get("core_commands", [])
+                steps_info = info.get("key_steps", [])
+                print(f"\n  ── {sname} v{ver} ──")
+                print(f"     描述: {desc}")
+                if triggers:
+                    print(f"     触发: {', '.join(str(t)[:30] for t in triggers[:3])}")
+                if cmds:
+                    print(f"     核心指令: {', '.join(c[:40] if isinstance(c,str) else str(c)[:40] for c in cmds[:3])}")
+                if steps_info:
+                    print(f"     关键步骤: {len(steps_info)} 个")
+                print()
+            print(f"{'='*55}\n")
+
+        # ═══════════════════════════════════════════════════
+        # [强制钩子] 缺口分析与步骤规划 — 扫描后强制检查缝合点
+        # ═══════════════════════════════════════════════════
+        if len(steps) > 1:
+            print(f"{'='*55}")
+            print(f"  [缺口分析] 扫描技能衔接点 — {len(steps)} 步骤")
+            print(f"{'='*55}")
+            for i in range(len(steps) - 1):
+                curr = steps[i]
+                nxt = steps[i + 1]
+                if curr.get("type") == "skill" and nxt.get("type") == "skill":
+                    cname = curr.get("skill_name", "?")
+                    cact = curr.get("action", "")[:40]
+                    nname = nxt.get("skill_name", "?")
+                    nact = nxt.get("action", "")[:40]
+                    print(f"  ⛓️ {cname} ({cact})")
+                    print(f"     → 缝合点 →")
+                    print(f"     {nname} ({nact})")
+            print()
+            print(f"  ── LLM 执行规则 ──")
+            print(f"  逐步骤检查缝合点：")
+            print(f"  • 无缺口 → 直接串联（不需要粘连点）")
+            print(f"  • 有缺口 → 插入 adhesion 步骤（类型可选：manual/auto/hybrid）")
+            print(f"  • 禁止连续粘连点（两个 adhesion 步骤必须合并）")
+            print(f"  • 粘连点占比不得超过 30%")
+            print(f"{'=' * 55}\n")
+
         # 定时/自动化关键字检测 —— 强制提醒，不靠 AI 自觉（v1.25.0）
         _TIMING_KEYWORDS = ["每天", "每周", "每月", "每年", "定时", "定期", "自动化", "自动执行",
                             "cron", "每小时", "每分", "每", "定期执行", "周期"]
@@ -661,6 +734,34 @@ class CLIHandler:
         success, message = self.chain_manager.create_chain(name, description, purpose, tags, steps, user_specified=user_specified, schedule=schedule)
         if success:
             print(f"✅ {message}")
+
+            # ═══════════════════════════════════════════════
+            # [强制钩子] 创建后自动校验
+            # ═══════════════════════════════════════════════
+            print(f"\n  [自动校验] 验证链结构和流程...")
+            try:
+                from chain_structure_checker import check as structure_check
+                result = structure_check(steps)
+                if result.get("passed", False):
+                    print(f"  ✅ 结构校验通过 ({len(result.get('issues', []))} 个问题)")
+                else:
+                    issues = result.get("issues", [])
+                    for iss in issues:
+                        print(f"  ❌ {iss.get('message', '?')}")
+            except ImportError:
+                pass
+
+            try:
+                from chain_flow_validator import validate_flow
+                vresult = validate_flow(steps)
+                if vresult.get("passed", False):
+                    print(f"  ✅ 流程校验通过")
+                else:
+                    for err in vresult.get("errors", []):
+                        print(f"  ❌ [流程] {err.get('message', '?')}")
+            except ImportError:
+                pass
+
             if schedule:
                 print("")
                 print("=" * 60)
@@ -674,7 +775,12 @@ class CLIHandler:
                 print("  AI 必须立即完成注册，否则调度不会生效：")
                 print(f"    选项1: 调用平台调度注册接口")
                 print(f"    选项2: chain_manager.py register-schedule --name \"{name}\"")
+                print()
+                print("  ⛔ 调度未注册 — exit(1) 截断")
+                print("  🚫 LLM 必须完成注册后再继续")
                 print("=" * 60)
+                import sys as _sys
+                _sys.exit(1)
             return 0
         else:
             print(f"❌ {message}")
