@@ -54,6 +54,7 @@ class PipelineState:
         self.blueprint: dict = {}
         self.blueprint_text: str = ""
         self.constraints: list[dict] = []   # S4 阶段A：约束清单
+        self.test_scope: list[dict] = []    # S4 阶段A：全量测试范围
         self.test_plan: dict = {}        # {dimensions: [], fix_mode: str, s4_enabled: bool}
         self.scenario_report: dict = {}
         self.function_report: dict = {}
@@ -126,7 +127,7 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
         json.dump(state.blueprint, f, ensure_ascii=False, indent=2)
     print(f"\n  蓝皮书已保存: {bp_path}")
 
-    # S4 阶段A：约束提取
+    # S4 阶段A：约束提取 + 全量测试范围生成
     print("\n  [S4 阶段A] 提取约束...")
     constraints = extract_constraints(state.skill_dir)
     state.constraints = constraints
@@ -135,14 +136,20 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
         json.dump(constraints, f, ensure_ascii=False, indent=2)
     print(f"  [S4] 约束清单已保存: {cpath} ({len(constraints)} 条)")
 
+    print("\n  [S4 阶段A] 生成全量测试范围（蓝皮书+约束+工作流+引用链路）...")
+    from s4_engine import generate_test_scope, save_test_scope
+    full_scope = generate_test_scope(state.skill_dir)
+    save_test_scope(state.skill_dir, full_scope)
+    state.test_scope = full_scope
+
     # 打印约束摘要
     if constraints:
         from s4_engine import print_constraint_summary
-        print(print_constraint_summary(constraints))
+        print(print_constraint_summary(full_scope))
 
     state.log_stage(2, "ok",
         f"文件: {state.blueprint['file_count']} | 函数: {len(state.blueprint.get('functions',[]))} | "
-        f"约束: {len(constraints)} 条")
+        f"全量范围: {len(full_scope)} 项")
     return state
 
 

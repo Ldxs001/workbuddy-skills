@@ -168,8 +168,119 @@ def print_constraint_summary(constraints: list[dict]) -> str:
 
 
 # ═══════════════════════════════════════════════════════
-# 阶段C：Python 噪音播放器（随机化回放引擎）
+# 阶段A-全量测试范围生成（蓝皮书 + 约束 + 流程）
 # ═══════════════════════════════════════════════════════
+
+BLUEPRINT_FILE = os.path.join(DATA_DIR, ".scenario-test_blueprint.json")
+
+
+def load_blueprint(skill_dir: str) -> dict:
+    """加载蓝皮书数据"""
+    bpath = os.path.join(skill_dir, BLUEPRINT_FILE)
+    if not os.path.exists(bpath):
+        return {}
+    with open(bpath, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def generate_test_scope(skill_dir: str) -> list[dict]:
+    """
+    从蓝皮书 + 约束清单 + 工作流程生成全面测试范围。
+
+    比纯约束关键词提取，多了：
+    - 工作流程步骤
+    - 引用链路可达性
+    - 文件清单完整性
+    """
+    scope = []
+    cid_counter = 0
+    bp = load_blueprint(skill_dir)
+
+    # 1. 约束关键词（已有）
+    constraints = load_constraints(skill_dir)
+    for c in constraints:
+        c["source"] = "MD约束"
+        scope.append(c)
+        if c.get("cid", "").startswith("C-"):
+            try:
+                n = int(c["cid"].split("-")[1])
+                if n > cid_counter:
+                    cid_counter = n
+            except:
+                pass
+
+    # 2. 工作流程步骤
+    steps = extract_workflow_steps(skill_dir)
+    for s in steps:
+        cid_counter += 1
+        scope.append({
+            "cid": f"W-{cid_counter:02d}", "source": "工作流程",
+            "strength": "步骤",
+            "text": f"步骤{s['order']}: {s['title']}",
+            "description": s.get("description", "")[:100],
+            "has_script": False, "lineno": 0,
+            "source_type": "workflow_step", "step_order": s["order"],
+        })
+
+    # 3. 引用链路（过滤掉代码块引用）
+    CODE_BLOCK_PATTERNS = ("```", "`", "```bash", "```json", "```text", "```python", "```yaml")
+    for link in bp.get("reference_links", []):
+        target = link.get("target", "")
+        if not target or target.startswith(CODE_BLOCK_PATTERNS):
+            continue
+        # 只保留看起来像文件路径的引用
+        if target and ("." in target or "/" in target or "\\" in target):
+            pass
+        else:
+            continue
+        cid_counter += 1
+        scope.append({
+            "cid": f"L-{cid_counter:02d}", "source": "引用链路",
+            "strength": "路径",
+            "text": f"引用: {target[:40]}",
+            "description": f"来自 {link.get('source', '?')}",
+            "has_script": os.path.exists(os.path.join(skill_dir, target)) if target else False,
+            "lineno": 0, "source_type": "reference_link",
+        })
+
+    # 4. 文件清单
+    for ftype, files in bp.get("file_manifest", {}).items():
+        for fname in files[:5]:
+            cid_counter += 1
+            fpath = os.path.join(skill_dir, fname) if not os.path.isabs(fname) else fname
+            exists = os.path.exists(fpath)
+            scope.append({
+                "cid": f"F-{cid_counter:02d}", "source": "文件清单",
+                "strength": "存在",
+                "text": f"{ftype}: {fname[:35]}",
+                "description": "存在" if exists else "缺失",
+                "has_script": exists, "lineno": 0,
+                "source_type": "file_manifest",
+            })
+
+    return scope
+
+
+def save_test_scope(skill_dir: str, scope: list[dict]):
+    """保存全量测试范围"""
+    spath = os.path.join(skill_dir, DATA_DIR, ".s4_test_scope.json")
+    with open(spath, "w", encoding="utf-8") as f:
+        json.dump(scope, f, ensure_ascii=False, indent=2)
+    print(f"[S4] ✅ 全量测试范围已保存: {spath} ({len(scope)} 项)")
+    from collections import Counter
+    groups = Counter(s.get("source", "?") for s in scope)
+    for src, count in groups.most_common():
+        print(f"      {src}: {count} 项")
+    return scope
+
+
+def load_test_scope(skill_dir: str) -> list[dict]:
+    """加载全量测试范围"""
+    spath = os.path.join(skill_dir, DATA_DIR, ".s4_test_scope.json")
+    if not os.path.exists(spath):
+        return []
+    with open(spath, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 # 原理：LLM 设计噪音方案 → Python 播放器随机化回放
 # 播放器不创造噪音，只对已知噪音做随机变换：
@@ -533,6 +644,7 @@ def print_fidelity_score(result: dict) -> str:
 USAGE = """
 用法:
   python s4_engine.py <skill-dir> constraints            — 打印约束清单
+  python s4_engine.py <skill-dir> scope                  — 生成全量测试范围（含蓝皮书+工作流+引用）
   python s4_engine.py <skill-dir> validate <json>        — 校验噪音方案 schema
   python s4_engine.py <skill-dir> report                 — 从 trace 生成坚守率报告
   python s4_engine.py <skill-dir> steps                  — 打印工作流步骤序列
@@ -552,6 +664,11 @@ def main():
     if cmd == "constraints":
         constraints = load_constraints(skill_dir)
         print(print_constraint_summary(constraints))
+
+    elif cmd == "scope":
+        scope = generate_test_scope(skill_dir)
+        save_test_scope(skill_dir, scope)
+        print(print_constraint_summary(scope))
 
     elif cmd == "validate":
         if len(sys.argv) < 4:
