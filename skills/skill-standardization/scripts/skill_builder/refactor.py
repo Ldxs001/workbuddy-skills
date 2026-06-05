@@ -100,6 +100,17 @@ class Refactor:
         print(f"   备份位置: {backup_dir}")
         print(f"   迁移文件: {len(migration_plan)} 个")
 
+        # ═══════════════════════════════════════════════════
+        # [强制钩子] 版本号三端一致验证
+        # ═══════════════════════════════════════════════════
+        print(f"\n{'='*55}")
+        print(f"  ⚠️ 执行完成后，请验证以下三项版本号一致：")
+        print(f"  1. SKILL.md frontmatter version")
+        print(f"  2. _meta.json version")
+        print(f"  3. references/changelog.md 最新条目版本")
+        print(f"  → 运行 audit --verify 确认三端一致")
+        print(f"{'='*55}")
+
     def _dry_run(self, skill_dir):
         """输出迁移计划但不执行"""
         print(f"=== refactor DRY-RUN plan ===")

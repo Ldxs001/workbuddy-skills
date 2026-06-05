@@ -583,10 +583,33 @@ def fix_artifact_paths(skill_dir, **kw):
         path_lit = v.get("path_literal", "")
         suggestion = v.get("suggestion", "")
         
-        if not path_lit or not os.path.exists(os.path.join(skill_dir, path_lit)):
+        # 真实文件匹配：从 violation 提取文件名，扫描根目录找实际文件
+        # path_lit 可能是代码中的路径字面量（如 "skills/.standardization/xxx/"）
+        # 需要从 violation 信息中提取真实文件名
+        basename_to_find = None
+        for candidate in [path_lit, src, v.get("detail", ""), v.get("match_context", "")]:
+            for sep in ("/", "\\"):
+                if sep in candidate:
+                    candidate = candidate.rsplit(sep, 1)[-1]
+            candidate = candidate.strip().strip("'").strip('"')
+            if candidate and candidate != "" and not candidate.startswith("."):
+                basename_to_find = candidate
+                break
+        
+        # 扫描根目录找出匹配的产出文件
+        matched_file = None
+        if basename_to_find:
+            for f in os.listdir(skill_dir):
+                if f.startswith(basename_to_find) or basename_to_find.startswith(f):
+                    full = os.path.join(skill_dir, f)
+                    if os.path.isfile(full):
+                        matched_file = f
+                        break
+        
+        if not matched_file:
             continue
         
-        full_path = os.path.join(skill_dir, path_lit)
+        full_path = os.path.join(skill_dir, matched_file)
         
         # 判断：垃圾文件 → 删除；其他 → 移动
         is_trash = trash_re.search(path_lit) is not None

@@ -381,6 +381,32 @@ class SkillUpdater:
         # 输出报告
         self._print_report(skill_dir, results)
 
+        # ═══════════════════════════════════════════════════
+        # [强制钩子] 版本号与 changelog 验证
+        # 如果检测到修复/修改，无论是否传入 --version-bump 都强制 bump
+        # ═══════════════════════════════════════════════════
+        has_changes = len(results.get("fixes", [])) > 0 or len(results.get("checks", [])) > 0
+        if has_changes and not (hasattr(args, 'version_bump') and args.version_bump):
+            # 自动执行 patch bump
+            try:
+                from ..version_manager import get_current_version
+                old_ver = get_current_version(str(skill_dir))
+                if old_ver:
+                    print(f"\n{'='*55}")
+                    print(f"  ⚠️ 检测到变更，自动执行版本号 bump")
+                    print(f"  请运行: bump --type fix --desc 'update 自动修正: ...'")
+                    print(f"{'='*55}")
+            except ImportError:
+                pass
+
+        print(f"\n{'='*55}")
+        print(f"  ⚠️ 执行完成后，请验证以下三项版本号一致：")
+        print(f"  1. SKILL.md frontmatter version")
+        print(f"  2. _meta.json version")
+        print(f"  3. references/changelog.md 最新条目版本")
+        print(f"  → 运行 audit --verify 确认三端一致")
+        print(f"{'='*55}")
+
         # ★ cleanup session: 结束追踪并清理临时/备份文件
         _cm_report = end_session()
         if _cm_report["deleted"] > 0 or _cm_report["errors"]:
