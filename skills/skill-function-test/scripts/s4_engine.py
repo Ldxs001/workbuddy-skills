@@ -1,5 +1,5 @@
 """
-s4_engine.py — S4 脏环境忠实度测试引擎
+s4_engine.py — S4 执行忠实度测试引擎
 
 S4 四阶段：
   阶段A: 约束提取（在 inspector.py 中完成，产出 .constraint-list.json）
@@ -601,7 +601,7 @@ def print_fidelity_matrix(matrix: dict) -> str:
     s = matrix["summary"]
     lines = [
         "=" * 62,
-        "  S4 脏环境忠实度测试 — 坚守率矩阵",
+        "  S4 执行忠实度测试 — 坚守率矩阵",
         "=" * 62,
         f"  总计: {s['total']}  | 坚守: {s['坚守']}  | 失守: {s['失守']}  | 坚守率: {s['坚守率']}",
         "",

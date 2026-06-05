@@ -15,7 +15,7 @@
 
 **场景测试 vs 功能测试 vs S4：**
 
-| | 场景测试 | 功能测试 | S4 脏环境 |
+| | 场景测试 | 功能测试 | S4 执行忠实度 |
 |--|---------|---------|----------|
 | 输入 | SKILL.md 声明了什么 | 代码里有什么 | 技能的铁律/约束 |
 | 输出 | "历时估算场景：CPM→MC 参数传递断链" | "calc_cpm 语法正确" | "C-07 备份铁律在L4下坚守率100%，C-12回归约束在L3下坚守率33%" |
@@ -70,7 +70,7 @@ inspector.py 自动执行：
 文件: 14 个 Python, 6 个 MD
 函数: 32 个
 场景: 5 条 (源于 trigger 字段)
-约束: 12 条 (S4 脏环境测试)
+约束: 12 条 (S4 执行忠实度测试)
 
 === 可测试的场景和维度 ===
 S1 场景链路完整性     — 触发词→能力→流程→代码是否完整匹配
@@ -82,11 +82,11 @@ D3 数据污染检测       — 硬编码路径、DB 交叉
 D4 噪音/干扰检测      — 裸 print、副效应
 D5 计算正确性        — 零除风险、数值精度
 D6 边界鲁棒性        — 异常处理、空值保护
-S4 脏环境忠实度      — 噪音/污染下铁律坚守率
+S4 执行忠实度忠实度      — 噪音/污染下铁律坚守率
 
 请选择测试范围（逗号分隔序号或 "all"）:
 修复模式: [0] 仅报告 / [1] 直接修复 / [2] 询问后修复
-是否执行 S4 脏环境测试: [y/N]
+是否执行 S4 执行忠实度测试: [y/N]
 ```
 
 ### 阶段 4：场景+功能+S4 测试
@@ -103,12 +103,12 @@ python scripts/test_engine.py /path/to/target-skill
 # S4 全量范围（手动执行）
 python scripts/s4_engine.py /path/to/target-skill scope
 
-# S4 脏环境测试（LLM 主导，数据存储在 .standardization/skill-function-test/data/ 下）
+# S4 执行忠实度测试（LLM 主导，数据存储在 .standardization/skill-function-test/data/ 下）
 # 查看坚守率矩阵
 python scripts/s4_engine.py /path/to/target-skill report
 ```
 
-S4 脏环境测试流程：
+S4 执行忠实度测试流程：
 1. **阶段A：全量测试范围生成** — 从蓝皮书提取约束+引用链路+工作流程+文件清单，产出 `.s4_test_scope.json`
 2. **阶段B：LLM推理层** — 读取全量范围 → 按硬控制模板推理 → 产出噪音方案 → schema 校验
 3. **阶段C：噪音执行** — 逐条执行噪音方案 → 记录坚守/失守 → 保存在 `.standardization/skill-function-test/data/.s4_trace.json`
@@ -133,7 +133,7 @@ python scripts/s4_engine.py /path/to/target-skill repair --dry-run # 预览不�
 | **1 直接修复** | 对 F-0 BLOCK 和 F-1 WARN 级问题执行自动修复 |
 | **2 询问后修复** | 逐条展示问题，询问用户是否修复：`[F-1] 零除风险: scripts/engine.py:42 — 修复？[y/N]` |
 
-> ⚠️ S4 脏环境测试仅报告、不修复。S4 坚守率矩阵仅记录在报告中，不触发修复流程。
+> ⚠️ S4 执行忠实度测试仅报告、不修复。S4 坚守率矩阵仅记录在报告中，不触发修复流程。
 
 ### 阶段 6：修复→回归循环
 

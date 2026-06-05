@@ -24,7 +24,7 @@ STAGES = {
     1: "备份",
     2: "蓝皮书扫描 + 约束提取",
     3: "询问测试计划",
-    4: "场景+功能+S4脏环境测试",
+    4: "场景+功能+S4执行忠实度测试",
     5: "LLM 后处理过滤",
     6: "修复",
     7: "回归循环",
@@ -222,7 +222,7 @@ def stage_3_ask(state: PipelineState) -> PipelineState:
 
 
 def stage_4_test(state: PipelineState) -> PipelineState:
-    """阶段4: 执行场景+功能+S4脏环境测试（按配置，多轮）"""
+    """阶段4: 执行场景+功能+S4执行忠实度测试（按配置，多轮）"""
     from scenario_engine import run_scenario_test
     from test_engine import run_full_test as run_function_test
     from s4_engine import load_trace, generate_fidelity_matrix, print_fidelity_matrix, extract_workflow_steps, print_workflow_steps, generate_fidelity_score, print_fidelity_score
@@ -270,11 +270,11 @@ def stage_4_test(state: PipelineState) -> PipelineState:
     else:
         print("  [SKIP] 功能测试维度未启用")
 
-    # S4 脏环境测试（多轮）
+    # S4 执行忠实度测试（多轮）
     s4_enabled = config.get("s4", {}).get("enabled", plan.get("s4_enabled", True))
     if s4_enabled and _has_dim("S4", "10"):
         s4_rounds = config.get("s4", {}).get("rounds", plan.get("s4_rounds", config.get("rounds", 3)))
-        print(f"\n  [RUN] S4 脏环境忠实度测试 ({s4_rounds} 轮)...")
+        print(f"\n  [RUN] S4 执行忠实度忠实度测试 ({s4_rounds} 轮)...")
 
         # 先用 Python 播放器生成随机化噪音脚本
         try:
@@ -391,7 +391,7 @@ def stage_4_test(state: PipelineState) -> PipelineState:
             # [强制] S4 已启用但无执行记录 → exit(1) 截断
             # ═══════════════════════════════════════════════
             print(f"\n{'='*55}")
-            print(f"  ⛔ S4 脏环境测试已开启，但无噪音执行记录")
+            print(f"  ⛔ S4 执行忠实度测试已开启，但无噪音执行记录")
             print(f"  🚫 LLM 必须完成以上步骤后再继续")
             print(f"  🚫 执行完毕后重新运行全流程")
             print(f"{'='*55}")
@@ -809,7 +809,7 @@ def stage_9_report(state: PipelineState) -> PipelineState:
         lines.append(state.function_text[:500])
     if state.s4_matrix_text:
         lines.append("")
-        lines.append("── S4 脏环境忠实度 ──")
+        lines.append("── S4 执行忠实度忠实度 ──")
         lines.append(state.s4_matrix_text)
     if state.s4_score:
         lines.append("")

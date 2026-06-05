@@ -189,7 +189,7 @@ python s4_engine.py /path/to/target-skill repair --dry-run # 预览
 ## 输出：S4 坚守率矩阵
 
 ```
-S4 脏环境忠实度 — 技能: activity-duration-estimation v1.3.2
+S4 执行忠实度 — 技能: activity-duration-estimation v1.3.2
 
 ┌──────────────────────────────────────┬──────────┬──────────┬──────────┬─────────┐
 │ 噪音类型                             │ 轮次1    │ 轮次2    │ 轮次3    │ 坚守率   │
