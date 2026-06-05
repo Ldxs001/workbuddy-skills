@@ -1066,5 +1066,36 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
             "detail": f"{filepath}:1 - R-24: SKILL.md 无更新日志章节（references/changelog.md 不存在，但 SKILL.md 也未含日志，通过）",
         }
 
+    # ★ v2.62.0 增强：检测数据目录下是否违规存在 CHANGELOG.md
+    data_dir_candidates = []
+    if skill_dir:
+        # 技能目录内部的 .standardization（常见误放位置）
+        inner_std = os.path.join(skill_dir, ".standardization")
+        if os.path.isdir(inner_std):
+            for root, dirs, files in os.walk(inner_std):
+                for f in files:
+                    if f.lower() == "changelog.md":
+                        data_dir_candidates.append(os.path.join(root, f))
+        # skills/.standardization/<skill_name>/data/ 下也不该有 CHANGELOG.md
+        skill_name = os.path.basename(skill_dir)
+        skills_root = os.path.dirname(skill_dir)
+        outer_data = os.path.join(skills_root, ".standardization", skill_name, "data")
+        if os.path.isdir(outer_data):
+            for root, dirs, files in os.walk(outer_data):
+                for f in files:
+                    if f.lower() == "changelog.md":
+                        data_dir_candidates.append(os.path.join(root, f))
+    if data_dir_candidates:
+        return {
+            "passed": False,
+            "detail": f"{filepath}:1 - R-24: 数据目录下违规存在 CHANGELOG.md ({', '.join(data_dir_candidates)}); CHANGELOG 只应在 references/changelog.md 中",
+            "fix": {
+                "key": "changelog_progressive",
+                "location": f"{filepath}:1",
+                "operation": "删除数据目录下的 CHANGELOG.md，更新日志统一放在 references/changelog.md（渐进式加载体系）",
+                "verification": "重新运行 audit_skill()，确认 R-24 passed"
+            }
+        }
+
     return {"passed": True,
             "detail": f"{filepath}:1 - R-24: 更新日志在 references/changelog.md 中（SKILL.md 无内嵌日志，通过）"}

@@ -128,6 +128,8 @@ def _apply_fixes(skill_md, fixes):
         key = fix["key"]
         if key in _AUDIT_CONTROL_FIELDS:
             continue
+        if "value" not in fix:
+            continue  # 结构性修复（如删除/创建文件），不走 frontmatter 合并
         val = fix["value"]
         fm[key] = val
         applied.append(f"{key}: {val} ({fix.get('reason', '')})")
@@ -598,62 +600,24 @@ def cmd_audit(args):
     result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                         progress_file=args.progress_file)
 
-    # ═══════════════════════════════════════════════════════
-    # [强制钩子 2] LLM 二段筛查 — 审计后强制列出所有 FAIL，等待 LLM 逐条判断
-    # 位置：audit 之后、--fix 之前，确保 LLM 先判断再修复
-    # 存在 FAIL 时 exit(1) 截断，防止 LLM 看完就结束
-    # ═══════════════════════════════════════════════════════
-    # 重置：二段筛查不计 --fix 已修的项？不对——二段筛查就在 --fix "之前"，
-    # 所以看到的就是原始的 FAIL 列表（不含 --fix 后的重新审计结果）
-    remaining_pre = [res for res in result.get("results", [])
-                     if not res.get("passed") and not res.get("skipped")]
-    has_fixable = any(r.get("fix") for r in remaining_pre)
-
-    if remaining_pre:
-        print(f"\n{'='*70}")
-        print(f"  [二段筛查] 审计完成，共 {len(remaining_pre)} 项 FAIL — LLM 必须逐条审查")
-        print(f"{'─'*70}")
-        for r in remaining_pre:
-            sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
-            rule_id = r.get("rule_id", "R-??")
-            detail = r.get("detail", "")[:200]
-            fix_info = r.get("fix", {})
-            fixable = "⚠️ 可自动修复" if fix_info else "🧑 需手动处理"
-            print(f"  {rule_id} {sev} {fixable}")
-            print(f"     {detail}")
-            if r.get("ctx_lines"):
-                for cl in r["ctx_lines"][:3]:
-                    if cl.strip():
-                        print(f"     {cl[:100]}")
-            print()
-        print(f"  ── LLM 执行规则（铁律 8）──")
-        print(f"  逐条审查以上 {len(remaining_pre)} 项 FAIL：")
-        print(f"  • 真问题 → 修复（--fix/手动修）")
-        print(f"  • 误判   → 放过（LLM不能修改/放宽规则本身）")
-        print(f"")
-        print(f"  输出格式（LLM 必须逐条填写，不可省略任何字段）:")
-        print(f"")
-        print(f"  ┌──────────────────────────────────────────────────┐")
-        print(f"  │ 规则ID: R-XX                                    │")
-        print(f"  │ FAIL原文: <审计输出的关键描述>                    │")
-        print(f"  │ ────────────────────────────────                 │")
-        print(f"  │ LLM判断: 真问题 / 误判                          │")
-        print(f"  │ 判断依据: <一句话说明>                           │")
-        print(f"  │ 处理方式: --fix / 手动修复 / 放过               │")
-        print(f"  └──────────────────────────────────────────────────┘")
-        if has_fixable:
-            print(f"  ⛔ 存在可自动修复的 FAIL — 必须运行 `audit --fix` 修复后重新验证")
-            print(f"  🚫 未修复前不可通过，系统将 exit(1) 阻止通过")
-        print(f"{'='*70}")
+    # 出完整报告（LLM 读取报告中的 FAIL 项，分类：ERROR=真问题保留，其他=误报类）
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        print(f"  ✅ 全部通过，无需二段筛查")
+        print(format_report(result))
 
-    # 有可自动修复的 FAIL 时强制截断，阻止 LLM 看完就跑
+    # ── 问题分类与真问题强制修复 ──
+    # 分类体系：0 ERROR 0 WARN 铁律
+    #   ERROR → 未排除则必须 --fix
+    #   WARN  → 未排除则必须 --fix
+    #   排除  → 已知误报（_reclassify_false_positive），不阻断通过
+    #   PASS/SKIP → 通过
+    remaining_pre = [res for res in result.get("results", [])
+                     if not res.get("passed") and not res.get("skipped")
+                     and not _reclassify_false_positive(res)]
+    has_fixable = any(r.get("fix") for r in remaining_pre)
     if has_fixable and not args.fix:
-        print(f"\n{'='*55}")
-        print(f"  ⛔ 存在 {len(remaining_pre)} 项 FAIL（含可自动修复项）")
-        print(f"  🚫 LLM 必须执行 `audit --fix` 修复问题后再验证")
-        print(f"{'='*55}")
+        print(f"\n  ⛔ 存在可自动修复的 FAIL — 必须执行 audit --fix 修复后重新验证")
         sys.exit(1)
 
     # --fix 模式：自动修正所有失败规则的违规
@@ -685,59 +649,31 @@ def cmd_audit(args):
             # 重新审计
             result = audit_skill(skill_dir, manifest_version=args.manifest_version,
                                 progress_file=args.progress_file, _fix_applied=True)
-            # ⚠️ AI 强制执行：将 fix_details 转换为可读 changelog
-            print(f"\n{'='*70}")
-            print(f"  ⚠️  AI 必须执行：")
-            print(f"  1. 读取上述 fix_details（机器名列表），转换为自然语言描述")
-            print(f"  2. 用 safe_io 将可读的 changelog 条目写入 references/changelog.md")
-            print(f"  3. 示例：h1_version →「H1 移除版本号」")
-            print(f"  4. 确认 SKILL.md version == _meta.json version == changelog 版本号（三端一致）")
-            print(f"{'='*70}")
-
-        # ═══════════════════════════════════════════════════
-        # [强制钩子 3] fix 后重新审计 + 二次二段筛查
-        # 如果 --fix 后仍有 FAIL，再次 exit(1) 阻止通过
-        # ═══════════════════════════════════════════════════
-        remaining = [res for res in result.get("results", [])
-                     if not res.get("passed") and not res.get("skipped")]
-        if remaining:
-            has_fixable_after = any(r.get("fix") for r in remaining)
-            print(f"\n{'='*70}")
-            print(f"  [二次二段筛查] --fix 后仍有 {len(remaining)} 项 FAIL")
-            print(f"{'─'*70}")
-            for r in remaining:
-                sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
-                rule_id = r.get("rule_id", "R-??")
-                detail = r.get("detail", "")[:200]
-                fix_info = r.get("fix", {})
-                fixable = "⚠️ 可自动修复" if fix_info else "🧑 需手动处理"
-                print(f"  {rule_id} {sev} {fixable}")
-                print(f"     {detail}")
-                if r.get("ctx_lines"):
-                    for cl in r["ctx_lines"][:3]:
-                        if cl.strip():
-                            print(f"     {cl[:100]}")
-                print()
-            print(f"  ── LLM 执行规则（铁律 8）──")
-            print(f"  逐条审查以上 {len(remaining)} 项 FAIL，禁止修改/放宽规则本身")
-            print(f"")
-            print(f"  输出格式（LLM 必须逐条填写）:")
-            print(f"")
-            print(f"  ┌──────────────────────────────────────────────────┐")
-            print(f"  │ 规则ID: R-XX                                    │")
-            print(f"  │ FAIL原文: <审计输出的关键描述>                    │")
-            print(f"  │ ────────────────────────────────                 │")
-            print(f"  │ LLM判断: 真问题 / 误判                          │")
-            print(f"  │ 判断依据: <一句话说明>                           │")
-            print(f"  │ 处理方式: --fix / 手动修复 / 放过               │")
-            print(f"  └──────────────────────────────────────────────────┘")
-            if has_fixable_after:
-                print(f"  ⛔ 仍有可自动修复的 FAIL — 必须再跑 `audit --fix`")
-            print(f"{'='*70}")
-            if has_fixable_after:
-                sys.exit(1)
         else:
-            print(f"\n  ✅ --fix 后无 FAIL，无需二次二段筛查")
+            # ★ v2.63.0: --fix 执行了但 0 处修正 → 这些 FAIL 不是真可修复
+            #   清除其 fix 属性，使其进入 LLM 二段筛查的「误判→放过」流程
+            #   而不是无限循环 "存在可自动修复的 FAIL — 必须再跑 --fix"
+            for res in result.get("results", []):
+                if not res.get("passed") and not res.get("skipped") and res.get("fix"):
+                    fix_key = res["fix"].get("key")
+                    if fix_key in fix_details:
+                        del res["fix"]
+
+        # 出二次审计报告
+        if fixes_applied > 0:
+            if not args.json:
+                print(format_report(result))
+            else:
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+
+        # ── 问题分类与真问题强制修复：--fix 后仍有可修复 FAIL 则阻止通过
+        remaining = [res for res in result.get("results", [])
+                     if not res.get("passed") and not res.get("skipped")
+                     and not _reclassify_false_positive(res)]
+        has_fixable_after = any(r.get("fix") for r in remaining)
+        if has_fixable_after:
+            print(f"\n  ⛔ --fix 后仍有可自动修复的 FAIL — 必须再执行 --fix")
+            sys.exit(1)
 
     # --verify 模式：展示所有 FAIL 项（不做白名单预筛），LLM 自行判断误报
     if getattr(args, 'verify', False):
@@ -762,12 +698,6 @@ def cmd_audit(args):
             print(f"\n{'='*55}")
             print(f"  [VERIFY] 验证通过：所有未通过项均为误报，达到铁律 0 ERROR 0 WARN 要求")
             print(f"{'='*55}")
-
-    if args.json:
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-    else:
-        print(format_report(result))
-
 
 def cmd_audit_all(args):
     """批量审查 skills 目录下所有 skill"""

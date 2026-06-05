@@ -1,3 +1,10 @@
+## 2.63.5 (2026-06-05)
+
+### 修复
+- __init__.py: 移除二段筛查文本附录、移除 has_fixable sys.exit(1) 死循环、移除 --fix 后二次附录、修复 0处修正死循环; structure_checker.py: 移除 R-24 data/目录过度扫描; fix.py: 移除 changelog_progressive fix_key
+
+---
+
 ## 2.63.4 (2026-06-05)
 
 ### 修复

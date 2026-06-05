@@ -624,13 +624,21 @@ def fix_artifact_paths(skill_dir, **kw):
             to_delete.append((full_path, f"垃圾文件: {suggestion}"))
         else:
             # 有意义文件：移到正确位置
+            # ★ CHANGELOG.md / changelog.md 是渐进式参考文件，不属于数据目录
+            #   应保持或迁到 references/changelog.md，绝不可迁到 data/
+            if os.path.basename(path_lit).lower() in ("changelog.md",):
+                print(f"  [跳过] {path_lit} 是渐进式参考文件，不迁移到数据目录（应在 references/changelog.md）")
+                continue
+
             # suggestion 格式：skills/.standardization/<skill>/<cat>/<fname>
             # 提取目标目录
             if "/" in suggestion:
                 parts = suggestion.replace("skills/.standardization/", "").split("/")
                 if len(parts) >= 2:
                     cat = parts[1]  # outputs/data/cache/temp
-                    dst_dir = os.path.join(skill_dir, ".standardization", skill_name, cat)
+                    # ★ v2.62.x 根因修复：目标路径应基于 skills/ 根，不是 skill_dir 内部
+                    skills_root = os.path.dirname(os.path.abspath(skill_dir))
+                    dst_dir = os.path.join(skills_root, ".standardization", skill_name, cat)
                     to_move.append((full_path, dst_dir, suggestion))
     
     # ── 执行删除 ──
