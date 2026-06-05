@@ -487,9 +487,12 @@ def render_html(cfg: dict) -> str:
     </label>
   </div>
 
-  <div class="btn-row">
+    <div class="btn-row" id="save_btn_row">
     <button class="btn btn-secondary" onclick="resetUI()">重置为默认</button>
-    <button class="btn btn-primary" onclick="saveAndCopy()">保存配置</button>
+    <button class="btn btn-primary" onclick="saveAndDone()">保存配置</button>
+  </div>
+  <div class="btn-row" id="done_btn_row" style="display:none">
+    <button class="btn btn-primary" onclick="finishSetup()" style="background:#059669;">✅ 完成配置</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -528,12 +531,11 @@ function collectConfig() {{
   }};
 }}
 
-function saveAndCopy() {{
+function saveAndDone() {{
   const cfg = collectConfig();
   const text = JSON.stringify(cfg, null, 2);
   localStorage.setItem('test_config', text);
 
-  // 优先通过 HTTP 服务器直接写盘
   fetch('/save', {{
     method: 'POST',
     headers: {{ 'Content-Type': 'application/json' }},
@@ -542,13 +544,29 @@ function saveAndCopy() {{
   .then(function(r) {{ return r.json(); }})
   .then(function(data) {{
     if (data.ok) {{
-      showMsg('✅ 配置已保存到磁盘');
+      showMsg('✅ 配置已保存，点击「完成配置」关闭服务器');
+      document.getElementById('save_btn_row').style.display = 'none';
+      document.getElementById('done_btn_row').style.display = 'flex';
     }} else {{
       showMsg('❌ 保存失败: ' + (data.error || '未知错误'));
     }}
   }})
   .catch(function() {{
-    showMsg('⚠️ 配置服务器未启动');
+    showMsg('⚠️ 服务器未响应');
+  }});
+}}
+
+function finishSetup() {{
+  fetch('/done')
+  .then(function(r) {{ return r.json(); }})
+  .then(function(data) {{
+    if (data.ok) {{
+      showMsg('✅ 配置已完成，可关闭此页面');
+      document.getElementById('done_btn_row').style.display = 'none';
+    }}
+  }})
+  .catch(function() {{
+    showMsg('⚠️ 服务器未响应');
   }});
 }}
 
@@ -660,7 +678,13 @@ class ConfigHandler(http.server.SimpleHTTPRequestHandler):
 
     def _handle_done(self):
         self._send_json({"ok": True, "closed": True})
-        # 服务器关闭由主线程检测
+        # 创建标志文件，通知主线程关闭服务器
+        try:
+            flag = os.path.join(self.skill_dir, ".settings_done")
+            with open(flag, "w") as f:
+                f.write("done")
+        except Exception:
+            pass
 
     def log_message(self, format, *args):
         pass  # 安静模式，不打印 HTTP 日志
@@ -679,7 +703,7 @@ def find_available_port(start=8080, end=8999):
 
 
 def start_server(skill_dir: str):
-    """启动 HTTP 配置服务器"""
+    """启动 HTTP 配置服务器（自动重试端口）"""
     from test_config import render_html
 
     # 确保 HTML 存在
@@ -690,29 +714,50 @@ def start_server(skill_dir: str):
         with open(html_file, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-    port = find_available_port()
-    if port is None:
-        print("[CFG] ❌ 无可用端口（8080-8999 均被占用）")
-        return
-
     # 注入路径到 handler
     ConfigHandler.skill_dir = skill_dir
     ConfigHandler.html_path = html_file
 
-    server = http.server.HTTPServer(("localhost", port), ConfigHandler)
+    # 尝试绑定端口（重试机制，避免竞争条件）
+    server = None
+    for attempt in range(10):
+        port = find_available_port(8080 + attempt, 8080 + attempt)
+        if port is None:
+            continue
+        try:
+            server = http.server.HTTPServer(("localhost", port), ConfigHandler)
+            break
+        except OSError:
+            continue
+
+    if server is None:
+        print("\n[CFG] ❌ 无法绑定端口（8080-8089 均不可用）")
+        return
+
     url = f"http://localhost:{port}/"
 
-    print(f"[CFG] 🌐 配置服务器已启动: {url}")
+    print(f"\n[CFG] 🌐 配置服务器已启动: {url}")
     print(f"[CFG] 按 Ctrl+C 关闭服务器")
+    print(f"[CFG] ⚡ 保存即写盘，无需手动操作")
+    import sys as _sys; _sys.stdout.flush()
 
     # 自动打开浏览器
     threading.Thread(target=lambda: webbrowser.open(url), daemon=True).start()
 
+    # 轮询 .settings_done 标志文件，用户点击"完成"后关闭服务器
+    done_flag = os.path.join(skill_dir, ".settings_done")
     try:
-        server.serve_forever()
+        while True:
+            server.handle_request()
+            if os.path.exists(done_flag):
+                break
     except KeyboardInterrupt:
-        print("\n[CFG] 服务器已关闭")
+        pass
+    finally:
         server.server_close()
+        if os.path.exists(done_flag):
+            os.remove(done_flag)
+        print("\n[CFG] 服务器已关闭")
 
 
 # ═══════════════════════════════════════════════════════

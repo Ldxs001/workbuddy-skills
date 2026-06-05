@@ -1,6 +1,6 @@
 ---
 name: skill-function-test
-version: 0.2.8
+version: 0.2.9
 author: wUwproject
 license: MIT
 description: 技能场景测试套件 —— 备份 → 蓝皮书 → 场景+功能双轨测试 → 修复循环 → 回归确认 → 分级报告。场景驱动：从 SKILL.md 解析触发场景和核心能力，构造端到端场景测试链路。包含 D1-D6 功能测试作为底座。

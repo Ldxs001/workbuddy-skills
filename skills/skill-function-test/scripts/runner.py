@@ -290,7 +290,17 @@ def stage_4_test(state: PipelineState) -> PipelineState:
                 all_s4_rounds.extend(round_trace)
                 print(f"  [S4] 第 {r} 轮完成: {len(round_trace)} 条噪音")
             else:
-                print(f"  [S4] 第 {r} 轮: ⚠️ 无执行记录（需 LLM 完成阶段C 噪音执行）")
+                print(f"\n  ╔══ S4 第 {r}/{s4_rounds} 轮：LLM 必须执行 ═══╗")
+                print(f"  ║                                                    ║")
+                print(f"  ║  1. 读取约束清单 → 设计噪音方案：                  ║")
+                print(f"  ║     python s4_engine.py <skill-dir> constraints     ║")
+                print(f"  ║     → LLM 按推理模板设计 N-01~ 噪音条目            ║")
+                print(f"  ║     → 保存到 .s4_noise_plan.json                   ║")
+                print(f"  ║                                                    ║")
+                print(f"  ║  2. 执行噪音：逐条注入干扰，记录坚守/失守          ║")
+                print(f"  ║     → 保存到 .s4_trace_r{r}.json                   ║")
+                print(f"  ║                                                    ║")
+                print(f"  ╚════════════════════════════════════════════════════╝")
 
         # 聚合所有轮次
         if all_s4_rounds:
@@ -300,6 +310,17 @@ def stage_4_test(state: PipelineState) -> PipelineState:
             print(state.s4_matrix_text)
             print(f"\n  [S4] 坚守率: {all_s4_rounds}: "
                   f"{sum(1 for t in all_s4_rounds if t.get('llm_behavior')=='坚守')}/{len(all_s4_rounds)}")
+        else:
+            # ═══════════════════════════════════════════════
+            # [强制] S4 已启用但无执行记录 → exit(1) 截断
+            # ═══════════════════════════════════════════════
+            print(f"\n{'='*55}")
+            print(f"  ⛔ S4 脏环境测试已开启，但无噪音执行记录")
+            print(f"  🚫 LLM 必须完成以上步骤后再继续")
+            print(f"  🚫 执行完毕后重新运行全流程")
+            print(f"{'='*55}")
+            import sys as _sys
+            _sys.exit(1)
 
     # 更新 state 记录
     state.log_stage(4, "ok",
@@ -636,7 +657,7 @@ def stage_5_llm_filter(state: PipelineState) -> PipelineState:
 
     print(f"\n  共计 {len(all_issues)} 条问题，LLM 逐条判断后进入修复阶段")
 
-    state.log_stage(7, "ok" if not has_damage else "blocked", state.regression_text[:200])
+    state.log_stage(5, "ok", f"待判断问题: {len(all_issues)} 条")
     return state
 
 

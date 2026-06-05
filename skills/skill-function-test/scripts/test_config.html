@@ -170,14 +170,17 @@
     <div class="section-title">S4 脏环境忠实度测试</div>
     <label class="toggle-row">
       <span>S4 脏环境测试 <span class="badge">仅报告</span></span>
-      <input type="checkbox" id="S4" >
+      <input type="checkbox" id="S4" checked>
       <span class="slider"></span>
     </label>
   </div>
 
-  <div class="btn-row">
+    <div class="btn-row" id="save_btn_row">
     <button class="btn btn-secondary" onclick="resetUI()">重置为默认</button>
-    <button class="btn btn-primary" onclick="saveAndCopy()">保存配置</button>
+    <button class="btn btn-primary" onclick="saveAndDone()">保存配置</button>
+  </div>
+  <div class="btn-row" id="done_btn_row" style="display:none">
+    <button class="btn btn-primary" onclick="finishSetup()" style="background:#059669;">✅ 完成配置</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -216,12 +219,11 @@ function collectConfig() {
   };
 }
 
-function saveAndCopy() {
+function saveAndDone() {
   const cfg = collectConfig();
   const text = JSON.stringify(cfg, null, 2);
   localStorage.setItem('test_config', text);
 
-  // 优先通过 HTTP 服务器直接写盘
   fetch('/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -230,14 +232,29 @@ function saveAndCopy() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.ok) {
-      showMsg('✅ 配置已保存到磁盘');
+      showMsg('✅ 配置已保存，点击「完成配置」关闭服务器');
+      document.getElementById('save_btn_row').style.display = 'none';
+      document.getElementById('done_btn_row').style.display = 'flex';
     } else {
       showMsg('❌ 保存失败: ' + (data.error || '未知错误'));
     }
   })
   .catch(function() {
-    // HTTP 服务器不可用，引导使用对话交互
-    showMsg('📢 服务器未启动，请在对话中键入 cfg <命令> 修改配置');
+    showMsg('⚠️ 服务器未响应');
+  });
+}
+
+function finishSetup() {
+  fetch('/done')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      showMsg('✅ 配置已完成，可关闭此页面');
+      document.getElementById('done_btn_row').style.display = 'none';
+    }
+  })
+  .catch(function() {
+    showMsg('⚠️ 服务器未响应');
   });
 }
 
