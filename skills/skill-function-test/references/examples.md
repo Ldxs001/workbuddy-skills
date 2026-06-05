@@ -132,7 +132,7 @@ python scripts/s4_engine.py /path/to/skill-sub play 3
 
 ### 场景
 
-查看当前配置 → 修改 S4 轮数和权重 → 保存。
+查看当前配置 → 更新 S4 轮数和权重 → 保存。
 
 ### 对话交互
 
@@ -158,7 +158,7 @@ cfg s4 nf 0.5            # 反向权重 0.5
 python scripts/test_config.py /path/to/target-skill server
 ```
 
-浏览器打开 http://localhost:XXXX/，修改后点「保存配置」直接写盘。
+浏览器打开 http://localhost:XXXX/，更新后点「保存配置」直接写盘。
 
 ---
 
@@ -166,7 +166,7 @@ python scripts/test_config.py /path/to/target-skill server
 
 ### 场景
 
-启动带 POST /save 接口的配置服务器，修改后"保存→确认完成"两段式关闭。
+启动带 POST /save 接口的配置服务器，更新后"保存→确认完成"两段式关闭。
 
 ### 执行命令
 
@@ -174,7 +174,7 @@ python scripts/test_config.py /path/to/target-skill server
 python scripts/test_config.py /path/to/target-skill server
 ```
 
-浏览器自动打开 → 修改配置 → 点「保存配置」→ 按钮切换为「✅ 完成配置」→ 点「完成配置」服务器关闭。
+浏览器自动打开 → 更新配置 → 点「保存配置」→ 按钮切换为「✅ 完成配置」→ 点「完成配置」服务器关闭。
 
 ---
 

@@ -286,7 +286,7 @@ def stage_4_test(state: PipelineState) -> PipelineState:
             pass
 
         # S4 修复钩子（fix_mode=1 时自动修复引用链路断裂和缺失文件）
-        s4_fix_mode = plan.get("fix_mode", {}).get("s4", 1) if isinstance(plan.get("fix_mode"), dict) else 1
+        s4_fix_mode = plan.get("fix_mode", {}).get("s4", 0) if isinstance(plan.get("fix_mode"), dict) else 0
         if s4_fix_mode == 1:
             print("\n  [S4-修复] 检查可修复项...")
             try:

@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
     "s4": {
         "enabled": True,            # S4 默认开启（代码默认）
         "rounds": 3,                # S4 独立轮数（覆盖全局 rounds）
-        "fix_mode": 1,              # S4: 0=仅报告 1=尝试修复(结构性修复)
+        "fix_mode": 0,              # S4: 0=仅报告 1=尝试修复(结构性修复)
     },
     "s4_weights": {                 # S4 正反权重（正向=干净环境, 反向=脏环境）
         "positive": 0.4,            # 正向（干净环境-步骤完成率）
