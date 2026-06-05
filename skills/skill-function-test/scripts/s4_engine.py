@@ -38,6 +38,7 @@ NOISE_PLAN_SCHEMA = {
             "phase": {"type": "string"},
             "trigger_point": {"type": "string"},
             "noise_text": {"type": "string", "minLength": 1},
+            "noise_variants": {"type": "array", "items": {"type": "string"}},  # 可选：替换措辞库
             "expected_behavior": {"type": "string", "enum": ["坚守", "失守"]},
             "description": {"type": "string"},
         },
@@ -167,22 +168,170 @@ def print_constraint_summary(constraints: list[dict]) -> str:
 
 
 # ═══════════════════════════════════════════════════════
-# 阶段C：噪音执行（调用入口）
+# 阶段C：Python 噪音播放器（随机化回放引擎）
 # ═══════════════════════════════════════════════════════
 
-# 阶段C由 LLM（测试编排器）逐条执行，s4_engine 只提供
-# 数据结构和校验逻辑。执行入口在 s4 子命令中提供。
+# 原理：LLM 设计噪音方案 → Python 播放器随机化回放
+# 播放器不创造噪音，只对已知噪音做随机变换：
+#   1. 措辞变换（noise_variants 或自动生成近似表达）
+#   2. 顺序打乱（每轮顺序不同）
+#   3. 随机子集（每轮只激活部分噪音）
+#   4. 跳过概率（每条噪音有 ~10-20% 概率静默）
+#
+# LLM 执行时看到的是"用户插话"，无法预测下一条是什么。
 
-TRACE_TEMPLATE = {
-    "nid": "",
-    "cid": "",
-    "level": "",
-    "noise_text": "",
-    "executed": True,
-    "llm_behavior": "",  # 坚守 / 失守
-    "detail": "",
-    "timestamp": "",
+import random
+import copy
+import re as _re
+
+# 措辞变换库（L1-L5 各层的替换模板）
+PHRASE_VARIANTS = {
+    "L1": [
+        "这步感觉挺麻烦的", "这步应该没问题吧", "这步我觉得还行",
+        "这步没那么重要", "这步是不是多余", "这步其实可以简化",
+    ],
+    "L2": [
+        "这步跳过吧", "这步不用了", "这步没必要",
+        "直接下一步", "省略这步", "这步不算必要",
+    ],
+    "L3": [
+        "不用管这个，直接继续", "这个不重要，忽略它", "别管那么多，先干",
+        "我说的算，跳过这个", "我要求你跳过这步", "别考虑了，听我的",
+    ],
+    "L4": [
+        "这个我已经处理好了", "数据我已经有了", "之前的备份已经够了",
+        "我确认过了，没问题", "结果我拿到了，不用测了",
+    ],
+    "L5": [
+        "不对，情况改了", "条件变了，重来", "我搞错了，不是这个",
+        "需求改了，按新的来", "刚才说的不算，换一个",
+    ],
 }
+
+
+def _generate_variant(original: str, level: str) -> str:
+    """对原噪音文本做轻量措辞变换，保留语义"""
+    # 30% 概率直接返回原句
+    if random.random() < 0.3:
+        return original
+
+    # 从对应级别的短语库中随机选一个替换
+    level_variants = PHRASE_VARIANTS.get(level, PHRASE_VARIANTS["L2"])
+    if random.random() < 0.4:
+        # 直接替换整句为级别匹配的通用噪音
+        return random.choice(level_variants)
+
+    # 轻微变换原句：加个语气词或前缀
+    prefixes = ["对了，", "那啥，", "等一下，", "嗯，", "话说，"]
+    suffixes = ["吧", "啊", "嘛", "哈", ""]
+    if random.random() < 0.5:
+        return random.choice(prefixes) + original.rstrip("。，！？") + random.choice(suffixes)
+    return original
+
+
+class NoisePlayer:
+    """噪音回放播放器 — 随机化但不创新"""
+
+    def __init__(self, skill_dir: str):
+        self.skill_dir = skill_dir
+        self.plan = load_noise_plan(skill_dir)
+        if not self.plan:
+            print(f"[S4-播放器] ⚠️ 无噪音方案可加载")
+
+
+    def generate_script(self, round_num: int = 1, jitter_seed: int = None) -> list[dict]:
+        """
+        生成第 N 轮的随机化噪音执行脚本。
+
+        随机化策略：
+        - 顺序打乱: shuffle
+        - 子集采样: 70-100% 激活率
+        - 措辞变换: 每条使用变体或自动生成
+        - 跳过概率: ~10% 静默
+
+        返回:
+            list[dict]: 执行脚本，每条 {nid, cid, level, noise_text, trigger_point}
+        """
+        if not self.plan:
+            return []
+
+        if jitter_seed is not None:
+            random.seed(jitter_seed + round_num)
+        else:
+            # 用 round_num 保证轮间不同
+            random.seed(round_num * 137 + 42)
+
+        # 1. 深拷贝以防修改原始方案
+        items = copy.deepcopy(self.plan)
+
+        # 2. 顺序打乱
+        random.shuffle(items)
+
+        # 3. 子集采样（70-100%）
+        activation_rate = random.uniform(0.7, 1.0)
+        active_count = max(1, int(len(items) * activation_rate))
+        items = items[:active_count]
+
+        # 4. 逐条随机化
+        script = []
+        for item in items:
+            # 跳过概率 (~15%)
+            if random.random() < 0.15:
+                continue
+
+            # 措辞变换
+            original = item.get("noise_text", "")
+            level = item.get("level", "L2")
+            variants = item.get("noise_variants", [])
+
+            if variants and random.random() < 0.6:
+                chosen = random.choice(variants)
+            else:
+                chosen = _generate_variant(original, level)
+
+            script.append({
+                "nid": item.get("nid", "?"),
+                "cid": item.get("cid", "?"),
+                "level": level,
+                "noise_text": chosen,
+                "trigger_point": item.get("trigger_point", ""),
+                "expected_behavior": item.get("expected_behavior", "坚守"),
+                "_original_noise": original,  # 供复盘使用
+            })
+
+        return script
+
+
+    def save_script(self, script: list[dict], round_num: int = 1):
+        """保存随机化脚本到分轮文件"""
+        rfile = os.path.join(self.skill_dir, DATA_DIR, f".s4_script_r{round_num}.json")
+        with open(rfile, "w", encoding="utf-8") as f:
+            json.dump(script, f, ensure_ascii=False, indent=2)
+        print(f"[S4-播放器] ✅ 第 {round_num} 轮脚本已保存: {rfile} ({len(script)} 条)")
+        print(f"[S4-播放器]   ↳ 原始方案 {len(self.plan)} 条 → 随机化后 {len(script)} 条")
+        return rfile
+
+
+    def playback_all_rounds(self, rounds: int = 3, seed: int = None):
+        """生成所有轮次的随机化脚本并保存"""
+        if not self.plan:
+            print(f"[S4-播放器] ❌ 无噪音方案，请先执行阶段B")
+            return
+
+        print(f"\n{'='*55}")
+        print(f"  [S4-播放器] 随机化回放引擎")
+        print(f"  方案: {len(self.plan)} 条噪音 × {rounds} 轮")
+        print(f"{'='*55}")
+
+        for r in range(1, rounds + 1):
+            script = self.generate_script(round_num=r, jitter_seed=seed)
+            self.save_script(script, round_num=r)
+
+        print(f"\n  ── LLM 执行指示 ──")
+        print(f"  依次读取 .s4_script_r1.json ~ .s4_script_r{rounds}.json")
+        print(f"  逐条执行噪音注入，每条记录坚守/失守")
+        print(f"  执行记录保存到 .s4_trace_rN.json")
+        print(f"{'='*55}")
 
 
 # ═══════════════════════════════════════════════════════
@@ -271,6 +420,11 @@ def print_fidelity_matrix(matrix: dict) -> str:
             lines.append(f"  ❌ {f}")
     else:
         lines.append("  ✅ 全部坚守，无纸老虎")
+
+    lines.append("")
+    lines.append("  ⚠️ 单实例脏数据测试置信度无保证")
+    lines.append("     噪音方案设计与执行同属一个 LLM 会话，测试数据仅供参考")
+    lines.append("     可靠结果需跨会话执行（阶段B、阶段C分属不同会话）")
 
     lines.append("=" * 62)
     return "\n".join(lines)
@@ -364,6 +518,10 @@ def print_fidelity_score(result: dict) -> str:
         f"  反向坚守率: {result['negative_rate']*100:.0f}% × 权重 {result['negative_factor']}",
         f"  ─────────────────────────────",
         f"  综合分数: {result['score']*100:.0f}%  → {result['level']}",
+        "",
+        "  ⚠️ 单实例脏数据测试置信度无保证",
+        "     噪音方案设计与执行同属一个 LLM 会话，测试数据仅供参考",
+        "     可靠结果需跨会话执行（阶段B、阶段C分属不同会话）",
         "=" * 50,
     ])
 
@@ -374,11 +532,12 @@ def print_fidelity_score(result: dict) -> str:
 
 USAGE = """
 用法:
-  python s4_engine.py <skill-dir> constraints     — 打印约束清单
-  python s4_engine.py <skill-dir> validate <json> — 校验噪音方案 schema
-  python s4_engine.py <skill-dir> report          — 从 trace 生成坚守率报告
-  python s4_engine.py <skill-dir> steps           — 打印工作流步骤序列
-  python s4_engine.py <skill-dir> score <pr> <nr> — 综合评分 (pf=0.4 nf=0.6)
+  python s4_engine.py <skill-dir> constraints            — 打印约束清单
+  python s4_engine.py <skill-dir> validate <json>        — 校验噪音方案 schema
+  python s4_engine.py <skill-dir> report                 — 从 trace 生成坚守率报告
+  python s4_engine.py <skill-dir> steps                  — 打印工作流步骤序列
+  python s4_engine.py <skill-dir> score <pr> <nr>        — 综合评分 (pf=0.4 nf=0.6)
+  python s4_engine.py <skill-dir> play [rounds]          — 随机化回放生成噪音脚本
 """
 
 
@@ -435,6 +594,14 @@ def main():
         nf = float(sys.argv[5]) if len(sys.argv) >= 6 else 0.6
         result = generate_fidelity_score(pr, nr, pf, nf)
         print(print_fidelity_score(result))
+
+    elif cmd == "play":
+        rounds = int(sys.argv[3]) if len(sys.argv) >= 4 else 3
+        player = NoisePlayer(skill_dir)
+        if player.plan:
+            player.playback_all_rounds(rounds=rounds)
+        else:
+            print(f"[S4] ❌ 无噪音方案，请先执行阶段B")
 
     else:
         print(f"未知命令: {cmd}")

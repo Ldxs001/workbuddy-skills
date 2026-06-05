@@ -269,6 +269,15 @@ def stage_4_test(state: PipelineState) -> PipelineState:
         s4_rounds = config.get("s4", {}).get("rounds", plan.get("s4_rounds", config.get("rounds", 3)))
         print(f"\n  [RUN] S4 脏环境忠实度测试 ({s4_rounds} 轮)...")
 
+        # 先用 Python 播放器生成随机化噪音脚本
+        try:
+            from s4_engine import NoisePlayer
+            player = NoisePlayer(state.skill_dir)
+            if player.plan:
+                player.playback_all_rounds(rounds=s4_rounds)
+        except ImportError:
+            pass
+
         all_s4_rounds = []
         s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
         os.makedirs(s4_data_dir, exist_ok=True)
