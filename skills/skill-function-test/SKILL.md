@@ -1,6 +1,6 @@
 ---
 name: skill-function-test
-version: 0.2.12
+version: 0.2.13
 author: wUwproject
 license: MIT
 description: 技能场景测试套件 —— 备份 → 蓝皮书 → 场景+功能双轨测试 → 修复循环 → 回归确认 → 分级报告。场景驱动：从 SKILL.md 解析触发场景和核心能力，构造端到端场景测试链路。包含 D1-D6 功能测试作为底座。
@@ -45,7 +45,7 @@ faq_quality: improve_qa
 | **S1 场景链路完整性** | scenario_chain | 从 SKILL.md 触发场景出发，构造端到端调用路径 | 触发词→核心能力→工作流程→代码实现是否完整匹配 |
 | **S2 场景输入产出匹配** | scenario_io | 每条场景的描述输入是否有对应的函数/方法实现 | 参数匹配、返回值类型、文档声明 vs 实际签名 |
 | **S3 场景数据流正确性** | scenario_flow | 场景中各步骤间的数据传递是否正确 | 函数A输出→函数B输入的类型兼容、字段名匹配 |
-| **S4 脏环境忠实度** | noise_fidelity | 噪音/污染/干扰下铁律约束的坚守率 | 约束提取 → LLM推理噪音 → 噪音执行 → 复盘归因 |
+| **S4 执行忠实度** | noise_fidelity | 噪音/污染下铁律坚守率 + 蓝皮书全量范围扫描 + 结构性修复 | 全量测试范围生成(蓝皮书+约束+引用+文件) → LLM推理噪音 → 噪音执行 → 复盘归因 → 引用链路/缺失文件修复 |
 | **D1 基础功能完整性** | smoke | 每个核心函数能否无崩溃运行 | 语法解析、文件可读、函数存在性 |
 | **D2 流程断点检测** | breakpoint | 模块间的引用链路是否完整 | 文件引用存在、import 可达、MD 声明 vs 实际文件 |
 | **D3 数据污染检测** | contamination | 模块间是否存在数据交叉污染 | 硬编码路径、DB 路径硬编码、全局变量冲突 |
@@ -112,6 +112,9 @@ cfg fix_mode scenario <0|1>   — 场景修复（0=仅报告 1=尝试修复）
 cfg fix_mode function <0|1|2> — 功能修复（0=仅报告 1=直接 2=询问）
 cfg s4 on/off                 — 开启/关闭 S4
 cfg s4 rounds <N>             — S4 独立轮数
+cfg s4 fix <0|1>              — S4 修复模式（0=仅报告 1=尝试修复）
+cfg s4 pf <0.0-1.0>           — 正向权重
+cfg s4 nf <0.0-1.0>           — 反向权重
 cfg <dim> on/off              — 开关某个维度
 cfg reset                     — 重置默认
 cfg server                    — 启动 HTML 配置界面
@@ -152,6 +155,13 @@ python scripts/scenario_engine.py /path/to/target-skill
 
 # 仅功能测试（快速模式）
 python scripts/test_engine.py /path/to/target-skill
+
+# S4 全量测试范围扫描
+python scripts/s4_engine.py /path/to/target-skill scope
+
+# S4 结构性修复（引用链路断裂、缺失文件）
+python scripts/s4_engine.py /path/to/target-skill repair
+python scripts/s4_engine.py /path/to/target-skill repair --dry-run  # 预览不改
 ```
 
 ---

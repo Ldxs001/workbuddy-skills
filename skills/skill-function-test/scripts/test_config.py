@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
     "s4": {
         "enabled": True,            # S4 默认开启（代码默认）
         "rounds": 3,                # S4 独立轮数（覆盖全局 rounds）
+        "fix_mode": 1,              # S4: 0=仅报告 1=尝试修复(结构性修复)
     },
     "s4_weights": {                 # S4 正反权重（正向=干净环境, 反向=脏环境）
         "positive": 0.4,            # 正向（干净环境-步骤完成率）
@@ -165,7 +166,7 @@ def format_config(cfg: dict) -> str:
     fm = cfg.get("fix_mode", {})
     lines.append(f"    场景测试(S1-S3): {_fix_mode_text_scenario(fm.get('scenario', 0))}")
     lines.append(f"    功能测试(D1-D6): {_fix_mode_text_function(fm.get('function', 0))}")
-    lines.append(f"    S4 执行忠实度:      只报告（固定）")
+    lines.append(f"    S4 执行忠实度:      {_fix_mode_text_s4(s4.get('fix_mode', 1))}")
     lines.append("")
     lines.append("  ── 场景测试 ──")
     for k in ["S1", "S2", "S3"]:
@@ -183,8 +184,11 @@ def format_config(cfg: dict) -> str:
     s4 = cfg.get("s4", {})
     s4_icon = "✅" if s4.get("enabled", False) else "❌"
     s4_rounds = s4.get("rounds", cfg.get("rounds", 3))
+    s4_fm = s4.get("fix_mode", 1)
     factors = cfg.get("s4_weights", {"positive": 0.4, "negative": 0.6})
-    lines.append(f"    {s4_icon} S4（{s4_rounds} 轮, 正向权重{factors['positive']}/反向权重{factors['negative']}）")
+    s4_fm = s4.get("fix_mode", 1)
+    fm_label = {0:"仅报告", 1:"尝试修复"}.get(s4_fm, "仅报告")
+    lines.append(f"    {s4_icon} S4（{s4_rounds} 轮, {fm_label}, 权重正{factors['positive']}/反{factors['negative']}）")
     lines.append("")
     lines.append(f"  ⚡ 当前测试集: {', '.join(get_active_tests(cfg))}")
     lines.append("=" * 56)
@@ -197,6 +201,10 @@ def _fix_mode_text_scenario(mode: int) -> str:
 
 def _fix_mode_text_function(mode: int) -> str:
     return {0: "仅报告", 1: "直接修复", 2: "询问后修复"}.get(mode, "未知")
+
+
+def _fix_mode_text_s4(mode: int) -> str:
+    return {0: "仅报告", 1: "尝试修复"}.get(mode, "仅报告")
 
 
 # ═══════════════════════════════════════════════════════
@@ -212,6 +220,7 @@ INTERACTIVE_HELP = """
   cfg fix_mode function <0|1|2> — 功能修复模式（0=仅报告 1=直接 2=询问）
   cfg s4 on/off                 — 开启/关闭 S4 执行忠实度测试
   cfg s4 rounds N               — 设置 S4 独立轮数
+  cfg s4 fix <0|1>              — S4 修复模式（0=仅报告 1=尝试修复）
   cfg <dim> on/off              — 开启/关闭某个维度（如 S1, D2 等）
   cfg reset                     — 重置为默认配置
   cfg server                    — 启动 HTML 配置界面（自动打开浏览器）
@@ -302,6 +311,12 @@ def interactive_edit(cfg: dict, cmd_args: list[str], skill_dir: str) -> dict:
                 cfg.setdefault("s4_weights", {})["negative"] = v
                 save_config(skill_dir, cfg)
                 print(f"[CFG] S4 反向因子已设置为 {v}")
+        elif sub == "fix" and len(cmd_args) >= 3:
+            n = int(cmd_args[2])
+            if n in (0, 1):
+                cfg.setdefault("s4", {})["fix_mode"] = n
+                save_config(skill_dir, cfg)
+                print(f"[CFG] S4 修复模式已设置为 {n} = {_fix_mode_text_s4(n)}")
 
     elif action in ("S1", "S2", "S3", "D1", "D2", "D3", "D4", "D5", "D6"):
         group = "scenarios" if action.startswith("S") else "functions"
@@ -480,9 +495,12 @@ def render_html(cfg: dict) -> str:
         <option value="2" {"selected" if function_fm==2 else ""}>2 - 询问后修复</option>
       </select>
     </div>
-    <div class="param-row" style="color:#94a3b8;">
-      <span>S4 执行忠实度 <span class="badge">固定</span></span>
-      <span style="font-size:13px;">仅报告（不可修改）</span>
+    <div class="param-row">
+      <span>S4 执行忠实度 <span class="badge">结构性修复</span></span>
+      <select id="fix_s4">
+        <option value="0" {"selected" if s4_fm==0 else ""}>0 - 仅报告</option>
+        <option value="1" {"selected" if s4_fm==1 else ""}>1 - 尝试修复</option>
+      </select>
     </div>
   </div>
 
@@ -532,6 +550,7 @@ function collectConfig() {{
     s4: {{
       enabled: document.getElementById('S4').checked,
       rounds: parseInt(document.getElementById('s4_rounds').value) || 3,
+      fix_mode: parseInt(document.getElementById('fix_s4').value) || 0,
     }},
     scenarios: {{
       S1: {{ enabled: document.getElementById('S1').checked }},

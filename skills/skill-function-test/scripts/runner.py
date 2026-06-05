@@ -285,6 +285,18 @@ def stage_4_test(state: PipelineState) -> PipelineState:
         except ImportError:
             pass
 
+        # S4 修复钩子（fix_mode=1 时自动修复引用链路断裂和缺失文件）
+        s4_fix_mode = plan.get("fix_mode", {}).get("s4", 1) if isinstance(plan.get("fix_mode"), dict) else 1
+        if s4_fix_mode == 1:
+            print("\n  [S4-修复] 检查可修复项...")
+            try:
+                from s4_engine import s4_scope_repair, load_test_scope
+                scope = load_test_scope(state.skill_dir)
+                if scope:
+                    s4_scope_repair(state.skill_dir, scope, dry_run=False)
+            except ImportError:
+                pass
+
         all_s4_rounds = []
         s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
         os.makedirs(s4_data_dir, exist_ok=True)

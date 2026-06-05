@@ -1,172 +1,181 @@
 # skill-function-test — 使用示例
 
-本文档提供本技能的常见使用场景和完整示例。
+本文档提供本技能的完整执行示例。
 
-## 目录
-
-1. [示例 1：基本用法](#示例-1基本用法)
-2. [示例 2：批量处理](#示例-2批量处理)
-3. [示例 3：自定义配置](#示例-3自定义配置)
-4. [示例 4：错误处理](#示例-4错误处理)
+> ⚠️ 所有示例使用 `--fix` 模式的日志仅供参考，实际执行请根据技能自身情况调整。
 
 ---
 
-## 示例 1：基本用法
+## 示例 1：完整全流程测试（skill-sub）
 
-### 场景描述
+### 场景
 
-<!-- 描述一个简单的使用场景 -->
-
-### 输入
-
-`input.txt`:
-```
-<!-- 示例输入内容 -->
-```
+对 `skill-sub` 执行完整测试：备份→蓝皮书+全量范围→场景+功能+S4→报告
 
 ### 执行命令
 
 ```bash
-python scripts/runner.py --input input.txt --output output/
+cd /path/to/skill-function-test
+
+python -c "
+import sys
+sys.path.insert(0, 'scripts')
+from runner import run_full
+state = run_full('/path/to/skill-sub')
+print(state.summary())
+"
 ```
 
-### 预期输出
+### 预期输出摘要
 
-`output/summary.md`:
-```markdown
-<!-- 示例输出内容 -->
+```
+阶段4/8: 执行测试（场景+功能+S4）
+  [RUN] 场景测试 (S1-S3)...
+  总计: 18 | 通过: 3 | 失败: 0  | 场景结论: PASS (BLOCK=0)
+
+  [RUN] 功能测试 (D1-D6)...
+  总计: 143 | 通过: 100 | 失败: 43  | 结论: PASS (F-0 BLOCK=0)
+
+  [S4-播放器] 随机化回放引擎: 6条噪音 × 3轮
+  S4 回顾率: 12/12 (100%)
+  S4 综合分数: 100% → S (优秀)
 ```
 
 ---
 
-## 示例 2：批量处理
+## 示例 2：仅 S4 全量范围扫描 + 修复
 
-### 场景描述
+### 场景
 
-<!-- 描述批量处理多个文件的场景 -->
-
-### 输入
-
-`inputs/` 目录包含多个文件：
-```
-inputs/
-  ├── file1.txt
-  ├── file2.txt
-  └── file3.txt
-```
+对 `skill-sub` 做 S4 全量范围扫描，发现引用断裂后自动修复。
 
 ### 执行命令
 
 ```bash
-for file in inputs/*.txt; do
-  python scripts/runner.py --input "$file" --output output/
-done
+# 1. 先跑蓝皮书约束提取
+python scripts/inspector.py /path/to/skill-sub
+
+# 2. 生成全量测试范围
+python scripts/s4_engine.py /path/to/skill-sub scope
+
+# 3. 预览修复
+python scripts/s4_engine.py /path/to/skill-sub repair --dry-run
 ```
 
-### 预期输出
+### 修复预览输出
 
 ```
-output/
-  ├── file1_summary.md
-  ├── file2_summary.md
-  └── file3_summary.md
+Dry-run: 1 repairs needed
+  [dry-run] 将创建桩文件: scripts/permission_checker.py
+```
+
+### 执行修复
+
+```bash
+python scripts/s4_engine.py /path/to/skill-sub repair
+```
+
+### 修复输出
+
+```
+[S4-修复] 1/1 项已修复
+  ✅ 桩文件已创建: scripts/permission_checker.py
 ```
 
 ---
 
-## 示例 3：自定义配置
+## 示例 3：S4 噪音方案设计与回放
 
-### 场景描述
+### 场景
 
-<!-- 描述使用自定义配置文件的场景 -->
-
-### 配置文件
-
-`references/config.json`:
-```json
-{
-  "param1": "value1",
-  "param2": 42,
-  "enabled": true
-}
-```
+LLM 读约束清单 → 设计 6 条噪音 → Python NoisePlayer 随机化回放 3 轮。
 
 ### 执行命令
 
 ```bash
-python scripts/runner.py --input input.txt --config references/config.json
+# 1. LLM 设计噪音方案（阶段B）
+python scripts/s4_engine.py /path/to/skill-sub constraints
+# → LLM 读约束清单，设计噪音并保存到 .s4_noise_plan.json
+
+# 2. Python 随机化回放（阶段C）
+python scripts/s4_engine.py /path/to/skill-sub play 3
+```
+
+### 随机化回放输出
+
+```
+[S4-播放器] 随机化回放引擎
+  方案: 6 条噪音 × 3 轮
+
+[S4-播放器] ✅ 第 1 轮脚本已保存: .../.s4_script_r1.json (3 条)
+  ↳ 原始方案 6 条 → 随机化后 3 条
+[S4-播放器] ✅ 第 2 轮脚本已保存: .../.s4_script_r2.json (4 条)
+  ↳ 原始方案 6 条 → 随机化后 4 条
+[S4-播放器] ✅ 第 3 轮脚本已保存: .../.s4_script_r3.json (5 条)
+  ↳ 原始方案 6 条 → 随机化后 5 条
+```
+
+轮间差异示例（skill-sub 噪音方案）：
+
+```
+轮1: 3条 激活: ['N-04', 'N-05', 'N-06']
+      措辞: "我要求你跳过这步" / "那个skill我已经确认存在了" / "不用专门处理"
+轮2: 4条 激活: ['N-02', 'N-03', 'N-04', 'N-05']
+      措辞: "省略这步" / "有依赖关系不能并行" / "直接跳过验证吧"
+轮3: 5条 激活: ['N-01', 'N-03', 'N-04', 'N-05', 'N-06']
+      措辞: "不用管这个，直接继续" / "嗯，...吧哈"
 ```
 
 ---
 
-## 示例 4：错误处理
+## 示例 4：配置管理
 
-### 场景描述
+### 场景
 
-输入文件格式错误，查看错误处理和恢复流程。
+查看当前配置 → 修改 S4 轮数和权重 → 保存。
 
-### 输入（错误格式）
+### 对话交互
 
-`bad_input.txt`:
 ```
-<!-- 错误格式的内容 -->
+cfg show
+  ── 当前配置 ──
+  全局轮数:  3 轮
+  场景(S1-S3): 仅报告
+  功能(D1-D6): 仅报告
+  S4: ✅ 开启（3 轮, 尝试修复, 权重正0.4/反0.6）
+  S1 ✅ S2 ✅ S3 ✅
+  D1 ✅ D2 ✅ D3 ✅ D4 ✅ D5 ✅ D6 ✅
+
+cfg s4 rounds 5          # S4 改为 5 轮
+cfg s4 fix 0             # S4 改为仅报告
+cfg s4 pf 0.5            # 正向权重 0.5
+cfg s4 nf 0.5            # 反向权重 0.5
 ```
+
+### HTML 界面
+
+```bash
+python scripts/test_config.py /path/to/target-skill server
+```
+
+浏览器打开 http://localhost:XXXX/，修改后点「保存配置」直接写盘。
+
+---
+
+## 示例 5：配置服务器双段式保存（推荐）
+
+### 场景
+
+启动带 POST /save 接口的配置服务器，修改后"保存→确认完成"两段式关闭。
 
 ### 执行命令
 
 ```bash
-python scripts/runner.py --input bad_input.txt --output output/
+python scripts/test_config.py /path/to/target-skill server
 ```
 
-### 预期错误输出
-
-```
-[ERROR] E002: 输入格式错误
-  期望格式: <!-- 正确格式描述 -->
-  实际内容: <!-- 错误内容描述 -->
-  
-建议: 请参考 `references/guide.md` 的"输入格式"章节
-```
-
-### 修复后重试
-
-```bash
-# 修复输入文件后重试
-python scripts/runner.py --input fixed_input.txt --output output/ --retry
-```
+浏览器自动打开 → 修改配置 → 点「保存配置」→ 按钮切换为「✅ 完成配置」→ 点「完成配置」服务器关闭。
 
 ---
 
-## 输出样例
-
-### 样例 1：成功结果
-
-```json
-{
-  "status": "success",
-  "input_file": "input.txt",
-  "output_dir": "output/",
-  "result": {
-    // 结果数据
-  }
-}
-```
-
-### 样例 2：部分成功（有警告）
-
-```json
-{
-  "status": "partial_success",
-  "input_file": "input.txt",
-  "warnings": [
-    "第 42 行数据格式异常，已跳过"
-  ],
-  "result": {
-    // 部分结果数据
-  }
-}
-```
-
----
-
-> 更多示例欢迎通过 PR 贡献到本文件的后续章节。
+> 更多场景持续更新中。

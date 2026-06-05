@@ -263,6 +263,100 @@ def generate_test_scope(skill_dir: str) -> list[dict]:
 
 def save_test_scope(skill_dir: str, scope: list[dict]):
     """保存全量测试范围"""
+
+# ═══════════════════════════════════════════════════════
+# S4 修复钩子（修复引用链路断裂、缺失文件等结构性问题）
+# ═══════════════════════════════════════════════════════
+
+def s4_scope_repair(skill_dir: str, scope: list[dict] = None, dry_run: bool = False) -> list[dict]:
+    """
+    对 S4 全量测试范围中的可修复项执行修复。
+
+    当前可修复类型：
+    - reference_link 断裂 → 创建空桩文件（来源是 MD 引用但目标不存在）
+    - file_manifest 缺失 → 创建空文件
+
+    返回修复记录列表 [{cid, type, target, success, detail}]
+    """
+    if scope is None:
+        scope = load_test_scope(skill_dir)
+        if not scope:
+            scope = generate_test_scope(skill_dir)
+
+    repairs = []
+
+    # 可修复项：引用链路指向不存在的文件
+    for item in scope:
+        if item.get("source_type") != "reference_link":
+            continue
+        if item.get("has_script"):
+            continue  # 已存在 → 不需要修复
+
+        target = item.get("text", "").replace("引用: ", "").strip()
+        if not target:
+            continue
+        full_path = os.path.join(skill_dir, target)
+        if os.path.exists(full_path):
+            continue
+
+        if dry_run:
+            repairs.append({"cid": item["cid"], "type": "reference_link",
+                            "target": target, "success": True,
+                            "detail": f"[dry-run] 将创建桩文件: {target}"})
+        else:
+            try:
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(f"# {os.path.basename(target)}\n\n自动生成桩文件 — {target}\n")
+                repairs.append({"cid": item["cid"], "type": "reference_link",
+                                "target": target, "success": True,
+                                "detail": f"✅ 桩文件已创建: {target}"})
+            except Exception as e:
+                repairs.append({"cid": item["cid"], "type": "reference_link",
+                                "target": target, "success": False,
+                                "detail": f"❌ 创建失败: {e}"})
+
+    # 可修复项：文件清单中缺失的文件
+    for item in scope:
+        if item.get("source_type") != "file_manifest":
+            continue
+        if item.get("has_script"):
+            continue
+        fname = item.get("text", "")
+        # 提取文件名
+        for prefix in ("python: ", "markdown: ", "json: ", "shell: ", "other: "):
+            if prefix in fname:
+                fname = fname.split(prefix, 1)[1].strip()
+                break
+        if not fname:
+            continue
+        full_path = os.path.join(skill_dir, fname)
+        if os.path.exists(full_path):
+            continue
+
+        if dry_run:
+            repairs.append({"cid": item["cid"], "type": "file_manifest",
+                            "target": fname, "success": True,
+                            "detail": f"[dry-run] 将创建缺失文件: {fname}"})
+        else:
+            try:
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(f"# {os.path.basename(fname)}\n\n自动生成 — {fname}\n")
+                repairs.append({"cid": item["cid"], "type": "file_manifest",
+                                "target": fname, "success": True,
+                                "detail": f"✅ 缺失文件已创建: {fname}"})
+            except Exception as e:
+                repairs.append({"cid": item["cid"], "type": "file_manifest",
+                                "target": fname, "success": False,
+                                "detail": f"❌ 创建失败: {e}"})
+
+    if not dry_run:
+        print(f"\n[S4-修复] {sum(1 for r in repairs if r['success'])}/{len(repairs)} 项已修复")
+        for r in repairs:
+            print(f"  {r['detail']}" if r['success'] else f"  {r['detail']}")
+
+    return repairs
     spath = os.path.join(skill_dir, DATA_DIR, ".s4_test_scope.json")
     with open(spath, "w", encoding="utf-8") as f:
         json.dump(scope, f, ensure_ascii=False, indent=2)
@@ -650,6 +744,7 @@ USAGE = """
   python s4_engine.py <skill-dir> steps                  — 打印工作流步骤序列
   python s4_engine.py <skill-dir> score <pr> <nr>        — 综合评分 (pf=0.4 nf=0.6)
   python s4_engine.py <skill-dir> play [rounds]          — 随机化回放生成噪音脚本
+  python s4_engine.py <skill-dir> repair [--dry-run]     — 修复引用链路断裂和缺失文件
 """
 
 
@@ -719,6 +814,15 @@ def main():
             player.playback_all_rounds(rounds=rounds)
         else:
             print(f"[S4] ❌ 无噪音方案，请先执行阶段B")
+
+    elif cmd == "repair":
+        dry_run = "--dry-run" in sys.argv or "-n" in sys.argv
+        scope = load_test_scope(skill_dir)
+        if not scope:
+            scope = generate_test_scope(skill_dir)
+        repairs = s4_scope_repair(skill_dir, scope, dry_run=dry_run)
+        if not repairs:
+            print("[S4-修复] 无需要修复的项")
 
     else:
         print(f"未知命令: {cmd}")

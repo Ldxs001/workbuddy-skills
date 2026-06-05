@@ -1,7 +1,7 @@
 # skill-function-test 完整使用指南
 
 > **场景测试（Scenario Testing）** — 不以函数为单位，以 **场景链路** 为单位。
-> 备份 → 蓝皮书+约束 → 场景+功能+S4脏环境测试 → 修复循环 → 回归确认 → 输出报告+S4矩阵。
+> 备份 → 蓝皮书+约束+全量范围 → 场景+功能+S4 → 修复循环 → 回归确认 → 输出报告+S4矩阵。
 
 ---
 
@@ -9,11 +9,11 @@
 
 1. **场景驱动** — 从目标技能 SKILL.md 中解析其声称的触发场景、核心能力和工作流程，每条场景就是一条测试链路
 2. **功能测试做底座** — D1-D6 功能测试定位到具体断点行号，场景测试定位到链路断裂位置
-3. **S4 脏环境忠实度** — 噪音/污染/干扰下，铁律约束的坚守率测试（仅报告、不修复）
+3. **S4 全量范围扫描** — 从蓝皮书提取约束、引用链路、工作流程、文件清单作为测试范围，噪音下测铁律坚守率，结构性修复引用断裂和缺失文件
 4. **不允许修复导致功能失效** — 修复后必须回归确认，与备份前基线对比
 5. **修复建议基于场景不越界** — 只建议修复本场景断点，不扩展功能范围
 
-**场景测试 vs 功能测试 vs S4 脏环境测试：**
+**场景测试 vs 功能测试 vs S4：**
 
 | | 场景测试 | 功能测试 | S4 脏环境 |
 |--|---------|---------|----------|
@@ -57,6 +57,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 inspector.py 自动执行：
 - 蓝皮书扫描（文件清单、AST 函数签名、引用链路）
 - **S4 阶段A：约束提取** — 从 SKILL.md 提取"必须/禁止/铁律/应"等约束关键词
+- **S4 阶段A：全量测试范围生成** — 从蓝皮书+约束+工作流程+引用链路生成完整 `.s4_test_scope.json`
 - 产出 `.standardization/skill-function-test/data/.constraint-list.json`
 
 ### 阶段 3：询问测试计划
@@ -88,7 +89,7 @@ S4 脏环境忠实度      — 噪音/污染下铁律坚守率
 是否执行 S4 脏环境测试: [y/N]
 ```
 
-### 阶段 4：场景+功能+S4 脏环境测试
+### 阶段 4：场景+功能+S4 测试
 
 执行选择的 S1-S3、D1-D6 和/或 S4 测试：
 
@@ -99,15 +100,26 @@ python scripts/scenario_engine.py /path/to/target-skill
 # 功能测试
 python scripts/test_engine.py /path/to/target-skill
 
+# S4 全量范围（手动执行）
+python scripts/s4_engine.py /path/to/target-skill scope
+
 # S4 脏环境测试（LLM 主导，数据存储在 .standardization/skill-function-test/data/ 下）
 # 查看坚守率矩阵
 python scripts/s4_engine.py /path/to/target-skill report
 ```
 
 S4 脏环境测试流程：
-1. **阶段B：LLM推理层** — 读取约束清单 → 按硬控制模板推理 → 产出噪音方案 → schema 校验
-2. **阶段C：噪音执行** — 逐条执行噪音方案 → 记录坚守/失守 → 保存在 `.standardization/skill-function-test/data/.s4_trace.json`
-3. **阶段D：复盘归因** — 读取 trace → 归因分析 → 产出坚守率矩阵
+1. **阶段A：全量测试范围生成** — 从蓝皮书提取约束+引用链路+工作流程+文件清单，产出 `.s4_test_scope.json`
+2. **阶段B：LLM推理层** — 读取全量范围 → 按硬控制模板推理 → 产出噪音方案 → schema 校验
+3. **阶段C：噪音执行** — 逐条执行噪音方案 → 记录坚守/失守 → 保存在 `.standardization/skill-function-test/data/.s4_trace.json`
+4. **阶段C：结构性修复**（fix_mode=1 时自动触发）— 修复引用链路断裂、创建缺失的桩文件
+5. **阶段D：复盘归因** — 读取 trace → 归因分析 → 产出坚守率矩阵
+
+S4 修复命令：
+```bash
+python scripts/s4_engine.py /path/to/target-skill repair          # 自动修复
+python scripts/s4_engine.py /path/to/target-skill repair --dry-run # 预览不改
+```
 
 场景测试、功能测试、S4 各自输出独立报告。
 
