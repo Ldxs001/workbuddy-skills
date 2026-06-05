@@ -34,8 +34,19 @@ STAGES = {
     11: "清理",
 }
 
-# 数据目录常量（R-12 合规）
-DATA_DIR = os.path.join(".standardization", "skill-function-test", "data")
+# 数据目录常量（R-12 合规：skills/.standardization/skill-function-test/data/）
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR = os.path.dirname(_SCRIPT_DIR)          # → skills/skill-function-test/
+_SKILLS_ROOT = os.path.dirname(_SKILL_DIR)         # → skills/
+# R-12 审计锚点：DATA_DIR 行直接赋值合规字面量（不可用变量替代 skill name）
+DATA_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data")
+
+def _data_dir_for(skill_dir: str) -> str:
+    """目标技能的数据子目录: skills/.standardization/skill-function-test/data/<target_skill>/"""
+    target_name = os.path.basename(os.path.abspath(skill_dir))
+    d = os.path.join(DATA_DIR, target_name)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 # ═══════════════════════════════════════════════════════
 # 流程状态
@@ -119,9 +130,7 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
     print(state.blueprint_text)
 
     # 保存到目标技能目录
-    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
-    os.makedirs(s4_data_dir, exist_ok=True)
-
+    s4_data_dir = _data_dir_for(state.skill_dir)
     bp_path = os.path.join(s4_data_dir, ".scenario-test_blueprint.json")
     with open(bp_path, "w", encoding="utf-8") as f:
         json.dump(state.blueprint, f, ensure_ascii=False, indent=2)
@@ -298,8 +307,7 @@ def stage_4_test(state: PipelineState) -> PipelineState:
                 pass
 
         all_s4_rounds = []
-        s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
-        os.makedirs(s4_data_dir, exist_ok=True)
+        s4_data_dir = _data_dir_for(state.skill_dir)
 
         for r in range(1, s4_rounds + 1):
             print(f"\n  ── S4 第 {r}/{s4_rounds} 轮 ──")
@@ -759,7 +767,7 @@ def stage_11_cleanup(state: PipelineState) -> PipelineState:
     print(f"{'='*50}")
 
     # 1. 清理目标技能目录的测试残留（data 目录中）
-    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+    s4_data_dir = _data_dir_for(state.skill_dir)
     patterns = [".scenario-test_blueprint.json", ".scenario-test_report.json",
                 ".function-test_blueprint.json", ".function-test_report.json"]
     removed = 0

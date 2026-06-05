@@ -1,11 +1,11 @@
 ---
 name: skill-function-test
-version: 0.2.18
+version: 0.2.20
 author: wUwproject
 license: MIT
 description: 技能场景测试套件 —— 备份 → 蓝皮书 → 场景+功能双轨测试 → 修复循环 → 回归确认 → 分级报告。场景驱动：从 SKILL.md 解析触发场景和核心能力，构造端到端场景测试链路。包含 D1-D6 功能测试作为底座。
 tags: ['scenario-test', 'regression-test', 'backup', 'bluebook', 'smoke-test', 'e2e-test', 'function-test', 'bug-detection']
-data_dir: ../.standardization/skill-function-test/
+data_dir: ../.standardization/skill-function-test/data/
 external_data_dir: true
 sensitive_access: false
 critical_write: false
@@ -83,6 +83,7 @@ faq_quality: improve_qa
 | 文件 | 位置 | 说明 |
 |------|------|------|
 | `references/guide.md` | 完整使用指南 | 10 阶段工作流程 + 备份/恢复说明 + 场景解析规则 |
+| `references/changelog.md` | 更新日志 | 版本更新记录（渐进式加载，R-24 合规） |
 | `references/antipatterns.md` | 反模式 | 常见错误和注意事项 |
 | `references/faq.md` | FAQ | 常见问题 |
 | `references/examples.md` | 示例集合 | 完整执行示例 |

@@ -13,12 +13,19 @@ import json
 import os
 import sys
 
-# S4 数据目录常量（R-12 合规命名）
-DATA_DIR = os.path.join(".standardization", "skill-function-test", "data")
+# S4 数据目录常量（R-12 合规：skills/.standardization/skill-function-test/data/）
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR = os.path.dirname(_SCRIPT_DIR)          # → skills/skill-function-test/
+_SKILLS_ROOT = os.path.dirname(_SKILL_DIR)         # → skills/
+# R-12 审计锚点：DATA_DIR 行直接赋值合规字面量（不可用变量替代 skill name）
+DATA_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data")
 
-CONSTRAINT_FILE = os.path.join(DATA_DIR, ".constraint-list.json")
-NOISE_PLAN_FILE = os.path.join(DATA_DIR, ".s4_noise_plan.json")
-S4_TRACE_FILE = os.path.join(DATA_DIR, ".s4_trace.json")
+def _data_dir_for(skill_dir: str) -> str:
+    """目标技能的数据子目录: skills/.standardization/skill-function-test/data/<target_skill>/"""
+    target_name = os.path.basename(os.path.abspath(skill_dir))
+    d = os.path.join(DATA_DIR, target_name)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 # ═══════════════════════════════════════════════════════
@@ -97,11 +104,17 @@ def validate_noise_plan(plan: list) -> list[str]:
                 break
 
     return errors
+# 文件命名常量（不在路径中，由 _data_dir_for() 拼接）
+F_CONSTRAINT = ".constraint-list.json"
+F_NOISE_PLAN = ".s4_noise_plan.json"
+F_TRACE = ".s4_trace.json"
+F_BLUEPRINT = ".scenario-test_blueprint.json"
+F_TEST_SCOPE = ".s4_test_scope.json"
 
 
 def load_constraints(skill_dir: str) -> list[dict]:
     """加载阶段A产出的约束清单"""
-    cpath = os.path.join(skill_dir, CONSTRAINT_FILE)
+    cpath = os.path.join(_data_dir_for(skill_dir), F_CONSTRAINT)
     if not os.path.exists(cpath):
         print(f"[S4] ⚠️ 约束清单不存在: {cpath}")
         return []
@@ -110,8 +123,8 @@ def load_constraints(skill_dir: str) -> list[dict]:
 
 
 def save_noise_plan(skill_dir: str, plan: list[dict]):
-    """保存噪音方案到目标技能目录"""
-    npath = os.path.join(skill_dir, NOISE_PLAN_FILE)
+    """保存噪音方案到目标技能数据目录"""
+    npath = os.path.join(_data_dir_for(skill_dir), F_NOISE_PLAN)
     with open(npath, "w", encoding="utf-8") as f:
         json.dump(plan, f, ensure_ascii=False, indent=2)
     print(f"[S4] ✅ 噪音方案已保存: {npath} ({len(plan)} 条)")
@@ -119,7 +132,7 @@ def save_noise_plan(skill_dir: str, plan: list[dict]):
 
 def load_noise_plan(skill_dir: str) -> list[dict]:
     """加载噪音方案"""
-    npath = os.path.join(skill_dir, NOISE_PLAN_FILE)
+    npath = os.path.join(_data_dir_for(skill_dir), F_NOISE_PLAN)
     if not os.path.exists(npath):
         print(f"[S4] ⚠️ 噪音方案不存在: {npath}")
         return []
@@ -129,7 +142,7 @@ def load_noise_plan(skill_dir: str) -> list[dict]:
 
 def save_trace(skill_dir: str, trace: list[dict]):
     """保存S4执行记录"""
-    tpath = os.path.join(skill_dir, S4_TRACE_FILE)
+    tpath = os.path.join(_data_dir_for(skill_dir), F_TRACE)
     with open(tpath, "w", encoding="utf-8") as f:
         json.dump(trace, f, ensure_ascii=False, indent=2)
     print(f"[S4] ✅ 执行记录已保存: {tpath}")
@@ -137,7 +150,7 @@ def save_trace(skill_dir: str, trace: list[dict]):
 
 def load_trace(skill_dir: str) -> list[dict]:
     """加载S4执行记录"""
-    tpath = os.path.join(skill_dir, S4_TRACE_FILE)
+    tpath = os.path.join(_data_dir_for(skill_dir), F_TRACE)
     if not os.path.exists(tpath):
         return []
     with open(tpath, "r", encoding="utf-8") as f:
@@ -171,12 +184,9 @@ def print_constraint_summary(constraints: list[dict]) -> str:
 # 阶段A-全量测试范围生成（蓝皮书 + 约束 + 流程）
 # ═══════════════════════════════════════════════════════
 
-BLUEPRINT_FILE = os.path.join(DATA_DIR, ".scenario-test_blueprint.json")
-
-
 def load_blueprint(skill_dir: str) -> dict:
     """加载蓝皮书数据"""
-    bpath = os.path.join(skill_dir, BLUEPRINT_FILE)
+    bpath = os.path.join(_data_dir_for(skill_dir), F_BLUEPRINT)
     if not os.path.exists(bpath):
         return {}
     with open(bpath, "r", encoding="utf-8") as f:
@@ -357,7 +367,7 @@ def s4_scope_repair(skill_dir: str, scope: list[dict] = None, dry_run: bool = Fa
             print(f"  {r['detail']}" if r['success'] else f"  {r['detail']}")
 
     return repairs
-    spath = os.path.join(skill_dir, DATA_DIR, ".s4_test_scope.json")
+    spath = os.path.join(_data_dir_for(skill_dir), F_TEST_SCOPE)
     with open(spath, "w", encoding="utf-8") as f:
         json.dump(scope, f, ensure_ascii=False, indent=2)
     print(f"[S4] ✅ 全量测试范围已保存: {spath} ({len(scope)} 项)")
@@ -370,7 +380,7 @@ def s4_scope_repair(skill_dir: str, scope: list[dict] = None, dry_run: bool = Fa
 
 def load_test_scope(skill_dir: str) -> list[dict]:
     """加载全量测试范围"""
-    spath = os.path.join(skill_dir, DATA_DIR, ".s4_test_scope.json")
+    spath = os.path.join(_data_dir_for(skill_dir), F_TEST_SCOPE)
     if not os.path.exists(spath):
         return []
     with open(spath, "r", encoding="utf-8") as f:
@@ -509,7 +519,7 @@ class NoisePlayer:
 
     def save_script(self, script: list[dict], round_num: int = 1):
         """保存随机化脚本到分轮文件"""
-        rfile = os.path.join(self.skill_dir, DATA_DIR, f".s4_script_r{round_num}.json")
+        rfile = os.path.join(_data_dir_for(self.skill_dir), f".s4_script_r{round_num}.json")
         with open(rfile, "w", encoding="utf-8") as f:
             json.dump(script, f, ensure_ascii=False, indent=2)
         print(f"[S4-播放器] ✅ 第 {round_num} 轮脚本已保存: {rfile} ({len(script)} 条)")

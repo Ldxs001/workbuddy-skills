@@ -465,7 +465,7 @@ def run_full_test(skill_dir: str, dimensions: list[str] = None) -> tuple[dict, s
     runner.run_all(dimensions)
     print(f"  [FT] 完成 {len(runner.results)} 项测试", flush=True)
 
-    # 3. 生成报告
+    # 3. 生成报告（LLM 分类由 runner.py Stage 5 负责，依据 fix_mode 配置执行）
     report = runner.generate_report()
     report_text = runner.print_report(skill_dir=skill_dir)
     return report, report_text

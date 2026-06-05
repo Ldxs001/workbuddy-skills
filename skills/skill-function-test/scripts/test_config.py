@@ -53,13 +53,20 @@ DEFAULT_CONFIG = {
 # 配置 I/O
 # ═══════════════════════════════════════════════════════
 
-# 数据目录常量（R-12 合规）
-DATA_DIR = os.path.join(".standardization", "skill-function-test", "data")
-CONFIG_FILE = os.path.join(DATA_DIR, ".test-config.json")
+# 数据目录常量（R-12 合规：skills/.standardization/skill-function-test/data/）
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR = os.path.dirname(_SCRIPT_DIR)
+_SKILLS_ROOT = os.path.dirname(_SKILL_DIR)
+# R-12 审计锚点：DATA_DIR 行直接赋值合规字面量（不可用变量替代 skill name）
+DATA_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data")
 
 
 def config_path(skill_dir: str) -> str:
-    return os.path.join(skill_dir, CONFIG_FILE)
+    """目标技能的测试配置文件路径"""
+    target_name = os.path.basename(os.path.abspath(skill_dir))
+    cfg_dir = os.path.join(DATA_DIR, target_name)
+    os.makedirs(cfg_dir, exist_ok=True)
+    return os.path.join(cfg_dir, ".test-config.json")
 
 
 def load_config(skill_dir: str) -> dict:
@@ -166,7 +173,6 @@ def format_config(cfg: dict) -> str:
     fm = cfg.get("fix_mode", {})
     lines.append(f"    场景测试(S1-S3): {_fix_mode_text_scenario(fm.get('scenario', 0))}")
     lines.append(f"    功能测试(D1-D6): {_fix_mode_text_function(fm.get('function', 0))}")
-    lines.append(f"    S4 执行忠实度:      {_fix_mode_text_s4(s4.get('fix_mode', 1))}")
     lines.append("")
     lines.append("  ── 场景测试 ──")
     for k in ["S1", "S2", "S3"]:

@@ -1,3 +1,20 @@
+## 0.2.20 (2026-06-05)
+- [fix] test_config.py: format_config 移除未定义变量 s4 引用（第176行 UnboundLocalError），修复 LLM 交互管道 Stage 3 崩溃
+
+## 0.2.19 (2026-06-05)
+
+### 修复
+- audit --fix 自动修正: writing_standards
+- [R-12] DATA_DIR 改用字面量 "skill-function-test" 替代变量 SKILL_NAME（审计器无法解析动态变量）
+- [R-23] references/examples.md: 修复 `scripts/permission_checker.py` 示例路径
+- [R-23] references/guide.md, permissions.md, s4-noise-testing.md: 数据路径改用 &lt;DATA_DIR&gt; 抽象符号（避免被 R-23 误认）
+- [R-24] 删除 4 个旧备份中的根级 CHANGELOG.md
+- [R-24] 审计增强：排除 backup 子目录中的 CHANGELOG 扫描
+- [fix.py] 新增 `changelog_progressive` fix_key 支持
+- [R-20] references/antipatterns.md: 修复「可能」模糊表述
+
+---
+
 ## 0.2.18 (2026-06-05)
 
 ### 修复
@@ -62,7 +79,7 @@
 ## 0.2.9 (2026-06-05)
 
 ### 修复
-- 修复runner.py has_damage未定义bug + S4强制执行钩子(exit(1)截断无噪音记录)+ S4执行步骤主动提示框
+- 修复 runner.py has_damage 未定义 bug + S4 强制执行钩子(exit(1)截断无噪音记录)+ S4 执行步骤主动提示框
 
 ---
 

@@ -85,10 +85,12 @@ def update_meta_json(skill_dir: str, new_ver: str) -> bool:
 def append_changelog(skill_dir: str, old_ver: str, new_ver: str,
                      changelog_entries: list[str] = None,
                      bump_type: str = "patch") -> bool:
-    """追加更新日志到 CHANGELOG.md（或 references/changelog.md）"""
+    """追加更新日志到 references/changelog.md（渐进式参考文件，R-24 合规）"""
+    # ★ v2.62.x 根因修复：CHANGELOG 是渐进式参考文件，优先 references/changelog.md
+    #   绝不在根目录创建 CHANGELOG.md（会被审计误判为违规产出物）
     changelog_paths = [
-        os.path.join(skill_dir, "CHANGELOG.md"),
         os.path.join(skill_dir, "references", "changelog.md"),
+        os.path.join(skill_dir, "CHANGELOG.md"),  # 兼容旧版
     ]
     target = None
     for p in changelog_paths:
@@ -96,7 +98,7 @@ def append_changelog(skill_dir: str, old_ver: str, new_ver: str,
             target = p
             break
     if not target:
-        target = os.path.join(skill_dir, "CHANGELOG.md")  # 默认创建
+        target = os.path.join(skill_dir, "references", "changelog.md")  # 默认创建在渐进式目录
 
     today = date.today().isoformat()
     type_labels = {"major": "Breaking", "minor": "Feature", "patch": "Fix"}
