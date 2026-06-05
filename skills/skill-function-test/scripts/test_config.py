@@ -28,6 +28,10 @@ DEFAULT_CONFIG = {
         "enabled": True,            # S4 默认开启（代码默认）
         "rounds": 3,                # S4 独立轮数（覆盖全局 rounds）
     },
+    "s4_weights": {                 # S4 正反权重（正向=干净环境, 反向=脏环境）
+        "positive": 0.4,            # 正向（干净环境-步骤完成率）
+        "negative": 0.6,            # 反向（脏环境-铁律坚守率）
+    },
     "scenarios": {
         "S1": {"enabled": True},
         "S2": {"enabled": True},
@@ -161,7 +165,7 @@ def format_config(cfg: dict) -> str:
     fm = cfg.get("fix_mode", {})
     lines.append(f"    场景测试(S1-S3): {_fix_mode_text_scenario(fm.get('scenario', 0))}")
     lines.append(f"    功能测试(D1-D6): {_fix_mode_text_function(fm.get('function', 0))}")
-    lines.append(f"    S4 脏环境:      只报告（固定）")
+    lines.append(f"    S4 执行忠实度:      只报告（固定）")
     lines.append("")
     lines.append("  ── 场景测试 ──")
     for k in ["S1", "S2", "S3"]:
@@ -175,11 +179,12 @@ def format_config(cfg: dict) -> str:
         icon = "✅" if v.get("enabled", True) else "❌"
         lines.append(f"    {icon} {k}")
     lines.append("")
-    lines.append("  ── S4 脏环境测试 ──")
+    lines.append("  ── S4 执行忠实度测试（正反交叉）──")
     s4 = cfg.get("s4", {})
     s4_icon = "✅" if s4.get("enabled", False) else "❌"
     s4_rounds = s4.get("rounds", cfg.get("rounds", 3))
-    lines.append(f"    {s4_icon} S4（{s4_rounds} 轮）")
+    factors = cfg.get("s4_weights", {"positive": 0.4, "negative": 0.6})
+    lines.append(f"    {s4_icon} S4（{s4_rounds} 轮, 正向权重{factors['positive']}/反向权重{factors['negative']}）")
     lines.append("")
     lines.append(f"  ⚡ 当前测试集: {', '.join(get_active_tests(cfg))}")
     lines.append("=" * 56)
@@ -205,7 +210,7 @@ INTERACTIVE_HELP = """
   cfg rounds N                  — 设置全局轮数（1-5）
   cfg fix_mode scenario <0|1>   — 场景修复模式（0=仅报告 1=尝试修复）
   cfg fix_mode function <0|1|2> — 功能修复模式（0=仅报告 1=直接 2=询问）
-  cfg s4 on/off                 — 开启/关闭 S4 脏环境测试
+  cfg s4 on/off                 — 开启/关闭 S4 执行忠实度测试
   cfg s4 rounds N               — 设置 S4 独立轮数
   cfg <dim> on/off              — 开启/关闭某个维度（如 S1, D2 等）
   cfg reset                     — 重置为默认配置
@@ -284,6 +289,19 @@ def interactive_edit(cfg: dict, cmd_args: list[str], skill_dir: str) -> dict:
                 cfg["s4"]["rounds"] = n
                 save_config(skill_dir, cfg)
                 print(f"[CFG] S4 轮数已设置为 {n}")
+        elif sub == "pf" and len(cmd_args) >= 3:
+            v = float(cmd_args[2])
+            if 0.0 <= v <= 1.0:
+                cfg.setdefault("s4_weights", {})["positive"] = v
+                if __import__("builtins").sum(cfg["s4_weights"].values()) > 0:
+                    save_config(skill_dir, cfg)
+                    print(f"[CFG] S4 正向因子已设置为 {v}")
+        elif sub == "nf" and len(cmd_args) >= 3:
+            v = float(cmd_args[2])
+            if 0.0 <= v <= 1.0:
+                cfg.setdefault("s4_weights", {})["negative"] = v
+                save_config(skill_dir, cfg)
+                print(f"[CFG] S4 反向因子已设置为 {v}")
 
     elif action in ("S1", "S2", "S3", "D1", "D2", "D3", "D4", "D5", "D6"):
         group = "scenarios" if action.startswith("S") else "functions"
@@ -463,7 +481,7 @@ def render_html(cfg: dict) -> str:
       </select>
     </div>
     <div class="param-row" style="color:#94a3b8;">
-      <span>S4 脏环境 <span class="badge">固定</span></span>
+      <span>S4 执行忠实度 <span class="badge">固定</span></span>
       <span style="font-size:13px;">仅报告（不可修改）</span>
     </div>
   </div>
@@ -479,9 +497,9 @@ def render_html(cfg: dict) -> str:
   </div>
 
   <div class="section">
-    <div class="section-title">S4 脏环境忠实度测试</div>
+    <div class="section-title">S4 执行忠实度测试（正反交叉）</div>
     <label class="toggle-row">
-      <span>S4 脏环境测试 <span class="badge">仅报告</span></span>
+      <span>S4 执行忠实度 <span class="badge">仅报告</span></span>
       <input type="checkbox" id="S4" {"checked" if s4_enabled=="true" else ""}>
       <span class="slider"></span>
     </label>

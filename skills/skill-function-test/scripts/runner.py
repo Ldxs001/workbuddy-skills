@@ -61,6 +61,7 @@ class PipelineState:
         self.function_text: str = ""
         self.s4_matrix: dict = {}        # S4 坚守率矩阵
         self.s4_matrix_text: str = ""    # S4 坚守率矩阵可读文本
+        self.s4_score: dict = {}         # S4 综合忠实度评分
         self.fix_results: list[dict] = []  # [{type, file, success, detail}]
         self.regression_report: dict = {}
         self.regression_text: str = ""
@@ -217,7 +218,7 @@ def stage_4_test(state: PipelineState) -> PipelineState:
     """阶段4: 执行场景+功能+S4脏环境测试（按配置，多轮）"""
     from scenario_engine import run_scenario_test
     from test_engine import run_full_test as run_function_test
-    from s4_engine import load_trace, generate_fidelity_matrix, print_fidelity_matrix
+    from s4_engine import load_trace, generate_fidelity_matrix, print_fidelity_matrix, extract_workflow_steps, print_workflow_steps, generate_fidelity_score, print_fidelity_score
     from test_config import load_config
     print(f"\n{'='*50}")
     print(f"  阶段4/8: 执行测试（场景+功能+S4）")
@@ -302,14 +303,61 @@ def stage_4_test(state: PipelineState) -> PipelineState:
                 print(f"  ║                                                    ║")
                 print(f"  ╚════════════════════════════════════════════════════╝")
 
-        # 聚合所有轮次
+        # 聚合所有轮次（反向-脏环境）
+        s4_weights = config.get("s4_weights", {"positive": 0.4, "negative": 0.6})
+        negative_rate = 0.0
         if all_s4_rounds:
             s4_matrix = generate_fidelity_matrix(all_s4_rounds)
             state.s4_matrix = s4_matrix
             state.s4_matrix_text = print_fidelity_matrix(s4_matrix)
             print(state.s4_matrix_text)
-            print(f"\n  [S4] 坚守率: {all_s4_rounds}: "
-                  f"{sum(1 for t in all_s4_rounds if t.get('llm_behavior')=='坚守')}/{len(all_s4_rounds)}")
+            n_held = sum(1 for t in all_s4_rounds if t.get('llm_behavior')=='坚守')
+            n_total = len(all_s4_rounds)
+            negative_rate = n_held / n_total if n_total > 0 else 0.0
+            print(f"  [S4] 反向坚守率: {n_held}/{n_total} ({negative_rate*100:.0f}%)")
+
+            # ═══════════════════════════════════════════════
+            # 正向测试：工作流步骤完成率
+            # ═══════════════════════════════════════════════
+            print(f"\n  [S4-正向] 提取工作流步骤...")
+            steps = extract_workflow_steps(state.skill_dir)
+            print(print_workflow_steps(steps))
+
+            # 读取正向追踪记录（由LLM执行时写入 .s4_positive.json）
+            positive_file = os.path.join(s4_data_dir, ".s4_positive.json")
+            if os.path.exists(positive_file):
+                with open(positive_file, "r", encoding="utf-8") as f:
+                    positive_trace = json.load(f)
+                completed = sum(1 for p in positive_trace if p.get("completed", False))
+                total_steps = len(positive_trace)
+                positive_rate = completed / total_steps if total_steps > 0 else 0.0
+                print(f"  [S4-正向] 步骤完成率: {completed}/{total_steps} ({positive_rate*100:.0f}%)")
+            else:
+                print("  [S4-正向] 无正向追踪记录")
+                print("  ╔═══════ 正向测试：LLM 必须执行 ══════╗")
+                print("  ║                                     ║")
+                print("  ║  1. 按以上工作流步骤顺序执行一次     ║")
+                print("  ║  2. 每步完成后记录到                 ║")
+                print("  ║     .s4_positive.json               ║")
+                print('  ║     格式: [{"step":1,"title":"备份",  ║')
+                print('  ║            "completed":true}]        ║')
+                print("  ║                                     ║")
+                print("  ╚═════════════════════════════════════╝")
+                # 有步骤但无追踪 → exit(1) 强制LLM执行
+                import sys as _sys
+                _sys.exit(1)
+
+            # ═══════════════════════════════════════════════
+            # 综合忠实度评分
+            # ═══════════════════════════════════════════════
+            score_result = generate_fidelity_score(
+                positive_rate, negative_rate,
+                s4_weights.get("positive", 0.4),
+                s4_weights.get("negative", 0.6),
+            )
+            state.s4_score = score_result
+            print()
+            print(print_fidelity_score(score_result))
         else:
             # ═══════════════════════════════════════════════
             # [强制] S4 已启用但无执行记录 → exit(1) 截断
@@ -735,6 +783,10 @@ def stage_9_report(state: PipelineState) -> PipelineState:
         lines.append("")
         lines.append("── S4 脏环境忠实度 ──")
         lines.append(state.s4_matrix_text)
+    if state.s4_score:
+        lines.append("")
+        from s4_engine import print_fidelity_score
+        lines.append(print_fidelity_score(state.s4_score))
     if state.regression_text:
         lines.append("")
         lines.append(state.regression_text)

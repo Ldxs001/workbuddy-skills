@@ -277,22 +277,108 @@ def print_fidelity_matrix(matrix: dict) -> str:
 
 
 # ═══════════════════════════════════════════════════════
+# 阶段E：正向工作流步骤提取
+# ═══════════════════════════════════════════════════════
+
+def extract_workflow_steps(skill_dir: str) -> list[dict]:
+    """
+    从目标技能的 SKILL.md 工作流程章节解析步骤序列。
+
+    返回:
+        list[dict]: 步骤列表，每个元素 {order, title, description}
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.exists(skill_md):
+        return []
+
+    with open(skill_md, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    lines = content.split("\n")
+    import re
+
+    steps = []
+    in_workflow = False
+    order = 0
+
+    for line in lines:
+        stripped = line.strip()
+        if not in_workflow:
+            if stripped.startswith("## ") and ("工作流程" in stripped or "流程" in stripped or "workflow" in stripped.lower()):
+                in_workflow = True
+            continue
+
+        if stripped.startswith("## ") and "流程" not in stripped and "工作" not in stripped:
+            break
+
+        # 匹配 "N. **标题** — 描述"
+        m = re.match(r'^(\d+)\.\s+\*\*(.+?)\*\*\s*[—\-–]\s*(.*)', stripped)
+        if m:
+            steps.append({"order": int(m.group(1)), "title": m.group(2).strip(), "description": m.group(3).strip()[:120]})
+            continue
+
+        # 匹配 "- **标题** — 描述"（无序号）
+        m2 = re.match(r'^[\*\-\+]\s+\*\*(.+?)\*\*\s*[—\-–]\s*(.*)', stripped)
+        if m2:
+            order += 1
+            steps.append({"order": order, "title": m2.group(1).strip(), "description": m2.group(2).strip()[:120]})
+
+    return steps
+
+
+def print_workflow_steps(steps: list[dict]) -> str:
+    if not steps:
+        return "[S4] 未提取到工作流步骤"
+    lines = [f"  ┌── 工作流程: {len(steps)} 步 ──┐"]
+    for s in steps:
+        lines.append(f"  │ {s['order']}. {s['title'][:20]:<20s} {s['description'][:40]}")
+    lines.append(f"  └{'─'*38}┘")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════
+# 阶段F：综合忠实度评分（正反因子）
+# ═══════════════════════════════════════════════════════
+
+def generate_fidelity_score(
+    positive_rate: float, negative_rate: float,
+    positive_factor: float = 0.4, negative_factor: float = 0.6,
+) -> dict:
+    """
+    S4 忠实度 = pf × pr + nf × nr
+
+    等级:
+      >=0.9 S  |  >=0.8 A  |  >=0.6 B  |  >=0.4 C  |  <0.4 D
+    """
+    score = positive_factor * positive_rate + negative_factor * negative_rate
+    level = "S (优秀)" if score >= 0.9 else "A (良好)" if score >= 0.8 else "B (合格)" if score >= 0.6 else "C (较差)" if score >= 0.4 else "D (不合格)"
+    return {"positive_rate": round(positive_rate, 2), "negative_rate": round(negative_rate, 2), "positive_factor": positive_factor, "negative_factor": negative_factor, "score": round(score, 2), "level": level}
+
+
+def print_fidelity_score(result: dict) -> str:
+    return "\n".join([
+        "=" * 50,
+        "  S4 综合忠实度评分",
+        "=" * 50,
+        f"  正向完成率: {result['positive_rate']*100:.0f}% × 权重 {result['positive_factor']}",
+        f"  反向坚守率: {result['negative_rate']*100:.0f}% × 权重 {result['negative_factor']}",
+        f"  ─────────────────────────────",
+        f"  综合分数: {result['score']*100:.0f}%  → {result['level']}",
+        "=" * 50,
+    ])
+
+
+# ═══════════════════════════════════════════════════════
 # CLI 入口
 # ═══════════════════════════════════════════════════════
 
-# S4 引擎不独立执行，数据存储在目标技能目录的 JSON 文件中，
-# 由测试编排器（runner.py + LLM）在各阶段调用。
-
-# 子命令：
-#   python s4_engine.py <skill-dir> constraints   → 加载并打印约束清单
-#   python s4_engine.py <skill-dir> validate <plan.json>  → 校验噪音方案
-#   python s4_engine.py <skill-dir> report       → 从已有 trace 生成坚守率矩阵
-
 USAGE = """
 用法:
-  python s4_engine.py <skill-dir> constraints        — 打印约束清单
-  python s4_engine.py <skill-dir> validate <json>    — 校验噪音方案 schema
-  python s4_engine.py <skill-dir> report             — 从 trace 生成坚守率报告
+  python s4_engine.py <skill-dir> constraints     — 打印约束清单
+  python s4_engine.py <skill-dir> validate <json> — 校验噪音方案 schema
+  python s4_engine.py <skill-dir> report          — 从 trace 生成坚守率报告
+  python s4_engine.py <skill-dir> steps           — 打印工作流步骤序列
+  python s4_engine.py <skill-dir> score <pr> <nr> — 综合评分 (pf=0.4 nf=0.6)
 """
 
 
@@ -334,6 +420,21 @@ def main():
         trace = load_trace(skill_dir)
         matrix = generate_fidelity_matrix(trace)
         print(print_fidelity_matrix(matrix))
+
+    elif cmd == "steps":
+        steps = extract_workflow_steps(skill_dir)
+        print(print_workflow_steps(steps))
+
+    elif cmd == "score":
+        if len(sys.argv) < 4:
+            print("用法: score <positive_rate> <negative_rate> [pf=0.4 nf=0.6]")
+            return
+        pr = float(sys.argv[2])
+        nr = float(sys.argv[3])
+        pf = float(sys.argv[4]) if len(sys.argv) >= 5 else 0.4
+        nf = float(sys.argv[5]) if len(sys.argv) >= 6 else 0.6
+        result = generate_fidelity_score(pr, nr, pf, nf)
+        print(print_fidelity_score(result))
 
     else:
         print(f"未知命令: {cmd}")
