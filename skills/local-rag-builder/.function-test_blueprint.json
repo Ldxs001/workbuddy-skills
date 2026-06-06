@@ -1,0 +1,1662 @@
+{
+  "skill_name": "local-rag-builder",
+  "version": "0.1.1",
+  "description": "本地 RAG 系统搭建技能，支持环境自动检测修复、嵌入模型多源下载与完整性校验、6种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化设置界面",
+  "file_manifest": {
+    "python": [
+      "scripts\\config.py",
+      "scripts\\embedding_model_manager.py",
+      "scripts\\knowledge_base_manager.py",
+      "scripts\\prompt_manager.py",
+      "scripts\\rag_core.py",
+      "scripts\\rag_env_setup.py",
+      "scripts\\rag_interface.py",
+      "scripts\\rag_web_ui.py",
+      "scripts\\text_splitter.py",
+      "scripts\\utils.py"
+    ],
+    "markdown": [
+      "SKILL.md",
+      "references\\antipatterns.md",
+      "references\\architecture.md",
+      "references\\changelog.md",
+      "references\\examples.md",
+      "references\\faq.md",
+      "references\\guide.md",
+      "references\\permissions.md"
+    ],
+    "shell": [],
+    "json": [
+      "_meta.json"
+    ],
+    "other": []
+  },
+  "functions": [
+    {
+      "name": "get_config_path",
+      "params": [],
+      "lineno": 49,
+      "file": "scripts\\config.py"
+    },
+    {
+      "name": "load_config",
+      "params": [],
+      "lineno": 53,
+      "file": "scripts\\config.py"
+    },
+    {
+      "name": "save_config",
+      "params": [
+        "cfg"
+      ],
+      "lineno": 69,
+      "file": "scripts\\config.py"
+    },
+    {
+      "name": "get_section",
+      "params": [
+        "section_name"
+      ],
+      "lineno": 74,
+      "file": "scripts\\config.py"
+    },
+    {
+      "name": "update_section",
+      "params": [
+        "section_name",
+        "updates"
+      ],
+      "lineno": 80,
+      "file": "scripts\\config.py"
+    },
+    {
+      "name": "reset_config",
+      "params": [],
+      "lineno": 90,
+      "file": "scripts\\config.py"
+    },
+    {
+      "name": "_load_index",
+      "params": [],
+      "lineno": 44,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_save_index",
+      "params": [
+        "index"
+      ],
+      "lineno": 55,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_find_actual_model_path",
+      "params": [
+        "model_id",
+        "download_dir"
+      ],
+      "lineno": 63,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_fuzzy_match",
+      "params": [
+        "expected",
+        "actual"
+      ],
+      "lineno": 85,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_check_integrity",
+      "params": [
+        "model_path"
+      ],
+      "lineno": 93,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_download_with_modelscope",
+      "params": [
+        "model_id",
+        "cache_dir"
+      ],
+      "lineno": 114,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_download_with_hf_mirror",
+      "params": [
+        "model_id",
+        "cache_dir"
+      ],
+      "lineno": 129,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_download_with_hf_official",
+      "params": [
+        "model_id",
+        "cache_dir"
+      ],
+      "lineno": 147,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "download_model",
+      "params": [
+        "model_id",
+        "sources",
+        "max_retries_per_source",
+        "max_sources"
+      ],
+      "lineno": 161,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "verify_model",
+      "params": [
+        "model_id_or_path"
+      ],
+      "lineno": 245,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "list_downloaded_models",
+      "params": [],
+      "lineno": 267,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "remove_model",
+      "params": [
+        "model_id"
+      ],
+      "lineno": 277,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "get_model_path",
+      "params": [
+        "model_id"
+      ],
+      "lineno": 293,
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "name": "_load_index",
+      "params": [],
+      "lineno": 18,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "_save_index",
+      "params": [
+        "index"
+      ],
+      "lineno": 27,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "_load_rules",
+      "params": [],
+      "lineno": 31,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "_save_rules",
+      "params": [
+        "rules"
+      ],
+      "lineno": 35,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "list_knowledge_bases",
+      "params": [],
+      "lineno": 39,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "create_knowledge_base",
+      "params": [
+        "name",
+        "description"
+      ],
+      "lineno": 44,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "delete_knowledge_base",
+      "params": [
+        "name"
+      ],
+      "lineno": 63,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "get_kb_vectorstore",
+      "params": [
+        "kb_name",
+        "embeddings"
+      ],
+      "lineno": 81,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "add_documents_to_kb",
+      "params": [
+        "kb_name",
+        "documents",
+        "embeddings"
+      ],
+      "lineno": 100,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "auto_classify",
+      "params": [
+        "content",
+        "rules"
+      ],
+      "lineno": 140,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "set_classify_rule",
+      "params": [
+        "kb_name",
+        "keywords",
+        "description"
+      ],
+      "lineno": 162,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "remove_classify_rule",
+      "params": [
+        "kb_name"
+      ],
+      "lineno": 173,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "get_kb_stats",
+      "params": [],
+      "lineno": 183,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "load_documents_from_file",
+      "params": [
+        "filepath"
+      ],
+      "lineno": 206,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "load_documents_from_directory",
+      "params": [
+        "dirpath"
+      ],
+      "lineno": 229,
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "name": "get_template_path",
+      "params": [],
+      "lineno": 25,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "load_template",
+      "params": [],
+      "lineno": 29,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "save_template",
+      "params": [
+        "content"
+      ],
+      "lineno": 39,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "reset_template",
+      "params": [],
+      "lineno": 48,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "get_default_template",
+      "params": [],
+      "lineno": 54,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "build_prompt",
+      "params": [
+        "context",
+        "question",
+        "template"
+      ],
+      "lineno": 58,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "list_saved_templates",
+      "params": [],
+      "lineno": 64,
+      "file": "scripts\\prompt_manager.py"
+    },
+    {
+      "name": "get_embeddings",
+      "params": [
+        "model_path",
+        "device"
+      ],
+      "lineno": 16,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "get_vectorstore",
+      "params": [
+        "kb_name",
+        "embeddings"
+      ],
+      "lineno": 43,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "retrieve_documents",
+      "params": [
+        "query",
+        "kb_name",
+        "k",
+        "score_threshold",
+        "embeddings"
+      ],
+      "lineno": 61,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "get_llm",
+      "params": [
+        "base_url",
+        "temperature",
+        "max_tokens"
+      ],
+      "lineno": 93,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "build_context",
+      "params": [
+        "docs"
+      ],
+      "lineno": 108,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "answer_question",
+      "params": [
+        "question",
+        "kb_name",
+        "template",
+        "llm_instance",
+        "embeddings",
+        "k",
+        "score_threshold"
+      ],
+      "lineno": 119,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "import_documents_to_kb",
+      "params": [
+        "file_path",
+        "kb_name",
+        "embeddings",
+        "splitter_config"
+      ],
+      "lineno": 169,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "verify_llm_connection",
+      "params": [],
+      "lineno": 211,
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "name": "get_python_path",
+      "params": [],
+      "lineno": 36,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "check_python_version",
+      "params": [],
+      "lineno": 40,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "check_pip",
+      "params": [],
+      "lineno": 53,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "list_installed",
+      "params": [],
+      "lineno": 62,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "check_missing",
+      "params": [
+        "installed_pkgs"
+      ],
+      "lineno": 78,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "install_packages",
+      "params": [
+        "packages",
+        "upgrade_pip"
+      ],
+      "lineno": 93,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "create_venv",
+      "params": [
+        "venv_path"
+      ],
+      "lineno": 119,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "check_torch_gpu",
+      "params": [],
+      "lineno": 141,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "run_full_check",
+      "params": [],
+      "lineno": 158,
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "name": "run_interactive",
+      "params": [],
+      "lineno": 43,
+      "file": "scripts\\rag_interface.py"
+    },
+    {
+      "name": "generate_html",
+      "params": [],
+      "lineno": 26,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "start_server",
+      "params": [
+        "port"
+      ],
+      "lineno": 355,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "_send_json",
+      "params": [
+        "self",
+        "data",
+        "status"
+      ],
+      "lineno": 281,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "_read_body",
+      "params": [
+        "self"
+      ],
+      "lineno": 288,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "do_GET",
+      "params": [
+        "self"
+      ],
+      "lineno": 295,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "do_POST",
+      "params": [
+        "self"
+      ],
+      "lineno": 309,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "log_message",
+      "params": [
+        "self",
+        "format"
+      ],
+      "lineno": 351,
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "name": "split_fixed_size",
+      "params": [
+        "text",
+        "chunk_size",
+        "chunk_overlap"
+      ],
+      "lineno": 15,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "split_recursive",
+      "params": [
+        "text",
+        "chunk_size",
+        "chunk_overlap",
+        "separators"
+      ],
+      "lineno": 29,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "split_by_headers",
+      "params": [
+        "text",
+        "headers_to_split_on",
+        "strip_headers"
+      ],
+      "lineno": 46,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "split_by_sentence",
+      "params": [
+        "text"
+      ],
+      "lineno": 64,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "split_semantic",
+      "params": [
+        "text",
+        "embeddings",
+        "breakpoint_type"
+      ],
+      "lineno": 87,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "split_with_mermaid_preserve",
+      "params": [
+        "text",
+        "headers_to_split_on",
+        "strip_headers"
+      ],
+      "lineno": 106,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "combo_split",
+      "params": [
+        "text",
+        "primary_strategy",
+        "secondary_strategy",
+        "chunk_size",
+        "chunk_overlap"
+      ],
+      "lineno": 127,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "format_chunks_report",
+      "params": [
+        "chunks"
+      ],
+      "lineno": 188,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "save_chunks",
+      "params": [
+        "chunks",
+        "output_path"
+      ],
+      "lineno": 201,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "replacer",
+      "params": [
+        "match"
+      ],
+      "lineno": 110,
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "name": "get_python_path",
+      "params": [],
+      "lineno": 39,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "run_command",
+      "params": [
+        "cmd",
+        "timeout",
+        "capture"
+      ],
+      "lineno": 44,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "check_python_version",
+      "params": [],
+      "lineno": 62,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "pip_install",
+      "params": [
+        "packages",
+        "venv_python"
+      ],
+      "lineno": 70,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "pip_check_installed",
+      "params": [
+        "package_name"
+      ],
+      "lineno": 76,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "list_installed_packages",
+      "params": [],
+      "lineno": 84,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "dir_size",
+      "params": [
+        "path"
+      ],
+      "lineno": 100,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "safe_json_dump",
+      "params": [
+        "data",
+        "filepath"
+      ],
+      "lineno": 113,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "safe_json_load",
+      "params": [
+        "filepath",
+        "default"
+      ],
+      "lineno": 121,
+      "file": "scripts\\utils.py"
+    },
+    {
+      "name": "find_model_dirs",
+      "params": [
+        "base_dir"
+      ],
+      "lineno": 132,
+      "file": "scripts\\utils.py"
+    }
+  ],
+  "classes": [
+    {
+      "name": "RAGHandler",
+      "methods": [
+        "_send_json",
+        "_read_body",
+        "do_GET",
+        "do_POST",
+        "log_message"
+      ],
+      "lineno": 278,
+      "file": "scripts\\rag_web_ui.py"
+    }
+  ],
+  "reference_links": [
+    {
+      "source": "SKILL.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/guide.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/architecture.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/examples.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/faq.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/antipatterns.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/changelog.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "SKILL.md",
+      "target": "references/permissions.md",
+      "type": "ref_link"
+    },
+    {
+      "source": "antipatterns.md",
+      "target": "```python 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "examples.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "examples.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "examples.md",
+      "target": "```python 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "examples.md",
+      "target": "import subprocess",
+      "type": "import_ref"
+    },
+    {
+      "source": "examples.md",
+      "target": "import json",
+      "type": "import_ref"
+    },
+    {
+      "source": "examples.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "examples.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```json 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    },
+    {
+      "source": "guide.md",
+      "target": "```bash 代码块",
+      "type": "code_block"
+    }
+  ],
+  "sensitive_ops": [
+    {
+      "lineno": 77,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\config.py"
+    },
+    {
+      "lineno": 77,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\config.py"
+    },
+    {
+      "lineno": 64,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\config.py"
+    },
+    {
+      "lineno": 283,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 180,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 286,
+      "operation": "rmtree",
+      "type": "file_delete",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 193,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 239,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 214,
+      "operation": "rmtree",
+      "type": "file_delete",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 334,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\embedding_model_manager.py"
+    },
+    {
+      "lineno": 74,
+      "operation": "rmtree",
+      "type": "file_delete",
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "lineno": 153,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "lineno": 272,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "lineno": 272,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "lineno": 281,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "lineno": 281,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\knowledge_base_manager.py"
+    },
+    {
+      "lineno": 22,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 78,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 98,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 214,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 215,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 25,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 79,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 80,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 114,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 186,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 102,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 114,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 191,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 192,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 193,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 39,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 101,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 103,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 104,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_core.py"
+    },
+    {
+      "lineno": 55,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "lineno": 64,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "lineno": 122,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "lineno": 99,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "lineno": 106,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "lineno": 144,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\rag_env_setup.py"
+    },
+    {
+      "lineno": 46,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_interface.py"
+    },
+    {
+      "lineno": 46,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_interface.py"
+    },
+    {
+      "lineno": 126,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_interface.py"
+    },
+    {
+      "lineno": 126,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_interface.py"
+    },
+    {
+      "lineno": 151,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 155,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 166,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 180,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 185,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 189,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 289,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 170,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 316,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 317,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 318,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 89,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 109,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 110,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 111,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 131,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 132,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 133,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 134,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 135,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 136,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 143,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 144,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 151,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 155,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 166,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 180,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 185,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 189,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 328,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 170,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 102,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 109,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 110,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 111,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 131,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 132,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 133,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 134,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 135,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 136,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 143,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 144,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 210,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 210,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 102,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 102,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\rag_web_ui.py"
+    },
+    {
+      "lineno": 143,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "lineno": 178,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "lineno": 151,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "lineno": 155,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "lineno": 157,
+      "operation": "get",
+      "type": "network",
+      "file": "scripts\\text_splitter.py"
+    },
+    {
+      "lineno": 47,
+      "operation": "subprocess.run",
+      "type": "subprocess",
+      "file": "scripts\\utils.py"
+    }
+  ],
+  "import_chain": {
+    "scripts\\config.py": [
+      "os",
+      "sys",
+      "utils.cfg_dir",
+      "utils.safe_json_load",
+      "utils.safe_json_dump"
+    ],
+    "scripts\\embedding_model_manager.py": [
+      "os",
+      "sys",
+      "json",
+      "hashlib",
+      "tempfile",
+      "utils.MODELS_DIR",
+      "utils.cache_directory",
+      "utils.run_command",
+      "utils.dir_size",
+      "argparse",
+      "shutil",
+      "shutil",
+      "shutil"
+    ],
+    "scripts\\knowledge_base_manager.py": [
+      "os",
+      "sys",
+      "json",
+      "glob",
+      "utils.KB_DIR",
+      "utils.safe_json_load",
+      "utils.safe_json_dump",
+      "shutil",
+      "langchain_chroma.Chroma",
+      "langchain_chroma.Chroma",
+      "langchain_community.document_loaders.TextLoader",
+      "langchain_core.documents.Document",
+      "langchain_community.document_loaders.DirectoryLoader",
+      "langchain_community.document_loaders.TextLoader",
+      "langchain_core.documents.Document",
+      "argparse",
+      "datetime.datetime",
+      "langchain_community.document_loaders.UnstructuredFileLoader"
+    ],
+    "scripts\\prompt_manager.py": [
+      "os",
+      "sys",
+      "utils.PROMPTS_DIR",
+      "argparse"
+    ],
+    "scripts\\rag_core.py": [
+      "os",
+      "sys",
+      "re",
+      "json",
+      "config.load_config",
+      "config.save_config",
+      "utils.KB_DIR",
+      "utils.OUTPUT_DIR",
+      "utils.find_model_dirs",
+      "utils.MODELS_DIR",
+      "langchain_huggingface.HuggingFaceEmbeddings",
+      "torch",
+      "langchain_chroma.Chroma",
+      "langchain_chroma.Chroma",
+      "langchain_community.llms.OpenAI",
+      "prompt_manager.build_prompt",
+      "text_splitter.split_recursive",
+      "knowledge_base_manager.add_documents_to_kb",
+      "urllib.request",
+      "argparse",
+      "langchain_community.document_loaders.TextLoader"
+    ],
+    "scripts\\rag_env_setup.py": [
+      "os",
+      "sys",
+      "subprocess",
+      "platform",
+      "argparse",
+      "json"
+    ],
+    "scripts\\rag_interface.py": [
+      "os",
+      "sys",
+      "re",
+      "json",
+      "rag_core.get_embeddings",
+      "rag_core.get_llm",
+      "rag_core.answer_question",
+      "rag_core.verify_llm_connection",
+      "rag_core.import_documents_to_kb",
+      "config.load_config",
+      "config.save_config",
+      "config.reset_config",
+      "prompt_manager.load_template",
+      "prompt_manager.save_template",
+      "prompt_manager.reset_template",
+      "prompt_manager.get_default_template",
+      "knowledge_base_manager.list_knowledge_bases",
+      "knowledge_base_manager.create_knowledge_base",
+      "knowledge_base_manager.delete_knowledge_base",
+      "knowledge_base_manager.auto_classify",
+      "knowledge_base_manager.set_classify_rule",
+      "embedding_model_manager.list_downloaded_models",
+      "embedding_model_manager.download_model",
+      "argparse"
+    ],
+    "scripts\\rag_web_ui.py": [
+      "os",
+      "sys",
+      "json",
+      "http.server",
+      "socketserver",
+      "urllib.parse",
+      "config.load_config",
+      "config.save_config",
+      "config.reset_config",
+      "config.DEFAULT_CONFIG",
+      "prompt_manager.load_template",
+      "prompt_manager.save_template",
+      "prompt_manager.reset_template",
+      "embedding_model_manager.list_downloaded_models",
+      "embedding_model_manager.RECOMMENDED_MODELS",
+      "knowledge_base_manager.list_knowledge_bases",
+      "knowledge_base_manager.get_kb_stats",
+      "rag_core.verify_llm_connection",
+      "argparse"
+    ],
+    "scripts\\text_splitter.py": [
+      "os",
+      "sys",
+      "re",
+      "json",
+      "langchain_text_splitters.CharacterTextSplitter",
+      "langchain_core.documents.Document",
+      "langchain_text_splitters.RecursiveCharacterTextSplitter",
+      "langchain_core.documents.Document",
+      "langchain_text_splitters.MarkdownHeaderTextSplitter",
+      "langchain_core.documents.Document",
+      "langchain_text_splitters.RecursiveCharacterTextSplitter",
+      "argparse",
+      "nltk",
+      "langchain_experimental.text_splitter.SemanticChunker",
+      "langchain_huggingface.HuggingFaceEmbeddings"
+    ],
+    "scripts\\utils.py": [
+      "os",
+      "sys",
+      "json",
+      "subprocess",
+      "pathlib.Path"
+    ]
+  },
+  "total_size_bytes": 118984,
+  "file_count": 19
+}

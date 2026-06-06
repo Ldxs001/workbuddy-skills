@@ -1,0 +1,24 @@
+{
+  "name": "local-rag-builder",
+  "version": "0.2.0",
+  "description": "本地 RAG 系统搭建技能，支持环境自动检测修复、嵌入模型多源下载与完整性校验、6种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化设置界面",
+  "author": "your-name-here",
+  "tags": [
+    "rag",
+    "embedding",
+    "llm",
+    "python",
+    "vector-db",
+    "text-splitter"
+  ],
+  "data_dir": "skills/.standardization/local-rag-builder/data/",
+  "triggers": [
+    "搭建 RAG",
+    "本地 RAG",
+    "RAG 系统",
+    "向量检索",
+    "知识库搭建",
+    "嵌入模型",
+    "文本切分"
+  ]
+}
