@@ -316,8 +316,24 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", "..", DEFAULT_DA
 
 ## 三、核心设计原则
 
-### D1: 无需 LM Studio
-本技能自身替代 LLM 角色，无需额外部署 LLM 服务。LM Studio 配置作为可选指南。
+### D1: 双模式架构（集成模式 vs 独立模式）
+
+本 skill 设计为两种运行模式，核心理念是 **skill 只做检索，生成归调用方**：
+
+| 模式 | 谁负责生成回答 | 外部 LLM 服务 | 适用场景 |
+|:----:|:-------------:|:-------------:|:--------:|
+| **集成模式**（默认） | **智能体自身**（WorkBuddy 等）根据 context 回答 | 不需要 | 在智能体平台内使用 skill |
+| **独立模式** | 外部 LLM 服务（LM Studio / Ollama / vLLM） | 需要用户自行部署 | 单独跑 Python 脚本 |
+
+**集成模式下**，调用 `retrieve_context()` → 返回 context + source_docs，智能体根据这些资料自己组织回答。
+**独立模式下**，调用 `answer_question()` → 检索 + 调用外部 LLM 全链路。
+
+**关于 LLM 推荐（独立模式）**：本 skill 只告知用户可选的方案，不替用户决定：
+- **LM Studio**（图形界面，适合新手）→ 下载 lmstudio.ai，加载模型后 Start Server
+- **Ollama**（命令行，适合开发者）→ `ollama run qwen2.5:7b`
+- **vLLM**（生产高性能）→ `python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen-7B`
+
+用户自行选择平台、自行选择模型（Qwen / DeepSeek / Gemma / Llama 等）、自行配置。skill 只提供连接地址和参数调节界面。
 
 ### D2: 松耦合模块
 七个核心模块各司其职，模块间通过 `config.py` + 函数参数传递数据，无循环依赖。
