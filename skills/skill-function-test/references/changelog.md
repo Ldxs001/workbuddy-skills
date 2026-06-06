@@ -1,12 +1,24 @@
-## 0.2.22 (2026-06-06)
+## 0.3.0 (2026-06-06)
 
-### 新增
-- [蓝皮书] 新增 `cli_scripts` 字段：扫描阶段自动检测所有有 `__main__` 的脚本及支持的参数（--json/--list/--show 等）
-- [场景测试] S1-S3 全面升级：从静态文本匹配改为真实 CLI 执行。每个 trigger 场景/核心能力/工作流步骤自动匹配 CLI 脚本并运行 `--help` 及可用参数验证
+### 重构
 
-### 修复
-- [inspector] `scan()` 后不再需要在 scenario_engine 中重复扫描文件，蓝皮书即事实来源
-- [scenario_engine] 移除所有硬编码的场景→脚本映射表，改为关键词自动匹配
+**【重大变更】S1-S3 场景测试从静态文本匹配升级为真实 CLI 执行**
+
+**旧行为**：S1-S3 只读 SKILL.md 的文本内容——检查 trigger 字段有没有值、核心能力表格有几行、工作流步骤列了几个。**一行代码没跑过**。
+
+**新行为**：S1-S3 对每个 trigger 场景/每个核心能力/每个工作流步骤，自动发现对应的 CLI 脚本，实际运行 `--help` 及可用参数（`--json`/`--list`/`--show` 等），验证返回码和输出结构。
+
+### 变动详情
+
+| 文件 | 改动 |
+|------|------|
+| `inspector.py` | **Blueprint 新增 `cli_scripts` 字段**：AST 扫描时同步检测每个 Python 文件是否有 `__main__` 入口、支持哪些参数标志（`--json`/`--list`/`--show` 等）。蓝皮书现在包含完整的 CLI 可执行信息 |
+| `scenario_engine.py` | **完全重写**：移除硬编码的 `SCENARIO_MAP`（原82行脚本名+参数映射表），改为从蓝皮书 `cli_scripts` 自动匹配。S1 对 trigger→脚本执行 `--help`+可用参数，S2 对能力→脚本执行 `--help`，S3 对工作流引用→脚本执行 `--help` |
+
+### 核心设计变化
+
+- **蓝皮书即事实来源**：所有代码分析在 `inspector.py` 的 `scan()` 阶段完成，`scenario_engine.py` 不再重新扫描或硬编码任何技能特定信息
+- **零特化**：不包含任何特定技能（local-rag-builder / activity-duration-estimation 等）的引用。0 行硬编码
 
 ## 0.2.21 (2026-06-05)
 - [fix] test_engine.py/scenario_engine.py: CLI 报告保存路径改为 DATA_DIR（非 skill 根目录），R-11 合规
