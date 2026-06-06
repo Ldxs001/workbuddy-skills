@@ -17,7 +17,7 @@ from config import load_config, save_config, reset_config, DEFAULT_CONFIG
 from prompt_manager import load_template, save_template, reset_template
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats
-from rag_core import verify_llm_connection
+from rag_standalone import verify_llm_connection
 
 PORT = 8765
 HTML_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rag_settings.html")

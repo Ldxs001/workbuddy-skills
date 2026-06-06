@@ -1,7 +1,7 @@
 {
   "name": "local-rag-builder",
-  "version": "0.2.0",
-  "description": "本地 RAG 系统搭建技能，支持环境自动检测修复、嵌入模型多源下载与完整性校验、6种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化设置界面",
+  "version": "0.2.1",
+  "description": "本地 RAG 系统搭建技能，支持环境自动检测修复、嵌入模型多源下载与完整性校验、6种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化配置界面",
   "author": "your-name-here",
   "tags": [
     "rag",

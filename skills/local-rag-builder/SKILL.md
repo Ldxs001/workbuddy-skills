@@ -1,6 +1,6 @@
 ---
 name: local-rag-builder
-version: 0.2.0
+version: 0.2.1
 description: 本地 RAG 系统搭建技能，支持环境自动检测修复、嵌入模型多源下载与完整性校验、6种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化配置界面
 author: your-name-here
 license: MIT
@@ -14,10 +14,15 @@ h1_position: true
 external_data_dir: true
 permission_weight: LOW
 faq_quality: improve_qa
+meta_field_sync: true
 ---
 # local-rag-builder（本地 RAG 搭建工具）
 
 一站式本地 RAG 系统搭建工具。支持环境自动检测修复、嵌入模型多源下载、6 种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化配置。
+
+**两种运行模式：**
+- **集成模式（默认）** — 纯检索，不调用 LLM。智能体（WorkBuddy 等）根据检索到的 context 自行回答
+- **独立模式** — 检索 + LLM 全链路。需要外部 LLM 服务（LM Studio / Ollama / vLLM），用户自行选择平台和模型
 
 ## 触发场景
 
@@ -28,8 +33,8 @@ faq_quality: improve_qa
 - **向量检索** — "把这份资料入库，搜索相似内容"
 - **知识库管理** — "创建一个知识库" / "把这类资料存入指定库"
 - **调整参数** — "更新切分参数" / "改 Prompt 模板"
-- **打开界面** — "打开 RAG 配置界面"
-- **不触发**：纯 LLM 聊天、不需要检索的简单问答
+- **智能体集成** — "根据这份资料回答：xxx"（智能体调用 skill 的集成模式）
+- **不触发**：纯 LLM 聊天不需要检索、简单问答不需要外部资料
 
 ## 核心能力
 
@@ -43,7 +48,7 @@ faq_quality: improve_qa
 | 4 | **多知识库管理** | 支持多个向量知识库并行，LLM 自动分类入库或用户指定 |
 | 5 | **可调 Prompt** | 模板持久化，支持自定义占位符（`{context}` `{question}`），运行时编辑 |
 | 6 | **Web 可视化界面** | 内嵌 HTML 配置面板，可直调 Python 核心参数，无需手动改代码 |
-| 7 | **结构化接口** | 提供标准 Python API 和 CLI，便于智能体集成调用 |
+| 7 | **双模式接口** | 集成模式（`--retrieve-only` / `--mode integrated`）纯检索，智能体自行回答；独立模式（`--mode standalone`）检索 + LLM 全链路 |
 
 ## 快速开始
 
@@ -60,8 +65,15 @@ python scripts/embedding_model_manager.py --interactive
 # 4. 启动 Web 配置界面
 python scripts/rag_web_ui.py
 
-# 5. 启动交互式 RAG 对话
-python scripts/rag_interface.py
+# 5a. [技能模式] 纯检索，供智能体调用（无需 LLM）
+python scripts/rag_skill.py --query "问题"
+python scripts/rag_skill.py --query "问题" --json          # JSON 输出
+
+# 5b. [独立模式] 检索 + LLM 全链路，需外部 LLM 服务
+python scripts/rag_standalone.py                            # 交互式 CLI
+python scripts/rag_standalone.py --query "问题"              # 单次问答
+python scripts/rag_standalone.py --query "问题" --json       # JSON 输出
+python scripts/rag_standalone.py --llm-help                  # 查看 LLM 接入指南
 ```
 
 ## 工作流程
@@ -69,9 +81,10 @@ python scripts/rag_interface.py
 1. **环境准备** — `rag_env_setup.py` 检测并安装依赖
 2. **模型下载** — `embedding_model_manager.py` 下载/校验嵌入模型
 3. **文档入库** — `text_splitter.py` 切分文档 → `knowledge_base_manager.py` 向量化
-4. **问答交互** — `rag_interface.py` 提供 CLI 交互，支持 `/prompt` `/kb` 等命令
+4. **模式选择** — 根据用途选择入口
+   - **技能模式** → `rag_skill.py`（纯检索，供智能体调用，无需 LLM）
+   - **独立模式** → `rag_standalone.py`（检索 + LLM 全链路，需外部 LLM）
 5. **配置调整** — `rag_web_ui.py` 提供可视化面板
-6. **结构化接口** — 各脚本均支持 JSON 输入输出供智能体调用
 
 ## 命令速查
 
@@ -80,8 +93,9 @@ python scripts/rag_interface.py
 | `rag_env_setup.py` | 环境检测与修复 | `--auto-install`, `--check-only` |
 | `embedding_model_manager.py` | 嵌入模型管理 | `--download`, `--list`, `--check`, `--remove` |
 | `text_splitter.py` | 文本切分 | `--strategy`, `--chunk-size`, `--overlap`, `--input` |
-| `rag_core.py` | RAG 核心引擎 | `--model`, `--kb`, `--question` |
-| `rag_interface.py` | CLI 交互 | `--kb`, `--model` |
+| `rag_core.py` | 共享核心（被其他模块导入，不直接运行） | — |
+| **`rag_skill.py`** | **[技能模式] 纯检索接口** | **`--query`, `--kb`, `--json`** |
+| **`rag_standalone.py`** | **[独立模式] 检索+LLM** | **`--query`, `--kb`, `--llm-help`, `--json`** |
 | `rag_web_ui.py` | Web 配置界面 | `--port` |
 | `prompt_manager.py` | Prompt 管理 | `--set`, `--show`, `--reset`, `--list` |
 | `knowledge_base_manager.py` | 知识库管理 | `--create`, `--import`, `--list`, `--delete`, `--classify` |

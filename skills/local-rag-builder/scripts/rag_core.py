@@ -1,16 +1,16 @@
 """
-local-rag-builder RAG 核心引擎模块
-v0.1.0
-整合嵌入模型、向量检索、LLM 调用
+local-rag-builder 共享核心模块
+v0.2.0
+
+纯核心层：不涉及任何 LLM 调用，不依赖外部服务。
+同时被 rag_skill.py（技能接口）和 rag_standalone.py（独立系统）导入。
 """
 
 import os
-import sys
-import re
 import json
 
-from config import load_config, save_config
-from utils import KB_DIR, OUTPUT_DIR, find_model_dirs, MODELS_DIR
+from config import load_config
+from utils import KB_DIR, MODELS_DIR, find_model_dirs
 
 
 def get_embeddings(model_path=None, device="auto"):
@@ -24,7 +24,6 @@ def get_embeddings(model_path=None, device="auto"):
     if model_path is None:
         model_path = emb_cfg.get("model_path", "")
     if not model_path:
-        # 自动查找已下载的模型
         models = find_model_dirs(MODELS_DIR)
         if not models:
             raise ValueError("未找到嵌入模型。请先运行 embedding_model_manager.py 下载模型")
@@ -40,25 +39,7 @@ def get_embeddings(model_path=None, device="auto"):
     )
 
 
-def get_vectorstore(kb_name="default", embeddings=None):
-    """获取向量存储"""
-    from langchain_chroma import Chroma
-
-    if embeddings is None:
-        embeddings = get_embeddings()
-
-    kb_path = os.path.join(KB_DIR, kb_name)
-    os.makedirs(kb_path, exist_ok=True)
-
-    if os.path.exists(kb_path) and os.listdir(kb_path):
-        return Chroma(
-            persist_directory=kb_path,
-            embedding_function=embeddings,
-        )
-    return None
-
-
-def retrieve_documents(query, kb_name="default", k=3, score_threshold=None, embeddings=None):
+def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, embeddings=None):
     """检索相关文档"""
     from langchain_chroma import Chroma
 
@@ -76,8 +57,10 @@ def retrieve_documents(query, kb_name="default", k=3, score_threshold=None, embe
 
     cfg = load_config()
     ret_cfg = cfg.get("retrieval", {})
-    k = k or ret_cfg.get("k", 3)
-    score_threshold = score_threshold if score_threshold is not None else ret_cfg.get("score_threshold")
+    if k is None:
+        k = ret_cfg.get("k", 3)
+    if score_threshold is None:
+        score_threshold = ret_cfg.get("score_threshold")
 
     if score_threshold:
         retriever = vectorstore.as_retriever(
@@ -90,23 +73,8 @@ def retrieve_documents(query, kb_name="default", k=3, score_threshold=None, embe
     return retriever.invoke(query)
 
 
-def get_llm(base_url=None, temperature=None, max_tokens=None):
-    """获取 LLM 实例（通过 OpenAI 兼容接口）"""
-    from langchain_community.llms import OpenAI
-
-    cfg = load_config()
-    llm_cfg = cfg.get("llm", {})
-
-    return OpenAI(
-        base_url=base_url or llm_cfg.get("base_url", "http://localhost:1234/v1"),
-        api_key=llm_cfg.get("api_key", "not-needed"),
-        temperature=temperature if temperature is not None else llm_cfg.get("temperature", 0.1),
-        max_tokens=max_tokens or llm_cfg.get("max_tokens", 512),
-    )
-
-
 def build_context(docs):
-    """从检索结果构建上下文文本"""
+    """从检索结果构建上下文字符串"""
     parts = []
     for i, doc in enumerate(docs):
         content = doc.page_content if hasattr(doc, "page_content") else str(doc)
@@ -116,53 +84,88 @@ def build_context(docs):
     return "\n\n---\n\n".join(parts)
 
 
-def answer_question(question, kb_name="default", template=None, llm_instance=None,
-                    embeddings=None, k=None, score_threshold=None):
+def retrieve_context(question, kb_name="default", k=None, score_threshold=None, embeddings=None):
     """
-    完整 RAG 问答流程
-    返回: {"answer": str, "source_docs": list, "context": str}
+    纯检索接口：只检索和构建 context，不调用 LLM。
+    返回结构化结果，供任何调用方（智能体 / 独立系统）消费。
     """
-    from prompt_manager import build_prompt
-
-    # 检索
     docs = retrieve_documents(
         question, kb_name=kb_name, k=k,
         score_threshold=score_threshold, embeddings=embeddings,
     )
-
     if not docs:
-        return {
-            "answer": "知识库中未找到相关信息。请先导入文档。",
-            "source_docs": [],
-            "context": "",
-        }
+        return {"context": "", "source_docs": [], "source_count": 0, "question": question}
 
-    # 构建上下文
     context = build_context(docs)
-
-    # 构建 Prompt
-    prompt = build_prompt(context, question, template)
-
-    # 调用 LLM
-    if llm_instance is None:
-        llm_instance = get_llm()
-
-    try:
-        raw_answer = llm_instance.invoke(prompt)
-    except Exception as e:
-        return {
-            "answer": f"LLM 调用失败: {str(e)}\n请确保 LM Studio 或兼容服务正在运行。",
-            "source_docs": docs,
-            "context": context,
-        }
-
-    # 清理 think 标签
-    clean_answer = re.sub(r"<think>.*?</think>\s*", "", raw_answer, flags=re.DOTALL).strip()
+    # source_docs 转可序列化格式
+    serialized = []
+    for d in docs:
+        serialized.append({
+            "content": d.page_content if hasattr(d, "page_content") else str(d),
+            "metadata": d.metadata if hasattr(d, "metadata") else {},
+            "length": len(d.page_content) if hasattr(d, "page_content") else len(str(d)),
+        })
 
     return {
-        "answer": clean_answer,
-        "source_docs": docs,
         "context": context,
+        "source_docs": serialized,
+        "source_count": len(docs),
+        "question": question,
+    }
+
+
+def format_skill_output(question, kb_name="default", k=None, score_threshold=None,
+                        embeddings=None, template=None):
+    """
+    [技能接口核心] 检索 + 格式化输出。
+    返回的 JSON 包含完整的 prompt（已填充 {context} 和 {question}），
+    任何智能体直接拿着 prompt 即可作答。
+
+    返回结构:
+    {
+      "question": str,          # 原始问题
+      "kb": str,                # 检索的知识库
+      "context": str,           # 检索到的文本块
+      "source_count": int,      # 命中的片段数
+      "source_docs": [...],     # 每个片段的详情
+      "prompt": str,            # 已填充的完整 prompt（含 context + question）
+      "prompt_template": str,   # 原始 prompt 模板
+      "has_context": bool,      # 是否找到相关内容
+    }
+    """
+    from prompt_manager import load_template, get_default_template
+
+    # 检索
+    retrieval = retrieve_context(
+        question, kb_name=kb_name, k=k,
+        score_threshold=score_threshold, embeddings=embeddings,
+    )
+
+    context = retrieval["context"]
+    has_context = bool(context)
+
+    # 获取 prompt 模板
+    tpl = template or load_template()
+
+    # 填充占位符
+    if has_context:
+        prompt = tpl.format(context=context, question=question)
+    else:
+        # 无 context 时也尝试填充，占位符缺失则保留原样
+        try:
+            prompt = tpl.format(context="（未检索到相关资料）", question=question)
+        except KeyError:
+            prompt = tpl.replace("{context}", "（未检索到相关资料）").replace("{question}", question)
+
+    return {
+        "question": question,
+        "kb": kb_name,
+        "context": context,
+        "source_count": retrieval["source_count"],
+        "source_docs": retrieval["source_docs"],
+        "prompt": prompt,
+        "prompt_template": tpl,
+        "has_context": has_context,
     }
 
 
@@ -174,7 +177,6 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     if embeddings is None:
         embeddings = get_embeddings()
 
-    # 加载文档
     try:
         from langchain_community.document_loaders import TextLoader
         loader = TextLoader(file_path, encoding="utf-8")
@@ -185,7 +187,6 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     cfg = load_config()
     split_cfg = splitter_config or cfg.get("splitting", {})
 
-    # 切分
     chunks = split_recursive(
         docs[0].page_content,
         chunk_size=split_cfg.get("chunk_size", 500),
@@ -193,11 +194,9 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
         separators=split_cfg.get("separators"),
     )
 
-    # 保留元数据
     for chunk in chunks:
         chunk.metadata["source"] = os.path.basename(file_path)
 
-    # 入库
     ok, msg = add_documents_to_kb(kb_name, chunks, embeddings)
 
     return {
@@ -206,78 +205,3 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
         "chunks_count": len(chunks),
         "source": os.path.basename(file_path),
     }
-
-
-def verify_llm_connection():
-    """验证 LLM 连接"""
-    cfg = load_config()
-    llm_cfg = cfg.get("llm", {})
-    base_url = llm_cfg.get("base_url", "http://localhost:1234/v1")
-
-    import urllib.request
-    try:
-        req = urllib.request.Request(f"{base_url}/models")
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return True, "LLM 连接正常"
-    except Exception as e:
-        return False, f"LLM 连接失败: {e}"
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="RAG 核心引擎")
-    parser.add_argument("--question", type=str, help="提问")
-    parser.add_argument("--kb", type=str, default="default", help="知识库名称")
-    parser.add_argument("--import-file", type=str, dest="import_file", help="导入文件")
-    parser.add_argument("--k", type=int, help="检索文档数")
-    parser.add_argument("--threshold", type=float, help="相似度阈值")
-    parser.add_argument("--verify-llm", action="store_true", help="验证 LLM 连接")
-    parser.add_argument("--json", action="store_true", help="JSON 格式输出")
-
-    args = parser.parse_args()
-
-    if args.verify_llm:
-        ok, msg = verify_llm_connection()
-        print(f"[{'OK' if ok else '!'}] {msg}")
-        if args.json:
-            print(json.dumps({"success": ok, "message": msg}, ensure_ascii=False, indent=2))
-        sys.exit(0)
-
-    if args.import_file:
-        if not os.path.exists(args.import_file):
-            print(f"[!] 文件不存在: {args.import_file}")
-            sys.exit(1)
-        print(f"导入 {args.import_file} 到知识库 '{args.kb}'...")
-        try:
-            result = import_documents_to_kb(args.import_file, args.kb)
-            if args.json:
-                print(json.dumps(result, ensure_ascii=False, indent=2))
-            else:
-                print(f"[{'OK' if result['success'] else '!'}] {result['message']}")
-                print(f"  切分块数: {result['chunks_count']}")
-        except Exception as e:
-            print(f"[!] 导入失败: {e}")
-            sys.exit(1)
-        sys.exit(0)
-
-    if args.question:
-        result = answer_question(
-            args.question, kb_name=args.kb,
-            k=args.k, score_threshold=args.threshold,
-        )
-        if args.json:
-            print(json.dumps({
-                "answer": result["answer"],
-                "source_count": len(result["source_docs"]),
-            }, ensure_ascii=False, indent=2))
-        else:
-            print(f"\n答案:\n{result['answer']}")
-            if result["source_docs"]:
-                print(f"\n引用来源 ({len(result['source_docs'])} 个片段):")
-                for i, doc in enumerate(result["source_docs"]):
-                    content = doc.page_content[:100] if hasattr(doc, "page_content") else str(doc)[:100]
-                    print(f"  [{i + 1}] {content}...")
-        sys.exit(0)
-
-    parser.print_help()

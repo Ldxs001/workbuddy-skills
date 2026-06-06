@@ -1,3 +1,10 @@
+## 0.2.1 (2026-06-06)
+
+### 修复
+- audit --fix 自动修正: meta_field_sync, artifact_paths, writing_standards
+
+---
+
 # 更新日志 — local-rag-builder
 
 ## 0.2.0 (2026-06-06)
@@ -23,6 +30,6 @@
 - 6 种文本切分策略 + 组合切分
 - 多知识库管理与自动分类
 - Prompt 模板持久化
-- Web 可视化设置界面
+- Web 可视化配置界面
 - 结构化 JSON 接口（智能体调用）
 - 交互式 CLI 界面

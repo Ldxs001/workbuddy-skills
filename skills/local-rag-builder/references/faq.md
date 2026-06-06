@@ -15,7 +15,7 @@ A: 在 CLI 中使用 `/kb use <name>` 命令，或在配置文件的 `kb.active_
 Q: Prompt 模板如何持久化？
 A: Prompt 模板保存在 `data/prompts/custom_prompt_template.txt`，程序重启后自动加载。使用 `/prompt set` 或 `--set` 命令配置后即持久化。
 
-Q: 如何重置所有配置？
+Q: 如何重置所有配置恢复到初始状态？
 A: 运行 `python -c "from config import reset_config; reset_config()"` 或从 Web 界面点击"重置配置"按钮。这会清除 `data/config/rag_config.json` 并恢复默认值，同时重置 Prompt 模板。注意：重置不会删除知识库数据和已下载的嵌入模型。
 
 Q: 本技能和本地 LLM（如 LM Studio）是什么关系？

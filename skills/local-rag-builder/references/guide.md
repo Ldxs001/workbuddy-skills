@@ -13,9 +13,10 @@
 5. [知识库管理](#知识库管理)
 6. [Prompt 自定义](#prompt-自定义)
 7. [Web 界面配置](#web-界面配置)
-8. [结构化接口（智能体调用）](#结构化接口智能体调用)
-9. [LM Studio 接入指南](#lm-studio-接入指南)
-10. [故障排除](#故障排除)
+8. [两种运行模式](#两种运行模式)
+9. [技能模式：智能体接口](#技能模式智能体接口)
+10. [独立模式：外部 LLM 接入](#独立模式外部-llm-接入)
+11. [故障排除](#故障排除)
 
 ---
 
@@ -34,8 +35,11 @@ python scripts/embedding_model_manager.py --interactive
 # 4. 启动 Web 配置界面
 python scripts/rag_web_ui.py
 
-# 5. 启动交互式问答
-python scripts/rag_interface.py
+# 5a. [技能模式] 纯检索（供智能体调用）
+python scripts/rag_skill.py --query "问题" --json
+
+# 5b. [独立模式] 检索 + LLM 全链路（需外部 LLM 服务）
+python scripts/rag_standalone.py
 ```
 
 ---
@@ -269,59 +273,172 @@ Web 面板支持：
 
 ---
 
-## 结构化接口（智能体调用）
+## 两种运行模式
 
-所有脚本均支持 `--json` 参数，输出结构化 JSON 供智能体解析。
+local-rag-builder 分为**两个完全独立的入口**：
 
-### 环境检测 (JSON)
+| 模式 | 入口脚本 | 是否需要 LLM | 适用场景 |
+|:----:|:--------:|:------------:|:---------|
+| **技能模式** | `rag_skill.py` | **不需要** | 智能体（WorkBuddy / OpenClaw 等）调用，纯检索返回 context |
+| **独立模式** | `rag_standalone.py` | 需要（LM Studio / Ollama / vLLM） | 用户直接跑 Python，全链路问答 |
+
+> ⚠️ 两者不共享同一个运行进程。选择哪个入口，就决定了是否涉及 LLM 调用。
+
+---
+
+## 技能模式：智能体接口
+
+**文件**：`scripts/rag_skill.py`
+**设计原则**：零 LLM 依赖。不 import `langchain_community.llms`，不做任何 HTTP 请求到外部服务。
+
+### 核心输出格式
 
 ```bash
-python scripts/rag_env_setup.py --json
-# 输出:
-# {
-#   "python_ok": true,
-#   "python_version": "3.11.8",
-#   "required_missing": [],
-#   "cuda_available": true,
-#   ...
-# }
+python scripts/rag_skill.py --query "问题" --kb default --json
 ```
 
-### 嵌入模型列表 (JSON)
+输出 JSON 包含完整的 prompt（已填充占位符），智能体直接使用：
 
-```bash
-python scripts/embedding_model_manager.py --list --json
+```json
+{
+  "question": "问题",
+  "kb": "default",
+  "context": "[片段 1] (来源: doc.md)\n...",
+  "source_count": 3,
+  "source_docs": [
+    {"content": "...", "metadata": {"source": "doc.md"}, "length": 500}
+  ],
+  "prompt": "基于以下资料回答问题。\n\n资料：\n...\n\n问题：...\n\n回答：",
+  "prompt_template": "基于以下资料回答问题。\n\n资料：\n{context}\n\n问题：{question}\n\n回答：",
+  "has_context": true
+}
 ```
 
-### 文本切分 (JSON)
+关键字段：
+- `context` — 检索到的文本块，已按片段编号
+- `prompt` — **已填充** `{context}` 和 `{question}` 的完整 prompt，智能体直接拿去用
+- `prompt_template` — 原始的 prompt 模板，智能体可了解格式
+- `has_context` — 是否找到相关内容
+
+### 支持的操作
 
 ```bash
-python scripts/text_splitter.py --input doc.md --strategy recursive --json
+# 检索
+python scripts/rag_skill.py --query "问题"
+python scripts/rag_skill.py --query "问题" --json
+
+# 导入文档
+python scripts/rag_skill.py --import-file doc.md
+
+# 列表知识库
+python scripts/rag_skill.py --kb-list
+python scripts/rag_skill.py --kb-list --json
+
+# 自定义 prompt 模板
+python scripts/rag_skill.py --query "问题" --template "自定义模板 {context} {question}"
 ```
 
-### RAG 问答 (JSON)
+### 智能体集成示例
 
-```bash
-# 非交互问答
-python scripts/rag_interface.py --non-interactive "什么是 RAG？" --json
-```
+```python
+import subprocess, json
 
-### 知识库管理 (JSON)
+result = subprocess.run(
+    ["python", "scripts/rag_skill.py", "--query", "问题", "--json"],
+    capture_output=True, text=True, cwd="/path/to/skill"
+)
+data = json.loads(result.stdout)
 
-```bash
-python scripts/knowledge_base_manager.py --list --json
-python scripts/knowledge_base_manager.py --stats --json
+# data["context"]  → 检索到的文本
+# data["prompt"]   → 已填充的完整 prompt
+# 智能体根据 data["prompt"] 或 data["context"] 自行组织回答
 ```
 
 ---
 
-## LM Studio 接入指南
+## 独立模式：外部 LLM 接入
 
-> 本技能本身扮演 LLM 角色，不需要额外部署。但如果你希望接入本地或远程 LLM 服务（如 LM Studio），以下是接入方法。
+**文件**：`scripts/rag_standalone.py`
+**设计原则**：检索 + LLM 全链路。需要用户自行部署外部 LLM 服务。
 
-### 配置 LLM 地址
+### 交互式 CLI
 
-在 Web 界面的 "LLM 配置" 卡片中更新 API 地址，或通过 CLI：
+```bash
+python scripts/rag_standalone.py
+```
+
+支持的交互命令：`/help`, `/prompt`, `/kb`, `/config`, `/verify-llm`, `/llm-help`, `/exit`
+
+### 外部 LLM 服务配置
+
+启动前，用户需自行选择一个平台和模型。配置在 `data/config/rag_config.json` 的 `llm` section：
+
+```json
+{
+  "llm": {
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "not-needed",
+    "temperature": 0.1,
+    "max_tokens": 512
+  }
+}
+```
+
+三种方案对比（详见 `references/llm-setup.md`）：
+
+| 方案 | 地址 | 适合 |
+|:----|:----|:----|
+| LM Studio | http://localhost:1234/v1 | 新手，图形界面 |
+| Ollama | http://localhost:11434/v1 | 开发者，命令行 |
+| vLLM | http://localhost:8000/v1 | 生产环境，高并发 |
+
+```bash
+# 查看完整接入指南
+python scripts/rag_standalone.py --llm-help
+
+# 验证 LLM 连接
+python scripts/rag_standalone.py --verify-llm
+
+# 单次问答
+python scripts/rag_standalone.py --query "什么是 RAG？"
+python scripts/rag_standalone.py --query "什么是 RAG？" --json
+```
+> - **集成模式**（默认）：纯检索，不调用 LLM。智能体根据检索到的 context 自行回答。
+> - **独立模式**：检索 + LLM 全链路。需要外部 LLM 服务，用户自行选择平台和模型。
+
+以下推荐三种外部 LLM 服务方案，**用户根据自身情况选择**（本 skill 不做决定，只提供接入方法）。
+
+### LM Studio（图形界面，适合新手）
+
+1. 下载安装 [LM Studio](https://lmstudio.ai)
+2. 左侧 Search 搜索模型（如 Qwen2.5-7B-Instruct-GGUF、DeepSeek-R1-GGUF 等）
+3. 选择一个量化版本（如 Q4_K_M），点击 Download
+4. 左侧 Local Inference Server，选择已下载的模型
+5. 点击 Start Server，默认地址 http://localhost:1234/v1
+
+### Ollama（命令行，适合开发者）
+
+```bash
+# 下载安装 https://ollama.com
+ollama pull qwen2.5:7b        # 通义千问
+ollama pull deepseek-r1:7b    # DeepSeek
+ollama pull gemma3:7b         # Google Gemma
+ollama run qwen2.5:7b         # 运行（自动启动 API）
+
+# 默认 API 地址: http://localhost:11434/v1
+# 在 Web 面板的 LLM 配置中对应更新 base_url
+```
+
+### vLLM（生产环境高性能）
+
+```bash
+pip install vllm
+python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-7B-Instruct \
+  --port 8000
+
+# 地址: http://localhost:8000/v1
+```
 
 ```bash
 python scripts/config.py  # 直接更新 config 文件
@@ -340,8 +457,10 @@ python scripts/config.py  # 直接更新 config 文件
 ### 验证 LLM 连接
 
 ```bash
-# CLI 内验证
-python scripts/rag_interface.py  # 进入后输入 /verify-llm
+# CLI 验证
+python scripts/rag_standalone.py --verify-llm
+
+# 或进入交互式 CLI 后输入 /verify-llm
 
 # Web 面板验证
 # 打开配置页，点击 "验证连接" 按钮

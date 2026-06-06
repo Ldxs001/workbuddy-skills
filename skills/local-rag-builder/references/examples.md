@@ -16,9 +16,11 @@ echo "# 测试文档
 RAG 即检索增强生成，是一种结合检索和生成的技术。
 它先根据问题从知识库检索相关文档，再输入 LLM 生成答案。" > test_doc.md
 
-# 4. 运行问答
-python scripts/rag_interface.py
-# > 什么是 RAG？
+# 4. 智能体调用（技能模式）
+python scripts/rag_skill.py --query "什么是 RAG？" --json
+
+# 5. 独立问答（需外部 LLM）
+python scripts/rag_standalone.py --query "什么是 RAG？"
 ```
 
 ## 示例 2：Web 界面操作
@@ -52,13 +54,21 @@ result = subprocess.run(
 )
 models = json.loads(result.stdout)
 
-# 非交互问答
+# [技能模式] 纯检索（不依赖 LLM）
 result = subprocess.run(
-    [PYTHON, f"{SKILL_DIR}/scripts/rag_interface.py",
-     "--non-interactive", "什么是 RAG？", "--json"],
+    [PYTHON, f"{SKILL_DIR}/scripts/rag_skill.py",
+     "--query", "什么是 RAG？", "--json"],
     capture_output=True, text=True
 )
-answer = json.loads(result.stdout)
+data = json.loads(result.stdout)
+context = data["context"]  # 智能体根据 context 自行回答
+
+# [独立模式] 全链路问答
+result = subprocess.run(
+    [PYTHON, f"{SKILL_DIR}/scripts/rag_standalone.py",
+     "--query", "什么是 RAG？", "--json"],
+    capture_output=True, text=True
+)
 
 print(answer["answer"])
 ```

@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  CLI (rag_interface.py)              │
+│             CLI (rag_skill.py / rag_standalone.py)    │
 │                    Web UI (rag_web_ui.py)           │
 ├─────────────────────────────────────────────────────┤
 │   rag_core.py         (RAG 问答核心)                │
@@ -29,7 +29,7 @@
 ## 模块依赖关系
 
 ```
-rag_interface.py (入口)
+rag_skill.py / rag_standalone.py (双入口)
   ├── rag_core.py
   │   ├── config.py ← utils.py
   │   ├── prompt_manager.py ← utils.py
