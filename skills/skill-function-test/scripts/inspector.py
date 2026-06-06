@@ -41,6 +41,7 @@ class BlueBook:
         self.reference_links: list[dict] = []  # {source, target, type}
         self.sensitive_ops: list[dict] = []    # {file, lineno, operation, type}
         self.import_chain: dict = {}           # {file: [imported_modules]}
+        self.cli_scripts: list[dict] = []       # {path, name, has_main, supports: {flag:bool}}
         self.total_size_bytes: int = 0
         self.file_count: int = 0
 
@@ -55,6 +56,7 @@ class BlueBook:
             "reference_links": self.reference_links,
             "sensitive_ops": self.sensitive_ops,
             "import_chain": self.import_chain,
+            "cli_scripts": self.cli_scripts,
             "total_size_bytes": self.total_size_bytes,
             "file_count": self.file_count,
         }
@@ -416,6 +418,22 @@ def scan(skill_dir: str) -> BlueBook:
                     s["file"] = relpath
                     bb.sensitive_ops.append(s)
 
+                # ── CLI 脚本检测 ──
+                with open(abspath, "r", encoding="utf-8") as _f:
+                    _content = _f.read()
+                has_main = bool(re.search(r'if\s+__name__\s*==\s*["\']__main__["\']', _content))
+                if has_main:
+                    supports = {"help": True}
+                    for flag in ["--json", "--list", "--show", "--check-only",
+                                 "--verify-llm", "--kb-list", "--list-strategies"]:
+                        if flag in _content or flag.replace("-", "_") in _content:
+                            supports[flag] = True
+                    bb.cli_scripts.append({
+                        "path": relpath,
+                        "name": os.path.basename(relpath).replace(".py", ""),
+                        "supports": supports,
+                    })
+
             if cat == "markdown":
                 refs = _scan_md_references(abspath)
                 bb.reference_links.extend(refs)
@@ -475,6 +493,13 @@ def print_bluebook(bb: BlueBook) -> str:
         lines.append(f"[IMPORTS] import 关系:")
         for f, imps in bb.import_chain.items():
             lines.append(f"  {f} → {', '.join(imps[:5])}")
+
+    if bb.cli_scripts:
+        lines.append("")
+        lines.append(f"[CLI] {len(bb.cli_scripts)} 个可执行脚本:")
+        for s in bb.cli_scripts:
+            flags = [k for k, v in s["supports"].items() if v]
+            lines.append(f"  - {s['name']} (支持: {', '.join(flags)})")
 
     return "\n".join(lines)
 

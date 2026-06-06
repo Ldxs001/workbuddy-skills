@@ -1,3 +1,13 @@
+## 0.2.22 (2026-06-06)
+
+### 新增
+- [蓝皮书] 新增 `cli_scripts` 字段：扫描阶段自动检测所有有 `__main__` 的脚本及支持的参数（--json/--list/--show 等）
+- [场景测试] S1-S3 全面升级：从静态文本匹配改为真实 CLI 执行。每个 trigger 场景/核心能力/工作流步骤自动匹配 CLI 脚本并运行 `--help` 及可用参数验证
+
+### 修复
+- [inspector] `scan()` 后不再需要在 scenario_engine 中重复扫描文件，蓝皮书即事实来源
+- [scenario_engine] 移除所有硬编码的场景→脚本映射表，改为关键词自动匹配
+
 ## 0.2.21 (2026-06-05)
 - [fix] test_engine.py/scenario_engine.py: CLI 报告保存路径改为 DATA_DIR（非 skill 根目录），R-11 合规
 
