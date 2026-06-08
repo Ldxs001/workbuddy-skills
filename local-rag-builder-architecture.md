@@ -1,23 +1,25 @@
 # local-rag-builder 架构与规范体系文档
 
-> 完整解读 v0.2.0 版的架构设计、6 种切分策略、多知识库管理与嵌入模型管理
-> 生成时间：2026-06-06（v0.2.0 最新更新）
+> 完整解读 v1.0.0 版的架构设计、三层切分流水线（GuardStack + 主策略 + 后处理）、插件注册与双模式接口
+> 生成时间：2026-06-08（v1.0.0 最新更新）
 
 ---
 
 ## 一、系统概览
 
-local-rag-builder 是一个 **本地 RAG 一键搭建工具集**，围绕以下闭环运行：
+local-rag-builder 是一个 **本地 RAG 一键搭建工具集**，基于三层切分流水线架构（GuardStack 守卫栈 → 主策略 → 后处理），以插件注册机制实现可扩展性。
 
 ```
 用户部署
-  → 环境检测（rag_env_setup: Python 版本 / 缺失包 / GPU）
+  → 环境检测（rag_env_setup: Python 版本 / 缺失包 / GPU / 镜像源）
     → 嵌入模型管理（embedding_model_manager: 多源下载 / 重试 / 校验 / 路径修正）
       → 文档处理
-           → 文本切分（text_splitter: 6 种策略 + 组合）
-           → 向量化入库（knowledge_base_manager: 多知识库 / 自动分类）
-      → RAG 问答（rag_core: embeddings + Chroma 检索 + LLM 调用）
-        → 结果输出（rag_interface: CLI 交互 / rag_web_ui: 可视化面板）
+           → 文本切分（text_splitter: 守卫栈 + 5 策略 + 后处理 + 插件注册）
+           → 向量化入库（knowledge_base_manager: 多知识库 / 自动分类规则）
+      → RAG 查询
+           → 技能模式（rag_skill: 纯检索，供智能体调用）
+           → 独立模式（rag_standalone: 检索 + 外部 LLM 全链路）
+        → 结果输出（rag_web_ui: 可视化面板 / 极客模式 JSON 编辑器）
 ```
 
 ### 1.1 三层架构
@@ -25,7 +27,7 @@ local-rag-builder 是一个 **本地 RAG 一键搭建工具集**，围绕以下�
 | 层 | 组件 | 职责 |
 |---|------|------|
 | **表现层** | SKILL.md + references/*.md + CLI + HTML 设置面板 | 人类可读的文档、命令行交互、可视化配置 |
-| **业务层** | rag_core / text_splitter / knowledge_base_manager / embedding_model_manager / rag_env_setup / prompt_manager | RAG 流程的核心逻辑 |
+| **业务层** | rag_core / text_splitter / knowledge_base_manager / embedding_model_manager / rag_env_setup / prompt_manager / rag_skill / rag_standalone | RAG 流程的核心逻辑 |
 | **数据层** | config.py（配置管理）+ utils.py（工具函数）+ data/ 目录（持久化） | 配置、工具函数、知识库/模型/Prompt 存储 |
 
 ### 1.2 目录结构
@@ -45,12 +47,13 @@ local-rag-builder/
 └── scripts/                    # 核心脚本
     ├── config.py               # 统一配置管理：6 个 section 默认值 + 持久化 + 合并
     ├── utils.py                # 工具函数：目录管理、pip 操作、文件安全读写
-    ├── rag_core.py             # RAG 核心引擎：嵌入→检索→LLM 调用
-    ├── text_splitter.py        # 文本切分引擎：6 种策略 + 组合切分
+    ├── rag_core.py             # 共享核心（被其他模块导入，不直接运行）
+    ├── text_splitter.py        # 三层切分流水线：5 策略 + GuardStack + 后处理 + 插件注册
     ├── knowledge_base_manager.py  # 知识库管理：创建/删除/切换/自动分类/档案导入
     ├── embedding_model_manager.py # 嵌入模型管理：多源下载/完整性校验/路径修正
     ├── rag_env_setup.py        # 环境检测与修复：Python 版本/pip/必需包/GPU
-    ├── rag_interface.py        # 交互式 CLI：支持 /prompt、/kb、/model 等命令
+    ├── rag_skill.py            # [技能模式] 纯检索接口：供智能体调用，无需 LLM
+    ├── rag_standalone.py       # [独立模式] 检索+LLM：全链路 RAG 问答
     ├── rag_web_ui.py           # Web 可视化设置面板：HTTP 服务器 + 内嵌 HTML
     └── prompt_manager.py       # Prompt 模板管理：持久化 + 运行时编辑 + 占位符校验
 ```
@@ -63,7 +66,8 @@ skills/.standardization/local-rag-builder/data/
 │   ├── default/                # 默认知识库
 │   ├── art/                    # 艺术类资料（自动分类）
 │   ├── politics/               # 政治类资料（自动分类）
-│   └── kb_index.json           # 知识库索引
+│   ├── kb_index.json           # 知识库索引
+│   └── auto_classify_rules.json # 自动分类规则
 ├── models/                     # 下载的嵌入模型
 │   └── model_index.json        # 模型索引
 ├── prompts/                    # Prompt 模板
@@ -72,43 +76,41 @@ skills/.standardization/local-rag-builder/data/
 │   └── rag_config.json
 ├── output/                     # 导出产物
 ├── cache/                      # 下载缓存
-└── logs/                       # 执行日志
+├── logs/                       # 执行日志
+└── config_templates/           # 用户保存的配置模板（v1.0 新增）
 ```
 
 ---
 
-## 二、七大核心模块
+## 二、八大核心模块
 
 ### 2.1 模块 A：环境检测与修复（rag_env_setup.py）
 
 **职责**：检测运行环境并自动修复缺失的依赖。
 
-| 功能 | 实现 | 输出 |
+| 功能 | 实现 | 说明 |
 |------|------|------|
-| Python 版本检测 | `check_python_version()` | (ok, version, message) — 建议 3.8-3.11 |
+| Python 版本检测 | `check_python_version()` | 建议 3.8-3.11 |
 | pip 可用性检查 | `check_pip()` | bool |
-| 已安装包列表 | `list_installed()` | dict[package_name → version] |
+| 已安装包列表 | `list_installed()` | dict[package_name → version]，统一 `_`→`-` |
 | 缺失包检测 | `check_missing()` | (required_missing, optional_missing) |
-| 自动安装 | `install_packages(packages)` | dict[package → success/fail] |
+| 自动安装 | `install_packages(packages)` | 流式输出进度，自动 `--no-deps` 防 chromadb 锁死 |
 | 虚拟环境创建 | `create_venv(path)` | venv python 路径 或 None |
 | GPU 检测 | `check_torch_gpu()` | (cuda_available, gpu_name) |
+| pip 锁清理 | `cleanup_pip_locks()` | 自动清理 stale pip 锁文件 |
+| 镜像选择 | `--mirror` | 支持 aliyun/tencent/tsinghua/ustc |
+
+**新增特性（v0.5+）**：
+- `--cleanup-locks`：自动清理 pip 锁残留
+- `--no-deps` 反锁死策略：chromadb 分步安装
+- `--mirror`：国内镜像选择
+- `--dry-run`：只检测不安装，报告待装列表
+- 流式输出：Popen 逐行显示 pip 安装进度
+- 安装日志自动写入 `data/logs/pip_install_*.log`
 
 **依赖检测范围**：
-- **必需包（10 个）**：langchain, langchain-community, langchain-huggingface, langchain-chroma, langchain-text-splitters, chromadb, sentence-transformers, huggingface-hub, modelscope, openai
-- **可选包（6 个）**：unstructured, pdfplumber, transformers, pillow, fastapi, uvicorn
-
-**环境检测报告输出示例**：
-```
-==================================================
-  本地 RAG 环境检测
-==================================================
-[OK] Python 版本: 3.11.8 — OK
-[OK] Pip: 可用
-已安装包: 85 个
-[OK] 所有必需包已安装
-[i] 可选包未安装 (2): fastapi, uvicorn
-[i] GPU: 未检测到 CUDA (将使用 CPU)
-```
+- **必需包（9 个）**：langchain, langchain-community, langchain-huggingface, langchain-chroma, langchain-text-splitters, chromadb, sentence-transformers, huggingface-hub, modelscope
+- **可选包（6 个）**：unstructured, pdfplumber, openai, torch, fastapi, uvicorn
 
 ### 2.2 模块 B：嵌入模型管理（embedding_model_manager.py）
 
@@ -125,12 +127,12 @@ skills/.standardization/local-rag-builder/data/
 
 #### 通用路径查找机制
 
-不再依赖特定变形模式（如 `1___5`），而是使用**内容感知 + 名称相似度评分**：
+内容感知 + 名称相似度评分，不依赖特定变形模式：
 
 ```python
 def _find_actual_model_path(model_id, download_dir):
     """通用模型路径查找。不依赖任何固定变形模式"""
-    target_norm = _normalize(model_id)  # 去除非字母数字
+    target_norm = _normalize(model_id)
     for root, dirs, _ in os.walk(download_dir):
         for d in dirs:
             dir_norm = _normalize(d)
@@ -148,7 +150,7 @@ def _find_actual_model_path(model_id, download_dir):
 | `_name_similarity(a, b)` | 名称相似度评分（0-100） | float |
 | `_is_model_dir(path)` | 内容感知：检查目录是否包含模型标志文件 | bool |
 | `_check_integrity(path)` | 验证模型文件完整性 | (ok, detail) |
-| `download_model(model_id)` | 多源下载 + 重试 + 校验 + 路径修正 | 字典 |
+| `download_model(model_id)` | 多源下载 + 重试 + 校验 + 路径修正 | dict |
 | `verify_model(path)` | 验证模型可用性 | (ok, detail) |
 | `list_downloaded_models()` | 列出已下载模型 | list |
 | `remove_model(model_id)` | 删除模型 | (ok, msg) |
@@ -165,42 +167,72 @@ def _find_actual_model_path(model_id, download_dir):
 | sentence-transformers/all-MiniLM-L6-v2 | 80MB | 英文嵌入（超轻量） |
 | BAAI/bge-large-zh-v1.5 | 1300MB | 高精度中文嵌入（大） |
 
-### 2.3 模块 C：文本切分（text_splitter.py）
+### 2.3 模块 C：文本切分（text_splitter.py）【v1.0 重大重构】
 
-**职责**：6 种切分策略 + 组合切分，将文档切割为语义完整的块。
+**职责**：三层切分流水线架构，将文档切割为语义完整的块。
 
-#### 六种切分策略
+#### 三层流水线架构
 
-| 策略 | 函数 | 原理 | 适用场景 | 参数 |
-|:----:|:----:|:----:|:--------:|:----:|
-| **固定窗口** | `split_fixed_size()` | 按固定字符数切分，可设重叠 | 长度均匀的清洗文本 | chunk_size, chunk_overlap |
-| **递归切分** | `split_recursive()` | 按优先级尝试不同分隔符 | 未知/混合格式文档（默认） | chunk_size, chunk_overlap, separators |
-| **层级/标题切分** | `split_by_headers()` | 基于 Markdown 标题切分，保留结构元数据 | Markdown 结构化文档 | headers_to_split_on, strip_headers |
-| **按句切分** | `split_by_sentence()` | 以句子为单位 | 短句文档、证据抽取 | — |
-| **语义切分** | `split_semantic()` | 计算相邻句子相似度，在主题边界处切分 | 长叙述性文本 | embeddings, breakpoint_type |
-| **代码块保护切分** | `split_with_mermaid_preserve()` | 先保护 mermaid 代码块，再按标题切，最后还原 | 含流程图/代码块的文档 | headers_to_split_on, strip_headers |
-
-#### 组合切分
-
-`combo_split()` 支持主策略 + 二次策略组合：
-
-```python
-# 示例：先用标题切分保留结构，再递归切分细化
-chunks = combo_split(text,
-    primary_strategy="headers",
-    secondary_strategy="recursive",
-    chunk_size=500, chunk_overlap=50)
+```
+原始文本 → [守卫栈(多选)] → [主策略(单选)] → [后处理(单选/不选)] → 最终 chunks
 ```
 
-**切分效果自检清单**：
-- [ ] 每个块能否在 500 字符内表达相对完整的主题？
-- [ ] 标题块是否包含所属章节的标题路径（元数据）？
-- [ ] 代码块（如 mermaid）是否完整保留，没有被切断？
-- [ ] 中英文混合内容是否没有出现乱码或异常换行？
+| 阶段 | 可选项 | 数量 |
+|:----:|--------|:----:|
+| **GuardStack 守卫栈** | mermaid / code / math / table / html | 可链式选多个，通过插件注册可扩展 |
+| **主策略** | fixed / recursive / headers / sentence / semantic | 单选，通过 `StrategyPlugin` 可扩展 |
+| **后处理子切** | recursive / fixed / semantic | 单选或不选，metadata 白名单继承 |
+
+#### 五种主策略
+
+| 策略 | 函数 | 原理 | 适用场景 |
+|:----:|:----:|:----:|:--------:|
+| **固定窗口** | `split_fixed_size()` | 按固定字符数切分，可设重叠 | 长度均匀的清洗文本 |
+| **递归切分** | `split_recursive()` | 按优先级尝试不同分隔符 | 未知/混合格式文档（默认） |
+| **层级/标题切分** | `split_by_headers()` | 基于 Markdown 标题切分，保留结构元数据 | Markdown 结构化文档 |
+| **按句切分** | `split_by_sentence()` | 以句子为单位，支持 `language` 参数及自定义分隔符 | 短句文档、证据抽取 |
+| **语义切分** | `split_semantic()` | 计算相邻句子相似度，在主题边界处切分 | 长叙述性文本 |
+
+#### 守卫栈（GuardStack）
+
+5 个内置守卫，链式保护与还原，唯一前缀 `__GUARD_NAME_X__` 防止冲突：
+
+| 守卫 | 正则 | 保护内容 |
+|:----:|:----:|----------|
+| mermaid | ```mermaid\n...\n``` | Mermaid 流程图 |
+| code | ```\n...\n``` | 通用代码块 |
+| math | $$...$$ / $...$ | LaTeX 公式 |
+| table | Markdown 表格 | 表格结构 |
+| html | `<...>` 标签 | HTML 标签 |
+
+#### 插件注册（v1.0 新增）
+
+```python
+from text_splitter import register_strategy, register_guard, StrategyPlugin, GuardPlugin, Guard
+
+# 自定义切分策略
+def my_splitter(text, my_param=100, **kwargs):
+    from langchain_core.documents import Document
+    return [Document(page_content=text)]
+
+register_strategy(StrategyPlugin(
+    "my_split", "我的自定义切分", my_splitter,
+    config_schema={
+        "my_param": {"type": "int", "label": "参数名", "default": 100, "min": 1, "max": 1000},
+    },
+    default_config={"my_param": 100},
+))
+
+# 自定义守卫
+my_guard = Guard("my_guard", re.compile(r'```special\n[\s\S]*?\n```'))
+register_guard(GuardPlugin("my_guard", "保护特殊代码块", my_guard))
+```
+
+注册后自动出现在 Web UI 的下拉列表中，配置表单根据 `config_schema` 动态渲染。
 
 ### 2.4 模块 D：知识库管理（knowledge_base_manager.py）
 
-**职责**：多知识库的创建、删除、切换、文档入库、自动分类。
+**职责**：多知识库的创建、删除、切换、文档入库、自动分类规则。
 
 | 函数 | 说明 |
 |------|------|
@@ -218,18 +250,17 @@ chunks = combo_split(text,
 
 #### 自动分类规则
 
+支持**关键词匹配 + 扩展名匹配**双模式，Web UI 提供可视化管理（添加/编辑/删除/重置）：
+
 ```
 规则: {"艺术": {"keywords": ["美术", "绘画", "雕塑", "设计"], "description": "艺术类资料"},
        "政治": {"keywords": ["政策", "法规", "政府", "选举"], "description": "政治类资料"},
        "娱乐": {"keywords": ["电影", "音乐", "综艺", "明星"], "description": "娱乐新闻"}}
 ```
 
-用户提供资料 → LLM 判断关键词匹配 → 自动归入指定知识库。
-也支持新建库指令："新建一个知识库 D，以后这种科研资料都放这里面。"
+### 2.5 模块 E：共享核心（rag_core.py）
 
-### 2.5 模块 E：RAG 核心引擎（rag_core.py）
-
-**职责**：嵌入模型初始化、向量检索、LLM 调用、问答流程编排。
+**职责**：嵌入模型初始化、向量检索、LLM 调用，被 `rag_skill.py` / `rag_standalone.py` 调用。
 
 | 函数 | 说明 | 关键参数 |
 |------|------|----------|
@@ -238,11 +269,10 @@ chunks = combo_split(text,
 | `retrieve_documents(query, kb_name, k, threshold)` | 检索相似文档 | k=3, score_threshold |
 | `get_llm(base_url, temperature, max_tokens)` | 获取 LLM 实例 | 默认 localhost:1234 |
 | `build_context(docs)` | 从检索结果构建上下文 | 含引用来源标记 |
-| `answer_question(question, kb_name, template)` | 完整 RAG 问答 | 返回 answer + source_docs + context |
-| `import_documents_to_kb(file_path, kb_name)` | 文档切分 + 入库 | 自动合并元数据 |
+| `import_documents_to_kb(file_path, kb_name)` | 文档切分 + 入库 | 自动合并元数据，支持 strategy_overrides |
 | `verify_llm_connection()` | 验证 LLM 连接 | 调用 /v1/models |
 
-#### 问答数据流
+#### 查询数据流
 
 ```
 用户问题
@@ -255,7 +285,7 @@ Chroma.similarity_search(query_vector, k=3)
   ↓
 prompt_template.format(context=context, question=question)
   ↓
-LLM.invoke(prompt) → 原始回答
+LLM.invoke(prompt) → 原始回答（独立模式）
   ↓
 re.sub(r'<think>.*?</think>', '', answer) → 清理推理标签
   ↓
@@ -300,11 +330,17 @@ re.sub(r'<think>.*?</think>', '', answer) → 清理推理标签
 | Section | 关键参数 | 默认值 |
 |:-------:|----------|:------:|
 | `embedding` | model_name, model_path, device, normalize_embeddings | bge-small-zh-v1.5, auto, true |
-| `splitting` | strategy, chunk_size, chunk_overlap, separators | recursive, 500, 50 |
+| `splitting` | strategy, chunk_size, chunk_overlap, separators, guards, postprocess | recursive, 500, 50 |
 | `retrieval` | k, score_threshold, search_type | 3, null, similarity |
 | `llm` | base_url, api_key, temperature, max_tokens | localhost:1234, 0.1, 512 |
 | `kb` | active_kb, auto_classify | default, false |
 | `prompt` | template_file | default_template.txt |
+
+**v1.0 新增配置**：
+- `splitting.guards`：守卫栈开关列表
+- `splitting.postprocess`：后处理策略
+- `splitting.strategy_overrides`：策略级参数覆盖
+- `input_source`：PDF/OCR/HTML→MD 输入源开关
 
 **R-12 合规路径模式**：
 ```python
@@ -312,82 +348,126 @@ DEFAULT_DATA_DIR_RAW = "skills/.standardization/local-rag-builder/data/"
 _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", "..", DEFAULT_DATA_DIR_RAW))
 ```
 
+### 2.8 模块 H：双模式入口
+
+#### 技能模式（rag_skill.py）【v1.0 新增】
+
+纯检索接口，供智能体调用，**不需要 LLM 服务**。
+
+```bash
+# 检索知识库
+python scripts/rag_skill.py --query "问题"
+python scripts/rag_skill.py --query "问题" --json
+python scripts/rag_skill.py --query "问题" --kb art
+```
+
+#### 独立模式（rag_standalone.py）【v1.0 新增】
+
+检索 + 外部 LLM 全链路，需自行部署 LLM 服务（LM Studio / Ollama / vLLM）。
+
+```bash
+# 交互式 CLI
+python scripts/rag_standalone.py
+
+# 单次问答
+python scripts/rag_standalone.py --query "问题"
+python scripts/rag_standalone.py --query "问题" --json
+
+# 文档入库
+python scripts/rag_standalone.py --import-file doc.md
+
+# 查看 LLM 接入指南
+python scripts/rag_standalone.py --llm-help
+```
+
 ---
 
 ## 三、核心设计原则
 
-### D1: 双模式架构（集成模式 vs 独立模式）
+### D1: 双模式架构（技能模式 vs 独立模式）
 
-本 skill 设计为两种运行模式，核心理念是 **skill 只做检索，生成归调用方**：
+本 skill 设计为两种运行模式，核心理念是 **技能模式只做检索，生成归调用方**：
 
-| 模式 | 谁负责生成回答 | 外部 LLM 服务 | 适用场景 |
-|:----:|:-------------:|:-------------:|:--------:|
-| **集成模式**（默认） | **智能体自身**（WorkBuddy 等）根据 context 回答 | 不需要 | 在智能体平台内使用 skill |
-| **独立模式** | 外部 LLM 服务（LM Studio / Ollama / vLLM） | 需要用户自行部署 | 单独跑 Python 脚本 |
+| 模式 | 入口 | 谁生成回答 | 外部 LLM | 适用场景 |
+|:----:|:----:|:---------:|:--------:|:--------:|
+| **技能模式**（默认） | `rag_skill.py` | 智能体根据 context 自行回答 | 不需要 | 在智能体平台内使用 |
+| **独立模式** | `rag_standalone.py` | 外部 LLM 服务 | 需用户部署 | 单独跑 Python 脚本 |
 
-**集成模式下**，调用 `retrieve_context()` → 返回 context + source_docs，智能体根据这些资料自己组织回答。
-**独立模式下**，调用 `answer_question()` → 检索 + 调用外部 LLM 全链路。
+**技能模式下**，`rag_skill.py --query "问题"` → 返回 context + source_docs，智能体根据检索结果组织回答。
 
-**关于 LLM 推荐（独立模式）**：本 skill 只告知用户可选的方案，不替用户决定：
+**独立模式下**，`rag_standalone.py --query "问题"` → 检索 + 调用外部 LLM 全链路。
+
+**LLM 推荐（独立模式）**：
 - **LM Studio**（图形界面，适合新手）→ 下载 lmstudio.ai，加载模型后 Start Server
 - **Ollama**（命令行，适合开发者）→ `ollama run qwen2.5:7b`
 - **vLLM**（生产高性能）→ `python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen-7B`
 
-用户自行选择平台、自行选择模型（Qwen / DeepSeek / Gemma / Llama 等）、自行配置。skill 只提供连接地址和参数调节界面。
-
 ### D2: 松耦合模块
-七个核心模块各司其职，模块间通过 `config.py` + 函数参数传递数据，无循环依赖。
-**目的**：每个模块可独立升级/替换，互不影响。
+
+八个核心模块各司其职，模块间通过 `config.py` + 函数参数传递数据，无循环依赖。
+每个模块可独立升级/替换，互不影响。
 
 ### D3: 自包含输出
-Web 设置面板、CLI 交互、HTML 报表均为自包含，无外部依赖。
-**目的**：无需部署服务器，打开即用。
+
+Web 设置面板、CLI 交互、HTML 报表均为自包含，无外部依赖。无需部署服务器，打开即用。
 
 ### D4: 结构化接口
+
 所有脚本支持 `--json` 参数输出标准 JSON，供智能体集成调用。
-**目的**：不仅人类可用，AI 也可编程调用。
 
 ### D5: 路径修正通用化
+
 嵌入模型路径查找使用内容感知方案，不依赖特定变形模式。
-**目的**：无论 ModelScope / HuggingFace 下载后的目录名如何变形，都能正确找到。
+
+### D6: 可扩展插件体系
+
+切分策略和守卫通过 `StrategyPlugin`/`GuardPlugin` 注册，config_schema 声明配置表单。Web UI 根据已注册的插件动态渲染下拉列表和配置表单。
 
 ---
 
 ## 四、交互方式
 
-### 4.1 CLI 交互（rag_interface.py）
+### 4.1 命令行接口
 
-**支持的交互命令**：
+| 脚本 | 功能 | 核心参数 |
+|------|------|----------|
+| `rag_env_setup.py` | 环境检测与修复 | `--auto-install`, `--check-only`, `--cleanup-locks`, `--mirror`, `--dry-run` |
+| `embedding_model_manager.py` | 嵌入模型管理 | `--download`, `--list`, `--check`, `--remove` |
+| `text_splitter.py` | 文本切分（三层流水线） | `--strategy`, `--guard`, `--secondary`, `--chunk-size`, `--input`, `--list-strategies` |
+| `rag_skill.py` | **[技能模式] 纯检索** | `--query`, `--kb`, `--json` |
+| `rag_standalone.py` | **[独立模式] 检索+LLM** | `--query`, `--kb`, `--llm-help`, `--json` |
+| `rag_web_ui.py` | Web 配置界面 | `--port`, `--gen-html` |
+| `prompt_manager.py` | Prompt 管理 | `--set`, `--show`, `--reset` |
+| `knowledge_base_manager.py` | 知识库管理 | `--create`, `--import`, `--list`, `--delete`, `--set-rule`, `--classify` |
 
-| 命令 | 说明 | 示例 |
-|:----:|------|:----:|
-| `/help` | 显示帮助 | — |
-| `/prompt show\|set\|reset` | Prompt 模板操作 | `/prompt set` |
-| `/kb list\|create\|use\|delete` | 知识库管理 | `/kb create art` |
-| `/model list\|use` | 嵌入模型切换 | `/model use BAAI/bge-large-zh` |
-| `/config show\|set` | 配置查看/修改 | `/config set retrieval.k 5` |
-| `/reset` | 重置所有配置 | — |
-| `/import <file>` | 导入文档 | `/import doc.md` |
-| `/verify-llm` | 验证 LLM 连接 | — |
-| `/exit` | 退出 | — |
-| 直接输入文本 | 问答模式 | "什么是 RAG？" |
-
-### 4.2 Web 可视化面板（rag_web_ui.py）
+### 4.2 Web 可视化面板（rag_web_ui.py）【v1.0 重写】
 
 | 面板区域 | 可调参数 |
 |:--------:|----------|
 | 状态卡片 | 嵌入模型数、知识库数、文档块数 |
-| 嵌入模型 | 当前模型选择、设备（auto/cuda/cpu）、推荐模型查看 |
-| 文本切分 | 主策略、二次策略、chunk_size、chunk_overlap |
+| 输入源 | PDF/OCR/HTML→MD 开关 |
+| GuardStack 守卫栈 | 5 守卫开关卡片，链式保护 |
+| 文本切分主策略 | 5 策略动态表单（根据所选策略展示对应参数） |
+| 后处理子切 | recursive/fixed/semantic 单选或不选 |
+| 极客模式 JSON 编辑器 | 原始配置 JSON 编辑 + 配置模板保存/加载/删除 |
 | 检索参数 | K 值、相似度阈值 |
-| LLM 设置 | API 地址、Temperature、Max Tokens（含连接验证按钮） |
+| LLM 设置 | 模式选择器（技能/独立），独立模式下显示 API 地址等参数（含连接验证按钮） |
 | Prompt 模板 | 完整模板编辑区（含重置按钮） |
-| 知识库概览 | 所有知识库列表 + 文档数 |
+| 知识库概览 | 所有知识库列表 + 文档数 + 自动分类规则编辑器 |
 | 全局操作 | 重置配置、刷新 |
 
-### 4.3 结构化 JSON 接口
+### 4.3 API 端点（v1.0 新增）
 
-所有脚本支持 `--json` 输出：
+| 端点 | 方法 | 说明 |
+|:----:|:----:|------|
+| `/api/override` | POST | 策略级参数覆盖 |
+| `/api/input-source` | POST | 输入源配置 |
+| `/api/config/raw` | GET/POST | 原始配置 JSON |
+| `/api/template/*` | GET/POST/DELETE | 配置模板管理 |
+| `/api/rules/*` | GET/POST/DELETE | 自动分类规则管理 |
+| `/api/mode` | GET/POST | 模式切换 |
+
+### 4.4 结构化 JSON 接口
 
 ```bash
 # 环境检测
@@ -399,8 +479,11 @@ python scripts/embedding_model_manager.py --list --json
 # 知识库列表
 python scripts/knowledge_base_manager.py --list --json
 
-# 单次问答
-python scripts/rag_interface.py --non-interactive "问题" --json
+# 技能模式检索
+python scripts/rag_skill.py --query "问题" --json
+
+# 独立模式问答
+python scripts/rag_standalone.py --query "问题" --json
 
 # 切分结果
 python scripts/text_splitter.py --input doc.md --strategy headers --json
@@ -421,7 +504,7 @@ python scripts/text_splitter.py --input doc.md --strategy headers --json
 | sentence-transformers | BGE 等嵌入模型 | 必需 |
 | huggingface-hub | 模型下载 | 必需 |
 | modelscope | ModelScope 国内下载 | 必需 |
-| openai | OpenAI 兼容 API 连接 | 必需 |
+| openai | OpenAI 兼容 API 连接 | 可选（独立模式） |
 | torch | PyTorch 后端（GPU 加速） | 推荐 |
 | unstructured[pdf] | PDF 文档加载 | 可选 |
 | pdfplumber | 精确 PDF 表格提取 | 可选 |
@@ -429,19 +512,18 @@ python scripts/text_splitter.py --input doc.md --strategy headers --json
 
 ---
 
-## 六、版本历史与升级路线
+## 六、版本历史
 
 | 版本 | 日期 | 核心变化 |
-|:----:|:----:|:--------:|
+|:----:|:----:|:--------|
 | 0.1.0 | 2026-06-06 | 初始版本：环境检测 / 模型下载 / 切分 / 知识库 / Prompt / Web UI / CLI |
-| 0.1.1 | 2026-06-06 | R-12 数据目录合规、frontmatter 补充、版本号合规 |
+| 0.1.1 | 2026-06-06 | R-12 数据目录合规、frontmatter 补充 |
 | 0.2.0 | 2026-06-06 | 模型路径查找通用化、exception 加固、功能测试全量通过 |
-
-**计划中**：
-- 0.3.0：语法索引 / query 重写 / 混合检索（稠密+稀疏）
-- 0.4.0：RAPTOR 摘要索引 / 多模态检索
-- 0.5.0：评估集 / LLM-as-Judge 自动评测
+| 0.3.0 | 2026-06-06 | rag_core 缺失 strategy_overrides 修复、双模式支持 |
+| 0.4.0 | 2026-06-06 | pip 锁自动清理、镜像选择、流式输出、反锁死策略、WorkBuddy 引用通用化 |
+| 0.5.0 | 2026-06-06 | 模式切换配置、pip 流水线全面加固、异常处理修复 |
+| **1.0.0** | **2026-06-07** | **三层切分流水线重写、GuardStack + 后处理、插件注册、Web UI 大改、双入口** |
 
 ---
 
-> 本文档基于 local-rag-builder v0.2.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 local-rag-builder v1.0.0 的 SKILL.md + references/architecture.md + 核心脚本综合分析整理。
