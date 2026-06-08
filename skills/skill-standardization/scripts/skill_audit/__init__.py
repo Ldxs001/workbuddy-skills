@@ -491,8 +491,11 @@ def cmd_rules():
     print(f"\n共 {len(RULES)} 条规则")
 
 
-def _do_bump(skill_dir, bump_type='fix', desc='自动升级'):
-    """版本号三端更新核心逻辑 — 供 --fix 和 bump 子命令复用"""
+def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=False):
+    """版本号三端更新核心逻辑 — 供 --fix 和 bump 子命令复用
+    参数 skip_changelog=True 时，仅更新 SKILL.md 和 _meta.json 的版本号，不写 changelog。
+    changelog 由 LLM 根据 fix 详情和审计报告动态翻译生成。
+    """
     import os, sys, json, re, datetime
 
     # 映射 fix/feature/breaking → patch/minor/major
@@ -549,21 +552,22 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级'):
             f.write(md_content)
         shutil.move(tmp, skill_md)
 
-    # 更新 changelog
-    cl_entry = f"## {new_version} ({today})\n\n### 修复\n- {desc}\n"
-    cl_path = os.path.join(skill_dir, 'references', 'changelog.md')
-    if os.path.isfile(cl_path):
-        with open(cl_path, 'r', encoding='utf-8') as f:
-            cl_old = f.read()
-    else:
-        cl_old = ''
-        os.makedirs(os.path.dirname(cl_path), exist_ok=True)
-    new_cl = cl_entry + '\n---\n\n' + cl_old if cl_old else cl_entry
-    import tempfile, shutil
-    tmp = tempfile.mktemp(suffix='.md', dir=os.path.dirname(cl_path) or skill_dir)
-    with open(tmp, 'w', encoding='utf-8') as f:
-        f.write(new_cl)
-    shutil.move(tmp, cl_path)
+    # 更新 changelog（--fix 模式跳过，由 LLM 根据审计结果动态翻译生成）
+    if not skip_changelog:
+        cl_entry = f"## [{new_version}] - {today}\n\n### 修复\n- {desc}\n"
+        cl_path = os.path.join(skill_dir, 'references', 'changelog.md')
+        if os.path.isfile(cl_path):
+            with open(cl_path, 'r', encoding='utf-8') as f:
+                cl_old = f.read()
+        else:
+            cl_old = ''
+            os.makedirs(os.path.dirname(cl_path), exist_ok=True)
+        new_cl = cl_entry + '\n---\n\n' + cl_old if cl_old else cl_entry
+        import tempfile, shutil
+        tmp = tempfile.mktemp(suffix='.md', dir=os.path.dirname(cl_path) or skill_dir)
+        with open(tmp, 'w', encoding='utf-8') as f:
+            f.write(new_cl)
+        shutil.move(tmp, cl_path)
 
 
 def cmd_audit(args):
@@ -639,10 +643,10 @@ def cmd_audit(args):
                         print(f"[ERROR] R-{fix_key} 修正失败: {e}")
         if fixes_applied > 0:
             print(f"[OK] 共修正 {fix_details} 处")
-            # ★ 自动执行版本号 bump（patch），changelog 写入实际修复内容而非空话
+            # 版本号 bump（仅更新 SKILL.md + _meta.json，不写 changelog）
+            # changelog 由 LLM 根据下方输出的 fix 详情和审计报告动态翻译写入
             try:
-                fix_desc = f"audit --fix 自动修正: {', '.join(fix_details)}" if fix_details else 'audit --fix 自动修正'
-                _do_bump(skill_dir, 'fix', fix_desc)
+                _do_bump(skill_dir, 'fix', '由 LLM 补充实际内容', skip_changelog=True)
                 print(f"[OK] 版本号已自动升级（R-03 规则: audit --fix 默认为 PATCH）")
             except Exception as e:
                 print(f"[WARN] 版本号自动更新失败（可手动执行 bump 子命令）: {e}")
