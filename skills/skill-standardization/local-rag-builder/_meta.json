@@ -1,9 +1,0 @@
-{
-  "name": "local-rag-builder",
-  "version": "0.1.0",
-  "description": "本地 RAG 系统搭建技能，支持环境检测、嵌入模型管理、多种切分策略、向量知识库管理",
-  "author": "your-name-here",
-  "tags": ["r", "a", "g", ",", "e", "m", "b", "e", "d", "d", "i", "n", "g", ",", "l", "l", "m", ",", "p", "y", "t", "h", "o", "n", ",", "t", "o", "o", "l"],
-  "data_dir": "skills/.standardization/local-rag-builder/",
-  "triggers": []
-}
