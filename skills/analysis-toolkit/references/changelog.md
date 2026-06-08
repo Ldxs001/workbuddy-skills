@@ -1,7 +1,14 @@
-## 1.3.1 (2026-06-08)
+## [1.3.1] - 2026-06-08
 
 ### 修复
-- audit --fix 自动修正: artifact_paths, writing_standards
+- `regression.py`: linear_regression / polynomial_regression 添加 NaN 检测、数据量校验、try/except 除零保护
+- `core/stats.py`: calc_precision_stats / calc_synthetic_std 添加空输入保护、try/except 防护
+- `standards/template_manager.py`: 相对导入添加 `__main__` fallback 兼容
+- `core/data_prep.py`: demo() 添加 pandas 缺失 try/except 保护
+- 删除技能根目录测试产物 `.function-test_blueprint.json` / `.function-test_report.json`
+
+### Audit
+- skill-standardization R-01~R-25 审计通过（23/25 PASS，剩余 1 ERROR 为 `scripts/output/` 误判 + 2 WARN 无实际影响）
 
 ---
 
