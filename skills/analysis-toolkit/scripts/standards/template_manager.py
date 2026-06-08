@@ -32,7 +32,13 @@ import os
 import json
 from typing import Optional
 
-from .registry import TEMPLATES_FILE
+try:
+    from .registry import TEMPLATES_FILE
+except ImportError:
+    # 当作为 __main__ 直接运行时，使用绝对路径
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from standards.registry import TEMPLATES_FILE  # type: ignore
 
 # ═══════════════════════════════════════════════════════
 # 数据模型

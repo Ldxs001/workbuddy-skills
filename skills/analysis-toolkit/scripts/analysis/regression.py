@@ -28,16 +28,25 @@ def linear_regression(x, y, force_zero=False):
     x = np.array(x, dtype=float)
     y = np.array(y, dtype=float)
     n = len(x)
-    
-    if force_zero:
-        slope = np.sum(x * y) / np.sum(x ** 2)
-        intercept = 0.0
-        y_pred = slope * x
-    else:
-        x_mean, y_mean = np.mean(x), np.mean(y)
-        slope = np.sum((x - x_mean) * (y - y_mean)) / np.sum((x - x_mean) ** 2)
-        intercept = y_mean - slope * x_mean
-        y_pred = slope * x + intercept
+
+    if n < 2:
+        raise ValueError(f"数据点不足 (n={n})，线性回归至少需要2个数据点")
+
+    if np.any(np.isnan(x)) or np.any(np.isnan(y)):
+        raise ValueError("输入数据包含 NaN，请先清理数据")
+
+    try:
+        if force_zero:
+            slope = np.sum(x * y) / np.sum(x ** 2)
+            intercept = 0.0
+            y_pred = slope * x
+        else:
+            x_mean, y_mean = np.mean(x), np.mean(y)
+            slope = np.sum((x - x_mean) * (y - y_mean)) / np.sum((x - x_mean) ** 2)
+            intercept = y_mean - slope * x_mean
+            y_pred = slope * x + intercept
+    except (ZeroDivisionError, FloatingPointError) as e:
+        raise ValueError(f"回归计算失败: {e}")
     
     # 统计量
     residuals = y - y_pred
@@ -78,9 +87,15 @@ def polynomial_regression(x, y, degree=4):
     """
     x = np.array(x, dtype=float)
     y = np.array(y, dtype=float)
-    
-    coeffs = np.polyfit(x, y, degree)
-    y_pred = np.polyval(coeffs, x)
+    n = len(x)
+    if n <= degree:
+        raise ValueError(f"数据点 (n={n}) 不足，多项式拟合(n={degree})至少需要 {degree+1} 个点")
+
+    try:
+        coeffs = np.polyfit(x, y, degree)
+        y_pred = np.polyval(coeffs, x)
+    except np.linalg.LinAlgError as e:
+        raise ValueError(f"多项式拟合失败: {e}")
     
     residuals = y - y_pred
     ss_res = np.sum(residuals ** 2)

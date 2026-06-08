@@ -7,19 +7,19 @@ import numpy as np
 def calc_precision_stats(values):
     """
     精密度统计：SD, RSD, 平均值, 中位数。
-    
-    Parameters
-    ----------
-    values : array-like
-    
-    Returns
-    -------
-    dict
-        {"mean", "median", "sd", "rsd", "count", "min", "max"}
     """
     arr = np.array(values, dtype=float)
-    mean = np.mean(arr)
-    sd = np.std(arr, ddof=1)
+    n = len(arr)
+    if n < 2:
+        raise ValueError(f"数据点不足 (n={n})，至少需要2个数据点计算标准差")
+    if np.any(np.isnan(arr)):
+        raise ValueError("数据包含 NaN")
+
+    try:
+        mean = np.mean(arr)
+        sd = np.std(arr, ddof=1)
+    except (ZeroDivisionError, FloatingPointError) as e:
+        raise ValueError(f"精密度计算失败: {e}")
     
     return {
         "mean": mean,
@@ -51,46 +51,48 @@ def calc_synthetic_std(groups, method="standard"):
     dict
         {"synthetic_std", "synthetic_rsd", "overall_mean", "group_stats"}
     """
-    group_stats = []
-    total_n = 0
-    total_ss = 0
-    weighted_sum = 0
-    sd_squares = 0
-    k = len(groups)
-    
-    for g in groups:
-        arr = np.array(g, dtype=float)
-        n = len(arr)
-        mean = np.mean(arr)
-        sd = np.std(arr, ddof=1)
-        ss = (n - 1) * sd ** 2
-        
-        group_stats.append({
-            "n": n, "mean": mean, "sd": sd, "ss": ss
-        })
-        total_n += n
-        total_ss += ss
-        weighted_sum += mean * n
-        sd_squares += sd ** 2
-    
-    if method == "simple":
-        # 简单算法：SQRT(ΣSD² / k)
-        synthetic_std = np.sqrt(sd_squares / k) if k > 0 else 0
-    else:
-        # 正规算法（加权合并）：SQRT(Σ(n-1)SD² / (Σn - k))
-        synthetic_std = np.sqrt(total_ss / (total_n - k)) if total_n > k else 0
-    
-    overall_mean = weighted_sum / total_n if total_n > 0 else 0
-    
-    return {
-        "synthetic_std": synthetic_std,
-        "synthetic_rsd": synthetic_std / overall_mean * 100 if overall_mean != 0 else 0,
-        "overall_mean": overall_mean,
-        "group_count": k,
-        "total_n": total_n,
-        "method": method,
-        "group_stats": group_stats,
-    }
+    if not groups or all(len(g) < 2 for g in groups):
+        raise ValueError("各组数据不足，至少有一组需要 ≥2 个数据点")
+
+    try:
+        group_stats = []
+        total_n = 0
+        total_ss = 0
+        weighted_sum = 0
+        sd_squares = 0
+        k = len(groups)
+
+        for g in groups:
+            arr = np.array(g, dtype=float)
+            n = len(arr)
+            mean = np.mean(arr)
+            sd = np.std(arr, ddof=1)
+            ss = (n - 1) * sd ** 2
+
+            group_stats.append({"n": n, "mean": mean, "sd": sd, "ss": ss})
+            total_n += n
+            total_ss += ss
+            weighted_sum += mean * n
+            sd_squares += sd ** 2
+
+        if method == "simple":
+            synthetic_std = np.sqrt(sd_squares / k) if k > 0 else 0
+        else:
+            synthetic_std = np.sqrt(total_ss / (total_n - k)) if total_n > k else 0
+
+        overall_mean = weighted_sum / total_n if total_n > 0 else 0
+
+        return {
+            "synthetic_std": synthetic_std,
+            "synthetic_rsd": synthetic_std / overall_mean * 100 if overall_mean != 0 else 0,
+            "overall_mean": overall_mean,
+            "group_count": k,
+            "total_n": total_n,
+            "method": method,
+            "group_stats": group_stats,
+        }
+    except (ZeroDivisionError, FloatingPointError) as e:
+        raise ValueError(f"合成标准差计算失败: {e}")
 
 
 def calc_precision(values):
