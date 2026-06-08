@@ -1,5 +1,17 @@
 # 更新日志
 
+## [1.3.0] - 2026-06-08
+
+### 新增
+- **标准注册表**（`scripts/standards/registry.py`）：Standard 数据模型 + 注册/注销/查询接口 + CLI，支持 LLM/智能体注册新标准
+- **模板管理系统**（`scripts/standards/template_manager.py`）：Template CRUD（创建/更新/删除/查询/应用）+ CLI
+- **`references/standards-interface.md`**：LLM 提取标准字段的完整指南和注册接口文档
+- 内置标准：`gbt27417`（GB/T 27417-2017）、`ich`（ICH Q2(R1)）
+- 内置模板：`food-testing`（食品检验检测）、`pharmaceutical-testing`（药品检验检测）
+
+### 变更
+- `calc_lod_loq()` 改为通过标准注册表查询参数，支持动态扩展新标准
+
 ## [1.2.0] - 2026-06-08
 
 ### 新增

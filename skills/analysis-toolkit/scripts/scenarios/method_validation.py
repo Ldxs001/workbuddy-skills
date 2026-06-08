@@ -150,23 +150,30 @@ def calc_lod_loq(sigma=None, slope=1, standard="gbt27417", sigma_source="curve",
             "      ② 如果传入 sigma 参数，确保值 >0"
         )
 
-    # 按标准选公式
-    if standard == "gbt27417":
-        lod = 3 * sigma / slope
-        loq = 3 * lod  # = 9 × σ / b
-        formula_str = "LOD=3σ/b, LOQ=3×LOD (GB/T 27417-2017)"
-    elif standard == "ich":
-        lod = 3.3 * sigma / slope
-        loq = 10 * sigma / slope
-        formula_str = "LOD=3.3σ/b, LOQ=10σ/b (ICH Q2(R1))"
+    # 按标准选公式（通过标准注册表查询）
+    from ..standards.registry import get_registry
+    reg = get_registry()
+    std_params = reg.get_lod_loq_params(standard)
+    if std_params:
+        lod = std_params["lod_factor"] * sigma / slope
+        loq = std_params["loq_factor"] * sigma / slope
+        formula_str = f"LOD={std_params['lod_factor']}σ/b, LOQ={std_params['loq_factor']}σ/b ({std_params['standard_info']})"
+        standard_info = std_params["standard_info"]
     else:
-        raise ValueError(
-            f"不支持的标准: '{standard}'。\n"
-            "支持的标准：\n"
-            "  'gbt27417' — GB/T 27417-2017 合格评定 化学分析方法确认和验证指南（默认）\n"
-            "  'ich'      — ICH Q2(R1) / 中国药典 2020版\n"
-            "建议：将 standard 参数设为 'gbt27417' 或 'ich'"
-        )
+        # 标准未注册时 fallback 到 gbt27417
+        lod = 3 * sigma / slope
+        loq = 3 * lod
+        formula_str = f"LOD=3σ/b, LOQ=3×LOD (GB/T 27417-2017)"
+        standard_info = "GB/T 27417-2017 (fallback)"
+        if standard != "gbt27417":
+            raise ValueError(
+                f"不支持的标准: '{standard}'。\n"
+                "可通过标准注册表注册新标准:\n"
+                f"  from scripts.standards.registry import get_registry\n"
+                f"  reg = get_registry()\n"
+                f"  reg.register({{...}})\n"
+                "建议: 查阅文档了解标准注册表用法"
+            )
 
     result = {
         "lod": lod,
@@ -175,6 +182,7 @@ def calc_lod_loq(sigma=None, slope=1, standard="gbt27417", sigma_source="curve",
         "sigma_source": sigma_source,
         "slope": slope,
         "standard": standard,
+        "standard_info": standard_info,
         "formula": formula_str,
     }
     publish(result, title="检出限/定量限计算")
