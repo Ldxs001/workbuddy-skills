@@ -137,8 +137,13 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     return True, f"已向 '{kb_name}' 添加 {len(documents)} 个文档块 (总计: {count})"
 
 
-def auto_classify(content, rules=None):
-    """根据规则自动分类内容到对应知识库"""
+def auto_classify(content, rules=None, filename=None):
+    """根据规则自动分类内容到对应知识库
+
+    支持：
+    - 关键词匹配（内容）
+    - 文件扩展名匹配（如 .py .md .pdf）
+    """
     if rules is None:
         rules = _load_rules()
 
@@ -146,12 +151,20 @@ def auto_classify(content, rules=None):
         return "default"
 
     content_lower = content.lower()
+    ext = os.path.splitext(filename or "")[1].lower() if filename else ""
     best_match = "default"
     best_score = 0
 
     for kb_name, rule in rules.items():
-        keywords = rule.get("keywords", [])
-        score = sum(1 for kw in keywords if kw.lower() in content_lower)
+        score = 0
+        # 关键词匹配
+        for kw in rule.get("keywords", []):
+            if kw.lower() in content_lower:
+                score += 1
+        # 扩展名匹配
+        for ex in rule.get("extensions", []):
+            if ex.lower() == ext:
+                score += 3  # 扩展名匹配权重更高
         if score > best_score:
             best_score = score
             best_match = kb_name
@@ -159,15 +172,22 @@ def auto_classify(content, rules=None):
     return best_match
 
 
-def set_classify_rule(kb_name, keywords, description=""):
+def set_classify_rule(kb_name, keywords=None, extensions=None, description=""):
     """设置自动分类规则"""
     rules = _load_rules()
-    rules[kb_name] = {
-        "keywords": keywords if isinstance(keywords, list) else [keywords],
-        "description": description,
-    }
+    entry = {"description": description}
+    if keywords:
+        entry["keywords"] = keywords if isinstance(keywords, list) else [keywords]
+    if extensions:
+        entry["extensions"] = extensions if isinstance(extensions, list) else [extensions]
+    rules[kb_name] = entry
     _save_rules(rules)
-    return True, f"分类规则已设置: '{kb_name}' ← {keywords}"
+    parts = []
+    if keywords:
+        parts.append(f"关键词: {keywords}")
+    if extensions:
+        parts.append(f"扩展名: {extensions}")
+    return True, f"分类规则已设置: '{kb_name}' ← {'; '.join(parts)}"
 
 
 def remove_classify_rule(kb_name):
@@ -178,6 +198,29 @@ def remove_classify_rule(kb_name):
         _save_rules(rules)
         return True, f"已删除 '{kb_name}' 的分类规则"
     return False, f"规则 '{kb_name}' 不存在"
+
+
+def reset_classify_rules():
+    """重置分类规则为默认"""
+    default_rules = {
+        "tech": {
+            "keywords": ["代码", "API", "编程", "函数", "class", "def", "import"],
+            "extensions": [".py", ".js", ".ts", ".java", ".cpp", ".go", ".rs"],
+            "description": "技术代码类",
+        },
+        "doc": {
+            "keywords": ["说明", "文档", "指南", "教程", "手册", "README"],
+            "extensions": [".md", ".txt", ".rst"],
+            "description": "文档类",
+        },
+        "data": {
+            "keywords": ["数据", "csv", "json", "数据库", "table", "分析"],
+            "extensions": [".csv", ".json", ".xml", ".yaml", ".yml"],
+            "description": "数据类",
+        },
+    }
+    _save_rules(default_rules)
+    return True, "分类规则已重置为默认"
 
 
 def get_kb_stats():

@@ -8,6 +8,9 @@ import ast
 import json
 import os
 import sys
+import subprocess
+import importlib.util
+import inspect
 from typing import Optional
 
 
@@ -116,26 +119,55 @@ class TestRunner:
                 self.add_result(TestResult("D1", f"语法错误: {relpath}", "block", "fail",
                                            str(e), relpath, e.lineno or 0,
                                            "修复语法错误"))
-            except Exception as e:
-                self.add_result(TestResult("D1", f"读取失败: {relpath}", "warn", "fail",
-                                           str(e)[:200], relpath, 0,
-                                           "检查文件编码和权限"))
 
-        # 尝试调用独立函数（无参或全默认值）— 只做语法检查，不实际执行
-        for fn in functions:
-            if fn.get("params") in ([], ["self"], ["cls"]):
-                filepath = os.path.join(self.skill_dir, fn["file"])
-                if os.path.exists(filepath):
-                    try:
-                        with open(filepath, "r", encoding="utf-8") as f:
-                            ast.parse(f.read())
-                        self.add_result(TestResult("D1",
-                            f"存在: {fn['file']}:{fn['name']}()", "info", "pass"))
-                    except SyntaxError as e:
-                        self.add_result(TestResult("D1",
-                            f"语法错误: {fn['file']}:{fn['name']}", "block", "fail",
-                            str(e), fn["file"], e.lineno or fn["lineno"],
-                            "修复语法错误"))
+        # -- 运行时烟雾测试 -- subprocess --help 验证脚本启动
+        cli_scripts = self._find_cli_scripts(py_files)
+        for script, script_rel in cli_scripts:
+            try:
+                result = subprocess.run(
+                    [sys.executable, script, "--help"],
+                    capture_output=True, text=True, timeout=30
+                )
+                if result.returncode == 0:
+                    self.add_result(TestResult("D1",
+                        f"运行时: {script_rel} --help", "info", "pass",
+                        f"exit code 0, stdout {len(result.stdout)} chars"))
+                else:
+                    self.add_result(TestResult("D1",
+                        f"启动失败: {script_rel}", "warn", "fail",
+                        f"exit code {result.returncode}: {result.stderr.strip()[-200:]}",
+                        script_rel, 0, "检查 __main__ 入口和依赖"))
+            except subprocess.TimeoutExpired:
+                self.add_result(TestResult("D1",
+                    f"启动超时: {script_rel}", "warn", "fail",
+                    f"30 秒未返回: 可能卡死在启动时 import 或网络请求",
+                    script_rel, 0, "检查 import 链是否有阻塞调用"))
+            except FileNotFoundError:
+                self.add_result(TestResult("D1",
+                    f"解释器不存在: {script_rel}", "block", "fail",
+                    f"{sys.executable} 不可用", script_rel, 0,
+                    "检查 Python 环境"))
+            except Exception as e:
+                self.add_result(TestResult("D1",
+                    f"运行时异常: {script_rel}", "warn", "fail",
+                    str(e)[:200], script_rel, 0))
+
+    def _find_cli_scripts(self, py_files):
+        """找出目录中有 __main__ 入口的脚本"""
+        candidates = []
+        for relpath in py_files:
+            abspath = os.path.join(self.skill_dir, relpath)
+            if not os.path.exists(abspath):
+                continue
+            try:
+                with open(abspath, "r", encoding="utf-8") as f:
+                    source = f.read()
+                if '__name__ == "__main__"' in source or '__name__ == "__main__":' in source:
+                    candidates.append((abspath, relpath))
+            except Exception:
+                pass
+        return candidates
+
 
     # ═══════════════════════════════════════════════════════
     # D2: 流程断点 — 模块间数据传递和调用链是否完整
@@ -294,6 +326,95 @@ class TestRunner:
                                 break
                     except Exception:
                         pass
+
+        # -- 运行时正确性验证 -- import + 调用核心函数
+        py_files_bp = self.blueprint.get("file_manifest", {}).get("python", [])
+        self._run_d5_runtime(funcs, py_files_bp)
+
+    def _run_d5_runtime(self, funcs, py_files):
+        """运行时验证：import + 调用核心函数"""
+        from collections import defaultdict
+
+        # 收集可安全调用的函数（无参 / 全默认）
+        testable = []
+        for fn in funcs:
+            fname = fn["name"]
+            if fname.startswith("_"):
+                continue
+            params = fn.get("params", [])
+            if params in ([], ["self"], ["cls"], [None]):
+                testable.append(fn)
+
+        if not testable:
+            self.add_result(TestResult("D5", "无安全可调用的函数", "info", "pass",
+                                       "跳过运行时验证"))
+            return
+
+        file_funcs = defaultdict(list)
+        for fn in testable:
+            file_funcs[fn["file"]].append(fn)
+
+        for relpath, func_list in file_funcs.items():
+            mod_name = relpath.replace("/", ".").replace(".py", "")
+            abspath = os.path.join(self.skill_dir, relpath)
+            if not os.path.exists(abspath):
+                continue
+
+            try:
+                spec = importlib.util.spec_from_file_location(mod_name, abspath)
+                if spec is None or spec.loader is None:
+                    self.add_result(TestResult("D5", f"无法加载模块: {mod_name}",
+                                               "warn", "fail", relpath, 0))
+                    continue
+
+                mod = importlib.util.module_from_spec(spec)
+                old_path = list(sys.path)
+                scripts_dir = os.path.join(self.skill_dir, "scripts")
+                if os.path.isdir(scripts_dir) and scripts_dir not in sys.path:
+                    sys.path.insert(0, scripts_dir)
+                try:
+                    spec.loader.exec_module(mod)
+                finally:
+                    sys.path = old_path
+
+                self.add_result(TestResult("D5", f"模块可加载: {mod_name}",
+                                           "info", "pass"))
+
+                for fn in func_list:
+                    fname = fn["name"]
+                    func_obj = getattr(mod, fname, None)
+                    if func_obj is None or not callable(func_obj):
+                        continue
+                    try:
+                        sig = inspect.signature(func_obj)
+                        bound = sig.bind_partial()
+                        result = func_obj(**bound.arguments)
+                        self.add_result(TestResult("D5",
+                            f"函数可运行: {fname}()", "info", "pass",
+                            f"返回值类型: {type(result).__name__}"))
+                    except TypeError as e:
+                        self.add_result(TestResult("D5",
+                            f"函数验证: {fname}()", "info", "pass",
+                            f"有必填参数 ({str(e)[:100]})"))
+                    except Exception as e:
+                        self.add_result(TestResult("D5",
+                            f"函数运行失败: {fname}", "warn", "fail",
+                            f"调用时抛出: {str(e)[:200]}",
+                            relpath, fn["lineno"],
+                            "检查函数体是否有未捕获的异常"))
+
+            except SyntaxError as e:
+                self.add_result(TestResult("D5", f"语法错误: {mod_name}", "block", "fail",
+                                           str(e), relpath, e.lineno or 0))
+            except ImportError as e:
+                self.add_result(TestResult("D5",
+                    f"模块导入失败: {mod_name}", "warn", "fail",
+                    f"缺少依赖: {str(e)[:200]}", relpath, 0,
+                    "检查是否缺少 pip 依赖"))
+            except Exception as e:
+                self.add_result(TestResult("D5",
+                    f"模块加载异常: {mod_name}", "warn", "fail",
+                    str(e)[:200], relpath, 0))
 
     # ═══════════════════════════════════════════════════════
     # D6: 边界鲁棒性 — 空输入、零值、超大值的处理

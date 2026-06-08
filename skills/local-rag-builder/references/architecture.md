@@ -1,4 +1,4 @@
-# 架构设计 — local-rag-builder v0.1.0
+# 架构设计 — local-rag-builder v1.0.0
 
 ## 整体架构
 
@@ -8,7 +8,7 @@
 │                    Web UI (rag_web_ui.py)           │
 ├─────────────────────────────────────────────────────┤
 │   rag_core.py         (RAG 问答核心)                │
-│   text_splitter.py    (6 种切分策略 + 组合)          │
+│   text_splitter.py    (5 切分策略 + GuardStack + 后处理 + 插件注册)  │
 │   knowledge_base_manager.py (多知识库管理)           │
 │   prompt_manager.py   (Prompt 模板管理)              │
 │   embedding_model_manager.py (嵌入模型生命周期)       │
@@ -41,6 +41,7 @@ rag_skill.py / rag_standalone.py (双入口)
 rag_web_ui.py (入口)
   ├── config.py ← utils.py
   ├── prompt_manager.py ← utils.py
+  ├── text_splitter.py        ← 策略注册表 + 守卫注册表
   ├── embedding_model_manager.py
   ├── knowledge_base_manager.py
   └── rag_core.py
@@ -53,7 +54,17 @@ rag_web_ui.py (入口)
 文档 → text_splitter.py (切分) → embeddings (向量化) → Chroma (存储)
 ```
 
-### 查询流程（问答）
+### 切分流水线架构
+
+```
+原始文本 → [守卫栈(多选)] → [主策略(单选)] → [后处理(单选/不选)] → 最终 chunks
+
+守卫栈：mermaid / code / math / table / html（可扩展）
+主策略：fixed / recursive / headers / sentence / semantic（可扩展）
+后处理：recursive / fixed / semantic 子切（metadata 白名单继承）
+```
+
+## 查询流程（问答）
 ```
 用户问题 → embeddings (向量化) → Chroma (检索) → 上下文 + Prompt → LLM → 回答
 ```
@@ -74,7 +85,12 @@ skills/.standardization/local-rag-builder/data/
 ├── config/                # 运行时配置
 │   └── rag_config.json
 ├── output/                # 导出产物
-└── cache/                 # 下载缓存
+├── cache/                 # 下载缓存
+├── config_templates/      # 配置模板
+└── kb/
+    ├── default/
+    ├── kb_index.json
+    └── auto_classify_rules.json  # 分类规则
 ```
 
 ## 配置体系

@@ -8,11 +8,12 @@ import sys
 from utils import cfg_dir, safe_json_load, safe_json_dump
 
 DEFAULT_CONFIG = {
-    "embedding": {
-        "model_name": "BAAI/bge-small-zh-v1.5",
-        "model_path": "",
-        "device": "auto",
-        "normalize_embeddings": True,
+    "mode": "integrated",
+    "input_sources": {
+        "enable_pdf": False,
+        "enable_ocr": False,
+        "enable_html2md": False,
+        "pdf_backend": "pypdf",  # pypdf / pdfplumber
     },
     "splitting": {
         "strategy": "recursive",
@@ -23,6 +24,12 @@ DEFAULT_CONFIG = {
         "strip_headers": False,
         "semantic_breakpoint": "percentile",
         "secondary_strategy": None,
+        "guards": ["code"],
+        "strategy_overrides": {
+            "headers": {"chunk_size": None, "chunk_overlap": None},
+            "semantic": {"chunk_size": None, "chunk_overlap": None},
+            "sentence": {"chunk_size": None, "chunk_overlap": None},
+        },
     },
     "retrieval": {
         "k": 3,
@@ -55,14 +62,18 @@ def load_config():
     cfg = safe_json_load(get_config_path())
     if cfg is None:
         return DEFAULT_CONFIG.copy()
-    # 合并缺失的默认字段
+    # 合并缺失的默认字段（兼容顶层非 dict 字段）
     merged = DEFAULT_CONFIG.copy()
-    merged.update(cfg)
-    for section in DEFAULT_CONFIG:
-        if section in cfg:
-            merged[section].update(
-                {k: v for k, v in DEFAULT_CONFIG[section].items() if k not in cfg.get(section, {})}
-            )
+    if isinstance(cfg, dict):
+        for k, v in cfg.items():
+            if k in DEFAULT_CONFIG and isinstance(DEFAULT_CONFIG[k], dict) and isinstance(v, dict):
+                merged[k].update(v)
+                # 补全子字段
+                for sk, sv in DEFAULT_CONFIG[k].items():
+                    if sk not in v:
+                        merged[k][sk] = sv
+            else:
+                merged[k] = v
     return merged
 
 

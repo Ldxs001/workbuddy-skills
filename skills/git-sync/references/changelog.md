@@ -1,3 +1,9 @@
+## 2.9.1 (2026-06-06)
+
+### 修复
+- `run_git()` 缺少 `timeout=120` 参数：GitHub 443 超时时 `subprocess.run` 永久挂死，脚本无法进入 retry 逻辑
+  - 修复：添加 `timeout=120`，超时后抛出 `TimeoutExpired`，走 retry 流程并正常退出
+
 ## 2.9.0 (2026-06-03)
 
 ### 新增

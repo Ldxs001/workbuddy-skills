@@ -171,7 +171,7 @@ def format_skill_output(question, kb_name="default", k=None, score_threshold=Non
 
 def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitter_config=None):
     """导入文档到知识库"""
-    from text_splitter import split_recursive
+    from text_splitter import split_pipeline
     from knowledge_base_manager import add_documents_to_kb
 
     if embeddings is None:
@@ -187,12 +187,30 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     cfg = load_config()
     split_cfg = splitter_config or cfg.get("splitting", {})
 
-    chunks = split_recursive(
-        docs[0].page_content,
+    # 合并基础配置 + 策略级覆盖
+    strategy_overrides = split_cfg.get("strategy_overrides", {})
+    primary = split_cfg.get("strategy", "recursive")
+    sec_strat = split_cfg.get("secondary_strategy")
+
+    pipeline_kwargs = dict(
+        guards=split_cfg.get("guards", ["code"]),
+        primary=primary,
+        secondary=sec_strat,
         chunk_size=split_cfg.get("chunk_size", 500),
         chunk_overlap=split_cfg.get("chunk_overlap", 50),
         separators=split_cfg.get("separators"),
+        headers_to_split_on=split_cfg.get("headers_to_split_on"),
+        strip_headers=split_cfg.get("strip_headers", False),
+        strategy_overrides=strategy_overrides,
     )
+
+    # 从 strategy_overrides 注入当前策略的专属参数
+    over = strategy_overrides.get(primary, {})
+    for k in ("separators", "headers_to_split_on", "strip_headers", "breakpoint_type", "language", "delimiters"):
+        if k in over:
+            pipeline_kwargs[k] = over[k]
+
+    chunks = split_pipeline(docs[0].page_content, **pipeline_kwargs)
 
     for chunk in chunks:
         chunk.metadata["source"] = os.path.basename(file_path)

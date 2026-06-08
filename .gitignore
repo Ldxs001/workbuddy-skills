@@ -48,3 +48,4 @@ workday-calendar/**
 # ZIP 安装包目录（不上传）
 skills/.dist/
 .dist/
+.venv*/

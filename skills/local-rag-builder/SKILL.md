@@ -1,7 +1,7 @@
 ---
 name: local-rag-builder
-version: 0.3.0
-description: 本地 RAG 系统搭建技能，支持环境自动检测修复、嵌入模型多源下载与完整性校验、6种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化配置界面
+version: 1.0.0
+description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
 license: MIT
 sensitive_access: false
@@ -18,11 +18,24 @@ meta_field_sync: true
 ---
 # local-rag-builder（本地 RAG 搭建工具）
 
-一站式本地 RAG 系统搭建工具。支持环境自动检测修复、嵌入模型多源下载、6 种切分策略及组合、多知识库管理、可调 Prompt、Web 可视化配置。
+一站式本地 RAG 系统搭建工具。支持环境自动检测修复、嵌入模型多源下载、5 种切分策略 + GuardStack 守卫栈 + 后处理子切 + 插件注册、多知识库管理与自动分类规则、可调 Prompt、Web 可视化配置。
 
 **两种运行模式：**
-- **集成模式（默认）** — 纯检索，不调用 LLM。智能体（WorkBuddy 等）根据检索到的 context 自行回答
-- **独立模式** — 检索 + LLM 全链路。需要外部 LLM 服务（LM Studio / Ollama / vLLM），用户自行选择平台和模型
+- **🔌 集成模式（默认）** — 纯检索，不调用 LLM。智能体（xxxx 等）根据检索到的 context 自行回答。无需配置 LLM，无额外推理成本。
+- **🤖 独立模式** — 检索 + LLM 全链路。`rag_standalone.py` 直接调用外部 LLM（LM Studio / Ollama / vLLM）完成回答，不经过智能体。用户自行选择平台和模型。
+
+> **工作流说明（以下 xxxx 代指任意智能体）：**
+>
+> **集成模式：**
+> 1. 你把文档/链接给 xxxx → xxxx 调用 `rag_skill.py` 向量化入库
+> 2. 你提问 → xxxx 调用 `rag_skill.py --query "..."` 检索知识库
+> 3. xxxx 根据检索到的 context 组织回答
+>
+> **独立模式：**
+> 1. 你把文档/链接给 xxxx → xxxx 调用 `rag_standalone.py --import-file <path>` 入库
+> 2. 你提问 → xxxx 调用 `rag_standalone.py --query "..."` 
+> 3. `rag_standalone.py` 自行检索知识库 → 调用本地 LLM → 输出回答
+> 4. xxxx 仅透传结果，不参与推理
 
 ## 触发场景
 
@@ -44,10 +57,10 @@ meta_field_sync: true
 |---|------|------|
 | 1 | **环境自动检测修复** | 检测 Python 版本（需 3.8-3.11）、缺失包，自动创建虚拟环境安装 |
 | 2 | **嵌入模型管理** | 多源下载（ModelScope / HuggingFace 镜像 / 官方 / LLM 找源），自动重试，完整性校验，路径修正 |
-| 3 | **6 种切分策略 + 组合** | 固定窗口、递归切、层级/标题切、按句切、语义切、代码块保护切，支持策略组合与参数调优 |
+| 3 | **5 种切分策略 + GuardStack + 后处理** | 固定窗口、递归切、层级/标题切、按句切、语义切；守卫栈（mermaid/代码块/公式/表格/HTML 保护）；后处理子切（递归/固定/语义，metadata 白名单继承） |
 | 4 | **多知识库管理** | 支持多个向量知识库并行，LLM 自动分类入库或用户指定 |
 | 5 | **可调 Prompt** | 模板持久化，支持自定义占位符（`{context}` `{question}`），运行时编辑 |
-| 6 | **Web 可视化界面** | 内嵌 HTML 配置面板，可直调 Python 核心参数，无需手动改代码 |
+| 6 | **Web 可视化界面** | 内嵌 HTML 配置面板：输入源开关、GuardStack 守卫配置、5 策略动态表单 + 后处理配置、极客模式 JSON 编辑器 + 配置模板管理、知识库自动分类规则编辑器 |
 | 7 | **双模式接口** | 集成模式（`--retrieve-only` / `--mode integrated`）纯检索，智能体自行回答；独立模式（`--mode standalone`）检索 + LLM 全链路 |
 
 ## 快速开始
@@ -56,8 +69,11 @@ meta_field_sync: true
 # 1. 进入技能目录
 cd ~/.workbuddy/skills/local-rag-builder
 
-# 2. 运行环境检测（自动修复）
-python scripts/rag_env_setup.py
+# 2. 运行环境检测（自动修复，建议首次用国内镜像）
+python scripts/rag_env_setup.py --auto-install --mirror aliyun      # 国内用户推荐
+# python scripts/rag_env_setup.py --auto-install                    # 海外用户/默认
+# python scripts/rag_env_setup.py --check-only                      # 仅检测不安装
+# python scripts/rag_env_setup.py --cleanup-locks                   # 清理 pip 锁文件
 
 # 3. 下载嵌入模型（交互式选择）
 python scripts/embedding_model_manager.py --interactive
@@ -90,15 +106,15 @@ python scripts/rag_standalone.py --llm-help                  # 查看 LLM 接入
 
 | 脚本 | 作用 | 核心参数 |
 |------|------|----------|
-| `rag_env_setup.py` | 环境检测与修复 | `--auto-install`, `--check-only` |
+| `rag_env_setup.py` | 环境检测与修复 | `--auto-install`, `--check-only`, `--cleanup-locks`, `--mirror`, `--dry-run` |
 | `embedding_model_manager.py` | 嵌入模型管理 | `--download`, `--list`, `--check`, `--remove` |
-| `text_splitter.py` | 文本切分 | `--strategy`, `--chunk-size`, `--overlap`, `--input` |
+| `text_splitter.py` | 文本切分（三层流水线） | `--strategy`, `--guard`, `--secondary`, `--chunk-size`, `--input`, `--list-strategies` |
 | `rag_core.py` | 共享核心（被其他模块导入，不直接运行） | — |
 | **`rag_skill.py`** | **[技能模式] 纯检索接口** | **`--query`, `--kb`, `--json`** |
 | **`rag_standalone.py`** | **[独立模式] 检索+LLM** | **`--query`, `--kb`, `--llm-help`, `--json`** |
-| `rag_web_ui.py` | Web 配置界面 | `--port` |
-| `prompt_manager.py` | Prompt 管理 | `--set`, `--show`, `--reset`, `--list` |
-| `knowledge_base_manager.py` | 知识库管理 | `--create`, `--import`, `--list`, `--delete`, `--classify` |
+| `rag_web_ui.py` | Web 配置界面 | `--port`, `--gen-html` |
+| `prompt_manager.py` | Prompt 管理 | `--set`, `--show`, `--reset` |
+| `knowledge_base_manager.py` | 知识库管理 | `--create`, `--import`, `--list`, `--delete`, `--set-rule`, `--classify` |
 
 ## 数据目录（skills/.standardization/local-rag-builder/data/）
 
@@ -113,8 +129,38 @@ data/
 ├── config/           # 运行时配置
 ├── output/           # 导出产物
 ├── logs/             # 执行日志
-└── cache/            # 缓存
+├── cache/            # 缓存
+└── config_templates/ # 用户保存的配置模板
 ```
+
+## 自定义扩展（插件注册）
+
+本技能 v1.0 支持通过代码注册自定义切分策略和守卫。
+
+```python
+from text_splitter import register_strategy, register_guard, StrategyPlugin, GuardPlugin, Guard
+
+# 自定义切分策略
+def my_splitter(text, my_param=100, **kwargs):
+    from langchain_core.documents import Document
+    # 自定义切分逻辑
+    return [Document(page_content=text)]
+
+register_strategy(StrategyPlugin(
+    "my_split", "我的自定义切分", my_splitter,
+    config_schema={
+        "my_param": {"type": "int", "label": "参数名", "default": 100, "min": 1, "max": 1000},
+        "flag": {"type": "bool", "label": "开关", "default": False},
+    },
+    default_config={"my_param": 100, "flag": False},
+))
+
+# 自定义守卫
+my_guard = Guard("my_guard", re.compile(r'```special\n[\s\S]*?\n```'))
+register_guard(GuardPlugin("my_guard", "保护特殊代码块", my_guard))
+```
+
+注册后自动出现在 Web UI 的下拉列表中，配置表单自动生成。
 
 ## 重要约定
 

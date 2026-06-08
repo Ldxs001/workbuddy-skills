@@ -101,7 +101,7 @@ def run_git(*args, workdir=None, check=True):
            *[str(a) for a in args]]
     return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
                          capture_output=True, encoding="utf-8",
-                         check=check, env=env,
+                         check=check, env=env, timeout=120,
                          stdin=subprocess.DEVNULL,
                          startupinfo=si)
 

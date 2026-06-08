@@ -279,7 +279,7 @@ local-rag-builder 分为**两个完全独立的入口**：
 
 | 模式 | 入口脚本 | 是否需要 LLM | 适用场景 |
 |:----:|:--------:|:------------:|:---------|
-| **技能模式** | `rag_skill.py` | **不需要** | 智能体（WorkBuddy / OpenClaw 等）调用，纯检索返回 context |
+| **技能模式** | `rag_skill.py` | **不需要** | 智能体（xxxx 等）调用，纯检索返回 context |
 | **独立模式** | `rag_standalone.py` | 需要（LM Studio / Ollama / vLLM） | 用户直接跑 Python，全链路问答 |
 
 > ⚠️ 两者不共享同一个运行进程。选择哪个入口，就决定了是否涉及 LLM 调用。

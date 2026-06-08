@@ -5,7 +5,7 @@ v0.2.0
 纯技能模式：只检索，不调用 LLM。
 - 无 LLM 依赖（不 import langchain_community.llms）
 - 无交互式 CLI
-- 所有输出为结构化 JSON，供任何智能体（WorkBuddy / OpenClaw / 其他）消费
+- 所有输出为结构化 JSON，供任何智能体（xxxx 等）消费
 - prompt 模板在输出中被正确填充，智能体直接使用即可
 
 用法:

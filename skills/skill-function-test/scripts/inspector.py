@@ -118,9 +118,9 @@ def scan_files(skill_dir: str) -> dict:
                     ".standardization", "data", ".progress.md"}
 
     for root, dirs, files in os.walk(skill_dir):
-        dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.endswith("_bak_")]
+        dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.endswith("_bak_") and not d.startswith(".venv")]
         for f in files:
-            if f.endswith(".pyc") or f in (".gitkeep", ".DS_Store"):
+            if f.endswith((".pyc", ".pyd", ".so", ".dll", ".exe")) or f in (".gitkeep", ".DS_Store"):
                 continue
             fpath = os.path.join(root, f)
             rel = os.path.relpath(fpath, skill_dir)

@@ -7,6 +7,8 @@ import os
 import sys
 import json
 import subprocess
+import time
+import threading
 from pathlib import Path
 
 # R-12 审计锚点
@@ -42,21 +44,88 @@ def get_python_path():
 
 
 def run_command(cmd, timeout=120, capture=True):
-    """运行命令并返回结果"""
+    """
+    运行命令并返回结果
+    自动流式输出 stdout/stderr 到终端（避免 Bash 工具因无输出超时）
+    """
     try:
-        result = subprocess.run(
-            cmd, capture_output=capture, text=True, timeout=timeout
-        )
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode,
-        }
+        if capture:
+            # 流式模式：实时输出 + 收集完整结果
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                bufsize=1, text=True
+            )
+            stdout_lines = []
+            stderr_lines = []
+            deadline = time.time() + timeout
+
+            def _read_stream(stream, out_list):
+                while True:
+                    remaining = deadline - time.time()
+                    if remaining <= 0:
+                        return False
+                    line = _readline_timeout(stream, timeout=min(1.0, remaining))
+                    if line is None:
+                        return True  # EOF normally
+                    if line == "":
+                        continue  # timeout, retry
+                    print(line, end="", flush=True)
+                    out_list.append(line)
+
+            import threading
+            t_out = threading.Thread(target=_read_stream, args=(proc.stdout, stdout_lines), daemon=True)
+            t_err = threading.Thread(target=_read_stream, args=(proc.stderr, stderr_lines), daemon=True)
+            t_out.start()
+            t_err.start()
+            t_out.join(timeout=max(1, timeout + 10))
+            t_err.join(timeout=5)
+            proc.wait(timeout=10)
+
+            return {
+                "success": proc.returncode == 0,
+                "stdout": "".join(stdout_lines),
+                "stderr": "".join(stderr_lines),
+                "returncode": proc.returncode,
+            }
+        else:
+            result = subprocess.run(
+                cmd, capture_output=False, text=True, timeout=timeout
+            )
+            return {
+                "success": result.returncode == 0,
+                "stdout": result.stdout or "",
+                "stderr": result.stderr or "",
+                "returncode": result.returncode,
+            }
     except subprocess.TimeoutExpired:
         return {"success": False, "stdout": "", "stderr": "timeout", "returncode": -1}
     except FileNotFoundError:
         return {"success": False, "stdout": "", "stderr": "command not found", "returncode": -1}
+
+
+def _readline_timeout(stream, timeout=1.0):
+    """带超时的逐行读取 — Windows 兼容版"""
+    import threading
+
+    result = [None]
+    event = threading.Event()
+
+    def _read():
+        try:
+            line = stream.readline()
+            result[0] = line
+        except Exception:
+            result[0] = ""
+        finally:
+            event.set()
+
+    t = threading.Thread(target=_read, daemon=True)
+    t.start()
+    event.wait(timeout=timeout)
+    if event.is_set():
+        val = result[0]
+        return val if val else None
+    return ""
 
 
 def check_python_version():
