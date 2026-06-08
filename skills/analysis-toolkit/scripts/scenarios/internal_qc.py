@@ -18,6 +18,31 @@ from ..core.qc_tables import get_tolerance, get_magnitude_order
 from ..output import publish
 
 
+def _warn_on_data_quality(data, value_col, level_col=None, min_rows=3):
+    """数据质量前置校验：不阻断执行，只输出警告。"""
+    warnings = []
+    if data.empty:
+        warnings.append("数据为空，计算结果可能无意义。")
+    if value_col not in data.columns:
+        warnings.append(f"数值列 '{value_col}' 不存在于数据中。")
+        return warnings
+    vals = data[value_col].dropna()
+    if len(vals) < min_rows:
+        warnings.append(f"有效数据仅 {len(vals)} 行（建议至少 {min_rows} 行）。")
+    if len(vals) < len(data):
+        warnings.append(f"数值列 '{value_col}' 包含 {len(data) - len(vals)} 个空值，已自动跳过。")
+    if pd.api.types.is_numeric_dtype(data[value_col]):
+        if vals.std() == 0:
+            warnings.append(f"数值列 '{value_col}' 所有值相同（标准差为0），精密度分析无意义。")
+    else:
+        warnings.append(f"数值列 '{value_col}' 不是数值类型，请检查数据格式。")
+    if level_col and level_col in data.columns:
+        n_levels = data[level_col].nunique()
+        if n_levels < 2:
+            warnings.append(f"水平列 '{level_col}' 仅有 {n_levels} 个水平，多水平分析至少需要 2 个。")
+    return warnings
+
+
 def internal_precision_analysis(data, level_col="水平", value_col="结果", n_replicates=3):
     """
     室内精密度分析 — 多水平精密度统计与合成标准差。
@@ -46,6 +71,13 @@ def internal_precision_analysis(data, level_col="水平", value_col="结果", n_
             "synthetic_rsd_simple": float # 合成RSD（简单算法）
         }
     """
+    # 数据质量前置校验
+    quality_warnings = _warn_on_data_quality(data, value_col, level_col)
+    if quality_warnings:
+        import warnings as _warn
+        for w in quality_warnings:
+            _warn.warn(f"[数据质量] {w}")
+
     levels = data[level_col].unique()
     summaries = []
 

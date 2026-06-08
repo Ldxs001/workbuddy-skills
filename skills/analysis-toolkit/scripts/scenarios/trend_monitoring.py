@@ -17,6 +17,35 @@ from ..analysis.time_series import prophet_forecast, prophet_plot
 from ..output import publish
 
 
+def _warn_on_data_quality(data, date_col, value_col, min_rows=5):
+    """数据质量前置校验：不阻断执行，只输出警告。"""
+    warnings = []
+    if data is None or data.empty:
+        warnings.append("数据为空，无法分析。")
+        return warnings
+    if value_col not in data.columns:
+        warnings.append(f"数值列 '{value_col}' 不存在。")
+        return warnings
+    if date_col not in data.columns:
+        warnings.append(f"日期列 '{date_col}' 不存在。")
+        return warnings
+    vals = data[value_col].dropna()
+    if len(vals) < min_rows:
+        warnings.append(f"有效数据仅 {len(vals)} 行（建议至少 {min_rows} 行用于趋势分析）。")
+    if len(vals) < len(data):
+        warnings.append(f"数值列包含 {len(data) - len(vals)} 个空值，已自动跳过。")
+    if vals.std() == 0:
+        warnings.append("数值列所有值相同，趋势分析无意义。")
+    # 检查日期范围
+    try:
+        dates = pd.to_datetime(data[date_col])
+        if dates.nunique() < 3:
+            warnings.append(f"日期列仅有 {dates.nunique()} 个不同日期，需要至少 3 个。")
+    except Exception:
+        warnings.append(f"日期列 '{date_col}' 无法解析为日期格式。")
+    return warnings
+
+
 def monitoring_dashboard(data, date_col="日期", value_col="值",
                          group_col=None, freq="W", window=7):
     """
@@ -41,6 +70,13 @@ def monitoring_dashboard(data, date_col="日期", value_col="值",
             "stats_summary": 总体摘要,
         }
     """
+    # 数据质量前置校验
+    quality_warnings = _warn_on_data_quality(data, date_col, value_col)
+    if quality_warnings:
+        import warnings as _warn
+        for w in quality_warnings:
+            _warn.warn(f"[数据质量] {w}")
+
     df = data.copy()
     df[date_col] = pd.to_datetime(df[date_col])
 

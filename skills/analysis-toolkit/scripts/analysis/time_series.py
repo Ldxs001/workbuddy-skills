@@ -196,7 +196,16 @@ def prophet_forecast(df, date_col, value_col, group_col=None, periods=4, freq="W
         ts = ts.dropna()
         
         if len(ts) < 3:
-            raise ValueError("数据不足3个时间点，无法预测")
+            raise ValueError(
+                f"数据不足，无法进行 Prophet 预测。\n"
+                f"当前有效时间点: {len(ts)} 个（至少需要 3 个）\n"
+                "可能原因：① 数据量不够，历史记录太少\n"
+                "         ② 按所选频率聚合后有效数据不足\n"
+                "         ③ 数据中有过多的空值（NaN）被过滤掉了\n"
+                "建议：① 补充更多历史数据\n"
+                "      ② 换用更粗的频率（如从'日'改为'周'）\n"
+                "      ③ 检查数据是否包含有效日期列"
+            )
         
         model = Prophet(interval_width=0.95, yearly_seasonality=True,
                         weekly_seasonality=(freq == "W"), daily_seasonality=False)

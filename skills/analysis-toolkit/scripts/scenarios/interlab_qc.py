@@ -19,6 +19,37 @@ from ..core.qc_tables import f_critical, calculate_z_score, z_score_judgment, ge
 from ..output import publish
 
 
+def _warn_on_data_quality(data, value_col, group_col=None, min_rows=3):
+    """数据质量前置校验：不阻断执行，只输出警告。"""
+    warnings = []
+    if data.empty:
+        warnings.append("数据为空，计算结果可能无意义。")
+        return warnings
+    if value_col not in data.columns:
+        warnings.append(f"数值列 '{value_col}' 不存在于数据中。")
+        return warnings
+    vals = data[value_col].dropna()
+    if len(vals) < min_rows:
+        warnings.append(f"有效数据仅 {len(vals)} 行（建议至少 {min_rows} 行）。")
+    if len(vals) < len(data):
+        warnings.append(f"数值列 '{value_col}' 包含 {len(data) - len(vals)} 个空值，已自动跳过。")
+    if not pd.api.types.is_numeric_dtype(data[value_col]):
+        warnings.append(f"数值列 '{value_col}' 不是数值类型，请检查数据格式。")
+        return warnings
+    if vals.std() == 0:
+        warnings.append(f"数值列 '{value_col}' 所有值相同（标准差为0），比对分析无意义。")
+    if group_col and group_col in data.columns:
+        n_groups = data[group_col].nunique()
+        if n_groups < 2:
+            warnings.append(f"分组列 '{group_col}' 仅有 {n_groups} 个组，比对分析至少需要 2 个组。")
+        # 检查是否有组数据不足
+        small_groups = [g for g in data[group_col].unique()
+                        if len(data[data[group_col] == g][value_col].dropna()) < 2]
+        if small_groups:
+            warnings.append(f"以下组数据不足2行: {small_groups}，这些组会被跳过。")
+    return warnings
+
+
 def interlab_comparison(data, lab_col="实验室", value_col="结果"):
     """
     室间/人员比对分析 —— 基于ANOVA的多组均值比较。
@@ -44,6 +75,13 @@ def interlab_comparison(data, lab_col="实验室", value_col="结果"):
             "conclusion": str
         }
     """
+    # 数据质量前置校验
+    quality_warnings = _warn_on_data_quality(data, value_col, lab_col)
+    if quality_warnings:
+        import warnings as _warn
+        for w in quality_warnings:
+            _warn.warn(f"[数据质量] {w}")
+
     groups = {}
     group_names = sorted(data[lab_col].unique())
     for name in group_names:

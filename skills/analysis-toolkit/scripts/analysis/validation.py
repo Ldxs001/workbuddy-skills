@@ -47,7 +47,13 @@ def calculate_lod_loq(calibration_data, method="pharmacopoeia"):
         lod_factor = 3
         loq_factor = 10
     else:
-        raise ValueError(f"不支持的方法: {method}")
+        raise ValueError(
+            f"不支持的方法: '{method}'。\n"
+            "支持的方法：\n"
+            "  'pharmacopoeia' — 药典法: LOD = 3.3×Sy/x / slope（默认）\n"
+            "  '17417'         — 国标法: LOD = 3×Sy/x / slope\n"
+            "建议：将 method 参数设为 'pharmacopoeia' 或 '17417'"
+        )
     
     lod = lod_factor * syx / slope if slope != 0 else float('inf')
     loq = loq_factor * syx / slope if slope != 0 else float('inf')

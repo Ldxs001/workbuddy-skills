@@ -16,6 +16,27 @@ from ..analysis.regression import linear_regression, polynomial_regression
 from ..output import publish
 
 
+def _warn_on_data_quality(x, y, label_x="x", label_y="y", min_points=3):
+    """数据质量前置校验（回归类函数）：不阻断执行，只输出警告。"""
+    import warnings as _warn
+    x_arr = np.array(x, dtype=float) if x is not None else np.array([])
+    y_arr = np.array(y, dtype=float) if y is not None else np.array([])
+    n = min(len(x_arr), len(y_arr))
+    if n == 0:
+        _warn.warn(f"[数据质量] 输入数据为空，无法拟合。")
+        return
+    if n < min_points:
+        _warn.warn(f"[数据质量] 有效数据点仅 {n} 个（建议至少 {min_points} 个）。")
+    if len(x_arr) != len(y_arr):
+        _warn.warn(f"[数据质量] {label_x} 长度 ({len(x_arr)}) 与 {label_y} 长度 ({len(y_arr)}) 不一致。")
+    if np.std(x_arr) == 0:
+        _warn.warn(f"[数据质量] {label_x} 所有值相同（方差为0），无法拟合有效曲线。")
+    if np.std(y_arr) == 0:
+        _warn.warn(f"[数据质量] {label_y} 所有值相同（方差为0），拟合结果参考意义有限。")
+    if np.any(np.isnan(x_arr)) or np.any(np.isnan(y_arr)):
+        _warn.warn(f"[数据质量] 输入数据中包含 NaN，将自动忽略。")
+
+
 def calibration_curve(x, y, force_zero=False, degree=1):
     """
     标准曲线拟合。
@@ -31,6 +52,8 @@ def calibration_curve(x, y, force_zero=False, degree=1):
     -------
     dict
     """
+    _warn_on_data_quality(x, y, "浓度", "响应值")
+
     if degree == 1:
         result = linear_regression(x, y, force_zero=force_zero)
     else:
@@ -109,9 +132,23 @@ def calc_lod_loq(sigma=None, slope=1, standard="gbt27417", sigma_source="curve",
             slope = calibration_data.get("slope", calibration_data.get("b", 1))
 
     if slope == 0:
-        raise ValueError("斜率为0，无法计算检出限")
+        raise ValueError(
+            "标准曲线的斜率为0，无法计算检出限/定量限。\n"
+            "可能原因：① 浓度和响应值之间没有线性关系（浓度变了但响应不变）\n"
+            "         ② 数据录入有误（比如所有浓度值相同）\n"
+            "建议：① 检查原始数据中的浓度和响应值是否正确\n"
+            "      ② 如果是重复录入，去掉重复数据后再试"
+        )
     if sigma is None or sigma <= 0:
-        raise ValueError("标准偏差必须提供且大于0")
+        raise ValueError(
+            "标准偏差无效（未提供或 ≤0），无法计算检出限。\n"
+            "根据 sigma_source 参数检查：\n"
+            "  sigma_source='curve' → 需要 calibration_data 包含 syx（剩余标准差）\n"
+            "  sigma_source='instrument' → 需要单独传入仪器精密度 SD\n"
+            "  sigma_source='blank' → 需要空白测定值计算 SD（至少10个数据点）\n"
+            "建议：① 如果使用 curve 模式，先调用 calibration_curve() 传入结果\n"
+            "      ② 如果传入 sigma 参数，确保值 >0"
+        )
 
     # 按标准选公式
     if standard == "gbt27417":
@@ -123,7 +160,13 @@ def calc_lod_loq(sigma=None, slope=1, standard="gbt27417", sigma_source="curve",
         loq = 10 * sigma / slope
         formula_str = "LOD=3.3σ/b, LOQ=10σ/b (ICH Q2(R1))"
     else:
-        raise ValueError(f"不支持的标准: {standard}")
+        raise ValueError(
+            f"不支持的标准: '{standard}'。\n"
+            "支持的标准：\n"
+            "  'gbt27417' — GB/T 27417-2017 合格评定 化学分析方法确认和验证指南（默认）\n"
+            "  'ich'      — ICH Q2(R1) / 中国药典 2020版\n"
+            "建议：将 standard 参数设为 'gbt27417' 或 'ich'"
+        )
 
     result = {
         "lod": lod,
@@ -194,6 +237,10 @@ def curve_uncertainty(calibration_data, sample_responses,
     -------
     dict
     """
+    # 数据质量校验
+    if not calibration_data:
+        import warnings as _warn
+        _warn.warn("[数据质量] calibration_data 为空，无法计算不确定度。")
     syx = calibration_data.get("syx", calibration_data.get("residual_std", 0))
     slope = calibration_data.get("slope", calibration_data.get("b", 0))
     intercept = calibration_data.get("intercept", calibration_data.get("a", 0))
@@ -203,7 +250,16 @@ def curve_uncertainty(calibration_data, sample_responses,
     p = n_sample_replicates if n_sample_replicates else len(sample_responses)
 
     if n < 2 or p < 1 or slope == 0:
-        raise ValueError("数据不足，无法计算不确定度")
+        raise ValueError(
+            "数据不足，无法计算不确定度。\n"
+            "当前检查结果：\n"
+            f"  校准点数 (n) = {n}（至少需要2个）\n"
+            f"  样品重复次数 (p) = {p}（至少需要1个）\n"
+            f"  曲线斜率 = {slope}（不能为0）\n"
+            "建议：① 确保标准曲线至少包含2个浓度点\n"
+            "      ② 确保传入了 sample_responses（样品测量值）\n"
+            "      ③ 检查 calibration_data 中斜率不为0"
+        )
 
     y_sample_mean = np.mean(sample_responses)
     x_sample = (y_sample_mean - intercept) / slope
@@ -211,7 +267,11 @@ def curve_uncertainty(calibration_data, sample_responses,
     ss_xx = np.sum((x_vals - x_mean) ** 2)
 
     if ss_xx <= 0:
-        raise ValueError("校准点浓度方差为0，无法计算")
+        raise ValueError(
+            "校准点浓度方差为0，无法计算不确定度。\n"
+            "可能原因：所有校准点的浓度值完全相同。\n"
+            "建议：检查标准曲线的浓度数据，确保浓度值有梯度（不同浓度）"
+        )
 
     u_rel = (syx / slope / x_sample) * np.sqrt(1/p + 1/n + (x_sample - x_mean)**2 / ss_xx)
 
