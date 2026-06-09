@@ -1,3 +1,11 @@
+## 2.63.6 (2026-06-08)
+
+### 修复
+- __init__.py: `--fix` 模式不再自动写 changelog（改为 bump 版本号时 skip_changelog=True），changelog 由 LLM 根据审计结果和 fix 详情动态翻译写入
+- __init__.py: `_do_bump` 新增 `skip_changelog` 参数，`--fix` 调用时传入 True
+
+---
+
 ## 2.63.5 (2026-06-05)
 
 ### 修复

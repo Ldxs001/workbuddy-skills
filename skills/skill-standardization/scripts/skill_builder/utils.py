@@ -27,12 +27,28 @@ SPLITTABLE_KEYWORDS = {
 
 
 def _create_backup(skill_dir, operation, workspace="."):
-    """创建备份目录（带时间戳）"""
+    """创建技能目录的 ZIP 备份（带时间戳）
+    
+    ZIP 格式避免备份目录被 Skill 扫描器误识别为重复技能。
+    支持单文件回退：可用 zipfile.ZipFile 的 extract() 提取指定文件。
+    """
+    import zipfile
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = skill_dir.parent / f"{skill_dir.name}_bak_{operation}_{ts}"
-    shutil.copytree(skill_dir, backup_dir)
-    print(f"📦 备份已创建: {backup_dir}")
-    return backup_dir
+    backup_name = f"{skill_dir.name}_bak_{operation}_{ts}.zip"
+    backup_path = skill_dir.parent / backup_name
+    
+    with zipfile.ZipFile(str(backup_path), "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(str(skill_dir)):
+            dirs[:] = [d for d in dirs if d not in {"__pycache__", ".git", "__MACOSX"}]
+            rel = os.path.relpath(root, str(skill_dir))
+            for f in files:
+                if f.endswith((".pyc", ".DS_Store")):
+                    continue
+                arcname = os.path.join(rel, f) if rel != "." else f
+                zf.write(os.path.join(root, f), arcname)
+    
+    print(f"  [BACKUP] 已创建: {backup_path}")
+    return backup_path
 
 
 def _write_json(path, data):

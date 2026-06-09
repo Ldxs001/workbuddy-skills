@@ -535,9 +535,22 @@ class Refactor:
 
 
 def _create_backup(skill_dir, operation, workspace):
-    """创建备份目录"""
+    """创建技能目录的 ZIP 备份（带时间戳）"""
+    import zipfile
     from datetime import datetime
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = skill_dir.parent / f"{skill_dir.name}_bak_{operation}_{ts}"
-    shutil.copytree(skill_dir, backup_dir)
-    return backup_dir
+    backup_name = f"{skill_dir.name}_bak_{operation}_{ts}.zip"
+    backup_path = skill_dir.parent / backup_name
+
+    with zipfile.ZipFile(str(backup_path), "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(str(skill_dir)):
+            dirs[:] = [d for d in dirs if d not in {"__pycache__", ".git", "__MACOSX"}]
+            rel = os.path.relpath(root, str(skill_dir))
+            for f in files:
+                if f.endswith((".pyc", ".DS_Store")):
+                    continue
+                arcname = os.path.join(rel, f) if rel != "." else f
+                zf.write(os.path.join(root, f), arcname)
+
+    print(f"  [BACKUP] 已创建: {backup_path}")
+    return backup_path
