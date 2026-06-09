@@ -1,6 +1,6 @@
 ---
 name: triphasic-execution
-version: 5.19.0
+version: 5.19.1
 author: wUwproject
 license: MIT
 description: Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。
@@ -109,15 +109,15 @@ skill 加载后，AI 输出以下状态标识：
 | **F-02** | 语义拆分完成后必须输出【任务规划】，禁止直接执行 | 语义拆分输出后 | ❌ AI 自觉（需用户确认规划）|
 | **F-03** | 任务规划输出后立即调用 `task_progress.py init` | 规划确认后 | ✅ 文件不存在则后续 update/complete 报错 |
 | **F-04** | 每步 EXECUTE 开始前重述本步骤任务目的 | 每步执行前 | ❌ AI 自觉 |
-| **F-05** | 每步执行后必须紧跟 REVIEW，禁止连续执行两步 | 每步执行后 | ❌ AI 自觉 |
-| **F-06** | 每步 REVIEW 后必须紧跟 ADVANCE | 每步 REVIEW 后 | ❌ AI 自觉 |
+| **F-05** | 每步执行后必须紧跟 REVIEW，禁止连续执行两步 | 每步执行后 | ✅ `pre_exec_search` 钩子拦截未 REVIEW 的执行 |
+| **F-06** | 每步 REVIEW 后必须紧跟 ADVANCE | 每步 REVIEW 后 | ✅ `block_skip_review` 钩子拦截未 REVIEW 的下一步 |
 | **F-07** | 每步 ADVANCE 后调用 `task_progress.py update` | 每步 ADVANCE 后 | ✅ update 校验 init 存在性 |
-| **F-08** | 同一步骤失败 3 次后必须换方案，禁止第 4 次重试 | 重试计数达到 3 | ⚠️ 部分（update 记录重试次数）|
+| **F-08** | 同一步骤失败 3 次后必须换方案，禁止第 4 次重试 | 重试计数达到 3 | ✅ 脚本强制（`retries>=3 → sys.exit(1)`）|
 | **F-09** | 任务完成后调用 `task_progress.py complete` | 任务完成时 | ✅ **v5.12 强制**：校验步骤完成率、记录文件、summary.json |
 | **F-10** | 任务完成后必须输出【任务完成】总结 | 任务结束时 | ⚠️ 部分（summary.json 自动生成）|
-| **F-11** | 同一步骤空转（未实际执行）3 次必须截断并请求触发词输入 | 空转计数达到 3 | ❌ AI 自觉（截断后等待用户输入触发词重新激发）|
-| **F-12** | 换思路必须经 ADVANCE→EXECUTE→REVIEW→ADVANCE 完整循环，禁止三步骤内部直接循环 | 换思路请求产生时 | ❌ AI 自觉（换思路也走完整三步）|
-| **F-13** | 推进阶段成功后，坚决不倒回已画√的步骤 | 推进决策时 | ❌ AI 自觉 |
+| **F-11** | 同一步骤空转（未实际执行）3 次必须截断并请求触发词输入 | 空转计数达到 3 | ✅ `auto_idle_cutoff` 钩子自动 abort（默认关）|
+| **F-12** | 换思路必须经 ADVANCE→EXECUTE→REVIEW→ADVANCE 完整循环，禁止三步骤内部直接循环 | 换思路请求产生时 | ❌ AI 自觉（LLM 决策流程，无法脚本化）|
+| **F-13** | 推进阶段成功后，坚决不倒回已画√的步骤 | 推进决策时 | ❌ AI 自觉（LLM 决策流程，无法脚本化）|
 
 ### 自检指令
 
@@ -227,4 +227,4 @@ python {SKILL_DIR}/scripts/settings.py
 
 ---
 ## 版本
-当前版本：**5.19.0** — 钩子系统完整（P0+P1+P2）+ 数据目录规范化 + R-12 合规 + 标准化改造完成
+当前版本：**5.19.1** — 强制约束总表强制级别标注修正
