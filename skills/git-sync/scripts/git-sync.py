@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.9.2 - 完整 Python 版 git-sync
+git-sync.py v2.9.3 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -546,9 +546,17 @@ def step_commit_and_push(skill_name: str, version: str):
         log(6, 8, f"工作仓库不存在: {WORK_REPO}", "err")
         return False, False
 
-    # git config
-    run_git("config", "user.email", "workbuddy@local", check=False)
-    run_git("config", "user.name",  "WorkBuddy",  check=False)
+    # git config — 从 config.json 读取提交者信息
+    import json as _json
+    _cfg_path = Path(__file__).resolve().parent.parent.parent / ".standardization" / "git-sync" / "data" / "config.json"
+    try:
+        _cfg = _json.loads(_cfg_path.read_text(encoding="utf-8"))
+    except Exception:
+        _cfg = {}
+    git_user = _cfg.get("author", "[username-redacted]")
+    git_email = _cfg.get("email", "[email-redacted]")
+    run_git("config", "user.email", git_email, check=False)
+    run_git("config", "user.name",  git_user,  check=False)
 
     # add
     run_git("add", f"skills/{skill_name}/")
@@ -770,7 +778,7 @@ def main():
             pass
     # ────────────────────────────────────────────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="git-sync.py v2.9.2")
+    parser = argparse.ArgumentParser(description="git-sync.py v2.9.3")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
     parser.add_argument("version", nargs="?", default="",

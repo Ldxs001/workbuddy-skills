@@ -1,3 +1,11 @@
+## 2.9.3 (2026-06-09)
+
+### 修复
+- **git commit author 从 config.json 读取**：改为使用 `author` + `email` 字段，不再硬编码 `WorkBuddy <workbuddy@local>`
+- **config.json 新增 `email` 字段**：用于设置 git commit 提交者邮箱
+
+---
+
 ## 2.9.2 (2026-06-09)
 
 ### 修复
