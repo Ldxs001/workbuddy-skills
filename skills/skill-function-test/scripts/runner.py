@@ -24,7 +24,7 @@ STAGES = {
     1: "备份",
     2: "蓝皮书扫描 + 约束提取",
     3: "询问测试计划",
-    4: "场景+功能+S4执行忠实度测试",
+    4: "场景+功能+S4脏环境测试",
     5: "LLM 后处理过滤",
     6: "修复",
     7: "回归循环",
@@ -34,19 +34,8 @@ STAGES = {
     11: "清理",
 }
 
-# 数据目录常量（R-12 合规：skills/.standardization/skill-function-test/data/）
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_SKILL_DIR = os.path.dirname(_SCRIPT_DIR)          # → skills/skill-function-test/
-_SKILLS_ROOT = os.path.dirname(_SKILL_DIR)         # → skills/
-# R-12 审计锚点：DATA_DIR 行直接赋值合规字面量（不可用变量替代 skill name）
-DATA_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data")
-
-def _data_dir_for(skill_dir: str) -> str:
-    """目标技能的数据子目录: skills/.standardization/skill-function-test/data/<target_skill>/"""
-    target_name = os.path.basename(os.path.abspath(skill_dir))
-    d = os.path.join(DATA_DIR, target_name)
-    os.makedirs(d, exist_ok=True)
-    return d
+# 数据目录常量（R-12 合规）
+DATA_DIR = os.path.join(".standardization", "skill-function-test", "data")
 
 # ═══════════════════════════════════════════════════════
 # 流程状态
@@ -130,7 +119,9 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
     print(state.blueprint_text)
 
     # 保存到目标技能目录
-    s4_data_dir = _data_dir_for(state.skill_dir)
+    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+    os.makedirs(s4_data_dir, exist_ok=True)
+
     bp_path = os.path.join(s4_data_dir, ".scenario-test_blueprint.json")
     with open(bp_path, "w", encoding="utf-8") as f:
         json.dump(state.blueprint, f, ensure_ascii=False, indent=2)
@@ -231,7 +222,7 @@ def stage_3_ask(state: PipelineState) -> PipelineState:
 
 
 def stage_4_test(state: PipelineState) -> PipelineState:
-    """阶段4: 执行场景+功能+S4执行忠实度测试（按配置，多轮）"""
+    """阶段4: 执行场景+功能+S4脏环境测试（按配置，多轮）"""
     from scenario_engine import run_scenario_test
     from test_engine import run_full_test as run_function_test
     from s4_engine import load_trace, generate_fidelity_matrix, print_fidelity_matrix, extract_workflow_steps, print_workflow_steps, generate_fidelity_score, print_fidelity_score
@@ -279,11 +270,11 @@ def stage_4_test(state: PipelineState) -> PipelineState:
     else:
         print("  [SKIP] 功能测试维度未启用")
 
-    # S4 执行忠实度测试（多轮）
+    # S4 脏环境测试（多轮）
     s4_enabled = config.get("s4", {}).get("enabled", plan.get("s4_enabled", True))
     if s4_enabled and _has_dim("S4", "10"):
         s4_rounds = config.get("s4", {}).get("rounds", plan.get("s4_rounds", config.get("rounds", 3)))
-        print(f"\n  [RUN] S4 执行忠实度忠实度测试 ({s4_rounds} 轮)...")
+        print(f"\n  [RUN] S4 脏环境忠实度测试 ({s4_rounds} 轮)...")
 
         # 先用 Python 播放器生成随机化噪音脚本
         try:
@@ -307,7 +298,8 @@ def stage_4_test(state: PipelineState) -> PipelineState:
                 pass
 
         all_s4_rounds = []
-        s4_data_dir = _data_dir_for(state.skill_dir)
+        s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+        os.makedirs(s4_data_dir, exist_ok=True)
 
         for r in range(1, s4_rounds + 1):
             print(f"\n  ── S4 第 {r}/{s4_rounds} 轮 ──")
@@ -399,7 +391,7 @@ def stage_4_test(state: PipelineState) -> PipelineState:
             # [强制] S4 已启用但无执行记录 → exit(1) 截断
             # ═══════════════════════════════════════════════
             print(f"\n{'='*55}")
-            print(f"  ⛔ S4 执行忠实度测试已开启，但无噪音执行记录")
+            print(f"  ⛔ S4 脏环境测试已开启，但无噪音执行记录")
             print(f"  🚫 LLM 必须完成以上步骤后再继续")
             print(f"  🚫 执行完毕后重新运行全流程")
             print(f"{'='*55}")
@@ -767,7 +759,7 @@ def stage_11_cleanup(state: PipelineState) -> PipelineState:
     print(f"{'='*50}")
 
     # 1. 清理目标技能目录的测试残留（data 目录中）
-    s4_data_dir = _data_dir_for(state.skill_dir)
+    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
     patterns = [".scenario-test_blueprint.json", ".scenario-test_report.json",
                 ".function-test_blueprint.json", ".function-test_report.json"]
     removed = 0
@@ -785,8 +777,13 @@ def stage_11_cleanup(state: PipelineState) -> PipelineState:
     if len(backups) > 5:
         old = backups[5:]
         for b in old:
+            path = b["path"]
+            import os as _os
             import shutil as _shutil
-            _shutil.rmtree(b["path"], ignore_errors=True)
+            if path.endswith(".zip"):
+                _os.remove(path)
+            else:
+                _shutil.rmtree(path, ignore_errors=True)
             print(f"  [CLEAN] 已删除旧备份: {b['name']}")
 
     print(f"  [CLEAN] 清理完成: 删除 {removed} 个临时文件, "
@@ -817,7 +814,7 @@ def stage_9_report(state: PipelineState) -> PipelineState:
         lines.append(state.function_text[:500])
     if state.s4_matrix_text:
         lines.append("")
-        lines.append("── S4 执行忠实度忠实度 ──")
+        lines.append("── S4 脏环境忠实度 ──")
         lines.append(state.s4_matrix_text)
     if state.s4_score:
         lines.append("")
