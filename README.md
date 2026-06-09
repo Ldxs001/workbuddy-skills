@@ -43,11 +43,7 @@
 workbuddy-skills/
 ├── LICENSE
 ├── README.md
-├── activity-duration-estimation-architecture.md
-├── analysis-toolkit-architecture.md
-├── local-rag-builder-architecture.md
-├── skill-function-test-architecture.md
-├── skill-standardization-architecture.md
+├── architecture/
 └── skills/
 ```
 
