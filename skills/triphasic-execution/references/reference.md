@@ -138,15 +138,24 @@ python {SKILL_DIR}/scripts/problem_logger.py merge-to-lessons
 
 ## 数据目录
 
-| 路径 | 说明 |
-|------|------|
-| `TRIPHASIC_HOME/.problem_logs/problems.jsonl` | 问题日志 |
-| `TRIPHASIC_HOME/.problem_logs/risks.jsonl` | 风险日志 |
-| `TRIPHASIC_HOME/PROBLEMS.md` | 问题清单（人类可读） |
-| `TRIPHASIC_HOME/RISKS.md` | 风险手册 |
-| `TRIPHASIC_HOME/LESSONS_REGISTER.md` | 经验教训登记册 |
-| `TRIPHASIC_HOME/.active_tasks/` | 临时进度文件目录 |
-| `TRIPHASIC_HOME/config.json` | 用户配置 |
+`TRIPHASIC_HOME` 默认指向 `skills/.standardization/triphasic-execution/`。
+
+| 路径 | 说明 | 规范分类 |
+|------|------|---------|
+| `TRIPHASIC_HOME/config.json` | 用户配置 | 根目录 |
+| `TRIPHASIC_HOME/default_config.json` | 默认配置模板 | 根目录 |
+| `TRIPHASIC_HOME/data/active/` | 活跃进度文件 | data/ |
+| `TRIPHASIC_HOME/data/completed/` | 已完成归档 | data/ |
+| `TRIPHASIC_HOME/output/PROBLEMS.md` | 问题清单 | output/ |
+| `TRIPHASIC_HOME/output/RISKS.md` | 风险手册 | output/ |
+| `TRIPHASIC_HOME/output/LESSONS_REGISTER.md` | 经验教训登记册 | output/ |
+| `TRIPHASIC_HOME/logs/problems.jsonl` | 问题日志 | logs/ |
+| `TRIPHASIC_HOME/logs/risks.jsonl` | 风险日志 | logs/ |
+| `TRIPHASIC_HOME/temp/` | 临时文件 | temp/ |
+| `TRIPHASIC_HOME/backup/` | 操作备份 | backup/ |
+| `TRIPHASIC_HOME/cache/` | 缓存 | cache/ |
+| `TRIPHASIC_HOME/state/` | 状态文件 | state/ |
+| `TRIPHASIC_HOME/.exec_output_pipe.txt` | exec 输出管道 | 根目录（运行期标志） |
 
 ---
 

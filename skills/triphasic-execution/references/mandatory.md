@@ -120,7 +120,7 @@
   │   └─ 多步任务（2个以上操作）→ 任务拆分，列出子步骤
   │
   ├─ [MANDATORY] 第三步：创建进度文件（F-03，规划确认后立即执行）
-  │   → 调用 ttask_progress.py init
+  │   → 调用 task_progress.py init
   │
   └─ 第四步：进入 Execute→Review→Advance 循环
 ```
@@ -250,7 +250,7 @@
 
 - **[MANDATORY]** REVIEW 后必须紧跟 ADVANCE，明确：继续 / 换方向 / 结束 / 向上返回
 - **[MANDATORY]** 更新进度追踪表，标记当前步骤状态
-- **[MANDATORY]** 调用 `ttask_progress.py update` 持久化进度（F-07）
+- **[MANDATORY]** 调用 `task_progress.py update` 持久化进度（F-07）
 - 不直接执行，只规划
 - **[v5.16.0 新增]** 成功：根据步骤确定接下来要执行什么，推进执行；**坚决不倒回已画√的步骤**
 - **[v5.16.0 新增]** 失败：根据重试次数明确重试 或 换思路 或 求助
@@ -395,13 +395,13 @@
 ```
 [VIOLATION-01] 收到任务后未输出语义拆分就开始规划或执行
 [VIOLATION-02] 语义拆分后未输出任务规划就开始执行
-[VIOLATION-03] 任务规划确认后未调用 ttask_progress.py init
+[VIOLATION-03] 任务规划确认后未调用 task_progress.py init
 [VIOLATION-04] 每步执行前未重述本步骤任务目的
 [VIOLATION-05] 步骤执行后未输出 REVIEW 就继续执行下一步
 [VIOLATION-06] REVIEW 后未输出 ADVANCE 就继续执行
-[VIOLATION-07] ADVANCE 后未调用 ttask_progress.py update
+[VIOLATION-07] ADVANCE 后未调用 task_progress.py update
 [VIOLATION-08] 同一步骤失败 3 次后仍继续重试而不换方案
-[VIOLATION-09] 任务完成后未调用 ttask_progress.py complete
+[VIOLATION-09] 任务完成后未调用 task_progress.py complete
 [VIOLATION-10] 任务完成后未输出【任务完成】总结
 [VIOLATION-11] [v5.16.0 新增] 同一步骤空转 3 次后未截断并请求触发词输入
 [VIOLATION-12] [v5.16.0 新增] 换思路时三步骤内部直接循环，未走完整三步

@@ -63,12 +63,12 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 **错误做法：**
 ```
-任务规划 → [无 ttask_progress.py init] → 直接执行
+任务规划 → [无 task_progress.py init] → 直接执行
 ```
 
 **正确做法：**
 ```
-任务规划 → ttask_progress.py init → 执行（✅ 遵守 F-03）
+任务规划 → task_progress.py init → 执行（✅ 遵守 F-03）
 ```
 
 ---
@@ -77,12 +77,12 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 **错误做法：**
 ```
-任务执行完 → [无 ttask_progress.py complete] → 结束
+任务执行完 → [无 task_progress.py complete] → 结束
 ```
 
 **正确做法：**
 ```
-任务执行完 → ttask_progress.py complete → 输出总结（✅ 遵守 F-09）
+任务执行完 → task_progress.py complete → 输出总结（✅ 遵守 F-09）
 ```
 
 ---
@@ -161,7 +161,7 @@ EXECUTE → REVIEW（✅/❌/⚠️ + 证据）→ ADVANCE
 
 | 问题 | 原因 | 解决方案 |
 |------|------|----------|
-| `ttask_progress.py update` 报错 | 未执行 `init` | 先执行 `ttask_progress.py init` |
+| `task_progress.py update` 报错 | 未执行 `init` | 先执行 `task_progress.py init` |
 | `complete` 校验失败 | 步骤完成率不足 | 检查哪些步骤未标记为 success |
 | 重试次数超限 | 同一方案失败 3 次 | 换方案，禁止第 4 次重试 |
 | 进度文件丢失 | 误删除或路径错误 | 重新执行 `init`，或手动创建进度文件 |

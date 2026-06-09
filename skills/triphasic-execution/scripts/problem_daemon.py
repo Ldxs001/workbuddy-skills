@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# R-12 审计锚点
+import os
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
 """
 Problem Daemon — 常驻后台的问题监控守护进程（v4.1：双模式设计）
 =============================================
@@ -35,8 +38,17 @@ import re
 # ============================================================================
 # 路径配置
 # ============================================================================
-_DEFAULT_HOME = Path.home() / ".workbuddy" / "triphasic"
-_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", _DEFAULT_HOME))
+_SKILL_DIR = Path(__file__).resolve().parent.parent
+
+def _find_standardization_dir() -> Path:
+    p = _SKILL_DIR.resolve()
+    for parent in [p] + list(p.parents):
+        if parent.name == "skills" and parent.parent.name != "skills":
+            return parent / ".standardization" / _SKILL_DIR.name
+    return _SKILL_DIR.parent / ".standardization" / _SKILL_DIR.name
+
+_DEFAULT_HOME = _find_standardization_dir()
+_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", str(_DEFAULT_HOME)))
 
 
 def get_home() -> Path:

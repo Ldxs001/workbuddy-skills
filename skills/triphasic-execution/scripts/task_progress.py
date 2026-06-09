@@ -1,13 +1,14 @@
+#!/usr/bin/env python3
 # R-12 审计锚点
+import os
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
 _data_dir_abs = os.path.normpath(os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "..", DEFAULT_DATA_DIR_RAW
 ))
 
-#!/usr/bin/env python3
 """
-ttask_progress.py - Triphasic Execution 临时进度文件管理器 (v5.16.0)
+task_progress.py - Triphasic Execution 临时进度文件管理器 (v5.16.0)
 
 功能：
   init        -- 初始化进度文件（任务规划后调用）
@@ -29,14 +30,14 @@ v5.16.0 新增（强制约束，由脚本而非AI自觉执行）：
   - --clear-cache：清除 __pycache__/.pyc 等缓存后验证
 
 使用：
-  python ttask_progress.py init --task "任务名称" --plan "规划内容" [--trigger-word "触发词"]
-  python ttask_progress.py pre_exec --task "任务名称" --step 1 [--files f1.py,f2.py]
-  python ttask_progress.py update --task "任务名称" --step 1 --status success --review "..." --advance "..."
-  python ttask_progress.py update --task "任务名称" --step 1 --idle   # 标记空转+1
-  python ttask_progress.py verify_exec --task "任务名称" --step 1 [--files f1.py,f2.py]
-  python ttask_progress.py complete --task "任务名称"
-  python ttask_progress.py abort --task "任务名称" --reason "..."
-  python ttask_progress.py clean
+  python task_progress.py init --task "任务名称" --plan "规划内容" [--trigger-word "触发词"]
+  python task_progress.py pre_exec --task "任务名称" --step 1 [--files f1.py,f2.py]
+  python task_progress.py update --task "任务名称" --step 1 --status success --review "..." --advance "..."
+  python task_progress.py update --task "任务名称" --step 1 --idle   # 标记空转+1
+  python task_progress.py verify_exec --task "任务名称" --step 1 [--files f1.py,f2.py]
+  python task_progress.py complete --task "任务名称"
+  python task_progress.py abort --task "任务名称" --reason "..."
+  python task_progress.py clean
 """
 
 import os
@@ -47,17 +48,52 @@ import shutil
 import hashlib
 from datetime import datetime
 
-#  路径配置 
-DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".workbuddy", ".standardization", "triphasic-execution")
+# ============================================================================
+# 路径配置 — 统一指向 skills/.standardization/triphasic-execution/
+# ============================================================================
+_SKILL_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+def _find_standardization_dir():
+    """向上找到 skills/ 目录，拼接 .standardization/<skill>/"""
+    p = os.path.normpath(_SKILL_DIR)
+    parts = p.split(os.sep)
+    # 找到 skills/ 目录层级
+    for i in range(len(parts) - 1, -1, -1):
+        if parts[i] == "skills" and (i == 0 or parts[i-1] != "skills"):
+            return os.sep.join(parts[:i+1] + [".standardization", parts[-1]])
+    return os.path.join(_SKILL_DIR, "..", ".standardization", os.path.basename(_SKILL_DIR))
+
+DEFAULT_HOME = _find_standardization_dir()
 TRIPHASIC_HOME = os.environ.get("TRIPHASIC_HOME", DEFAULT_HOME)
 
 
+def load_config():
+    """加载统一配置（靠用户覆盖 default_config.json）"""
+    config_path = os.path.join(TRIPHASIC_HOME, "default_config.json")
+    user_path = os.path.join(TRIPHASIC_HOME, "config.json")
+    merged = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                merged = json.load(f)
+        except Exception:
+            pass
+    if os.path.exists(user_path):
+        try:
+            with open(user_path, "r", encoding="utf-8") as f:
+                user_cfg = json.load(f)
+                merged.update(user_cfg)
+        except Exception:
+            pass
+    return merged
+
+
 def get_active_dir():
-    return os.path.join(TRIPHASIC_HOME, "active")
+    return os.path.join(TRIPHASIC_HOME, "data", "active")
 
 
 def get_completed_dir():
-    return os.path.join(TRIPHASIC_HOME, "completed")
+    return os.path.join(TRIPHASIC_HOME, "data", "completed")
 
 
 def _ensure_dirs():
@@ -437,6 +473,12 @@ def cmd_update(args):
         print("可用步骤: {}".format([s['index'] for s in data['steps']]))
         sys.exit(1)
 
+    #  加载 hooks 配置 
+    config = load_config()
+    hooks = config.get("hooks", {})
+    block_skip_review = hooks.get("block_skip_review", False)
+    auto_idle_cutoff = hooks.get("auto_idle_cutoff", False)
+
     #  处理 --idle（空转计数）
     if args.idle:
         step_found["idle_count"] = step_found.get("idle_count", 0) + 1
@@ -446,12 +488,39 @@ def cmd_update(args):
             json.dump(data, f, ensure_ascii=False, indent=2)
         print("[WARN] 步骤 {} 空转计数: {}/3".format(step_idx, idle_now))
         if idle_now >= 3:
+            if auto_idle_cutoff:
+                # 自动截断：abort 任务
+                data["status"] = "aborted"
+                data["aborted_at"] = datetime.now().isoformat()
+                data["updated_at"] = datetime.now().isoformat()
+                data["abort_reason"] = "步骤 {} 空转 {} 次自动截断（auto_idle_cutoff）".format(step_idx, idle_now)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                completed_dir = get_completed_dir()
+                new_path = os.path.join(completed_dir, os.path.basename(filepath))
+                shutil.move(filepath, new_path)
+                print("[ERROR] F-11 + auto_idle_cutoff：步骤 {} 已空转 {} 次，自动截断任务".format(step_idx, idle_now))
+                print("  任务已中止，进度文件已归档")
+                sys.exit(1)
             trigger = data.get("trigger_word", "继续执行")
             print("[ERROR] F-11 强制：步骤 {} 已空转 {} 次".format(step_idx, idle_now))
             print("  必须截断。请输入触发词「{}」重新激发".format(trigger))
             sys.exit(1)
         # 空转未超限，正常退出（不更新状态）
         return filepath
+
+    #  block_skip_review：检查上一步是否已 REVIEW
+    if block_skip_review and step_idx > 1:
+        prev_step = None
+        for s in data["steps"]:
+            if s["index"] == step_idx - 1:
+                prev_step = s
+                break
+        if prev_step and prev_step["status"] not in ("skipped",):
+            if not prev_step.get("review") or prev_step["review"].strip() == "":
+                print("[ERROR] block_skip_review：步骤 {} 未完成 REVIEW，禁止更新步骤 {}".format(step_idx - 1, step_idx))
+                print("  请先为步骤 {} 执行 update --review \"...\"".format(step_idx - 1))
+                sys.exit(1)
 
     #  处理 --clear-cache 
     if args.clear_cache:
@@ -588,29 +657,63 @@ def cmd_complete(args):
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # 校验：步骤完成率（--force 可跳过）
-    enforce = args.force and not args.no_enforce
-    if enforce:
+    # ── 加载 hooks 配置 ──────────────────────────────────
+    config = load_config()
+    hooks = config.get("hooks", {})
+    require_complete_validation = hooks.get("require_complete_validation", True)
+    auto_idle_cutoff = hooks.get("auto_idle_cutoff", False)
+
+    # 是否跳过校验
+    skip_validation = args.force or not args.enforce
+
+    if not skip_validation and require_complete_validation:
+        # 校验 1：步骤完成率
         incomplete = [s for s in data["steps"] if s["status"] not in ("success", "skipped")]
         if incomplete:
             print(f"[ERROR] 强制校验失败: 还有 {len(incomplete)} 个步骤未完成")
             for s in incomplete:
                 print(f"    - 步骤 {s['index']}: {s['status']} - {s['description']}")
-            print(f"   提示: 使用 --force 跳过步骤检查，或直接完成剩余步骤")
+            print(f"   提示: 使用 --force 跳过步骤检查，或完成剩余步骤")
             sys.exit(1)
 
-    # 校验：记录文件（复杂任务）
-    if data["total_steps"] >= 4:
-        context_dir = TRIPHASIC_HOME
+        # 校验 2：每步必须有 REVIEW 记录
+        no_review = [s for s in data["steps"] if s["status"] in ("success", "skipped") and not s.get("review")]
+        if no_review:
+            print(f"[ERROR] 强制校验失败: {len(no_review)} 个已完成步骤缺少 REVIEW 记录")
+            for s in no_review:
+                print(f"    - 步骤 {s['index']}: {s['description']}")
+            sys.exit(1)
+
+        # 校验 3：空转/重试未超限
+        for s in data["steps"]:
+            if s.get("idle_count", 0) >= 3:
+                print(f"[ERROR] 强制校验失败: 步骤 {s['index']} 空转 {s['idle_count']} 次（已达上限）")
+                sys.exit(1)
+            if s.get("retries", 0) >= 3:
+                print(f"[ERROR] 强制校验失败: 步骤 {s['index']} 重试 {s['retries']} 次（已达上限）")
+                sys.exit(1)
+
+        # 校验 4：记录文件存在（所有任务，不限于 >=4 步骤）
+        context_dir = os.path.join(TRIPHASIC_HOME, "output")
         missing = []
         for fname in ("PROBLEMS.md", "RISKS.md", "LESSONS_REGISTER.md"):
             fpath_check = os.path.join(context_dir, fname)
             if not os.path.exists(fpath_check):
                 missing.append(fname)
-        if missing and enforce:
+        if missing:
             print(f"[ERROR] 强制校验失败: 缺少记录文件 {missing}")
             print(f"   提示: 使用 --no-enforce 关闭记录校验")
             sys.exit(1)
+
+    # ── auto_idle_cutoff 钩子：检查空转超限 ──────────────
+    if auto_idle_cutoff:
+        for s in data["steps"]:
+            if s.get("idle_count", 0) >= 3:
+                print(f"[auto_idle_cutoff] 步骤 {s['index']} 空转超限，自动 complete --abort")
+                data["status"] = "aborted"
+                data["aborted_at"] = datetime.now().isoformat()
+                data["abort_reason"] = f"步骤 {s['index']} 空转 {s['idle_count']} 次自动截断"
+                break
 
     # 标记完成
     data["status"] = "completed"
@@ -733,41 +836,41 @@ def main():
         epilog="""
 示例:
   # 初始化进度文件
-  python ttask_progress.py init --task "修复登录Bug" --purpose "修复Token验证缺失" \\
+  python task_progress.py init --task "修复登录Bug" --purpose "修复Token验证缺失" \\
     --steps '[{"description":"读取代码","purpose":"理解逻辑","tool":"Read"}]'
 
   # 执行前快照（可选，用于 verify_exec 验证）
-  python ttask_progress.py pre_exec --task "修复登录Bug" --step 1 --files "main.py,utils.py"
+  python task_progress.py pre_exec --task "修复登录Bug" --step 1 --files "main.py,utils.py"
 
   # 更新步骤状态
-  python ttask_progress.py update --task "修复登录Bug" --step 1 --status success \\
+  python task_progress.py update --task "修复登录Bug" --step 1 --status success \\
     --review "代码已读取，逻辑清晰" --advance "继续步骤2"
-  python ttask_progress.py update --task "修复登录Bug" --step 2 --status failed \\
+  python task_progress.py update --task "修复登录Bug" --step 2 --status failed \\
     --review "语法错误" --advance "重试" --error "第45行缺少冒号"
 
   # 标记空转（F-11，由AI在EXECUTE阶段未实际执行时调用）
-  python ttask_progress.py update --task "修复登录Bug" --step 2 --idle
+  python task_progress.py update --task "修复登录Bug" --step 2 --idle
 
   # 执行后验证（文件系统级验证）
-  python ttask_progress.py verify_exec --task "修复登录Bug" --step 2 --files "main.py"
+  python task_progress.py verify_exec --task "修复登录Bug" --step 2 --files "main.py"
 
   # 恢复中断任务
-  python ttask_progress.py resume --task "修复登录Bug"
+  python task_progress.py resume --task "修复登录Bug"
 
   # 列出活跃任务
-  python ttask_progress.py list
+  python task_progress.py list
 
   # 完成任务并归档
-  python ttask_progress.py complete --task "修复登录Bug"
+  python task_progress.py complete --task "修复登录Bug"
 
   # 强制完成（跳过步骤检查，仍做记录校验）
-  python ttask_progress.py complete --task "修复登录Bug" --force
+  python task_progress.py complete --task "修复登录Bug" --force
 
   # 中止任务
-  python ttask_progress.py abort --task "修复登录Bug" --reason "用户取消"
+  python task_progress.py abort --task "修复登录Bug" --reason "用户取消"
 
   # 清理已完成任务
-  python ttask_progress.py clean
+  python task_progress.py clean
         """
     )
 

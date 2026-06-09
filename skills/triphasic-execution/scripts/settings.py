@@ -1,10 +1,3 @@
-# R-12 审计锚点
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
-_data_dir_abs = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "..", DEFAULT_DATA_DIR_RAW
-))
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -31,6 +24,13 @@ from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
+# R-12 审计锚点（放在 import 之后，保证 os 已加载）
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
+_data_dir_abs = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "..", DEFAULT_DATA_DIR_RAW
+))
+
 # 全局标志：设置是否完成
 SETTINGS_DONE = False
 SERVER_INSTANCE = None
@@ -49,7 +49,7 @@ def get_skill_dir(args) -> Path:
 
 
 def get_standardization_dir(skill_dir: Path) -> Path:
-    """定位 skills/.standardization/<skill>/data/ 目录"""
+    """定位 skills/.standardization/<skill_name>/data/ 目录"""
     # skill_dir 是技能根目录，如 .../skills/triphasic-execution
     # 向上找 skills/ 目录
     p = skill_dir.resolve()
@@ -178,26 +178,55 @@ def update_skill_md(skill_dir: Path, config: dict):
 def save_config_from_json(skill_dir: Path, home_dir: Path, config_json: str) -> int:
     """
     从 JSON 字符串保存配置（用于对话式设置）
+    与 HTML UI 的 _do_save_config 采用相同的 merge 逻辑：
+    先读现有 config.json（或 default_config.json），再用传入字段覆盖。
     
     Args:
         skill_dir: 技能目录
         home_dir: 数据目录
-        config_json: JSON 字符串，包含配置
+        config_json: JSON 字符串，包含要更新的配置字段
         
     Returns:
         int: 0 表示成功，1 表示失败
     """
     try:
         # 解析 JSON
-        config = json.loads(config_json)
+        updates = json.loads(config_json)
         print(f"   📝 解析配置 JSON 成功")
-        
-        # 确保数据目录存在
-        home_dir = Path(config.get("_triphasic_home", str(home_dir))).expanduser()
-        home_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        # 确定数据目录
+        target_home = Path(updates.get("_triphasic_home", str(home_dir))).expanduser()
+        target_home.mkdir(parents=True, exist_ok=True)
+        config_file = target_home / "config.json"
+
+        # 读取现有配置（与 _do_save_config 一致）
+        if config_file.exists():
+            with open(config_file, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        else:
+            default_file = target_home / "default_config.json"
+            if default_file.exists():
+                with open(default_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            else:
+                config = {}
+
+        # 增量覆盖（只更新传入的字段，保留未传字段）
+        # 特殊处理 mode / triphasic_home / 文件路径
+        for key in ("mode", "triphasic_home", "problems_file", "risks_file", "lessons_file", "logs_dir"):
+            if key in updates:
+                config[key] = updates[key]
+
+        # 特殊处理 hooks（保留未在传入 JSON 中的 hooks 字段）
+        if "hooks" in updates:
+            if "hooks" not in config:
+                config["hooks"] = {}
+            config["hooks"].update(updates["hooks"])
+
+        # 标记已保存
+        config["_saved"] = True
+
         # 写入 config.json
-        config_file = home_dir / "config.json"
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
         print(f"   ✅ 已写入 config.json：{config_file}")
@@ -258,9 +287,18 @@ class SettingsHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Not Found")
 
     def serve_settings_html(self):
-        """返回 settings.html"""
-        html_file = self.server.skill_dir / "assets" / "settings.html"
-        if not html_file.exists():
+        """返回 settings.html — 搜索技能目录 assets/ 及标准化目录"""
+        search_paths = [
+            self.server.skill_dir / "assets" / "settings.html",          # 功能目录（主要）
+            self.server.home_dir.parent / "settings.html",               # standardization 父级
+            self.server.home_dir / "settings.html",                      # standardization/data/
+        ]
+        html_file = None
+        for p in search_paths:
+            if p.exists():
+                html_file = p
+                break
+        if not html_file:
             self.send_error(404, "settings.html not found")
             return
 
@@ -296,6 +334,14 @@ class SettingsHandler(BaseHTTPRequestHandler):
                 "lessons_file": config.get("lessons_file", "LESSONS_REGISTER.md"),
                 "logs_dir": config.get("logs_dir", ".problem_logs"),
                 "require_confirmation": config.get("hooks", {}).get("require_task_confirmation", True),
+                "hooks": config.get("hooks", {
+                    "pre_exec_search": True,
+                    "auto_record_exception": True,
+                    "require_task_confirmation": True,
+                    "require_complete_validation": True,
+                    "auto_idle_cutoff": False,
+                    "block_skip_review": False
+                }),
                 "_saved": config.get("_saved", False)
             }
 
@@ -389,9 +435,17 @@ class SettingsHandler(BaseHTTPRequestHandler):
             config["lessons_file"] = form_data.get("lessons_file", "LESSONS_REGISTER.md")
             config["logs_dir"] = form_data.get("logs_dir", ".problem_logs")
 
-            if "hooks" not in config:
-                config["hooks"] = {}
-            config["hooks"]["require_task_confirmation"] = form_data.get("require_confirmation", True)
+            # 完整 hooks 配置
+            hooks_from_form = form_data.get("hooks", {})
+            if hooks_from_form:
+                if "hooks" not in config:
+                    config["hooks"] = {}
+                config["hooks"].update(hooks_from_form)
+            # 兼容旧版表单提交（只有 require_confirmation）
+            elif "require_confirmation" in form_data:
+                if "hooks" not in config:
+                    config["hooks"] = {}
+                config["hooks"]["require_task_confirmation"] = form_data.get("require_confirmation", True)
 
             # 添加 _saved 标记（让 HTML 轮询检测到）
             config["_saved"] = True

@@ -1,18 +1,20 @@
 ---
 name: triphasic-execution
-version: 5.17.3
+version: 5.19.0
 author: wUwproject
 license: MIT
 description: Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。
 tags: ['framework', 'execution', 'debugging', 'problem-tracking', 'risk-tracking', 'lessons-learned', 'cross-platform', 'configuration', 'config-ui']
 category: workflow
-trigger: 当用户要求执行三步循环框架/规划步骤/执行任务时；当用户需要任务进度管理/问题追踪时
+trigger: ['三步循环', 'Execute', 'Review', 'Advance', '步骤', 'pre_exec', 'verify_exec', 'retry', 'idle']
 trigger_negative: true
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-data_dir: ../.standardization/triphasic-execution/
+data_dir: ../.standardization/triphasic-execution/data/
 external_data_dir: true
+meta_field_sync: true
+h1_position: true
 ---
 # Triphasic Execution Framework
 执行 → 审查 → 推进。每次交互只做一件事，三者缺一不可。
@@ -170,7 +172,8 @@ task_progress.py init → 创建进度文件
 | 3 | `problem_logger.py merge-to-lessons` | 任务完全完成后，合并所有待合并条目到 LESSONS_REGISTER.md |
 
 → 完整用法见下方「快速命令」章节
-→ 数据目录：`~/.workbuddy/.standardization/triphasic-execution/`（符合 R-11/R-12 规范）
+→ 数据目录：`skills/.standardization/triphasic-execution/`（符合 R-11/R-12 规范）
+→ 结构规范：`data/`(进度文件) `output/`(记录文件) `logs/`(日志) `temp/`(临时文件)
 
 → 详细规则、模板、禁止行为清单见 `references/mandatory.md`
 → 完整示例见 `references/examples.md`
@@ -223,7 +226,5 @@ python {SKILL_DIR}/scripts/settings.py
 | | 📄 `faq.md` — 常见问题（Q&A 1~12） |
 
 ---
-
 ## 版本
-
-当前版本：**5.17.1** — v5.17.1：数据目录迁移到 .standardization/triphasic-execution/；cmd_add 同步写 PROBLEMS.md；SKILL.md 新增强制输出协议；task_progress.py complete 路径修正。
+当前版本：**5.19.0** — 钩子系统完整（P0+P1+P2）+ 数据目录规范化 + R-12 合规 + 标准化改造完成

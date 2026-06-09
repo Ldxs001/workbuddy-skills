@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# R-12 审计锚点
+import os
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
 """
 Exec Wrapper — 命令执行拦截器
 ================================
@@ -34,44 +37,73 @@ from pathlib import Path
 from datetime import datetime
 
 # ============================================================================
-# 路径配置
+# 路径配置 — 统一指向 skills/.standardization/triphasic-execution/
 # ============================================================================
-_DEFAULT_HOME = Path.home() / ".workbuddy" / "triphasic"
-_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", _DEFAULT_HOME))
+_SKILL_DIR = Path(__file__).resolve().parent.parent
 
+def _find_standardization_dir() -> Path:
+    p = _SKILL_DIR.resolve()
+    for parent in [p] + list(p.parents):
+        if parent.name == "skills" and parent.parent.name != "skills":
+            return parent / ".standardization" / _SKILL_DIR.name
+    return _SKILL_DIR.parent / ".standardization" / _SKILL_DIR.name
+
+_DEFAULT_HOME = _find_standardization_dir()
+_HOME = Path(os.environ.get("TRIPHASIC_HOME", str(_DEFAULT_HOME)))
 
 def get_home() -> Path:
-    home = _TRIPHASIC_HOME
+    home = _HOME
     home.mkdir(parents=True, exist_ok=True)
     return home
-
 
 def get_exec_pipe() -> Path:
     return get_home() / ".exec_output_pipe.txt"
 
-
 def get_config_file() -> Path:
     return get_home() / "config.json"
 
+def get_default_config() -> Path:
+    return get_home() / "default_config.json"
+
+def get_active_dir() -> Path:
+    return get_home() / "data" / "active"
+
+def get_progress_file(task_name: str):
+    """按任务名称查找活跃进度文件"""
+    active = get_active_dir()
+    if not active.exists():
+        return None
+    for f in active.iterdir():
+        if f.suffix == ".json":
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                if data.get("task_name") == task_name and data.get("status") == "active":
+                    return f
+            except Exception:
+                continue
+    return None
+
 
 def load_config() -> dict:
-    """加载配置"""
-    defaults = {}
-    default_path = Path(__file__).parent.parent / "assets" / "default_config.json"
+    """加载配置 — 优先 default_config.json，再以 config.json 覆盖（用户设置优先）"""
+    merged = {}
+    # 1) 默认配置模板
+    default_path = get_default_config()
     if default_path.exists():
         try:
-            defaults = json.loads(default_path.read_text(encoding="utf-8"))
+            merged = json.loads(default_path.read_text(encoding="utf-8"))
         except Exception:
             pass
 
+    # 2) 用户配置（覆盖默认）
     user_path = get_config_file()
     if user_path.exists():
         try:
             user_cfg = json.loads(user_path.read_text(encoding="utf-8"))
-            defaults.update(user_cfg)
+            merged.update(user_cfg)
         except Exception:
             pass
-    return defaults
+    return merged
 
 
 # ============================================================================
@@ -213,8 +245,8 @@ def main():
 
     # --home 覆盖
     if args.home:
-        global _TRIPHASIC_HOME
-        _TRIPHASIC_HOME = Path(args.home).expanduser().resolve()
+        global _HOME
+        _HOME = Path(args.home).expanduser().resolve()
 
     if not remaining:
         print("用法：python exec_wrapper.py [--home /path] [--no-pipe] \"command\"", file=sys.stderr)
@@ -222,6 +254,48 @@ def main():
 
     command_str = " ".join(remaining)
 
+    # ── Hook: 执行前校验 ────────────────────────────────────
+    config = load_config()
+    hooks = config.get("hooks", {})
+    if hooks.get("pre_exec_search", False):
+        # 尝试从 command 中提取可能关联的任务名称（启发式）
+        # 真正的拦截逻辑：检查是否有活跃进度文件
+        active_dir = get_active_dir()
+        active_tasks = []
+        if active_dir.exists():
+            for f in active_dir.iterdir():
+                if f.suffix == ".json":
+                    try:
+                        data = json.loads(f.read_text(encoding="utf-8"))
+                        if data.get("status") == "active":
+                            active_tasks.append(data)
+                    except Exception:
+                        continue
+        if active_tasks:
+            # 有活跃任务，检查最后一步是否已完成 REVIEW
+            for task in active_tasks:
+                steps = task.get("steps", [])
+                if not steps:
+                    continue
+                # 找最后有 review 记录的步骤
+                last_reviewed = None
+                for s in steps:
+                    if s.get("review"):
+                        last_reviewed = s
+                # 找下一个待执行步骤
+                next_pending = None
+                for s in steps:
+                    if s["status"] in ("pending", "failed"):
+                        next_pending = s
+                        break
+                if next_pending and next_pending.get("index") and (not last_reviewed or last_reviewed["index"] < next_pending["index"]):
+                    print(f"  ⛔ [Hook] 步骤 {next_pending['index']} 待执行但未经 REVIEW，拦截执行")
+                    print(f"    任务: {task['task_name']}")
+                    print(f"    请先完成 REVIEW 再执行命令")
+                    print("=" * 60)
+                    return -10
+
+    # ── 执行命令 ────────────────────────────────────────────
     # 保存当前命令供信号处理器使用
     global _current_command, _current_args
     _current_command = command_str
@@ -243,6 +317,23 @@ def main():
     # 写入管道
     if not args.no_pipe:
         write_to_pipe(command_str, exit_code, stdout, stderr)
+
+    # ── Hook: 失败自动记录 ──────────────────────────────
+    if exit_code != 0 and hooks.get("auto_record_exception", False):
+        problems_file = get_home() / "output" / "PROBLEMS.md"
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        entry = (
+            f"\n## [{timestamp}] 命令执行失败\n\n"
+            f"- **命令**: `{command_str}`\n"
+            f"- **退出码**: {exit_code}\n"
+            f"- **stderr**: {stderr.strip()[:500] if stderr else '(无)'}\n"
+        )
+        try:
+            with open(problems_file, "a", encoding="utf-8") as f:
+                f.write(entry)
+            print(f"\n  📝 [Hook] 已自动记录异常到 PROBLEMS.md", file=sys.stderr)
+        except Exception:
+            pass
 
     # 返回摘要
     status = "✅ 成功" if exit_code == 0 else f"❌ 失败 (exit={exit_code})"

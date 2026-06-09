@@ -1,28 +1,7 @@
-# R-12 审计锚点
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
-_data_dir_abs = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "..", DEFAULT_DATA_DIR_RAW
-))
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Problem Logger — 结构化问题日志管理工具
-========================================
-独立于 Agent 会话，保证问题不丢失。支持 CLI 调用和定时任务触发。
-
-路径配置：
-  1. 环境变量 TRIPHASIC_HOME（最高优先级）
-  2. --home 命令行参数
-  3. 默认值 ~/.workbuddy/triphasic/
-
-用法:
-  python problem_logger.py add --scene "xxx" --symptom "xxx" --cause "xxx" --solution "xxx"
-  python problem_logger.py list [--recent N]
-  python problem_logger.py search "关键词"
-  python problem_logger.py update --id P001 --cause "xxx" --solution "yyy"
-  python problem_logger.py merge-to-lessons
 """
 
 import json
@@ -35,11 +14,27 @@ from pathlib import Path
 from typing import Optional
 import hashlib
 
+# R-12 审计锚点（放在 import 之后）
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
+_data_dir_abs = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "..", DEFAULT_DATA_DIR_RAW
+))
+
 # ============================================================================
-# 路径配置（通用化）
+# 路径配置 — 统一指向 skills/.standardization/triphasic-execution/
 # ============================================================================
-_DEFAULT_HOME = Path.home() / ".workbuddy" / ".standardization" / "triphasic-execution"
-_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", _DEFAULT_HOME))
+_SKILL_DIR = Path(__file__).resolve().parent.parent
+
+def _find_standardization_dir() -> Path:
+    p = _SKILL_DIR.resolve()
+    for parent in [p] + list(p.parents):
+        if parent.name == "skills" and parent.parent.name != "skills":
+            return parent / ".standardization" / _SKILL_DIR.name
+    return _SKILL_DIR.parent / ".standardization" / _SKILL_DIR.name
+
+_DEFAULT_HOME = _find_standardization_dir()
+_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", str(_DEFAULT_HOME)))
 
 
 def get_home() -> Path:
@@ -50,8 +45,8 @@ def get_home() -> Path:
 
 
 def get_logs_dir() -> Path:
-    """获取日志目录"""
-    return get_home() / ".problem_logs"
+    """获取日志目录（规范：logs/）"""
+    return get_home() / "logs"
 
 
 def get_config_file() -> Path:
@@ -65,18 +60,18 @@ def get_problems_jsonl() -> Path:
 
 
 def get_problems_md() -> Path:
-    """获取 PROBLEMS.md 路径"""
-    return get_home() / "PROBLEMS.md"
+    """获取 PROBLEMS.md 路径（规范：output/）"""
+    return get_home() / "output" / "PROBLEMS.md"
 
 
 def get_risks_md() -> Path:
-    """获取 RISKS.md 路径"""
-    return get_home() / "RISKS.md"
+    """获取 RISKS.md 路径（规范：output/）"""
+    return get_home() / "output" / "RISKS.md"
 
 
 def get_lessons_md() -> Path:
-    """获取 LESSONS_REGISTER.md 路径"""
-    return get_home() / "LESSONS_REGISTER.md"
+    """获取 LESSONS_REGISTER.md 路径（规范：output/）"""
+    return get_home() / "output" / "LESSONS_REGISTER.md"
 
 
 def get_risks_jsonl() -> Path:

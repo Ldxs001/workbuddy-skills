@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# R-12 审计锚点
+import os
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/triphasic-execution/data/"
 """
 Lessons Register — 经验教训登记册汇总与优化
 ============================================
@@ -23,8 +26,17 @@ from collections import Counter
 # ============================================================================
 # 路径配置
 # ============================================================================
-_DEFAULT_HOME = Path.home() / ".workbuddy" / "triphasic"
-_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", _DEFAULT_HOME))
+_SKILL_DIR = Path(__file__).resolve().parent.parent
+
+def _find_standardization_dir() -> Path:
+    p = _SKILL_DIR.resolve()
+    for parent in [p] + list(p.parents):
+        if parent.name == "skills" and parent.parent.name != "skills":
+            return parent / ".standardization" / _SKILL_DIR.name
+    return _SKILL_DIR.parent / ".standardization" / _SKILL_DIR.name
+
+_DEFAULT_HOME = _find_standardization_dir()
+_TRIPHASIC_HOME = Path(os.environ.get("TRIPHASIC_HOME", str(_DEFAULT_HOME)))
 
 
 def get_home() -> Path:

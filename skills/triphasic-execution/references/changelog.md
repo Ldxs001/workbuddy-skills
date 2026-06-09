@@ -1,8 +1,68 @@
+## 5.19.0 (2026-06-09)
+
+### 新增
+- **P0/P1/P2 钩子系统**：pre_exec_search（执行前 REVIEW 校验）、require_complete_validation（complete 4 项校验）、auto_idle_cutoff（空转≥3 自动 abort）、block_skip_review（跳过 REVIEW 拦截）
+- **UI 配置支持完整钩子**：settings.html 新增强制纪律区域，6 个 toggle 开关
+- **文本/HTML 配置同步**：save_config_from_json 与 _do_save_config 采用相同 merge 逻辑
+
+### 改进
+- **数据目录规范化**：按 skill-standardization R-12 规范重组标准化目录结构
+  - data/active/、data/completed/、output/、logs/、temp/、backup/、cache/、state/
+- **6 个脚本路径统一**：全部使用 _find_standardization_dir() 计算路径
+- **settings.html 移入 assets/**：功能文件与数据目录分离
+- **R-12 数据目录锚点补全**：cron_helper.py、exec_wrapper.py、lessons_register.py、problem_daemon.py 补充 DEFAULT_DATA_DIR_RAW
+- **R-17 行数合规**：SKILL.md 精简至 230 行
+
+### 修复
+- settings.py R-12 锚点位置错误（import 前引用导致启动失败）
+- problem_logger.py R-12 锚点位置错误（同 settings.py）
+- settings.html 路径搜索修复（三路 fallback）
+- 文档中多处过时路径描述（SKILL.md、reference.md）
+- `ttask_progress.py` 拼写错误（6 个文件中 30+ 处）
+- changelog 过时规则范围 R-01~R-11 → R-01~R-25
+- settings.py 注释占位符 `<skill>` → `<skill_name>`
+- install.py 交互式提示导致测试工具阻塞
+- **三端版本号一致**：SKILL.md / _meta.json / changelog 同步为 5.19.0
+
+---
+
+## 5.18.0 (2026-06-09)
+
+### 改进
+- **数据目录规范化**：按 skill-standardization R-12 规范重组标准化目录结构
+  - data/active/、data/completed/ — 进度文件
+  - output/ — 记录文件（PROBLEMS.md/RISKS.md/LESSONS_REGISTER.md）
+  - logs/ — 日志；temp/ — 临时文件；backup/、cache/、state/ — 按规范预留
+- **6 个脚本路径统一**：problem_logger、problem_daemon、cron_helper、lessons_register、exec_wrapper、task_progress 全部使用 _find_standardization_dir() 计算路径
+- **settings.html 移入 assets/**：功能文件与数据目录分离
+
+### 新增
+- **P2 钩子：auto_idle_cutoff** — 空转≥3 次自动 abort
+- **P2 钩子：block_skip_review** — update 时检查上一步 REVIEW
+
+### 修复
+- settings.py R-12 锚点位置错误（import 前引用导致启动失败）
+- settings.html 路径搜索修复（三路 fallback）
+- 文档中多处过时路径描述（SKILL.md、reference.md）
+- **HTML UI 保存后同步更新 SKILL.md**（_do_save_config 补调 update_skill_md）
+
+---
+
+
+
+## v5.18.2 (2026-06-09) — 自动版本升级
+
+### Changed
+- 版本号 5.18.1 → 5.18.2（`update --fix` 自动 bump）
+## v5.18.1 (2026-06-09) — 自动版本升级
+
+### Changed
+- 版本号 5.18.0 → 5.18.1（`update --fix` 自动 bump）
 ## 5.17.3 (2026-05-31)
 
 ### 修复
-- **R-04**: description 移除版本号
-- **R-06**: H1 移除版本号
+- **R-04**: description 删除版本号
+- **R-06**: H1 删除版本号
 - **R-07**: frontmatter 补全 trigger 字段
 - **R-10**: changelog 版本号去 v 前缀
 - **R-11/R-22**: temp_progress/ 迁移至数据目录
@@ -14,8 +74,8 @@
 ## 5.17.2 (2026-05-30)
 
 ### 修复
-- **R-04**: description 移除版本号
-- **R-06**: H1 移除版本号
+- **R-04**: description 删除版本号
+- **R-06**: H1 删除版本号
 - **R-07**: frontmatter 补全 trigger 字段
 - **R-10**: changelog 版本号去 v 前缀
 - **R-11/R-22**: temp_progress/ 迁移至数据目录
@@ -128,7 +188,7 @@
 **改写类型：skill-standardization 标准化审查**
 
 ### 更新内容
-- 标准化审查通过，无需更新（R-01~R-11 全部合规）
+- 标准化审查通过，无需更新（R-01~R-25 全部合规）
 
 ### 标准化审查结果
 - ERROR=0, WARN=0, PASS=5
