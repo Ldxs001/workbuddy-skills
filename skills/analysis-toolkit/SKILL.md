@@ -1,6 +1,6 @@
 ---
 name: analysis-toolkit
-version: 1.3.1
+version: 1.4.1
 author: wUwproject
 license: MIT
 description: 检验检测行业质量控制和数据分析工具箱。覆盖室内质控、室间比对、批次间比对、方法验证、趋势监控五大场景。方法通用，跨领域适用。
@@ -49,8 +49,6 @@ faq_quality: improve_qa
 - 农产品检测、食品检测（其他技能覆盖）
 
 ## 核心场景
-
-> 📚 **渐进式加载**：本技能采用渐进式MD体系，`SKILL.md`为入口，详细内容拆分到`references/*.md`按需加载。
 
 ### 1️⃣ 室内质控（Internal QC）
 
@@ -214,4 +212,3 @@ lod_loq = method_validation.calc_lod_loq(calibration_data=curve, standard="gbt27
 2. 规划执行步骤
 3. 调用相关工具/脚本
 4. 返回结果给用户
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
