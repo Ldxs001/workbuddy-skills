@@ -435,6 +435,8 @@ class StandardSearchChain:
         搜索 + 自动注册到标准注册表。
 
         当搜索链找到匹配的标准且尚未注册时，自动执行注册。
+        仅当搜索来源权威等级 >= 注册表 MIN_TRUSTED_LEVEL 时才会自动注册，
+        低等级来源需要 user_confirm=True。
 
         Returns
         -------
@@ -449,8 +451,13 @@ class StandardSearchChain:
                 reg = get_registry()
                 existing = reg.get(std_data["standard_id"])
                 if not existing:
-                    reg.register(std_data)
-                    result["auto_registered"] = True
+                    # 将搜索链的 source 等级传给注册表做权威校验
+                    reg_result = reg.register({
+                        **std_data,
+                        "source_level": result["source"],
+                    })
+                    result["auto_registered"] = (reg_result["status"] == "ok")
+                    result["register_result"] = reg_result
                 else:
                     result["auto_registered"] = False
 

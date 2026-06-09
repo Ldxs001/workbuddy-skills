@@ -1,3 +1,14 @@
+## [1.4.0] - 2026-06-09
+
+### 修复
+- F 临界值表系统性错误修复：F(5,4) 5.19→6.26、F(6,14) 2.52→2.85（仅 anova.py），以及 df1=7/8/12/24 整行偏移修正
+- `calculate_lod_loq(method="17417")` 重命名为 `method="gbt27417"`，LOQ 因子 10→9，消除与场景层的不一致（旧名 "17417" 仍兼容传入）
+
+### 新增
+- **权威等级体系**（`registry.py`）：标准注册增加 `source_level` 字段（national/industry/association/literature/tech_doc）
+- **注册门槛控制**：默认阈值 `MIN_TRUSTED_LEVEL = "industry"`，低等级来源需 `user_confirm=True` 才能注册
+- `auto_register_and_search()` 自动携带搜索链的 source 等级进行注册校验
+
 ## [1.3.1] - 2026-06-08
 
 ### 修复

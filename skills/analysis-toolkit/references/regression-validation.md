@@ -78,7 +78,7 @@ result = calculate_lod_loq(cal_data, method="pharmacopoeia")
 
 支持的方法：
 - `"pharmacopoeia"` — 药典法: LOD = 3.3×Sy/x / slope
-- `"17417"` — 国标法: LOD = 3×Sy/x / slope
+- `"gbt27417"` — 国标法: LOD = 3×Sy/x / slope, LOQ = 9×Sy/x / slope
 
 #### `calc_recovery(measured, spiked, blank=0)`
 加标回收率计算。
@@ -108,6 +108,7 @@ result = uncertainty_propagation(cal, sample_response=[7236, 14904],
 | RSD | SD/mean × 100% | 相对标准偏差 |
 | 合成SD | $\sqrt{\frac{\sum(n_i-1)SD_i^2}{\sum n_i - k}}$ | 多组精密度合并 |
 | LOD(药典) | 3.3 × Sy/x / slope | 检出限 |
-| LOD(17417) | 3 × Sy/x / slope | 检出限 |
-| LOQ | 10 × Sy/x / slope | 定量限 |
+| LOD(GB/T 27417) | 3 × Sy/x / slope | 检出限 |
+| LOQ(药典) | 10 × Sy/x / slope | 定量限 |
+| LOQ(GB/T 27417) | 9 × Sy/x / slope | 定量限（= 3 × LOD） |
 | 回收率 | (测得值-空白)/加标量 × 100% | 准确度 |

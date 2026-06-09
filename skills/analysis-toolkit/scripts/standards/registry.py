@@ -60,6 +60,36 @@ import json
 from typing import Optional
 
 # ═══════════════════════════════════════════════════════
+# 权威等级定义
+# ═══════════════════════════════════════════════════════
+
+SOURCE_LEVELS = ["national", "industry", "association", "literature", "tech_doc"]
+"""权威等级（从高到低）
+national     = 国家标准(GB) / 国际标准(ISO)       — 最高权威
+industry     = 行业标准(QC/T, DB等)                — 高权威
+association  = 团体标准(T/xxx)                     — 中等权威
+literature   = 学术文献 / 行业惯例                  — 参考级别
+tech_doc     = 技术文档 / 博客 / 非正式来源          — 最低权威，需人工确认
+"""
+
+
+def assert_source_level(level: str) -> None:
+    """校验 source_level 合法性"""
+    if level not in SOURCE_LEVELS:
+        raise ValueError(
+            f"无效的权威等级: '{level}'。"
+            f"可用: {', '.join(SOURCE_LEVELS)}"
+        )
+
+
+def is_source_trusted(level: str, min_level: str = "industry") -> bool:
+    """判断 source_level 是否达到最低信任阈值"""
+    assert_source_level(level)
+    assert_source_level(min_level)
+    return SOURCE_LEVELS.index(level) <= SOURCE_LEVELS.index(min_level)
+
+
+# ═══════════════════════════════════════════════════════
 # 数据目录（R-12 合规）
 # ═══════════════════════════════════════════════════════
 SKILL_DIR = os.path.normpath(os.path.join(
@@ -108,6 +138,9 @@ class Standard:
 
 class StandardRegistry:
     """标准注册表 — 管理所有已注册的标准"""
+
+    MIN_TRUSTED_LEVEL = "industry"
+    """最低自动信任等级（<=此级别可自动注册，低于此需 user_confirm）"""
 
     def __init__(self, filepath: str = STANDARDS_FILE):
         self._filepath = filepath
@@ -200,8 +233,18 @@ class StandardRegistry:
             "applicable_functions": ["calc_lod_loq"],
             "parameters": {"lod_factor": 3, "loq_factor": 10},
             "formulas": {"lod": "LOD = 3σ/b", "loq": "LOQ = 10σ/b"},
+            "source_level": "national",     # 权威等级：来源可靠性
         })
         ```
+
+        权威等级门槛：达到 "industry" 及以上（national/industry）可自动注册；
+        "association" 及以下需要 user_confirm=True 确认。
+
+        Parameters
+        ----------
+        data : dict
+            标准定义，必含 REQUIRED_FIELDS 定义的字段。
+            可选字段：source_level（默认 "literature"）
 
         Returns
         -------
@@ -211,6 +254,26 @@ class StandardRegistry:
             std = Standard(data)
         except ValueError as e:
             return {"status": "error", "message": str(e), "standard_id": None}
+
+        # 权威等级检查
+        source_level = data.get("source_level", "literature")
+        user_confirm = data.get("user_confirm", False)
+        try:
+            assert_source_level(source_level)
+        except ValueError as e:
+            return {"status": "error", "message": str(e), "standard_id": None}
+
+        trusted = is_source_trusted(source_level, self.MIN_TRUSTED_LEVEL)
+        if not trusted and not user_confirm:
+            return {
+                "status": "warning",
+                "message": (
+                    f"来源权威等级为 '{source_level}'，低于信任阈值 '{self.MIN_TRUSTED_LEVEL}'。\n"
+                    "如需强制注册，请设置 user_confirm=True。\n"
+                    f"建议从更高权威来源（{'/'.join(SOURCE_LEVELS[:SOURCE_LEVELS.index(self.MIN_TRUSTED_LEVEL)+1])}）确认参数后再注册。"
+                ),
+                "standard_id": std.standard_id,
+            }
 
         existing = self._standards.get(std.standard_id)
         if existing:

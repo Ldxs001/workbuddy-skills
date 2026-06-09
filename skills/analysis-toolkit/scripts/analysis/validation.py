@@ -20,7 +20,7 @@ def calculate_lod_loq(calibration_data, method="pharmacopoeia"):
         - "slope": 斜率（可选，不提供则自动计算）
     method : str
         "pharmacopoeia" — 药典法: LOD = 3.3 * Sy/x / slope, LOQ = 10 * Sy/x / slope
-        "17417" — 国标17417法: LOD = 3 * Sy/x / slope, LOQ = 10 * Sy/x / slope
+        "gbt27417" — GB/T 27417: LOD = 3 * Sy/x / slope, LOQ = 9 * Sy/x / slope (= 3 × LOD)
     
     Returns
     -------
@@ -43,16 +43,16 @@ def calculate_lod_loq(calibration_data, method="pharmacopoeia"):
     if method == "pharmacopoeia":
         lod_factor = 3.3
         loq_factor = 10
-    elif method == "17417":
+    elif method in ("gbt27417", "17417"):
         lod_factor = 3
-        loq_factor = 10
+        loq_factor = 9
     else:
         raise ValueError(
             f"不支持的方法: '{method}'。\n"
             "支持的方法：\n"
             "  'pharmacopoeia' — 药典法: LOD = 3.3×Sy/x / slope（默认）\n"
-            "  '17417'         — 国标法: LOD = 3×Sy/x / slope\n"
-            "建议：将 method 参数设为 'pharmacopoeia' 或 '17417'"
+            "  'gbt27417'      — 国标法: LOD = 3×Sy/x / slope, LOQ = 9×Sy/x / slope\n"
+            "建议：将 method 参数设为 'pharmacopoeia' 或 'gbt27417'"
         )
     
     lod = lod_factor * syx / slope if slope != 0 else float('inf')

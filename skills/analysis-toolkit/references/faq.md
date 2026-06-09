@@ -45,7 +45,7 @@
 
 **排查步骤**：
 - `calc_lod_loq()` 的参数是 `standard=`，可选 `"gbt27417"`（默认）或 `"ich"`
-- `calculate_lod_loq()`（scripts/analysis/validation.py）的参数是 `method=`，可选 `"pharmacopoeia"`（默认）或 `"17417"`
+- `calculate_lod_loq()`（scripts/analysis/validation.py）的参数是 `method=`，可选 `"pharmacopoeia"`（默认）或 `"gbt27417"`
 
 **解决**：检查你用的哪个函数，参数名和可选值是否正确
 
