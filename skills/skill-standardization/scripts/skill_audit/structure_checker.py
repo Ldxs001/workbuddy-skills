@@ -745,20 +745,39 @@ def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
     """
     R-21: 渐进式加载显式说明检查 (v2.24.2 固定模板)
     检查 SKILL.md 是否在显眼位置（核心能力/工作流程章节）包含固定模板句。
-    ✅ v2.24.2：固定模板句必须原封不动包含，可后面接其他说明。
+    增强：同时检查全文中是否有多余的重复模板句（仅允许出现 1 次）。
     """
     from .utils import CORE_KEYWORDS, WORKFLOW_KEYWORDS
 
-    # v2.24.2 固定模板句子（所有技能必须原封不动包含此句，可在后面接其他说明）
+    # v2.24.2 固定模板句子
     FIXED_TEMPLATE = "> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。"
 
-    # v2.24.2 硬编码章节名：只检查 ## 核心能力 和 ## 工作流程（不用 CORE_KEYWORDS，避免匹配到 ## 核心概念）
+    # 第一步：统计全文中的模板句出现次数（包括核心能力/工作流程之外的章节）
+    total_count = 0
+    extra_positions = []
+    for i, line in enumerate(body.splitlines()):
+        stripped = line.strip()
+        if stripped.startswith(FIXED_TEMPLATE) or stripped == FIXED_TEMPLATE:
+            total_count += 1
+            if total_count > 1:
+                abs_pos = _abs_line(body, content, i)
+                extra_positions.append(abs_pos)
+
+    # 如果全文有多处重复模板句
+    if total_count > 1:
+        first_pos = extra_positions[0]  # 第二处及以后
+        return {"passed": False,
+                "detail": f"{filepath}:{first_pos} - 发现 {total_count} 处渐进式加载模板句（仅允许唯一 1 处），多余位置：{extra_positions}",
+                "fix": {"key": "progressive_loading_explicit", "value": True,
+                         "location": f"{filepath}:{first_pos}",
+                         "operation": f"删除多余模板句，仅保留 ## 核心能力 章节下的唯一一句（{FIXED_TEMPLATE}）",
+                         "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
+
+    # v2.24.2 硬编码章节名
     prominent_texts = []
-    # 硬编码检查 ## 核心能力
     found, title, section_text, line_no = _section_text(body, ["核心能力", "核心功能", "概述", "Overview", "技能概述"])
     if found:
         prominent_texts.append(("核心能力", title, section_text, line_no))
-    # 硬编码检查 ## 工作流程
     found, title, section_text, line_no = _section_text(body, ["工作流程", "使用方式", "Workflow", "完整执行流程", "核心指令", "完整工作流"])
     if found:
         prominent_texts.append(("工作流程", title, section_text, line_no))
@@ -772,20 +791,18 @@ def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
                          "operation": f"在 ## 核心能力 章节添加固定模板句：{FIXED_TEMPLATE}",
                          "verification": "重新运行 audit_skill()，确认 R-21 passed"}}
 
-    # v2.24.2：直接搜固定模板句子（原封不动，可后面接其他内容）
     for section_name, title, section_text, line_no in prominent_texts:
         abs_line = _abs_line(body, content, line_no - 1)
         for line in section_text.splitlines():
             stripped = line.strip()
             if stripped.startswith(FIXED_TEMPLATE) or stripped == FIXED_TEMPLATE:
                 return {"passed": True,
-                        "detail": f"{filepath}:{abs_line} - 在 ## {title} 章节发现渐进式加载固定模板句"}
+                        "detail": f"{filepath}:{abs_line} - 在 ## {title} 章节发现渐进式加载固定模板句（唯一，共 {total_count} 处）"}
 
-    # 未找到固定模板句
     first_section, first_title, _, first_line_no = prominent_texts[0]
     first_abs_line = _abs_line(body, content, first_line_no - 1)
     return {"passed": False,
-            "detail": f"{filepath}:{first_abs_line} - 在 ## {first_title} 等显眼章节未找到渐进式加载固定模板句",
+            "detail": f"{filepath}:{first_abs_line} - 在 ## {first_title} 等显眼章节未找到渐进式加载固定模板句（全文共 {total_count} 处）",
             "fix": {"key": "progressive_loading_explicit", "value": True,
                      "location": f"{filepath}:{first_abs_line}",
                      "operation": f"在 ## {first_section} 章节添加固定模板句：{FIXED_TEMPLATE}（必须原封不动，可在后面接其他说明）",
