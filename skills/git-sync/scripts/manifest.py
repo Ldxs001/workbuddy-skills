@@ -27,6 +27,19 @@ import re
 from datetime import date
 from pathlib import Path
 
+# ── 编码安全 ─────────────────────────────────────────────
+# Windows Git Bash (GBK) 下 print(emoji) 直接崩，
+# 模块级替换 print 为安全版本，避免挨个改 25+ 处调用。
+import builtins
+_original_print = builtins.print
+def _safe_print(*args, **kwargs):
+    try:
+        _original_print(*args, **kwargs)
+    except UnicodeEncodeError:
+        safe_args = [str(a).encode("ascii", errors="replace").decode("ascii") for a in args]
+        _original_print(*safe_args, **kwargs)
+builtins.print = _safe_print
+
 # R-12 审计锚点：数据目录字面量声明
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
 
@@ -418,11 +431,15 @@ def _generate_readme(skills):
     """全量生成 README.md 内容"""
     today = date.today().isoformat()
 
-    # 从 config.json 读取平台用户名
+    # 从 config.json 读取全部配置
     config = _load_config()
     gitee_user = config.get("gitee", {}).get("user", "your-gitee-username")
     github_user = config.get("github", {}).get("user", "your-github-username")
     repo_name = config.get("gitee", {}).get("repo", "workbuddy-skills")
+    readme_cfg = config.get("readme", {})
+    readme_title = readme_cfg.get("title", "WorkBuddy Skills Repository")
+    readme_desc = readme_cfg.get("description", "本仓库存放 WorkBuddy 用户技能，支持码云（Gitee）和 GitHub 双平台同步。")
+    readme_repo_name = readme_cfg.get("repo_name", "workbuddy-skills")
 
     # 技能列表表格
     table_lines = []
@@ -440,12 +457,12 @@ def _generate_readme(skills):
             tree_lines.append("└── " + skills[-1][0] + "/")
     tree = "\n".join(tree_lines)
 
-    readme = f"""# WorkBuddy Skills Repository
+    readme = f"""# {readme_title}
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：{today}
 
-本仓库存放 WorkBuddy 用户技能，支持码云（Gitee）和 GitHub 双平台同步。
+{readme_desc}
 
 ---
 
@@ -462,7 +479,7 @@ def _generate_readme(skills):
 ## 目录结构
 
 ```
-workbuddy-skills/
+{readme_repo_name}/
 ├── README.md
 ├── LICENSE
 └── skills/

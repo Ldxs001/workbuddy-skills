@@ -1,4 +1,4 @@
-# WorkBuddy Skills Repository
+# Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：2026-06-09

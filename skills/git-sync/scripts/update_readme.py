@@ -50,6 +50,10 @@ def get_clone_urls(config):
         urls['github'] = f"https://github.com/{github_cfg['user']}/{github_cfg['repo']}.git"
     return urls
 
+def get_readme_config(config):
+    """从 config.json 提取 README 文案配置"""
+    return config.get('readme', {})
+
 def extract_desc(skill_dir):
     """从 _meta.json 或 SKILL.md 提取描述"""
     # 优先 _meta.json
@@ -125,19 +129,23 @@ def generate_readme(repo_path, readme_path):
         tree_lines.append(f"└── {root_entries[-1][0]}{root_entries[-1][1]}")
     tree = "\n".join(tree_lines)
 
-    # 读取配置中的 clone URL
+    # 读取配置中的 clone URL 和 README 文案
     config = load_config()
     urls = get_clone_urls(config)
     gitee_url = urls['gitee'] or "https://gitee.com/USER/REPO.git"
     github_url = urls['github'] or "https://github.com/USER/REPO.git"
+    readme_cfg = get_readme_config(config)
+    readme_title = readme_cfg.get('title', 'WorkBuddy Skills Repository')
+    readme_desc = readme_cfg.get('description', '本仓库托管技能合集，码云（Gitee）和 GitHub 双平台同步。')
+    readme_repo_name = readme_cfg.get('repo_name', 'workbuddy-skills')
 
     # 构建新的 README.md
-    new_readme = f"""# WorkBuddy Skills Repository
+    new_readme = f"""# {readme_title}
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：{today}
 
-本仓库托管 [username-redacted] 技能合集，码云（Gitee）和 GitHub 双平台同步。
+{readme_desc}
 
 ---
 
@@ -154,7 +162,7 @@ def generate_readme(repo_path, readme_path):
 ## 目录结构
 
 ```
-workbuddy-skills/
+{readme_repo_name}/
 {tree}
 ```
 

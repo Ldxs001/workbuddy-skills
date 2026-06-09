@@ -1,3 +1,10 @@
+## 2.9.2 (2026-06-09)
+
+### 修复
+- **README 文案从硬编码改为 config.json 驱动**：新增 `readme` 配置段（title/description/repo_name），update_readme.py 和 manifest.py 的 `_generate_readme()` 统一从 config.json 读取
+- **GBK 终端编码崩溃**：manifest.py 和 git-sync.py 模块级替换 `print` 为 `_safe_print`，30+ 处 emoji 输出不再崩
+- **git-sync.py 版本号与 _meta.json 不同步**：v2.6.22/2.6.23 → v2.9.2，对齐主版本
+
 ## 2.9.1 (2026-06-06)
 
 ### 修复

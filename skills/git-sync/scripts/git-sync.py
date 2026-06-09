@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.6.23 - 完整 Python 版 git-sync
+git-sync.py v2.9.2 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -10,6 +10,19 @@ import json
 import shutil
 import subprocess
 import argparse
+import builtins
+
+# ── 编码安全 ─────────────────────────────────────────────
+# Windows Git Bash (GBK) 下 print(emoji) 直接崩，
+# 模块级替换 print 为安全版本，避免挨个改 30+ 处调用。
+_original_print = builtins.print
+def _safe_print(*args, **kwargs):
+    try:
+        _original_print(*args, **kwargs)
+    except UnicodeEncodeError:
+        safe_args = [str(a).encode("ascii", errors="replace").decode("ascii") for a in args]
+        _original_print(*safe_args, **kwargs)
+builtins.print = _safe_print
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -99,11 +112,16 @@ def run_git(*args, workdir=None, check=True):
            "-c", "credential.https://gitee.com.provider=",
            "-c", "credential.https://github.com.provider=",
            *[str(a) for a in args]]
-    return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
-                         capture_output=True, encoding="utf-8",
-                         check=check, env=env, timeout=120,
-                         stdin=subprocess.DEVNULL,
-                         startupinfo=si)
+    try:
+        return subprocess.run(cmd, cwd=str(workdir or WORK_REPO),
+                             capture_output=True, encoding="utf-8",
+                             check=check, env=env, timeout=120,
+                             stdin=subprocess.DEVNULL,
+                             startupinfo=si)
+    except subprocess.TimeoutExpired:
+        ret = subprocess.CompletedProcess(args=cmd, returncode=-1,
+                                          stdout='', stderr='TIMEOUT')
+        return ret
 
 # ── 步骤 1：检查维护清单 ─────────────────────────────────────────────────────
 def step_manifest(skill_name: str, version: str, repo_name="workbuddy-skills"):
@@ -752,7 +770,7 @@ def main():
             pass
     # ────────────────────────────────────────────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="git-sync.py v2.6.22")
+    parser = argparse.ArgumentParser(description="git-sync.py v2.9.2")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
     parser.add_argument("version", nargs="?", default="",
