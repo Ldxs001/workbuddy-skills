@@ -554,4 +554,35 @@ def _is_asset_dir(skill_dir, dir_name):
     except OSError:
         pass
     return False
+
+
+# ────────────────────────────────────────────
+# Frontmatter 序列化辅助（list/bool 安全）
+# ────────────────────────────────────────────
+
+def _fmt_frontmatter_value(v):
+    """
+    将 Python 值序列化为 YAML frontmatter 值字符串。
+    修复 str(list) 通过 repr() 导致反斜杠翻倍的 bug。
+
+    用法：
+        buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
+    """
+    if v is None:
+        return 'null'
+    if isinstance(v, bool):
+        return 'true' if v else 'false'
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, list):
+        items = []
+        for item in v:
+            if isinstance(item, str):
+                items.append(f"'{item}'")
+            elif isinstance(item, bool):
+                items.append('true' if item else 'false')
+            else:
+                items.append(str(item))
+        return f"[{', '.join(items)}]"
+    return str(v)
     

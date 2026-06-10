@@ -63,6 +63,9 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
     # ── 5. [v2.10.0] 标准化路径磁盘验证 ──
     _verify_standardization_paths(skill_dir, violations)
 
+    # ── 6. [v2.3.2] SKILL.md 正文路径冗余扫描 ──
+    _check_body_paths(body, violations)
+
     if violations:
         detail_lines = [f"发现 {len(violations)} 处产出物路径违规："]
         for v in violations:
@@ -806,3 +809,147 @@ def fix_external_data_dir(skill_dir):
                 f.write(content)
 
     return fixed
+
+
+# ────────────────────────────────────────────
+# [v2.3.2] SKILL.md 正文路径冗余扫描（R-11）
+# 铁律 8 细筛说明：输出含 source=SKILL.md:行号,
+# LLM 可据此查看上下文行判断是否为真问题。
+# ────────────────────────────────────────────
+
+_KNOWN_BODY_PATH_PATTERNS = {
+    'output_dir_desc': {
+        'label': '目录描述路径',
+        'desc': '正文中描述了输出/数据/安装等目录路径',
+    },
+    'template_var_path': {
+        'label': '模板变量路径',
+        'desc': '正文裸写了 {XXX} 模板变量路径',
+    },
+    'standardization_path': {
+        'label': '标准化路径重复',
+        'desc': 'skills/.standardization/ 路径已在 _meta.json 声明',
+    },
+    'abs_win_path': {
+        'label': '绝对路径',
+        'desc': '正文包含硬编码绝对路径',
+    },
+}
+
+def _check_body_paths(body, violations):
+    """
+    R-11 阶段6: 扫描 SKILL.md 正文（不含 frontmatter）中的路径描述。
+    
+    设计目标：
+    - 路径信息应由 _meta.json data_dir + frontmatter 统一管理
+    - 正文不应重复描述路径，避免过时/不一致
+    - 代码块内的路径示例（```）豁免
+    - 引用链接（→ 详见）豁免
+    
+    铁律 8 二段筛查指引：
+    ┌──────────────────────────────────────────────┐
+    │ 规则ID: R-11 (body_path)                     │
+    │ FAIL原文: SKILL.md:N行 路径描述               │
+    │ ─────────────────────────────                 │
+    │ LLM判断: 需逐条判断                           │
+    │ 真问题条件:                                  │
+    │   - 该行是正文描述（列表项/段落），非代码块    │
+    │   - 该路径确实已在 _meta.json data_dir 定义   │
+    │ 误判条件:                                    │
+    │   - 路径在代码块内（``` 未正确追踪）           │
+    │   - 该路径引用了外部依赖（如 draw.io 安装路径） │
+    │ 处理方式: 删行 / 移入代码块 / 放过             │
+    └──────────────────────────────────────────────┘
+    """
+    if not body or not body.strip():
+        return
+
+    lines = body.split('\n')
+    in_code_block = False
+
+    path_patterns = [
+        (re.compile(
+            r'(?:输出目录|数据目录|安装目录|安装路径|导入目录|导出目录|缓存目录|临时目录|工作目录)'
+            r'(?:\s*[：:]\s*)(.+?)(?:[。，,；;]|$)'
+        ), 'output_dir_desc'),
+        (re.compile(r'\{[A-Z_]+\}(?:/[^\s,);。，；、]*)*'), 'template_var_path'),
+        (re.compile(r'skills/\.standardization/[^\s,);。，；、:\"]+'), 'standardization_path'),
+        (re.compile(r'[A-Za-z]:\\(?:[^\\\s,\");。，、]+\\)*(?:[^\\\s,\");。，、]+)?'), 'abs_win_path'),
+    ]
+
+    found_items = []
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped.startswith('```'):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+        if not stripped or stripped.startswith('#') or stripped.startswith('---'):
+            continue
+        if stripped.startswith('→') or stripped.startswith('->'):
+            continue
+
+        for pat, pat_name in path_patterns:
+            for m in pat.finditer(stripped):
+                matched = m.group(0).strip()
+                if matched in found_items:
+                    continue
+                found_items.append(matched)
+
+                label = _KNOWN_BODY_PATH_PATTERNS.get(pat_name, {}).get('label', pat_name)
+                desc = _KNOWN_BODY_PATH_PATTERNS.get(pat_name, {}).get('desc', '')
+
+                if pat_name == 'output_dir_desc':
+                    path_val = m.group(1).strip() if m.lastindex and m.lastindex >= 1 else matched
+                    violations.append({
+                        "source": "SKILL.md:" + str(i + 1),
+                        "path_literal": f"[{label}] {matched}",
+                        "suggestion": (
+                            "路径信息应在 _meta.json data_dir + frontmatter 中集中定义，"
+                            "正文不应重复描述。\n"
+                            f"  行内容: {stripped[:120]}\n"
+                            f"  命中路径: {path_val}\n"
+                            "  处理: 删除此行；若为功能描述需要参考路径，改用引用 _meta.json"
+                        ),
+                        "body_path": path_val,
+                    })
+                elif pat_name == 'template_var_path':
+                    violations.append({
+                        "source": "SKILL.md:" + str(i + 1),
+                        "path_literal": f"[{label}] {matched}",
+                        "suggestion": (
+                            f"模板变量路径应置于代码块（```）内，裸写在正文中导致路径信息分散。\n"
+                            f"  行内容: {stripped[:120]}\n"
+                            f"  命中: {matched}\n"
+                            f"  处理: 若为描述性文本，删除路径部分；若为示例，移入代码块"
+                        ),
+                        "body_path": matched,
+                    })
+                elif pat_name == 'standardization_path':
+                    violations.append({
+                        "source": "SKILL.md:" + str(i + 1),
+                        "path_literal": f"[{label}] {matched}",
+                        "suggestion": (
+                            f"skills/.standardization/ 路径已在 _meta.json data_dir 声明，正文重复。\n"
+                            f"  行内容: {stripped[:120]}\n"
+                            f"  命中: {matched}\n"
+                            f"  处理: 删除此行引用"
+                        ),
+                        "body_path": matched,
+                    })
+                elif pat_name == 'abs_win_path':
+                    violations.append({
+                        "source": "SKILL.md:" + str(i + 1),
+                        "path_literal": f"[{label}] {matched}",
+                        "suggestion": (
+                            f"外部依赖的绝对路径（如 draw.io 安装路径）可保留在正文，"
+                            f"但路径字符串建议通过代码常量管理。\n"
+                            f"  行内容: {stripped[:120]}\n"
+                            f"  命中: {matched}\n"
+                            f"  处理: LLM 判断——若是外部依赖引用则放过，若是数据路径则删除"
+                        ),
+                        "body_path": matched,
+                    })

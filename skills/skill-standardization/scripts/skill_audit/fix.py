@@ -18,7 +18,7 @@ import re
 import io
 import json
 
-from .utils import parse_simple_yaml_frontmatter
+from .utils import _fmt_frontmatter_value, parse_simple_yaml_frontmatter
 
 
 # ═══════════════════════════════════════════════════
@@ -32,10 +32,9 @@ def _read_file(filepath):
 
 
 def _write_file(filepath, content):
-    """写入文件内容（UTF-8）"""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(content)
+    """写入文件内容（UTF-8），使用 safe_io 原子写入 + 自动备份"""
+    from ..safe_io import safe_write
+    safe_write(filepath, content, backup=True)
 
 
 def _update_frontmatter_field(filepath, field_name, field_value):
@@ -56,12 +55,7 @@ def _update_frontmatter_field(filepath, field_name, field_value):
     buf = io.StringIO()
     buf.write("---\n")
     for k, v in fm.items():
-        if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
-        elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
-        else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(body)
     _write_file(filepath, buf.getvalue())
@@ -114,12 +108,7 @@ def _add_section_to_body(filepath, section_title, section_body, insert_after=Non
     buf = io.StringIO()
     buf.write("---\n")
     for k, v in fm.items():
-        if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
-        elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
-        else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(new_body)
     _write_file(filepath, buf.getvalue())
@@ -249,12 +238,7 @@ def fix_h1(skill_dir, **kw):
     buf = io.StringIO()
     buf.write("---\n")
     for k, v in fm.items():
-        if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
-        elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
-        else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(new_body)
     _write_file(skill_md, buf.getvalue())
@@ -283,12 +267,7 @@ def fix_h1_version(skill_dir, **kw):
     buf = io.StringIO()
     buf.write("---\n")
     for k, v in fm.items():
-        if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
-        elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
-        else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(new_body)
     _write_file(skill_md, buf.getvalue())
@@ -352,12 +331,7 @@ def fix_h1_position(skill_dir, **kw):
     buf = io.StringIO()
     buf.write("---\n")
     for k, v in fm.items():
-        if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
-        elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
-        else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(new_body)
     _write_file(skill_md, buf.getvalue())
@@ -706,8 +680,8 @@ def fix_artifact_paths(skill_dir, **kw):
                             content = content.replace(old_rel.replace("\\", "/"), 
                                                        new_rel.replace("\\", "/"))
                     if content != original:
-                        with open(fpath, "w", encoding="utf-8") as f:
-                            f.write(content)
+                        from ..safe_io import safe_write
+                        safe_write(fpath, content, backup=True)
                         print(f"  [修正引用] {os.path.relpath(fpath, skill_dir)}")
                         fixed += 1
                 except Exception:
@@ -845,12 +819,7 @@ def fix_progressive_loading(skill_dir, **kw):
         buf = io.StringIO()
         buf.write("---\n")
         for k, v in fm.items():
-            if isinstance(v, bool):
-                buf.write(f"{k}: {'true' if v else 'false'}\n")
-            elif isinstance(v, (int, float)):
-                buf.write(f"{k}: {v}\n")
-            else:
-                buf.write(f"{k}: {v}\n")
+                        buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
         buf.write("---\n")
         buf.write(new_body)
         _write_file(skill_md, buf.getvalue())
@@ -1015,12 +984,7 @@ def fix_progressive_loading_explicit(skill_dir, **kw):
             buf = io.StringIO()
             buf.write("---\n")
             for k, v in fm.items():
-                if isinstance(v, bool):
-                    buf.write(f"{k}: {'true' if v else 'false'}\n")
-                elif isinstance(v, (int, float)):
-                    buf.write(f"{k}: {v}\n")
-                else:
-                    buf.write(f"{k}: {v}\n")
+                    buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
             buf.write("---\n")
             buf.write(fixed_body)
             _write_file(skill_md, buf.getvalue())
@@ -1183,8 +1147,8 @@ def fix_meta_json_completeness(skill_dir, **kw):
             del meta[k]
         print(f'  ✅ 已删除非标字段: {", ".join(extra)}')
 
-    with open(meta_path, 'w', encoding='utf-8') as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    from ..safe_io import safe_write
+    safe_write(meta_path, json.dumps(meta, ensure_ascii=False, indent=2) + '\n', backup=True)
     if fixes > 0:
         print(f'  ✅ _meta.json: 补全 {fixes} 个缺失字段')
     return fixes
@@ -1269,10 +1233,9 @@ def fix_frontmatter_fields(skill_dir, **kw):
 
     new_fm = '\n'.join(fm_lines)
     new_content = content[:m.start(1)] + new_fm + content[m.end(1):]
-    tmp = tempfile.mktemp(suffix='.md', dir=skill_dir)
-    with open(tmp, 'w', encoding='utf-8') as f:
-        f.write(new_content)
-    shutil.move(tmp, skill_md)
+
+    from ..safe_io import safe_write
+    safe_write(skill_md, new_content, backup=True)
     print(f'  [OK] SKILL.md frontmatter: +{", ".join(added)}')
     return len(added)
 
@@ -1493,20 +1456,16 @@ def fix_meta_field_sync(skill_dir, **kw):
             fm['data_dir'] = meta_data_dir_norm
             fixed += 1
 
-    # Write _meta.json
-    with open(meta_path, 'w', encoding='utf-8') as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    # Write _meta.json (uses safe_io via _write_file for SKILL.md below)
+    meta_content = json.dumps(meta, ensure_ascii=False, indent=2) + '\n'
+    from ..safe_io import safe_write
+    safe_write(meta_path, meta_content, backup=True)
 
     # Rebuild and write SKILL.md
     buf = io.StringIO()
     buf.write("---\n")
     for k, v in fm.items():
-        if isinstance(v, bool):
-            buf.write(f"{k}: {'true' if v else 'false'}\n")
-        elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
-        else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(body)
     _write_file(skill_md, buf.getvalue())
@@ -1704,10 +1663,7 @@ def fix_progressive_index_table(skill_dir, **kw):
     # 写回
     new_content = '---\n'
     for k, v in fm.items():
-        if isinstance(v, bool):
-            new_content += f'{k}: {"true" if v else "false"}\n'
-        else:
-            new_content += f'{k}: {v}\n'
+            new_content += f'{k}: {_fmt_frontmatter_value(v)}\n'
     new_content += '---\n' + body.lstrip('\n')
     _write_file(skill_md, new_content)
     
@@ -1826,10 +1782,7 @@ def fix_reclassify_section(skill_dir, **kw):
     # 写回
     new_content = '---\n'
     for k, v in fm.items():
-        if isinstance(v, bool):
-            new_content += f'{k}: {"true" if v else "false"}\n'
-        else:
-            new_content += f'{k}: {v}\n'
+            new_content += f'{k}: {_fmt_frontmatter_value(v)}\n'
     new_content += '---\n' + body.lstrip('\n')
     _write_file(skill_md, new_content)
     
@@ -1995,8 +1948,8 @@ def fix_split_nonstandard(skill_dir, **kw):
 
         # 写 references/ 文件
         ref_content = f"# {title}\n\n{section_content}\n\n*由 fix_split_nonstandard 从 SKILL.md 迁移*"
-        with open(ref_path, 'w', encoding='utf-8') as f:
-            f.write(ref_content)
+        from ..safe_io import safe_write
+        safe_write(ref_path, ref_content, backup=True)
 
         # 在 body 中替换为引用
         full_match = m.group(0)
@@ -2008,7 +1961,7 @@ def fix_split_nonstandard(skill_dir, **kw):
         # 写回 SKILL.md
         new_content = f"---\n"
         for k, v in fm.items():
-            new_content += f"{k}: {v}\n"
+            new_content += f"{k}: {_fmt_frontmatter_value(v)}\n"
         new_content += "---\n"
         new_content += body.lstrip('\n')
         _write_file(skill_md, new_content)
@@ -2087,7 +2040,7 @@ def fix_section_order(skill_dir, **kw):
     # 写回
     new_content = f"---\n"
     for k, v in fm.items():
-        new_content += f"{k}: {v}\n"
+        new_content += f"{k}: {_fmt_frontmatter_value(v)}\n"
     new_content += "---\n"
     new_content += new_body.lstrip('\n')
     _write_file(skill_md, new_content)
@@ -2183,11 +2136,8 @@ def fix_data_dir(skill_dir, **kw):
         return 0  # 已正确
     
     meta["data_dir"] = expected_data_dir
-    import tempfile, shutil
-    tmp = tempfile.mktemp(suffix='.json', dir=os.path.dirname(meta_path))
-    with open(tmp, 'w', encoding='utf-8') as f:
-        _json.dump(meta, f, ensure_ascii=False, indent=2)
-    shutil.move(tmp, meta_path)
+    from ..safe_io import safe_write
+    safe_write(meta_path, json.dumps(meta, ensure_ascii=False, indent=2) + '\n', backup=True)
     return 1
 
 

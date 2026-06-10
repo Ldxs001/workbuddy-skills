@@ -32,7 +32,7 @@ if sys.stderr.encoding and sys.stderr.encoding.upper() not in ('UTF-8', 'UTF8'):
 
 # ── 导入子模块 ─────────────────────────────────────────────
 from .utils import (
-    RULES, TRIGGER_KEYWORDS, CORE_KEYWORDS, WORKFLOW_KEYWORDS,
+    _fmt_frontmatter_value, RULES, TRIGGER_KEYWORDS, CORE_KEYWORDS, WORKFLOW_KEYWORDS,
     ARTIFACT_DIR_NAMES, _KNOWN_STANDARD_DIRS, _ARTIFACT_DIR_CLASSIFY,
     _ARTIFACT_EXTS_COMPREHENSIVE, _ARTIFACT_DIR_PATTERN,
     _ARTIFACT_WRITE_PATTERNS, _HARDCODED_PATH_RE, _PATH_EXCLUDE_RE,
@@ -145,14 +145,15 @@ def _apply_fixes(skill_md, fixes):
             val_str = 'true' if v else 'false'
             buf.write(f"{k}: {val_str}\n")
         elif isinstance(v, (int, float)):
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
         else:
-            buf.write(f"{k}: {v}\n")
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
     buf.write("---\n")
     buf.write(body.lstrip("\n"))
 
-    with open(skill_md, "w", encoding="utf-8") as f:
-        f.write(buf.getvalue())
+    # 使用 safe_io 原子写入 + 自动备份
+    from ..safe_io import safe_write
+    safe_write(skill_md, buf.getvalue(), backup=True)
 
     return applied
 
@@ -536,8 +537,8 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
         with open(meta_path, 'r', encoding='utf-8') as f:
             meta = json.load(f)
         meta['version'] = new_version
-        with open(meta_path, 'w', encoding='utf-8') as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
+        from ..safe_io import safe_write
+        safe_write(meta_path, json.dumps(meta, ensure_ascii=False, indent=2) + '\n', backup=True)
         skill_md = os.path.join(skill_dir, 'SKILL.md')
         with open(skill_md, 'r', encoding='utf-8') as f:
             md_content = f.read()
@@ -546,11 +547,7 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
             rf'\g<1>{new_version}',
             md_content, count=1, flags=re.MULTILINE
         )
-        import tempfile, shutil
-        tmp = tempfile.mktemp(suffix='.md', dir=skill_dir)
-        with open(tmp, 'w', encoding='utf-8') as f:
-            f.write(md_content)
-        shutil.move(tmp, skill_md)
+        safe_write(skill_md, md_content, backup=True)
 
     # 更新 changelog（--fix 模式跳过，由 LLM 根据审计结果动态翻译生成）
     if not skip_changelog:
@@ -563,11 +560,9 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
             cl_old = ''
             os.makedirs(os.path.dirname(cl_path), exist_ok=True)
         new_cl = cl_entry + '\n---\n\n' + cl_old if cl_old else cl_entry
-        import tempfile, shutil
-        tmp = tempfile.mktemp(suffix='.md', dir=os.path.dirname(cl_path) or skill_dir)
-        with open(tmp, 'w', encoding='utf-8') as f:
-            f.write(new_cl)
-        shutil.move(tmp, cl_path)
+        os.makedirs(os.path.dirname(cl_path), exist_ok=True)
+        from ..safe_io import safe_write
+        safe_write(cl_path, new_cl, backup=True)
 
 
 def cmd_audit(args):

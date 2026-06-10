@@ -37,10 +37,8 @@ def write_frontmatter(filepath, fm, body):
             lines.append(f'{k}: {fm[k]}')
     lines.append('---')
     new_content = '\n'.join(lines) + '\n' + body
-    tmp = filepath + '.tmp'
-    with open(tmp, 'w', encoding='utf-8', newline='') as f:
-        f.write(new_content)
-    os.replace(tmp, filepath)
+    from scripts.safe_io import safe_write
+    safe_write(filepath, new_content, backup=True)
 
 def main():
     args = sys.argv[1:]
