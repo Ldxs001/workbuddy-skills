@@ -16,7 +16,7 @@ python scripts/main.py --input "..." --mode custom --repeat-ratio "4:2:7:1"
 # 配置管理
 python scripts/main.py --input "..." --no-confirm   # 跳过本次确认
 python scripts/main.py --input "..." --always        # 永久跳过确认
-python scripts/main.py --input "..." --set-default-mode fair  # 设置默认后处理
+python scripts/main.py --input "..." --set-default-mode fair  # 配置默认后处理
 ```
 
 ## 三要素规则（NTK）
@@ -46,7 +46,7 @@ python scripts/main.py --input "..." --set-default-mode fair  # 设置默认后�
   │ 1=确认执行  2=取消  3=永久跳过确认         │
   │ 后处理: 4=ID排序  5=随机打乱  6=均匀分布    │
   │         7=自定义                            │
-  │ 8=设默认后处理  9=补充修改参数              │
+  │ 8=设默认后处理  9=补充更新参数              │
   └─────────────────────────────────────────────┘
 ```
 
@@ -57,7 +57,7 @@ python scripts/main.py --input "..." --set-default-mode fair  # 设置默认后�
 | **3** | 永久跳过确认 |
 | **4/5/6/7** | 切换后处理并立即执行 |
 | **8** | 设默认后处理（二级菜单） |
-| **9** | 补充/修改参数（自然语言输入） |
+| **9** | 补充/更新参数（自然语言输入） |
 
 ### 缺参数时
 
@@ -74,7 +74,7 @@ python scripts/main.py --input "..." --set-default-mode fair  # 设置默认后�
   当前参数：N=33, T=4
   缺失/可补充：K(方案数), 比例(默认等分)
   ════════════════════════════════════════
-  请输入补充/修改内容：5套方案，比例7:8:10:3:5
+  请输入补充/更新内容：5套方案，比例7:8:10:3:5
   ℹ️  已更新参数
 ```
 
@@ -97,7 +97,7 @@ python scripts/main.py --input "..." --set-default-mode fair  # 设置默认后�
 {"skip_confirm": false, "default_mode": "algorithm"}
 ```
 
-| 字段 | 说明 | 修改方式 |
+| 字段 | 说明 | 更新方式 |
 |------|------|---------|
 | skip_confirm | 是否跳过确认表 | 菜单按 3 或 `--always` |
 | default_mode | 默认后处理模式 | 菜单按 8 或 `--set-default-mode` |

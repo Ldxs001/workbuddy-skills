@@ -3,7 +3,7 @@ name: round-robin-allocator
 author: wUwproject
 data_dir: ../.standardization/round-robin-allocator/
 license: MIT
-version: 1.1.1
+version: 1.1.3
 description: 均匀轮转分配工具 — 将 N 个对象在 T 个轮次中按比例分配 K 种选项，最大化覆盖多样性，支持四种后处理模式调整重复分布。
 tags: ['分配', '轮转', 'round-robin', '覆盖', '后处理', '可视化']
 external_data_dir: true
@@ -12,8 +12,9 @@ critical_write: false
 permission_weight: LOW
 trigger: ['分配', '轮转', '分配算法', 'round-robin', '均匀轮转', '覆盖', '后处理', '配额']
 trigger_negative: ['不分配', '不需要分配', '与其他无关']
+data_dir_compliance: true
 ---
-# 均匀轮转分配工具（Round-Robin Allocator）
+# round-robin-allocator
 
 > 给 N 个「对象」，在 T 个「轮次」中，按比例把 K 种「选项」分配出去，
 > 并让每个对象每轮尽量拿到不同的选项。
@@ -35,13 +36,27 @@ trigger_negative: ['不分配', '不需要分配', '与其他无关']
 |------|------|
 | `references/usage.md` | 详细使用指南（确认表/菜单/后处理/配置/输出） |
 | `references/algorithm.md` | 分配算法与后处理算法说明 |
+| `references/antipatterns.md` | 反模式与常见错误 |
+| `references/faq.md` | FAQ 与排错指导 |
 | `references/changelog.md` | 更新日志 |
 
 ## 使用方式
 
 ### AI 对话
 
-直接告诉 AI：`我有 33 个项目，4 个周期，5 套方案，比例是 7:8:10:3:5`
+**场景 1：标准分配（等分比例）**
+```text
+用户：我有 33 个项目，4 个月，5 套方案，比例是 7:8:10:3:5
+计算报告：已解析参数 N=33, T=4, K=5, 比例=7:8:10:3:5
+结果：输出分配明细表 + 热力图表（含分布统计和 3D 散点图）
+```
+
+**场景 2：均匀分布（避免集中）**
+```text
+用户：12 个学生，6 周，3 个课题，比例 4:4:4，用 fair 模式
+计算报告：已解析参数 N=12, T=6, K=3, 比例=4:4:4, 模式=fair
+输出结果：每周 3 个课题均匀分配，每个学生前两周不重复，热力图显示覆盖平衡
+```
 
 ### 命令行
 
@@ -52,6 +67,16 @@ python scripts/main.py --input "..." --no-confirm
 ```
 
 → 详见 `references/usage.md`
+
+## 限制与边界
+
+| 约束项 | 说明 |
+|--------|------|
+| **输入规模** | 建议 N ≤ 1000 个对象，T ≤ 52 轮，K ≤ 20 种选项。超过可能影响性能 |
+| **比例约束** | 比例之和必须等于 N。不指定比例则默认等分 |
+| **参数缺失** | N/K/T 缺任意一个无法执行，工具不会自动推断 |
+| **运行环境** | 脚本需 Python ≥ 3.8，仅标准库。HTML 可视化依赖 CDN 加载 Chart.js/Plotly.js |
+| **后处理范围** | 后处理只影响分配显示顺序，不影响配额计算的正确性 |
 
 ## 触发场景
 
@@ -66,7 +91,7 @@ python scripts/main.py --input "..." --no-confirm
 
 ## 文件结构
 
-```
+```text
 round-robin-allocator/
 ├── SKILL.md              # 入口文档
 ├── _meta.json            # 元数据
@@ -84,3 +109,7 @@ round-robin-allocator/
 
 - **Python ≥ 3.8**，仅标准库
 - HTML 可视化：Chart.js + Plotly.js（CDN 加载）
+
+> 详见 [反模式](references/antipatterns.md)
+
+> 详见 [FAQ](references/faq.md)
