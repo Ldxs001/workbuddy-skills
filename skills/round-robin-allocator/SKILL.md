@@ -3,7 +3,7 @@ name: round-robin-allocator
 author: wUwproject
 data_dir: ../.standardization/round-robin-allocator/
 license: MIT
-version: 1.1.3
+version: 1.6.0
 description: 均匀轮转分配工具 — 将 N 个对象在 T 个轮次中按比例分配 K 种选项，最大化覆盖多样性，支持四种后处理模式调整重复分布。
 tags: ['分配', '轮转', 'round-robin', '覆盖', '后处理', '可视化']
 external_data_dir: true
@@ -67,15 +67,14 @@ python scripts/main.py --input "..." --no-confirm
 ```
 
 → 详见 `references/usage.md`
-
 ## 限制与边界
 
 | 约束项 | 说明 |
 |--------|------|
-| **输入规模** | 建议 N ≤ 1000 个对象，T ≤ 52 轮，K ≤ 20 种选项。超过可能影响性能 |
+| **输入规模** | 建议 N ≤ 1000 个对象，T ≤ 52 轮，K ≤ 20 种选项。超过会降低性能 |
 | **比例约束** | 比例之和必须等于 N。不指定比例则默认等分 |
 | **参数缺失** | N/K/T 缺任意一个无法执行，工具不会自动推断 |
-| **运行环境** | 脚本需 Python ≥ 3.8，仅标准库。HTML 可视化依赖 CDN 加载 Chart.js/Plotly.js |
+| **运行环境** | 脚本需 Python ≥ 3.8，仅标准库。HTML 可视化图表依赖 CDN（Chart.js + Plotly.js）|
 | **后处理范围** | 后处理只影响分配显示顺序，不影响配额计算的正确性 |
 
 ## 触发场景
@@ -113,3 +112,4 @@ round-robin-allocator/
 > 详见 [反模式](references/antipatterns.md)
 
 > 详见 [FAQ](references/faq.md)
+

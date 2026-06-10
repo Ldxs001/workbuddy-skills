@@ -109,3 +109,4 @@ python scripts/main.py --input "..." --set-default-mode fair  # 配置默认后�
 | allocation_result.md | 分配明细表 + 轮次分布统计 |
 | allocation_result.csv | 仅在询问时按 y 才导出 |
 | allocation_result.html | 热力表格 + 分布图表 + 3D 散点图 |
+
