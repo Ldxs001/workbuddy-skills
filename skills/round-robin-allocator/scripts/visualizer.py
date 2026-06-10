@@ -123,6 +123,22 @@ def render_html(
     cov_counts_json  = json.dumps(bin_counts)
     cov_labels_json  = json.dumps(bin_labels)
 
+    # ── 3D 散点图数据：XYZ 三轴分配空间映射 ──
+    # x=对象ID, y=方案编号, z=轮次, color=该对象的覆盖率
+    trace_x, trace_y, trace_z, trace_c, trace_t = [], [], [], [], []
+    for obj in results:
+        cov = obj["coverage"]
+        for t, opt in enumerate(obj["slots"]):
+            trace_x.append(obj["id"])
+            trace_y.append(opt)
+            trace_z.append(t + 1)
+            trace_c.append(cov)
+            trace_t.append(f"对象{obj['id']} 方案{opt} 轮次{t+1}")
+    trace3d_json = json.dumps({
+        "x": trace_x, "y": trace_y, "z": trace_z,
+        "c": trace_c, "t": trace_t,
+    }, ensure_ascii=False)
+
     # ── 参数摘要卡片 ──
     ratio_str = " : ".join(str(int(r) if r == int(r) else r) for r in ratios)
 
@@ -134,6 +150,7 @@ def render_html(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>均匀轮转分配结果</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js@2.35.2/dist/plotly.min.js"></script>
 <style>
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{
@@ -262,13 +279,23 @@ def render_html(
 <!-- 图表区域 -->
 <div class="charts">
   <div class="chart-card">
-    <h2>📊 各{slot_name}选项分布</h2>
+    <h2>{slot_name}选项分布</h2>
     <canvas id="distChart"></canvas>
   </div>
   <div class="chart-card">
-    <h2>📈 覆盖率分布</h2>
+    <h2>覆盖率分布</h2>
     <canvas id="covChart"></canvas>
   </div>
+</div>
+
+<!-- 3D 空间映射散点图 -->
+<div class="chart-card" style="margin-bottom:28px;">
+  <h2>分配空间映射（XYZ三轴）</h2>
+  <p style="font-size:0.82rem;color:#7F8C8D;margin-bottom:12px;">
+    X=对象ID, Y=方案编号, Z=轮次, 颜色=覆盖率。
+    可拖拽旋转查看分配的三维空间分布。同一X-Y-Z坐标若有重叠点表示同一方案在某对象中多次出现。
+  </p>
+  <div id="scatter3d" style="height:500px;"></div>
 </div>
 
 <footer>由「均匀轮转分配工具」生成 · 纯静态 HTML，无需服务器</footer>
@@ -350,6 +377,33 @@ new Chart(document.getElementById('covChart'), {{
       y: {{ beginAtZero: true, title: {{ display: true, text: '{obj_name}数' }} }}
     }}
   }}
+}});
+
+// ── 3D 散点图（Plotly） ──
+const d3 = {trace3d_json};
+Plotly.newPlot('scatter3d', [{{
+  x: d3.x, y: d3.y, z: d3.z,
+  mode: 'markers',
+  type: 'scatter3d',
+  text: d3.t,
+  hoverinfo: 'text',
+  marker: {{
+    size: 3,
+    color: d3.c,
+    colorscale: [['0.0','#FFF8DC'],['0.5','#FF8C00'],['1.0','#8B0000']],
+    cmin: 0, cmax: 1,
+    colorbar: {{title: '覆盖率', len: 0.6, x: 0.85}},
+    line: {{width: 0}}
+  }}
+}}], {{
+  margin: {{l:40, r:40, b:40, t:20}},
+  scene: {{
+    xaxis: {{title: '{obj_name}ID', dtick: Math.max(1, Math.floor({N}/10))}},
+    yaxis: {{title: '{opt_name}编号', dtick: 1}},
+    zaxis: {{title: '{slot_name}', dtick: 1}}
+  }},
+  paper_bgcolor: '#F5F6FA',
+  plot_bgcolor: '#F5F6FA'
 }});
 </script>
 </body>

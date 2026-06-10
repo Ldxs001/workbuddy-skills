@@ -1,15 +1,9 @@
 {
   "name": "round-robin-allocator",
-  "version": "1.0.1",
-  "description": "将 N 个对象在 T 个轮次中按比例分配 K 种选项，贪心算法确保每个对象尽量每轮获得不同选项。支持自然语言输入、一行统计数据解析、Markdown/CSV/HTML 三种输出。",
+  "version": "1.1.1",
+  "description": "均匀轮转分配工具 — 将 N 个对象在 T 个轮次中按比例分配 K 种选项，最大化覆盖多样性，支持四种后处理模式调整重复分布。",
   "author": "wUwproject",
-  "tags": [
-    "分配",
-    "算法",
-    "可视化",
-    "贪心",
-    "轮转",
-    "allocation",
-    "greedy"
-  ]
+  "tags": ["分配", "轮转", "round-robin", "覆盖", "后处理", "可视化"],
+  "triggers": [],
+  "data_dir": "skills/.standardization/round-robin-allocator/data/"
 }
