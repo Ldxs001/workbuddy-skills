@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.66.0
+version: 2.70.2
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -60,7 +60,7 @@ h1_position: true
 | **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ / scripts/） | 只生成结构模板和占位符，功能代码需要手动填充 |
 | **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码 |
 | **批量审计** | `--audit-all` 参数扫描 skills/ 下多个 skill | 仅支持 skills/ 目录下的一级子目录（不支持嵌套目录） |
-| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 写作规范等格式问题 | 仅修复格式/结构/路径类问题（R-01/R-03/R-11/R-12/R-22），**不修复代码逻辑错误**（R-23 也只检查文件存在性/参数一致性，不验证示例是否能运行） |
+| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 触发词 / 反模式 / FAQ / 写作规范等格式问题，覆盖 R-01~R-25 共 20+ 条规则 | 仅修复格式/结构/路径/生成类问题，**不修复代码逻辑错误**。<br>修复后需运行 `--verify` + `--show-fix` 两阶段验证确认 |
 | **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析，无法检测动态代码执行的权限需求 |
 
 > 触发本技能后立即可见的能力输出：读取目标 SKILL.md 中的 frontmatter/正文/references/scripts → 执行 R-01~R-25 规则审查 → 输出审查报告（含每条规则的 PASS/WARN/FAIL 状态 + 详细原因 + 附近代码上下文）。
@@ -86,12 +86,23 @@ h1_position: true
 ## 工作流程
 
 **audit 模式**（仅审查）：
-1. 读取目标 skill 的 SKILL.md
-2. 执行 R-01~R-25 规则检查
-3. 输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
-4. **LLM 二段筛查**：逐条审查所有 FAIL 项（包含上下文），真问题→修复，误判→直接放过（无需匹配白名单，LLM 的语义判断即是依据）
-5. 若传了 --fix，自动修正可修复项（R-01/R-03/R-11/R-12/R-22 等）
-6. 调用 `fix.py` 按规则 ID 分派自动修复（推荐：审计后自动修复 WARN/ERROR 项）
+1. **语义确认** — 输出模式描述，LLM 确认模式是否正确
+2. 读取目标 skill 的 SKILL.md
+3. 执行 R-01~R-25 规则检查
+4. 输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
+5. **`--fix` 自动修复** — 自动修正可修复项（frontmatter/版本号/数据目录/反模式/FAQ 等 20+ 条规则）
+6. **`--verify` 验证** — 输出编号 FAIL 条目 `[#ID]`，每条含独立问题描述
+7. **`--show-fix ID1,ID2`** — 筛选真问题后获取对应修复指引
+
+→ 修复指引获取：`python -m scripts.skill_audit audit <skill_dir> --show-fix 1,3,4`
+
+**create 模式**（创建新技能）：
+1. **语义确认** — 输出模式描述，LLM 确认模式是否正确
+2. `python -m scripts.skill_audit create <skill_dir> --desc "描述"` — 从模板生成标准骨架（13 字段 frontmatter + _meta.json 7 字段）
+3. AI 或手动填充 TODO 占位符为实际内容
+4. `python -m scripts.skill_audit audit <dir>` 验证合规（0 ERROR 0 WARN）
+5. 按需补充 scripts/ 功能代码 + references/ 渐进式文档
+6. **cleanup 清理** — 操作完成后清除生成过程中的临时文件
 
 **create 模式**（创建新技能）：
 1. `python -m scripts.skill_builder create <name> --desc "描述"` — 从模板生成标准骨架
@@ -105,24 +116,24 @@ h1_position: true
 
 
 > 生成后目录结构：
-> ```
+> ```text
 > <skill-name>/
 > ├── SKILL.md          # 含 frontmatter + TODO 占位符
 > ├── _meta.json        # {name, version, description, author, tags}
 > ├── references/       # 渐进式文档目录（含 .gitkeep）
 > └── scripts/          # 功能代码目录（含 .gitkeep）
-> ```
+> ```text
 **update/refactor 模式**（改造+审查）：
-1. 操作前整体备份（时间戳命名）
-2. **★ 强制 inspect 蓝皮书扫描** — 输出技能结构、AST 函数签名、引用链路
-3. 执行 audit（R-01~R-25）或 refactor 改造步骤
-4. 调用 fix.py 自动修复（规则 ID 分派）
-5. **运行 `audit --verify` 验证**（不设白名单预筛，LLM 自行逐条判断所有 FAIL 项：真问题→修复，误判→放过，修复后重新 `--verify` 直到 exit(0)）
-6. LLM 阅读 `--verify` 输出的 FAIL 项（含上下文），逐条执行二段筛查后进入下一轮或完成
-6. **bump 版本号**（三端同步 SKILL.md / _meta.json / changelog）
-7. **cleanup 清理** — manifest 驱动删除临时文件、过期备份
+1. **语义确认** — 输出模式描述，LLM 确认 refactor/update 选择是否正确
+2. 操作前整体备份（时间戳命名）
+3. **★ 强制 inspect 蓝皮书扫描** — 输出技能结构、AST 函数签名、引用链路
+4. 执行 audit（R-01~R-25）
+5. **`--fix` 自动修复** — 自动修正可修复项
+6. **`--verify` 验证** — 输出编号 FAIL 条目，阻断式（exit(1) 阻止跳步）
+7. **bump 版本号**（三端同步 SKILL.md / _meta.json / changelog）— bump 前置 0 ERROR 0 WARN 检查，未修复完禁止升级
+8. **cleanup 清理** — manifest 驱动删除临时文件、过期备份
 
-> 两阶段检查协议、排错止损规则、临时文件与备份管理 → 详见 ### 渐进式文件索引 的 `references/guide.md`
+> 两阶段检查协议、排错止损规则、临时文件与备份管理 → 详见 ### 渐进式文件索引
 
 ## 数据目录说明
 

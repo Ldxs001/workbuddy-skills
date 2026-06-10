@@ -408,10 +408,10 @@ def _expand_fail_entries(remaining):
 
 
 def _reclassify_false_positive(res):
-    """检测已知误报模式，仅用于报告格式化时标记 ⓘ 排除标记。
+    """检测已知误报模式，用于标记 ⓘ 排除标记 + bump 铁律过滤。
     
-    注意：--verify 模式已关闭白名单预筛，LLM 需要逐条审查所有 FAIL 项。
-    此函数仅用于报告显示时的视觉标记（ⓘ），不影响 exit code 和 LLM 决策。
+    bump 前置检查使用此函数过滤已知误报，避免被无法修复的标准项阻断。
+    --verify 模式仍全部展示，由 LLM 最终判断。
     """
     detail = str(res.get("detail", ""))
     rule = res.get("rule_id", "")
@@ -443,6 +443,12 @@ def _reclassify_false_positive(res):
         return True
     # 使用示例中的占位符路径（如 my_package 等通用占位符名）
     if 'my_package' in detail:
+        return True
+    # data_dir frontmatter 路径被误判为文件引用（如 skills/.standardization/xxx）
+    if rule == "R-23" and "skills/.stan" in detail:
+        return True
+    # R-25 C-14：工作流步骤完整性提醒（所有 skill 都有，标准项）
+    if rule == "R-25" and "由全报告LLM精筛确认步骤是否完整覆盖" in detail:
         return True
     return False
 
@@ -663,6 +669,7 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
 
 def cmd_audit(args):
     """审查单个 skill 目录"""
+    _semantic_precheck('audit', getattr(args, 'skill_dir', None))
     # 强制 UTF-8 输出（Windows 终端兼容）
     if hasattr(sys.stdout, "reconfigure"):
         try:
@@ -698,6 +705,57 @@ def cmd_audit(args):
                 print(f"  [#{rid}] (未找到对应修复指引)")
         if not found_any:
             print(f"  (无有效修复指引，请确认 ID 正确或重新运行 --verify)")
+        print(f"{'='*55}")
+        sys.exit(0)
+
+    # ── --classify 模式：将指定 #ID 标记为误判，后续 bump 自动跳过 ──
+    if getattr(args, 'classify', None) and not getattr(args, 'verify', False):
+        ids = [s.strip() for s in args.classify.split(',')]
+        verify_dir = os.path.join(
+            os.path.dirname(skill_dir), '.standardization',
+            os.path.basename(skill_dir), 'data')
+        fp_path = os.path.join(verify_dir, '.verify_fp.json')
+        # 读取已有分类
+        fp_ids = set()
+        if os.path.isfile(fp_path):
+            try:
+                import json as _json
+                fp_ids = set(_json.load(open(fp_path, 'r', encoding='utf-8')))
+            except Exception:
+                pass
+        fp_ids.update(ids)
+        os.makedirs(verify_dir, exist_ok=True)
+        import json as _json2
+        with open(fp_path, 'w', encoding='utf-8') as f:
+            _json2.dump(sorted(fp_ids), f, ensure_ascii=False, indent=2)
+        print(f"\n{'='*55}")
+        print(f"  [CLASSIFY] 已标记 {len(ids)} 个 #ID 为误判：{', '.join(ids)}")
+        print(f"  当前误判列表：{', '.join(sorted(fp_ids))}")
+        print(f"{'='*55}")
+        sys.exit(0)
+
+    # ── --no-fp 模式：从误判列表中移除指定 #ID ──
+    if getattr(args, 'no_fp', None) and not getattr(args, 'verify', False):
+        ids = [s.strip() for s in args.no_fp.split(',')]
+        verify_dir = os.path.join(
+            os.path.dirname(skill_dir), '.standardization',
+            os.path.basename(skill_dir), 'data')
+        fp_path = os.path.join(verify_dir, '.verify_fp.json')
+        fp_ids = set()
+        if os.path.isfile(fp_path):
+            try:
+                import json as _json
+                fp_ids = set(_json.load(open(fp_path, 'r', encoding='utf-8')))
+            except Exception:
+                pass
+        fp_ids.difference_update(ids)
+        import json as _json2
+        os.makedirs(verify_dir, exist_ok=True)
+        with open(fp_path, 'w', encoding='utf-8') as f:
+            _json2.dump(sorted(fp_ids), f, ensure_ascii=False, indent=2)
+        print(f"\n{'='*55}")
+        print(f"  [NO-FP] 已取消 {len(ids)} 个 #ID 的误判标记：{', '.join(ids)}")
+        print(f"  当前误判列表：{', '.join(sorted(fp_ids))}")
         print(f"{'='*55}")
         sys.exit(0)
 
@@ -805,9 +863,15 @@ def cmd_audit(args):
             if not res.get("passed") and not res.get("skipped"):
                 remaining.append(res)
         if remaining:
+            # 读取已有误判分类
+            fp_ids = _load_fp_ids(skill_dir)
+
             print(f"\n{'='*55}")
             print(f"  [VERIFY v1] {len(remaining)} 项 FAIL 待筛选，逐条判断真问题/误判")
+            if fp_ids:
+                print(f"  已分类为误判的 #ID：{', '.join(sorted(fp_ids))}")
             print(f"  确认真问题后记下 #ID，运行 --show-fix ID1,ID2 获取修复指引")
+            print(f"  #ID 为误判则运行：audit <skill_dir> --classify ID1,ID2")
             print(f"{'─'*55}")
 
             # 展开为带 ID 的条目，每条有问题描述 + 对应修复指引
@@ -837,7 +901,8 @@ def cmd_audit(args):
                 pass  # 写不进去不影响主流程
 
             print(f"{'─'*55}")
-            print(f"  确认真问题后运行： audit <skill_dir> --show-fix ID1,ID2,ID3")
+            print(f"  确认真问题 → audit <skill_dir> --show-fix ID1,ID2,ID3")
+            print(f"  确认为误判 → audit <skill_dir> --classify ID1,ID2")
             print(f"{'='*55}")
         else:
             print(f"\n{'='*55}")
@@ -923,7 +988,7 @@ def cmd_fix(args):
 
     if not keys:
         # 列出所有可用的 fix key
-        print("可用修复 key（对应审计规则 R-01~R-23）:")
+        print("可用修复 key（对应审计规则 R-01~R-25）:")
         for k in list_fixable():
             print(f"  {k}")
         print("\n用法: python -m skill_audit fix <skill_dir> --key <key> [--dry-run]")
@@ -957,6 +1022,20 @@ def cmd_fix(args):
         print(format_report(result))
 
 
+def _load_fp_ids(skill_dir):
+    """读取 LLM 分类的误判 #ID 列表"""
+    fp_path = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'data', '.verify_fp.json')
+    if os.path.isfile(fp_path):
+        try:
+            import json
+            return set(json.load(open(fp_path, 'r', encoding='utf-8')))
+        except Exception:
+            pass
+    return set()
+
+
 def cmd_bump(args):
     """bump 子命令：一键升级技能版本号三端（遵循 R-03 语义规则）"""
     import os, json, datetime
@@ -965,6 +1044,25 @@ def cmd_bump(args):
     dry_run = getattr(args, 'dry_run', False)
     bump_type = getattr(args, 'type', None)
     desc = getattr(args, 'desc', '')
+
+    # ── 铁律 0 ERROR 0 WARN 前置检查（阻断式） ──
+    # 应用 _reclassify_false_positive 过滤已知误报（R-25 C-14 等标准项）
+    if not dry_run:
+        pre_result = audit_skill(skill_dir)
+        remaining = [r for r in pre_result.get("results", [])
+                     if not r.get("passed") and not r.get("skipped")
+                     and not _reclassify_false_positive(r)]
+        if remaining:
+            print(f"\n{'='*55}")
+            print(f"  ⛔ 铁律阻断：{len(remaining)} 项 FAIL 未处理，拒绝 bump")
+            print(f"  请先修复以下问题后再试（运行 audit <skill> --verify 查看）：")
+            for r in remaining[:5]:
+                sev = "[ERROR]" if r['severity'] == 'ERROR' else "[WARN]"
+                print(f"    {r['rule_id']} {sev} {r['detail'][:100]}")
+            if len(remaining) > 5:
+                print(f"    ...等 {len(remaining)} 项")
+            print(f"{'='*55}")
+            sys.exit(1)
 
     # 未指定 --type 时显示规则并提示
     if bump_type is None:
@@ -1017,10 +1115,354 @@ def cmd_bump(args):
     print(f"  changelog.md:   ✅ 已插入 v{new_version} 条目")
 
 
+def _semantic_precheck(command, skill_dir=None):
+    """
+    语义前置检查（代码强制，非 LLM 自觉）。
+    在进入 create/update/refactor/audit 之前输出模式描述和适用范围，
+    让 LLM 有机会在正式执行前确认模式选择是否正确。
+    """
+    modes = {
+        'audit': '仅审查，不修改。适用于查看技能合规状态、检查 FAIL 项',
+        'refactor': '全流程改造。蓝图扫描 → 备份 → 审计 → 修复 → 验证 → bump → cleanup',
+        'create': '创建新技能。骨架生成 → 审计 → 报告',
+        'update': '轻量更新。审计 → 修复 → 验证 → bump（无蓝图/备份）',
+        'bump': '版本号升级（三端同步）。由 refactor/update 内部调用',
+    }
+    desc = modes.get(command, '')
+    print(f"\n{'='*55}")
+    print(f"  🧠 语义确认：{command} 模式")
+    if desc:
+        print(f"  适用范围：{desc}")
+    if skill_dir:
+        print(f"  目标技能：{os.path.basename(skill_dir)}")
+    print(f"  确认无误后继续执行，模式不匹配请中止后重新选择")
+    print(f"{'='*55}")
+
+
+def cmd_refactor(args):
+    """
+    refactor 子命令：强制全流程改造（蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 版本升级 → 清理）
+    每一步用 exit code 阻断，LLM 无法跳步。
+    """
+    _semantic_precheck('refactor', getattr(args, 'skill_dir', None))
+    import shutil, datetime
+
+    skill_dir = os.path.abspath(args.skill_dir)
+    bump_type = getattr(args, 'bump_type', 'feature')
+    bump_desc = getattr(args, 'desc', '')
+
+    print(f"\n{'='*55}")
+    print(f"  ⚙️  [refactor] 全流程改造：{os.path.basename(skill_dir)}")
+    print(f"{'='*55}")
+
+    # ── 步骤 1：蓝皮书扫描（强制） ──
+    print(f"\n{'─'*55}")
+    print(f"  [1/7] 蓝皮书前置扫描")
+    print(f"{'─'*55}")
+    try:
+        from ..skill_inspector import inspect_skill
+        inspect_skill(skill_dir)
+    except ImportError:
+        try:
+            from scripts.skill_inspector import inspect_skill
+            inspect_skill(skill_dir)
+        except ImportError:
+            print("  [WARN] 未找到 skill_inspector，跳过蓝皮书扫描")
+
+    # ── 步骤 2：备份（强制） ──
+    print(f"\n{'─'*55}")
+    print(f"  [2/7] 创建备份")
+    print(f"{'─'*55}")
+    backup_dir = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'backup',
+        datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+    os.makedirs(backup_dir, exist_ok=True)
+    for item in os.listdir(skill_dir):
+        if item.startswith('.'):
+            continue
+        s = os.path.join(skill_dir, item)
+        d = os.path.join(backup_dir, item)
+        if os.path.isdir(s):
+            shutil.copytree(s, d, ignore=shutil.ignore_patterns('__pycache__', '.git'))
+        else:
+            shutil.copy2(s, d)
+    print(f"  ✅ 备份到 {backup_dir}")
+
+    # ── 步骤 3：审计（强制） ──
+    print(f"\n{'─'*55}")
+    print(f"  [3/7] 全量审计")
+    print(f"{'─'*55}")
+    result = audit_skill(skill_dir, manifest_version=args.manifest_version)
+    print(format_report(result))
+
+    # 检查是否有 FAIL
+    remaining = [r for r in result.get("results", [])
+                 if not r.get("passed") and not r.get("skipped")]
+    if not remaining:
+        print(f"\n  ✅ 审计 0 FAIL，跳过修复步骤")
+    else:
+        # ── 步骤 4：自动修复（如果存在可修复项） ──
+        has_fixable = any(r.get("fix") for r in remaining)
+        if has_fixable:
+            print(f"\n{'─'*55}")
+            print(f"  [4/7] 自动修复")
+            print(f"{'─'*55}")
+            for res in result.get("results", []):
+                if not res.get("passed") and res.get("fix"):
+                    fix_key = res["fix"].get("key")
+                    if fix_key:
+                        try:
+                            n = apply_fix(skill_dir, fix_key, **res["fix"])
+                            if n > 0:
+                                print(f"  ✅ {res['rule_id']}: 已修复")
+                        except Exception as e:
+                            print(f"  ⚠️  {res['rule_id']} 自动修复失败: {e}")
+
+            # 修复后重新审计
+            result = audit_skill(skill_dir)
+            print(format_report(result))
+            remaining = [r for r in result.get("results", [])
+                         if not r.get("passed") and not r.get("skipped")]
+
+        # ── 步骤 5：验证（阻断式） ──
+        print(f"\n{'─'*55}")
+        print(f"  [5/7] 铁律验证 --verify")
+        print(f"{'─'*55}")
+        if remaining:
+            print(f"  ⛔ {len(remaining)} 项 FAIL 待处理（LLM 逐条筛查后修复）")
+            for r in remaining:
+                sev = "[ERROR]" if r['severity'] == 'ERROR' else "[WARN]"
+                print(f"    {r['rule_id']} {sev} {r['detail'][:120]}")
+            print(f"\n  💡 处理完后再执行 refactor --continue 继续")
+            # 保存进度文件供 --continue 使用
+            _save_refactor_progress(skill_dir, step=5, remaining=remaining,
+                                    bump_type=bump_type, desc=bump_desc)
+            sys.exit(1)
+        else:
+            print(f"  ✅ 0 FAIL，验证通过")
+
+    # ── 步骤 6：版本升级（三端同步） ──
+    print(f"\n{'─'*55}")
+    print(f"  [6/7] 版本升级（{bump_type}）")
+    print(f"{'─'*55}")
+    # 生成 bump args
+    bump_args = argparse.Namespace(
+        skill_dir=skill_dir,
+        type=bump_type,
+        desc=bump_desc or f'refactor: {os.path.basename(skill_dir)}',
+        dry_run=False)
+    cmd_bump(bump_args)
+
+    # ── 步骤 7：清理 ──
+    print(f"\n{'─'*55}")
+    print(f"  [7/7] cleanup 清理")
+    print(f"{'─'*55}")
+    try:
+        from scripts.cleanup_manager import run_cleanup
+        run_cleanup(skill_dir)
+        print(f"  ✅ cleanup 完成")
+    except ImportError:
+        print(f"  ⚠️  未找到 cleanup_manager，跳过")
+
+    print(f"\n{'='*55}")
+    print(f"  ✅ refactor 全流程完成：{os.path.basename(skill_dir)}")
+    print(f"{'='*55}")
+
+
+def _save_refactor_progress(skill_dir, step, remaining=None, bump_type='feature', desc=''):
+    """保存 refactor 进度，供 --continue 恢复"""
+    import json
+    progress = {
+        'step': step,
+        'remaining': [{'rule_id': r['rule_id'], 'detail': r['detail'][:200],
+                        'severity': r['severity']} for r in (remaining or [])],
+        'bump_type': bump_type,
+        'desc': desc,
+    }
+    progress_dir = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'data')
+    os.makedirs(progress_dir, exist_ok=True)
+    with open(os.path.join(progress_dir, '.refactor_progress.json'), 'w', encoding='utf-8') as f:
+        json.dump(progress, f, ensure_ascii=False, indent=2)
+
+
+def cmd_create(args):
+    """
+    create 子命令：全流程创建新技能
+    骨架生成 → 审计 → 报告
+    """
+    _semantic_precheck('create', getattr(args, 'skill_dir', None))
+    skill_dir = os.path.abspath(args.skill_dir)
+    skill_name = os.path.basename(skill_dir)
+    desc = getattr(args, 'desc', '')
+
+    print(f"\n{'='*55}")
+    print(f"  🆕 [create] 创建技能：{skill_name}")
+    print(f"{'='*55}")
+
+    # ── 步骤 1：生成骨架 ──
+    print(f"\n{'─'*55}")
+    print(f"  [1/3] 生成标准骨架")
+    print(f"{'─'*55}")
+    try:
+        from scripts.skill_builder import create_skill
+        create_skill(skill_name, skill_dir, desc)
+        print(f"  ✅ 骨架已生成：{skill_dir}")
+    except ImportError:
+        # fallback: 手动生成最小骨架
+        os.makedirs(skill_dir, exist_ok=True)
+        os.makedirs(os.path.join(skill_dir, 'references'), exist_ok=True)
+        os.makedirs(os.path.join(skill_dir, 'scripts'), exist_ok=True)
+        # 生成 SKILL.md
+        skel_skill = f"""---
+name: {skill_name}
+author: your-name-here
+license: MIT
+version: 1.0.0
+description: {desc or skill_name}
+tags: []
+trigger: []
+trigger_negative: []
+sensitive_access: false
+critical_write: false
+permission_weight: LOW
+data_dir: ../.standardization/{skill_name}/
+external_data_dir: true
+---
+
+# {skill_name}
+
+## 触发条件
+
+**正向触发**：
+
+**否定条件**：
+
+## 核心能力
+
+## 使用方式
+
+## 工作流程
+"""
+        with open(os.path.join(skill_dir, 'SKILL.md'), 'w', encoding='utf-8') as f:
+            f.write(skel_skill)
+        # 生成 _meta.json
+        import json
+        with open(os.path.join(skill_dir, '_meta.json'), 'w', encoding='utf-8') as f:
+            json.dump({
+                'name': skill_name, 'version': '1.0.0',
+                'description': desc or skill_name, 'author': 'your-name-here',
+                'tags': [], 'data_dir': f'skills/.standardization/{skill_name}/data/',
+                'triggers': []
+            }, f, ensure_ascii=False, indent=2)
+        # 生成 .gitkeep
+        for d in ('references', 'scripts'):
+            open(os.path.join(skill_dir, d, '.gitkeep'), 'w').close()
+        print(f"  ✅ 最小骨架已生成：{skill_dir}")
+
+    # ── 步骤 2：审计 ──
+    print(f"\n{'─'*55}")
+    print(f"  [2/3] 审计检查")
+    print(f"{'─'*55}")
+    result = audit_skill(skill_dir)
+    print(format_report(result))
+
+    # ── 步骤 3：报告与建议 ──
+    print(f"\n{'─'*55}")
+    print(f"  [3/3] 创建总结")
+    print(f"{'─'*55}")
+    remaining = [r for r in result.get("results", [])
+                 if not r.get("passed") and not r.get("skipped")]
+    if remaining:
+        print(f"  ⚠️  审计发现 {len(remaining)} 项 FAIL，完成骨架填充后运行 refactor 修复")
+    else:
+        print(f"  ✅ 骨架通过审计，可直接使用")
+
+    print(f"\n{'='*55}")
+    print(f"  ✅ 创建完成：{skill_name}")
+    print(f"{'='*55}")
+
+
+def cmd_update(args):
+    """
+    update 子命令：轻量更新流程
+    审计 → 修复 → 验证 → bump
+    （相比 refactor，省略蓝皮书扫描和备份）
+    """
+    _semantic_precheck('update', getattr(args, 'skill_dir', None))
+    skill_dir = os.path.abspath(args.skill_dir)
+    bump_type = getattr(args, 'bump_type', 'fix')
+    bump_desc = getattr(args, 'desc', '')
+
+    print(f"\n{'='*55}")
+    print(f"  🔄 [update] 更新技能：{os.path.basename(skill_dir)}")
+    print(f"{'='*55}")
+
+    # ── 步骤 1：审计 ──
+    print(f"\n{'─'*55}")
+    print(f"  [1/4] 全量审计")
+    print(f"{'─'*55}")
+    result = audit_skill(skill_dir)
+    print(format_report(result))
+    remaining = [r for r in result.get("results", [])
+                 if not r.get("passed") and not r.get("skipped")]
+
+    if remaining:
+        # ── 步骤 2：固定 ──
+        has_fixable = any(r.get("fix") for r in remaining)
+        if has_fixable:
+            print(f"\n{'─'*55}")
+            print(f"  [2/4] 自动修复")
+            print(f"{'─'*55}")
+            for res in result.get("results", []):
+                if not res.get("passed") and res.get("fix"):
+                    fix_key = res["fix"].get("key")
+                    if fix_key:
+                        try:
+                            n = apply_fix(skill_dir, fix_key, **res["fix"])
+                            if n > 0:
+                                print(f"  ✅ {res['rule_id']}: 已修复")
+                        except Exception:
+                            pass
+            result = audit_skill(skill_dir)
+            print(format_report(result))
+            remaining = [r for r in result.get("results", [])
+                         if not r.get("passed") and not r.get("skipped")]
+
+        # ── 步骤 3：验证 ──
+        print(f"\n{'─'*55}")
+        print(f"  [3/4] 铁律验证")
+        print(f"{'─'*55}")
+        if remaining:
+            print(f"  ⛔ {len(remaining)} 项 FAIL 待手动处理：")
+            for r in remaining:
+                sev = "[ERROR]" if r['severity'] == 'ERROR' else "[WARN]"
+                print(f"    {r['rule_id']} {sev} {r['detail'][:120]}")
+            sys.exit(1)
+        else:
+            print(f"  ✅ 验证通过")
+
+    # ── 步骤 4：版本升级 ──
+    print(f"\n{'─'*55}")
+    print(f"  [{'3/4' if not remaining else '4/4'}] 版本升级（{bump_type}）")
+    print(f"{'─'*55}")
+    bump_args = argparse.Namespace(
+        skill_dir=skill_dir, type=bump_type,
+        desc=bump_desc or f'update: {os.path.basename(skill_dir)}',
+        dry_run=False)
+    cmd_bump(bump_args)
+
+    print(f"\n{'='*55}")
+    print(f"  ✅ update 完成：{os.path.basename(skill_dir)}")
+    print(f"{'='*55}")
+
+
 def main():
     """主入口函数"""
     parser = argparse.ArgumentParser(
-    description="SKILL.md 规范化审查工具 (R-01~R-23)",
+    description="SKILL.md 规范化审查工具 (R-01~R-25)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
@@ -1041,6 +1483,8 @@ def main():
     p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
     p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
     p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
+    p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（逗号分隔，如 2,5），后续 bump 自动跳过")
+    p_audit.add_argument("--no-fp", metavar="IDS", help="将指定 #ID 从误判列表中移除（取消分类）")
 
     # audit-all 子命令
     p_all = subparsers.add_parser("audit-all", help="批量审查所有 skill")
@@ -1077,6 +1521,32 @@ def main():
     p_bump.add_argument("--desc", required=True, help="本次变更描述（将写入 changelog）")
     p_bump.add_argument("--dry-run", action="store_true", help="仅预览，不实际修改")
 
+    # refactor 子命令（v2.66.0 新增）
+    p_refactor = subparsers.add_parser("refactor",
+        help="全流程改造：蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 版本升级 → 清理")
+    p_refactor.add_argument("skill_dir", help="skill 目录路径")
+    p_refactor.add_argument("--bump-type", choices=["fix", "feature", "breaking"], default="feature",
+                            help="版本升级类型（默认 feature）")
+    p_refactor.add_argument("--desc", default="", help="变更描述（将写入 changelog）")
+    p_refactor.add_argument("--manifest-version", metavar="VER",
+                            help="manifest 中记录的版本号（用于 R-10）")
+    p_refactor.add_argument("--continue", dest="refactor_continue", action="store_true",
+                            help="从上一次中断处继续")
+
+    # create 子命令（v2.66.0 新增）
+    p_create = subparsers.add_parser("create", help="全流程创建新技能：骨架生成 → 审计 → 报告")
+    p_create.add_argument("skill_dir", help="技能目录路径（目录名将作为技能名）")
+    p_create.add_argument("--desc", default="", help="技能描述")
+
+    # update 子命令（v2.66.0 新增）
+    p_update = subparsers.add_parser("update", help="轻量更新：审计 → 修复 → 验证 → bump")
+    p_update.add_argument("skill_dir", help="skill 目录路径")
+    p_update.add_argument("--bump-type", choices=["fix", "feature", "breaking"], default="fix",
+                          help="版本升级类型（默认 fix）")
+    p_update.add_argument("--desc", default="", help="变更描述（将写入 changelog）")
+    p_update.add_argument("--manifest-version", metavar="VER",
+                          help="manifest 中记录的版本号（用于 R-10）")
+
     args = parser.parse_args()
 
     if args.command == "audit":
@@ -1089,6 +1559,12 @@ def main():
         cmd_fix(args)
     elif args.command == "bump":
         cmd_bump(args)
+    elif args.command == "refactor":
+        cmd_refactor(args)
+    elif args.command == "create":
+        cmd_create(args)
+    elif args.command == "update":
+        cmd_update(args)
     elif args.command in ("create-template", "template"):
         if hasattr(args, "json") and args.json:
             import json
