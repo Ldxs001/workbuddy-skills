@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.65.0
+version: 2.65.5
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -20,7 +20,7 @@ h1_position: true
 ## 约束
 
 - **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 `scripts/` 下的 Python 脚本原子写入
-- **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `references/changelog.md`
+- **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `CHANGELOG.md`
 - **0 ERROR 0 WARN 铁律强制** — 更新后用 `audit --verify` 验证，非误报项必须全部修复，exit(0) 方可提交
 - **`--fix` 自动修正后** — 将 fix_details 转化为可读 changelog 并用 safe_io 写入
 
@@ -68,10 +68,6 @@ h1_position: true
 ## 核心能力
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
-
-
-
-
 
 ### 渐进式文件索引
 
@@ -126,8 +122,7 @@ h1_position: true
 6. **bump 版本号**（三端同步 SKILL.md / _meta.json / changelog）
 7. **cleanup 清理** — manifest 驱动删除临时文件、过期备份
 
-> 两阶段检查协议、排错止损规则 → 详见 `references/guide.md`
-> 临时文件与备份管理 → 详见 `references/guide.md` 的 cleanup 章节
+> 两阶段检查协议、排错止损规则、临时文件与备份管理 → 详见 ### 渐进式文件索引 的 `references/guide.md`
 
 ## 数据目录说明
 

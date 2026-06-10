@@ -113,9 +113,10 @@ def check_data_dir_compliance(skill_dir=None, auto_fix=False, verbose=False, **k
 
     # 扫描安装目录，找数据类文件
     for root, dirs, files in os.walk(skill_dir):
-        # 跳过 scripts/ 和 references/
+        # 跳过 scripts/、references/ 和 .standardization/（标准化数据目录）
         rel_root = os.path.relpath(root, skill_dir)
-        if rel_root.startswith("scripts") or rel_root.startswith("references"):
+        if (rel_root.startswith("scripts") or rel_root.startswith("references")
+            or rel_root == ".standardization" or rel_root.startswith(".standardization\\") or rel_root.startswith(".standardization/")):
             continue
         # 跳过被脚本引用的功能数据目录（R-11 同款交叉引用检查）
         rel_parts = rel_root.replace("\\", "/").split("/")
@@ -160,7 +161,7 @@ def check_data_dir_compliance(skill_dir=None, auto_fix=False, verbose=False, **k
     return passed, issues, fixable
 
 
-def fix_data_dir_compliance(skill_dir, fixable_list, dry_run=False):
+def fix_data_dir_compliance(skill_dir, fixable_list, dry_run=False, **kw):
     """
     自动修复 R-22 违规：迁移文件到数据目录
     """

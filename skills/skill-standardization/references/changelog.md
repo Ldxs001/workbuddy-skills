@@ -1,3 +1,67 @@
+## [2.65.5] - 2026-06-10
+
+### 修复
+- 自审计修复C-10/C-15/C-17
+
+---
+
+## 2.65.4 (2026-06-10)
+
+### 修复
+- **移除所有 `.workbuddy` 依赖** — fix_map 路径从 `<skill>/.workbuddy/` 改为标准化数据目录 `<skill>/.standardization/<skill>/data/`。技能不再绑定 WorkBuddy 平台
+- **`--verify` 输出版本化** — 输出头改为 `[VERIFY v1]`，`--show-fix` 改为 `[SHOW-FIX v1]`。格式固定后 LLM 解析稳定，版本号变更时 LLM 能感知
+- **`--show-fix` 空结果防护** — 所有指定 ID 均未找到时输出明确提示，避免 LLM 误判
+- **data_dir_checker 修复** — 移除 `.workbuddy` 白名单，改为跳过 `.standardization/` 目录（标准化数据目录，跨平台）
+- **R-22: `.standardization/` 目录跳过** — 原有的 scripts/references 跳过逻辑新增 `.standardization/`，修复变更不再触发 R-22 违规
+
+### 影响
+- `__init__.py`：fix_map 路径 + 输出格式版本化
+- `data_dir_checker.py`：`.workbuddy` → `.standardization` 跳过
+
+---
+## 2.65.3 (2026-06-10)
+
+### 修复
+- **P0c: `--verify` 1:1 问题→修复映射** — 每条 FAIL 展开为独立可编号条目（含 R-25 子项拆分），每个 `#ID` 有独立的 problem 和 fix 字段。筛选时只看 problem，确认真问题后用 `--show-fix ID1,ID2` 获取对应修复指引，不需扫描整个报告
+- **新增 `--show-fix` 参数** — 接收逗号分隔 ID 列表，仅输出指定条目的修复指引
+- **数据目录白名单扩充** — `.workbuddy/` 加入 data_dir_checker 跳过列表，避免 `--verify` 写入的 fix_map.json 被 R-22 标记为违规
+
+### 影响
+- `__init__.py`：`_expand_fail_entries()` + `--show-fix` 处理 + 两段式 --verify 输出
+- `data_dir_checker.py`：`.workbuddy` 加入 whitelist 和 os.walk 跳过
+
+---
+## 2.65.2 (2026-06-10)
+
+### 修复
+- **P0: `--verify` detail 截断** — `detail[:200]` 改为不截断，ctx_lines 从 4→10 行、120→200 字，LLM 铁律 8 能读到完整修复指引
+- **P0b: `--verify` 两段式输出** — 铁律 8 明确分为两段：(1) 只看问题描述判断真/误判；(2) 真问题对照 full report 修复。修复指引（`→ LLM执行：`、`💡 建议修正：`）从 verify 输出中剥离，LLM 筛选时不浪费 token
+- **P1: 12 个 fix key 不匹配** — 补全 structure_checker、permission_checks、frontmatter_checker 发出的全部缺失 fix key 映射到 fix.py dispatch：
+  - `trigger_quality`/`trigger_negative`/`trigger_danger` → `fix_section_trigger`
+  - `antipattern_count`/`antipattern_detail` → `fix_antipattern_progressive`
+  - `faq_unparsable`/`faq_quality` → `fix_faq_progressive`
+  - `changelog_progressive` → `fix_progressive_loading_explicit`
+  - `create_references_permissions_md`/`fix_permissions_md_readable`/`add_risk_description` → `fix_create_permissions_md`
+  - `frontmatter` → `fix_frontmatter_fields`
+- **P2: R-22 data_dir_checker 修复丢失** — data_dir_checker 返回 `(passed, details, fixable_list)` 元组，__init__.py 转换时为 list→dict 兼容处理；`fix_data_dir_compliance` 加 `**kw` 兼容 dispatch 透传参数
+
+### 影响
+- `__init__.py`：verify 输出不截断 + data_dir 元组转换
+- `fix.py`：dispatch 表 +12 映射
+- `data_dir_checker.py`：函数签名加 `**kw`
+
+---
+## 2.65.1 (2026-06-10)
+
+### 修复
+- **Bug: R-18/R-19 fix key 不匹配** — structure_checker.py 返回 `antipattern_reference`/`faq_reference`，但 fix.py dispatch 仅有 `antipattern_progressive`/`faq_progressive`，导致 `--fix` 静默失败。已补入缺失的 4 个 dispatch 映射
+- **Bug: R-25 C-17/C-18/C-19 质量子检查无强制力** — 此前子检查 WARN 仅注记在 detail 文本中，不影响 R-25 `passed` 状态。升级为：C-17/C-18/C-19 质量问题触发 `passed=False`，进入铁律 9 验证管道，无 fix key（由 LLM 铁律 8 细筛手动修复）
+
+### 影响
+- `fix.py`：dispatch 表 +4 映射
+- `structure_checker.py`：C-17/C-18/C-19 质量检查升级为规则级 FAIL
+
+---
 ## 2.64.1 (2026-06-09)
 
 ### 修复

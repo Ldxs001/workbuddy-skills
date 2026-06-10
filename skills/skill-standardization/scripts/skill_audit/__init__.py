@@ -221,6 +221,9 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
             # 将 tuple 转为 dict 以便后续处理
             detail = result[1] if len(result) > 1 else ""
             fix = result[2] if len(result) > 2 and isinstance(result[2], dict) else None
+            # data_dir_checker 返回 (passed, details, fixable_list)，fixable 为 list
+            if fix is None and len(result) > 2 and isinstance(result[2], list) and len(result[2]) > 0:
+                fix = {"key": "data_dir_compliance", "fixable_list": result[2], "value": True}
             result = {"passed": passed, "detail": detail, "fix": fix}
         else:
             passed = False
@@ -309,6 +312,99 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
         except Exception as e:
             print(f"[!] 更新 .progress.md 失败: {e}", file=sys.stderr)
     return r
+
+
+def _expand_fail_entries(remaining):
+    """
+    将 FAIL 项展开为颗粒度一致的可编号条目。
+    每条包含独立 ID、规则 ID、严重度、问题描述、修复指引、上下文行。
+
+    特别处理 R-25：将 WARN(N) 中的 C-XX 子项展开为独立条目，
+    每个子项带有自己的问题描述和对应的 → LLM执行：修复指引。
+    非 R-25 规则保持原样输出。
+    """
+    entries = []
+    eid = 0
+    # 匹配 C-XX 子项：C-07, C-10, C-11... 及其内容和修复指引
+    # 子项之间以 ; 分隔。部分子项有 C-XX 前缀，部分无前缀（续前项）
+    # 格式示例：C-10: xxx; C-17: yyy → LLM执行：zzz; 【续】www → LLM执行：vvv
+    sub_pattern = re.compile(
+        r'(?:'
+        r'(C-\d+):\s*(.*?)(?:\s*→\s*LLM执行[：:]([^;]*))?'
+        r'|'
+        r';\s*(【[^】]+】.*?)(?:\s*→\s*LLM执行[：:]([^;]*))?'
+        r')'
+        r'(?=;\s*(?:C-\d|【)|\s*C-\d|$)'
+    )
+
+    for res in remaining:
+        rid = res.get('rule_id', '')
+        detail = res.get('detail', '')
+        sev = res.get('severity', 'WARN')
+        ctx = res.get('ctx_lines', [])
+
+        if rid == 'R-25':
+            # 从 detail 中提取 WARN(N) 块
+            warn_match = re.search(r'🟡\s*WARN\(\d+\):\s*(.+)', detail)
+            if warn_match:
+                sub_text = warn_match.group(1)
+                # 逐个匹配子项（含 C-XX 前缀项和无前缀续项）
+                last_cid = None  # 记录最近 C-XX，给续项用
+                for sm in sub_pattern.finditer(sub_text):
+                    eid += 1
+                    c_id = sm.group(1)       # 如 "C-17"，续项为 None
+                    if c_id:
+                        last_cid = c_id
+                        problem = sm.group(2).strip()
+                        fix = sm.group(3)
+                    else:
+                        # 续项：无 C-XX 前缀，使用最近一个 C-XX + 序号
+                        suffix = chr(ord('a') + [m.group(1) for m in sub_pattern.finditer(sub_text[:sm.start()])].count(None))
+                        c_id = f'{last_cid}{suffix}'
+                        problem = sm.group(4).strip()
+                        fix = sm.group(5)
+                    if fix:
+                        fix = fix.strip()
+                    else:
+                        fix = ''
+                    entries.append({
+                        'id': str(eid),
+                        'rule_id': f'R-25 ({c_id})',
+                        'severity': sev,
+                        'problem': f'{c_id}: {problem}',
+                        'fix': f'R-25 ({c_id}): {problem} → LLM执行：{fix}' if fix else '',
+                        'ctx_lines': ctx,
+                    })
+            else:
+                # fallback: 无法解析 WARN 格式，整条输出
+                eid += 1
+                detail_clean = re.sub(r'\s*→\s*LLM执行[：:][^;]*', '', detail)
+                entries.append({
+                    'id': str(eid),
+                    'rule_id': rid,
+                    'severity': sev,
+                    'problem': detail_clean,
+                    'fix': detail,
+                    'ctx_lines': ctx,
+                })
+        else:
+            # 非 R-25：整条规则作为一个条目
+            eid += 1
+            # 分离问题描述和修复指引
+            detail_clean = re.sub(r'\s*→\s*LLM执行[：:][^;]*', '', detail)
+            detail_clean = re.sub(r'\s*💡\s*建议修正[：:].*', '', detail_clean)
+            # 提取修复指引（💡 建议修正 或 → LLM执行：）
+            fix = detail
+            entries.append({
+                'id': str(eid),
+                'rule_id': rid,
+                'severity': sev,
+                'problem': detail_clean.strip(),
+                'fix': fix,
+                'ctx_lines': ctx,
+            })
+
+    return entries
 
 
 def _reclassify_false_positive(res):
@@ -578,6 +674,33 @@ def cmd_audit(args):
         print(f"[X] 目录不存在: {skill_dir}", file=sys.stderr)
         sys.exit(1)
 
+    # 纯 --show-fix 模式：跳过审计，直接读取 fix_map 输出修复指引
+    if getattr(args, 'show_fix', None) and not getattr(args, 'verify', False):
+        fix_map_path = os.path.join(
+            os.path.dirname(skill_dir), '.standardization',
+            os.path.basename(skill_dir), 'data', '.verify_fix_map.json')
+        if not os.path.isfile(fix_map_path):
+            print(f"[ERROR] 未找到 fix_map 文件（{fix_map_path}），请先运行 --verify")
+            sys.exit(1)
+        with open(fix_map_path, 'r', encoding='utf-8') as f:
+            fix_map = json.load(f)
+        ids = [s.strip() for s in args.show_fix.split(',')]
+        print(f"\n{'='*55}")
+        print(f"  [SHOW-FIX v1] 展示 {len(ids)} 条修复指引")
+        print(f"{'─'*55}")
+        found_any = False
+        for rid in ids:
+            fix_text = fix_map.get(rid)
+            if fix_text:
+                print(f"  [#{rid}] {fix_text}")
+                found_any = True
+            else:
+                print(f"  [#{rid}] (未找到对应修复指引)")
+        if not found_any:
+            print(f"  (无有效修复指引，请确认 ID 正确或重新运行 --verify)")
+        print(f"{'='*55}")
+        sys.exit(0)
+
     # ═══════════════════════════════════════════════════════
     # [强制钩子 1] 蓝皮书前置扫描 — audit 执行前输出技能全貌
     # ═══════════════════════════════════════════════════════
@@ -675,6 +798,7 @@ def cmd_audit(args):
             sys.exit(1)
 
     # --verify 模式：展示所有 FAIL 项（不做白名单预筛），LLM 自行判断误报
+    # 铁律 8 分两阶段：(1) 筛选看到的问题 → (2) 凭ID获取对应修复指引
     if getattr(args, 'verify', False):
         remaining = []
         for res in result.get("results", []):
@@ -682,21 +806,47 @@ def cmd_audit(args):
                 remaining.append(res)
         if remaining:
             print(f"\n{'='*55}")
-            print(f"  [VERIFY] 审计完成，共 {len(remaining)} 项 FAIL（白名单预筛已关闭，LLM 必须逐条审查）")
-            print(f"  LLM 执行铁律 8：真问题→修复，误判→放过，修复后重新 --verify")
+            print(f"  [VERIFY v1] {len(remaining)} 项 FAIL 待筛选，逐条判断真问题/误判")
+            print(f"  确认真问题后记下 #ID，运行 --show-fix ID1,ID2 获取修复指引")
             print(f"{'─'*55}")
-            for r in remaining:
-                sev = "[ERROR]" if r['severity'] == 'ERROR' else "[WARN]"
-                print(f"  {r['rule_id']} {sev} {r['detail'][:200]}")
-                if r.get('ctx_lines'):
-                    for cl in r['ctx_lines'][:4]:
-                        print(f"      {cl[:120]}")
+
+            # 展开为带 ID 的条目，每条有问题描述 + 对应修复指引
+            entries = _expand_fail_entries(remaining)
+            fix_map = {}  # id → fix_suggestion
+
+            for e in entries:
+                eid = e['id']
+                sev = "[ERROR]" if e['severity'] == 'ERROR' else "[WARN]"
+                # 输出 [ID] 规则 + 问题描述（不带修复指引）
+                print(f"  [#{eid}] {e['rule_id']} {sev} {e['problem']}")
+                if e.get('ctx_lines'):
+                    for cl in e['ctx_lines'][:6]:
+                        print(f"         {cl[:160]}")
+                fix_map[eid] = e['fix']
+
+            # 将 fix_map 写入标准化数据目录供 --show-fix 读取
+            try:
+                fix_map_dir = os.path.join(
+                    os.path.dirname(skill_dir), '.standardization',
+                    os.path.basename(skill_dir), 'data')
+                os.makedirs(fix_map_dir, exist_ok=True)
+                fix_map_path = os.path.join(fix_map_dir, '.verify_fix_map.json')
+                with open(fix_map_path, 'w', encoding='utf-8') as f:
+                    json.dump(fix_map, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass  # 写不进去不影响主流程
+
+            print(f"{'─'*55}")
+            print(f"  确认真问题后运行： audit <skill_dir> --show-fix ID1,ID2,ID3")
             print(f"{'='*55}")
-            sys.exit(1)
         else:
             print(f"\n{'='*55}")
             print(f"  [VERIFY] 验证通过：所有未通过项均为误报，达到铁律 0 ERROR 0 WARN 要求")
             print(f"{'='*55}")
+        # --verify 和 --show-fix 互斥
+        if getattr(args, 'show_fix', None):
+            return  # --show-fix 单独处理
+        sys.exit(1 if remaining else 0)
 
 def cmd_audit_all(args):
     """批量审查 skills 目录下所有 skill"""
@@ -890,6 +1040,7 @@ def main():
     p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
     p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
     p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
+    p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
 
     # audit-all 子命令
     p_all = subparsers.add_parser("audit-all", help="批量审查所有 skill")

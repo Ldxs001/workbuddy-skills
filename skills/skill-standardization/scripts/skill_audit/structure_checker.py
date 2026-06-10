@@ -1824,7 +1824,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     # ════════════════════════════════════════════════════════════
     # C-17 (WARN): 使用示例质量 — 检查示例是否展示完整的用户输入到输出
     # 修复方式：LLM 根据输出指引，在 SKILL.md 的「快速开始」或示例章节执行增删替换
+    # v2.65.1 增强：C-17/C-18/C-19 质量问题会触发 R-25 规则级 FAIL（铁律 9 可见）
     # ════════════════════════════════════════════════════════════
+    _c171819_quality_flag = False  # 标记 C-17/18/19 是否有质量问题
     _c17_body = body.lower()
     _c17_has_section = bool(re.search(
         r'^##\s+.*示例|^##\s+.*example|^##\s+.*使用|^##\s+.*快速',
@@ -1854,6 +1856,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 f'LLM执行：在现有示例之后新增至少1个不同场景的示例'
                 f'（如完整OMP:单阶段直接估算 + 含紧前关系:多阶段CPM分析）')
     if _c17_quality_issues:
+        _c171819_quality_flag = True
         if '缺少使用示例' in _c17_quality_issues[0]:
             issues['warn'].append('C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个完整输入到输出对话示例）')
         else:
@@ -1891,6 +1894,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 f'【{_c18_loc}】缺少环境要求 → '
                 f'LLM执行：补充运行环境依赖说明（离线/联网、输出格式等）')
     if _c18_quality_issues:
+        _c171819_quality_flag = True
         if '未声明能力边界' in _c18_quality_issues[0]:
             issues['warn'].append('C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）')
         else:
@@ -1920,6 +1924,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 f'【{_c19_loc}】未分类说明 → '
                 f'LLM执行：区分 参数错误/依赖错误/环境错误 三类场景并分别给出修复步骤')
     if _c19_quality_issues:
+        _c171819_quality_flag = True
         if 'FAQ缺少错误处理指导' in _c19_quality_issues[0]:
             issues['warn'].append('C-19: FAQ缺少错误处理指导（建议新增出错或异常相关的问答条目）')
         else:
@@ -1927,6 +1932,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     # ════════════════════════════════════════════════════════════
     # 汇总输出
+    # v2.65.1 增强：C-17/C-18/C-19 质量问题 → R-25 规则级 FAIL（铁律 9 可见）
     # ════════════════════════════════════════════════════════════
     error_count = len(issues["error"])
     warn_count = len(issues["warn"])
@@ -1943,6 +1949,12 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:20])}")
         if warn_count > 20:
             detail_parts[-1] += f" 等（共 {warn_count} 条建议）"
+
+    # C-17/C-18/C-19 质量问题：产生规则级 FAIL，进入铁律 9 验证管道
+    # 不设 fix key → LLM 通过铁律 8 全报告细筛手动修复
+    if _c171819_quality_flag:
+        return {"passed": False,
+                "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
 
     return {"passed": error_count == 0,
             "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
