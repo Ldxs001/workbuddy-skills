@@ -2,7 +2,7 @@
 name: drawiodo
 author: wUwproject
 license: MIT
-version: 2.4.0
+version: 2.4.1
 description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。
 tags: ['diagram', 'drawio', 'flowchart', 'architecture', 'uml', 'er', 'visualization']
 allowed-tools: ['Bash', 'Read', 'Write', 'Edit']
@@ -14,6 +14,7 @@ permission_weight: LOW
 data_dir: skills/.standardization/drawiodo/data/
 external_data_dir: true
 meta_field_sync: true
+faq_quality: improve_qa
 ---
 # drawiodo: draw.io 自动做图 Skill
 
@@ -46,6 +47,21 @@ meta_field_sync: true
 4. **思考-确认-执行工作流**：先分析需求、展示方案、等待确认，再动手画图
 5. **本地预览**：生成后用 `draw.io.exe` 打开，即时查看结果
 
+### 渐进式文件索引
+
+| 文件 | 说明 |
+|------|------|
+| `references/guide.md` | 执行流程详解（思考-确认-迭代-版本回溯） |
+| `references/hooks.md` | 钩子系统详解（8 个 Hook Point 实现） |
+| `references/generation.md` | 图表生成参考（XML 结构/样式/模板） |
+| `references/api_reference.md` | API 参考（CLI/SDK/脚本接口） |
+| `references/layout_rules.md` | 坐标系与布局规则 |
+| `references/antipatterns.md` | 反模式与常见错误 |
+| `references/faq.md` | 常见问题与排错 |
+| `references/known_issues.md` | 已知问题与修复记录 |
+| `references/changelog.md` | 更新日志 |
+| `references/permissions.md` | 权限说明 |
+
 ## 工作流程
 
 1. **思考分析（Think）**：分析用户需求，判断图表类型和输入类型，输出结构化思考结果
@@ -68,9 +84,9 @@ meta_field_sync: true
 - **Version Control**：最多保留 5 个版本，支持随时回溯 
 
 **快捷模式**（可跳过确认）：
-1. 简单流程图（3-5 个步骤的线性流程）
-2. 明确的模板调用（用户给出完整的 JSON spec）
-3. 已确认方案后的迭代更新 
+- 简单流程图（3-5 个步骤的线性流程）
+- 明确的模板调用（用户给出完整的 JSON spec）
+- 已确认方案后的迭代更新 
 
 **版本管理命令**：
 ```bash
@@ -192,3 +208,19 @@ python {SKILL_DIR}/scripts/drawio_hooks.py history  # 查看执行历史
 | 模板库 | `scripts/drawio_templates.py` | 8 种图表模板 |
 | Agent 入口 | `scripts/drawio_agent.py` | CLI/自然语言解析 |
 | 版本管理 | `scripts/drawio_version.py` | 5 版本回溯系统 |
+
+## 使用示例
+
+### 场景 1：生成架构图
+```text
+用户：帮我画一个微服务架构图，包含 API 网关、用户服务、订单服务和数据库
+drawiodo：正在分析需求 → 判断为"架构图" → 输出方案：4 个容器+连线+数据库图标
+用户确认后 → 生成 architecture_microservice.drawio → 自动打开预览
+```
+
+### 场景 2：迭代更新
+```text
+用户：在上次的系统架构图里加一个消息队列，在订单服务和用户服务之间
+drawiodo：读取已存在的文件 → 自动备份(v2) → 在订单服务和用户服务之间插入消息队列节点和连线
+→ 更新文件 → 自动打开预览展示变化
+```

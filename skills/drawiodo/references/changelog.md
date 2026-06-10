@@ -1,3 +1,10 @@
+## 2.4.1 (2026-06-10)
+
+### 修复
+- 修复FAQ排错章节格式 + changelog反斜杠引用清理
+
+---
+
 
 ## 2.4.0 (2026-06-10)
 
@@ -16,7 +23,7 @@
 - 生成图表章节拆分到 `references/generation.md`（247→194 行）
 
 ### 修复
-- trigger 字段反斜杠损坏修复：--fix 将 `draw\\.io` 反复转义为 512 反斜杠，已恢复
+- trigger 字段反斜杠损坏修复：--fix 将触发词中的 `draw.io` 反复转义为大量反斜杠，已恢复
 - 版本号三端一致：SKILL.md = _meta.json = changelog = 2.4.0
 - _meta.json description 与 SKILL.md frontmatter 同步
 
