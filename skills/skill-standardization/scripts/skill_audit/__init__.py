@@ -796,6 +796,23 @@ def cmd_audit(args):
                      if not res.get("passed") and not res.get("skipped")
                      and not _reclassify_false_positive(res)]
     has_fixable = any(r.get("fix") for r in remaining_pre)
+
+    # 输出标准化报告摘要（fixable 检查之前）
+    if not args.fix and not getattr(args, 'verify', False) and not getattr(args, 'classify', None) and not getattr(args, 'no_fp', None) and not getattr(args, 'show_fix', None):
+        passed = result.get("passed_count", 0)
+        total = len(result.get("results", []))
+        print(f"\n{'='*55}")
+        print(f"  审计报告：{os.path.basename(skill_dir)}")
+        print(f"  {passed}/{total} 通过")
+        has_warn = any(not r.get("passed") and r.get("severity") == 'WARN' for r in result.get("results", []))
+        has_err = any(not r.get("passed") and r.get("severity") == 'ERROR' for r in result.get("results", []))
+        if has_err:
+            print(f"  ❌ {sum(1 for r in result.get('results',[]) if not r.get('passed') and r.get('severity')=='ERROR')} ERROR")
+        if has_warn:
+            print(f"  ⚠️  {sum(1 for r in result.get('results',[]) if not r.get('passed') and r.get('severity')=='WARN')} WARN")
+        print(f"  → 运行 --fix 自动修复，或 --verify 逐项审查")
+        print(f"{'='*55}")
+
     if has_fixable and not args.fix:
         print(f"\n  ⛔ 存在可自动修复的 FAIL — 必须执行 audit --fix 修复后重新验证")
         sys.exit(1)
@@ -839,12 +856,22 @@ def cmd_audit(args):
                     if fix_key in fix_details:
                         del res["fix"]
 
-        # 出二次审计报告
+        # 出二次审计报告 + 修复前后对比
         if fixes_applied > 0:
+            before_err = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'ERROR')
+            before_warn = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'WARN')
+            print(f"\n{'─'*55}")
+            print(f"  修复前后对比")
+            print(f"  修复项：{', '.join(fix_details)} ({fixes_applied} 处)")
+            print(f"  修复前：{before_err} ERROR, {before_warn} WARN")
             if not args.json:
                 print(format_report(result))
-            else:
-                print(json.dumps(result, ensure_ascii=False, indent=2))
+            after_err = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'ERROR')
+            after_warn = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'WARN')
+            print(f"  修复后：{after_err} ERROR, {after_warn} WARN")
+            if after_err == 0 and after_warn == 0:
+                print(f"  ✅ 全部修复")
+            print(f"{'─'*55}")
 
         # ── 问题分类与真问题强制修复：--fix 后仍有可修复 FAIL 则阻止通过
         remaining = [res for res in result.get("results", [])
@@ -911,6 +938,14 @@ def cmd_audit(args):
         # --verify 和 --show-fix 互斥
         if getattr(args, 'show_fix', None):
             return  # --show-fix 单独处理
+        # 退出码尊重 --classify 误判标记：所有 FAIL 已分类为误判则视为通过
+        if fp_ids and remaining:
+            entry_ids = {str(e['id']) for e in entries}
+            if entry_ids.issubset({str(i) for i in fp_ids}):
+                remaining = []
+                print(f"\n{'='*55}")
+                print(f"  [VERIFY] 全部 {len(fp_ids)} 项已通过 --classify 标记为误判，视为通过")
+                print(f"{'='*55}")
         sys.exit(1 if remaining else 0)
 
 def cmd_audit_all(args):
@@ -1052,6 +1087,14 @@ def cmd_bump(args):
         remaining = [r for r in pre_result.get("results", [])
                      if not r.get("passed") and not r.get("skipped")
                      and not _reclassify_false_positive(r)]
+        # bump 也尊重 --classify 用户误判标记
+        if remaining:
+            fp_ids = _load_fp_ids(skill_dir)
+            if fp_ids:
+                entries = _expand_fail_entries(remaining)
+                remaining_ids = {str(e['id']) for e in entries}
+                if remaining_ids.issubset({str(i) for i in fp_ids}):
+                    remaining = []
         if remaining:
             print(f"\n{'='*55}")
             print(f"  ⛔ 铁律阻断：{len(remaining)} 项 FAIL 未处理，拒绝 bump")
@@ -1105,7 +1148,8 @@ def cmd_bump(args):
         return
 
     _do_bump(skill_dir, bump_type, desc)
-    print(f"\n=== 版本号三端更新完成 ===")
+    print(f"\n{'='*55}")
+    print(f"  版本号三端更新完成")
     print(f"  skill:          {os.path.basename(skill_dir)}")
     print(f"  版本:           {current_version} → {new_version}")
     print(f"  类型:           {bump_type} — {rule_note}")
@@ -1113,13 +1157,14 @@ def cmd_bump(args):
     print(f"  SKILL.md:       ✅ version={new_version}")
     print(f"  _meta.json:     ✅ version={new_version}")
     print(f"  changelog.md:   ✅ 已插入 v{new_version} 条目")
+    print(f"{'='*55}")
 
 
 def _semantic_precheck(command, skill_dir=None):
     """
     语义前置检查（代码强制，非 LLM 自觉）。
-    在进入 create/update/refactor/audit 之前输出模式描述和适用范围，
-    让 LLM 有机会在正式执行前确认模式选择是否正确。
+    在进入 create/update/refactor/audit 之前输出模式选择对照表，
+    强制 LLM 在校验模式后再确认，无法跳过。
     """
     modes = {
         'audit': '仅审查，不修改。适用于查看技能合规状态、检查 FAIL 项',
@@ -1130,12 +1175,21 @@ def _semantic_precheck(command, skill_dir=None):
     }
     desc = modes.get(command, '')
     print(f"\n{'='*55}")
-    print(f"  🧠 语义确认：{command} 模式")
+    print(f"  🧠 【流程门禁】模式选择确认")
+    print(f"{'─'*55}")
+    print(f"  用户请求关键词 → 模式")
+    print(f"  仅审查/不要修改   → audit")
+    print(f"  创建/生成/新建     → create")
+    print(f"  审计/检查/更新     → update")
+    print(f"  改造/重构/标准化   → refactor")
+    print(f"  版本升级（内部）   → bump")
+    print(f"{'─'*55}")
+    print(f"  当前选择：{command}")
     if desc:
         print(f"  适用范围：{desc}")
     if skill_dir:
         print(f"  目标技能：{os.path.basename(skill_dir)}")
-    print(f"  确认无误后继续执行，模式不匹配请中止后重新选择")
+    print(f"  模式不匹配请中止后重新选择，匹配则继续执行")
     print(f"{'='*55}")
 
 
@@ -1229,6 +1283,19 @@ def cmd_refactor(args):
         print(f"\n{'─'*55}")
         print(f"  [5/7] 铁律验证 --verify")
         print(f"{'─'*55}")
+
+        # refactor 尊重 --classify 误判标记
+        if remaining:
+            fp_ids = _load_fp_ids(skill_dir)
+            if fp_ids:
+                entries = _expand_fail_entries(remaining)
+                remaining_ids = {str(e['id']) for e in entries}
+                if remaining_ids.issubset({str(i) for i in fp_ids}):
+                    remaining = []
+                    print(f"  ✅ [refactor] 所有 FAIL 已通过 --classify 标记为误判")
+                    for rid in sorted(fp_ids):
+                        print(f"    误判 #{rid}")
+
         if remaining:
             print(f"  ⛔ {len(remaining)} 项 FAIL 待处理（LLM 逐条筛查后修复）")
             for r in remaining:
@@ -1260,7 +1327,7 @@ def cmd_refactor(args):
     print(f"{'─'*55}")
     try:
         from scripts.cleanup_manager import run_cleanup
-        run_cleanup(skill_dir)
+        run_cleanup(skill_dir, os.path.basename(skill_dir))
         print(f"  ✅ cleanup 完成")
     except ImportError:
         print(f"  ⚠️  未找到 cleanup_manager，跳过")

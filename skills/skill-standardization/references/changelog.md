@@ -1,3 +1,15 @@
+## 2.72.0 (2026-06-10)
+
+### refactor
+- **5 模式流程门禁** — `_semantic_precheck` 增加模式选择对照表，SKILL.md 增加 Step 0 模式识别流程
+- **`--verify` 尊重 `--classify`** — 退出码检查已分类误判，全部标记为误判则 exit(0)
+- **`cmd_refactor` 铁律验证尊重分类** — refactor 步骤 5 加载 `.verify_fp.json`，已分类项不阻断
+- **`cmd_bump` 前置检查尊重分类** — bump 前铁律检查加载分类文件，已标记误判不阻断
+- **refactor cleanup bugfix** — `run_cleanup()` 缺 `manifest_id` 参数，补上 `os.path.basename(skill_dir)`
+- **修复前后对比** — `audit --fix` 完成后输出修复项、修复前/后 ERROR/WARN 统计对比
+- **标准化最终摘要** — audit/bump 最终报告统一为 `=====` 包围格式
+- **`cmd_bump` 输出格式修复** — 改用 `=====` 对齐其他模式
+
 ## 2.70.2 (2026-06-10)
 
 ### 修复

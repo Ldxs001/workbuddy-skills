@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.70.2
+version: 2.72.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -85,7 +85,27 @@ h1_position: true
 | `references/rules.md` | 改写/更新铁律（AI 执行前必须遵守） | > 本文件为 skill-standardization v2.13.0 的铁律条款，AI 更新任何 skill 前必须 |
 ## 工作流程
 
-**audit 模式**（仅审查）：
+### 【流程门禁】Step 0：模式识别（强制）
+
+**本技能有五个模式，各自对应不同的命令和流程。执行前必须按以下规则识别用户意图，不可跳过此步骤直接执行。**
+
+1. 读取用户的原始请求
+2. 对照下表，匹配关键词：
+
+| 用户请求包含 | → 模式 | → 执行命令 |
+|-------------|--------|-----------|
+| 仅审查/仅检查/看结果/不要改任何东西 | **audit** | `python -m scripts.skill_audit audit <skill_dir>` |
+| 创建/生成/新建/把 xxx做成skill | **create** | `python -m scripts.skill_builder create <name> --desc "描述"` |
+| 审计/检查/审查/评估/更新/修复/升级/跑一遍规范/做个体检 | **update** | `python -m scripts.skill_audit audit <skill_dir> --fix` |
+| 改造/重构/迁移/大改/标准化/规范化 | **refactor** | `python -m scripts.skill_audit refactor <skill_dir>` |
+| 升版本/版本号更新（内部流程自动触发，非用户主动请求） | **bump** | `python -m scripts.skill_audit bump <skill_dir>` |
+
+3. 匹配到关键词 → 走对应模式流程
+4. 未匹配到任何关键词 → **询问用户具体意图**，不得自行猜测
+
+---
+
+### audit 模式（仅审查）
 1. **语义确认** — 输出模式描述，LLM 确认模式是否正确
 2. 读取目标 skill 的 SKILL.md
 3. 执行 R-01~R-25 规则检查
@@ -96,44 +116,24 @@ h1_position: true
 
 → 修复指引获取：`python -m scripts.skill_audit audit <skill_dir> --show-fix 1,3,4`
 
-**create 模式**（创建新技能）：
-1. **语义确认** — 输出模式描述，LLM 确认模式是否正确
-2. `python -m scripts.skill_audit create <skill_dir> --desc "描述"` — 从模板生成标准骨架（13 字段 frontmatter + _meta.json 7 字段）
-3. AI 或手动填充 TODO 占位符为实际内容
-4. `python -m scripts.skill_audit audit <dir>` 验证合规（0 ERROR 0 WARN）
-5. 按需补充 scripts/ 功能代码 + references/ 渐进式文档
-6. **cleanup 清理** — 操作完成后清除生成过程中的临时文件
+**create 模式**（创建新技能——从零开始生成骨架）：
+- **适用场景**：用户说"创建/生成/新建一个技能，把 xxx 做成 skill"
+- **不适用**：用户说"审查/改造/更新已有技能"
+- 流程：骨架生成 → 填充内容 → audit 验证 → cleanup
+- 命令：`python -m scripts.skill_builder create <name> --desc "描述"`
 
-**create 模式**（创建新技能）：
-1. `python -m scripts.skill_builder create <name> --desc "描述"` — 从模板生成标准骨架
-2. 自动生成 SKILL.md（含 H1/触发/核心/快速开始/工作流程章节占位符）
-3. 自动生成 _meta.json（7 字段）、references/ 目录、scripts/ 目录
-4. AI 或手动填充 TODO 占位符为实际内容
-5. `python -m scripts.skill_audit audit <dir>` 验证合规
-6. 按需补充 scripts/ 功能代码 + references/ 渐进式文档
-7. **cleanup 清理** — 操作完成后清除生成过程中的临时文件
+**update 模式**（轻量更新——技能结构已标准，只需审计修复）：
+- **适用场景**：用户说"审计/检查/更新/修复/升级某个技能"
+- **不适用**：用户说"改造/迁移/重构/大改/标准化"
+- 流程：语义确认 → audit → --fix → --verify → bump → cleanup
+- 命令：`python -m scripts.skill_audit audit <skill_dir> --fix`
 
+**refactor 模式**（全量改造——技能非标准/结构混乱/需要迁移）：
+- **适用场景**：用户说"改造/重构/迁移/大改/标准化/规范化某个技能"
+- **不适用**：用户说"简单审计/检查一下"（应走 update）
+- 流程：语义确认 → 蓝皮书扫描 → 备份 → audit → --fix → --verify → bump → cleanup
+- 命令：`python -m scripts.skill_audit refactor <skill_dir>`
 
-
-> 生成后目录结构：
-> ```text
-> <skill-name>/
-> ├── SKILL.md          # 含 frontmatter + TODO 占位符
-> ├── _meta.json        # {name, version, description, author, tags}
-> ├── references/       # 渐进式文档目录（含 .gitkeep）
-> └── scripts/          # 功能代码目录（含 .gitkeep）
-> ```text
-**update/refactor 模式**（改造+审查）：
-1. **语义确认** — 输出模式描述，LLM 确认 refactor/update 选择是否正确
-2. 操作前整体备份（时间戳命名）
-3. **★ 强制 inspect 蓝皮书扫描** — 输出技能结构、AST 函数签名、引用链路
-4. 执行 audit（R-01~R-25）
-5. **`--fix` 自动修复** — 自动修正可修复项
-6. **`--verify` 验证** — 输出编号 FAIL 条目，阻断式（exit(1) 阻止跳步）
-7. **bump 版本号**（三端同步 SKILL.md / _meta.json / changelog）— bump 前置 0 ERROR 0 WARN 检查，未修复完禁止升级
-8. **cleanup 清理** — manifest 驱动删除临时文件、过期备份
-
-> 两阶段检查协议、排错止损规则、临时文件与备份管理 → 详见 ### 渐进式文件索引
 
 ## 数据目录说明
 
