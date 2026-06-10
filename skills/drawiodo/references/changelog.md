@@ -1,9 +1,24 @@
 
 ## 2.4.0 (2026-06-10)
 
+### 新增
+- **钩子系统强制约束**：12 个内置钩子全部 Python 端执行，0 个依赖 LLM 自觉
+  - `preview_trigger` 钩子：直接调用 subprocess.Popen 打开 draw.io 预览
+  - `shortcut_detector` 钩子：快捷模式时直接清除 confirm_options，LLM 无法 AskUserQuestion
+  - `auto_backup` 钩子：迭代前直接调用 VersionManager.save_version() 自动备份
+  - `limit_checker` 钩子：版本超限时直接删除最旧版本
+- 新增 `references/hooks.md`：钩子系统完整参考文档
+
 ### Changed
-- 标准化改造完成：25/25 PASS
-- 版本号 2.3.2 → 2.4.0（MINOR）
+- 输出路径标准化：`{workspace}` → `skills/.standardization/drawiodo/outputs/`（铁律 4）
+- 创建 outputs/ 和 temp/ 标准化目录
+- SKILL.md 正文冗余路径清理（删 8 行）
+- 生成图表章节拆分到 `references/generation.md`（247→194 行）
+
+### 修复
+- trigger 字段反斜杠损坏修复：--fix 将 `draw\\.io` 反复转义为 512 反斜杠，已恢复
+- 版本号三端一致：SKILL.md = _meta.json = changelog = 2.4.0
+- _meta.json description 与 SKILL.md frontmatter 同步
 
 ---
 
