@@ -2,11 +2,11 @@
 name: drawiodo
 author: wUwproject
 license: MIT
-version: 2.2.2
-description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流。
+version: 2.4.0
+description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。
 tags: ['diagram', 'drawio', 'flowchart', 'architecture', 'uml', 'er', 'visualization']
 allowed-tools: ['Bash', 'Read', 'Write', 'Edit']
-trigger: ['画一个.*图|生成.*图|做一个图表', '架构图|流程图|UML|ER图|时序图|思维导图', 'draw\\.io|drawio|diagrams\\.net', '网络拓扑|组织架构|系统架构']
+trigger: ['画一个.*图|生成.*图|做一个图表', '架构图|流程图|UML|ER图|时序图|思维导图', 'draw\\\\\\\\.io|drawio|diagrams\\\\\\\\.net', '网络拓扑|组织架构|系统架构']
 trigger_negative: true
 sensitive_access: false
 critical_write: false
@@ -80,62 +80,82 @@ python {SKILL_DIR}/scripts/drawio_version.py list <文件.drawio>
 python {SKILL_DIR}/scripts/drawio_version.py restore <文件.drawio> v2
 ```
 
+## 钩子系统（强制约束）
+
+**关键操作由 Python 端自动执行，不依赖 LLM 自觉。**
+备份、版本管理初始化、版本上限清理均由钩子在脚本层直接完成，
+LLM 无权跳过这些操作。
+
+→ 详见 [钩子系统](references/hooks.md)
+
+### 8 个 Hook Point
+
+| Hook Point | 强制操作 | 说明 |
+|---|---|---|
+| `pre_think` | 输入非空校验（阻断） | 空输入直接阻断 |
+| `post_think` | 分析结果校验 | 缺失字段仅警告 |
+| `pre_confirm` | 选项完整性校验（阻断）+ 快捷跳过（清除选项） | 不足 2 项或快捷跳转均阻断/跳过 |
+| `post_confirm` | 用户选择解析 | - |
+| `pre_iterate` | 自动创建目录 + **自动备份** | 备份由 Python 调用 VersionManager |
+| `post_iterate` | 输出校验 + **自动初始化版本管理** + **自动打开预览** | init 和预览都由 Python 执行 |
+| `pre_vc` | **自动清理超限版本** | 删除最旧版本由 Python 执行 |
+| `post_vc` | 版本状态报告 | - |
+
+### 执行规则
+
+- **abort=True** -> 立即阻断流程（LLM 无权绕过）
+- **success=False 但不 abort** -> 记录警告，不阻塞
+- 所有操作由 Python 端算法强制完成
+
+### 在阶段代码中调用
+
+```python
+from drawio_hooks import hooks
+
+# 在阶段开始时
+results = hooks('pre_iterate', {
+    'output_path': output_path,
+    'is_update': True,          # 会触发自动备份
+})
+for r in results:
+    if r.abort:
+        return  # 钩子已处理，阻断并返回
+    if not r.success:
+        print(f'Warning: {r.message}')
+
+# 在阶段结束时
+results = hooks('post_iterate', {
+    'output_path': output_path,  # 会触发自动 init 版本管理
+})
+```
+
+### 注册/注销自定义钩子
+
+```python
+from drawio_hooks import register, unregister
+
+@register('pre_think', name='my_check', description='自定义校验')
+def my_hook(ctx):
+    if 'special' not in ctx.get('user_input', ''):
+        return {'success': False, 'message': '缺少特殊参数', 'abort': True}
+    return {'success': True, 'message': 'ok'}
+
+unregister('post_iterate', 'preview_trigger')  # 禁用自动预览
+```
+
+### CLI 管理命令
+
+```bash
+python {SKILL_DIR}/scripts/drawio_hooks.py list     # 查看所有注册钩子
+python {SKILL_DIR}/scripts/drawio_hooks.py check    # 全流程自检
+python {SKILL_DIR}/scripts/drawio_hooks.py history  # 查看执行历史
+```
+
 ---
 
 ## 生成图表
 
-### 方式 A - Python API 调用（推荐）
-
-```python
-import sys
-sys.path.insert(0, "{SKILLS_DIR}/drawiodo/scripts")
-from drawio_templates import *
-
-# 流程图 
-builder = create_flowchart(["开始", "处理", "结束"])
-builder.save("output.drawio")
-
-# 架构图 
-builder = create_architecture([
-    {"name": "Frontend", "components": ["React", "Vue"], "color": Styles.BLUE_NODE},
-    {"name": "Backend", "components": ["API", "Auth"], "color": Styles.GREEN_NODE},
-])
-builder.save("output.drawio")
-
-# 自定义（完全控制） 
-from drawio_gen import DrawIOBuilder, Styles
-builder = DrawIOBuilder(name="My Diagram")
-builder.add_node("Node1", 100, 100, 120, 60, style=Styles.BLUE_NODE)
-builder.add_node("Node2", 100, 220, 120, 60, style=Styles.GREEN_NODE)
-builder.connect(node1, node2, "label")
-builder.save("output.drawio")
-```
-
-### 方式 B - CLI 调用 
-
-```bash
-cd {workspace}
-python {SKILL_DIR}/scripts/drawio_agent.py "画一个用户登录流程图：输入账号 → 验证 → 查询数据库 → 返回结果"
-python {SKILL_DIR}/scripts/drawio_agent.py spec.json  # JSON 模式 
-```
-
-### 方式 C - JSON spec 文件 
-
-```json
-{
-  "type": "flowchart",
-  "title": "用户登录",
-  "steps": ["输入账号", "验证密码", "查询数据库", "返回结果"]
-}
-```
-
-支持的 type：`flowchart`, `architecture`, `class_diagram`, `er_diagram`, `tree`, `sequence`, `mindmap`, `network`
-
-### 打开预览 
-
-```bash
-"C:\Program Files\draw.io\draw.io.exe" "生成的文件路径"
-```
+→ 详见 [图表生成参考](references/generation.md)
 
 ---
 
@@ -158,11 +178,11 @@ python {SKILL_DIR}/scripts/drawio_agent.py spec.json  # JSON 模式
 
 ## 输出规范 
 
-- 输出目录：`{workspace}` 
 - 文件命名：`{类型}_{描述}.drawio`，如 `architecture_microservice.drawio`
 - 生成后自动用 draw.io 打开预览 
 - 交付附件给用户 
 - 每次生成/更新后初始化或更新版本管理 
+- 路径信息见 `_meta.json` data_dir 声明 + frontmatter data_dir 字段
 
 ## 核心文件 
 
@@ -172,5 +192,3 @@ python {SKILL_DIR}/scripts/drawio_agent.py spec.json  # JSON 模式
 | 模板库 | `scripts/drawio_templates.py` | 8 种图表模板 |
 | Agent 入口 | `scripts/drawio_agent.py` | CLI/自然语言解析 |
 | 版本管理 | `scripts/drawio_version.py` | 5 版本回溯系统 |
-| draw.io | `C:\Program Files\draw.io\draw.io.exe` | 本地安装路径 |
-| 输出目录 | `{workspace}` | 所有图表输出到此 |
