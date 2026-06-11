@@ -249,8 +249,115 @@ python scripts/component_manager.py validate --dir scripts/components/
 
 ## 文件路径
 
-所有 Python 脚本使用 managed Python 执行：
+所有脚本使用 managed Python（版本由 WorkBuddy 运行时自动管理）执行：
 
 ```
-C:\Users\sm001\.workbuddy\binaries\python\versions\3.13.12\python.exe scripts/compose.py ...
+<python> scripts/compose.py ...
 ```
+
+
+## 快速用例
+
+### 用例 1: 新建文档
+
+用 article 模板生成一篇论文，自动编译为 PDF：
+
+
+
+用 report 模板生成技术报告，只输出 .tex 不编译：
+
+
+
+### 用例 2: 改造旧文章
+
+将一篇 pdfLaTeX 老文章转换为 LuaLaTeX，直接输出（不入库）：
+
+This is LuaHBTeX, Version 1.17.1 (MiKTeX 24.1)
+ restricted system commands enabled.
+! I can't find file `old_paper_lualatex.tex'.
+<*> old_paper_lualatex.tex
+                       
+(Press Enter to retry, or Control-Z to exit)
+Please type another input file name: 
+! Emergency stop.
+<*> 
+ 
+ 270 words of node memory still in use:
+   1 hlist, 39 glue_spec nodes
+   avail lists: 2:12,3:3,4:1,5:1
+!  ==> Fatal error occurred, no output PDF file produced!
+Transcript written on texput.log.
+
+转换后同时入库和输出：
+
+
+
+LuaLaTeX 文章直接入库（跳过 convert）：
+
+
+
+### 用例 3: 增量编辑
+
+写到一半的文章，加一个表格：
+
+This is LuaHBTeX, Version 1.17.1 (MiKTeX 24.1)
+ restricted system commands enabled.
+! I can't find file `draft.tex'.
+<*> draft.tex
+          
+(Press Enter to retry, or Control-Z to exit)
+Please type another input file name: 
+! Emergency stop.
+<*> 
+ 
+ 270 words of node memory still in use:
+   1 hlist, 39 glue_spec nodes
+   avail lists: 2:12,3:3,4:1,5:1
+!  ==> Fatal error occurred, no output PDF file produced!
+Transcript written on texput.log.
+
+给 pdfLaTeX 文档加图片（自动转换语法）：
+
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex.fmt)
+ restricted \write18 enabled.
+entering extended mode
+! I can't find file `old_doc.tex'.
+<*> old_doc.tex
+               
+(Press Enter to retry, or Control-C to exit)
+Please type another input file name: 
+! Emergency stop.
+<*> 
+    
+!  ==> Fatal error occurred, no output PDF file produced!
+Transcript written on texput.log.
+
+### 用例 4: 组件复用
+
+拆解已有文章 → 存入组件库：
+
+
+
+用组件库组合生成新文档：
+
+
+
+保存当前组件组合为模板，下次直接复用：
+
+
+
+### 用例 5: 语义路由
+
+测试路由是否能识别你的需求：
+
+
+
+### 用例 6: 写入守卫
+
+扫描所有脚本的违规直接写入：
+
+
+
+检查单个文件是否有违规写入：
+
+

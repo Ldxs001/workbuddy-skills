@@ -198,7 +198,7 @@ def generate_body_from_template(template: dict, params: dict, sample: bool = Tru
 # ── compose / validate 调用 ──────────────────────────────
 
 def call_compose(skill_dir: str, manifest_path: str, output_path: str,
-                 engine: str) -> dict:
+                 engine: str, title: str = "", author: str = "") -> dict:
     compose_script = os.path.join(skill_dir, "scripts", "compose.py")
     if not os.path.exists(compose_script):
         return {"success": False, "error": f"compose.py not found: {compose_script}"}
@@ -208,6 +208,10 @@ def call_compose(skill_dir: str, manifest_path: str, output_path: str,
         "--output", output_path,
         "--engine", engine,
     ]
+    if title:
+        cmd.extend(["--title", title])
+    if author:
+        cmd.extend(["--author", author])
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         return {
@@ -245,7 +249,11 @@ def cleanup_aux(tex_path: str):
     for ext in [".log", ".aux", ".out", ".toc", ".lof", ".lot", ".bbl", ".blg"]:
         p = base.with_suffix(ext)
         if p.exists():
-            p.unlink()
+            try:
+                from safe_write import safe_delete
+                safe_delete(str(p), backup=False)
+            except Exception:
+                p.unlink()
 
 
 # ── 主入口 ────────────────────────────────────────────────
@@ -471,7 +479,8 @@ def main():
     # ── 调用 compose.py 组装 ─────────────────────────
     print(f"[template] 调用 compose.py 组装文档...")
     out_path = os.path.abspath(args.output)
-    result = call_compose(skill_dir, manifest_path, out_path, args.engine)
+    result = call_compose(skill_dir, manifest_path, out_path, args.engine,
+                          title=args.title, author=args.author)
 
     if not result["success"]:
         print(f"[template] FAIL 组装失败:")
@@ -505,7 +514,8 @@ def main():
         if args.output_mode == "tex":
             pdf_path = val_result.get("pdf_path")
             if pdf_path and os.path.exists(pdf_path):
-                os.remove(pdf_path)
+                from safe_write import safe_delete
+                safe_delete(pdf_path, backup=False)
             cleanup_aux(out_path)
             print(f"[template] 输出模式: tex（已验证代码，PDF 已清除）")
             print(f"[template] 输出: {out_path}")

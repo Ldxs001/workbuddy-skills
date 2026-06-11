@@ -182,14 +182,27 @@ echo "All files passed!"
 
 ### Q13: 如何贡献新功能或报告 Bug？
 
-**A**: 联系作者 **[username-redacted]**（GitHub: [username-redacted]，Gitee: [username-redacted]）。
+**A**: 在 `workbuddy-skills` 仓库提交 Issue 或 Pull Request。
 
-提交 Issue 或 Pull Request 到 `workbuddy-skills` 仓库。
+### Q14: 这个技能支持哪些 LaTeX 引擎？能切换吗？
 
-### Q14: 这个技能用 lualatex 还是 xelatex？能切换吗？
+**A**: 技能默认使用 **LuaLaTeX**，组件库基于 LuaLaTeX 语法。引擎策略如下：
 
-**A**: 默认使用 **lualatex**（推荐），可通过 `--engine xelatex` 参数切换。
-当前组件库中未使用任何 lualatex 独占功能（如 `luacode`、`directlua`），所以 xelatex 也能正常编译。
+| 引擎 | 状态 | 说明 |
+|------|------|------|
+| **LuaLaTeX** | ✅ 默认 | 组件库原生语法，推荐使用 |
+| **XeLaTeX** | ✅ 一键切换 | `--engine xelatex`，组件库完全兼容（无 LuaLaTeX 独占功能） |
+| **pdfLaTeX** | 🔧 动态转换 | inject 时自动将组件转为 pdfLaTeX 语法；convert 模式支持整篇转换 p→l |
+
+LuaLaTeX ↔ XeLaTeX 互转无需额外配置，编译结果一致。
+pdfLaTeX → LuaLaTeX 需要用 convert 模式。inject 模式会自动检测目标文档引擎。
+
+如果尚未安装 LaTeX 环境：
+
+| 发行版 | 下载 | 国内镜像 |
+|--------|------|---------|
+| **MiKTeX**（推荐，轻量） | https://miktex.org/download | 清华: https://mirrors.tuna.tsinghua.edu.cn/CTAN/systems/texlive/tlnet/<br>阿里: https://mirrors.aliyun.com/CTAN/systems/texlive/tlnet/ |
+| **TeX Live**（完整版） | https://tug.org/texlive/ | 同上 |
 
 切换方式：
 ```bash

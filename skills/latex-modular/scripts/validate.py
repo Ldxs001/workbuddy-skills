@@ -77,26 +77,95 @@ WARNING_PATTERNS = [
 ]
 
 
-def find_engine(engine: str) -> str:
-    """查找 LaTeX 引擎路径"""
-    candidates = [
-        r"C:\Program Files\MiKTeX\miktex\bin\x64\{engine}.exe",
-        r"/c/Program Files/MiKTeX/miktex/bin/x64/{engine}",
-        r"/c/texlive/2024/bin/windows/{engine}",
-        r"/usr/bin/{engine}",
-        r"/usr/local/bin/{engine}",
-        engine  # 系统 PATH 中查找
-    ]
-    for p in candidates:
-        if os.path.exists(p):
-            return p
-    # 尝试 which
+def _probe_path(path: str) -> str:
+    """检查路径是否存在（兼容 Windows 无后缀和有 .exe 的情况）"""
+    if os.path.exists(path):
+        return path
+    if not path.endswith(".exe"):
+        pext = path + ".exe"
+        if os.path.exists(pext):
+            return pext
+    return ""
+
+def _registry_miktex_root() -> str:
+    """从 Windows 注册表读取 MiKTeX 安装根目录"""
     try:
-        result = subprocess.run(["which", engine], capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except:
+        import winreg
+        for hive, flag in [(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY),
+                           (winreg.HKEY_CURRENT_USER, winreg.KEY_WOW64_64KEY),
+                           (winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY)]:
+            try:
+                key = winreg.OpenKey(hive, r"SOFTWARE\MiKTeX\MiKTeX", 0, winreg.KEY_READ | flag)
+                try:
+                    val, _ = winreg.QueryValueEx(key, "Install Root")
+                    return val.strip()
+                finally:
+                    winreg.CloseKey(key)
+            except WindowsError:
+                continue
+    except Exception:
         pass
+    return ""
+
+def find_engine(engine: str) -> str:
+    """查找 LaTeX 引擎路径，扫描常见安装位置 + 注册表 + PATH"""
+
+    # 1. 注册表优先（用户自定义安装路径）
+    root = _registry_miktex_root()
+    if root:
+        for sub in [r"miktex\bin\x64", r"miktex\bin"]:
+            p = os.path.join(root, sub, engine)
+            r = _probe_path(p)
+            if r:
+                return r
+
+    # 2. 常见路径扫描
+    candidates = [
+        # MiKTeX 系统级安装
+        os.path.expandvars(r"%ProgramFiles%\MiKTeX\miktex\bin\x64\{e}"),
+        os.path.expandvars(r"%ProgramFiles%\MiKTeX\miktex\bin\{e}"),
+        os.path.expandvars(r"%ProgramFiles(x86)%\MiKTeX\miktex\bin\{e}"),
+        # MiKTeX 用户级安装
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\MiKTeX\miktex\bin\x64\{e}"),
+        os.path.expandvars(r"%USERPROFILE%\AppData\Local\Programs\MiKTeX\miktex\bin\x64\{e}"),
+        # Git Bash 映射路径
+        r"/c/Program Files/MiKTeX/miktex/bin/x64/{e}",
+        r"/c/Program Files (x86)/MiKTeX/miktex/bin/{e}",
+        # TeX Live — 扫描最近 5 个版本年份
+    ]
+    from datetime import datetime
+    for year in range(datetime.now().year, datetime.now().year - 5, -1):
+        candidates.append(os.path.expandvars(
+            r"%ProgramFiles%\TeX Live\{y}\bin\win32\{e}".format(y=year, e="{e}")))
+        candidates.append(r"/c/texlive/{y}/bin/win32/{e}".format(y=year, e="{e}"))
+
+    # 按候选路径查找
+    for tmpl in candidates:
+        p = tmpl.format(e=engine)
+        r = _probe_path(p)
+        if r:
+            return r
+
+    # 3. Unix 路径（macOS / Linux 兜底）
+    for unix_p in [f"/usr/bin/{engine}", f"/usr/local/bin/{engine}",
+                   f"/opt/texlive/*/bin/*/{engine}"]:
+        r = _probe_path(unix_p)
+        if r:
+            return r
+
+    # 4. PATH / where 命令
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(["where", engine], capture_output=True, text=True, timeout=5)
+        else:
+            result = subprocess.run(["which", engine], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            path = result.stdout.strip().split("\n")[0].strip()
+            if path:
+                return path
+    except Exception:
+        pass
+
     return ""
 
 def compile_tex(tex_path: str, engine: str = "lualatex", timeout: int = 120) -> dict:
@@ -118,7 +187,13 @@ def compile_tex(tex_path: str, engine: str = "lualatex", timeout: int = 120) -> 
     engine_path = find_engine(engine)
     if not engine_path:
         result["errors"].append(f"找不到 {engine} 可执行文件，请检查 LaTeX 安装")
-        result["suggestions"].append(f"安装 MiKTeX 或 TeX Live，或将 {engine} 加入 PATH")
+        result["suggestions"].extend([
+            f"安装 MiKTeX（推荐）：https://miktex.org/download",
+            f"  CTAN 镜像：https://mirrors.tuna.tsinghua.edu.cn/ctan/systems/texlive/tlnet/",
+            f"  ️ 阿里云镜像：https://mirrors.aliyun.com/CTAN/systems/texlive/tlnet/",
+            f"安装 TeX Live：https://tug.org/texlive/",
+            f"或将 {engine} 所在目录加入系统 PATH 环境变量",
+        ])
         return result
     
     work_dir = str(Path(tex_path).parent)
@@ -342,6 +417,8 @@ def main():
     parser.add_argument("--fix", action="store_true", help="尝试自动修复常见错误")
     parser.add_argument("--output-json", default="", help="将结果输出为 JSON 文件")
     parser.add_argument("--keep-logs", action="store_true", help="保留编译日志文件")
+    parser.add_argument("--workflow", default="", help="流程线 ID，启用步骤守卫")
+    parser.add_argument("--lines", default="", help="处理范围 START-END")
     
     args = parser.parse_args()
     

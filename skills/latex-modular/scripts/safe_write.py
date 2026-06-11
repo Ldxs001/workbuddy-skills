@@ -116,6 +116,31 @@ def safe_insert_after(filepath: str, after_pattern: str, insert_text: str, encod
     except Exception as e:
         return {"success": False, "error": f"{type(e).__name__}: {e}"}
 
+def safe_delete(filepath: str, backup: bool = True) -> dict:
+    """
+    安全删除文件：先备份到 .backup 目录再删除。
+    返回: {"success": bool, "path": str, "backup": str|None, "error": str|None}
+    """
+    fp = Path(filepath)
+    result = {"success": False, "path": str(fp), "backup": None, "error": None}
+    if not fp.exists():
+        result["error"] = f"File not found: {filepath}"
+        return result
+    try:
+        if backup:
+            backup_dir = fp.parent / ".backup"
+            backup_dir.mkdir(exist_ok=True)
+            backup_name = fp.name + ".del." + fp.stem + ".bak"
+            backup_path = backup_dir / backup_name
+            shutil.copy2(str(fp), str(backup_path))
+            result["backup"] = str(backup_path)
+        os.unlink(str(fp))
+        result["success"] = True
+        return result
+    except Exception as e:
+        result["error"] = f"{type(e).__name__}: {e}"
+        return result
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) >= 3:
@@ -140,8 +165,11 @@ if __name__ == "__main__":
             insert_text = sys.argv[4]
             result = safe_insert_after(path, pattern, insert_text)
             print(result)
+        elif cmd == "delete":
+            result = safe_delete(path)
+            print(result)
         else:
             print(f"Unknown command: {cmd}")
     else:
         print("Usage: python safe_write.py <command> <filepath> [args...]")
-        print("Commands: write, patch-line, patch-regex, insert-after")
+        print("Commands: write, patch-line, patch-regex, insert-after, delete")

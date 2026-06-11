@@ -1,7 +1,7 @@
 ---
 name: latex-modular
 data_dir: ../.standardization/latex-modular/data
-version: 1.2.4
+version: 1.3.0
 author: wUwproject
 license: MIT
 description: LaTeX 模块化组合技能。提取 LaTeX 文档头/组件（表格、图片、列表、章节样式）作为可组合模块，通过 Python 脚本稳定组合生成不报错的 lualatex 文档，支持从原始 LaTeX 代码重构进模块化体系。
@@ -14,6 +14,7 @@ critical_write: false
 permission_weight: LOW
 h1_position: true
 meta_field_sync: true
+data_dir_compliance: true
 ---
 # latex-modular
 
@@ -51,6 +52,8 @@ meta_field_sync: true
 - **refactor 模式** — 将原始 LaTeX 代码重构进模块化体系，保留原文语义，按模块拆分存储
 - **validate 模式** — 使用 lualatex 编译验证生成的 .tex 文件，报告错误并返回修复建议
 - **template 模式** — 模板库+自定义保存+内容注入。支持 `--template` 按名加载、`--save-as` 保存自定义模板、`--content` 注入正文、`--list-templates` 等，内置 article/report 两种预设模板（`scripts/template.py` + `scripts/templates/`）
+- **inject 模式** — 向现有 .tex 增量插入组件，不破坏已有内容。自动将导言区内容追加到目标导言区，正文插入到指定位置。支持 LuaLaTeX/XeLaTeX 直接注入和 pdfLaTeX 语法动态转换（`scripts/component_inject.py`）
+- **convert 模式** — 将完整的 pdfLaTeX 文档转换为 LuaLaTeX 兼容语法。原文件不动，输出新文件 + 转换报告（`scripts/convert.py`）
 
 ### 渐进式文件索引
 
@@ -71,19 +74,83 @@ meta_field_sync: true
 | `scripts/extract.py` | 从 LaTeX 源文件提取组件 |
 | `scripts/validate.py` | 编译验证，调用 lualatex 并检查输出 |
 | `scripts/refactor.py` | 重构引擎，将原始 LaTeX 转为模块化结构 |
-| `scripts/template.py` | 模板库管理：`--template` 加载、`--save-as` 保存、`--content` 注入、`--list-templates` 等 |
+| `scripts/template.py` | 模板库管理 |
 | `scripts/component_manager.py` | 组件库管理（增删改查） |
-| `scripts/safe_write.py` | 原子写入工具（tmp + os.replace）|
+| `scripts/component_inject.py` | 增量注入：向现有 .tex 插入组件 |
+| `scripts/convert.py` | 引擎转换：pdfLaTeX → LuaLaTeX |
+| `scripts/workflow_router.py` | 语义路由：分析用户输入 → 匹配流程线 |
+| `scripts/write_guard.py` | 写入守卫：扫描直接 open()/os.remove() 调用，强制使用 safe_write |
+| `scripts/safe_write.py` | 原子写入工具 + safe_delete() 安全删除 |
+| `scripts/workflow_state.py` | 流程守卫：步骤依赖检查 + 状态持久化 |
 | `scripts/update_frontmatter.py` | 更新 SKILL.md frontmatter |
 
 ### 依赖
 
 - Python 3.11+（推荐 3.13.12 managed）
-- **lualatex**（默认，推荐）：`/c/Program Files/MiKTeX/miktex/bin/x64/lualatex`
-- 也可通过 `--engine xelatex` 切换为 **xelatex**
-- 不推荐 pdflatex
+- **LuaLaTeX**（默认，推荐）：组件库基于 LuaLaTeX 语法
+- **XeLaTeX**：可通过 `--engine xelatex` 切换，组件库完全兼容
+- **pdfLaTeX**：inject 模式支持动态转换为 pdfLaTeX 语法；convert 模式支持从 pdfLaTeX 转换为 LuaLaTeX
 - **首次编译**时 MiKTeX 会自动安装缺失宏包，可能需要等待
 - 中文字体依赖：SimSun、SimHei、KaiTi、FangSong（Windows 系统自带）
+
+### 大文件处理
+
+长篇 .tex 文件处理策略：
+- 使用 `--lines START-END` 参数限定处理行范围，避免加载全文
+- 支持 `--encoding` 指定文件编码（默认 utf-8）
+- inject 模式下通过正则锚点或行号定位插入点，避免全文扫描
+- validate 模式下流式读取编译输出，不分页
+
+### 四流程线 + 语义路由
+
+本技能内置 4 条流程线 + 独立模式，通过语义路由器自动匹配用户意图。
+
+#### 执行协议（强制）
+
+```
+用户输入
+  │
+  ▼
+语义路由器 (scripts/workflow_router.py)
+  ├── 路由分析 → 匹配流程线或独立模式
+  ├── 验证钩子 → 检查路由与输入语义的一致性
+  │   ├── 高置信度 + 无冲突 → 走匹配路线
+  │   └── 低置信度 + 有冲突 → 降级为独立模式
+  └── 文件大小钩子 → 检测源文件体积
+      ├── >500KB → 建议 --lines 分块
+      └── >2MB  → 强制 --lines，拒绝无参数执行
+  │
+  ├── workflow 模式 → 严格步骤守卫 (workflow_state.py)
+  │   每步执行前检查前置步骤是否完成，跳过则报错
+  │   状态持久化在 .standardization/latex-modular/data/workflow_state/ 目录
+  │
+  └── standalone 模式 → 独立操作，无步骤约束
+       AI 自行决断，不设守卫
+```
+
+#### 流程线定义
+
+| 流程线 | 步骤链 | 强制备份 | 强制验证 | 报告 |
+|--------|--------|---------|---------|------|
+| **Line 1 创建文档** | template → inject_params → compose → **validate** → **report** | ❌ | ✅ | ✅ |
+| **Line 2 改造** | **backup** → convert → branch → **final_validate** → **report** | ✅ 第一步 | ✅ | ✅ |
+| **Line 3 增量编辑** | **backup** → inject → **final_validate** → **report** | ✅ 第一步 | ✅ | ✅ |
+| **Line 4 组件复用** | extract → compose → template → reuse → **final_validate** → **report** | ❌ | ✅ | ✅ |
+| **独立模式** | execute → **final_validate** → **report** | ❌ | 推荐 | ✅ |
+
+#### 文件大小钩子
+
+| 大小 | 级别 | 行为 |
+|------|------|------|
+| <500KB | normal | 正常处理 |
+| 500KB~2MB | large | 建议使用 `--lines` 限定范围 |
+| >2MB | huge | **强制** `--lines`，拒绝无参数执行 |
+
+#### 相关脚本
+
+- `scripts/workflow_router.py` — 语义路由 + 验证钩子 + 文件大小钩子
+- `scripts/workflow_state.py` — 流程守卫：步骤依赖检查 + 状态持久化
+- `scripts/workflow_report.py` — 结构化报告生成（Markdown 表格）
 
 ## 工作流程
 

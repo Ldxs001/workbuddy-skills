@@ -120,7 +120,8 @@ def extract(in_path, out_dir):
     while i < len(plines):
         s = plines[i].strip()
         if s == r"\pagestyle{fancy}":
-            j = i
+            fancy_lines.append(plines[i].rstrip())  # 保留触发行
+            j = i + 1  # 从下一行开始扫描，避免死循环
             while j < len(plines):
                 t = plines[j].strip()
                 if t.startswith(("\\fancyhead","\\fancyfoot","\\fancyhf",
@@ -128,7 +129,7 @@ def extract(in_path, out_dir):
                                  "\\setlength")):
                     fancy_lines.append(plines[j].rstrip())
                     j += 1
-                elif t == "" and j == i:
+                elif t == "" and j == i + 1:
                     j += 1
                 else:
                     break

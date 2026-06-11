@@ -152,8 +152,8 @@ source.tex → refactor.py → scripts/components/*.txt + manifest.json + output
 ### Python 解释器
 
 ```
-C:\Users\sm001\.workbuddy\binaries\python\versions\3.13.12\python.exe  (managed, 优先)
-C:\Users\sm001\AppData\Local\Programs\Python\Python311\python.exe  (system, 后备)
+<managed_python>  (优先)
+<system_python>  (后备)
 ```
 
 ### LaTeX 引擎

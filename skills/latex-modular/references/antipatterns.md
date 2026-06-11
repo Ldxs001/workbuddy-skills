@@ -72,7 +72,7 @@ python scripts/safe_write.py write SKILL.md "<content>"
 
 **错误代码**：
 ```latex
-\includegraphics[width=0.5\textwidth]{D:\Users\sm001\OneDrive\Desktop-HW\xxx.png}
+\includegraphics[width=0.5\textwidth]{D:\Users\username\OneDrive\Desktop\xxx.png}
 ```
 
 **后果**：LaTeX 将 `\U` `\O` 等解释为命令，编译失败。
@@ -80,7 +80,7 @@ python scripts/safe_write.py write SKILL.md "<content>"
 **正确做法**：
 使用正斜杠：
 ```latex
-\includegraphics[width=0.5\textwidth]{D:/Users/sm001/OneDrive/Desktop-HW/xxx.png}
+\includegraphics[width=0.5\textwidth]{D:/Users/username/OneDrive/Desktop/xxx.png}
 ```
 
 ---

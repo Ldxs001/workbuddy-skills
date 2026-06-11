@@ -1,6 +1,6 @@
 % --- 标题 ---
-\title{\timu{扩展名测试}}
-\author{test}
+\title{\timu{模板验证}}
+\author{测试}
 \date{\today}
 
 % --- 摘要 ---

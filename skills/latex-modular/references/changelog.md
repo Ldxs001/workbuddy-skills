@@ -1,8 +1,36 @@
+## 1.3.0 (2026-06-11)
+
+### 新增
+
+- **inject 模式**：`scripts/component_inject.py` — 向现有 .tex 增量插入组件，自动拆分导言区/正文，支持 lualatex/xelatex/pdflatex 引擎检测和语法转换
+- **convert 模式**：`scripts/convert.py` — pdfLaTeX → LuaLaTeX 全文档转换，原文件不动，输出新文件 + 转换报告
+- **语义路由**：`scripts/workflow_router.py` — 分析用户输入自动匹配 4 条流程线，含语义验证钩子 + 文件大小钩子
+- **流程守卫**：`scripts/workflow_state.py` — 四流程线步骤依赖检查，跳过则拦截，状态持久化；所有流程线末尾强制 validate + report；line2/line3 首步强制 backup
+- **结构化报告**：`scripts/workflow_report.py` — 按流程线生成 Markdown 表格报告
+- **写入守卫**：`scripts/write_guard.py` — AST 扫描直接 `open() 'w'` / `os.remove()` 等违规写入
+- **引擎路径智能查找**：`find_engine()` 支持注册表 + 系统/用户安装路径 + TeX Live 年份扫描 + `where/which` + 安装指引（含清华大学/阿里云镜像链接）
+
+### 修复
+
+- **extract.py fancyhdr 死循环**：`j = i` 导致内层循环立即 break 而外层 i 不推进，改为 `j = i + 1`
+- **个人隐私信息清理**：body.txt 中 `\author{思淼}` 替换为 `__AUTHOR__` 占位符；文档中 sm001 路径泛化；联系方式移除
+- **safe_delete() 统一删除接口**：`template.py` 的 `os.remove()`/`unlink()` 迁移到 `safe_delete()`
+- **异常处理覆盖率**：`convert.py`、`workflow_state.py` 增加文件读写 try/except
+- **产出物路径合规**：`.function-test_blueprint.json` 等迁至 `.standardization/latex-modular/data/`
+- **skill-standardization 备份格式统一**：`skill_audit/__init__.py` 备份从 `shutil.copytree()` 改为 `shutil.make_archive(zip)`
+
+### 变更
+
+- 引擎策略从「不推荐 pdflatex」改为「inject 模式支持 pdflatex 动态转换」
+- 4 条流程线确立：新建文档 / 改造（三分支） / 增量编辑 / 组件复用闭环
+
+---
+
 ## 1.2.4 (2026-06-02)
 
 ### 修复
 
-- **组件库目录树同步**：SKILL.md 组件库目录树从 .tex 更新为 .txt，移除不存在的幻影条目，仅保留磁盘上实际存在的 11 个文件
+- **组件库目录树同步**：SKILL.md 组件库目录树从 .tex 更新为 .txt，删除不存在的幻影条目，仅保留磁盘上实际存在的 11 个文件
 - **组件表路径修复**：references/component-spec.md 组件表中 standard-table 改为 table-style
 
 ---
