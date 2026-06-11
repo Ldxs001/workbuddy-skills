@@ -85,6 +85,14 @@ skill-standardization/                 # Skill 根目录
     ├── permission_checker.py                 # 权限检查器
     ├── authorization_manager.py             # 授权管理器
     ├── json_loader.py                 # 渐进式 JSON 加载器
+    ├── safe_io.py                    # 安全 IO（备份+写入）
+    ├── op_logger.py                  # 操作日志记录
+    ├── op_logger_patch.py            # 操作日志补丁（兼容旧版）
+    ├── cleanup_manager.py            # 清理管理器（备份/temp文件）
+    ├── patch_utils.py                # 补丁工具函数
+    ├── run_audit.py                  # 审计运行器
+    ├── _fix_run_audit_docs.py        # 审计文档修复脚本
+    ├── _dead_code_backup/            # 废弃代码备份（v1→v2重构遗留）
     │                                 #   ├─ load/list/show/refs 子命令
     │                                 #   └─ 从 _index.json 发现模块
     │
