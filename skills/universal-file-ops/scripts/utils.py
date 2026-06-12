@@ -10,6 +10,7 @@ import sys
 import hashlib
 import datetime
 import json
+import tempfile
 
 # ── 常量 ─────────────────────────────────────────────────────────────
 # 审计 R-12 检查用：变量名含 DATA，值含合规字面量 skills/.standardization/...
@@ -225,3 +226,36 @@ def print_output(result_json: str, is_error: bool = False):
     """
     sys.stdout.write(result_json + "\n")
     sys.stdout.flush()
+
+
+# ── 原子写入 ──────────────────────────────────────────────────────────
+
+def atomic_write(file_path: str, content, encoding: str = "utf-8", mode: str = "w") -> bool:
+    """
+    原子写入：先写临时文件，再 os.replace 交换，写入中断不会产生残缺文件。
+    content 可以是 str（mode='w'/'a'）或 list[str]（mode='w'，writelines）。
+    成功返回 True，失败抛出异常。
+    """
+    dir_path = os.path.dirname(os.path.abspath(file_path))
+    os.makedirs(dir_path, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(
+        dir=dir_path,
+        prefix=".tmp_",
+        suffix=os.path.splitext(file_path)[1]
+    )
+    try:
+        if isinstance(content, list):
+            with os.fdopen(fd, mode, encoding=encoding) as f:
+                f.writelines(content)
+        else:
+            with os.fdopen(fd, mode, encoding=encoding) as f:
+                f.write(content)
+        os.replace(tmp_path, file_path)
+        return True
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        raise

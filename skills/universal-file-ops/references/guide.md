@@ -9,7 +9,7 @@
 1. **鲁棒性优先**：所有写操作前自动备份，支持回滚
 2. **标准化 IO**：所有脚本输入输出均为 JSON，便于程序化调用和调试
 3. **幂等性**：重复执行不产生副作用（读操作天然幂等，写操作在适当条件下幂等）
-4. **可回溯**：所有操作记录日志（`data/logs/ops.log`），备份留存（`data/backup/`）
+4. **可回溯**：所有操作记录日志，备份留存。
 
 ---
 
@@ -380,12 +380,7 @@ python scripts/python_env.py detect
 
 ### 自动备份
 
-所有破坏性操作（create overwrite、update、delete、move、copy overwrite）执行前，自动将目标文件备份至：
-
-```
-skills/.standardization/universal-file-ops/data/backup/
-    └── 20260525_164457_123456_file.txt_abcdef01.bak
-```
+所有破坏性操作（create overwrite、update、delete、move、copy overwrite）执行前，自动将目标文件备份至备份目录：
 
 备份文件名格式：`<时间戳>_<原文件名>_<SHA256前8位>.bak`
 
@@ -407,10 +402,6 @@ python scripts/rollback.py --ids "id1.bak,id2.bak"
 ### 操作日志
 
 所有操作记录在：
-
-```
-skills/.standardization/universal-file-ops/data/logs/ops.log
-```
 
 格式：`[timestamp] OK|FAIL | action | file_path | rollback=... | detail`
 

@@ -1,6 +1,6 @@
 """py_tools.py - Python code quality tools for universal-file-ops skill.
 
-Provides: normalize, review, oo-ify, gen-test subcommands.
+Provides: normalize, review, oo-ify, gen-test, sandbox-test subcommands.
 All output in standardized JSON format with error codes (UFO-XXXX).
 """
 
@@ -12,6 +12,8 @@ import json
 import subprocess
 import tempfile
 import venv
+import shutil
+import time
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -21,6 +23,12 @@ ENCODING = "utf-8"
 MAX_FORMAL_LINES = 600
 INDENT_CHARS = "    "
 SHEBANG_SYSTEM_PATHS = ["/usr/local/bin", "/usr/bin"]
+
+# ── Self-referential I/O ──
+# 所有文件写入操作必须通过技能自身的 text_crud.py / file_ops.py 或 atomic_write 完成
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _SCRIPT_DIR)
+from utils import atomic_write
 
 
 # --- Helpers ---
@@ -101,8 +109,8 @@ def cmd_normalize(args):
         print(json.dumps({"fixed": fixed, "dry_run": True}))
         return 0
 
-    with open(target, "w", encoding=ENCODING) as f:
-        f.writelines(new_lines)
+    # 用原子写入而非直接 open（符合技能自身 I/O 规范）
+    atomic_write(target, new_lines, ENCODING)
 
     print(json.dumps({"fixed": fixed, "file": target}))
     return 0
@@ -228,6 +236,173 @@ def cmd_gen_test(args):
     return 0
 
 
+# --- Sandbox Test ---
+
+def _get_venv_python(venv_dir: str) -> str:
+    """Get the python executable path inside a venv (cross-platform)."""
+    if os.name == "nt":
+        return os.path.join(venv_dir, "Scripts", "python.exe")
+    return os.path.join(venv_dir, "bin", "python")
+
+
+def _get_venv_pip(venv_dir: str) -> str:
+    """Get the pip executable path inside a venv (cross-platform)."""
+    if os.name == "nt":
+        return os.path.join(venv_dir, "Scripts", "pip.exe")
+    return os.path.join(venv_dir, "bin", "pip")
+
+
+def cmd_sandbox_test(args):
+    """Run generated tests in an isolated sandbox virtual environment.
+
+    Creates a temp directory, copies target and test files, builds a venv,
+    installs pytest (and optional --require packages), executes tests,
+    reports structured results, then cleans up.
+    """
+    target = os.path.abspath(args.file)
+    test_file = os.path.abspath(args.test_file)
+    extra_pkgs = args.require or []
+
+    # Validate inputs
+    if not os.path.exists(target):
+        err = {"error_code": "UFO-1001", "script": "py_tools.py", "line": 0,
+               "message": "被测文件不存在: " + target,
+               "suggestion": "检查文件路径是否正确"}
+        print(json.dumps(err))
+        return 1
+    if not os.path.exists(test_file):
+        err = {"error_code": "UFO-1001", "script": "py_tools.py", "line": 0,
+               "message": "测试文件不存在: " + test_file,
+               "suggestion": "先运行 gen-test 生成测试文件"}
+        print(json.dumps(err))
+        return 1
+
+    sandbox_dir = None
+    start_ts = time.time()
+
+    try:
+        # 1. Create sandbox directory
+        sandbox_dir = tempfile.mkdtemp(prefix="ufo_sandbox_")
+        target_basename = os.path.basename(target)
+        test_basename = os.path.basename(test_file)
+
+        shutil.copy2(target, os.path.join(sandbox_dir, target_basename))
+        shutil.copy2(test_file, os.path.join(sandbox_dir, test_basename))
+
+        # Write conftest.py so the target module is importable from the sandbox dir
+        conftest_content = (
+            "import sys\n"
+            "import os\n"
+            "_this_dir = os.path.dirname(os.path.abspath(__file__))\n"
+            "if _this_dir not in sys.path:\n"
+            "    sys.path.insert(0, _this_dir)\n"
+        )
+        with open(os.path.join(sandbox_dir, "conftest.py"), "w", encoding="utf-8") as f:
+            f.write(conftest_content)
+
+        # 2. Build venv
+        venv_dir = os.path.join(sandbox_dir, "venv")
+        venv.create(venv_dir, with_pip=True, clear=False)
+
+        python_exe = _get_venv_python(venv_dir)
+        pip_exe = _get_venv_pip(venv_dir)
+
+        # 3. Install dependencies
+        pkgs_to_install = ["pytest"] + extra_pkgs
+        pip_result = subprocess.run(
+            [pip_exe, "install"] + pkgs_to_install,
+            capture_output=True, text=True, timeout=120
+        )
+        if pip_result.returncode != 0:
+            err = {"error_code": "UFO-4001", "script": "py_tools.py", "line": 0,
+                   "message": "沙箱中安装依赖失败: " + pip_result.stderr.strip(),
+                   "suggestion": "检查网络连接或包名是否正确"}
+            print(json.dumps(err))
+            return 1
+
+        # 4. Run pytest from the sandbox directory so conftest.py is picked up
+        test_path = os.path.join(sandbox_dir, test_basename)
+        pytest_result = subprocess.run(
+            [python_exe, "-m", "pytest", test_path, "-v", "--tb=short"],
+            capture_output=True, text=True, timeout=120,
+            cwd=sandbox_dir
+        )
+
+        duration = round(time.time() - start_ts, 2)
+
+        # 5. Parse pytest output for counts
+        stdout_lower = pytest_result.stdout.lower()
+        stderr_lower = pytest_result.stderr.lower()
+
+        # Parse summary line like "3 passed, 1 failed in 0.45s"
+        passed = 0
+        failed = 0
+        errors = 0
+        total = 0
+
+        for line in (pytest_result.stdout + pytest_result.stderr).split("\n"):
+            line = line.strip()
+            # Match pytest summary: "3 passed, 1 failed, 1 error in 0.45s"
+            if "passed" in line or "failed" in line or "error" in line:
+                import re as _re
+                passed_m = _re.search(r"(\d+)\s+passed", line)
+                failed_m = _re.search(r"(\d+)\s+failed", line)
+                errors_m = _re.search(r"(\d+)\s+error", line)
+                if passed_m:
+                    passed = int(passed_m.group(1))
+                if failed_m:
+                    failed = int(failed_m.group(1))
+                if errors_m:
+                    errors = int(errors_m.group(1))
+                total = passed + failed + errors
+                if total > 0:
+                    break
+
+        # If pytest summary not found, try getting test count from output
+        if total == 0:
+            test_items = [l for l in pytest_result.stdout.split("\n") if l.strip().startswith("test_")]
+            total = len(test_items)
+            if pytest_result.returncode == 0:
+                passed = total
+
+        status = "passed" if pytest_result.returncode == 0 else "failed"
+
+        result = {
+            "status": status,
+            "tests_run": total,
+            "passed": passed,
+            "failed": failed,
+            "errors": errors,
+            "duration_seconds": duration,
+            "stdout_preview": pytest_result.stdout[:500],
+            "stderr_preview": pytest_result.stderr[:500] if pytest_result.stderr else ""
+        }
+
+        if status == "failed" and total == 0 and not pytest_result.stdout.strip():
+            # Possible compilation/import error
+            result["status"] = "failed"
+            result["error_detail"] = pytest_result.stderr[:500] if pytest_result.stderr else "no output"
+
+        print(json.dumps(result))
+        return 0 if status == "passed" else 1
+
+    except subprocess.TimeoutExpired:
+        err = {"error_code": "UFO-4001", "script": "py_tools.py", "line": 0,
+               "message": "沙箱运行测试超时（120秒）",
+               "suggestion": "检查测试是否有死循环或过长等待"}
+        print(json.dumps(err))
+        return 1
+    except Exception as e:
+        err = {"error_code": "UFO-9001", "script": "py_tools.py", "line": 0,
+               "message": "沙箱执行异常: " + str(e),
+               "suggestion": "检查 Python 环境和依赖是否正常"}
+        print(json.dumps(err))
+        return 1
+    finally:
+        if sandbox_dir and os.path.exists(sandbox_dir):
+            shutil.rmtree(sandbox_dir, ignore_errors=True)
+
+
 # --- Main ---
 def main():
     import argparse
@@ -251,6 +426,12 @@ def main():
     p_test.add_argument("file", help="Target .py file")
     p_test.add_argument("-o", "--output", help="Output test file")
     p_test.set_defaults(func=cmd_gen_test)
+
+    p_sbx = sub.add_parser("sandbox-test", help="Run tests in isolated sandbox venv")
+    p_sbx.add_argument("--file", required=True, help="Target .py file to test")
+    p_sbx.add_argument("--test-file", required=True, help="Generated test .py file")
+    p_sbx.add_argument("--require", action="append", default=[], help="Extra pip packages to install in sandbox (repeatable)")
+    p_sbx.set_defaults(func=cmd_sandbox_test)
 
     args = parser.parse_args()
     if not args.command:

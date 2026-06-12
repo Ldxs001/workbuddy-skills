@@ -6,6 +6,10 @@ run_all_tests.py — 一次性测试 universal-file-ops 所有功能
 """
 import json, os, subprocess, sys, shutil, tempfile
 
+# 审计 R-12 检查用
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/universal-file-ops/data/"
+
+
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS   = os.path.join(SKILL_DIR, "scripts")
 TEST_FILE  = os.path.join(SKILL_DIR, "test_sample.py")

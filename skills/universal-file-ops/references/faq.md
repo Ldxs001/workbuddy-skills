@@ -4,7 +4,7 @@
 
 **Q: 如何确保重复执行不会破坏文件？**
 
-A: 所有写操作（create overwrite、update、delete、move、copy overwrite）执行前会自动备份原文件到 `skills/.standardization/universal-file-ops/data/backup/`，且脚本支持幂等执行（重复执行结果一致）。如果出错，可用 `python scripts/rollback.py --id <rollback_id>` 回滚。读操作（read）天然幂等，多次执行无副作用。
+A: 所有写操作（create overwrite、update、delete、move、copy overwrite）执行前会自动备份原文件到备份目录，且脚本支持幂等执行（重复执行结果一致）。如果出错，可用 `python scripts/rollback.py --id <rollback_id>` 回滚。读操作（read）天然幂等，多次执行无副作用。
 
 ---
 
@@ -29,7 +29,7 @@ A: 根据文件格式判断：
 
 A: 有两种方式：
 1. **看 orchestrator 返回的 JSON 数组**——每项对应一个任务，按 `success` 字段判断是否成功，`error` 字段包含错误详情。
-2. **查看操作日志**——所有操作记录在 `skills/.standardization/universal-file-ops/data/logs/ops.log`，按时间戳和状态（OK/FAIL）过滤。
+2. **查看操作日志**——所有操作记录在数据目录下的 logs/ops.log，按时间戳和状态（OK/FAIL）过滤。
 
 建议：批量执行前加 `--dry-run` 先验证配置正确性，再实际执行。
 
@@ -53,7 +53,7 @@ A: 当前版本不会自动清理备份文件。如果备份较多占用空间�
 
 **Q: 为什么 `office_crud.py` 的 update 操作是全文覆盖，而不是局部更新？**
 
-A: 当前 v0.1.0 的 `office_crud.py` 采用简化实现（docx 清空所有段落再重写），主要是为了避免复杂的格式保留逻辑。如果你需要局部更新 docx 内容，建议：
+A: 当前版本的 `office_crud.py` 采用简化实现（docx 清空所有段落再重写），主要是为了避免复杂的格式保留逻辑。如果你需要局部更新 docx 内容，建议：
 1. 先用 `office_crud.py --action read` 读取全文
 2. 在 LLM 中处理文本（插入/替换/删除段落）
 3. 再用 `--action create` 全覆盖写入
@@ -120,7 +120,7 @@ A: `python_env.py` 本身不安装 Python（需要系统管理员权限），但
 3. **切换 venv 的 Python 版本**：`python scripts/python_env.py switch --python-version 3.11`
 
 如果需要安装新的 Python 版本，请：
-- Windows：从 [python.org](https://www.python.org/downloads/) 下载安装
+- Windows：从 https://www.python.org/downloads/ 下载安装
 - Linux：使用 `apt install python3.11` 或 `pyenv`
 - macOS：使用 `brew install python@3.11` 或 `pyenv`
 
@@ -161,5 +161,20 @@ A: `python_env.py` 是 **venv 的管理工具**，提供比原生 `venv` 更完�
 | 自动更新 requirements.txt | 不支持 | 支持 |
 
 **推荐使用 `python_env.py`**，因为它提供标准化的 JSON IO，更适合 LLM 调用和自动化流程。
+
+---
+
+**Q: universal-file-ops 有哪些能力边界限制？**
+
+A: 本技能的能力边界如下：
+
+| 类别 | 限制 |
+|------|------|
+| 文件大小 | 文本文件单次读写不超过 50MB |
+| 并行任务 | 最多同时 10 个并行任务 |
+| Python 版本 | 仅支持 Python 3.8+ |
+| 文件类型 | 仅支持文本文件和 Office 文件（.docx/.xlsx） |
+| 网络访问 | pip 安装时需要网络连接；其他操作不需要网络 |
+
 
 ---

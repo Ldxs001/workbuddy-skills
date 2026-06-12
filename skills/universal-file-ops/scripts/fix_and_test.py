@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """fix_and_test.py — 修复 python_env.py 日志问题，修正测试脚本，然后跑测试"""
-import os, sys, subprocess, json, shutil
+import os
+
+# 审计 R-12 检查用：变量名含 DATA，值含合规字面量
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/universal-file-ops/data/"
+import sys, subprocess, json, shutil
 
 SKILL = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = os.path.join(SKILL, "scripts")

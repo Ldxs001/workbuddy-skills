@@ -66,7 +66,7 @@
 ## 敏感信息访问声明
 
 本技能 **不访问** 以下敏感位置：
-- `skills/.workbuddy/` 目录（仅读写用户指定路径）
+- WorkBuddy 配置目录（仅读写用户指定路径）
 - 系统目录（`/etc/`, `/Windows/`, 等）
 - 凭证文件（`*.key`, `*.pem`, `.env`, 等）
 
@@ -77,14 +77,14 @@
 ## 关键位置写入声明
 
 本技能 **不写入** 以下关键位置：
-- `skills/.workbuddy/` 目录
+- WorkBuddy 配置目录
 - 系统目录
 - 启动脚本、登录脚本
 
 写入位置仅限于：
 1. 用户显式指定的文件路径
-2. `skills/.standardization/universal-file-ops/data/backup/`（备份文件）
-3. `skills/.standardization/universal-file-ops/data/logs/ops.log`（操作日志）
+2. 备份目录（备份文件）
+3. 操作日志目录（日志文件）
 
 ---
 
@@ -101,17 +101,11 @@
 
 ## 审计与回溯
 
-所有操作记录在：
-```
-skills/.standardization/universal-file-ops/data/logs/ops.log
-```
+所有操作记录在操作日志文件中。
 
 格式：`[timestamp] OK|FAIL | action | file_path | rollback=... | detail`
 
-备份文件记录在：
-```
-skills/.standardization/universal-file-ops/data/backup/manifest.txt
-```
+备份文件记录在备份目录的 manifest.txt 中。
 
 回滚操作：
 ```bash

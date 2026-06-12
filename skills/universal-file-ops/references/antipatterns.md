@@ -36,8 +36,8 @@ LLM 或用户为了适配某个特定场景，直接编辑 `scripts/text_crud.py
 
 **正确做法：**
 - `SKILL.md` 只保留触发场景、核心能力概述、快速开始示例
-- 详细的 API 参考、参数说明放到 `references/api.md`
-- 使用示例放到 `references/examples.md`
+- 详细的 API 参考、参数说明放到独立的 API 文档文件
+- 使用示例放到独立的示例文档文件
 
 ---
 

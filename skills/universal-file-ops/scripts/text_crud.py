@@ -33,6 +33,7 @@ from utils import (
     ensure_data_dirs,
     is_safe_path,
     file_content_eq,
+    atomic_write,
     print_output,
 )
 
@@ -72,8 +73,7 @@ def do_create(
         if backup:
             rollback_id = backup_file(file_path, operation="create_overwrite")
     os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-    with open(file_path, "w", encoding=encoding) as f:
-        f.write(content)
+    atomic_write(file_path, content, encoding)
     return {
         "content": content,
         "encoding": encoding,
@@ -97,19 +97,16 @@ def do_update(
     rollback_id = backup_file(file_path, operation="update") if backup else None
 
     if mode == "replace":
-        with open(file_path, "w", encoding=encoding) as f:
-            f.write(content)
+        atomic_write(file_path, content, encoding)
     elif mode == "append":
-        with open(file_path, "a", encoding=encoding) as f:
-            f.write(content)
+        atomic_write(file_path, content, encoding, mode="a")
     elif mode == "insert":
         if line is None:
             raise ValueError("mode=insert 时必须指定 --line")
         with open(file_path, "r", encoding=encoding) as f:
             lines = f.readlines()
         lines.insert(line, content if content.endswith("\n") else content + "\n")
-        with open(file_path, "w", encoding=encoding) as f:
-            f.writelines(lines)
+        atomic_write(file_path, lines, encoding)
     else:
         raise ValueError(f"不支持的 mode: {mode}")
     return {
