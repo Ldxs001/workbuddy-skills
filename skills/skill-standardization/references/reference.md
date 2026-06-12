@@ -1044,25 +1044,26 @@ progress = load_progress('.standardization/skill-standardization')
 print(format_progress('.standardization/skill-standardization'))
 ```
 ---
-### scripts/fix.py
+### scripts/skill_audit/fix.py（通过 `audit --fix` 调用）
 **功能**: 统一修复入口，根据审计结果自动修复可修复的规则违规（覆盖 R-01~R-25）。
-**子命令**: `audit`（默认，根据审计结果修复）、`fix`（强制修复指定规则）
+**调用方式**: `python -m scripts.skill_audit audit <skill-dir> --fix`
+或使用子命令: `python -m scripts.skill_audit fix <skill_dir> --key <fix_key>`
 **用法**:
 ```bash
-python scripts/fix.py audit <skill_dir> [--rules R-01,R-02,...]
-python scripts/fix.py fix <skill_dir> --rule R-11 --params '{"violations": [...]}'
+python -m scripts.skill_audit audit <skill-dir> --fix
+python -m scripts.skill_audit fix <skill_dir> --key R-11
 ```
 **参数说明**:
-| 子命令 | 参数 | 说明 | 必需 | 默认值 |
+| 命令 | 参数 | 说明 | 必需 | 默认值 |
 |---------|------|------|------|--------|
-| `audit` | `skill_dir` | 目标技能根目录路径 | 是 | — |
-| `audit` | `--rules` | 仅修复指定的规则（逗号分隔） | 否 | 所有可修复规则 |
+| `audit --fix` | `skill-dir` | 目标技能根目录路径 | 是 | — |
+| `audit --fix` | `--fix` | 自动修复可修复规则 | 是 | off |
 | `fix` | `skill_dir` | 目标技能根目录路径 | 是 | — |
-| `fix` | `--rule` | 要修复的规则 ID（如 `R-11`） | 是 | — |
-| `fix` | `--params` | 修复所需的参数（JSON 格式） | 否 | `{}` |
+| `fix` | `--key` | 要修复的 fix key | 是 | — |
+| `fix` | `--dry-run` | 仅模拟不修改 | 否 | false |
 ---
 ### scripts/skill_audit/fix.py
-**功能**: 规则级修复函数库，提供每个规则（R-01~R-25）的独立修复函数，供 `scripts/fix.py` 调用。
+**功能**: 规则级修复函数库，提供每个规则（R-01~R-25）的独立修复函数，供 `audit --fix` 或 `audit fix` 子命令调用。
 **Python API 示例**:
 ```python
 from skill_audit.fix import apply_fix, list_fixable_rules

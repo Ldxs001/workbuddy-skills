@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.72.0
+version: 2.73.2
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -14,6 +14,7 @@ trigger: ['帮我看看这个技能写得怎么样', '检查这个技能是否�
 trigger_negative: 当用户仅闲聊或问你有什么技能时不触发；单步任务如查看文件不触发
 meta_field_sync: true
 h1_position: true
+data_dir_compliance: true
 ---
 # skill-standardization
 
@@ -95,7 +96,7 @@ h1_position: true
 | 用户请求包含 | → 模式 | → 执行命令 |
 |-------------|--------|-----------|
 | 仅审查/仅检查/看结果/不要改任何东西 | **audit** | `python -m scripts.skill_audit audit <skill_dir>` |
-| 创建/生成/新建/把 xxx做成skill | **create** | `python -m scripts.skill_builder create <name> --desc "描述"` |
+| 创建/生成/创建/把 xxx做成skill | **create** | `python -m scripts.skill_builder create <name> --desc "描述"` |
 | 审计/检查/审查/评估/更新/修复/升级/跑一遍规范/做个体检 | **update** | `python -m scripts.skill_audit audit <skill_dir> --fix` |
 | 改造/重构/迁移/大改/标准化/规范化 | **refactor** | `python -m scripts.skill_audit refactor <skill_dir>` |
 | 升版本/版本号更新（内部流程自动触发，非用户主动请求） | **bump** | `python -m scripts.skill_audit bump <skill_dir>` |
@@ -117,7 +118,7 @@ h1_position: true
 → 修复指引获取：`python -m scripts.skill_audit audit <skill_dir> --show-fix 1,3,4`
 
 **create 模式**（创建新技能——从零开始生成骨架）：
-- **适用场景**：用户说"创建/生成/新建一个技能，把 xxx 做成 skill"
+- **适用场景**：用户说"创建/生成/创建一个技能，把 xxx 做成 skill"
 - **不适用**：用户说"审查/改造/更新已有技能"
 - 流程：骨架生成 → 填充内容 → audit 验证 → cleanup
 - 命令：`python -m scripts.skill_builder create <name> --desc "描述"`
@@ -135,11 +136,35 @@ h1_position: true
 - 命令：`python -m scripts.skill_audit refactor <skill_dir>`
 
 
+## 快速开始
+
+### 场景 1：审计（仅检查）
+
+```bash
+python -m scripts.skill_audit audit /path/to/target-skill --confirmed
+# → PASS (25/25 通过)
+```
+
+### 场景 2：审计+修复
+
+```bash
+python -m scripts.skill_audit audit /path/to/target-skill --fix --confirmed
+# → 修正后 PASS
+```
+
+### 场景 3：全流程改造
+
+```bash
+python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
+# → 1/7 蓝皮书 → 2/7 备份 → 3/7 审计 → 4/7 修复 → 5/7 验证 → 6/7 bump → 7/7 清理
+```
+
+
 ## 数据目录说明
 
 本技能的数据文件（审查缓存、进度文件、备份、日志等）存放在：
 
-```
+```text
 ../.standardization/skill-standardization/
 ```
 

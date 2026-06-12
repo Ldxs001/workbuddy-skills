@@ -1,3 +1,20 @@
+## 2.73.2 (2026-06-12)
+
+### fix
+- **修复 `_dead_code_backup/permission_checks.py` 语法错误**: line 408 未闭合 f-string，改为显式 `
+` 拼接
+
+## 2.73.1 (2026-06-12)
+- [fix] refactor 自改造: 清理测试产物 + 语义门禁 --confirmed 流程走通
+
+## 2.73.0 (2026-06-12)
+
+### feature
+- **`--confirmed` 语义门禁钩子** — audit/refactor/create/update 入口必须传 `--confirmed` 才放行，否则 exit(0) 阻断。脚本级强制，不再靠 LLM 自觉
+
+### fix
+- **refactor 模式 `shutil.make_archive` 崩溃修复** — Python 3.13 不支持 `ignore` 参数，改用 `zipfile` 模块
+
 ## 2.72.0 (2026-06-10)
 
 ### refactor
@@ -69,11 +86,11 @@
 ## 2.65.4 (2026-06-10)
 
 ### 修复
-- **移除所有 `.workbuddy` 依赖** — fix_map 路径从 `<skill>/.workbuddy/` 改为标准化数据目录 `<skill>/.standardization/<skill>/data/`。技能不再绑定 WorkBuddy 平台
-- **`--verify` 输出版本化** — 输出头改为 `[VERIFY v1]`，`--show-fix` 改为 `[SHOW-FIX v1]`。格式固定后 LLM 解析稳定，版本号变更时 LLM 能感知
+- **删除所有 `.workbuddy` 依赖** — fix_map 路径从 `<skill>/.workbuddy/` 改为标准化数据目录 `<skill>/.standardization/<skill>/data/`。技能不再绑定 WorkBuddy 平台
+- **`--verify` 输出版本化** — 输出头改为 `[VERIFY v1]`，`--show-fix` 改为 `[SHOW-FIX v1]`。格式固定后 LLM 解析稳定，版本号更新时 LLM 能感知
 - **`--show-fix` 空结果防护** — 所有指定 ID 均未找到时输出明确提示，避免 LLM 误判
-- **data_dir_checker 修复** — 移除 `.workbuddy` 白名单，改为跳过 `.standardization/` 目录（标准化数据目录，跨平台）
-- **R-22: `.standardization/` 目录跳过** — 原有的 scripts/references 跳过逻辑新增 `.standardization/`，修复变更不再触发 R-22 违规
+- **data_dir_checker 修复** — 删除 `.workbuddy` 白名单，改为跳过 `.standardization/` 目录（标准化数据目录，跨平台）
+- **R-22: `.standardization/` 目录跳过** — 原有的 scripts/references 跳过逻辑新增 `.standardization/`，修复更新不再触发 R-22 违规
 
 ### 影响
 - `__init__.py`：fix_map 路径 + 输出格式版本化
@@ -140,7 +157,7 @@
 ## 2.63.5 (2026-06-05)
 
 ### 修复
-- __init__.py: 移除二段筛查文本附录、移除 has_fixable sys.exit(1) 死循环、移除 --fix 后二次附录、修复 0处修正死循环; structure_checker.py: 移除 R-24 data/目录过度扫描; fix.py: 移除 changelog_progressive fix_key
+- __init__.py: 删除二段筛查文本附录、删除 has_fixable sys.exit(1) 死循环、删除 --fix 后二次附录、修复 0处修正死循环; structure_checker.py: 删除 R-24 data/目录过度扫描; fix.py: 删除 changelog_progressive fix_key
 
 ---
 
@@ -154,7 +171,7 @@
 ## 2.63.3 (2026-06-05)
 
 ### 修复
-- 铁律8: 明确定义误判判定边界，禁止LLM修改/放宽规则；增加二段筛查输出格式模板(强制逐条填写)
+- 铁律8: 明确定义误判判定边界，禁止LLM更新/放宽规则；增加二段筛查输出格式模板(强制逐条填写)
 
 ---
 

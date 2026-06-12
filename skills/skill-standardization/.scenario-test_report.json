@@ -1,0 +1,156 @@
+{
+  "summary": {
+    "total": 13,
+    "pass": 12,
+    "fail": 0,
+    "skip": 1,
+    "block": 0,
+    "warn": 0,
+    "info": 13
+  },
+  "results": [
+    {
+      "sid": "S1",
+      "name": "触发场景「帮我看看这个技能写得怎么样」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「检查这个技能是否规范」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「创建新技能」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「重构技能」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「R-规则」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「标准化这个项目- 帮我看看这个技能写得怎么样」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「检查这个技能是否规范」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「创建新技能」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「重构技能」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景「R-规则」",
+      "status": "pass",
+      "level": "info",
+      "message": "由外部编排实现，无直接 CLI",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S1",
+      "name": "触发场景执行汇总",
+      "status": "pass",
+      "level": "info",
+      "message": "执行了 77 个 CLI 命令",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S2",
+      "name": "核心能力执行汇总",
+      "status": "pass",
+      "level": "info",
+      "message": "执行了 14 个 CLI 命令",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    },
+    {
+      "sid": "S3",
+      "name": "工作流链路",
+      "status": "skip",
+      "level": "info",
+      "message": "无工作流程",
+      "file": "",
+      "lineno": 0,
+      "suggestion": "",
+      "detail": ""
+    }
+  ]
+}

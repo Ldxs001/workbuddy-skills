@@ -669,7 +669,7 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
 
 def cmd_audit(args):
     """审查单个 skill 目录"""
-    _semantic_precheck('audit', getattr(args, 'skill_dir', None))
+    _semantic_precheck('audit', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
     # 强制 UTF-8 输出（Windows 终端兼容）
     if hasattr(sys.stdout, "reconfigure"):
         try:
@@ -1160,11 +1160,11 @@ def cmd_bump(args):
     print(f"{'='*55}")
 
 
-def _semantic_precheck(command, skill_dir=None):
+def _semantic_precheck(command, skill_dir=None, confirmed=False):
     """
     语义前置检查（代码强制，非 LLM 自觉）。
     在进入 create/update/refactor/audit 之前输出模式选择对照表，
-    强制 LLM 在校验模式后再确认，无法跳过。
+    必须带 --confirmed 参数才放行，否则 exit(0) 阻断。
     """
     modes = {
         'audit': '仅审查，不修改。适用于查看技能合规状态、检查 FAIL 项',
@@ -1191,6 +1191,10 @@ def _semantic_precheck(command, skill_dir=None):
         print(f"  目标技能：{os.path.basename(skill_dir)}")
     print(f"  模式不匹配请中止后重新选择，匹配则继续执行")
     print(f"{'='*55}")
+    if not confirmed:
+        print(f"\n  ⛔ 未传入 --confirmed 参数，拒绝执行。")
+        print(f"  请确认模式正确后重新运行: python -m scripts.skill_audit {command} <skill-dir> --confirmed")
+        sys.exit(0)
 
 
 def cmd_refactor(args):
@@ -1198,7 +1202,7 @@ def cmd_refactor(args):
     refactor 子命令：强制全流程改造（蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 版本升级 → 清理）
     每一步用 exit code 阻断，LLM 无法跳步。
     """
-    _semantic_precheck('refactor', getattr(args, 'skill_dir', None))
+    _semantic_precheck('refactor', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
     import shutil, datetime
 
     skill_dir = os.path.abspath(args.skill_dir)
@@ -1227,21 +1231,20 @@ def cmd_refactor(args):
     print(f"\n{'─'*55}")
     print(f"  [2/7] 创建备份")
     print(f"{'─'*55}")
+    backup_id = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     backup_dir = os.path.join(
         os.path.dirname(skill_dir), '.standardization',
-        os.path.basename(skill_dir), 'backup',
-        datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        os.path.basename(skill_dir), 'backup')
     os.makedirs(backup_dir, exist_ok=True)
-    for item in os.listdir(skill_dir):
-        if item.startswith('.'):
-            continue
-        s = os.path.join(skill_dir, item)
-        d = os.path.join(backup_dir, item)
-        if os.path.isdir(s):
-            shutil.copytree(s, d, ignore=shutil.ignore_patterns('__pycache__', '.git'))
-        else:
-            shutil.copy2(s, d)
-    print(f"  ✅ 备份到 {backup_dir}")
+    zip_path = os.path.join(backup_dir, f"pre_refactor_{backup_id}")
+    # Python 3.13 shutil.make_archive 不支持 ignore 参数，改用 zipfile
+    with __import__('zipfile').ZipFile(zip_path + '.zip', 'w', __import__('zipfile').ZIP_DEFLATED) as _zf:
+        for _root, _dirs, _files in os.walk(skill_dir):
+            _dirs[:] = [d for d in _dirs if d not in ('__pycache__', '.git', '.standardization')]
+            for _f in _files:
+                _fp = os.path.join(_root, _f)
+                _zf.write(_fp, os.path.relpath(_fp, skill_dir))
+    print(f"  ✅ 备份到 {zip_path}.zip")
 
     # ── 步骤 3：审计（强制） ──
     print(f"\n{'─'*55}")
@@ -1360,7 +1363,7 @@ def cmd_create(args):
     create 子命令：全流程创建新技能
     骨架生成 → 审计 → 报告
     """
-    _semantic_precheck('create', getattr(args, 'skill_dir', None))
+    _semantic_precheck('create', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
     skill_dir = os.path.abspath(args.skill_dir)
     skill_name = os.path.basename(skill_dir)
     desc = getattr(args, 'desc', '')
@@ -1458,7 +1461,7 @@ def cmd_update(args):
     审计 → 修复 → 验证 → bump
     （相比 refactor，省略蓝皮书扫描和备份）
     """
-    _semantic_precheck('update', getattr(args, 'skill_dir', None))
+    _semantic_precheck('update', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
     skill_dir = os.path.abspath(args.skill_dir)
     bump_type = getattr(args, 'bump_type', 'fix')
     bump_desc = getattr(args, 'desc', '')
@@ -1548,6 +1551,7 @@ def main():
     p_audit.add_argument("--manifest-version", metavar="VER", help="manifest 中记录的版本号（用于 R-10）")
     p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
     p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
+    p_audit.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
     p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
     p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
     p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（逗号分隔，如 2,5），后续 bump 自动跳过")
@@ -1599,11 +1603,13 @@ def main():
                             help="manifest 中记录的版本号（用于 R-10）")
     p_refactor.add_argument("--continue", dest="refactor_continue", action="store_true",
                             help="从上一次中断处继续")
+    p_refactor.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
 
     # create 子命令（v2.66.0 新增）
     p_create = subparsers.add_parser("create", help="全流程创建新技能：骨架生成 → 审计 → 报告")
     p_create.add_argument("skill_dir", help="技能目录路径（目录名将作为技能名）")
     p_create.add_argument("--desc", default="", help="技能描述")
+    p_create.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
 
     # update 子命令（v2.66.0 新增）
     p_update = subparsers.add_parser("update", help="轻量更新：审计 → 修复 → 验证 → bump")
@@ -1613,6 +1619,7 @@ def main():
     p_update.add_argument("--desc", default="", help="变更描述（将写入 changelog）")
     p_update.add_argument("--manifest-version", metavar="VER",
                           help="manifest 中记录的版本号（用于 R-10）")
+    p_update.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
 
     args = parser.parse_args()
 

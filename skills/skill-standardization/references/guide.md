@@ -451,9 +451,10 @@ A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需
 
 | 脚本 | 参数 | 说明 |
 |---|------|------|
-| `scripts/chain_manager.py` | `--list`, `--create` | 调用链管理 |
+| `scripts/skill_sub/` | 调用链管理模块 | 调用链管理 |
+| `scripts/skill_sub/runner.py` | `--list`, `--create` | 调用链运行器 |
 
-> 💡 可直接 `python scripts/chain_manager.py --list` 查看所有调用链。
+> 💡 可直接 `python scripts/skill_sub/runner.py --list` 查看所有调用链。
 ```
 
 **示例（通过）：**

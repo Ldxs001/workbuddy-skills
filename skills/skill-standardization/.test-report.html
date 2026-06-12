@@ -1,0 +1,1991 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测试报告: skill-standardization</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
+<style>
+:root {
+  --primary: #534AB7; --success: #3B6D11; --danger: #A32D2D;
+  --warning: #854F0B; --info: #185FA5; --bg: #f8f9fa;
+  --card: #ffffff; --border: #dee2e6; --text: #212529; --text-muted: #6c757d;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 20px; }
+.container { max-width: 960px; margin: 0 auto; }
+.header { background: var(--primary); color: white; padding: 24px 32px; border-radius: 12px; margin-bottom: 24px; }
+.header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.header p { opacity: 0.85; font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+.card h2 { font-size: 16px; font-weight: 600; margin-bottom: 14px; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat-box { text-align: center; padding: 14px; background: var(--bg); border-radius: 8px; }
+.stat-box .num { font-size: 24px; font-weight: 700; }
+.stat-box .label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.stat-box.pass .num { color: var(--success); }
+.stat-box.fail .num { color: var(--danger); }
+.stat-box.warn .num { color: var(--warning); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--bg); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-muted); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-danger { background: #FCEBEB; color: var(--danger); }
+.badge-warning { background: #FAEEDA; color: var(--warning); }
+.badge-info { background: #E6F1FB; color: var(--info); }
+.row-danger { background: #FFF5F5; }
+.row-warning { background: #FFFBF0; }
+.row-info { background: #F5F9FF; }
+.timing-table { margin-top: 10px; }
+.timing-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.stats-info { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.stats-table { width: auto; }
+.stats-table td { padding: 4px 16px 4px 0; }
+.chart-container { max-width: 600px; margin: 16px auto; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>测试报告: skill-standardization</h1>
+  <p>生成时间: 2026-06-12T10:23:11.968</p>
+</div>
+
+<div class="card">
+  <h2>1. 测试概览</h2>
+  <div class="grid">
+    <div class="stat-box pass"><div class="num">12/13</div><div class="label">场景测试通过</div></div>
+    <div class="stat-box pass"><div class="num">448/587</div><div class="label">功能测试通过</div></div>
+    <div class="stat-box fail"><div class="num">1</div><div class="label">F-0 BLOCK</div></div>
+    <div class="stat-box warn"><div class="num">138</div><div class="label">F-1 WARN</div></div>
+    <div class="stat-box"><div class="num">0</div><div class="label">F-2 INFO</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. 计时统计</h2>
+  <table class="timing-table">
+    <tr><td>总耗时</td><td><strong>24.89s</strong></td></tr>
+    <tr><td>脚本执行</td><td>23.601s</td></tr>
+    <tr><td>LLM 处理（推导）</td><td>1.289s</td></tr>
+    <tr><td>目标技能调用</td><td><strong>13.515s</strong></td></tr>
+  </table>
+  
+  
+  
+  <h3 style="margin-top:14px;font-size:14px;font-weight:600;color:#534AB7;">单步耗时细目</h3>
+  <table class="timing-table">
+    <tr><th>步骤</th><th>类型</th><th>调用次数</th><th>总耗时 (s)</th></tr>
+    <tr><td>S1</td><td>py_script</td><td>1</td><td>14.526</td></tr>
+    <tr><td>S2</td><td>py_script</td><td>1</td><td>2.779</td></tr>
+    <tr><td>S3</td><td>py_script</td><td>1</td><td>0.067</td></tr>
+    <tr><td>backup</td><td>py_script</td><td>1</td><td>0.125</td></tr>
+    <tr><td>blueprint</td><td>py_script</td><td>3</td><td>1.068</td></tr>
+    <tr><td>d1_smoke</td><td>py_script</td><td>1</td><td>3.401</td></tr>
+    <tr><td>d1_subprocess</td><td>subprocess_wall</td><td>16</td><td>2.081</td></tr>
+    <tr><td>d2_breakpoint</td><td>py_script</td><td>1</td><td>0.069</td></tr>
+    <tr><td>d3_contamination</td><td>py_script</td><td>1</td><td>0.078</td></tr>
+    <tr><td>d4_noise</td><td>py_script</td><td>1</td><td>0.077</td></tr>
+    <tr><td>d5_correctness</td><td>py_script</td><td>1</td><td>0.090</td></tr>
+    <tr><td>d6_robustness</td><td>py_script</td><td>1</td><td>0.167</td></tr>
+    <tr><td>function_test</td><td>py_script</td><td>2</td><td>9.261</td></tr>
+    <tr><td>scenario</td><td>py_script</td><td>2</td><td>35.840</td></tr>
+    <tr><td>target_S1</td><td>subprocess_wall</td><td>77</td><td>9.638</td></tr>
+    <tr><td>target_S2</td><td>subprocess_wall</td><td>14</td><td>1.796</td></tr>
+    
+  </table>
+</div>
+
+<div class="card">
+  <h2>3. 问题列表</h2>
+  
+  <table>
+    <tr><th>级别</th><th>来源</th><th>名称</th><th>消息</th><th>位置</th><th>建议</th></tr>
+    
+    <tr class="row-danger">
+      <td><span class="badge badge-danger">BLOCK</span></td>
+      <td>D1</td>
+      <td>语法错误: scripts\_dead_code_backup\permission_checks.</td>
+      <td>unterminated f-string literal (detected at line 408) (<unknown>, line 408)</td>
+      <td>scripts\_dead_code_backup\permission_checks.py:408</td>
+      <td>修复语法错误</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>空文件: scripts\__init__.py</td>
+      <td>scripts\__init__.py</td>
+      <td>0:文件内容为空</td>
+      <td></td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>空文件: scripts\skill_audit\utils_restored.py</td>
+      <td>scripts\skill_audit\utils_restored.py</td>
+      <td>0:文件内容为空</td>
+      <td></td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\skill_inspector.py</td>
+      <td>exit code 1: </td>
+      <td>scripts\skill_inspector.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\skill_audit\data_dir_checker.py</td>
+      <td>exit code 1: ddy\skills\skill-standardization\scripts\skill_audit\data_dir_checker.py", line 22, in </td>
+      <td>scripts\skill_audit\data_dir_checker.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\skill_audit\__init__.py</td>
+      <td>exit code 1: ills\skill-standardization\scripts\skill_audit\__init__.py", line 34, in <module>
+    f</td>
+      <td>scripts\skill_audit\__init__.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\skill_audit\__main__.py</td>
+      <td>exit code 1: "C:\Users\sm001\.workbuddy\skills\skill-standardization\scripts\skill_audit\__main__.py</td>
+      <td>scripts\skill_audit\__main__.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\skill_builder\__init__.py</td>
+      <td>exit code 1: orkbuddy\skills\skill-standardization\scripts\skill_builder\__init__.py", line 30, in <</td>
+      <td>scripts\skill_builder\__init__.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\skill_builder\__main__.py</td>
+      <td>exit code 1: :\Users\sm001\.workbuddy\skills\skill-standardization\scripts\skill_builder\__main__.py</td>
+      <td>scripts\skill_builder\__main__.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D1</td>
+      <td>启动失败: scripts\_dead_code_backup\__main__.py</td>
+      <td>exit code 1: ers\sm001\.workbuddy\skills\skill-standardization\scripts\_dead_code_backup\__main__.py</td>
+      <td>scripts\_dead_code_backup\__main__.py:0</td>
+      <td>检查 __main__ 入口和依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D2</td>
+      <td>引用文件不存在</td>
+      <td>guide.md → scripts/skill_sub/runner.py</td>
+      <td>guide.md:0</td>
+      <td>创建缺失文件 scripts/skill_sub/runner.py 或修正引用路径</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D2</td>
+      <td>引用文件不存在</td>
+      <td>reference.md → references/xxx.md</td>
+      <td>reference.md:0</td>
+      <td>创建缺失文件 references/xxx.md 或修正引用路径</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D2</td>
+      <td>引用文件不存在</td>
+      <td>rules.md → references/xxx.md</td>
+      <td>rules.md:0</td>
+      <td>创建缺失文件 references/xxx.md 或修正引用路径</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D2</td>
+      <td>引用文件不存在</td>
+      <td>rules.md → references/xxx.md</td>
+      <td>rules.md:0</td>
+      <td>创建缺失文件 references/xxx.md 或修正引用路径</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D3</td>
+      <td>多处文件删除操作</td>
+      <td>11 个删除操作分布于不同文件</td>
+      <td>scripts\cleanup_manager.py:316</td>
+      <td>确认删除操作是否集中管理，避免误删</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D3</td>
+      <td>DB 路径可能硬编码</td>
+      <td>".yml":     "data",   ".db":    "data",   ".sqlite": "data",</td>
+      <td>scripts\skill_audit\utils.py:317</td>
+      <td>使用变量引用而非硬编码路径</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json_str)</td>
+      <td>scripts\authorization_manager.py:516</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法: python cleanup_manager.py <skill_dir> [--dry-run]")</td>
+      <td>scripts\cleanup_manager.py:348</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("-" * 70)</td>
+      <td>scripts\json_loader.py:106</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(data, ensure_ascii=False, indent=2))</td>
+      <td>scripts\json_loader.py:120</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(data, ensure_ascii=False, indent=2))</td>
+      <td>scripts\json_loader.py:160</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("\n📊 全量依赖关系图:")</td>
+      <td>scripts\json_loader.py:170</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("   all")</td>
+      <td>scripts\json_loader.py:171</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("_ops.log written:", OPS_LOG)</td>
+      <td>scripts\op_logger.py:147</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(e)</td>
+      <td>scripts\op_logger.py:149</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[OK] op_logger.log_modify() 已注入")</td>
+      <td>scripts\op_logger_patch.py:67</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[OK] utils.py — RULES 列表增加 R-24")</td>
+      <td>scripts\patch_utils.py:34</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[WARN] 未找到精确插入点，尝试在 ] 前插入")</td>
+      <td>scripts\patch_utils.py:36</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[OK] utils.py — 备用方案插入 R-24")</td>
+      <td>scripts\patch_utils.py:45</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[ERROR] 无法找到插入位置")</td>
+      <td>scripts\patch_utils.py:47</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(report, indent=2, ensure_ascii=False))</td>
+      <td>scripts\permission_checker.py:952</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(result, ensure_ascii=False, indent=2))</td>
+      <td>scripts\safe_io.py:345</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(result, ensure_ascii=False, indent=2))</td>
+      <td>scripts\safe_io.py:351</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(result, ensure_ascii=False, indent=2))</td>
+      <td>scripts\safe_io.py:357</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("Usage: python -m scripts.skill_inspector <skill-dir> [--json]")</td>
+      <td>scripts\skill_inspector.py:348</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("只读操作，输出 skill 蓝皮书：结构、AST函数签名、引用链路")</td>
+      <td>scripts\skill_inspector.py:349</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用于 update/refactor 前的全貌扫描")</td>
+      <td>scripts\skill_inspector.py:350</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(result)</td>
+      <td>scripts\skill_inspector.py:361</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("暂无备份记录")</td>
+      <td>scripts\skill_rollback.py:112</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_rollback.py:123</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("\n".join(diff))</td>
+      <td>scripts\skill_rollback.py:188</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(__doc__)</td>
+      <td>scripts\skill_rollback.py:194</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法: python skill_rollback.py rollback <rollback_id>")</td>
+      <td>scripts\skill_rollback.py:200</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法: python skill_rollback.py show <rollback_id>")</td>
+      <td>scripts\skill_rollback.py:211</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(__doc__)</td>
+      <td>scripts\skill_rollback.py:216</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("⚠️ 缺少 --confirm 参数。修改版本号是破坏性操作，请确认后加上 --confirm 再执行。")</td>
+      <td>scripts\update_all_versions.py:98</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("ALL DONE")</td>
+      <td>scripts\update_all_versions.py:111</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("部分操作失败，请检查")</td>
+      <td>scripts\update_all_versions.py:114</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法: python update_skill_frontmatter.py <skill_dir> [--set key=value ...] </td>
+      <td>scripts\update_skill_frontmatter.py:46</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("✅ 找到并替换了 run_audit 章节")</td>
+      <td>scripts\_fix_run_audit_docs.py:16</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("⚠️ 找到标题但未匹配完整章节，尝试手动修复")</td>
+      <td>scripts\_fix_run_audit_docs.py:20</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("✅ 正则匹配并替换成功")</td>
+      <td>scripts\_fix_run_audit_docs.py:27</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("❌ 无法匹配章节内容")</td>
+      <td>scripts\_fix_run_audit_docs.py:29</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("❌ 未找到 run_audit 章节")</td>
+      <td>scripts\_fix_run_audit_docs.py:32</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(result, ensure_ascii=False, indent=2))</td>
+      <td>scripts\_fix_run_audit_docs.py:39</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("    [OK] 更新 _meta.json: data_dir = " + expected)</td>
+      <td>scripts\skill_audit\artifact_checker.py:769</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("    [OK] 更新 " + fname + ": " + var_name + " → 标准路径")</td>
+      <td>scripts\skill_audit\artifact_checker.py:804</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法: python data_dir_checker.py <skill_dir> [--fix]")</td>
+      <td>scripts\skill_audit\data_dir_checker.py:200</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("=" * 60)</td>
+      <td>scripts\skill_audit\data_dir_checker.py:206</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  R-22 数据目录规范检查")</td>
+      <td>scripts\skill_audit\data_dir_checker.py:207</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("=" * 60)</td>
+      <td>scripts\skill_audit\data_dir_checker.py:208</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(issue)</td>
+      <td>scripts\skill_audit\data_dir_checker.py:213</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("\n─── 自动修复 ───────────────────────────────────────")</td>
+      <td>scripts\skill_audit\data_dir_checker.py:216</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  skill-standardization 创建模板（供 LLM 参考）")</td>
+      <td>scripts\skill_audit\__init__.py:559</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:576</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法：")</td>
+      <td>scripts\skill_audit\__init__.py:581</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  python -m skill_audit create-template")</td>
+      <td>scripts\skill_audit\__init__.py:582</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  python -m skill_audit create-template --json  （JSON 格式）")</td>
+      <td>scripts\skill_audit\__init__.py:583</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:584</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("-" * 65)</td>
+      <td>scripts\skill_audit\__init__.py:590</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:771</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:776</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(result, ensure_ascii=False, indent=2))</td>
+      <td>scripts\skill_audit\__init__.py:785</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps({</td>
+      <td>scripts\skill_audit\__init__.py:988</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:1003</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  详细逐项结果:")</td>
+      <td>scripts\skill_audit\__init__.py:1006</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:1011</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("可用修复 key（对应审计规则 R-01~R-25）:")</td>
+      <td>scripts\skill_audit\__init__.py:1026</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("\n用法: python -m skill_audit fix <skill_dir> --key <key> [--dry-run]")</td>
+      <td>scripts\skill_audit\__init__.py:1029</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("      python -m skill_audit fix <skill_dir> --key <key1> <key2> ...")</td>
+      <td>scripts\skill_audit\__init__.py:1030</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("R-03 版本号变更语义规则：")</td>
+      <td>scripts\skill_audit\__init__.py:1112</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  breaking (MAJOR.0.0) = 架构级重构/破坏性变更/核心引擎重写")</td>
+      <td>scripts\skill_audit\__init__.py:1113</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  feature  (x.MINOR.0) = 新增功能/已有功能重构/大面积描述修正/bug修复")</td>
+      <td>scripts\skill_audit\__init__.py:1114</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  fix      (x.y.PATCH) = 单处描述修正/参数拼写/路径修正/错别字")</td>
+      <td>scripts\skill_audit\__init__.py:1115</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_audit\__init__.py:1116</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  [WARN] 未找到 skill_inspector，跳过蓝皮书扫描")</td>
+      <td>scripts\skill_audit\__init__.py:1228</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(json.dumps(output, ensure_ascii=False, indent=2))</td>
+      <td>scripts\skill_audit\__init__.py:1655</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] 权限扫描无风险项，跳过 permissions.md 写入")</td>
+      <td>scripts\skill_builder\creator.py:702</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  Skill 结构扫描 — 了解全貌后再改造")</td>
+      <td>scripts\skill_builder\refactor.py:58</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(inspect_skill(str(skill_dir)))</td>
+      <td>scripts\skill_builder\refactor.py:60</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_builder\refactor.py:61</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] skill_inspector 未找到，跳过结构扫描")</td>
+      <td>scripts\skill_builder\refactor.py:63</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td>
+      <td>scripts\skill_builder\refactor.py:313</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td>
+      <td>scripts\skill_builder\refactor.py:412</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] SKILL.md 不存在，无法升级版本号")</td>
+      <td>scripts\skill_builder\refactor.py:452</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] SKILL.md frontmatter 中未找到 version 字段")</td>
+      <td>scripts\skill_builder\refactor.py:459</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_builder\updater.py:214</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_builder\updater.py:223</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] permission_checker.py 不存在，跳过授权检查")</td>
+      <td>scripts\skill_builder\updater.py:235</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td>
+      <td>scripts\skill_builder\updater.py:278</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  Skill 结构扫描 — 了解全貌后再改造")</td>
+      <td>scripts\skill_builder\updater.py:343</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(inspect_skill(str(skill_dir)))</td>
+      <td>scripts\skill_builder\updater.py:345</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\skill_builder\updater.py:346</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] skill_inspector 未找到，跳过结构扫描")</td>
+      <td>scripts\skill_builder\updater.py:348</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td>
+      <td>scripts\skill_builder\updater.py:435</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(result)</td>
+      <td>scripts\skill_builder\__init__.py:130</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("    [OK] 更新 _meta.json: data_dir = " + expected)</td>
+      <td>scripts\_dead_code_backup\artifact_checker.py:674</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("    [OK] 更新 " + fname + ": " + var_name + " → 标准路径")</td>
+      <td>scripts\_dead_code_backup\artifact_checker.py:709</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] 权限扫描无风险项，跳过 permissions.md 写入")</td>
+      <td>scripts\_dead_code_backup\creator.py:696</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("用法: python data_dir_checker.py <skill_dir> [--fix]")</td>
+      <td>scripts\_dead_code_backup\data_dir_checker.py:230</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("=" * 60)</td>
+      <td>scripts\_dead_code_backup\data_dir_checker.py:236</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("  R-22 数据目录规范检查")</td>
+      <td>scripts\_dead_code_backup\data_dir_checker.py:237</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("=" * 60)</td>
+      <td>scripts\_dead_code_backup\data_dir_checker.py:238</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print(issue)</td>
+      <td>scripts\_dead_code_backup\data_dir_checker.py:243</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("\n─── 自动修复 ───────────────────────────────────────")</td>
+      <td>scripts\_dead_code_backup\data_dir_checker.py:246</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td>
+      <td>scripts\_dead_code_backup\refactor.py:279</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td>
+      <td>scripts\_dead_code_backup\refactor.py:378</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] SKILL.md 不存在，无法升级版本号")</td>
+      <td>scripts\_dead_code_backup\refactor.py:418</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] SKILL.md frontmatter 中未找到 version 字段")</td>
+      <td>scripts\_dead_code_backup\refactor.py:425</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\_dead_code_backup\updater.py:168</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print()</td>
+      <td>scripts\_dead_code_backup\updater.py:177</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[!] permission_checker.py 不存在，跳过授权检查")</td>
+      <td>scripts\_dead_code_backup\updater.py:189</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td>
+      <td>scripts\_dead_code_backup\updater.py:232</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D4</td>
+      <td>裸 print 调用</td>
+      <td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td>
+      <td>scripts\_dead_code_backup\updater.py:339</td>
+      <td>建议使用 logging 替代 print</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D5</td>
+      <td>模块导入失败: scripts\skill_audit\fix</td>
+      <td>缺少依赖: attempted relative import with no known parent package</td>
+      <td>scripts\skill_audit\fix.py:0</td>
+      <td>检查是否缺少 pip 依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D5</td>
+      <td>模块导入失败: scripts\skill_audit\__init__</td>
+      <td>缺少依赖: No module named 'scripts\\skill_audit\\__init__'</td>
+      <td>scripts\skill_audit\__init__.py:0</td>
+      <td>检查是否缺少 pip 依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D5</td>
+      <td>模块导入失败: scripts\_dead_code_backup\fix</td>
+      <td>缺少依赖: attempted relative import with no known parent package</td>
+      <td>scripts\_dead_code_backup\fix.py:0</td>
+      <td>检查是否缺少 pip 依赖</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\authorization_manager.py: 1 个 except / 521 行</td>
+      <td>scripts\authorization_manager.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\json_loader.py: 0 个 except / 239 行</td>
+      <td>scripts\json_loader.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\update_skill_frontmatter.py: 0 个 except / 91 行</td>
+      <td>scripts\update_skill_frontmatter.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\skill_audit\fix.py: 10 个 except / 2294 行</td>
+      <td>scripts\skill_audit\fix.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\skill_audit\progress_manager.py: 0 个 except / 341 行</td>
+      <td>scripts\skill_audit\progress_manager.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\skill_audit\utils.py: 2 个 except / 589 行</td>
+      <td>scripts\skill_audit\utils.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\skill_builder\creator.py: 1 个 except / 804 行</td>
+      <td>scripts\skill_builder\creator.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\skill_builder\__init__.py: 0 个 except / 137 行</td>
+      <td>scripts\skill_builder\__init__.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\_dead_code_backup\creator.py: 1 个 except / 798 行</td>
+      <td>scripts\_dead_code_backup\creator.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\_dead_code_backup\fix.py: 4 个 except / 997 行</td>
+      <td>scripts\_dead_code_backup\fix.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\_dead_code_backup\frontmatter_checker.py: 0 个 except / 156 行</td>
+      <td>scripts\_dead_code_backup\frontmatter_checker.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+
+    <tr class="row-warning">
+      <td><span class="badge badge-warning">WARN</span></td>
+      <td>D6</td>
+      <td>异常处理覆盖率低</td>
+      <td>scripts\_dead_code_backup\progress_manager.py: 0 个 except / 341 行</td>
+      <td>scripts\_dead_code_backup\progress_manager.py:0</td>
+      <td>建议对可能抛异常的操作添加 try/except</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>4. 测试详情</h2>
+  <table>
+    <tr><th>测试</th><th>维度</th><th>状态</th><th>详情</th></tr>
+    <tr><td>SS1</td><td>触发场景「帮我看看这个技能写得怎么样」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「检查这个技能是否规范」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「创建新技能」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「重构技能」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「R-规则」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「标准化这个项目- 帮我看看这个技能写得怎么样」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「检查这个技能是否规范」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「创建新技能」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「重构技能」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景「R-规则」</td><td>PASS</td><td>由外部编排实现，无直接 CLI</td></tr>
+    <tr><td>SS1</td><td>触发场景执行汇总</td><td>PASS</td><td>执行了 77 个 CLI 命令</td></tr>
+    <tr><td>SS2</td><td>核心能力执行汇总</td><td>PASS</td><td>执行了 14 个 CLI 命令</td></tr>
+    <tr><td>SS3</td><td>工作流链路</td><td>FAIL</td><td>无工作流程</td></tr>
+    
+    <tr><td>D1</td><td>语法检查: scripts\authorization_manager.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\cleanup_manager.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\json_loader.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\op_logger.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\op_logger_patch.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\patch_utils.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\permission_checker.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\run_audit.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\safe_io.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_inspector.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_rollback.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\update_all_versions.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\update_skill_frontmatter.p</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_fix_run_audit_docs.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>空文件: scripts\__init__.py</td><td>FAIL</td><td>scripts\__init__.py</td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\artifact_check</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\data_dir_check</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\fix.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\frontmatter_ch</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\permission_che</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\progress_manag</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\structure_chec</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\utils.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>空文件: scripts\skill_audit\utils_restored.</td><td>FAIL</td><td>scripts\skill_audit\utils_restored.py</td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\_tree_scanner.</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\__init__.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_audit\__main__.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\creator.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\migrator.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\refactor.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\updater.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\utils.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\version_mana</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\__init__.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\skill_builder\__main__.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\artifact</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\creator.</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\data_dir</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\fix.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\frontmat</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\migrator</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法错误: scripts\_dead_code_backup\permissi</td><td>FAIL</td><td>unterminated f-string literal (detected at line 408) (<unknown>, line 408)</td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\progress</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\refactor</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\structur</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\updater.</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\utils.py</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\version_</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\_tree_sc</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>语法检查: scripts\_dead_code_backup\__main__</td><td>PASS</td><td></td></tr>
+    <tr><td>D1</td><td>运行时: scripts\authorization_manager.py --</td><td>PASS</td><td>exit code 0, stdout 515 chars</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\cleanup_manager.py --help</td><td>PASS</td><td>exit code 0, stdout 82 chars</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\json_loader.py --help</td><td>PASS</td><td>exit code 0, stdout 367 chars</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\op_logger.py --help</td><td>PASS</td><td>exit code 0, stdout 693 chars</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\permission_checker.py --hel</td><td>PASS</td><td>exit code 0, stdout 413 chars</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\safe_io.py --help</td><td>PASS</td><td>exit code 0, stdout 343 chars</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\skill_inspector.py</td><td>FAIL</td><td>exit code 1: </td></tr>
+    <tr><td>D1</td><td>运行时: scripts\skill_rollback.py --help</td><td>PASS</td><td>exit code 0, stdout 376 chars</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\update_all_versions.py --he</td><td>PASS</td><td>exit code 0, stdout 450 chars</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\skill_audit\data_dir_check</td><td>FAIL</td><td>exit code 1: ddy\skills\skill-standardization\scripts\skill_audit\data_dir_checker.py", line 22, in <module>
+    from .utils import _is_asset_dir
+ImportError: attempted relative import with no known parent package</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\skill_audit\__init__.py</td><td>FAIL</td><td>exit code 1: ills\skill-standardization\scripts\skill_audit\__init__.py", line 34, in <module>
+    from .utils import (
+    ...<6 lines>...
+    )
+ImportError: attempted relative import with no known parent package</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\skill_audit\__main__.py</td><td>FAIL</td><td>exit code 1: "C:\Users\sm001\.workbuddy\skills\skill-standardization\scripts\skill_audit\__main__.py", line 7, in <module>
+    from . import main
+ImportError: attempted relative import with no known parent package</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\skill_builder\__init__.py</td><td>FAIL</td><td>exit code 1: orkbuddy\skills\skill-standardization\scripts\skill_builder\__init__.py", line 30, in <module>
+    from .creator import SkillCreator
+ImportError: attempted relative import with no known parent package</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\skill_builder\__main__.py</td><td>FAIL</td><td>exit code 1: :\Users\sm001\.workbuddy\skills\skill-standardization\scripts\skill_builder\__main__.py", line 6, in <module>
+    from . import main
+ImportError: attempted relative import with no known parent package</td></tr>
+    <tr><td>D1</td><td>运行时: scripts\_dead_code_backup\data_dir_</td><td>PASS</td><td>exit code 0, stdout 150 chars</td></tr>
+    <tr><td>D1</td><td>启动失败: scripts\_dead_code_backup\__main__</td><td>FAIL</td><td>exit code 1: ers\sm001\.workbuddy\skills\skill-standardization\scripts\_dead_code_backup\__main__.py", line 6, in <module>
+    from . import main
+ImportError: attempted relative import with no known parent package</td></tr>
+    <tr><td>D2</td><td>引用文件不存在</td><td>FAIL</td><td>guide.md → scripts/skill_sub/runner.py</td></tr>
+    <tr><td>D2</td><td>引用文件不存在</td><td>FAIL</td><td>reference.md → references/xxx.md</td></tr>
+    <tr><td>D2</td><td>引用文件不存在</td><td>FAIL</td><td>rules.md → references/xxx.md</td></tr>
+    <tr><td>D2</td><td>引用文件不存在</td><td>FAIL</td><td>rules.md → references/xxx.md</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\authorization_manager.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: uuid</td><td>PASS</td><td>scripts\cleanup_manager.py → uuid</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\json_loader.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: op_logger</td><td>PASS</td><td>scripts\op_logger_patch.py → op_logger</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\permission_checker.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: tokenize</td><td>PASS</td><td>scripts\permission_checker.py → tokenize</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\permission_checker.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\run_audit.py → scripts.skill_audit.main</td></tr>
+    <tr><td>D2</td><td>外部依赖: io</td><td>PASS</td><td>scripts\safe_io.py → io</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\safe_io.py → scripts.cleanup_manager.register</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\safe_io.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\safe_io.py → scripts.cleanup_manager.register_backup</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\skill_inspector.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: glob</td><td>PASS</td><td>scripts\skill_rollback.py → glob</td></tr>
+    <tr><td>D2</td><td>外部依赖: difflib</td><td>PASS</td><td>scripts\skill_rollback.py → difflib</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\update_all_versions.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\update_skill_frontmatter.py → scripts.safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\_fix_run_audit_docs.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._KNOWN_ROOT_FILES</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._KNOWN_STANDARD_DIRS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._ARTIFACT_DIR_CLASSIFY</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._ARTIFACT_EXTS_COMPREHENSIVE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._ROOT_ARTIFACT_EXTS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._ROOT_EXT_CLASSIFY</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._ARTIFACT_WRITE_PATTERNS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._HARDCODED_PATH_RE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._PATH_EXCLUDE_RE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._is_hardcoded_path</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._classify_artifact</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._classify_artifact_by_ext</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._extract_path_literal</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._find_skills_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils._is_asset_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\artifact_checker.py → utils.parse_simple_yaml_frontmatter</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\data_dir_checker.py → utils._is_asset_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: io</td><td>PASS</td><td>scripts\skill_audit\fix.py → io</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\fix.py → utils._fmt_frontmatter_value</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\fix.py → utils.parse_simple_yaml_frontmatter</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\skill_audit\fix.py → artifact_checker.fix_external_data_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: data_dir_checker</td><td>PASS</td><td>scripts\skill_audit\fix.py → data_dir_checker.fix_data_dir_compliance</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\skill_audit\fix.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\skill_audit\fix.py → artifact_checker.check_artifact_paths</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\fix.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: permission_checker</td><td>PASS</td><td>scripts\skill_audit\permission_checks.py → permission_checker.PermissionChecker</td></tr>
+    <tr><td>D2</td><td>外部依赖: warnings</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → warnings</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → utils.TRIGGER_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → utils.CORE_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → utils.WORKFLOW_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → utils.CORE_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → utils.WORKFLOW_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: py_compile</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → py_compile</td></tr>
+    <tr><td>D2</td><td>外部依赖: _tree_scanner</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → _tree_scanner._check_directory_tree</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\skill_audit\structure_checker.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: warnings</td><td>PASS</td><td>scripts\skill_audit\__init__.py → warnings</td></tr>
+    <tr><td>D2</td><td>外部依赖: warnings</td><td>PASS</td><td>scripts\skill_audit\__init__.py → warnings</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\skill_audit\__init__.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._fmt_frontmatter_value</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils.RULES</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils.TRIGGER_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils.CORE_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils.WORKFLOW_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils.ARTIFACT_DIR_NAMES</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._KNOWN_STANDARD_DIRS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._ARTIFACT_DIR_CLASSIFY</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._ARTIFACT_EXTS_COMPREHENSIVE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._ARTIFACT_DIR_PATTERN</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._ARTIFACT_WRITE_PATTERNS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._HARDCODED_PATH_RE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._PATH_EXCLUDE_RE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._is_hardcoded_path</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils.parse_simple_yaml_frontmatter</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_audit\__init__.py → utils._find_skills_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.regex_frontmatter_exists</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.yaml_has_name</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.yaml_has_semver_version</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.yaml_has_description</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.name_matches_dirname</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.version_matches_manifest</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.check_meta_json_completeness</td></tr>
+    <tr><td>D2</td><td>外部依赖: frontmatter_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → frontmatter_checker.regex_frontmatter_and_meta</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_h1</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_trigger_section</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_core_section</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_workflow_section</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_antipattern_section</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_faq_section</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_check_writing_standards</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_has_progressive_loading_explicit</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.check_doc_code_consistency</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.check_changelog_progressive</td></tr>
+    <tr><td>D2</td><td>外部依赖: structure_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → structure_checker.body_check_document_format</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → artifact_checker.check_artifact_paths</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → artifact_checker.check_external_data_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → artifact_checker.fix_external_data_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: permission_checks</td><td>PASS</td><td>scripts\skill_audit\__init__.py → permission_checks.check_sensitive_access_declaration</td></tr>
+    <tr><td>D2</td><td>外部依赖: permission_checks</td><td>PASS</td><td>scripts\skill_audit\__init__.py → permission_checks.check_critical_write_declaration</td></tr>
+    <tr><td>D2</td><td>外部依赖: permission_checks</td><td>PASS</td><td>scripts\skill_audit\__init__.py → permission_checks.check_authorization_present</td></tr>
+    <tr><td>D2</td><td>外部依赖: permission_checks</td><td>PASS</td><td>scripts\skill_audit\__init__.py → permission_checks.check_permission_weight_explained</td></tr>
+    <tr><td>D2</td><td>外部依赖: permission_checks</td><td>PASS</td><td>scripts\skill_audit\__init__.py → permission_checks.check_progressive_loading_forced</td></tr>
+    <tr><td>D2</td><td>外部依赖: data_dir_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → data_dir_checker.check_data_dir_compliance</td></tr>
+    <tr><td>D2</td><td>外部依赖: data_dir_checker</td><td>PASS</td><td>scripts\skill_audit\__init__.py → data_dir_checker.fix_data_dir_compliance</td></tr>
+    <tr><td>D2</td><td>外部依赖: fix</td><td>PASS</td><td>scripts\skill_audit\__init__.py → fix.apply_fix</td></tr>
+    <tr><td>D2</td><td>外部依赖: fix</td><td>PASS</td><td>scripts\skill_audit\__init__.py → fix.list_fixable</td></tr>
+    <tr><td>D2</td><td>外部依赖: io</td><td>PASS</td><td>scripts\skill_audit\__init__.py → io</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\__init__.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_builder</td><td>PASS</td><td>scripts\skill_audit\__init__.py → skill_builder.version_manager.VersionManager</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\__init__.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_inspector</td><td>PASS</td><td>scripts\skill_audit\__init__.py → skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_inspector</td><td>PASS</td><td>scripts\skill_audit\__init__.py → skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_audit\__init__.py → scripts.cleanup_manager.run_cleanup</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_audit\__init__.py → scripts.skill_builder.create_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: progress_manager</td><td>PASS</td><td>scripts\skill_audit\__init__.py → progress_manager.update_progress_from_audit</td></tr>
+    <tr><td>D2</td><td>外部依赖: progress_manager</td><td>PASS</td><td>scripts\skill_audit\__init__.py → progress_manager.finalize_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: safe_io</td><td>PASS</td><td>scripts\skill_audit\__init__.py → safe_io.safe_write</td></tr>
+    <tr><td>D2</td><td>外部依赖: traceback</td><td>PASS</td><td>scripts\skill_audit\__init__.py → traceback</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_audit\__init__.py → scripts.skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_audit\__init__.py → scripts.skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: main</td><td>PASS</td><td>scripts\skill_audit\__main__.py → main</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\creator.py → skill_audit.audit_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\creator.py → skill_audit.format_report</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\creator.py → skill_audit.progress_manager.create_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_builder\refactor.py → scripts.cleanup_manager.start_session</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_builder\refactor.py → scripts.cleanup_manager.end_session</td></tr>
+    <tr><td>D2</td><td>外部依赖: zipfile</td><td>PASS</td><td>scripts\skill_builder\refactor.py → zipfile</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\refactor.py → skill_audit.progress_manager.create_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\refactor.py → skill_audit.progress_manager.update_progress_from_audit</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\refactor.py → skill_audit.progress_manager.finalize_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\skill_builder\refactor.py → skill_audit.format_report</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_inspector</td><td>PASS</td><td>scripts\skill_builder\refactor.py → skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_builder\updater.py → utils._create_backup</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_builder\updater.py → utils._check_artifact_paths</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_builder\updater.py → utils._check_external_data_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_builder\updater.py → utils._write_json</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_builder\updater.py → scripts.cleanup_manager.start_session</td></tr>
+    <tr><td>D2</td><td>外部依赖: scripts</td><td>PASS</td><td>scripts\skill_builder\updater.py → scripts.cleanup_manager.end_session</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_inspector</td><td>PASS</td><td>scripts\skill_builder\updater.py → skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: version_manager</td><td>PASS</td><td>scripts\skill_builder\updater.py → version_manager.get_current_version</td></tr>
+    <tr><td>D2</td><td>外部依赖: zipfile</td><td>PASS</td><td>scripts\skill_builder\utils.py → zipfile</td></tr>
+    <tr><td>D2</td><td>外部依赖: argparse</td><td>PASS</td><td>scripts\skill_builder\__init__.py → argparse</td></tr>
+    <tr><td>D2</td><td>外部依赖: creator</td><td>PASS</td><td>scripts\skill_builder\__init__.py → creator.SkillCreator</td></tr>
+    <tr><td>D2</td><td>外部依赖: updater</td><td>PASS</td><td>scripts\skill_builder\__init__.py → updater.SkillUpdater</td></tr>
+    <tr><td>D2</td><td>外部依赖: refactor</td><td>PASS</td><td>scripts\skill_builder\__init__.py → refactor.Refactor</td></tr>
+    <tr><td>D2</td><td>外部依赖: migrator</td><td>PASS</td><td>scripts\skill_builder\__init__.py → migrator.SkillMigrator</td></tr>
+    <tr><td>D2</td><td>外部依赖: version_manager</td><td>PASS</td><td>scripts\skill_builder\__init__.py → version_manager.VersionManager</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\skill_builder\__init__.py → utils.*</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_inspector</td><td>PASS</td><td>scripts\skill_builder\__init__.py → skill_inspector.inspect_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: main</td><td>PASS</td><td>scripts\skill_builder\__main__.py → main</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._KNOWN_ROOT_FILES</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._KNOWN_STANDARD_DIRS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._ARTIFACT_DIR_CLASSIFY</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._ARTIFACT_EXTS_COMPREHENSIVE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._ROOT_ARTIFACT_EXTS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._ROOT_EXT_CLASSIFY</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._ARTIFACT_WRITE_PATTERNS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._HARDCODED_PATH_RE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._PATH_EXCLUDE_RE</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._is_hardcoded_path</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._classify_artifact</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._classify_artifact_by_ext</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._extract_path_literal</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._find_skills_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils._is_asset_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\artifact_checker.py → utils.parse_simple_yaml_frontmatter</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\creator.py → skill_audit.audit_skill</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\creator.py → skill_audit.format_report</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\creator.py → skill_audit.progress_manager.create_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: io</td><td>PASS</td><td>scripts\_dead_code_backup\fix.py → io</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\fix.py → utils.parse_simple_yaml_frontmatter</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\_dead_code_backup\fix.py → artifact_checker.fix_external_data_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: data_dir_checker</td><td>PASS</td><td>scripts\_dead_code_backup\fix.py → data_dir_checker.fix_data_dir_compliance</td></tr>
+    <tr><td>D2</td><td>外部依赖: artifact_checker</td><td>PASS</td><td>scripts\_dead_code_backup\fix.py → artifact_checker.check_artifact_paths</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\refactor.py → skill_audit.progress_manager.create_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\refactor.py → skill_audit.progress_manager.update_progress_from_audit</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\refactor.py → skill_audit.progress_manager.finalize_progress</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\refactor.py → skill_audit.format_report</td></tr>
+    <tr><td>D2</td><td>外部依赖: warnings</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → warnings</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → utils.TRIGGER_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → utils.CORE_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → utils.WORKFLOW_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → utils.CORE_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → utils.WORKFLOW_KEYWORDS</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: py_compile</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → py_compile</td></tr>
+    <tr><td>D2</td><td>外部依赖: _tree_scanner</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → _tree_scanner._check_directory_tree</td></tr>
+    <tr><td>D2</td><td>外部依赖: ast</td><td>PASS</td><td>scripts\_dead_code_backup\structure_checker.py → ast</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\updater.py → utils._create_backup</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\updater.py → utils._check_artifact_paths</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\updater.py → utils._check_external_data_dir</td></tr>
+    <tr><td>D2</td><td>外部依赖: utils</td><td>PASS</td><td>scripts\_dead_code_backup\updater.py → utils._write_json</td></tr>
+    <tr><td>D2</td><td>外部依赖: skill_audit</td><td>PASS</td><td>scripts\_dead_code_backup\utils.py → skill_audit.utils.parse_simple_yaml_frontmatter</td></tr>
+    <tr><td>D2</td><td>外部依赖: yaml</td><td>PASS</td><td>scripts\_dead_code_backup\utils.py → yaml</td></tr>
+    <tr><td>D2</td><td>外部依赖: main</td><td>PASS</td><td>scripts\_dead_code_backup\__main__.py → main</td></tr>
+    <tr><td>D3</td><td>多处文件删除操作</td><td>FAIL</td><td>11 个删除操作分布于不同文件</td></tr>
+    <tr><td>D3</td><td>DB 路径可能硬编码</td><td>FAIL</td><td>".yml":     "data",   ".db":    "data",   ".sqlite": "data",</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json_str)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法: python cleanup_manager.py <skill_dir> [--dry-run]")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("-" * 70)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(data, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(data, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("\n📊 全量依赖关系图:")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("   all")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("_ops.log written:", OPS_LOG)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(e)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[OK] op_logger.log_modify() 已注入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[OK] utils.py — RULES 列表增加 R-24")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[WARN] 未找到精确插入点，尝试在 ] 前插入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[OK] utils.py — 备用方案插入 R-24")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[ERROR] 无法找到插入位置")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(report, indent=2, ensure_ascii=False))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(result, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(result, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(result, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("Usage: python -m scripts.skill_inspector <skill-dir> [--json]")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("只读操作，输出 skill 蓝皮书：结构、AST函数签名、引用链路")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用于 update/refactor 前的全貌扫描")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(result)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("暂无备份记录")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("\n".join(diff))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(__doc__)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法: python skill_rollback.py rollback <rollback_id>")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法: python skill_rollback.py show <rollback_id>")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(__doc__)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("⚠️ 缺少 --confirm 参数。修改版本号是破坏性操作，请确认后加上 --confirm 再执行。")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("ALL DONE")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("部分操作失败，请检查")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法: python update_skill_frontmatter.py <skill_dir> [--set key=value ...] </td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("✅ 找到并替换了 run_audit 章节")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("⚠️ 找到标题但未匹配完整章节，尝试手动修复")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("✅ 正则匹配并替换成功")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("❌ 无法匹配章节内容")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("❌ 未找到 run_audit 章节")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(result, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("    [OK] 更新 _meta.json: data_dir = " + expected)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("    [OK] 更新 " + fname + ": " + var_name + " → 标准路径")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法: python data_dir_checker.py <skill_dir> [--fix]")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("=" * 60)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  R-22 数据目录规范检查")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("=" * 60)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(issue)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("\n─── 自动修复 ───────────────────────────────────────")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  skill-standardization 创建模板（供 LLM 参考）")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法：")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  python -m skill_audit create-template")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  python -m skill_audit create-template --json  （JSON 格式）")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("-" * 65)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(result, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps({</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  详细逐项结果:")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("可用修复 key（对应审计规则 R-01~R-25）:")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("\n用法: python -m skill_audit fix <skill_dir> --key <key> [--dry-run]")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("      python -m skill_audit fix <skill_dir> --key <key1> <key2> ...")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("R-03 版本号变更语义规则：")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  breaking (MAJOR.0.0) = 架构级重构/破坏性变更/核心引擎重写")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  feature  (x.MINOR.0) = 新增功能/已有功能重构/大面积描述修正/bug修复")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  fix      (x.y.PATCH) = 单处描述修正/参数拼写/路径修正/错别字")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  [WARN] 未找到 skill_inspector，跳过蓝皮书扫描")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(json.dumps(output, ensure_ascii=False, indent=2))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] 权限扫描无风险项，跳过 permissions.md 写入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  Skill 结构扫描 — 了解全貌后再改造")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(inspect_skill(str(skill_dir)))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] skill_inspector 未找到，跳过结构扫描")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] SKILL.md 不存在，无法升级版本号")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] SKILL.md frontmatter 中未找到 version 字段")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] permission_checker.py 不存在，跳过授权检查")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  Skill 结构扫描 — 了解全貌后再改造")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(inspect_skill(str(skill_dir)))</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] skill_inspector 未找到，跳过结构扫描")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(result)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("    [OK] 更新 _meta.json: data_dir = " + expected)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("    [OK] 更新 " + fname + ": " + var_name + " → 标准路径")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] 权限扫描无风险项，跳过 permissions.md 写入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("用法: python data_dir_checker.py <skill_dir> [--fix]")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("=" * 60)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("  R-22 数据目录规范检查")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("=" * 60)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print(issue)</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("\n─── 自动修复 ───────────────────────────────────────")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] SKILL.md 不存在，无法升级版本号")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] SKILL.md frontmatter 中未找到 version 字段")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print()</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[!] permission_checker.py 不存在，跳过授权检查")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[*] SKILL.md 已包含「授权要求」章节，跳过注入")</td></tr>
+    <tr><td>D4</td><td>裸 print 调用</td><td>FAIL</td><td>print("[💡] 权限扫描无风险项，跳过 permissions.md 写入")</td></tr>
+    <tr><td>D5</td><td>发现 66 个验证函数</td><td>PASS</td><td>check_authorization, _check_sensitive_access, _check_critical_write, _check_network_access, _check_file_delete</td></tr>
+    <tr><td>D5</td><td>发现 4 个计算函数</td><td>PASS</td><td></td></tr>
+    <tr><td>D5</td><td>模块可加载: scripts\cleanup_manager</td><td>PASS</td><td></td></tr>
+    <tr><td>D5</td><td>函数可运行: end_session()</td><td>PASS</td><td>返回值类型: dict</td></tr>
+    <tr><td>D5</td><td>模块可加载: scripts\json_loader</td><td>PASS</td><td></td></tr>
+    <tr><td>D5</td><td>函数可运行: load_index()</td><td>PASS</td><td>返回值类型: dict</td></tr>
+    <tr><td>D5</td><td>函数可运行: cmd_list()</td><td>PASS</td><td>返回值类型: NoneType</td></tr>
+    <tr><td>D5</td><td>模块可加载: scripts\permission_checker</td><td>PASS</td><td></td></tr>
+    <tr><td>D5</td><td>模块可加载: scripts\skill_rollback</td><td>PASS</td><td></td></tr>
+    <tr><td>D5</td><td>函数可运行: load_manifest()</td><td>PASS</td><td>返回值类型: dict</td></tr>
+    <tr><td>D5</td><td>函数可运行: list_backups()</td><td>PASS</td><td>返回值类型: NoneType</td></tr>
+    <tr><td>D5</td><td>模块导入失败: scripts\skill_audit\fix</td><td>FAIL</td><td>缺少依赖: attempted relative import with no known parent package</td></tr>
+    <tr><td>D5</td><td>模块导入失败: scripts\skill_audit\__init__</td><td>FAIL</td><td>缺少依赖: No module named 'scripts\\skill_audit\\__init__'</td></tr>
+    <tr><td>D5</td><td>模块导入失败: scripts\_dead_code_backup\fix</td><td>FAIL</td><td>缺少依赖: attempted relative import with no known parent package</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_output_result() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>__init__() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>request_authorization() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>get_pending_requests() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_save_request() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_decision_id() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_user_prompt() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_resolve_manifest_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>register() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>finalize() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>list_active_manifests() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>cmd_show() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>cmd_refs() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>log_op() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>read_logs() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_ast_string_ranges() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_file() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_sensitive_access() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_sensitive_false_positive() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_regex_pattern() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_critical_write() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_network_access() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_file_delete() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_subprocess_call() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_determine_risk_level() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_report() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_recommendation() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>safe_read() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>safe_read_lines() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_record_backup() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>inspect_skill() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_format_text_report() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>save_manifest() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>rollback() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>show_diff() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>update_skill_standardization() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>update_universal_file_ops() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>write_frontmatter() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_artifact_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_root_artifact_files() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_artifact_directories() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_dir_recursive() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_asset_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_unknown_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_trace_cross_references() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_body_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_fix_script() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>log_check_result() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_read_file() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_file() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>fix_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>fix_missing_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>fix_section_constraint() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_norm_rel() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_norm_path() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_authorization_present() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>create_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>update_progress_from_audit() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>finalize_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>load_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>format_progress_markdown() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>body_has_antipattern_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>body_has_faq_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_extract_qa_pairs() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_doc_code_consistency() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_changelog_progressive() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_hardcoded_path() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_find_skills_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_classify_artifact_by_ext() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_extract_path_literal() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_asset_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>format_report() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_do_bump() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>cmd_audit_all() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>create() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_guide_template() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_permissions_template() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_examples_template() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_audit_and_update_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_permissions_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_category_description() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_item_explanation() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_auth_method() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>__init__() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>migrate() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_detect_current_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_compute_target_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_find_skills_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_execute_migration() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_update_meta_json() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_hardcoded_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_create_backup() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>__init__() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>refactor() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_build_migration_plan() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_execute_migration() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_permission_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_inject_auth_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_bump_version() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_audit_and_update_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_meta_json() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_skill_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_dir_structure() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_bump_version() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_inject_auth_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_permissions_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_category_description() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_item_explanation() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_auth_method() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_create_backup() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_json() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_artifact_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>request_changelog() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>append_changelog() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_artifact_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_root_artifact_files() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_artifact_directories() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_dir_recursive() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_unknown_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_trace_cross_references() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>create() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_guide_template() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_permissions_template() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_generate_examples_template() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_audit_and_update_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_permissions_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_category_description() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_item_explanation() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_auth_method() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_fix_script() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_is_local_asset_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>log_check_result() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_read_file() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_file() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>fix_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>fix_data_dir_compliance() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>__init__() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>migrate() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_detect_current_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_compute_target_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_find_skills_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_execute_migration() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_update_meta_json() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_scan_hardcoded_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>create_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>update_progress_from_audit() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>finalize_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>load_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>format_progress_markdown() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_create_backup() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>__init__() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>refactor() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_build_migration_plan() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_execute_migration() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_permission_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_inject_auth_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_bump_version() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_audit_and_update_progress() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>body_has_antipattern_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>body_has_faq_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_extract_qa_pairs() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_doc_code_consistency() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>check_changelog_progressive() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_meta_json() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_skill_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_dir_structure() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_bump_version() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_inject_auth_section() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_permissions_md() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_category_description() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_item_explanation() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_get_auth_method() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_create_backup() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_write_json() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_artifact_paths() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>_check_external_data_dir() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>缺少边界说明</td><td>PASS</td><td>parse_simple_yaml_frontmatter() 无参数边界说明</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\authorization_manager.py: 1 个 except / 521 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\json_loader.py: 0 个 except / 239 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\update_skill_frontmatter.py: 0 个 except / 91 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\skill_audit\fix.py: 10 个 except / 2294 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\skill_audit\progress_manager.py: 0 个 except / 341 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\skill_audit\utils.py: 2 个 except / 589 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\skill_builder\creator.py: 1 个 except / 804 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\skill_builder\__init__.py: 0 个 except / 137 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\_dead_code_backup\creator.py: 1 个 except / 798 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\_dead_code_backup\fix.py: 4 个 except / 997 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\_dead_code_backup\frontmatter_checker.py: 0 个 except / 156 行</td></tr>
+    <tr><td>D6</td><td>异常处理覆盖率低</td><td>FAIL</td><td>scripts\_dead_code_backup\progress_manager.py: 0 个 except / 341 行</td></tr>
+    
+  </table>
+</div>
+
+<div class="card">
+  <h2>5. 修复记录</h2>
+  <p style="color: var(--text-muted);">无修复记录</p>
+</div>
+
+</div>
+</body>
+</html>

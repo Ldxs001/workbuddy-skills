@@ -404,14 +404,11 @@ def check_progressive_loading_forced(filepath, content, fm, body, **kw):
         for ln, title, preview in nonstandard:
             phase1_lines.append(f"  {filepath}:{ln} - 「{title}」（内容预览：{preview}...）")
         detail_parts.append(
-            f"ⓘ 粗筛 {len(nonstandard)} 个疑似非标章节，待 LLM 全报告LLM精筛确认（不阻断通过）："
-            f"
-【两阶段】正则粗筛：发现以下 H2 章节不在 allowed_sections 白名单中，"
-            f"需 LLM 全报告LLM精筛判断为真实非标（应拆分到 references/）"
-            f"还是应合并到已有标准章节（如「注意事项」→「铁律/规范」）："
-            f"
-" + '
-'.join(phase1_lines)
+            f"ⓘ 粗筛 {len(nonstandard)} 个疑似非标章节，待 LLM 全报告LLM精筛确认（不阻断通过）：\n"
+            f"【两阶段】正则粗筛：发现以下 H2 章节不在 allowed_sections 白名单中，\n"
+            f"需 LLM 全报告LLM精筛判断为真实非标（应拆分到 references/）\n"
+            f"还是应合并到已有标准章节（如「注意事项」→「铁律/规范」）：\n"
+            + "\n".join(phase1_lines)
         )
         # 非标章节仅 Phase 1 粗筛，不设置 passed=False（行数强制拆分才是 ERROR）
 
