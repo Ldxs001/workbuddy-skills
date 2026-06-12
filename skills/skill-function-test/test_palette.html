@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配色方案 - 科技感 蓝色</title>
+    <style>
+        :root {
+            --primary: #0066ff;
+            --bg: #f5f7fa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .color-item {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-preview {
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hex-label {
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .color-details {
+            background: white;
+            padding: 15px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.85rem;
+        }
+
+        .detail-label {
+            color: #888;
+        }
+
+        .detail-value {
+            font-family: monospace;
+            color: #333;
+        }
+
+        .gradient-showcase {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .gradient-box {
+            height: 60px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 500;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .gradient-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>配色方案 - 科技感 蓝色</h1>
+        <p class="subtitle">Color Toolkit 自动生成</p>
+
+        <section>
+            <h2>🎨 颜色色板</h2>
+            <div class="color-grid">
+                
+        <div class="color-item">
+            <div class="color-preview" style="background-color: #0066ff; color: #FFFFFF;">
+                <div class="hex-label">#0066FF</div>
+            </div>
+            <div class="color-details">
+                <div class="detail-row"><span class="detail-label">RGB</span><span class="detail-value">rgb(0, 102, 255)</span></div>
+                <div class="detail-row"><span class="detail-label">HSL</span><span class="detail-value">hsl(216.0, 100.0%, 50.0%)</span></div>
+                <div class="detail-row"><span class="detail-label">CMYK</span><span class="detail-value">cmyk(100%, 60%, 0%, 0%)</span></div>
+                <div class="detail-row"><span class="detail-label">亮度</span><span class="detail-value">0.167</span></div>
+            </div>
+        </div>
+        
+        <div class="color-item">
+            <div class="color-preview" style="background-color: #e89f30; color: #FFFFFF;">
+                <div class="hex-label">#E89F30</div>
+            </div>
+            <div class="color-details">
+                <div class="detail-row"><span class="detail-label">RGB</span><span class="detail-value">rgb(232, 159, 48)</span></div>
+                <div class="detail-row"><span class="detail-label">HSL</span><span class="detail-value">hsl(36.2, 80.0%, 54.9%)</span></div>
+                <div class="detail-row"><span class="detail-label">CMYK</span><span class="detail-value">cmyk(0%, 31%, 79%, 9%)</span></div>
+                <div class="detail-row"><span class="detail-label">亮度</span><span class="detail-value">0.422</span></div>
+            </div>
+        </div>
+        
+        <div class="color-item">
+            <div class="color-preview" style="background-color: #4531f4; color: #FFFFFF;">
+                <div class="hex-label">#4531F4</div>
+            </div>
+            <div class="color-details">
+                <div class="detail-row"><span class="detail-label">RGB</span><span class="detail-value">rgb(69, 49, 244)</span></div>
+                <div class="detail-row"><span class="detail-label">HSL</span><span class="detail-value">hsl(246.2, 89.9%, 57.5%)</span></div>
+                <div class="detail-row"><span class="detail-label">CMYK</span><span class="detail-value">cmyk(72%, 80%, 0%, 4%)</span></div>
+                <div class="detail-row"><span class="detail-label">亮度</span><span class="detail-value">0.100</span></div>
+            </div>
+        </div>
+        
+        <div class="color-item">
+            <div class="color-preview" style="background-color: #ff0066; color: #FFFFFF;">
+                <div class="hex-label">#FF0066</div>
+            </div>
+            <div class="color-details">
+                <div class="detail-row"><span class="detail-label">RGB</span><span class="detail-value">rgb(255, 0, 102)</span></div>
+                <div class="detail-row"><span class="detail-label">HSL</span><span class="detail-value">hsl(336.0, 100.0%, 50.0%)</span></div>
+                <div class="detail-row"><span class="detail-label">CMYK</span><span class="detail-value">cmyk(0%, 100%, 60%, 0%)</span></div>
+                <div class="detail-row"><span class="detail-label">亮度</span><span class="detail-value">0.222</span></div>
+            </div>
+        </div>
+        
+            </div>
+        </section>
+
+        <section>
+            <h2>🌈 渐变效果</h2>
+            <div class="gradient-row">
+                <div class="gradient-box" style="background: linear-gradient(135deg, #0066ff, #e89f30, #4531f4, #ff0066);">
+                    135° 线性渐变
+                </div>
+                <div class="gradient-box" style="background: linear-gradient(135deg, #ff0066, #4531f4, #e89f30, #0066ff);">
+                    反向渐变
+                </div>
+                <div class="gradient-box" style="background: radial-gradient(circle, #0066ff, #e89f30, #4531f4, #ff0066);">
+                    径向渐变
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>📋 颜色代码</h2>
+            <pre style="background: #1a1a1a; color: #a9dc76; padding: 20px; border-radius: 8px; overflow-x: auto; font-family: monospace;">1. #0066FF
+2. #E89F30
+3. #4531F4
+4. #FF0066</pre>
+        </section>
+    </div>
+</body>
+</html>

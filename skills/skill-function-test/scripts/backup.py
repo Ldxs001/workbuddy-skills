@@ -3,12 +3,33 @@ backup.py — 目标技能目录 ZIP 备份与恢复
 
 在修改目标技能前创建完整 ZIP 备份（时间戳命名），修改后支持回滚。
 ZIP 格式避免备份目录被 Skill 扫描器识别为重复技能条目。
+
+时间线集成：backup_skill() 自动记录 [START] 和 [END] marker。
 """
 import os
 import io
 import re
 import zipfile
+import subprocess
+import sys
 from datetime import datetime
+
+# 时间线输出 + 流程钩子
+_TIMELINE_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "timeline.py"
+))
+_HOOKS_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hooks.py"
+))
+def _tl(skill_dir: str, *args):
+    """调用 timeline.py 记录 marker"""
+    try:
+        subprocess.run(
+            [sys.executable, _TIMELINE_SCRIPT, "mark", skill_dir] + list(args),
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        pass
 
 
 # R-12 审计锚点：数据目录字面量声明
@@ -49,6 +70,7 @@ def backup_skill(skill_dir: str, label: str = "pre_test") -> str:
     返回备份路径（.zip）
     备份名: <skill-name>_<label>_<timestamp>.zip
     """
+    _tl(skill_dir, "backup", f"备份: {os.path.basename(skill_dir)}", "--type", "py_script")
     _ensure_backup_dir()
     skill_name = os.path.basename(skill_dir)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -56,12 +78,14 @@ def backup_skill(skill_dir: str, label: str = "pre_test") -> str:
     backup_path = os.path.join(_BACKUP_DIR, backup_name)
 
     if not os.path.exists(skill_dir):
+        _tl(skill_dir, "backup", f"备份失败: 目录不存在", "end", "--type", "py_script", "--detail", "目录不存在")
         raise FileNotFoundError(f"目标目录不存在: {skill_dir}")
 
     with zipfile.ZipFile(backup_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for arcname, filepath in _walk_skill(skill_dir):
             zf.write(filepath, arcname)
 
+    _tl(skill_dir, "backup", f"备份完成: {backup_name}", "end", "--type", "py_script", "--detail", backup_path)
     print(f"  [BACKUP] 已备份: {skill_dir} → {backup_path}")
     return backup_path
 
@@ -147,10 +171,12 @@ def restore_backup(backup_path: str, target_dir: str = None) -> bool:
 
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) >= 3:
         if sys.argv[1] == "backup":
-            backup_skill(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "manual")
+            skill_dir = sys.argv[2]
+            subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, "backup"])
+            backup_skill(skill_dir, sys.argv[3] if len(sys.argv) > 3 else "manual")
+            subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, "backup"])
         elif sys.argv[1] == "list":
             blist = list_backups()
             for b in blist:

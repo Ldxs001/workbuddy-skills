@@ -1,9 +1,9 @@
 ---
 name: skill-function-test
-version: 0.4.0
+version: 1.1.0
 author: wUwproject
 license: MIT
-description: 技能场景测试套件 —— 备份 → 蓝皮书 → 场景+功能双轨测试 → 修复循环 → 回归确认 → 分级报告。场景驱动：从 SKILL.md 解析触发场景和核心能力，构造端到端场景测试链路。包含 D1-D6 功能测试作为底座。
+description: 技能场景测试套件 —— 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 + 计时+流程钩子+双格式报告。包含 D1-D6 功能测试作为底座。
 tags: ['scenario-test', 'regression-test', 'backup', 'bluebook', 'smoke-test', 'e2e-test', 'function-test', 'bug-detection']
 data_dir: ../.standardization/skill-function-test/data/
 external_data_dir: true
@@ -19,10 +19,9 @@ faq_quality: improve_qa
 ---
 # skill-function-test — 技能场景测试套件
 
-> 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵
+> 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 → 计时→钩子→双格式报告
 
-> 本技能以 **场景驱动**：从目标技能的 SKILL.md 中解析其声称的触发场景、核心能力和工作流程，
-> 针对每条场景链路构造端到端测试用例。**功能测试（D1-D6）作为底座**，定位到具体断点。
+> 本技能以 **场景驱动** 为核心，同时提供功能测试、S4 执行忠实度、三级嵌套计时、流程钩子和双格式报告。
 
 ---
 
@@ -83,10 +82,13 @@ faq_quality: improve_qa
 | 文件 | 位置 | 说明 |
 |------|------|------|
 | `references/guide.md` | 完整使用指南 | 10 阶段工作流程 + 备份/恢复说明 + 场景解析规则 |
+| `references/hooks.md` | 流程钩子使用说明 | 双档策略、三步校验机制、查看状态 |
+| `references/timing.md` | 计时系统使用说明 | 三级嵌套、间隙推导、验证模式 |
 | `references/changelog.md` | 更新日志 | 版本更新记录（渐进式加载，R-24 合规） |
 | `references/antipatterns.md` | 反模式 | 常见错误和注意事项 |
 | `references/faq.md` | FAQ | 常见问题 |
 | `references/examples.md` | 示例集合 | 完整执行示例 |
+| `references/permissions.md` | 权限说明 | 权限扫描风险等级说明 |
 | `references/s4-noise-testing.md` | S4 执行忠实度测试 | 全量范围 + 噪音分级 + LLM推理层 + 随机化回放 + 修复钩子 + 坚守率矩阵 |
 | `scripts/backup.py` | 备份与恢复 | 完整目录备份 + 时间戳 + 恢复回滚 |
 | `scripts/inspector.py` | 蓝皮书扫描器 | AST + 文件清单 + 函数签名 + 引用链路 + 场景解析 |
@@ -95,7 +97,20 @@ faq_quality: improve_qa
 | `scripts/s4_engine.py` | S4 执行忠实度引擎 | 全量测试范围生成 + 噪音方案校验/schema + 随机化回放播放器(NoisePlayer) + 结构性修复 |
 | `scripts/fixer.py` | 通用修复工具 | 安全写入、零除保护、print→logging、路径替换 |
 | `scripts/test_config.py` | 测试配置管理 | 配置持久化/CLI/文字交互/HTML配置界面 |
+| `scripts/hooks.py` | 流程钩子系统 | 双档策略：Python 步骤自动补齐，LLM 步骤阻断指引；入口校验+出口标记+中间钩 |
+| `scripts/timeline.py` | 测试流程时间线计时引擎 | 记录阶段/子进程的开始/结束，`--validate` 模式自动推导 LLM 间隙时间 |
+| `scripts/gen_report.py` | 报告生成器 | 从 JSON 数据源填充结构化模板，输出 HTML + Markdown 双格式 |
 | `scripts/test_config.html` | 配置界面（自包含HTML） | 可视化开关+下拉+滑块+两段式保存(保存→完成) |
+
+---
+
+## 测试流程时间线（计时系统）
+
+> 详见 `references/timing.md`
+
+所有阶段通过 `scripts/timeline.py` 自动记录 start/end marker。LLM 无需手动计时——工作时间由 py_script marker 之间的 gap 自动推导。
+
+`python scripts/timeline.py report <skill-dir> --validate` 输出阶段覆盖状态和未归属长间隙。
 
 ---
 
@@ -130,14 +145,18 @@ cfg server                    — 启动 HTML 配置界面
 
 **8 阶段标准流程（严格按顺序执行，S4 嵌入阶段2/4/8）：**
 
-1. **备份** — 对目标技能完整目录做时间戳备份，记录备份路径
-2. **蓝皮书扫描 + 约束提取 + 全量测试范围** — 扫描文件清单 + AST 函数签名 + 引用链路 + SKILL.md 场景解析 + **约束提取 + 全量测试范围生成**（阶段A：从蓝皮书+约束+工作流+引用链路生成完整测试范围）
-3. **询问模式** — 展示场景摘要 + 测试范围 → 用户选择测试范围 + 修复策略（场景仅报告/尝试修复，功能仅报告/直接/询问）+ **配置 S4 执行忠实度测试**
-4. **场景+功能+S4 执行忠实度测试** — 先执行 S1-S3 场景测试，再执行 D1-D6 功能测试，最后执行 **S4 执行忠实度测试**（阶段B/C/D/E：LLM推理层 → 噪音方案 → 随机化回放 → 噪音执行 → 结构性修复 → 复盘归因）
-5. **修复/报告** — 根据模式：直接修复→执行修复→跳第6步；询问模式→输报告等人确认
+**前置：初始化时间线** — `python scripts/timeline.py init <skill-dir>` (工作流开始时执行一次，hooks 自动补齐)
+
+1. **备份** — 对目标技能完整目录做时间戳备份，记录备份路径（hooks 自动补齐）
+2. **蓝皮书扫描 + 约束提取 + 全量测试范围** — 扫描文件清单 + AST 函数签名 + 引用链路 + SKILL.md 场景解析 + **约束提取 + 全量测试范围生成**（hooks 自动补齐）
+3. **询问模式** — 展示场景摘要 + 测试范围 → 用户选择测试范围 + 修复策略。LLM 基于蓝皮书分析后写入 `.test-config.json`（hooks 中间钩校验）
+4. **场景+功能+S4 执行忠实度测试** — 先执行 S1-S3 场景测试，再执行 D1-D6 功能测试，最后执行 **S4 执行忠实度测试**（阶段B/C/D/E：LLM推理层 → 噪音方案(.s4_noise_plan.json，hooks 中间钩校验≥3条) → 随机化回放 → 噪音执行 → 结构性修复 → 复盘归因）
+5. **修复/报告** — 根据模式：直接修复→执行修复（`fixer.py` 自动写入 `.fix-record.json`）→跳第6步；询问模式→输报告等人确认
 6. **修复→回归循环** — 修复后重新执行全量测试，确认 F-0 不增、已有通过项不退步；循环直到无新 F-0 出现
 7. **最终回归确认** — 完整场景+功能测试一遍，与备份前的基线对比：无功能损伤
-8. **输出报告** — 分级报告 + 修复记录 + 回归对比表 + **S4 坚守率矩阵**
+8. **输出报告** — `python scripts/gen_report.py <skill-dir>` 生成 HTML + Markdown 双格式报告。分级报告 + 修复记录 + 回归对比表 + **S4 坚守率矩阵** + 计时分析
+
+**后置：生成时间线验证报告** — `python scripts/timeline.py report <skill-dir> --validate`
 
 > → 详见 `references/guide.md`
 
@@ -151,6 +170,9 @@ cfg server                    — 启动 HTML 配置界面
 ## 快速开始
 
 ```bash
+# 查看流程状态
+python scripts/hooks.py status /path/to/target-skill
+
 # 完整场景测试
 python scripts/scenario_engine.py /path/to/target-skill
 
@@ -163,12 +185,27 @@ python scripts/s4_engine.py /path/to/target-skill scope
 # S4 结构性修复（引用链路断裂、缺失文件）
 python scripts/s4_engine.py /path/to/target-skill repair
 python scripts/s4_engine.py /path/to/target-skill repair --dry-run  # 预览不改
+
+# 生成时间线验证报告
+python scripts/timeline.py report /path/to/target-skill --validate
+
+# 生成双格式报告
+python scripts/gen_report.py /path/to/target-skill              # HTML + Markdown
+python scripts/gen_report.py /path/to/target-skill --html       # 仅 HTML
+python scripts/gen_report.py /path/to/target-skill --markdown   # 仅 Markdown
 ```
 
 ---
 
 > 反模式详见 `references/antipatterns.md`，常见问题详见 `references/faq.md`
 
+## 流程钩子系统（强制阀 + 自动补全）
+
+> 详见 `references/hooks.md`
+
+双档策略：init/backup/blueprint 自动补齐，scenario/function_test/s4/gen_report 阻断指引。
+`python scripts/hooks.py status <skill-dir>` 查看流程状态。
+
 ## 版本
 
-当前版本 **v0.2.18** — SKILL.md 全量信息对齐 + 术语修正（脏环境→执行忠实度）+ 完整流程描述
+当前版本 **v1.0.0** — 三级嵌套计时 + 流程钩子 + 双格式模板报告

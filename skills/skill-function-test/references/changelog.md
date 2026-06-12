@@ -1,3 +1,51 @@
+## 1.1.0 (2026-06-12)
+
+### feature
+- **S2/S3 蓝皮书驱动**: 不再解析 SKILL.md `## 核心能力` 和 `## 工作流程` 正文格式。S2 遍历蓝皮书中所有 CLI 脚本逐一测试，S3 从 import_chain 构建依赖链测试
+- **S1/S2/S3 相位独立**: 改为独立相位名 `S1`/`S2`/`S3`，修复相位名重复导致的时间膨胀
+- **触发词 YAML 列表格式支持**: 解析 frontmatter 的 YAML 列表格式 trigger
+
+### fix
+- **compute_timing 栈式配对**: 修复相位名重复导致 py_script 时间膨胀，只计根级 py_script 避免嵌套重复
+- **单步耗时细目完整化**: 不再只显示 subprocess_wall，显示所有 py_script + subprocess_wall 阶段
+- **场景报告路径一致**: scenario_engine.py 保存到中央数据目录，与 test_engine 一致
+- **gen_report 模板泄漏**: 内联 ''.join() 改为预构建变量，修复 HTML/Markdown 模板代码暴露
+
+## 1.0.1 (2026-06-12)
+- [fix] skill-standardization audit --fix: 版本号同步 + writing_standards 修正
+
+## 1.0.0 (2026-06-12)
+
+### 重大更新
+
+**【版本 1.0】三级嵌套计时系统 + 流程钩子 + 模板化报告**
+
+### 新增
+
+| # | 文件 | 说明 |
+|---|------|------|
+| 1 | `scripts/timeline.py` | 测试流程时间线计时引擎。自动记录每个脚本 start/end marker。`--validate` 模式通过 py_script marker 间隙自动推导 LLM 耗时，无需 LLM 手动标记 |
+| 2 | `scripts/hooks.py` | 流程钩子系统。双档策略：Python-only 步骤（init/backup/blueprint）产物缺失时自动补齐；LLM 需参与的步骤（scenario/function_test/s4）阻断指引 LLM 执行。入口检查 + 完成标记 + 中间钩（LLM 产出物校验：`.test-config.json` 存在? `.s4_noise_plan.json` 存在且>=3 条?） |
+| 3 | `scripts/gen_report.py` | 结构化报告生成器。从 timeline.json + 各测试 JSON 读取数据填充模板。输出 HTML（Chart.js 控制图）和 Markdown 双格式。含概览/计时/问题/测试详情/修复记录 5 个区块 |
+| 4 | `scripts/fixer.py` | 新增 `log_fix()` 修复记录函数，每次修复自动写入 .fix-record.json，附着在最终报告中 |
+
+### 更新
+
+| 文件 | 改动 |
+|------|------|
+| `backup.py` | 入口/出口加 hooks.check/done |
+| `inspector.py` | 入口/出口加 hooks.check/done |
+| `scenario_engine.py` | S1/S2/S3 各自独立计时 + subprocess wall time + hooks |
+| `test_engine.py` | D1-D6 各自独立计时 + subprocess wall time + hooks |
+| `s4_engine.py` | 每个 S4 子命令独立计时 + hooks |
+| `SKILL.md` | 新增计时系统章节、流程钩子章节、gen_report 快速开始、工作流新增 init/report 前置后置 |
+
+### 删除
+
+- 删除 LLM 手动 timeline.py mark 调用。LLM 时间由 --validate 的 gap 推导自动完成，无需自觉
+
+---
+
 ## 0.4.0 (2026-06-06)
 - 自动版本更新 (minor)
 
@@ -5,7 +53,7 @@
 
 ### 重构
 
-**【重大变更】S1-S3 场景测试从静态文本匹配升级为真实 CLI 执行**
+**【重大更新】S1-S3 场景测试从静态文本匹配升级为真实 CLI 执行**
 
 **旧行为**：S1-S3 只读 SKILL.md 的文本内容——检查 trigger 字段有没有值、核心能力表格有几行、工作流步骤列了几个。**一行代码没跑过**。
 
@@ -16,7 +64,7 @@
 | 文件 | 改动 |
 |------|------|
 | `inspector.py` | **Blueprint 新增 `cli_scripts` 字段**：AST 扫描时同步检测每个 Python 文件是否有 `__main__` 入口、支持哪些参数标志（`--json`/`--list`/`--show` 等）。蓝皮书现在包含完整的 CLI 可执行信息 |
-| `scenario_engine.py` | **完全重写**：移除硬编码的 `SCENARIO_MAP`（原82行脚本名+参数映射表），改为从蓝皮书 `cli_scripts` 自动匹配。S1 对 trigger→脚本执行 `--help`+可用参数，S2 对能力→脚本执行 `--help`，S3 对工作流引用→脚本执行 `--help` |
+| `scenario_engine.py` | **完全重写**：删除硬编码的 `SCENARIO_MAP`（原82行脚本名+参数映射表），改为从蓝皮书 `cli_scripts` 自动匹配。S1 对 trigger→脚本执行 `--help`+可用参数，S2 对能力→脚本执行 `--help`，S3 对工作流引用→脚本执行 `--help` |
 
 ### 核心设计变化
 

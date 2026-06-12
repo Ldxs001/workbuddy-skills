@@ -11,7 +11,35 @@ S4 只报告、不修复。坚守率矩阵嵌入阶段8的最终报告中。
 """
 import json
 import os
+import subprocess
 import sys
+
+# 流程钩子
+_HOOKS_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hooks.py"
+))
+def _hook_check(skill_dir, step):
+    r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
+                        capture_output=True, text=True)
+    if r.stdout.strip(): print(r.stdout)
+    if r.returncode != 0: sys.exit(r.returncode)
+def _hook_done(skill_dir, step):
+    subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
+                    capture_output=True)
+
+# 时间线输出
+_TIMELINE_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "timeline.py"
+))
+def _tl(skill_dir: str, *args):
+    """调用 timeline.py 记录 marker"""
+    try:
+        subprocess.run(
+            [sys.executable, _TIMELINE_SCRIPT, "mark", skill_dir] + list(args),
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        pass
 
 # S4 数据目录常量（R-12 合规：skills/.standardization/skill-function-test/data/）
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -765,6 +793,10 @@ def main():
 
     skill_dir = sys.argv[1]
     cmd = sys.argv[2]
+    _hook_check(skill_dir, "s4")
+    s4_label = f"S4 {cmd}"
+
+    _tl(skill_dir, f"s4_{cmd}", s4_label, "--type", "py_script")
 
     if cmd == "constraints":
         constraints = load_constraints(skill_dir)
@@ -778,6 +810,7 @@ def main():
     elif cmd == "validate":
         if len(sys.argv) < 4:
             print("缺少方案 JSON 路径")
+            _tl(skill_dir, f"s4_{cmd}", s4_label, "end", "--type", "py_script", "--detail", "缺少参数")
             return
         plan_path = sys.argv[3]
         if os.path.exists(plan_path):
@@ -788,6 +821,7 @@ def main():
                 plan = json.loads(plan_path)
             except json.JSONDecodeError:
                 print(f"无法解析 JSON: {plan_path}")
+                _tl(skill_dir, f"s4_{cmd}", s4_label, "end", "--type", "py_script", "--detail", "JSON解析失败")
                 return
         errors = validate_noise_plan(plan)
         if errors:
@@ -809,6 +843,7 @@ def main():
     elif cmd == "score":
         if len(sys.argv) < 4:
             print("用法: score <positive_rate> <negative_rate> [pf=0.4 nf=0.6]")
+            _tl(skill_dir, f"s4_{cmd}", s4_label, "end", "--type", "py_script", "--detail", "缺少参数")
             return
         pr = float(sys.argv[2])
         nr = float(sys.argv[3])
@@ -837,6 +872,9 @@ def main():
     else:
         print(f"未知命令: {cmd}")
         print(USAGE)
+
+    _tl(skill_dir, f"s4_{cmd}", s4_label, "end", "--type", "py_script")
+    _hook_done(skill_dir, "s4")
 
 
 if __name__ == "__main__":

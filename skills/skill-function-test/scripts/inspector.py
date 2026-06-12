@@ -17,7 +17,36 @@ import ast
 import json
 import os
 import re
+import subprocess
+import sys
 from typing import Optional
+
+# 流程钩子
+_HOOKS_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hooks.py"
+))
+def _hook_check(skill_dir, step):
+    r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
+                        capture_output=True, text=True)
+    if r.stdout.strip(): print(r.stdout)
+    if r.returncode != 0: sys.exit(r.returncode)
+def _hook_done(skill_dir, step):
+    subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
+                    capture_output=True)
+
+# 时间线输出
+_TIMELINE_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "timeline.py"
+))
+def _tl(skill_dir: str, *args):
+    """调用 timeline.py 记录 marker"""
+    try:
+        subprocess.run(
+            [sys.executable, _TIMELINE_SCRIPT, "mark", skill_dir] + list(args),
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        pass
 
 # R-12 审计锚点
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
@@ -377,6 +406,7 @@ def extract_constraints(skill_dir: str) -> list[dict]:
 
 def scan(skill_dir: str) -> BlueBook:
     """对目标技能执行完整蓝皮书扫描（含 S4 阶段A 约束提取）"""
+    _tl(skill_dir, "blueprint", f"蓝皮书扫描: {os.path.basename(skill_dir)}", "--type", "py_script")
     bb = BlueBook()
 
     # 读取 _meta.json
@@ -449,6 +479,8 @@ def scan(skill_dir: str) -> BlueBook:
                         "type": "shell_script",
                     })
 
+    _tl(skill_dir, "blueprint", f"蓝皮书扫描完成: {bb.file_count} 文件", "end",
+           "--type", "py_script", "--detail", f"{bb.file_count} files, {bb.total_size_bytes} bytes")
     return bb
 
 
@@ -509,6 +541,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         target = sys.argv[1]
         if os.path.isdir(target):
+            _hook_check(target, "blueprint")
             bb = scan(target)
             print(print_bluebook(bb))
             # 同时输出 JSON
@@ -528,6 +561,7 @@ if __name__ == "__main__":
             with open(cpath, "w", encoding="utf-8") as f:
                 json.dump(constraints, f, ensure_ascii=False, indent=2)
             print(f"约束清单已保存: {cpath} ({len(constraints)} 条)")
+            _hook_done(target, "blueprint")
         else:
             print(f"错误: 目录不存在 {target}")
     else:

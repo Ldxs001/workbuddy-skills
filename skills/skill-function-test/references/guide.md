@@ -1,7 +1,7 @@
 # skill-function-test 完整使用指南
 
 > **场景测试（Scenario Testing）** — 不以函数为单位，以 **场景链路** 为单位。
-> 备份 → 蓝皮书+约束+全量范围 → 场景+功能+S4 → 修复循环 → 回归确认 → 输出报告+S4矩阵。
+> 备份 → 蓝皮书+约束+全量范围 → 场景+功能+S4 → 修复循环 → 回归确认 → 输出报告+S4矩阵+计时+钩子+双格式报告。
 
 ---
 
@@ -26,7 +26,12 @@
 
 ## 8 阶段完整工作流程
 
-### 阶段 0：安全校验
+### 阶段 0：安全校验 + 时间线初始化
+
+```bash
+# 初始化时间线（hooks 自动补齐，手动也行）
+python scripts/timeline.py init /path/to/target-skill
+```
 
 | 校验项 | 规则 |
 |--------|------|
@@ -121,7 +126,13 @@ python scripts/s4_engine.py /path/to/target-skill repair          # 自动修复
 python scripts/s4_engine.py /path/to/target-skill repair --dry-run # 预览不改
 ```
 
-场景测试、功能测试、S4 各自输出独立报告。
+场景测试、功能测试、S4 各自输出独立报告。各脚本自动记录 timeline marker。
+
+测试完成后生成综合报告：
+```bash
+python scripts/gen_report.py /path/to/target-skill              # HTML + Markdown
+python scripts/timeline.py report /path/to/target-skill --validate  # 计时验证
+```
 
 ### 阶段 5：修复/报告
 

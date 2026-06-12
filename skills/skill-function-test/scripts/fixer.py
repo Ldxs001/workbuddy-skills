@@ -8,11 +8,55 @@ fixer.py — 通用修复工具（语言无关）
   .js  → js_null_guard, js_try_catch, js_console_to_logger
   .ps1 → powershell_error_guard, powershell_null_guard
 """
+import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from datetime import datetime
+
+
+# ── 目录定位 ──
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+_SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
+
+
+def _fix_record_path(skill_dir: str = None) -> str:
+    """修复记录文件路径"""
+    if skill_dir is None:
+        skill_dir = os.getcwd()
+    target = os.path.basename(os.path.abspath(skill_dir))
+    data_dir = os.path.normpath(os.path.join(
+        _SKILLS_ROOT, ".standardization", "skill-function-test", "data", target
+    ))
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, ".fix-record.json")
+
+
+def log_fix(skill_dir: str, fix_type: str, filepath: str, detail: str = "",
+            success: bool = True):
+    """记录一条修复行为到 .fix-record.json"""
+    path = _fix_record_path(skill_dir)
+    records = []
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                records = json.load(f)
+        except Exception:
+            records = []
+    records.append({
+        "fix_type": fix_type,
+        "filepath": filepath,
+        "detail": detail,
+        "success": success,
+        "at": datetime.now().isoformat(timespec="seconds"),
+    })
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
 
 
 # ═══════════════════════════════════════════════════════
@@ -527,7 +571,8 @@ def fix_exception_guard(filepath: str, risky_pattern: str) -> bool:
 # 批量修复入口
 # ═══════════════════════════════════════════════════════
 
-def apply_fix(filepath: str, fix_type: str, params: dict = None) -> bool:
+def apply_fix(filepath: str, fix_type: str, params: dict = None,
+              skill_dir: str = None) -> bool:
     """
     统一修复入口，按文件类型自动派发
 
@@ -545,6 +590,8 @@ def apply_fix(filepath: str, fix_type: str, params: dict = None) -> bool:
 
     fix_type (PowerShell):
       powershell_error_guard
+
+    skill_dir 传入时自动记录修复日志
     """
     fixers = {
         "add_none_guard": lambda: fix_add_none_guard(
@@ -567,7 +614,10 @@ def apply_fix(filepath: str, fix_type: str, params: dict = None) -> bool:
     }
     fixer = fixers.get(fix_type)
     if fixer:
-        return fixer()
+        result = fixer()
+        if skill_dir:
+            log_fix(skill_dir, fix_type, filepath, detail=fix_type, success=result)
+        return result
     print(f"  [FIX] 未知修复类型: {fix_type}")
     return False
 

@@ -3,6 +3,8 @@ test_engine.py — 6 维功能测试引擎
 
 执行指定的测试维度，聚合结果，生成分级报告。
 测试维度：D1 基础功能、D2 流程断点、D3 数据污染、D4 噪音干扰、D5 计算正确性、D6 边界鲁棒性
+
+时间线集成：每个维度独立计时，subprocess 调用记录 wall time。
 """
 import ast
 import json
@@ -12,6 +14,33 @@ import subprocess
 import importlib.util
 import inspect
 from typing import Optional
+
+# 流程钩子
+_HOOKS_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hooks.py"
+))
+def _hook_check(skill_dir, step):
+    r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
+                        capture_output=True, text=True)
+    if r.stdout.strip(): print(r.stdout)
+    if r.returncode != 0: sys.exit(r.returncode)
+def _hook_done(skill_dir, step):
+    subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
+                    capture_output=True)
+
+# 时间线输出
+_TIMELINE_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "timeline.py"
+))
+def _tl(skill_dir: str, *args):
+    """调用 timeline.py 记录 marker"""
+    try:
+        subprocess.run(
+            [sys.executable, _TIMELINE_SCRIPT, "mark", skill_dir] + list(args),
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        pass
 
 
 # ═══════════════════════════════════════════════════════
@@ -66,21 +95,28 @@ class TestRunner:
         self.results: list[TestResult] = []
 
     def run_dimension(self, dim: str):
-        """执行指定维度的全部测试"""
+        """执行指定维度的全部测试，记录执行时间"""
+        dim_label = {"d1_smoke": "D1 基础功能完整性", "d2_breakpoint": "D2 流程断点检测",
+                     "d3_contamination": "D3 数据污染检测", "d4_noise": "D4 噪音干扰检测",
+                     "d5_correctness": "D5 计算正确性", "d6_robustness": "D6 边界鲁棒性"}.get(dim, dim)
+        _tl(self.skill_dir, dim, dim_label, "--type", "py_script")
         runner_name = f"_run_{dim}"
         if hasattr(self, runner_name):
             getattr(self, runner_name)()
         else:
             self.results.append(TestResult(
                 dim, f"未知维度 {dim}", "info", "skip", "未实现"))
+        _tl(self.skill_dir, dim, dim_label, "end", "--type", "py_script")
 
     def run_all(self, dimensions: list[str] = None):
         """执行一个或多个维度的测试"""
         if dimensions is None:
             dimensions = ["d1_smoke", "d2_breakpoint", "d3_contamination",
                           "d4_noise", "d5_correctness", "d6_robustness"]
+        _tl(self.skill_dir, "function_test", "功能测试总入口", "--type", "py_script")
         for dim in dimensions:
             self.run_dimension(dim)
+        _tl(self.skill_dir, "function_test", "功能测试总入口", "end", "--type", "py_script")
 
     def add_result(self, r: TestResult):
         self.results.append(r)
@@ -123,6 +159,7 @@ class TestRunner:
         # -- 运行时烟雾测试 -- subprocess --help 验证脚本启动
         cli_scripts = self._find_cli_scripts(py_files)
         for script, script_rel in cli_scripts:
+            _tl(self.skill_dir, "d1_subprocess", f"D1: {script_rel} --help", "--type", "subprocess_wall")
             try:
                 result = subprocess.run(
                     [sys.executable, script, "--help"],
@@ -137,11 +174,15 @@ class TestRunner:
                         f"启动失败: {script_rel}", "warn", "fail",
                         f"exit code {result.returncode}: {result.stderr.strip()[-200:]}",
                         script_rel, 0, "检查 __main__ 入口和依赖"))
+                _tl(self.skill_dir, "d1_subprocess", f"D1: {script_rel} --help", "end",
+                       "--type", "subprocess_wall", "--detail", f"rc={result.returncode}")
             except subprocess.TimeoutExpired:
                 self.add_result(TestResult("D1",
                     f"启动超时: {script_rel}", "warn", "fail",
                     f"30 秒未返回: 可能卡死在启动时 import 或网络请求",
                     script_rel, 0, "检查 import 链是否有阻塞调用"))
+                _tl(self.skill_dir, "d1_subprocess", f"D1: {script_rel} --help", "end",
+                       "--type", "subprocess_wall", "--detail", "timeout")
             except FileNotFoundError:
                 self.add_result(TestResult("D1",
                     f"解释器不存在: {script_rel}", "block", "fail",
@@ -341,6 +382,8 @@ class TestRunner:
             fname = fn["name"]
             if fname.startswith("_"):
                 continue
+            if fname == "main":
+                continue  # main() 通常依赖 sys.argv，不能安全调用
             params = fn.get("params", [])
             if params in ([], ["self"], ["cls"], [None]):
                 testable.append(fn)
@@ -535,7 +578,7 @@ class TestRunner:
             end = min(len(source_lines), lineno + context_lines)
             ctx = []
             for i in range(start, end):
-                marker = "→" if i == lineno - 1 else " "
+                marker = "\u2192" if i == lineno - 1 else " "
                 ctx.append(f"      {marker} {i+1:4d}| {source_lines[i]}")
             return "\n".join(ctx)
 
@@ -586,7 +629,7 @@ def run_full_test(skill_dir: str, dimensions: list[str] = None) -> tuple[dict, s
     runner.run_all(dimensions)
     print(f"  [FT] 完成 {len(runner.results)} 项测试", flush=True)
 
-    # 3. 生成报告（LLM 分类由 runner.py Stage 5 负责，依据 fix_mode 配置执行）
+    # 3. 生成报告
     report = runner.generate_report()
     report_text = runner.print_report(skill_dir=skill_dir)
     return report, report_text
@@ -598,8 +641,11 @@ if __name__ == "__main__":
         target = sys.argv[1]
         dims = sys.argv[2:] if len(sys.argv) > 2 else None
         if os.path.isdir(target):
+            _hook_check(target, "function_test")
+            _tl(target, "function_test", "功能测试（独立运行）", "--type", "py_script")
             report, text = run_full_test(target, dims)
             print(text)
+            _tl(target, "function_test", "功能测试（独立运行）", "end", "--type", "py_script")
             # 保存报告到数据目录（R-12 合规）
             from test_config import config_path as _cfg
             _rd = os.path.dirname(_cfg(target))
@@ -608,6 +654,7 @@ if __name__ == "__main__":
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(report, f, ensure_ascii=False, indent=2)
             print(f"\n报告 JSON 已保存: {report_path}")
+            _hook_done(target, "function_test")
         else:
             print(f"错误: 目录不存在 {target}")
     else:

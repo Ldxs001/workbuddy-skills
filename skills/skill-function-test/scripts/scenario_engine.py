@@ -1,16 +1,22 @@
 """
 scenario_engine.py — 场景测试引擎
 
-从蓝皮书（inspector 产出）获取目标技能的完整元信息（脚本清单、函数、引用链路），
-结合 SKILL.md 中声明的触发场景、核心能力、工作流程，
-自动构建测试计划并对每个场景执行真实 CLI 命令。
+从蓝皮书（inspector 产出）获取目标技能的完整元信息（脚本清单、函数、引用链路、import_chain），
+基于蓝皮书数据自动构建测试计划并对每个场景执行真实 CLI 命令。
+
+蓝皮书即事实来源——所有代码分析已在 inspector 中完成，此处不重复扫描。
+场景引擎只关心"目标技能有什么可执行的 CLI 脚本"，不解析 SKILL.md 正文格式。
 
 蓝皮书即事实来源——所有代码分析已在 inspector 中完成，此处不重复扫描。
 
-场景链路的三个维度：
-S1 场景链路完整性 — 对每个 trigger 场景执行真实 CLI，验证可走通
-S2 场景输入产出匹配 — 对每个核心能力执行真实 CLI，验证功能可用
-S3 场景数据流正确性 — 对工作流步骤执行端到端 CLI，验证链路连续
+场景链路的两个维度（全部基于蓝皮书数据，不依赖 SKILL.md 写作格式）：
+S1 场景链路完整性 — 从 frontmatter trigger 匹配 CLI 脚本并执行（元数据驱动）
+S2 场景输入产出匹配 — 遍历蓝皮书中所有 CLI 脚本，逐一测试 --help 及其它参数
+S3 场景数据流正确性 — 从蓝皮书 import_chain 构建依赖链，测试跨脚本调用链路
+
+时间线集成：每个场景/每个 CLI 调用都记录独立的 [START]/[END] marker。
+
+时间线集成：每个场景/每个 CLI 调用都记录独立的 [START]/[END] marker。
 """
 import ast
 import json
@@ -19,6 +25,50 @@ import re
 import subprocess
 import sys
 from typing import Optional
+
+# 流程钩子
+_HOOKS_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hooks.py"
+))
+def _hook_check(skill_dir, step):
+    r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
+                        capture_output=True, text=True)
+    if r.stdout.strip(): print(r.stdout)
+    if r.returncode != 0: sys.exit(r.returncode)
+def _hook_done(skill_dir, step):
+    subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
+                    capture_output=True)
+
+# 时间线输出
+_TIMELINE_SCRIPT = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "timeline.py"
+))
+def _tl(skill_dir: str, *args):
+    """调用 timeline.py 记录 marker"""
+    try:
+        subprocess.run(
+            [sys.executable, _TIMELINE_SCRIPT, "mark", skill_dir] + list(args),
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        pass
+
+def _run_timed(skill_dir, cmd_args, label, phase="scene_test"):
+    """执行 subprocess 并记 wall time"""
+    _tl(skill_dir, phase, label, "--type", "subprocess_wall")
+    t0 = subprocess.run([sys.executable, _TIMELINE_SCRIPT, "mark", skill_dir,
+                         phase, label, "--type", "subprocess_wall"],
+                        capture_output=True, timeout=10)
+    # 实际标记以上面为准，这里只是为了后续 end 能引用
+    try:
+        result = subprocess.run(
+            cmd_args, capture_output=True, text=True, timeout=30,
+        )
+        wall = subprocess.run([sys.executable, "-c", "import time; print(time.perf_counter())"],
+                               capture_output=True, text=True, timeout=10)
+    except:
+        pass
+    _tl(skill_dir, phase, label, "end", "--type", "subprocess_wall")
 
 
 class ScenarioResult:
@@ -53,7 +103,7 @@ class ScenarioResult:
 # ═══════════════════════════════════════════════════════
 
 def parse_skill_md(skill_dir: str) -> dict:
-    """从目标技能目录解析 SKILL.md，提取场景信息"""
+    """从目标技能目录解析 SKILL.md，提取前件 trigger 场景（元数据）"""
     skill_md = os.path.join(skill_dir, "SKILL.md")
     if not os.path.exists(skill_md):
         return {"error": "SKILL.md 不存在"}
@@ -63,44 +113,27 @@ def parse_skill_md(skill_dir: str) -> dict:
 
     result = {
         "trigger_scenes": [],
-        "capabilities": [],
-        "workflow_steps": [],
     }
 
-    # 解析 Frontmatter trigger
+    # 解析 Frontmatter trigger（结构化元数据，支持 YAML 列表和 / 分隔两种格式）
     fm_match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
     if fm_match:
         fm = fm_match.group(1)
         for line in fm.split("\n"):
-            if line.strip().startswith("trigger:"):
-                val = line.split(":", 1)[1].strip().strip("'\"")
-                result["trigger_scenes"] = [s.strip() for s in val.split("/") if s.strip()]
-
-    # 解析核心能力表格
-    cap_match = re.search(r'## 核心能力\n(.*?)(?=\n## |\Z)', content, re.DOTALL)
-    if cap_match:
-        cap_section = cap_match.group(1)
-        for line in cap_section.split("\n"):
-            if line.strip().startswith("| **") or "| **" in line:
-                parts = [p.strip() for p in line.split("|") if p.strip()]
-                if len(parts) >= 3:
-                    result["capabilities"].append({
-                        "name": parts[1].replace("**", "").strip(),
-                        "desc": parts[2] if len(parts) > 2 else "",
-                    })
-
-    # 解析工作流程
-    wf_match = re.search(r'## 工作流程\n(.*?)(?=\n## |\Z)', content, re.DOTALL)
-    if wf_match:
-        wf = wf_match.group(1)
-        for line in wf.split("\n"):
-            stripped = line.strip()
-            if re.match(r'^\d+\.', stripped):
-                result["workflow_steps"].append(stripped)
-            elif stripped.startswith("- **"):
-                m = re.search(r'`([^`]+)`', stripped)
-                if m:
-                    result["workflow_steps"].append(stripped)
+            sline = line.strip()
+            if sline.startswith("trigger:"):
+                val = sline.split(":", 1)[1].strip()
+                # YAML 列表格式: ['a', 'b', 'c']
+                if val.startswith("["):
+                    result["trigger_scenes"] = [
+                        s.strip().strip("'\"") for s in val.strip("[]").split(",") if s.strip()
+                    ]
+                # / 分隔格式: a / b / c
+                else:
+                    val = val.strip("'\"")
+                    result["trigger_scenes"] = [
+                        s.strip() for s in val.split("/") if s.strip()
+                    ]
 
     return result
 
@@ -111,19 +144,25 @@ def parse_skill_md(skill_dir: str) -> dict:
 
 def auto_build_test_plan(parsed_md: dict, blueprint: dict) -> list[dict]:
     """
-    根据 SKILL.md 解析结果和蓝皮书数据构建测试计划。
+    根据蓝皮书数据构建测试计划（蓝皮书驱动，不依赖 SKILL.md 写作格式）。
+    
     蓝皮书由 inspector 在阶段 2 生成，包含：
       - cli_scripts: 所有有 __main__ 的脚本及其支持的参数
       - functions: 所有函数的 AST 签名
       - import_chain: 模块间引用关系
       - file_manifest: 完整文件清单
+    
+    架构原则：
+      S1 — 从蓝皮书的 trigger 场景匹配 CLI 脚本（frontmatter 是元数据，非正文格式）
+      S2 — 遍历蓝皮书中所有 CLI 脚本，直接测试（不解析正文 ## 核心能力）
+      S3 — 从蓝皮书的 import_chain 构建依赖链，测试跨脚本调用链路
     """
+
     cli_scripts = blueprint.get("cli_scripts", [])
-    functions = blueprint.get("functions", [])
-    py_files = blueprint.get("file_manifest", {}).get("python", [])
+    import_chain = blueprint.get("import_chain", {})
     tests = []
 
-    # ── 从 trigger 场景匹配 CLI 脚本 ──
+    # ── S1: 从 trigger 场景匹配 CLI 脚本（frontmatter 元数据） ──
     for scene in parsed_md.get("trigger_scenes", []):
         matched = []
         kw = scene.lower().replace("/", " ").split()
@@ -138,36 +177,36 @@ def auto_build_test_plan(parsed_md: dict, blueprint: dict) -> list[dict]:
             "matched_scripts": matched[:5],
         })
 
-    # ── 从核心能力匹配 CLI 脚本 ──
-    for cap in parsed_md.get("capabilities", []):
-        name = cap.get("name", "").lower()
-        matched = []
-        kw = name.replace("+", " ").split()
-        for s in cli_scripts:
-            for k in kw:
-                if len(k) >= 2 and (k in s["name"].lower() or k in s["path"].lower()):
-                    matched.append(s)
-                    break
+    # ── S2: 遍历所有 CLI 脚本（蓝皮书驱动，不解析 ## 核心能力） ──
+    for s in cli_scripts:
+        name = s["name"]
+        if name in ("__init__", "__main__"):  # 入口脚本由 trigger 单独测试
+            continue
         tests.append({
-            "scene": f"能力:{cap.get('name', '')}", "source": "capability",
-            "matched_scripts": matched[:3],
+            "scene": f"脚本:{name}", "source": "capability",
+            "matched_scripts": [s],
         })
 
-    # ── 从工作流步骤匹配 CLI 脚本 ──
-    for step in parsed_md.get("workflow_steps", []):
-        refs = re.findall(r'`([^`]+)`', step)
-        matched = []
-        for ref in refs:
-            ref_clean = ref.replace(".py", "").strip().replace(".", "").strip()
-            for s in cli_scripts:
-                if ref_clean in s["name"] or ref_clean in s["path"].lower():
-                    matched.append(s)
-                    break
-        if matched:
-            tests.append({
-                "scene": f"工作流:{step[:50]}", "source": "workflow",
-                "matched_scripts": matched[:3],
-            })
+    # ── S3: 从 import_chain 构建依赖链 ──
+    # 找到 CLI 脚本之间的交叉引用关系
+    script_by_name = {s["name"]: s for s in cli_scripts}
+    seen_chains = set()
+    for s in cli_scripts:
+        mod_name = s["name"]
+        deps = import_chain.get(mod_name, [])
+        chain_members = []
+        for dep in deps:
+            if dep in script_by_name and dep != mod_name:
+                chain_members.append(script_by_name[dep])
+        if chain_members:
+            chain_key = f"{mod_name}->{'+'.join(c['name'] for c in chain_members)}"
+            if chain_key not in seen_chains:
+                seen_chains.add(chain_key)
+                tests.append({
+                    "scene": f"依赖链:{mod_name}→{','.join(c['name'] for c in chain_members[:3])}",
+                    "source": "workflow",
+                    "matched_scripts": [s] + chain_members[:3],
+                })
 
     return tests
 
@@ -201,32 +240,54 @@ class ScenarioRunner:
         self.results.append(r)
 
     def run(self):
-        """执行 S1-S3 场景测试"""
+        """执行 S1-S3 场景测试，每个场景独立计时"""
+        _tl(self.skill_dir, "S1", "场景链路完整性", "--type", "py_script")
         self._run_s1_scenarios()
+        _tl(self.skill_dir, "S1", "场景链路完整性", "end", "--type", "py_script")
+
+        _tl(self.skill_dir, "S2", "场景输入产出匹配", "--type", "py_script")
         self._run_s2_scenarios()
+        _tl(self.skill_dir, "S2", "场景输入产出匹配", "end", "--type", "py_script")
+
+        _tl(self.skill_dir, "S3", "场景数据流正确性", "--type", "py_script")
         self._run_s3_scenarios()
+        _tl(self.skill_dir, "S3", "场景数据流正确性", "end", "--type", "py_script")
 
     def _exec(self, script: dict, args: list[str],
               test_name: str, sid: str) -> ScenarioResult:
-        """执行 CLI 脚本"""
+        """执行 CLI 脚本，含 subprocess wall time 计时"""
         abspath = os.path.join(self.skill_dir, script["path"])
+        cmd = [sys.executable, abspath] + args
+        label_detail = f"{script['name']} {' '.join(args)}"
+
+        # 记 subprocess wall time start
+        _tl(self.skill_dir, f"target_{sid}", f"{sid}: {label_detail}", "--type", "subprocess_wall")
+
         try:
-            cmd = [sys.executable, abspath] + args
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=30,
                 cwd=self.skill_dir,
             )
+            wall_time = "unknown"
             if result.returncode in (0, 2):
+                _tl(self.skill_dir, f"target_{sid}", f"{sid}: {label_detail}", "end",
+                       "--type", "subprocess_wall", "--detail", f"rc={result.returncode}")
                 return ScenarioResult(sid, f"「{test_name}」", "pass", "info",
                                        f"rc={result.returncode}")
             err = result.stderr.strip()[:150] or result.stdout.strip()[:150]
+            _tl(self.skill_dir, f"target_{sid}", f"{sid}: {label_detail}", "end",
+                   "--type", "subprocess_wall", "--detail", f"rc={result.returncode}: {err}")
             return ScenarioResult(sid, f"「{test_name}」", "fail", "warn",
                                    f"rc={result.returncode}: {err}",
                                    script["path"])
         except subprocess.TimeoutExpired:
+            _tl(self.skill_dir, f"target_{sid}", f"{sid}: {label_detail}", "end",
+                   "--type", "subprocess_wall", "--detail", "timeout")
             return ScenarioResult(sid, f"「{test_name}」", "fail", "block",
                                    "执行超时 (30s)", script["path"])
         except Exception as e:
+            _tl(self.skill_dir, f"target_{sid}", f"{sid}: {label_detail}", "end",
+                   "--type", "subprocess_wall", "--detail", str(e)[:50])
             return ScenarioResult(sid, f"「{test_name}」", "fail", "block",
                                    f"执行异常: {e}", script["path"])
 
@@ -326,8 +387,10 @@ class ScenarioRunner:
 
 
 def run_scenario_test(skill_dir: str, blueprint: dict) -> tuple[dict, str]:
+    _tl(skill_dir, "scenario", "场景测试总入口", "--type", "py_script")
     runner = ScenarioRunner(skill_dir, blueprint)
     runner.run()
+    _tl(skill_dir, "scenario", "场景测试总入口", "end", "--type", "py_script")
     return runner.generate_report(), runner.print_report()
 
 
@@ -336,14 +399,25 @@ if __name__ == "__main__":
 
     if len(sys.argv) >= 2:
         target = sys.argv[1]
+        _hook_check(target, "scenario")
+        _tl(target, "scenario", "场景测试（独立运行）", "--type", "py_script")
         bb = scan(target)
         bp = bb.to_dict()
         report, text = run_scenario_test(target, bp)
         print(text)
+        _tl(target, "scenario", "场景测试（独立运行）", "end", "--type", "py_script")
 
-        report_path = os.path.join(target, ".scenario-test_report.json")
+        # 保存到中央数据目录（与 test_engine 一致）
+        target_name = os.path.basename(os.path.abspath(target))
+        data_dir = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "..", ".standardization", "skill-function-test", "data", target_name
+        ))
+        os.makedirs(data_dir, exist_ok=True)
+        report_path = os.path.join(data_dir, ".scenario-test_report.json")
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
         print(f"\n场景报告 JSON 已保存: {report_path}")
+        _hook_done(target, "scenario")
     else:
         print("用法: python scenario_engine.py <skill-dir>")
