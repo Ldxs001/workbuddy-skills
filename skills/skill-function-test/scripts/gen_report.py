@@ -206,6 +206,30 @@ def extract_issues(data: dict) -> list[dict]:
                 "file": r.get("file", ""), "line": r.get("lineno", 0),
                 "suggestion": r.get("suggestion", ""), "detail": r.get("detail", ""),
             })
+    # ── S4 失守项加入问题列表 ──
+    s4_trace = data.get("s4_trace", [])
+    if s4_trace:
+        # 按 cid 统计坚守率
+        from collections import Counter
+        cid_total = Counter()
+        cid_held = Counter()
+        for t in s4_trace:
+            cid = t.get("cid", "?")
+            cid_total[cid] += 1
+            if t.get("llm_behavior") == "坚守":
+                cid_held[cid] += 1
+        for cid in sorted(cid_total):
+            total = cid_total[cid]
+            held = cid_held[cid]
+            pct = held * 100 // total
+            if pct < 100:
+                issues.append({
+                    "source": "S4", "name": f"{cid} 坚守率 {pct}%",
+                    "level": "warn", "message": f"约束 {cid} 坚守率 {held}/{total} ({pct}%)，仅建议级别约束",
+                    "file": "", "line": 0,
+                    "suggestion": "建议级别约束不会被代码强制，如需100%坚守请提升约束强度",
+                    "detail": "",
+                })
     return issues
 
 
@@ -451,6 +475,47 @@ def gen_html(data: dict) -> str:
         st = "PASS" if r.get("status") == "pass" else "FAIL"
         function_rows += f"<tr><td>{r.get('dim','')}</td><td>{r.get('name','')[:40]}</td><td>{st}</td><td>{r.get('message','')}</td></tr>\n    "
 
+    # ── S4 坚守率矩阵 ──
+    s4_trace = data.get("s4_trace", [])
+    s4_plan = data.get("s4_plan", [])
+    s4_html = ""
+    if s4_trace:
+        held = sum(1 for t in s4_trace if t.get("llm_behavior") == "坚守")
+        total = len(s4_trace)
+        rate = f"{held}/{total} ({held*100//total if total else 0}%)"
+        # 按轮次统计
+        from collections import Counter
+        round_counts = Counter(t.get("round", 1) for t in s4_trace)
+        num_rounds = len(round_counts)
+        round_stats = ""
+        if num_rounds > 1:
+            round_rows = ""
+            for rn in sorted(round_counts):
+                r_items = [t for t in s4_trace if t.get("round", 1) == rn]
+                r_held = sum(1 for t in r_items if t.get("llm_behavior") == "坚守")
+                r_total = len(r_items)
+                rpct = r_held * 100 // r_total if r_total else 0
+                round_rows += f'<tr><td>第 {rn} 轮</td><td>{r_total}</td><td>{r_held}</td><td>{r_total - r_held}</td><td>{rpct}%</td></tr>\n    '
+            round_stats = f'''
+  <h4 style="margin-top:12px;font-size:13px;font-weight:600;">各轮次坚守率</h4>
+  <table style="width:auto;">
+    <tr><th>轮次</th><th>总数</th><th>坚守</th><th>失守</th><th>坚守率</th></tr>
+    {round_rows}
+  </table>'''
+
+        s4_rows = ""
+        for t in s4_trace:
+            status = "✅" if t.get("llm_behavior") == "坚守" else "❌"
+            s4_rows += f'<tr><td>{t.get("nid","")}</td><td>{t.get("cid","")}</td><td>R{t.get("round",1)}</td><td>{t.get("level","")}</td><td>{status}</td><td>{t.get("noise_text","")[:50]}</td><td>{t.get("llm_behavior","")}</td></tr>\n    '
+        s4_html = f'''
+  <h3 style="margin-top:14px;font-size:14px;font-weight:600;color:#534AB7;">S4 坚守率矩阵</h3>
+  <p>噪音方案: {len(s4_plan)} 条 · 轮次: {num_rounds} · 执行记录: {total} 条 · 坚守率: {rate}</p>
+  {round_stats}
+  <table>
+    <tr><th>噪音ID</th><th>约束</th><th>轮次</th><th>级别</th><th>结果</th><th>噪音内容</th><th>行为</th></tr>
+    {s4_rows}
+  </table>'''
+
     # 修复记录行
     fix_record = data.get("fix_record", [])
     if fix_record:
@@ -535,6 +600,8 @@ th {{ background: var(--bg); font-weight: 600; font-size: 12px; text-transform: 
   <div class="grid">
     <div class="stat-box pass"><div class="num">{s_pass}/{s_total}</div><div class="label">场景测试通过</div></div>
     <div class="stat-box pass"><div class="num">{f_pass}/{f_total}</div><div class="label">功能测试通过</div></div>
+    <div class="stat-box"><div class="num">{len(s4_trace)}</div><div class="label">S4 噪音执行</div></div>
+    <div class="stat-box pass"><div class="num">{held}/{total if total else 0}</div><div class="label">S4 坚守率</div></div>
     <div class="stat-box fail"><div class="num">{f0_count}</div><div class="label">F-0 BLOCK</div></div>
     <div class="stat-box warn"><div class="num">{f1_count}</div><div class="label">F-1 WARN</div></div>
     <div class="stat-box"><div class="num">{f2_count}</div><div class="label">F-2 INFO</div></div>
@@ -566,6 +633,7 @@ th {{ background: var(--bg); font-weight: 600; font-size: 12px; text-transform: 
     {scenario_rows}
     {function_rows}
   </table>
+  {s4_html}
 </div>
 
 <div class="card">

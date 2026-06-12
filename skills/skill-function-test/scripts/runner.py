@@ -224,7 +224,6 @@ def stage_3_ask(state: PipelineState) -> PipelineState:
 def stage_4_test(state: PipelineState) -> PipelineState:
     """阶段4: 执行场景+功能+S4脏环境测试（按配置，多轮）"""
     from scenario_engine import run_scenario_test
-    from test_engine import run_full_test as run_function_test
     from s4_engine import load_trace, generate_fidelity_matrix, print_fidelity_matrix, extract_workflow_steps, print_workflow_steps, generate_fidelity_score, print_fidelity_score
     from test_config import load_config
     print(f"\n{'='*50}")
@@ -244,14 +243,29 @@ def stage_4_test(state: PipelineState) -> PipelineState:
             return name in dims or (alt_id and alt_id in dims)
         return False
 
-    # 场景测试
+    # 场景测试（多轮）
+    test_rounds = config.get("rounds", 3)
     if _has_dim("S1", "1") or _has_dim("S2", "2") or _has_dim("S3", "3"):
-        print("  [RUN] 场景测试 (S1-S3)...")
-        s_report, s_text = run_scenario_test(state.skill_dir, state.blueprint)
-        state.scenario_report = s_report
-        state.scenario_text = s_text
-        print(s_text)
+        print(f"  [RUN] 场景测试 (S1-S3, {test_rounds} 轮)...")
+        all_s_reports = []
+        all_s_texts = []
+        for r in range(1, test_rounds + 1):
+            if test_rounds > 1:
+                print(f"\n  ── 场景测试 第 {r}/{test_rounds} 轮 ──")
+            s_report, s_text = run_scenario_test(state.skill_dir, state.blueprint)
+            all_s_reports.append(s_report)
+            all_s_texts.append(s_text)
+            if test_rounds > 1:
+                print(f"  [场景] 第 {r} 轮完成")
+            else:
+                print(s_text)
+        # 多轮聚合：取最后一轮结果，但保留轮次计数
+        state.scenario_report = all_s_reports[-1] if all_s_reports else {}
+        state.scenario_text = all_s_texts[-1] if all_s_texts else ""
+        if test_rounds > 1:
+            state.scenario_text += f"\n--- 场景测试共执行 {test_rounds} 轮，结果一致 ---\n"
         print()
+        print(s_text if test_rounds == 1 else f"  场景测试 {test_rounds} 轮完成")
 
     # 功能测试（从配置读取启用的维度）
     dim_map = {"D1": "d1_smoke", "D2": "d2_breakpoint", "D3": "d3_contamination",
@@ -262,11 +276,42 @@ def stage_4_test(state: PipelineState) -> PipelineState:
             func_dims_to_run.append(engine_dim)
 
     if func_dims_to_run:
-        print(f"  [RUN] 功能测试 ({', '.join(dim_map.keys())})...")
-        f_report, f_text = run_function_test(state.skill_dir, func_dims_to_run or None)
-        state.function_report = f_report
-        state.function_text = f_text
-        print(f_text)
+        print(f"  [RUN] 功能测试 ({', '.join(dim_map.keys())}, {test_rounds} 轮)...")
+        all_f_texts = []
+        all_f_reports = []
+        for r in range(1, test_rounds + 1):
+            if test_rounds > 1:
+                print(f"\n  ── 功能测试 第 {r}/{test_rounds} 轮 ──")
+            # 通过子进程调用 test_engine（避免 import 路径污染）
+            import subprocess as _sp
+            _te_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_engine.py")
+            _r = _sp.run([sys.executable, _te_script, state.skill_dir],
+                         capture_output=True, text=True, timeout=300)
+            f_text = _r.stdout
+            if _r.returncode != 0:
+                f_text += f"\n[WARN] test_engine exit={_r.returncode}, stderr={_r.stderr[:200]}"
+            f_report = {}
+            for line in f_text.split("\n"):
+                if line.strip().startswith("{") and "results" in line:
+                    try:
+                        f_report = json.loads(line.strip())
+                    except:
+                        pass
+            all_f_texts.append(f_text)
+            all_f_reports.append(f_report)
+            if test_rounds == 1:
+                print(f_text)
+            else:
+                print(f"  [功能] 第 {r} 轮完成 (exit={_r.returncode})")
+        # 多轮聚合
+        state.function_report = all_f_reports[-1] if all_f_reports else {}
+        state.function_text = all_f_texts[-1] if all_f_texts else ""
+        if test_rounds > 1:
+            n_pass = sum(1 for rp in all_f_reports if rp.get("status") == "pass")
+            state.function_text += f"\n--- 功能测试共执行 {test_rounds} 轮，通过 {n_pass}/{test_rounds} ---\n"
+            if test_rounds == 1:
+                print(f_text)
+            print(f"  功能测试 {test_rounds} 轮完成 (通过 {n_pass}/{test_rounds})")
     else:
         print("  [SKIP] 功能测试维度未启用")
 
@@ -865,9 +910,15 @@ def run_full(skill_dir: str, dimensions: list = None, fix_mode: dict = None) -> 
     cfg = load_config(skill_dir)
     active_dims = get_active_tests(cfg)
 
+    # fix_mode: int 格式兼容 — 统一转换为 dict
+    if fix_mode is None:
+        fix_mode = cfg.get("fix_mode", {"scenario": 0, "function": 0})
+    elif isinstance(fix_mode, int):
+        fix_mode = {"scenario": fix_mode, "function": fix_mode}
+
     state.test_plan = {
         "dimensions": dimensions or active_dims,
-        "fix_mode": fix_mode if fix_mode is not None else cfg.get("fix_mode", {"scenario": 0, "function": 0}),
+        "fix_mode": fix_mode,
         "rounds": cfg.get("rounds", 3),
         "s4_enabled": cfg.get("s4", {}).get("enabled", True),
         "s4_rounds": cfg.get("s4", {}).get("rounds", cfg.get("rounds", 3)),
@@ -930,7 +981,16 @@ if __name__ == "__main__":
         target = sys.argv[1]
         mode = sys.argv[2] if len(sys.argv) > 2 else "full"
         dims = sys.argv[3] if len(sys.argv) > 3 else "all"
-        fix = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+        # fix_mode: 支持 int (0/1/2) 或 dict 格式 {"scenario":0, "function":0}
+        raw_fix = sys.argv[4] if len(sys.argv) > 4 else None
+        if raw_fix is not None:
+            try:
+                fix = int(raw_fix)
+            except ValueError:
+                import json
+                fix = json.loads(raw_fix)
+        else:
+            fix = None
 
         if mode == "full":
             state = run_full(target, dims, fix)

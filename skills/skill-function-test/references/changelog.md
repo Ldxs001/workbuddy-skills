@@ -1,3 +1,20 @@
+## [1.2.0] - 2026-06-12
+
+### 新增
+- **S1-S3 场景测试多轮支持**: runner.py stage_4_test 用 rounds 循环跑 3 轮
+- **D1-D6 功能测试多轮支持**: 同样 3 轮循环，每轮独立 subprocess 调用
+- **gen_report.py S4 集成**: 坚守率矩阵进报告、各轮次明细表、失守项进问题列表
+
+### 修复
+- **runner.py fix_mode 参数**: 兼容 int/dict 两种格式
+- **runner.py 功能测试**: 从 import 改为 subprocess 调用，根治路径污染
+- **test_engine.py subprocess**: 添加 cwd=self.skill_dir
+
+### 更新
+- 版本 1.1.2 → 1.2.0
+
+---
+
 ## 1.1.2 (2026-06-12)
 
 ### fix
@@ -57,6 +74,25 @@
 
 - 删除 LLM 手动 timeline.py mark 调用。LLM 时间由 --validate 的 gap 推导自动完成，无需自觉
 
+
+## v1.2.0 (2026-06-12)
+
+**改写类型：Minor — 多轮支持 + gen_report S4 集成 + subprocess 路径修复**
+
+### 新增
+- **S1-S3 场景测试多轮支持**：runner.py stage_4_test 用 rounds 循环跑 3 轮
+- **D1-D6 功能测试多轮支持**：同样 3 轮循环，每轮独立 subprocess 调用
+- **gen_report.py S4 集成**：坚守率矩阵进报告、各轮次明细表、失守项进问题列表
+
+### 修复
+- **runner.py fix_mode 参数**：兼容 int/dict 两种格式
+- **runner.py 功能测试**：从 import 改为 subprocess 调用，根治路径污染
+- **test_engine.py subprocess**：添加 cwd=self.skill_dir
+
+### 更新
+- 版本 1.1.2 → 1.2.0
+
+---
 ---
 
 ## 0.4.0 (2026-06-06)

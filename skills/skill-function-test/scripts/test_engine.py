@@ -163,7 +163,8 @@ class TestRunner:
             try:
                 result = subprocess.run(
                     [sys.executable, script, "--help"],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True, text=True, timeout=30,
+                    cwd=self.skill_dir
                 )
                 if result.returncode == 0:
                     self.add_result(TestResult("D1",
