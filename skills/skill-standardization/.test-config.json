@@ -1,8 +1,0 @@
-{
-  "version": "0.1.0",
-  "rounds": 1,
-  "fix_mode": {"scenario": 0, "function": 0},
-  "s4": {"enabled": false, "rounds": 3},
-  "scenarios": {"S1": {"enabled": true}, "S2": {"enabled": true}, "S3": {"enabled": true}},
-  "functions": {"D1": true, "D2": true, "D3": true, "D4": true, "D5": true, "D6": true}
-}

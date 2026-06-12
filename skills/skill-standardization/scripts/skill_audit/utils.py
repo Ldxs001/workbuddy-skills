@@ -377,6 +377,8 @@ _ARTIFACT_WRITE_PATTERNS = [
     re.compile(rf'Path\s*\(\s*["\']\.?({_ARTIFACT_DIR_PATTERN})["\']'),
     # with open("file.json", "w") — 直接写入 JSON/CSV 到工作目录
     re.compile(r'open\s*\(\s*["\']([^"\']+\.(json|csv|html|png|jpg|pdf|txt|ics))["\']\s*,\s*["\']w["\']'),
+    # os.path.join(<var>, ".known_test_artifact.json") — 动态路径写入已知测试产物（跨技能污染防御）
+    re.compile(r'os\.path\.join\s*\([^,]+,\s*["\']((?:\.(?:function-test|scenario-test|test-report|s4|fix-record|constraint-list|flow-state|test-config)\S*))["\']'),
 ]
 
 # [v2.11.0] 通用硬编码路径检测：匹配所有引号包裹的路径字符串
