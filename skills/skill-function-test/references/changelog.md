@@ -1,3 +1,10 @@
+## 1.1.2 (2026-06-12)
+
+### fix
+- **R-11 产出路径合规**: inspector.py/gen_report.py 产出存到数据目录而非目标技能根目录
+- **hooks.py R-11 强制清理**: gen_report 完成后自动清理目标技能根目录的已知测试残留
+- **R-11 动态路径检测增强**: skill-standardization R-11 新增 `os.path.join(<var>, .已知测试产物)` 检测模式
+
 ## 1.1.1 (2026-06-12)
 
 ### fix

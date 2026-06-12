@@ -331,11 +331,35 @@ def hook_post_s4(skill_dir: str):
 
 
 def hook_post_gen_report(skill_dir: str):
+    """报告生成完成 → 清理目标技能根目录的测试残留 + 指引"""
     _mark_done(skill_dir, "report")
-    print(f"  [HOOK] >> 报告已生成:")
-    print(f"  [HOOK] >>   Markdown: {os.path.join(skill_dir, '.test-report.md')}")
-    print(f"  [HOOK] >>   HTML:     {os.path.join(skill_dir, '.test-report.html')}")
-    print(f"  [HOOK] >> 完整流程执行完毕。")
+    _clean_skill_root(skill_dir, strict=True)
+    print(f"  [HOOK] >> 报告已生成（数据目录），完整流程执行完毕。")
+
+
+
+# R-11 强制清理：gen_report 完成后自动清除目标技能根目录的测试产出物
+
+_KNOWN_TEST_ARTIFACTS = {
+    ".function-test_blueprint.json", ".scenario-test_report.json",
+    ".test-config.json", ".test-report.html", ".test-report.md",
+    ".timeline.json", ".constraint-list.json",
+    ".s4_trace.json", ".s4_noise_plan.json",
+    ".fix-record.json", ".flow-state.json",
+}
+
+
+def _clean_skill_root(skill_dir: str, strict: bool = False):
+    """扫描目标技能根目录，删除已知测试残留文件"""
+    removed = []
+    for fname in _KNOWN_TEST_ARTIFACTS:
+        fpath = os.path.join(skill_dir, fname)
+        if os.path.exists(fpath):
+            os.remove(fpath)
+            removed.append(fname)
+            print(f"  [HOOK] 🧹 清理残留: {fname}")
+    if strict:
+        print(f"  [HOOK] ✅ 根目录{'干净，无测试残留' if not removed else f'已清理 {len(removed)} 个文件'}")
 
 
 # ── 通用标记 ──

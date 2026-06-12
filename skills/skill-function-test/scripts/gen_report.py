@@ -598,15 +598,18 @@ def main():
     elif "--markdown" in sys.argv:
         mode = "markdown"
     data = load_all(skill_dir)
+    # 输出到数据目录（R-11 合规）
+    report_dir = _data_dir_for(skill_dir)
+    os.makedirs(report_dir, exist_ok=True)
     if mode in ("markdown", "both"):
         md = gen_markdown(data)
-        md_path = os.path.join(skill_dir, ".test-report.md")
+        md_path = os.path.join(report_dir, ".test-report.md")
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md)
         print(f"  [REPORT] Markdown 报告: {md_path}")
     if mode in ("html", "both"):
         html = gen_html(data)
-        html_path = os.path.join(skill_dir, ".test-report.html")
+        html_path = os.path.join(report_dir, ".test-report.html")
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html)
         print(f"  [REPORT] HTML 报告: {html_path}")

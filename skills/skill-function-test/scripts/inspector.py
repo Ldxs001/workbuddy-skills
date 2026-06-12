@@ -544,8 +544,12 @@ if __name__ == "__main__":
             _hook_check(target, "blueprint")
             bb = scan(target)
             print(print_bluebook(bb))
-            # 同时输出 JSON
-            json_path = os.path.join(target, ".function-test_blueprint.json")
+            # 输出 JSON 到数据目录（R-11 合规）
+            _SKILLS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            target_name = os.path.basename(os.path.abspath(target))
+            data_dir = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data", target_name)
+            os.makedirs(data_dir, exist_ok=True)
+            json_path = os.path.join(data_dir, ".function-test_blueprint.json")
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(bb.to_dict(), f, ensure_ascii=False, indent=2)
             print(f"\n蓝皮书 JSON 已保存: {json_path}")
@@ -553,9 +557,6 @@ if __name__ == "__main__":
             # S4 阶段A：约束提取
             constraints = extract_constraints(target)
             # 数据目录按 R-12 规范：skills/.standardization/skill-function-test/data/<target_skill>/
-            _SKILLS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            target_name = os.path.basename(os.path.abspath(target))
-            data_dir = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data", target_name)
             os.makedirs(data_dir, exist_ok=True)
             cpath = os.path.join(data_dir, ".constraint-list.json")
             with open(cpath, "w", encoding="utf-8") as f:
