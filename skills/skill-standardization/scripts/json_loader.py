@@ -12,6 +12,9 @@ json_loader.py — SKILL.md 标准化规范渐进式 JSON 加载器 (v2.0.0)
 """
 
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 import json
 import argparse

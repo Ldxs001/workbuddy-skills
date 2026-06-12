@@ -14,6 +14,9 @@ skill_rollback.py — 技能文件专用容灾回滚工具
 
 import os
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 import glob
 import datetime
 import difflib
@@ -109,7 +112,7 @@ def list_backups():
     """列出所有备份（从 manifest 读取）"""
     manifest = load_manifest()
     if not manifest:
-        print("暂无备份记录")
+        logger.info("暂无备份记录")
         return
     print(f"共 {len(manifest)} 个备份：\n")
     for fn, meta in sorted(manifest.items(), key=lambda x: x[1].get("timestamp", ""), reverse=True):
@@ -191,7 +194,7 @@ def show_diff(rollback_id):
 if __name__ == "__main__":
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
-        print(__doc__)
+        logger.info(__doc__)
     elif args[0] == "list":
         list_backups()
     elif args[0] == "rollback":
@@ -213,5 +216,5 @@ if __name__ == "__main__":
         show_diff(target)
     else:
         print(f"未知命令: {args[0]}")
-        print(__doc__)
+        logger.info(__doc__)
         sys.exit(1)

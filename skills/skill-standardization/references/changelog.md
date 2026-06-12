@@ -1,3 +1,11 @@
+## 2.73.3 (2026-06-12)
+
+### fix
+- **清理 **`_dead_code_backup/`** 目录**: 删除 50+ 死文件，消除 D1 语法错误和相对导入失败
+- **新增 **`scripts/log.py`** 共享日志模块**: 统一日志配置
+- **print→logging 转换**: json_loader.py / skill_rollback.py / update_skill_frontmatter.py 将调试 print 转为 logger
+- **异常处理补全**: run_audit.py / update_skill_frontmatter.py 添加 try/except
+
 ## 2.73.2 (2026-06-12)
 
 ### fix

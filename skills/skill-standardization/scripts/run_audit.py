@@ -6,6 +6,9 @@ run_audit.py — skill-standardization 审计启动脚本
 用法: python run_audit.py audit <skill_dir> [--json] [--fix]
 """
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 
 # ── [GBK 兼容] ──
