@@ -1,7 +1,7 @@
 # skill-function-test 架构与规范体系文档
 
-> 完整解读 v0.2.21 版的架构设计、双轨测试体系、S4 执行忠实度与修复回归流程
-> 生成时间：2026-06-06（v0.2.21 最新更新）
+> 完整解读 v1.1.1 版的架构设计、双轨测试体系、流程钩子、计时系统与报告输出
+> 生成时间：2026-06-12（v1.1.1 最新更新）
 
 ---
 
@@ -11,12 +11,14 @@ skill-function-test 是一个 **技能场景测试套件**，围绕以下闭环�
 
 ```
 目标技能 SKILL.md
-  → 蓝皮书扫描（inspector: AST + 函数签名 + 引用链路 + 场景解析）
-    → 场景测试（scenario_engine: S1链路/S2输入产出/S3数据流）
+  → 蓝皮书扫描（inspector: AST + 函数签名 + 引用链路 + import_chain + 约束提取）
+    → [HOOK] 流程钩子校验（自动补齐/阻断指引）
+    → 场景测试（scenario_engine: S1 frontmatter trigger / S2 全 CLI 脚本 / S3 import_chain 依赖链）
       → 功能测试（test_engine: D1语法/D2断点/D3污染/D4噪音/D5正确性/D6鲁棒性）
         → S4 执行忠实度（噪音方案 + 随机化回放 + 结构性修复）
           → 修复循环（fixer: 零除/裸print/路径/异常）
             → 回归确认（全量重测 + 基线对比）
+              → 双格式报告（gen_report: HTML + Markdown 模板化报告 + 计时验证）
 ```
 
 ### 1.1 三层架构
@@ -24,7 +26,8 @@ skill-function-test 是一个 **技能场景测试套件**，围绕以下闭环�
 | 层 | 组件 | 职责 |
 |---|------|------|
 | **表现层** | SKILL.md + references/*.md + CLI + HTML 配置界面 | 人类可读的文档、命令行交互、可视化配置 |
-| **业务层** | inspector / scenario_engine / test_engine / s4_engine / fixer / runner | 扫描、测试、修复、回归的核心逻辑 |
+| **业务层** | inspector / scenario_engine / test_engine / s4_engine / fixer / gen_report | 扫描、测试、修复、回归、双格式报告的核心逻辑 |
+| **流程控制层** | hooks.py / timeline.py | 流程钩子（入口阻断+自动补齐）和三级嵌套计时系统 |
 | **数据层** | backup.py（时间戳备份）+ test_config.py（JSON 持久化） | 备份与配置管理 |
 
 ### 1.2 目录结构
@@ -40,11 +43,15 @@ skill-function-test/
 │   ├── examples.md             # 使用示例
 │   ├── faq.md                  # 常见问题
 │   ├── permissions.md          # 权限说明
-│   └── s4-noise-testing.md     # S4 噪音测试方案
+│   ├── s4-noise-testing.md     # S4 噪音测试方案
+│   ├── timing.md               # 计时系统使用说明
+│   └── hooks.md                # 流程钩子使用说明
 └── scripts/                    # 核心脚本
-    ├── runner.py               # 全流程编排层：8 阶段自动化编排
-    ├── inspector.py            # 蓝皮书扫描器：AST + 文件清单 + 函数签名 + 引用链路 + 场景解析 + 约束提取
-    ├── scenario_engine.py      # 场景测试引擎：从 SKILL.md 解析场景，构造端到端测试用例
+    ├── hooks.py                # 流程钩子系统：入口校验阻断 + 自动补齐 + 完成标记
+    ├── timeline.py             # 计时引擎：三级嵌套 start/end marker + --validate 间隙推导
+    ├── gen_report.py           # 报告生成器：从 JSON 填充模板，输出 HTML + Markdown 双格式
+    ├── inspector.py            # 蓝皮书扫描器：AST + 文件清单 + 函数签名 + 引用链路 + import_chain + 约束提取
+    ├── scenario_engine.py      # 场景测试引擎：基于蓝皮书数据（非 SKILL.md 正文格式）构建测试计划
     ├── test_engine.py          # 功能测试引擎：D1-D6 功能测试 + 结果聚合
     ├── s4_engine.py            # S4 执行忠实度引擎：噪音方案校验 + NoisePlayer 随机化回放 + 结构性修复
     ├── fixer.py                # 通用修复工具：safe_write 原子写入、零除保护、print→logging、路径替换
@@ -66,13 +73,15 @@ skill-function-test/
 
 ### 2.1 轨道 A：场景测试（S1-S3）
 
-**目的**：验证技能在 SKILL.md 中声称的能力在实际代码中是否真实可走通。
+**目的**：验证技能的 CLI 脚本是否真实可运行。基于蓝皮书数据驱动，不依赖 SKILL.md 正文写作格式。
 
 | 维度 | 代号 | 检测内容 | 检测方式 |
 |------|------|---------|---------|
-| **S1 场景链路完整性** | scenario_chain | 触发词→核心能力→工作流程→代码实现是否完整匹配 | 解析 SKILL.md 的 trigger 字段 → 匹配 scripts/ 函数 → 检查调用链路 |
-| **S2 场景输入产出匹配** | scenario_io | 场景描述输入是否有对应的函数/方法实现 | 参数匹配、返回值类型、文档声明 vs 实际签名 |
-| **S3 场景数据流正确性** | scenario_flow | 场景中各步骤间的数据传递是否正确 | 函数 A 输出→函数 B 输入的类型兼容、字段名匹配 |
+| **S1 场景链路完整性** | scenario_chain | frontmatter trigger 字段的触发词是否能匹配到 CLI 脚本 | 解析 frontmatter trigger → 关键字匹配蓝皮书 CLI 脚本清单 → 执行 `--help` 及附加参数 |
+| **S2 场景输入产出匹配** | scenario_io | 蓝皮书中所有 CLI 脚本是否能正常启动 | 遍历蓝皮书中所有 CLI 脚本（跳过 __init__/__main__），逐一带 `--help` 和附加参数验证 |
+| **S3 场景数据流正确性** | scenario_flow | 蓝皮书 import_chain 中 CLI 脚本之间的依赖链是否完整 | 从 import_chain 构建 CLI 脚本间引用关系，验证依赖链路 |
+
+**重构说明**（v1.1.0）：原 S2/S3 解析 SKILL.md 的 `## 核心能力` 和 `## 工作流程` 节正文格式，导致格式不匹配时永远返回空。v1.1.0 改为完全基于蓝皮书数据（file_manifest + cli_scripts + import_chain），不依赖任何 SKILL.md 正文写作格式。
 
 **修复规则**：
 - F-0 导入错误/语法错误 → ✅ 自动修复（fixer.safe_patch）
@@ -149,7 +158,7 @@ skill-function-test/
 
 ## 三、8 阶段完整工作流程
 
-### 阶段 0：安全校验
+### 阶段 0：安全校验 + 时间线初始化
 
 | 校验项 | 规则 |
 |--------|------|
@@ -157,13 +166,19 @@ skill-function-test/
 | 目标路径范围 | 必须在 `~/.workbuddy/skills/<name>` 内 |
 | 目标存在 | 目标目录必须有 SKILL.md |
 
+初始化时间线：
+```bash
+python scripts/timeline.py init /path/to/target-skill
+```
+（hooks 自动补齐，LLM 不需要手动记时）
+
 ### 阶段 1：备份
 
 ```bash
 python scripts/backup.py backup /path/to/target-skill pre_test
 ```
 
-备份自动以时间戳命名，存储在 `.standardization/skill-scenario-test/data/backup/`。
+备份自动以时间戳命名，存储在 `.standardization/skill-function-test/data/backup/`。
 
 ### 阶段 2：蓝皮书扫描 + 约束提取 + 全量测试范围
 
@@ -175,7 +190,8 @@ python scripts/inspector.py /path/to/target-skill
 - 文件清单（按扩展名分组）
 - AST 函数签名（def 名称 + 行号 + 参数列表）
 - 引用链路（import 关系图）
-- **SKILL.md 场景解析**（触发词、核心能力、工作流程步骤）
+- import_chain（模块间交叉引用）
+- CLI 脚本清单（有 __main__ 的脚本及其支持参数）
 - **约束提取**（扫描 scripts/ 下 `必须/不得/禁止/MUST` 关键词）
 - **全量测试范围生成**（所有函数名 + 所有文件 + 所有 import + 所有裸 print 等）
 
@@ -208,7 +224,7 @@ S4 执行忠实度         — 噪音环境下的铁律坚守率
 修复模式: [0] 仅报告 / [1] 直接修复 / [2] 询问后修复
 ```
 
-### 阶段 4：场景 + 功能 + S4 测试执行
+### 阶段 4：场景 + 功能 + S4 测试执行（hooks 自动校验前置条件）
 
 ```bash
 # 场景测试
@@ -220,6 +236,8 @@ python scripts/test_engine.py /path/to/target-skill
 # S4 执行忠实度
 python scripts/s4_engine.py /path/to/target-skill
 ```
+
+钩子机制：每个脚本入口自动触发 `hooks.py check`，检测前置步骤制品是否存在。备份/蓝皮书等纯 Python 步骤缺失时自动补齐；场景/功能测试等需要 LLM 参与的步骤缺失时阻断并输出指引命令。参见 `references/hooks.md`。
 
 三个引擎各自输出独立报告。**执行顺序**：S1-S3 → D1-D6 → S4。
 
@@ -251,17 +269,24 @@ python scripts/s4_engine.py /path/to/target-skill
 - 修复前 F-0 已消失
 - 无新增 F-0
 
-### 阶段 8：输出报告
+### 阶段 8：输出报告（双格式模板化）
 
-最终报告包含：
+```bash
+python scripts/gen_report.py /path/to/target-skill
+python scripts/timeline.py report /path/to/target-skill --validate
+```
 
-```
-场景测试结果  | 功能测试结果   | 修复记录     | 回归对比
-  S1: 3/3 PASS | D1: 14/14   | 修复 2 项    | F-0 3→0
-  S2: 2/3 WARN | D2: 8/8     | 零除保护     | F-1 5→2
-  S3: 1/1 PASS | D5: 2/3     | →已修复     | 回归: ✅无损伤
-                | D6: 50/58   | ...         | S4: L1-L4 ✅
-```
+`gen_report.py` 从 timeline.json + 各测试 JSON 读取数据填充结构化模板，输出 HTML 和 Markdown 双格式：
+
+**HTML 报告**（自包含，含 Chart.js 控制图）：
+- 概览卡片（场景/功能通过率、F-0/F-1/F-2 计数）
+- 计时仪表板（总耗时、脚本执行、LLM 间隙、目标技能调用、单步细目）
+- 问题列表（颜色标记分级：BLOCK/WARN/INFO）
+- 测试详情表 + 修复记录
+- 多轮统计（≥2 轮显示均值+标准差，≥9 轮显示休哈特控制图）
+
+**Markdown 报告**（纯文本+表格，无图）：
+- 同结构模板化输出，问题分级 + 计时表 + 测试步骤详表
 
 ---
 
@@ -291,22 +316,54 @@ python scripts/s4_engine.py /path/to/target-skill
 
 ## 五、关键脚本详细说明
 
-### 5.1 runner.py — 全流程编排层
+### 5.1 hooks.py — 流程钩子系统
 
-**职责**：8 阶段自动化编排，串联所有引擎。
+**职责**：每个脚本入口做前置检查+自动补齐，出口标记完成+指引下一步。
 
 关键函数：
 | 函数 | 说明 |
 |------|------|
-| `run_all(skill_dir, mode, fix_mode)` | 完整 8 阶段执行 |
-| `run_inspector(skill_dir)` | 阶段 2 蓝皮书扫描 |
-| `run_scenario(skill_dir)` | 阶段 4a 场景测试 |
-| `run_functional(skill_dir)` | 阶段 4b 功能测试 |
-| `run_s4(skill_dir)` | 阶段 4c S4 执行忠实度 |
-| `run_fix(skill_dir, issues)` | 阶段 5 修复 |
-| `run_regression(skill_dir)` | 阶段 6 回归验证 |
+| `hook_pre_{step}(skill_dir)` | 入口检查：Python 步骤缺了自动补齐，LLM 步骤缺了阻断指引 |
+| `hook_post_{step}(skill_dir)` | 出口标记：写入 .flow-state.json |
+| `cmd_status(skill_dir)` | 查看当前流程完成状态 |
 
-### 5.2 inspector.py — 蓝皮书扫描器
+双档策略：
+- **自动补齐**：init/backup/blueprint 产物缺失时自动 `subprocess.run()` 补齐
+- **阻断指引**：scenario/function_test/s4 前置缺失时 `exit(1)`，明确告诉 LLM 该执行什么命令
+
+参见 `references/hooks.md`。
+
+### 5.2 timeline.py — 计时引擎
+
+**职责**：测试流程时间线，自动记录每个阶段/步骤/子进程的 start/end marker。
+
+关键函数：
+| 函数 | 说明 |
+|------|------|
+| `cmd_init(skill_dir)` | 初始化时间线 JSON |
+| `cmd_mark(skill_dir, phase, label, mark, ...)` | 记录 marker（含类型/标签/父ID） |
+| `cmd_report(skill_dir, --validate)` | 输出层级时间线 + 间隙推导（LLM 时间自动计算） |
+
+三级嵌套计时体系：
+| 层级 | 范围 | 是否自动 |
+|------|------|---------|
+| L1 阶段级 | 备份/蓝皮书/场景/功能/S4/报告 | ✅ 各脚本自动标记 |
+| L2 测试级 | 每个测试维度的调用 | ✅ scenario/test_engine 自动标记 |
+| L3 子进程级 | 每个 subprocess 调用目标脚本 | ✅ 脚本内部自动记录 |
+
+`--validate` 模式：自动检测缺失阶段，从 py_script marker 间的 gap 推导 LLM 耗时。
+
+### 5.3 gen_report.py — 报告生成器
+
+**职责**：从 timeline.json + 各测试 JSON 读取数据，填入结构化模板。
+
+输出：
+- `.test-report.html` — 自包含 HTML（概览/计时/问题/测试详情/修复记录，含 Chart.js 控制图）
+- `.test-report.md` — 模板化 Markdown（同结构，文本+表格）
+
+统计规则：1 轮→总计时+技能耗时 / ≥2 轮→均值+标准差 / ≥9 轮→休哈特控制图
+
+### 5.4 inspector.py — 蓝皮书扫描器
 
 **职责**：全量扫描目标技能，生成蓝皮书报告。
 
@@ -321,16 +378,16 @@ python scripts/s4_engine.py /path/to/target-skill
 8. **约束提取**：扫描 scripts/ 下 `必须/不得/禁止/MUST` 关键词
 9. **全量测试范围**：所有函数名 + 所有文件 + 所有 import + 所有裸 print 等
 
-### 5.3 scenario_engine.py — 场景测试引擎
+### 5.5 scenario_engine.py — 场景测试引擎
 
-**职责**：从 SKILL.md 解析触发场景、核心能力、工作流程，验证代码实现是否匹配。
+**职责**：基于蓝皮书数据（非 SKILL.md 正文格式）构建测试计划并执行真实 CLI 命令。
 
-检测逻辑：
-- S1：trigger 字段的每个触发词 → 是否有对应函数实现？
-- S2：核心能力表中的每项能力 → 是否有对应的函数/方法？
-- S3：工作流程中的每个步骤 → 数据传递是否连续？
+检测逻辑（蓝皮书驱动，v1.1.0 重构）：
+- S1：frontmatter trigger 字段的每个触发词 → 关键字匹配蓝皮书 CLI 脚本清单 → 执行 `--help`
+- S2：遍历蓝皮书中所有 CLI 脚本（跳过 __init__/__main__），逐个测试 `--help` 及其它参数
+- S3：从蓝皮书 import_chain 构建 CLI 脚本间引用关系，验证依赖链
 
-### 5.4 test_engine.py — 功能测试引擎
+### 5.6 test_engine.py — 功能测试引擎
 
 **职责**：D1-D6 静态分析 + 结果聚合。
 
@@ -342,7 +399,7 @@ python scripts/s4_engine.py /path/to/target-skill
 - D5：数学运算的零除风险检测
 - D6：try/except 覆盖率和参数边界说明
 
-### 5.5 s4_engine.py — S4 执行忠实度引擎
+### 5.7 s4_engine.py — S4 执行忠实度引擎
 
 **职责**：噪音方案校验 + NoisePlayer 随机化回放 + 结构性修复。
 
@@ -354,7 +411,7 @@ python scripts/s4_engine.py /path/to/target-skill
 | `NoisePlayer.recover(skill_dir)` | 恢复被噪音污染的环境 |
 | `measure_fidelity(pre_report, post_report)` | 计算忠实度坚守率 |
 
-### 5.6 fixer.py — 通用修复工具
+### 5.8 fixer.py — 通用修复工具
 
 **职责**：安全写入、零除保护、print→logging、路径替换。
 
@@ -367,7 +424,7 @@ python scripts/s4_engine.py /path/to/target-skill
 | `fix_hardcoded_path(code, new_base)` | 将硬编码路径替换为变量 |
 | `fix_exception_guard(code)` | 为模块级调用添加 try/except |
 
-### 5.7 backup.py — 备份与恢复
+### 5.9 backup.py — 备份与恢复
 
 **职责**：完整目录备份 + 恢复回滚。
 
@@ -400,7 +457,7 @@ python scripts/s4_engine.py /path/to/target-skill
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|:----:|:------:|------|
-| `backup_dir` | str | `.standardization/skill-scenario-test/data/backup/` | 备份存储路径 |
+| `backup_dir` | str | `.standardization/skill-function-test/data/backup/` | 备份存储路径 |
 | `mode` | str | `0` | 默认修复模式（0=仅报告/1=直接修复/2=询问后修复） |
 | `enabled_dimensions` | list | `["S1","S2","S3","D1","D2","D3","D4","D5","D6"]` | 启用的测试维度 |
 
@@ -426,4 +483,4 @@ skill-standardization（审计规范）
 
 ---
 
-> 本文档基于 skill-function-test v0.2.21 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-function-test v1.1.1 的 SKILL.md + references/*.md + 核心脚本综合分析整理。

@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.63.5 版的架构设计、审查规则体系、标准化执行流程与修复体系  
-> 生成时间：2026-06-06（v2.63.5 最新更新）
+> 完整解读 v2.73.2 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 生成时间：2026-06-12（v2.73.2 最新更新）
 
 ---
 
@@ -59,17 +59,16 @@ skill-standardization/
     │   ├── fix.py              # 自动修复函数（30+ 规则）
     │   └── utils.py            # 工具函数
     ├── json_loader.py          # 渐进式 JSON 加载器
-    ├── skill_inspector.py      # 技能结构蓝皮书生成器
-    ├── permission_checker.py   # 权限检查器
-    ├── authorization_manager.py# 授权管理器
-    ├── cleanup_manager.py      # manifest 驱动临时文件清理
-    └── safe_io.py              # 安全文件写入（原子写入+备份）
+    ├── safe_io.py              # 安全文件写入（原子写入+备份）
     ├── op_logger.py            # 操作日志记录
     ├── op_logger_patch.py      # 操作日志补丁
     ├── run_audit.py            # 独立审计入口
     ├── update_all_versions.py  # 全版本更新
     ├── update_skill_frontmatter.py # frontmatter 更新脚本
-    ├── restore_from_gitee.py   # 从码云恢复
+    ├── _dead_code_backup/      # 已废弃但保留的旧版脚本（供参考）
+    │   ├── permission_checks.py
+    │   ├── skill_inspector.py
+    │   └── ...（其他搬迁前的旧版文件）
     └── spec/                   # 规范定义（JSON Schema）
         ├── _index.json         # 模块注册索引
         ├── frontmatter.json    # Frontmatter 字段规范 v2.5.0
@@ -111,11 +110,13 @@ SKILL.md 新增 ## 能力与限制 章节，明确列出每项核心能力的适
 
 | 模式 | 命令 | 作用 | 风险等级 |
 |------|------|------|---------|
-| **create** | `skill_builder create <name>` | 从模板创建标准的 skill 骨架 | 🟢 无害 |
-| **update** | `skill_builder update <dir> [--fix]` | 增量检查 + 可选修复 | 🟡 轻度修改 |
-| **refactor** | `skill_builder refactor <dir> [--dry-run]` | 整体结构改造（移动文件） | 🔴 必须先 dry-run |
+| **create** | `python -m scripts.skill_audit create <name> --confirmed` | 从模板创建标准的 skill 骨架 | 🟢 无害 |
+| **update** | `python -m scripts.skill_audit update <dir> [--fix] --confirmed` | 增量检查 + 可选修复 | 🟡 轻度修改 |
+| **refactor** | `python -m scripts.skill_audit refactor <dir> --confirmed` | 全流程改造（蓝皮书→备份→审计→修复→验证→bump→清理） | 🟡 有备份保障 |
 
-此外，审计模式可通过 `python -m scripts.skill_audit audit <dir>` 独立运行。
+此外，审计模式可通过 `python -m scripts.skill_audit audit <dir> --confirmed` 独立运行。
+
+> **语义门禁**：v2.73.0+ 所有模式入口必须传 `--confirmed` 参数，否则 exit(0) 阻断。脚本级强制，不再靠 LLM 自觉。
 
 ---
 
@@ -153,10 +154,10 @@ SKILL.md 新增 ## 能力与限制 章节，明确列出每项核心能力的适
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
 | **R-06** | WARN | 一级标题 | 正文包含 `# ` 开头的 H1 标题（排除代码块内 `#` 注释）；H1 不得含版本号；H1 应紧跟在 frontmatter 后；H1 内容应含技能名 |
-| **R-07** | WARN | 触发条件章节 | 含触发场景章节，≥3 个触发词，≥1 个否定条件，且与 frontmatter 的 trigger/trigger_negative 字段一致性 |
+| **R-07** | **ERROR** | 触发条件章节 | 含触发场景章节，≥3 个触发词，≥1 个否定条件，且与 frontmatter 的 trigger/trigger_negative 字段一致性 |
 | **R-08** | WARN | 核心能力章节 | 含核心能力/功能章节 |
 | **R-09** | WARN | 工作流程章节 | 含工作流程/步骤章节 |
-| **R-10** | WARN | 版本 + 字段同步 | 三端版本号一致性 + mtime 时序检查 + _meta.json 与 frontmatter 共享字段一致性（name/description/tags/trigger/data_dir 交叉比对，路径归一化） |
+| **R-10** | **ERROR** | 版本 + 字段同步 | 三端版本号一致性 + mtime 时序检查 + _meta.json 与 frontmatter 共享字段一致性（name/description/tags/trigger/data_dir 交叉比对，路径归一化） |
 
 **R-07 增强**（v2.17.0+）：不仅检查 `## 触发场景` 章节存在性，还执行 4 项质量子检查：
 1. 正向触发词数量 ≥3 个（每条约 4 字以上，含具体动作，避免"画图""帮我"等宽泛词）
@@ -165,7 +166,7 @@ SKILL.md 新增 ## 能力与限制 章节，明确列出每项核心能力的适
 4. frontmatter trigger/trigger_negative 字段与正文一致性（正文有触发词但 frontmatter 缺 trigger → WARN）
 **R-10 增强**：不再依赖 `--manifest-version` CLI 参数，改为自动读取 _meta.json 和 changelog 进行三端对比。v2.44.7 新增共享字段一致性检查：_meta.json 与 frontmatter 的 name/description/tags/trigger/data_dir 交叉比对，路径自动归一化（`skills/` ≈ `../`），`--fix` 按权威方向自动同步（tags 以 _meta 为准、description/trigger 以 frontmatter 为准、data_dir 统一为 `../` 相对路径）。
 
-**设计意图**：确保用户和 AI 都能快速理解技能的作用、何时触发、能做什么、怎么用。R-10 保证版本号三端一致性。
+**设计意图**：确保用户和 AI 都能快速理解技能的作用、何时触发、能做什么、怎么用。R-10 保证版本号三端一致性。R-07 和 R-10 在 v2.70.0+ 从 WARN 升级为 ERROR，附加强制性。
 
 ### 2.3 类别 C：产出物与数据目录（R-11 ~ R-12）
 
@@ -176,14 +177,7 @@ SKILL.md 新增 ## 能力与限制 章节，明确列出每项核心能力的适
 | **R-11** | ERROR | 产出物路径 | 产出物应放在 `skills/.standardization/<skill>/output/`，不在安装目录 |
 | **R-12** | ERROR | 数据目录路径 | 脚本中 `DATA_DIR` 变量的值必须包含合规字面量 |
 
-**R-12 的核心机制**：审计器对源码做**三源证据链**判断：
-1. **代码脚本**：扫描所有 .py 文件中的 `DATA_DIR`/`STORAGE_DIR`/`CACHE_DIR`/`CONFIG` 变量定义
-2. **SKILL.md frontmatter**：看是否有 `data_dir:` 声明
-3. **_meta.json**：看 `data_dir` 字段是否存在
-
-只要有任何一个来源表明技能有数据需求，就要求 `_meta.json` 声明 `data_dir`。
-
-**R-12 修复历程**：修复了 `_extract_path_value` 函数不存在导致的漏检问题，新增 step 1.5 检测引用 `.standardization` 但无 `DATA_DIR` 的脚本。
+**R-12 的核心机制**：审计器对源码做**三源证据链**判断。v2.73.0+ 要求 `DATA_DIR` 变量所在行直接赋值合规字面量（`DEFAULT_DATA_DIR_RAW = "skills/.standardization/..."`），不得通过中间变量间接赋值。
 
 **推荐写法**：
 ```python
@@ -288,13 +282,13 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | 类别 | 包含规则 | ERROR | WARN | 目的 |
 |------|---------|:-----:|:----:|------|
 | A. Frontmatter | R-01~R-05 | 4 | 1 | 技能身份标识 + _meta.json 字段完整性（R-01 合并） |
-| B. 正文结构 | R-06~R-10 | 2 | 3 | 文档结构和质量（R-07、R-10 为 ERROR） |
+| B. 正文结构 | R-06~R-10 | **4** | 1 | 文档结构和质量（R-06、R-08、R-09 为 WARN；R-07、R-10 为 ERROR） |
 | C. 产出物与目录 | R-11~R-12 | 2 | 0 | 目录隔离和数据安全 |
 | D. 安全与权限 | R-13~R-17 | 2 | 3 | 权限声明和风险控制（R-15、R-17 为 ERROR） |
 | E. 质量规范 | R-18~R-21 | 0 | 4 | 内容质量和可读性 |
 | F. 合规与维护 | R-22~R-24 | 0 | 3 | 长期维护一致性 |
-| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（19 项子检查仅 C-01 为 ERROR 级，其余均 WARN。v2.60.0 C-17/18/19 升级为质量检查） |
-| **合计** | **R-01~R-25** | **10** | **15** | |
+| G. 写作格式 | **R-25** | 0 | 1 | 文档排版统一建议（19 项子检查仅 C-01 为 ERROR 级） |
+| **合计** | **R-01~R-25** | **12** | **13** | |
 
 ---
 
@@ -304,9 +298,9 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 所有脚本仅使用 Python 标准库（pathlib, json, re, argparse 等），零 pip install。
 **目的**：降低安装门槛，提高跨平台兼容性，减少供应链风险。
 
-### D2: 纯警告模式
-审查结果不阻断工作流——即使 ERROR 也始终 exit(0)，git-sync 不会因此停止。
-**目的**：Skill 开发是迭代过程，初期不规范是正常的。阻断会导致开发者关闭审查。
+### D2: 铁律验证阻断模式
+审查发现 ERROR/WARN 时，refactor 模式第 5 步（铁律验证 --verify）使用 **exit(1) 阻断**，要求 LLM 逐条排查修复。非误判项必须修复才能继续 bump。
+**目的**：0 ERROR 0 WARN 铁律强制，确保推送前所有真实问题已消除。非阻断规则（如 R-20/23/25 文档建议项）可标记为误判后继续。
 
 ### D3: 信息零遗漏
 refactor 模式绝不删除任何文件——只执行 `move` 操作，执行前强制备份，执行后验证字节一致性。
@@ -380,12 +374,8 @@ create 使用硬编码字符串模板（当前），未来可能支持外部模�
 ### 4.5 R-12 数据目录字面量规则
 
 ```python
-# ✅ 正确写法：变量名含 DATA，值含合规字面量
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/<skill-name>/data/"
-_data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR_RAW))
-
-# ❌ 错误写法：运行时计算路径，审计匹配不到
-DATA_DIR = os.path.normpath(os.path.join(SKILL_ROOT, "..", "skills/.standardization/.../data/"))
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/<skill-name>/data/"  # R-12 审计锚点
+DATA_DIR = os.path.normpath(os.path.join(...))  # 可接受（值含合规字面量）
 ```
 
 变量名必须含 `DATA|STORAGE|DB|CACHE|CONFIG` 之一才能被审计匹配。推荐使用 `DEFAULT_DATA_DIR_RAW` + `_data_dir_abs` 双变量模式。
