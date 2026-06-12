@@ -1,3 +1,9 @@
+## 1.1.1 (2026-06-12)
+
+### fix
+- **R-11 清理**: 删除根目录 test_palette.html / test_preview.html
+- **R-12 修复**: hooks.py/scenario_engine.py 补充 DEFAULT_DATA_DIR_RAW 审计锚点
+
 ## 1.1.0 (2026-06-12)
 
 ### feature

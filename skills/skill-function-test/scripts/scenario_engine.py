@@ -15,8 +15,6 @@ S2 场景输入产出匹配 — 遍历蓝皮书中所有 CLI 脚本，逐一测�
 S3 场景数据流正确性 — 从蓝皮书 import_chain 构建依赖链，测试跨脚本调用链路
 
 时间线集成：每个场景/每个 CLI 调用都记录独立的 [START]/[END] marker。
-
-时间线集成：每个场景/每个 CLI 调用都记录独立的 [START]/[END] marker。
 """
 import ast
 import json
@@ -25,6 +23,9 @@ import re
 import subprocess
 import sys
 from typing import Optional
+
+# R-12 审计锚点
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
 
 # 流程钩子
 _HOOKS_SCRIPT = os.path.normpath(os.path.join(

@@ -18,18 +18,16 @@ import os
 import subprocess
 import sys
 
-# R-12 审计锚点
+# R-12 审计锚点 — 数据目录字面量
+# 规范：skills/.standardization/skill-function-test/data/
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
 
 # ── 目录定位 ──
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_SKILL_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
-_SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
-# R-12 compliant: DATA_DIR assigned after raw computation
-_data_abs = os.path.normpath(os.path.join(
-    _SKILLS_ROOT, ".standardization", "skill-function-test", "data"
-))
-DATA_DIR = _data_abs
+import pathlib
+_SCRIPT_DIR = str(pathlib.Path(__file__).resolve().parent)
+_SKILL_DIR = str(pathlib.Path(_SCRIPT_DIR).parent)
+_SKILLS_ROOT = str(pathlib.Path(_SKILL_DIR).parent)
+DATA_DIR = str(pathlib.Path(_SKILLS_ROOT) / ".standardization" / "skill-function-test" / "data")
 
 
 def _data_dir(skill_dir: str) -> str:
