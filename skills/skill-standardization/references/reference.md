@@ -1060,7 +1060,7 @@ python -m scripts.skill_audit fix <skill_dir> --key R-11
 | `audit --fix` | `--fix` | 自动修复可修复规则 | 是 | off |
 | `fix` | `skill_dir` | 目标技能根目录路径 | 是 | — |
 | `fix` | `--key` | 要修复的 fix key | 是 | — |
-| `fix` | `--dry-run` | 仅模拟不修改 | 否 | false |
+| `fix` | `--dry-run` | 仅模拟不更新 | 否 | false |
 ---
 ### scripts/skill_audit/fix.py
 **功能**: 规则级修复函数库，提供每个规则（R-01~R-25）的独立修复函数，供 `audit --fix` 或 `audit fix` 子命令调用。

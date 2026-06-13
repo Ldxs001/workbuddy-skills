@@ -1677,6 +1677,33 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 if ref_count > 0:
                     issues["warn"].append(f"C-13: references/ 目录有 {ref_count} 个 .md 文件，但 ## 核心能力 章节末尾缺少渐进式索引表（### 渐进式文件索引）")
 
+    # C-13b: 检测正文中散落的"见xxx"渐进式引用（应统一归入索引表）
+    if _c13_sd and body:
+        scattered_refs = re.findall(r'(?:见|详见|→\s*详见|参考)\s*`?(?:references/)?([a-zA-Z0-9_\-]+\.md)`?', body)
+        if scattered_refs:
+            # 排除索引表自身行的匹配
+            index_table = re.search(r'### 渐进式文件索引.*?(?=\n## |\Z)', body, re.DOTALL)
+            table_text = index_table.group(0) if index_table else ''
+            real_scattered = [r for r in scattered_refs if r not in table_text]
+            if real_scattered:
+                unique = sorted(set(real_scattered))
+                issues["warn"].append(f"C-13b: 正文中发现散落的渐进式文件引用（{', '.join(unique)}），应统一归入渐进式文件索引表，移除正文中的\"见xxx\"引用")
+
+    # C-13c: 渐进式索引表列结构校验 — 必须为 4 列（文件名 | 分类 | 包含内容 | 审计关联）
+    if has_index_table:
+        header_line = None
+        for line in body.split('\n'):
+            stripped = line.strip()
+            if stripped.startswith('|') and '文件名' in stripped and '分类' in stripped:
+                header_line = stripped
+                break
+        if header_line:
+            col_count = len(header_line.split('|')) - 2  # 去掉首尾空列
+            if col_count != 4:
+                issues["warn"].append(f"C-13c: 渐进式索引表列数为 {col_count}，应为 4 列（文件名 | 分类 | 包含内容 | 审计关联）")
+        else:
+            issues["warn"].append("C-13c: 渐进式索引表缺少规范的表头行（| 文件名 | 分类 | 包含内容 | 审计关联 |）")
+
     # ════════════════════════════════════════════════════════════
     # C-14 (WARN): 工作流程步骤完整性 — Phase 1 正则粗筛步骤数， LLM 确认
     # ════════════════════════════════════════════════════════════

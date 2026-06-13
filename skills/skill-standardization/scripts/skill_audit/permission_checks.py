@@ -163,9 +163,41 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
     report = _get_report(skill_dir)
     risk_level = report.get("risk_level", "low").upper() if report else "LOW"
 
-    # 低风险/中风险：无需在 references/permissions.md 中说明风险
+    # 低风险/中风险：无需说明高权限操作风险，但仍需校验权限文档头部
     if risk_level in ("LOW", "MEDIUM"):
-        return {"passed": True, "detail": f"{filepath}:1 - 风险等级 {risk_level}，无需在 references/permissions.md 中说明高风险操作"}
+        refs_dir = os.path.join(skill_dir, "references")
+        permissions_md = os.path.join(refs_dir, "permissions.md")
+        if not os.path.isfile(permissions_md):
+            return {
+                "passed": False,
+                "detail": f"{filepath}:1 - 风险等级 {risk_level}，references/permissions.md 不存在",
+                "fix": {"key": "create_permissions_md", "value": True,
+                         "location": permissions_md,
+                         "operation": "创建 permissions.md 并补充 skill-standardization 权限说明头部",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
+        try:
+            with open(permissions_md, "r", encoding="utf-8", errors="replace") as f:
+                pm_content = f.read()
+        except Exception:
+            return {
+                "passed": False,
+                "detail": f"{filepath}:1 - 风险等级 {risk_level}，但无法读取 references/permissions.md",
+                "fix": {"key": "fix_permissions_md_readable", "value": True,
+                         "location": permissions_md,
+                         "operation": "确保 permissions.md 可读，并补充 skill-standardization 权限说明头部",
+                         "verification": "重新运行 audit_skill()"}
+            }
+        if "基于skill-standardization渐进式披露规范的权限说明" not in pm_content:
+            return {
+                "passed": False,
+                "detail": f"{filepath}:1 - 风险等级 {risk_level}，references/permissions.md 缺少 skill-standardization 权限说明头部",
+                "fix": {"key": "create_permissions_md", "value": True,
+                         "location": permissions_md,
+                         "operation": "在 permissions.md 最前面插入 skill-standardization 权限说明头部",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
+        return {"passed": True, "detail": f"{filepath}:1 - 风险等级 {risk_level}，references/permissions.md 包含权限说明头部 ✓"}
 
     # 高风险/严重风险：必须在 references/permissions.md 中说明
     if risk_level in ("HIGH", "CRITICAL"):

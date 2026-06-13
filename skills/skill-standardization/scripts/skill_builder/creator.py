@@ -53,11 +53,11 @@ trigger_negative:
 
 ### 渐进式文件索引
 
-| 文件名 | 位置 | 说明 |
-|--------|------|------|
-| `references/guide.md` | 完整使用教程 | 参数说明和完整工作流 |
-| `references/permissions.md` | 权限说明 | 权限扫描报告和风险说明 |
-| `references/examples.md` | 示例集合 | 使用示例和输出样例 |
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+|--------|------|----------|----------|
+| `references/guide.md` | 使用指南 | 参数说明和完整工作流 | 无 |
+| `references/permissions.md` | 权限与测试 | 权限扫描报告、风险说明和 skill-function-test 测试结论 | R-15, R-16 |
+| `references/examples.md` | 使用示例 | 使用示例和输出样例 | 无 |
 
 ## 约束
 
@@ -328,7 +328,7 @@ A: 对于超过 10MB 的文件，建议使用流式处理模式，添加 `--stre
 
     def _generate_permissions_template(self, name):
         """生成 references/permissions.md 模板"""
-        return f"""# {name} — 权限说明
+        return f"""# {name} — 基于skill-standardization渐进式披露规范的权限说明
 
 本文档由 `skill-standardization` 权限扫描器自动生成，描述本技能运行所需的权限及其风险等级。
 
@@ -703,7 +703,7 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
             return
 
         lines = []
-        lines.append("# 权限说明\n")
+        lines.append("# 基于skill-standardization渐进式披露规范的权限说明\n")
         lines.append(f"权限扫描风险等级：**{risk_level}**\n")
         lines.append("## 权限总览\n")
         lines.append(f"共 {len(issues)} 项权限风险，按类别分组如下：\n")
@@ -773,7 +773,13 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
             lines.append("")
 
         pm.parent.mkdir(parents=True, exist_ok=True)
-        pm.write_text("\n".join(lines), encoding="utf-8")
+        new_content = "\n".join(lines)
+        # 文件已存在且不含 skill-standardization 头部时，保留原有内容在下方
+        if pm.exists():
+            existing = pm.read_text(encoding="utf-8")
+            if "基于skill-standardization渐进式披露规范的权限说明" not in existing:
+                new_content = new_content + "\n\n---\n\n" + existing
+        pm.write_text(new_content, encoding="utf-8")
         print(f"[OK] 权限扫描结果已自动写入 {pm}")
 
     def _get_category_description(self, category):

@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.73.4
+version: 2.73.8
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -15,6 +15,7 @@ trigger_negative: 当用户仅闲聊或问你有什么技能时不触发；单�
 meta_field_sync: true
 h1_position: true
 data_dir_compliance: true
+create_permissions_md: true
 ---
 # skill-standardization
 
@@ -50,7 +51,6 @@ data_dir_compliance: true
 - 用户要求执行某个 skill 的常规功能——应直接调用该 skill 本身，而不是先审计它
 - 用户只是提到[skill]这个词，但没有明确的审计/创建/改造意图
 
-
 ## 能力与限制
 
 本技能能做什么、不能做什么，一目了然：
@@ -72,18 +72,18 @@ data_dir_compliance: true
 
 ### 渐进式文件索引
 
-| 文件名 | 位置 | 说明 |
-|--------|------|------|
-| `references/antipatterns.md` | 反模式（Anti-Patterns） | > 本文件收录 skill 编写过程中的常见反模式，帮助 AI 和开发者避开典型坑点。 |
-| `references/architecture.md` | 架构设计 | > 本文件描述 skill-standardization v2 的整体架构、模块关系和数据流。 |
-| `references/changelog.md` | changelog | - 修复 _load_body_spec 路径错误（spec/→scripts/spec/），导致 fix_sectio |
-| `references/data_dir_map.md` | skill-standardization 数据目录路径引用对照表 | 1. **安装目录**（`skills/<name>/` 或 `skills/installed/<name>/`）—— |
-| `references/examples.md` | 示例集合 — skill-standardization v2 | 本文件包含 skill-standardization v2 各种使用场景的完整示例。 |
-| `references/faq.md` | 常见问题（FAQ） | > 本文件收集 skill-standardization v2 使用过程中的常见疑问和解答。 |
-| `references/guide.md` | 使用指南 — skill-standardization v2 | 本指南提供 skill-standardization v2 三种执行模式的详细操作教程。 |
-| `references/permissions.md` | 权限说明 | 权限扫描风险等级：**CRITICAL** |
-| `references/reference.md` | API / 命令参考 | > 本文件为 skill-standardization v2 的完整命令参考手册。 |
-| `references/rules.md` | 改写/更新铁律（AI 执行前必须遵守） | > 本文件为 skill-standardization v2.13.0 的铁律条款，AI 更新任何 skill 前必须 |
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+|--------|------|----------|----------|
+| `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
+| `references/architecture.md` | 架构设计 | skill-standardization 整体架构。包含：模块关系、数据流、核心设计决策。 | 无 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
+| `references/data_dir_map.md` | 路径参考 | 数据目录路径对照表。包含：安装目录、标准化目录、备份目录及用途。 | 无 |
+| `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
+| `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
+| `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
+| `references/reference.md` | 命令参考 | CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。 | 无 |
+| `references/rules.md` | 审计规则 | R-01~R-25 审计规则定义。包含：检查逻辑、修复指引、设计背景。 | R-01~R-25 |
 ## 工作流程
 
 ### 【流程门禁】Step 0：模式识别（强制）
@@ -126,15 +126,16 @@ data_dir_compliance: true
 **update 模式**（轻量更新——技能结构已标准，只需审计修复）：
 - **适用场景**：用户说"审计/检查/更新/修复/升级某个技能"
 - **不适用**：用户说"改造/迁移/重构/大改/标准化"
-- 流程：语义确认 → audit → --fix → --verify → bump → cleanup
-- 命令：`python -m scripts.skill_audit audit <skill_dir> --fix`
+- 流程：语义确认 → audit（输出审查报告）→ **LLM 阅读报告，判断 FAIL 项为真问题或误报** → `--classify <ID>` 标记误报 → `--show-fix <ID>` 获取真问题修复指引 → LLM 按指引手动修复 → `--verify` 确认 → bump → cleanup
+- 命令：`python -m scripts.skill_audit audit <skill_dir> --confirmed`（先审计拿报告，LLM 筛查后再执行后续步骤）
 
 **refactor 模式**（全量改造——技能非标准/结构混乱/需要迁移）：
 - **适用场景**：用户说"改造/重构/迁移/大改/标准化/规范化某个技能"
 - **不适用**：用户说"简单审计/检查一下"（应走 update）
-- 流程：语义确认 → 蓝皮书扫描 → 备份 → audit → --fix → --verify → bump → cleanup
-- 命令：`python -m scripts.skill_audit refactor <skill_dir>`
+- 流程：语义确认 → **LLM 检查目录结构，识别并排除非技能目录（虚拟环境、缓存、构建产物等）** → 蓝皮书扫描（跳过已排除目录） → 备份 → audit（输出审查报告）→ **LLM 阅读报告，判断 FAIL 项为真问题或误报** → `--classify <ID>` 标记误报 → `--show-fix <ID>` 获取真问题修复指引 → LLM 按指引手动修复 → `--verify` 确认 → bump → cleanup
+- 命令：`python -m scripts.skill_audit refactor <skill_dir> --confirmed`（先走蓝皮书+备份+审计，LLM 筛查后再执行后续步骤）
 
+> **⚠️ 关键约束**：audit 输出的报告包含 PASS/WARN/FAIL 三类。`--fix` 仅修复格式类问题（frontmatter/版本号/数据目录），**文档一致性（R-23）等问题需要 LLM 阅读报告后逐条判断并手动处理**。`--fixed` 不等于"已处理完毕"。
 
 ## 快速开始
 
@@ -158,7 +159,6 @@ python -m scripts.skill_audit audit /path/to/target-skill --fix --confirmed
 python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
 # → 1/7 蓝皮书 → 2/7 备份 → 3/7 审计 → 4/7 修复 → 5/7 验证 → 6/7 bump → 7/7 清理
 ```
-
 
 ## 数据目录说明
 

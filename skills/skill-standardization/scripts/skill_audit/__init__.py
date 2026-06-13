@@ -762,6 +762,7 @@ def cmd_audit(args):
     # ═══════════════════════════════════════════════════════
     # [强制钩子 1] 蓝皮书前置扫描 — audit 执行前输出技能全貌
     # ═══════════════════════════════════════════════════════
+    _check_large_dirs(skill_dir)
     try:
         from ..skill_inspector import inspect_skill
         print(f"\n{'='*55}")
@@ -1217,6 +1218,9 @@ def cmd_refactor(args):
     print(f"\n{'─'*55}")
     print(f"  [1/7] 蓝皮书前置扫描")
     print(f"{'─'*55}")
+
+    # ── 钩子：扫描前检查大目录，阻断直到 LLM 确认 ──
+    _check_large_dirs(skill_dir)
     try:
         from ..skill_inspector import inspect_skill
         inspect_skill(skill_dir)
@@ -1277,6 +1281,12 @@ def cmd_refactor(args):
                             print(f"  ⚠️  {res['rule_id']} 自动修复失败: {e}")
 
             # 修复后重新审计
+            # 同步渐进式文件索引表（清理散落引用、更新目录标题）
+            try:
+                from .fix import fix_progressive_index_table
+                fix_progressive_index_table(skill_dir)
+            except Exception:
+                pass
             result = audit_skill(skill_dir)
             print(format_report(result))
             remaining = [r for r in result.get("results", [])
@@ -1338,6 +1348,48 @@ def cmd_refactor(args):
     print(f"\n{'='*55}")
     print(f"  ✅ refactor 全流程完成：{os.path.basename(skill_dir)}")
     print(f"{'='*55}")
+
+
+def _check_large_dirs(skill_dir):
+    """扫描前钩子：检查是否存在大体积非标准目录，阻断直到 LLM 确认处理。"""
+    LARGE_THRESHOLD_MB = 50
+    suspicious = []
+    for entry in os.scandir(skill_dir):
+        if not entry.is_dir():
+            continue
+        if entry.name.startswith('.'):
+            # 计算隐藏目录大小
+            size_mb = 0
+            for root, dirs, files in os.walk(entry.path):
+                dirs[:] = []  # 仅统计一层
+                for f in files:
+                    try:
+                        size_mb += os.path.getsize(os.path.join(root, f))
+                    except OSError:
+                        pass
+                if size_mb > LARGE_THRESHOLD_MB * 1024 * 1024:
+                    break
+            size_mb = round(size_mb / (1024 * 1024), 1)
+            if size_mb > LARGE_THRESHOLD_MB:
+                suspicious.append((entry.name, size_mb))
+        elif entry.name in ('node_modules', 'vendor', 'third_party'):
+            size_mb = round(sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fn in os.walk(entry.path) for f in fn) / (1024 * 1024), 1)
+            if size_mb > LARGE_THRESHOLD_MB:
+                suspicious.append((entry.name, size_mb))
+    if suspicious:
+        print(f"\n{'='*55}")
+        print(f"  ⛔ 扫描前检查：发现 {len(suspicious)} 个大体积目录")
+        print(f"{'─'*55}")
+        for name, size in suspicious:
+            print(f"  📁 {name}  ({size} MB)")
+        print(f"{'─'*55}")
+        print(f"  LLM 必须确认这些目录是否需要扫描：")
+        print(f"  1. 开发遗留产物（如 .venv_rag）→ 直接删除")
+        print(f"  2. 依赖目录（如 node_modules）→ 确认无文档引用后排除")
+        print(f"  3. 确有必要 → 说明理由后保留")
+        print(f"\n  确认处理后重新运行: python -m scripts.skill_audit refactor {skill_dir} --confirmed")
+        print(f"{'='*55}")
+        sys.exit(1)
 
 
 def _save_refactor_progress(skill_dir, step, remaining=None, bump_type='feature', desc=''):

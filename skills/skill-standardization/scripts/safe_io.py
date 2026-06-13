@@ -74,6 +74,28 @@ def safe_read_lines(path: str, encoding_fallback: list = None) -> list:
 
 # ── 备份 ─────────────────────────────────────────────────────────────────────
 
+def _safe_replace(tmp_path, path, max_retries=3):
+    """
+    Windows 安全的文件替换：重试 3 次 + shutil.move 降级。
+    os.replace 在 Windows 上可能因杀软扫描/句柄争用失败。
+    """
+    import time as _t
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except (PermissionError, OSError) as e:
+            last_exc = e
+            _t.sleep(0.2 * (attempt + 1))
+    # 最后一次降级到 shutil.move
+    import shutil
+    try:
+        shutil.move(tmp_path, path)
+    except Exception:
+        raise RuntimeError(f"文件替换失败（已重试{max_retries}次并降级move）: {last_exc}")
+
+
 def _ensure_data_dirs():
     os.makedirs(BACKUP_DIR, exist_ok=True)
     os.makedirs(os.path.join(_data_dir_abs, "logs"), exist_ok=True)
@@ -145,7 +167,7 @@ def safe_write(path: str, content: str, backup: bool = True,
                                         suffix=".tmp")
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(content)
-        os.replace(tmp_path, path)
+        _safe_replace(tmp_path, path)
         return {
             "success": True,
             "rollback_id": rollback_id,
@@ -189,7 +211,7 @@ def safe_patch_by_line(path: str, line_num: int, new_str: str,
                                         suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, path)
+        _safe_replace(tmp_path, path)
 
         return {
             "success": True,
@@ -237,7 +259,7 @@ def safe_patch_regex(path: str, pattern: str, replacement: str,
                                         suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, path)
+        _safe_replace(tmp_path, path)
 
         return {
             "success": True,
@@ -283,7 +305,7 @@ def safe_insert_after(path: str, after_line: int, content: str,
                                         suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, path)
+        _safe_replace(tmp_path, path)
 
         return {
             "success": True,

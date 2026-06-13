@@ -743,24 +743,57 @@ def fix_critical_write(skill_dir, **kw):
 
 def fix_create_permissions_md(skill_dir, **kw):
     """
-    R-15 修复：创建 references/permissions.md 并说明高权限操作风险。
+    R-15 修复：创建/更新 references/permissions.md。
+    文件不存在则创建完整权限文档（含头部+权限表格），
+    已存在则将 skill-standardization 权限头部插入到第一位。
     """
     refs_dir = os.path.join(skill_dir, "references")
     os.makedirs(refs_dir, exist_ok=True)
     permissions_md = os.path.join(refs_dir, "permissions.md")
+
+    header = "# 基于skill-standardization渐进式披露规范的权限说明\n\n"
+    header += "本文档由 `skill-standardization` 权限扫描器自动维护。\n\n"
+    header += "## 风险等级\n\n"
+    header += "（请填写：LOW / MEDIUM / HIGH / CRITICAL）\n\n"
+    header += "## 高权限操作说明\n\n"
+    header += "（如含敏感信息访问、关键位置写入，请在此说明：）\n"
+    header += "- 操作：\n"
+    header += "- 必要性：\n"
+    header += "- 如何降低风险：\n"
+
+    # 完整权限文档内容（新建时使用）
+    full_content = header + "\n"
+    full_content += "## 权限总览\n\n"
+    full_content += "| 工具 | 访问级别 | 风险等级 | 授权方式 | 说明 |\n"
+    full_content += "|------|----------|----------|----------|------|\n"
+    full_content += "| Read | read-only | 低 | 静默 | 读取输入文件和配置 |\n"
+    full_content += "| Write | write | 中 | 即时 | 写入输出结果到 `data/output/` |\n"
+    full_content += "| Bash | restricted | 中 | 统一 | 运行 `scripts/` 目录下的内部脚本 |\n\n"
+    full_content += "## 权限详细说明\n\n"
+    full_content += "### Read（读取）\n\n"
+    full_content += "- **用途**：读取用户输入文件、配置文件、参考数据\n"
+    full_content += "- **范围限制**：仅读取技能安装目录和指定输入文件，不访问系统敏感路径\n"
+    full_content += "- **不会读取**：系统敏感路径或凭证文件\n\n"
+    full_content += "### Write（写入）\n\n"
+    full_content += "- **用途**：将处理结果写入 `data/output/` 目录\n"
+    full_content += "- **范围限制**：仅写入技能安装目录下的 `data/output/` 子目录\n"
+    full_content += "- **不会写入**：系统目录或其他技能目录\n\n"
+    full_content += "### Bash（子进程调用）\n\n"
+    full_content += "- **用途**：运行 `scripts/` 目录下的内部脚本\n"
+    full_content += "- **范围限制**：仅运行技能安装目录下的脚本\n"
+    full_content += "- **不会执行**：用户输入的命令或路径\n\n"
+    full_content += "## 授权方式说明\n\n"
+    full_content += "- **即时授权**：每次执行前需获得用户批准\n"
+    full_content += "- **统一授权**：首次执行前获得用户批准，后续不再询问\n"
+    full_content += "- **静默授权**：无需用户交互，自动执行并记录\n"
+
     if os.path.isfile(permissions_md):
-        return 0  # 已存在
-    content = (
-        "# 权限说明\n\n"
-        "## 风险等级\n\n"
-        "（请填写：LOW / MEDIUM / HIGH / CRITICAL）\n\n"
-        "## 高权限操作说明\n\n"
-        "（如含敏感信息访问、关键位置写入，请在此说明：）\n"
-        "- 操作：\n"
-        "- 必要性：\n"
-        "- 如何降低风险：\n"
-    )
-    _write_file(permissions_md, content)
+        existing = _read_file(permissions_md)
+        if "基于skill-standardization渐进式披露规范的权限说明" not in existing:
+            content = header + "\n---\n\n" + existing
+            _write_file(permissions_md, content)
+        return 0
+    _write_file(permissions_md, full_content)
     return 1
 
 
@@ -1580,9 +1613,9 @@ def fix_section_constraint(skill_dir, **kw):
 def fix_progressive_index_table(skill_dir, **kw):
     """
     扫描目标技能 references/ 目录下的每个 .md 文件，读取其标题和首段内容，
-    生成 ### 渐进式文件索引 表格（3 列：文件名 | 位置 | 说明）。
+    生成 ### 渐进式文件索引 表格（4 列：文件名 | 分类 | 包含内容 | 审计关联）。
     
-    不从模板拷贝——每个文件的说明从文件自身的标题和首段提取。
+    使用标准化内容表确保格式统一。未收录的文件从文件自身标题提取内容。
     放在 ## 核心能力 章节末尾。
     """
     import os
@@ -1600,46 +1633,60 @@ def fix_progressive_index_table(skill_dir, **kw):
     if not os.path.isdir(refs_dir):
         return 0
     
-    # 收集所有 .md 文件及其描述
+    # 标准化内容表 — 格式：(分类, 包含内容, 审计关联)
+    STANDARDIZED = {
+        "antipatterns.md": ("规范指南", "skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。", "R-18"),
+        "architecture.md": ("架构设计", "skill-standardization 整体架构。包含：模块关系、数据流、核心设计决策。", "无"),
+        "changelog.md": ("版本管理", "版本更新日志。包含：版本号、变更类型、修复项、升级说明。", "R-24"),
+        "data_dir_map.md": ("路径参考", "数据目录路径对照表。包含：安装目录、标准化目录、备份目录及用途。", "无"),
+        "examples.md": ("使用示例", "各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。", "R-25 C-17"),
+        "faq.md": ("常见问题", "常见疑问与解答。包含：问题分类、原因分析、解决方案。", "R-19, R-25 C-19"),
+        "guide.md": ("使用指南", "三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。", "无"),
+        "permissions.md": ("权限与测试", "权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。", "R-15, R-16"),
+        "reference.md": ("命令参考", "CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。", "无"),
+        "rules.md": ("审计规则", "R-01~R-25 审计规则定义。包含：检查逻辑、修复指引、设计背景。", "R-01~R-25"),
+    }
+    
+    # 收集所有 .md 文件
     ref_files = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
     if not ref_files:
         return 0
     
     rows = []
     for fn in ref_files:
-        fpath = os.path.join(refs_dir, fn)
-        try:
-            with open(fpath, 'r', encoding='utf-8') as fh:
-                ref_content = fh.read()
-        except Exception:
-            rows.append((fn, '参考文档', ''))
-            continue
-        
-        # 提取 H1 或第一行非空文本作为"位置"
-        h1 = re.search(r'^#\s+(.+)$', ref_content, re.MULTILINE)
-        position = h1.group(1).strip() if h1 else fn.replace('.md', '').replace('-', ' ')
-        
-        # 提取 H1 后的第一段非空文本作为"说明"
-        after_h1 = ref_content[h1.end():] if h1 else ref_content
-        first_para = ''
-        for line in after_h1.split('\n'):
-            stripped = line.strip()
-            if stripped and not stripped.startswith('#'):
-                first_para = stripped[:60]
-                break
-        
-        rows.append((fn, position, first_para))
+        if fn in STANDARDIZED:
+            cat, content_desc, audit_rules = STANDARDIZED[fn]
+            rows.append((fn, cat, content_desc, audit_rules))
+        else:
+            # 未知文件：从文件自身提取
+            fpath = os.path.join(refs_dir, fn)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as fh:
+                    ref_content = fh.read()
+            except Exception:
+                rows.append((fn, '参考文档', fn.replace('.md', '').replace('-', ' '), '无'))
+                continue
+            h1 = re.search(r'^#\s+(.+)$', ref_content, re.MULTILINE)
+            # 用 H1 作为分类，H1 后首段作为内容
+            after_h1 = ref_content[h1.end():] if h1 else ref_content
+            first_para = ''
+            for line in after_h1.split('\n'):
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    first_para = stripped[:80]
+                    break
+            rows.append((fn, '参考文档', first_para if first_para else fn.replace('.md', ''), '无'))
     
     # 生成表格
     table_lines = [
         '### 渐进式文件索引',
         '',
-        '| 文件名 | 位置 | 说明 |',
-        '|--------|------|------|',
+        '| 文件名 | 分类 | 包含内容 | 审计关联 |',
+        '|--------|------|----------|----------|',
     ]
-    for fn, pos, desc in rows:
-        desc_clean = desc.replace('|', '/') if desc else ''
-        table_lines.append(f'| `references/{fn}` | {pos} | {desc_clean} |')
+    for fn, cat, content_desc, audit_rules in rows:
+        c = content_desc.replace('|', '/') if content_desc else ''
+        table_lines.append(f'| `references/{fn}` | {cat} | {c} | {audit_rules} |')
     table_lines.append('')
     
     section_body = '\n'.join(table_lines)
@@ -1659,6 +1706,13 @@ def fix_progressive_index_table(skill_dir, **kw):
     if core_match:
         core_end = core_match.end()
         body = body[:core_end] + '\n' + section_body + body[core_end:]
+    
+    # 清除正文中散落的"见xxx"渐进式引用（已统一归入索引表）
+    body = re.sub(
+        r'(?:见|详见|→\s*详见|参考)\s*`?(?:references/)?[a-zA-Z0-9_\-]+\.md`?',
+        '', body
+    )
+    body = re.sub(r'\n{3,}', '\n\n', body)
     
     # 写回
     new_content = '---\n'

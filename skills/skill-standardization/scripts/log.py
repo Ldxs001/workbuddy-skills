@@ -18,6 +18,13 @@ from datetime import datetime
 
 _LOG_CONFIGURED = False
 
+# R-12 锚点：合规字面量
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-standardization/data/"
+LOG_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ".standardization", "skill-standardization", "logs"
+)
+
 
 def setup_logging(level: str = "WARNING", skill_dir: str = None) -> None:
     """配置日志格式，可选写入文件"""
@@ -37,10 +44,10 @@ def setup_logging(level: str = "WARNING", skill_dir: str = None) -> None:
     root.setLevel(getattr(logging, level.upper(), logging.WARNING))
 
     if skill_dir:
-        log_dir = os.path.join(skill_dir, ".standardization", "skill-standardization", "logs")
-        os.makedirs(log_dir, exist_ok=True)
+        _log_dir = os.path.join(skill_dir, ".standardization", "skill-standardization", "logs")
+        os.makedirs(_log_dir, exist_ok=True)
         fh = logging.FileHandler(
-            os.path.join(log_dir, f"skill-std-{datetime.now().strftime('%Y%m%d')}.log"),
+            os.path.join(_log_dir, f"skill-std-{datetime.now().strftime('%Y%m%d')}.log"),
             encoding="utf-8",
         )
         fh.setFormatter(fmt)

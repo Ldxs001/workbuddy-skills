@@ -436,7 +436,7 @@ class SkillUpdater:
             return
 
         lines = []
-        lines.append("# 权限说明\n")
+        lines.append("# 基于skill-standardization渐进式披露规范的权限说明\n")
         lines.append(f"权限扫描风险等级：**{risk_level}**\n")
         lines.append("## 权限总览\n")
         lines.append(f"共 {len(issues)} 项权限风险，按类别分组如下：\n")
@@ -483,7 +483,13 @@ class SkillUpdater:
             lines.append("")
 
         pm.parent.mkdir(parents=True, exist_ok=True)
-        pm.write_text("\n".join(lines), encoding="utf-8")
+        new_content = "\n".join(lines)
+        # 文件已存在且不含 skill-standardization 头部时，保留原有内容在下方
+        if pm.exists():
+            existing = pm.read_text(encoding="utf-8")
+            if "基于skill-standardization渐进式披露规范的权限说明" not in existing:
+                new_content = new_content + "\n\n---\n\n" + existing
+        pm.write_text(new_content, encoding="utf-8")
         print(f"[✅] 权限扫描结果已自动写入 {pm}")
 
     def _get_category_description(self, category):
