@@ -32,7 +32,7 @@ DATA_DIR = str(pathlib.Path(_SKILLS_ROOT) / ".standardization" / "skill-function
 
 def _data_dir(skill_dir: str) -> str:
     target = os.path.basename(os.path.abspath(skill_dir))
-    d = os.path.join(DATA_DIR, target)
+    d = os.path.join(DATA_DIR, target, "outputs")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -55,7 +55,7 @@ def _block(msg: str, action: str = "", exit_code: int = 1):
 
 
 def _pass(msg: str):
-    print(f"  [HOOK] \u2713 {msg}")
+    print(f"  [HOOK] [OK] {msg}")
 
 
 def _run_py_step(cmd_args: list[str], label: str) -> bool:

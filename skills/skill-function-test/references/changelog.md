@@ -1,4 +1,36 @@
-## [1.2.0] - 2026-06-12
+## 1.3.2 (2026-06-13)
+
+### 修复
+- R-11 产出物路径违规（27处）：fixer.py/gen_report.py/hooks.py/runner.py/scenario_engine.py/test_config.py/test_engine.py 输出文件路径统一迁移至 `outputs/` 子目录
+- R-12 数据目录合规：test_engine.py 新增 `DEFAULT_DATA_DIR_RAW` 合规字面量
+
+---
+
+## 1.3.0 (2026-06-13)
+
+### 修复
+- refactor: 标准化改造——R-10 版本同步、R-15 permissions 头部插入、渐进式索引表格式修复、C-13c 格式校验
+
+### 新增
+- **测试结论写入目标技能文档**: 测试完成后追加测试概览和计时统计到 `<skill>/references/permissions.md`，作为不可跳过的流程步骤
+- **scenario_engine.py/test_engine.py 多轮支持**: 独立运行时读取 `.test-config.json` 的 rounds 配置循环执行
+- **test_engine.py/scenario_engine.py timeline 按轮快照**: 每轮完成后生成 `.timeline_rN.json`，供报告按轮统计
+
+### 修复
+- **gen_report.py compute_round_stats 按轮 delta 计算**: 排序改为按 last_marker_time，用相邻文件 cummulative delta 作为各轮耗时，而非绝对累计值
+- **gen_report.py compute_round_stats 统计规则**: 2-8 轮使用绝对差值（极差），9+ 轮使用标准差
+- **gen_report.py HTML 场景编号**: `S{r.get('sid','')}` 改为 `{r.get('sid','')}`，修复 sid=S1 拼出 SS1 的 bug
+- **Windows GBK 编码兼容**: hooks.py/scenario_engine.py/test_engine.py/s4_engine.py/gen_report.py/inspector.py/timeline.py 的 `_hook_check`/`_hook_done` 添加 `encoding="utf-8"`，hooks.py ✓ 符号改为 [OK]
+
+### 流程
+- 添加步骤9「测试结论写入目标技能」为不可跳过约束
+
+### 更新
+- 版本 1.2.0 → 1.3.0
+
+---
+
+## 1.2.0 (2026-06-12)
 
 ### 新增
 - **S1-S3 场景测试多轮支持**: runner.py stage_4_test 用 rounds 循环跑 3 轮

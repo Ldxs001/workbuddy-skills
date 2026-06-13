@@ -119,7 +119,7 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
     print(state.blueprint_text)
 
     # 保存到目标技能目录
-    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR, "outputs")
     os.makedirs(s4_data_dir, exist_ok=True)
 
     bp_path = os.path.join(s4_data_dir, ".scenario-test_blueprint.json")

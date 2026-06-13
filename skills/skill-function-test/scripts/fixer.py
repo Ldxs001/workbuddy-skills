@@ -34,7 +34,7 @@ def _fix_record_path(skill_dir: str = None) -> str:
         _SKILLS_ROOT, ".standardization", "skill-function-test", "data", target
     ))
     os.makedirs(data_dir, exist_ok=True)
-    return os.path.join(data_dir, ".fix-record.json")
+    os.makedirs(os.path.join(data_dir, "outputs"), exist_ok=True); return os.path.join(data_dir, "outputs", ".fix-record.json")
 
 
 def log_fix(skill_dir: str, fix_type: str, filepath: str, detail: str = "",

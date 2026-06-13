@@ -1,9 +1,9 @@
 ---
 name: skill-function-test
-version: 1.2.0
+version: 1.3.2
 author: wUwproject
 license: MIT
-description: 技能场景测试套件 —— 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 + 计时+流程钩子+双格式报告。包含 D1-D6 功能测试作为底座。
+description: 技能场景测试套件 —— 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 + 计时+流程钩子+双格式报告 → 测试结论写入目标技能。包含 D1-D6 功能测试作为底座。
 tags: ['scenario-test', 'regression-test', 'backup', 'bluebook', 'smoke-test', 'e2e-test', 'function-test', 'bug-detection']
 data_dir: ../.standardization/skill-function-test/data/
 external_data_dir: true
@@ -16,10 +16,11 @@ h1_position: true
 meta_field_sync: true
 faq_unparsable: reformat
 faq_quality: improve_qa
+create_permissions_md: true
 ---
 # skill-function-test — 技能场景测试套件
 
-> 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 → 计时→钩子→双格式报告
+> 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 → 计时→钩子→双格式报告 → 测试结论写入目标技能
 
 > 本技能以 **场景驱动** 为核心，同时提供功能测试、S4 执行忠实度、三级嵌套计时、流程钩子和双格式报告。
 
@@ -77,36 +78,24 @@ faq_quality: improve_qa
 | **L4 环境污染** | 伪造产物/信息污染 | "上次备份在那边直接用" / "数据我给了" | 脚本/工具的强制逻辑 |
 | **L5 条件篡改** | 中途更新前提条件 | "不对，分支B才是对的，重来" | 流程完整性 |
 
-### 渐进式文件索引
-
-| 文件 | 位置 | 说明 |
-|------|------|------|
-| `references/guide.md` | 完整使用指南 | 10 阶段工作流程 + 备份/恢复说明 + 场景解析规则 |
-| `references/hooks.md` | 流程钩子使用说明 | 双档策略、三步校验机制、查看状态 |
-| `references/timing.md` | 计时系统使用说明 | 三级嵌套、间隙推导、验证模式 |
-| `references/changelog.md` | 更新日志 | 版本更新记录（渐进式加载，R-24 合规） |
-| `references/antipatterns.md` | 反模式 | 常见错误和注意事项 |
-| `references/faq.md` | FAQ | 常见问题 |
-| `references/examples.md` | 示例集合 | 完整执行示例 |
-| `references/permissions.md` | 权限说明 | 权限扫描风险等级说明 |
-| `references/s4-noise-testing.md` | S4 执行忠实度测试 | 全量范围 + 噪音分级 + LLM推理层 + 随机化回放 + 修复钩子 + 坚守率矩阵 |
-| `scripts/backup.py` | 备份与恢复 | 完整目录备份 + 时间戳 + 恢复回滚 |
-| `scripts/inspector.py` | 蓝皮书扫描器 | AST + 文件清单 + 函数签名 + 引用链路 + 场景解析 |
-| `scripts/scenario_engine.py` | 场景测试引擎 | 从 SKILL.md 解析场景，构造场景级测试用例 |
-| `scripts/test_engine.py` | 功能测试引擎 | D1-D6 功能测试 + 结果聚合 |
-| `scripts/s4_engine.py` | S4 执行忠实度引擎 | 全量测试范围生成 + 噪音方案校验/schema + 随机化回放播放器(NoisePlayer) + 结构性修复 |
-| `scripts/fixer.py` | 通用修复工具 | 安全写入、零除保护、print→logging、路径替换 |
-| `scripts/test_config.py` | 测试配置管理 | 配置持久化/CLI/文字交互/HTML配置界面 |
-| `scripts/hooks.py` | 流程钩子系统 | 双档策略：Python 步骤自动补齐，LLM 步骤阻断指引；入口校验+出口标记+中间钩 |
-| `scripts/timeline.py` | 测试流程时间线计时引擎 | 记录阶段/子进程的开始/结束，`--validate` 模式自动推导 LLM 间隙时间 |
-| `scripts/gen_report.py` | 报告生成器 | 从 JSON 数据源填充结构化模板，输出 HTML + Markdown 双格式 |
-| `scripts/test_config.html` | 配置界面（自包含HTML） | 可视化开关+下拉+滑块+两段式保存(保存→完成) |
-
 ---
 
+### 渐进式文件索引
+
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+|--------|------|----------|----------|
+| `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
+| `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
+| `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
+| `references/hooks.md` | 参考文档 | / 档位 / 适用步骤 / 行为 / | 无 |
+| `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
+| `references/s4-noise-testing.md` | 参考文档 | > **不测技能有没有定义好，不测干净环境能不能跑通。** | 无 |
+| `references/timing.md` | 参考文档 | / 层级 / 范围 / 标记者 / 时间粒度 / 是否自动 / | 无 |
 ## 测试流程时间线（计时系统）
 
-> 详见 `references/timing.md`
+> 
 
 所有阶段通过 `scripts/timeline.py` 自动记录 start/end marker。LLM 无需手动计时——工作时间由 py_script marker 之间的 gap 自动推导。
 
@@ -155,16 +144,18 @@ cfg server                    — 启动 HTML 配置界面
 6. **修复→回归循环** — 修复后重新执行全量测试，确认 F-0 不增、已有通过项不退步；循环直到无新 F-0 出现
 7. **最终回归确认** — 完整场景+功能测试一遍，与备份前的基线对比：无功能损伤
 8. **输出报告** — `python scripts/gen_report.py <skill-dir>` 生成 HTML + Markdown 双格式报告。分级报告 + 修复记录 + 回归对比表 + **S4 坚守率矩阵** + 计时分析
+9. **测试结论写入目标技能** — 将测试概览和计时统计（不含单步耗时细目）写入 `<skill>/references/permissions.md`（标题为`基于skill-function-test的测试报告`）。已有则追加到末尾，没有则创建文件/目录。
 
 **后置：生成时间线验证报告** — `python scripts/timeline.py report <skill-dir> --validate`
 
-> → 详见 `references/guide.md`
+> 
 
 ## 约束
 
 - `.md` 文件更新必须使用 `scripts/fixer.py` 的 `safe_write()` 原子写入
 - **更新目标技能前必须先备份**（`scripts/backup.py` 自动执行）
 - 测试后必须执行回归确认，否则报告标记为「未回归确认」
+- **测试结论必须写入目标技能文档**（步骤9），不可跳过
 - 修复不得引入新的 F-0 BLOCK 级别错误
 
 ## 快速开始
@@ -197,11 +188,11 @@ python scripts/gen_report.py /path/to/target-skill --markdown   # 仅 Markdown
 
 ---
 
-> 反模式详见 `references/antipatterns.md`，常见问题详见 `references/faq.md`
+> 反模式，常见问题
 
 ## 流程钩子系统（强制阀 + 自动补全）
 
-> 详见 `references/hooks.md`
+> 
 
 双档策略：init/backup/blueprint 自动补齐，scenario/function_test/s4/gen_report 阻断指引。
 `python scripts/hooks.py status <skill-dir>` 查看流程状态。

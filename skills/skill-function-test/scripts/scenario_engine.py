@@ -33,12 +33,12 @@ _HOOKS_SCRIPT = os.path.normpath(os.path.join(
 ))
 def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
-                        capture_output=True, text=True)
-    if r.stdout.strip(): print(r.stdout)
+                        capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip(): print(r.stdout)
     if r.returncode != 0: sys.exit(r.returncode)
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
-                    capture_output=True)
+                    capture_output=True, encoding="utf-8")
 
 # 时间线输出
 _TIMELINE_SCRIPT = os.path.normpath(os.path.join(
@@ -404,8 +404,54 @@ if __name__ == "__main__":
         _tl(target, "scenario", "场景测试（独立运行）", "--type", "py_script")
         bb = scan(target)
         bp = bb.to_dict()
-        report, text = run_scenario_test(target, bp)
+
+        # 读取轮次配置
+        try:
+            from test_config import load_config
+            test_rounds = load_config(target).get("rounds", 3)
+        except Exception:
+            test_rounds = 3
+
+        all_reports = []
+        all_texts = []
+        _tl_base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "..", ".standardization", "skill-function-test", "data",
+                                os.path.basename(os.path.abspath(target)))
+        # 在轮次开始前快照基线（第0轮），作为 delta 计算基准
+        if test_rounds > 1:
+            _tl_file = os.path.join(_tl_base, ".timeline.json")
+            if os.path.exists(_tl_file):
+                import shutil
+                shutil.copy2(_tl_file, os.path.join(_tl_base, ".timeline_r0.json"))
+        for r in range(1, test_rounds + 1):
+            if test_rounds > 1:
+                print(f"\n  ── 场景测试 第 {r}/{test_rounds} 轮 ──")
+            report, text = run_scenario_test(target, bp)
+            all_reports.append(report)
+            all_texts.append(text)
+            # 每轮完成后快照 timeline，供 compute_round_stats 按轮统计
+            if test_rounds > 1:
+                _tl_file = os.path.join(_tl_base, ".timeline.json")
+                if os.path.exists(_tl_file):
+                    import shutil
+                    shutil.copy2(_tl_file, os.path.join(_tl_base, f".timeline_r{r}.json"))
+                print(f"  [场景] 第 {r} 轮完成 (BLOCK={report.get('summary',{}).get('block','?')})")
+
+        # 使用最后一轮作为展示，但添加轮次信息
+        report = all_reports[-1]
+        text = all_texts[-1]
+        report["_rounds_executed"] = len(all_reports)
+        report["_rounds_configured"] = test_rounds
+
+        # 如果多轮，汇总所有轮的 BLOCK 数量
+        if len(all_reports) > 1:
+            max_block = max(r.get("summary", {}).get("block", 0) for r in all_reports)
+            report["summary"]["block"] = max_block
+            report["_max_block_across_rounds"] = max_block
+
         print(text)
+        if test_rounds > 1:
+            print(f"  轮次执行: {len(all_reports)}/{test_rounds} 轮完成")
         _tl(target, "scenario", "场景测试（独立运行）", "end", "--type", "py_script")
 
         # 保存到中央数据目录（与 test_engine 一致）
@@ -415,7 +461,7 @@ if __name__ == "__main__":
             "..", ".standardization", "skill-function-test", "data", target_name
         ))
         os.makedirs(data_dir, exist_ok=True)
-        report_path = os.path.join(data_dir, ".scenario-test_report.json")
+        report_path = os.path.join(data_dir, "outputs", ".scenario-test_report.json")
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
         print(f"\n场景报告 JSON 已保存: {report_path}")

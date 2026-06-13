@@ -64,7 +64,7 @@ DATA_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test",
 def config_path(skill_dir: str) -> str:
     """目标技能的测试配置文件路径"""
     target_name = os.path.basename(os.path.abspath(skill_dir))
-    cfg_dir = os.path.join(DATA_DIR, target_name)
+    cfg_dir = os.path.join(DATA_DIR, target_name, "outputs")
     os.makedirs(cfg_dir, exist_ok=True)
     return os.path.join(cfg_dir, ".test-config.json")
 

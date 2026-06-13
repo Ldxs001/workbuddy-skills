@@ -17,12 +17,12 @@ _HOOKS_SCRIPT = os.path.normpath(os.path.join(
 ))
 def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
-                        capture_output=True, text=True)
-    if r.stdout.strip(): print(r.stdout)
+                        capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip(): print(r.stdout)
     if r.returncode != 0: sys.exit(r.returncode)
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
-                    capture_output=True)
+                    capture_output=True, encoding="utf-8")
 
 
 def _data_dir_for(skill_dir: str) -> str:
@@ -54,6 +54,8 @@ def _load_rounds(skill_dir: str) -> list[dict]:
     for f in sorted(glob.glob(os.path.join(datadir, ".timeline_*.json"))):
         data = _load_json(f)
         if data:
+            # 标记源文件名，方便 compute_round_stats 区分 _rN 与 base
+            data["_source"] = os.path.basename(f)
             rounds.append(data)
     return rounds
 
@@ -61,13 +63,13 @@ def _load_rounds(skill_dir: str) -> list[dict]:
 def load_all(skill_dir: str) -> dict:
     datadir = _data_dir_for(skill_dir)
     skill_name = os.path.basename(os.path.abspath(skill_dir))
-    scenario_report = _load_json(os.path.join(datadir, ".scenario-test_report.json"))
+    scenario_report = _load_json(os.path.join(datadir, "outputs", ".scenario-test_report.json"))
     if not scenario_report:
         scenario_report = _load_json(os.path.join(skill_dir, ".scenario-test_report.json"))
-    function_report = _load_json(os.path.join(datadir, ".function-test_report.json"))
-    s4_trace = _load_json(os.path.join(datadir, ".s4_trace.json"))
-    s4_noise_plan = _load_json(os.path.join(datadir, ".s4_noise_plan.json"))
-    fix_record = _load_json(os.path.join(datadir, ".fix-record.json"))
+    function_report = _load_json(os.path.join(datadir, "outputs", ".function-test_report.json"))
+    s4_trace = _load_json(os.path.join(datadir, "outputs", ".s4_trace.json"))
+    s4_noise_plan = _load_json(os.path.join(datadir, "outputs", ".s4_noise_plan.json"))
+    fix_record = _load_json(os.path.join(datadir, "outputs", ".fix-record.json"))
     if isinstance(fix_record, dict):
         fix_record = fix_record.get("fixes", [])
     if not isinstance(fix_record, list):
@@ -78,11 +80,20 @@ def load_all(skill_dir: str) -> dict:
     for f in os.listdir(datadir):
         if f.endswith("_report.json") and not f.startswith("."):
             test_reports[f] = _load_json(os.path.join(datadir, f))
+    # 读取 S4 轮次配置
+    try:
+        from test_config import load_config as _load_tc
+        _tc = _load_tc(skill_dir)
+        _s4_rounds = _tc.get("s4", {}).get("rounds", _tc.get("rounds", 1))
+    except Exception:
+        _s4_rounds = 1
+
     return {
         "skill_dir": skill_dir,
         "skill_name": skill_name,
         "timeline": timeline,
         "rounds": rounds,
+        "s4_rounds": _s4_rounds,
         "scenario": scenario_report,
         "function": function_report,
         "s4_trace": s4_trace,
@@ -152,15 +163,46 @@ def compute_timing(data: dict) -> dict:
 def compute_round_stats(rounds: list[dict]) -> dict:
     if len(rounds) < 2:
         return {"rounds": len(rounds), "has_stats": False, "has_control_chart": False}
-    totals = []
-    targets = []
-    for r in rounds:
+
+    # 仅筛选 _r{数字}.json 文件作为轮次边界（排除 base .timeline.json）
+    round_files = [r for r in rounds if r.get("_source", "").startswith(".timeline_r")]
+    # 如果只有 base 文件（无 _rN），退化为原始逻辑：只看文件数
+    if not round_files and len(rounds) >= 2:
+        # 兜底：用最早和最晚的 timeline 算近似值
+        def _last_marker_time(r):
+            markers = r.get("markers", [])
+            if not markers: return r.get("started_at", 0)
+            return max(m["t"] for m in markers)
+        sorted_all = sorted(rounds, key=_last_marker_time)
+        tl_first = sorted_all[0]
+        tl_last = sorted_all[-1]
+        total = max(m["t"] for m in (tl_last.get("markers") or [])) - tl_first.get("started_at", 0)
+        return {"rounds": 1, "has_stats": False, "has_control_chart": False,
+                "mean_total": round(total, 3), "mean_target": 0,
+                "totals": [round(total, 3)], "targets": [0],
+                "dispersion": "none", "dispersion_label": ""}
+
+    if len(round_files) < 2:
+        return {"rounds": len(round_files), "has_stats": False, "has_control_chart": False}
+
+    # 按最后一个 marker 的时间排序（编号保证 r0 < r1 < r2 < r3）
+    def _last_marker_time(r):
+        markers = r.get("markers", [])
+        if not markers:
+            return r.get("started_at", 0)
+        return max(m["t"] for m in markers)
+
+    sorted_r = sorted(round_files, key=_last_marker_time)
+    cumulative = []
+    cumulative_targets = []
+    for r in sorted_r:
         markers = r.get("markers", [])
         if not markers:
             continue
         started_at = r.get("started_at", 0)
         total_end = max(m["t"] for m in markers)
-        totals.append(total_end - started_at)
+        cumulative.append(total_end - started_at)
+        # 按轮次计算目标技能耗时
         tgt = 0.0
         ws = {}
         for m in markers:
@@ -171,20 +213,50 @@ def compute_round_stats(rounds: list[dict]) -> dict:
                     pid = m.get("parent_id")
                     if pid and pid in ws:
                         tgt += m["t"] - ws.pop(pid)
-        targets.append(tgt)
+        cumulative_targets.append(tgt)
+
+    # 每轮耗时 = cumulative[i] - cumulative[i-1]，第0项为累计基线
+    totals = []
+    targets = []
+    n = len(cumulative)
+    for i in range(1, n):
+        totals.append(round(cumulative[i] - cumulative[i-1], 3))
+        targets.append(round(cumulative_targets[i] - cumulative_targets[i-1], 3))
+    # 如果只有1个有效delta以外的累计值，退回到原始的绝对值统计
     if not totals:
-        return {"rounds": 0, "has_stats": False, "has_control_chart": False}
-    n = len(totals)
-    mean_total = sum(totals) / n
-    mean_target = sum(targets) / n
-    std_total = math.sqrt(sum((x - mean_total) ** 2 for x in totals) / max(n - 1, 1))
-    std_target = math.sqrt(sum((x - mean_target) ** 2 for x in targets) / max(n - 1, 1))
+        totals = cumulative[1:] if len(cumulative) > 1 else cumulative
+        targets = cumulative_targets[1:] if len(cumulative_targets) > 1 else cumulative_targets
+
+    m = len(totals)
+    if m < 2:
+        return {"rounds": m, "has_stats": False, "has_control_chart": False,
+                "mean_total": totals[0] if totals else 0,
+                "mean_target": targets[0] if targets else 0,
+                "totals": totals, "targets": targets,
+                "dispersion": "none", "dispersion_label": ""}
+    mean_total = sum(totals) / m
+    mean_target = sum(targets) / m
+
+    # 统计规则：
+    #   1 轮: 仅展示实际耗时（has_stats=False 在上方已处理）
+    #   2-8 轮: 均值 + 绝对差值（|max-min|，极差）
+    #   9+ 轮:  均值 + 标准差
+    if m >= 9:
+        disp_total = math.sqrt(sum((x - mean_total) ** 2 for x in totals) / max(m - 1, 1))
+        disp_target = math.sqrt(sum((x - mean_target) ** 2 for x in targets) / max(m - 1, 1))
+        disp_label = "标准差"
+    else:
+        disp_total = max(totals) - min(totals)
+        disp_target = max(targets) - min(targets) if targets else 0
+        disp_label = "绝对差值"
+
     return {
-        "rounds": n, "has_stats": n >= 2, "has_control_chart": n >= 9,
-        "mean_total": round(mean_total, 3), "std_total": round(std_total, 3),
-        "mean_target": round(mean_target, 3), "std_target": round(std_target, 3),
-        "totals": [round(t, 3) for t in totals],
-        "targets": [round(t, 3) for t in targets],
+        "rounds": m, "has_stats": m >= 2, "has_control_chart": m >= 9,
+        "mean_total": round(mean_total, 3), "disp_total": round(disp_total, 3),
+        "mean_target": round(mean_target, 3), "disp_target": round(disp_target, 3),
+        "dispersion_label": disp_label,
+        "totals": totals,
+        "targets": targets,
     }
 
 
@@ -270,6 +342,11 @@ def gen_markdown(data: dict) -> str:
     lines.append("")
     lines.append(f"场景测试: {s_summary.get('pass', 0)}/{s_summary.get('total', 0)} 通过 (BLOCK={s_summary.get('block', 0)})")
     lines.append(f"功能测试: {f_summary.get('pass', 0)}/{f_summary.get('total', 0)} 通过 (BLOCK={f_summary.get('block', 0)})")
+    s_rounds = scenario.get('_rounds_executed', 1)
+    s_rounds_cfg = scenario.get('_rounds_configured', 1)
+    f_rounds = func.get('_rounds_executed', 1)
+    f_rounds_cfg = func.get('_rounds_configured', 1)
+    lines.append(f"场景轮次: {s_rounds}/{s_rounds_cfg} | 功能轮次: {f_rounds}/{f_rounds_cfg}")
     lines.append("")
 
     lines.append("## 2. 问题列表")
@@ -315,10 +392,10 @@ def gen_markdown(data: dict) -> str:
 
     if stats.get("has_stats"):
         lines.append("")
-        lines.append("| 统计 | 均值 (s) | 标准差 (s) |")
+        lines.append(f"| 统计 | 均值 (s) | {stats['dispersion_label']} (s) |")
         lines.append("|------|---------|-----------|")
-        lines.append(f"| 总耗时 | {stats['mean_total']} | {stats['std_total']} |")
-        lines.append(f"| 目标技能 | {stats['mean_target']} | {stats['std_target']} |")
+        lines.append(f"| 总耗时 | {stats['mean_total']} | {stats['disp_total']} |")
+        lines.append(f"| 目标技能 | {stats['mean_target']} | {stats['disp_target']} |")
         lines.append(f"  > 基于 {stats['rounds']} 轮数据")
 
     lines.append("")
@@ -365,7 +442,9 @@ def _render_control_chart(stats: dict) -> str:
         return ""
     totals = stats["totals"]
     mean = stats["mean_total"]
-    std = stats["std_total"]
+    disp = stats.get("disp_total", 0)
+    # 控制图用标准差（9+轮才显示控制图，此时 disp = 标准差）
+    std = disp
     import json as _json
     return f'''
     <div class="chart-container">
@@ -442,11 +521,11 @@ def gen_html(data: dict) -> str:
     stats_row = ""
     if stats.get("has_stats"):
         stats_row = f'''
-      <p class="stats-info">基于 {stats['rounds']} 轮 — 均值 {stats['mean_total']}s / 标准差 {stats['std_total']}s</p>
+      <p class="stats-info">基于 {stats['rounds']} 轮 — 均值 {stats['mean_total']}s / {stats['dispersion_label']} {stats['disp_total']}s</p>
       <table class="stats-table">
-        <tr><th></th><th>均值 (s)</th><th>标准差 (s)</th></tr>
-        <tr><td>总耗时</td><td>{stats['mean_total']}</td><td>{stats['std_total']}</td></tr>
-        <tr><td>目标技能</td><td>{stats['mean_target']}</td><td>{stats['std_target']}</td></tr>
+        <tr><th></th><th>均值 (s)</th><th>{stats['dispersion_label']} (s)</th></tr>
+        <tr><td>总耗时</td><td>{stats['mean_total']}</td><td>{stats['disp_total']}</td></tr>
+        <tr><td>目标技能</td><td>{stats['mean_target']}</td><td>{stats['disp_target']}</td></tr>
       </table>'''
 
     # 单步耗时行
@@ -469,7 +548,7 @@ def gen_html(data: dict) -> str:
     scenario_rows = ""
     for r in data.get("scenario", {}).get("results", []):
         st = "PASS" if r.get("status") == "pass" else "FAIL"
-        scenario_rows += f"<tr><td>S{r.get('sid','')}</td><td>{r.get('name','')[:40]}</td><td>{st}</td><td>{r.get('message','')}</td></tr>\n    "
+        scenario_rows += f"<tr><td>{r.get('sid','')}</td><td>{r.get('name','')[:40]}</td><td>{st}</td><td>{r.get('message','')}</td></tr>\n    "
     function_rows = ""
     for r in data.get("function", {}).get("results", []):
         st = "PASS" if r.get("status") == "pass" else "FAIL"
@@ -479,6 +558,8 @@ def gen_html(data: dict) -> str:
     s4_trace = data.get("s4_trace", [])
     s4_plan = data.get("s4_plan", [])
     s4_html = ""
+    held = 0
+    total = 0
     if s4_trace:
         held = sum(1 for t in s4_trace if t.get("llm_behavior") == "坚守")
         total = len(s4_trace)
@@ -606,6 +687,11 @@ th {{ background: var(--bg); font-weight: 600; font-size: 12px; text-transform: 
     <div class="stat-box warn"><div class="num">{f1_count}</div><div class="label">F-1 WARN</div></div>
     <div class="stat-box"><div class="num">{f2_count}</div><div class="label">F-2 INFO</div></div>
   </div>
+  <p class="rounds-info" style="margin-top:8px;font-size:13px;color:#666;">
+    场景轮次: {data.get('scenario',{}).get('_rounds_executed',1)}/{data.get('scenario',{}).get('_rounds_configured',1)} |
+    功能轮次: {data.get('function',{}).get('_rounds_executed',1)}/{data.get('function',{}).get('_rounds_configured',1)} |
+    S4 轮次: {len(set(t.get('round',1) for t in s4_trace)) if s4_trace else 1}/{data.get('s4_rounds',1)}
+  </p>
 </div>
 
 <div class="card">
@@ -668,16 +754,17 @@ def main():
     data = load_all(skill_dir)
     # 输出到数据目录（R-11 合规）
     report_dir = _data_dir_for(skill_dir)
-    os.makedirs(report_dir, exist_ok=True)
+    outputs_dir = os.path.join(report_dir, "outputs")
+    os.makedirs(outputs_dir, exist_ok=True)
     if mode in ("markdown", "both"):
         md = gen_markdown(data)
-        md_path = os.path.join(report_dir, ".test-report.md")
+        md_path = os.path.join(outputs_dir, ".test-report.md")
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md)
         print(f"  [REPORT] Markdown 报告: {md_path}")
     if mode in ("html", "both"):
         html = gen_html(data)
-        html_path = os.path.join(report_dir, ".test-report.html")
+        html_path = os.path.join(outputs_dir, ".test-report.html")
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html)
         print(f"  [REPORT] HTML 报告: {html_path}")

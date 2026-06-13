@@ -27,12 +27,12 @@ _HOOKS_SCRIPT = os.path.normpath(os.path.join(
 ))
 def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
-                        capture_output=True, text=True)
-    if r.stdout.strip(): print(r.stdout)
+                        capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip(): print(r.stdout)
     if r.returncode != 0: sys.exit(r.returncode)
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
-                    capture_output=True)
+                    capture_output=True, encoding="utf-8")
 
 # 时间线输出
 _TIMELINE_SCRIPT = os.path.normpath(os.path.join(
@@ -549,7 +549,7 @@ if __name__ == "__main__":
             target_name = os.path.basename(os.path.abspath(target))
             data_dir = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data", target_name)
             os.makedirs(data_dir, exist_ok=True)
-            json_path = os.path.join(data_dir, ".function-test_blueprint.json")
+            json_path = os.path.join(data_dir, "outputs", ".function-test_blueprint.json")
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(bb.to_dict(), f, ensure_ascii=False, indent=2)
             print(f"\n蓝皮书 JSON 已保存: {json_path}")
@@ -558,7 +558,7 @@ if __name__ == "__main__":
             constraints = extract_constraints(target)
             # 数据目录按 R-12 规范：skills/.standardization/skill-function-test/data/<target_skill>/
             os.makedirs(data_dir, exist_ok=True)
-            cpath = os.path.join(data_dir, ".constraint-list.json")
+            cpath = os.path.join(data_dir, "outputs", ".constraint-list.json")
             with open(cpath, "w", encoding="utf-8") as f:
                 json.dump(constraints, f, ensure_ascii=False, indent=2)
             print(f"约束清单已保存: {cpath} ({len(constraints)} 条)")

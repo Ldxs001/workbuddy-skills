@@ -20,12 +20,12 @@ _HOOKS_SCRIPT = os.path.normpath(os.path.join(
 ))
 def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
-                        capture_output=True, text=True)
-    if r.stdout.strip(): print(r.stdout)
+                        capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip(): print(r.stdout)
     if r.returncode != 0: sys.exit(r.returncode)
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
-                    capture_output=True)
+                    capture_output=True, encoding="utf-8")
 
 # 时间线输出
 _TIMELINE_SCRIPT = os.path.normpath(os.path.join(

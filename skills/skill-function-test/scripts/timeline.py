@@ -43,8 +43,8 @@ def _hook_check(skill_dir: str, step: str):
     """调用 hooks.py 前置检查，失败则 exit"""
     import subprocess as _sp
     r = _sp.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
-                capture_output=True, text=True)
-    if r.stdout.strip():
+                capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip():
         print(r.stdout)
     if r.returncode != 0:
         sys.exit(r.returncode)
@@ -53,8 +53,8 @@ def _hook_done(skill_dir: str, step: str):
     """调用 hooks.py 标记完成"""
     import subprocess as _sp
     r = _sp.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
-                capture_output=True, text=True)
-    if r.stdout.strip():
+                capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip():
         print(r.stdout)
 
 F_TIMELINE = ".timeline.json"

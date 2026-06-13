@@ -15,18 +15,25 @@ import importlib.util
 import inspect
 from typing import Optional
 
+# R-12 数据目录合规
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
+_test_data_dir = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ".standardization", "skill-function-test", "data"
+))
+
 # 流程钩子
 _HOOKS_SCRIPT = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "hooks.py"
 ))
 def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
-                        capture_output=True, text=True)
-    if r.stdout.strip(): print(r.stdout)
+                        capture_output=True, text=True, encoding="utf-8")
+    if r.stdout and r.stdout.strip(): print(r.stdout)
     if r.returncode != 0: sys.exit(r.returncode)
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
-                    capture_output=True)
+                    capture_output=True, encoding="utf-8")
 
 # 时间线输出
 _TIMELINE_SCRIPT = os.path.normpath(os.path.join(
@@ -644,8 +651,54 @@ if __name__ == "__main__":
         if os.path.isdir(target):
             _hook_check(target, "function_test")
             _tl(target, "function_test", "功能测试（独立运行）", "--type", "py_script")
-            report, text = run_full_test(target, dims)
+
+            # 读取轮次配置
+            try:
+                from test_config import load_config
+                test_rounds = load_config(target).get("rounds", 3)
+            except Exception:
+                test_rounds = 3
+
+            all_reports = []
+            all_texts = []
+            _tl_base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                    "..", ".standardization", "skill-function-test", "data",
+                                    os.path.basename(os.path.abspath(target)))
+            # 轮次前快照基线（第0轮），作为 delta 基准
+            if test_rounds > 1:
+                _tl_file = os.path.join(_tl_base, ".timeline.json")
+                if os.path.exists(_tl_file):
+                    import shutil
+                    shutil.copy2(_tl_file, os.path.join(_tl_base, ".timeline_r0.json"))
+            for r in range(1, test_rounds + 1):
+                if test_rounds > 1:
+                    print(f"\n  ── 功能测试 第 {r}/{test_rounds} 轮 ──")
+                report, text = run_full_test(target, dims)
+                all_reports.append(report)
+                all_texts.append(text)
+                # 每轮完成后快照 timeline，供 compute_round_stats 按轮统计
+                if test_rounds > 1:
+                    _tl_file = os.path.join(_tl_base, ".timeline.json")
+                    if os.path.exists(_tl_file):
+                        import shutil
+                        shutil.copy2(_tl_file, os.path.join(_tl_base, f".timeline_r{r}.json"))
+                    print(f"  [功能] 第 {r} 轮完成 (BLOCK={report.get('summary',{}).get('block','?')})")
+
+            # 使用最后一轮作为展示，但标记轮次数
+            report = all_reports[-1]
+            text = all_texts[-1]
+            report["_rounds_executed"] = len(all_reports)
+            report["_rounds_configured"] = test_rounds
+
+            # 多轮时取各轮 BLOCK 最大值报告
+            if len(all_reports) > 1:
+                max_block = max(r.get("summary", {}).get("block", 0) for r in all_reports)
+                report["summary"]["block"] = max_block
+                report["_max_block_across_rounds"] = max_block
+
             print(text)
+            if test_rounds > 1:
+                print(f"  轮次执行: {len(all_reports)}/{test_rounds} 轮完成")
             _tl(target, "function_test", "功能测试（独立运行）", "end", "--type", "py_script")
             # 保存报告到数据目录（R-12 合规）
             from test_config import config_path as _cfg
