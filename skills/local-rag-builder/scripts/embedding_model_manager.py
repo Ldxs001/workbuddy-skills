@@ -165,10 +165,8 @@ def _check_integrity(model_path):
                 model_files.append(os.path.join(root, f))
 
     if not model_files:
-        # 检查是否至少有 config.json
-        if os.path.exists(os.path.join(model_path, "config.json")):
-            return True, "仅有 config.json（可能为目录结构异常）"
-        return False, "未找到模型文件"
+        # 仅有 config.json 不够，必须有权重文件才认为完整性通过
+        return False, "模型文件不完整（缺少 .bin/.safetensors/.onnx 等权重文件）"
 
     total_size = sum(os.path.getsize(f) for f in model_files if os.path.exists(f))
     return True, f"找到 {len(model_files)} 个模型文件，共 {total_size / 1e6:.1f}MB"

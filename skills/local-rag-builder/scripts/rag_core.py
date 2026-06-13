@@ -13,17 +13,30 @@ from config import load_config
 from utils import KB_DIR, MODELS_DIR, find_model_dirs
 
 
-def get_embeddings(model_path=None, device="auto"):
-    """获取嵌入模型实例"""
+def get_embeddings(model_path=None, device="auto", kb_name=None):
+    """获取嵌入模型实例。
+    如果指定 kb_name，优先使用该知识库的专属模型；没有则回退全局默认。
+    """
     from langchain_huggingface import HuggingFaceEmbeddings
     import torch
 
     cfg = load_config()
     emb_cfg = cfg.get("embedding", {})
 
+    # 如果指定了知识库，优先查 KB 专属模型
+    if model_path is None and kb_name:
+        try:
+            from knowledge_base_manager import get_kb_model
+            kb_model = get_kb_model(kb_name)
+            if kb_model:
+                model_path = kb_model
+        except Exception:
+            pass
+
     if model_path is None:
         model_path = emb_cfg.get("model_path", "")
-    if not model_path:
+    # 校验：路径为空或路径失效时回退到扫描 MODELS_DIR
+    if not model_path or not os.path.exists(model_path):
         models = find_model_dirs(MODELS_DIR)
         if not models:
             raise ValueError("未找到嵌入模型。请先运行 embedding_model_manager.py 下载模型")
@@ -34,7 +47,7 @@ def get_embeddings(model_path=None, device="auto"):
 
     return HuggingFaceEmbeddings(
         model_name=model_path,
-        model_kwargs={"device": device},
+        model_kwargs={"device": device, "local_files_only": True},
         encode_kwargs={"normalize_embeddings": emb_cfg.get("normalize_embeddings", True)},
     )
 
@@ -44,7 +57,7 @@ def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, e
     from langchain_chroma import Chroma
 
     if embeddings is None:
-        embeddings = get_embeddings()
+        embeddings = get_embeddings(kb_name=kb_name)
 
     kb_path = os.path.join(KB_DIR, kb_name)
     if not os.path.exists(kb_path) or not os.listdir(kb_path):
@@ -175,7 +188,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     from knowledge_base_manager import add_documents_to_kb
 
     if embeddings is None:
-        embeddings = get_embeddings()
+        embeddings = get_embeddings(kb_name=kb_name)
 
     try:
         from langchain_community.document_loaders import TextLoader

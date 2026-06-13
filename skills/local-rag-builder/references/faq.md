@@ -5,7 +5,7 @@ A: chromadb 的 Windows 预编译轮子最高支持到 Python 3.11。建议使�
 
 Q: 模型下载失败怎么办？
 A: 本工具内置 4 个下载源（ModelScope、HuggingFace 镜像、官方源、LLM 搜索），每个源会自动重试 3 次。如果全部失败，可以尝试：
-1. 手动配置 `HF_ENDPOINT=https://hf-mirror.com` 环境变量
+1. 配置环境变量 `HF_ENDPOINT` 为 `https://hf-mirror.com` 后重试
 2. 使用 `--interactive` 模式选择其他源
 3. 手动下载后使用 `--check` 验证
 

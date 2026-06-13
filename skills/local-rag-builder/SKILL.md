@@ -1,6 +1,6 @@
 ---
 name: local-rag-builder
-version: 1.0.0
+version: 1.0.5
 description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
 license: MIT
@@ -8,13 +8,15 @@ sensitive_access: false
 critical_write: false
 trigger: ['搭建 RAG 系统', '本地知识库', '嵌入模型下载', '文本切分', '向量检索', 'RAG 环境配置', '下载模型', '入库文档', '切分文档', '知识库管理']
 trigger_negative: ['纯聊天', '简单问答']
-tags: ['rag', 'embedding', 'llm', 'python', 'vector-db', 'text-splitter']
+tags: ['rag', 'embedding', 'llm', 'python', 'vector-db', 'text-splitter', 'guard-stack', 'plugin']
 data_dir: skills/.standardization/local-rag-builder/data/
 h1_position: true
 external_data_dir: true
 permission_weight: LOW
 faq_quality: improve_qa
 meta_field_sync: true
+data_dir_compliance: true
+create_permissions_md: true
 ---
 # local-rag-builder（本地 RAG 搭建工具）
 
@@ -63,6 +65,18 @@ meta_field_sync: true
 | 6 | **Web 可视化界面** | 内嵌 HTML 配置面板：输入源开关、GuardStack 守卫配置、5 策略动态表单 + 后处理配置、极客模式 JSON 编辑器 + 配置模板管理、知识库自动分类规则编辑器 |
 | 7 | **双模式接口** | 集成模式（`--retrieve-only` / `--mode integrated`）纯检索，智能体自行回答；独立模式（`--mode standalone`）检索 + LLM 全链路 |
 
+### 渐进式文件索引
+
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+|--------|------|----------|----------|
+| `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
+| `references/architecture.md` | 架构设计 | skill-standardization 整体架构。包含：模块关系、数据流、核心设计决策。 | 无 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
+| `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
+| `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
+| `references/llm-setup.md` | 参考文档 | > 本文件适用于 **独立模式**（`rag_standalone.py`）。技能模式（`rag_skill.py`）不需要 LLM。 | 无 |
+| `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 ## 快速开始
 
 ```bash
@@ -169,10 +183,3 @@ register_guard(GuardPlugin("my_guard", "保护特殊代码块", my_guard))
 3. **知识库隔离**：不同资料自动/手动归入不同库
 4. **重置**：删除 `data/` 下对应子目录即可重置相关数据
 
-→ 详见 references/guide.md
-→ 详见 references/architecture.md
-→ 详见 references/examples.md
-→ 详见 references/faq.md
-→ 详见 references/antipatterns.md
-→ 详见 references/changelog.md
-→ 详见 references/permissions.md

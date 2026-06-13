@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
 from prompt_manager import load_template, save_template, reset_template
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS
-from knowledge_base_manager import list_knowledge_bases, get_kb_stats
+from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
 from rag_standalone import verify_llm_connection
 from text_splitter import STRATEGY_REGISTRY, GUARD_REGISTRY, get_all_strategies_info, SECONDARY_STRATEGIES
 from utils import cfg_dir
@@ -278,9 +278,10 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <div class="form-group">
       <label>当前模型</label>
       <select id="model-select" onchange="updateConfig('embedding','model_path',this.value)">
-        <option value="">-- 选择模型 --</option>
-        {''.join(f'<option value="{m["path"]}" {"selected" if m["path"]==cfg.get("embedding",{}).get("model_path","") else ""}>{m.get("model_id",m["path"].split(os.sep)[-1])}</option>' for m in models)}
+        {''.join(f'<option value="{m["path"]}" {"selected" if m["path"]==(cfg.get("embedding",{}).get("model_path","") or (models[0]["path"] if models else "")) else ""}>{m.get("model_id",m["path"].split(os.sep)[-1])}</option>' for m in models)}
+        <option value="" {"selected" if not cfg.get("embedding",{}).get("model_path","") and not models else ""}>-- 无可用模型 --</option>
       </select>
+      <div style="font-size:11px;color:#888;margin-top:4px;">未配置时自动使用列表中第一个可用模型。知识库未指定模型时回退到此默认值。</div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -412,8 +413,16 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
 
   <div class="card">
     <h2>📚 知识库 & 分类规则</h2>
-    <div id="kb-list">
-      {''.join(f'<div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;"><span><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</span></div>' for name, info in kbs.items())}
+    <div id="kb-list" style="margin-bottom:8px;">
+      {' '.join(f'''<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
+        <div style="flex:1;"><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</div>
+        <div style="min-width:200px;">
+          <select class="kb-model-select" data-kb="{name}" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:12px;" onchange="setKbModel('{name}',this.value)">
+            <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
+            {''.join(f'<option value="{m.get("path","")}" {'selected' if info.get("embedding_model","")==m.get("path","") else ""}>{m.get("model_id","")}</option>' for m in models)}
+          </select>
+        </div>
+      </div>''' for name, info in kbs.items())}
     </div>
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
       <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">📋 自动分类规则 <span style="font-weight:400;color:#888;font-size:11px;">（关键词 + 扩展名匹配）</span></div>
@@ -434,6 +443,13 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group"><label>关键词（逗号分隔）</label><input id="rule-keywords" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="例: 代码,API,编程"></div>
       <div class="form-group"><label>扩展名（逗号分隔）</label><input id="rule-extensions" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="例: .py,.js,.ts"></div>
       <div class="form-group"><label>描述</label><input id="rule-desc" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="可选"></div>
+      <div class="form-group"><label>知识库嵌入模型</label>
+        <select id="rule-model" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
+          <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
+          {''.join(f'<option value="{m.get("path","")}">{m.get("model_id","")}</option>' for m in models)}
+        </select>
+        <div style="font-size:11px;color:#888;margin-top:4px;">选空=回退到全局默认模型。已有文档的知识库切换模型后需重新导入。</div>
+      </div>
       <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
         <button class="btn btn-secondary" onclick="hideRuleEditor()">取消</button>
         <button class="btn btn-primary" onclick="saveRule()">💾 保存</button>
@@ -486,6 +502,16 @@ function updateConfig(section, key, value) {{
     body: JSON.stringify({{section: section, key: key, value: value}})
   }}).then(function(r){{return r.json()}}).then(function(d){{
     if(d.success) toast('已更新');
+    else toast(d.error, 'error');
+  }}).catch(function(e){{toast('请求失败', 'error')}});
+}}
+
+function setKbModel(kbName, modelId) {{
+  fetch('/api/kb-model', {{
+    method: 'POST', headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify({{kb_name: kbName, model_id: modelId}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if(d.success) toast('知识库模型已更新: ' + d.message);
     else toast(d.error, 'error');
   }}).catch(function(e){{toast('请求失败', 'error')}});
 }}
@@ -654,9 +680,14 @@ function refreshGeekTemplates() {{
 }}
 
 function refreshRules() {{
-  fetch('/api/rules/list', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d) {{
+  Promise.all([
+    fetch('/api/rules/list', {{method:'POST'}}).then(function(r){{return r.json()}}),
+    fetch('/api/kb-models', {{method:'POST'}}).then(function(r){{return r.json()}})
+  ]).then(function(results) {{
+    var d = results[0], kbData = results[1];
     var el = document.getElementById('rules-list');
     var rules = d.rules || {{}};
+    var kbModels = (kbData && kbData.kb_models) || {{}};
     var names = Object.keys(rules);
     if (names.length === 0) {{
       el.innerHTML = '\u6682\u65e0\u81ea\u5b9a\u4e49\u89c4\u5219\uff0c\u70b9\u201c\u91cd\u7f6e\u9ed8\u8ba4\u201d\u521b\u5efa\u9ed8\u8ba4\u89c4\u5219\u3002';
@@ -666,10 +697,17 @@ function refreshRules() {{
       var r = rules[name];
       var kws = (r.keywords || []).join(', ');
       var exts = (r.extensions || []).join(', ');
+      var modelLabel = '\u9ed8\u8ba4\u6a21\u578b';
+      if (kbModels[name]) {{
+        var parts = kbModels[name].split('/');
+        modelLabel = parts[parts.length-1] || kbModels[name];
+      }}
+      var modelHtml = '<br><span style=\"font-size:11px;color:#667eea;\">\u25b6 \u6a21\u578b: ' + modelLabel + '</span>';
       return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;\">' +
         '<div style=\"flex:1;\"><strong>' + name + '</strong> ' +
         (r.description ? '<span style=\"color:#888;font-size:11px;\">(' + r.description + ')</span>' : '') +
-        '<br><span style=\"font-size:11px;color:#aaa;\">\u5173\u952e\u8bcd: ' + (kws || '\u2014') + ' | \u6269\u5c55\u540d: ' + (exts || '\u2014') + '</span></div>' +
+        '<br><span style=\"font-size:11px;color:#aaa;\">\u5173\u952e\u8bcd: ' + (kws || '\u2014') + ' | \u6269\u5c55\u540d: ' + (exts || '\u2014') + '</span>' +
+        modelHtml + '</div>' +
         '<span>' +
         '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;margin-right:4px;\" onclick=\"editRule(\\'' + name + '\\')\">\u7f16\u8f91</button>' +
         '<button class=\"btn btn-danger\" style=\"padding:3px 10px;font-size:11px;\" onclick=\"deleteRule(\\'' + name + '\\')\">\u5220\u9664</button>' +
@@ -686,13 +724,19 @@ function showRuleEditor(editName) {{
 function hideRuleEditor() {{
   document.getElementById('rule-editor-overlay').style.display = 'none';
   document.getElementById('rule-name').value = '';
+  document.getElementById('rule-name').readOnly = false;
   document.getElementById('rule-keywords').value = '';
   document.getElementById('rule-extensions').value = '';
   document.getElementById('rule-desc').value = '';
+  document.getElementById('rule-model').value = '';
 }}
 
 function editRule(name) {{
-  fetch('/api/rules/list', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d) {{
+  Promise.all([
+    fetch('/api/rules/list', {{method:'POST'}}).then(function(r){{return r.json()}}),
+    fetch('/api/kb-models', {{method:'POST'}}).then(function(r){{return r.json()}})
+  ]).then(function(results) {{
+    var d = results[0], kbData = results[1];
     var r = (d.rules || {{}})[name];
     if (!r) {{ toast('\u89c4\u5219\u4e0d\u5b58\u5728', 'error'); return; }}
     document.getElementById('rule-name').value = name;
@@ -701,6 +745,14 @@ function editRule(name) {{
     document.getElementById('rule-extensions').value = (r.extensions || []).join(', ');
     document.getElementById('rule-desc').value = r.description || '';
     document.getElementById('rule-editor-title').textContent = '\u7f16\u8f91\u89c4\u5219: ' + name;
+    // 设置模型下拉
+    var kbModels = (kbData && kbData.kb_models) || {{}};
+    var sel = document.getElementById('rule-model');
+    if (kbModels[name]) {{
+      sel.value = kbModels[name];
+    }} else {{
+      sel.value = '';
+    }}
     document.getElementById('rule-editor-overlay').style.display = 'flex';
   }});
 }}
@@ -711,12 +763,22 @@ function saveRule() {{
   var kws = document.getElementById('rule-keywords').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});
   var exts = document.getElementById('rule-extensions').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});
   var desc = document.getElementById('rule-desc').value.trim();
+  var modelId = document.getElementById('rule-model').value;
+  // 先保存规则，再设置 KB 模型
   fetch('/api/rules/save', {{
     method: 'POST', headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{name: name, keywords: kws, extensions: exts, description: desc}})
   }}).then(function(r){{return r.json()}}).then(function(d) {{
-    if (d.success) {{ toast('\u89c4\u5219\u5df2\u4fdd\u5b58'); hideRuleEditor(); refreshRules(); }}
-    else toast(d.error, 'error');
+    if (!d.success) {{ toast(d.error, 'error'); return; }}
+    // 设置 KB 模型
+    fetch('/api/kb-model', {{
+      method: 'POST', headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{kb_name: name, model_id: modelId}})
+    }}).then(function(r){{return r.json()}}).then(function(d2) {{
+      toast(d2.success ? '\u89c4\u5219\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u5df2\u66f4\u65b0' : '\u89c4\u5219\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u8bbe\u7f6e\u5931\u8d25');
+      hideRuleEditor();
+      refreshRules();
+    }});
   }});
 }}
 
@@ -979,6 +1041,26 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 from knowledge_base_manager import reset_classify_rules
                 ok, msg = reset_classify_rules()
                 self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb-model":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                model_id = data.get("model_id", "")
+                if not kb_name:
+                    self._send_json({"success": False, "error": "知识库名不能为空"})
+                    return
+                from knowledge_base_manager import set_kb_model
+                ok, msg = set_kb_model(kb_name, model_id)
+                self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb-models":
+                """返回所有知识库的模型配置 + 已下载模型列表"""
+                from knowledge_base_manager import list_knowledge_bases, get_kb_model
+                from embedding_model_manager import list_downloaded_models
+                kbs = list_knowledge_bases()
+                kb_models = {name: get_kb_model(name) for name in kbs}
+                models = list_downloaded_models()
+                self._send_json({"success": True, "kb_models": kb_models, "models": models})
 
             elif path == "/api/recommend":
                 data = self._read_body()

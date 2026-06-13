@@ -1,28 +1,40 @@
-# 更新日志 — local-rag-builder
-
-## 1.0.0 (2026-06-07)
-
-### 重大重构
-- `text_splitter.py` 全面重写为三层流水线：守卫栈(多选) → 主策略(单选) → 后处理(单选/不选)
-- 新增插件注册架构 `StrategyPlugin`/`GuardPlugin`，每个策略声明 `config_schema`
-- 5 内置策略 + 5 内置守卫全部注册到插件系统，Web UI 根据 schema 动态渲染表单
-- `split_by_sentence` 支持 `language` 参数（中文/English/自定义）及自定义分隔符
-- metadata 白名单继承：headers/semantic 子切继承 h1/h2/h3/source
-
-### 新增功能
-- 输入源配置：PDF/OCR/HTML→MD 开关
-- GuardStack 守卫栈：mermaid/code/math/table/html 可链式保护与还原
-- Web UI 大改：守卫栈卡片、5 策略动态配置表单、后处理配置、极客模式 JSON 编辑器
-- 配置模板系统：保存/加载/删除复用模板
-- 知识库自动分类规则编辑器（关键词 + 扩展名匹配），Web UI 可视化管理（添加/编辑/删除/重置）
-- 新 API：`/api/override`, `/api/input-source`, `/api/config/raw`, `/api/template/*`, `/api/rules/*`
-- 所有配置/规则可一键恢复默认
+## 1.0.5 (2026-06-13)
 
 ### 修复
-- `rag_core.py` 缺失 `strategy_overrides` 传递，导致策略级 chunk_size 覆盖入库时不生效
-- Guard 链式占位符冲突（改为唯一前缀 `__GUARD_NAME_X__`）
-- HTML 编码错误（surrogate pair）
-- 多处文档与代码不同步
+- refactor: 标准化改造（渐进式索引表格式修复、权限文档补充）
+
+## 1.0.4 (2026-06-13)
+
+### 新增
+- KB 专属嵌入模型：每个知识库可独立选择嵌入模型，未指定时回退全局默认
+- Web UI KB 管理新增模型下拉选择器
+- `/api/kb-model`、`/api/kb-models` API 端点
+
+### 修复
+- `knowledge_base_manager.py` `create_knowledge_base()` 新增 `model_id` 参数
+- `rag_core.py` `get_embeddings()` 新增 `kb_name` 参数，自动查 KB 专属模型
+
+## 1.0.3 (2026-06-13)
+
+### 修复
+- 标准化改造：SKILL.md frontmatter 修复、权限文档补充、产出物路径合规
+- 三端版本同步至 1.0.3
+
+## 1.0.2 (2026-06-13)
+
+### 修复
+- 删除根目录 `.venv_rag` 遗留虚拟环境
+- 同步三端版本号至 1.0.2
+
+## 1.0.1 (2026-06-13)
+
+### 修复
+- `rag_core.py` 配置路径失效时无法回退到 `find_model_dirs()`（`if not model_path` 改为 `if not model_path or not os.path.exists(model_path)`）
+- `rag_core.py` `HuggingFaceEmbeddings` 未限制本地加载（添加 `local_files_only=True` 避免加载失败时摸 Hub）
+- `embedding_model_manager.py` `_check_integrity()` 将仅有 `config.json` 的目录误判为完整（改为要求至少有权重文件）
+- 删除根目录残留的空 `data/` 目录
+
+## 1.0.0 (2026-06-07)
 
 ## 0.5.0 (2026-06-06)
 
@@ -45,7 +57,7 @@
 - **config.py `load_config()`**：`mode` 字段非 dict 导致 `.update()` 崩溃，兼容非 dict 顶层字段
 
 ### 重构
-- SKILL.md 及全文件移除 WorkBuddy 特化引用，改为 `xxxx` 代指任意智能体
+- SKILL.md 及全文件删除 WorkBuddy 特化引用，改为 `xxxx` 代指任意智能体
 - 所有 docstring 和注释统一通用化描述
 
 ## 0.4.0 (2026-06-06)
@@ -53,7 +65,7 @@
 ### 修复
 - **【关键】`rag_env_setup.py` pip 锁死导致 auto-install 报 OK 但啥也没装的 BUG**
   - 根因：`install_packages()` 内 `except Exception: pass` 吞掉 pip 升级超时异常，返回空 `{}`，调用方误判为安装成功
-  - 修复：移除裸 `except: pass`，所有异常明确 catch 并报告
+  - 修复：删除裸 `except: pass`，所有异常明确 catch 并报告
   - 修复：安装后通过 `pip list` + `check_missing()` 双重验证才报 OK
   - 修复：安装前自动检测并清理 stale pip 锁文件（Windows `%LOCALAPPDATA%/pip/ephem/`）
 - **新增 pip 锁自动清理** — `--cleanup-locks` 参数、`cleanup_pip_locks()` 函数、安装前自动清理
@@ -69,7 +81,7 @@
 
 ### 重构
 - **双模式架构**：拆分为 `rag_skill.py`（技能模式，纯检索无 LLM）和 `rag_standalone.py`（独立模式，检索+LLM 全链路）
-- `rag_core.py` 移除所有 LLM 依赖，改为纯核心层。新增 `format_skill_output()` 返回结构化 JSON（含已填充 prompt）
+- `rag_core.py` 删除所有 LLM 依赖，改为纯核心层。新增 `format_skill_output()` 返回结构化 JSON（含已填充 prompt）
 - `embedding_model_manager.py`：路径查找改为通用内容感知方案（`_normalize` + `_name_similarity` + `_is_model_dir`），不再依赖任何特定变形模式
 
 ### 新增

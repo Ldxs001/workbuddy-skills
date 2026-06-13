@@ -41,7 +41,7 @@ def list_knowledge_bases():
     return _load_index()
 
 
-def create_knowledge_base(name, description=""):
+def create_knowledge_base(name, description="", model_id=""):
     """创建新知识库"""
     index = _load_index()
     if name in index:
@@ -50,14 +50,37 @@ def create_knowledge_base(name, description=""):
     kb_path = os.path.join(KB_DIR, name)
     os.makedirs(kb_path, exist_ok=True)
 
-    index[name] = {
+    entry = {
         "path": kb_path,
         "description": description,
         "created": str(__import__("datetime").datetime.now()),
         "doc_count": 0,
     }
+    if model_id:
+        entry["embedding_model"] = model_id
+    index[name] = entry
     _save_index(index)
     return True, f"知识库 '{name}' 已创建"
+
+
+def set_kb_model(kb_name, model_id=""):
+    """设置/清除知识库的嵌入模型。空字符串 = 回退到全局默认。"""
+    index = _load_index()
+    if kb_name not in index:
+        return False, f"知识库 '{kb_name}' 不存在"
+    if model_id:
+        index[kb_name]["embedding_model"] = model_id
+    else:
+        index[kb_name].pop("embedding_model", None)
+    _save_index(index)
+    return True, f"知识库 '{kb_name}' 嵌入模型已{'更新' if model_id else '清除（回退全局默认）'}"
+
+
+def get_kb_model(kb_name):
+    """获取知识库指定的嵌入模型 ID，空串表示未指定（回退全局默认）"""
+    index = _load_index()
+    entry = index.get(kb_name, {})
+    return entry.get("embedding_model", "")
 
 
 def delete_knowledge_base(name):
@@ -293,6 +316,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="知识库管理工具")
     parser.add_argument("--create", type=str, help="创建知识库")
     parser.add_argument("--desc", type=str, default="", help="知识库描述")
+    parser.add_argument("--model", type=str, default="", help="知识库专用嵌入模型 ID 或路径")
+    parser.add_argument("--set-model", nargs=2, metavar=("KB_NAME", "MODEL_ID"), help="设置知识库的嵌入模型")
     parser.add_argument("--delete", type=str, help="删除知识库")
     parser.add_argument("--list", action="store_true", help="列出所有知识库")
     parser.add_argument("--stats", action="store_true", help="显示知识库统计")
@@ -324,7 +349,12 @@ if __name__ == "__main__":
                 print(f"  {name}: {s.get('doc_count', 0)} 文档, {s.get('size_mb', 0)} MB")
 
     elif args.create:
-        ok, msg = create_knowledge_base(args.create, args.desc)
+        ok, msg = create_knowledge_base(args.create, args.desc, args.model)
+        print(f"[{'OK' if ok else '!'}] {msg}")
+
+    elif args.set_model:
+        kb_name, model_id = args.set_model
+        ok, msg = set_kb_model(kb_name, model_id)
         print(f"[{'OK' if ok else '!'}] {msg}")
 
     elif args.delete:
