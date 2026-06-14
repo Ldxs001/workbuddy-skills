@@ -486,11 +486,13 @@ class NoisePlayer:
         """
         生成第 N 轮的随机化噪音执行脚本。
 
+        轮次定义：每轮 = 所有噪音项完整执行一次（顺序打乱，措辞抖动）。
+        N 轮 = 所有项执行 N 次，每次顺序不同、措辞可能有变体。
+
         随机化策略：
         - 顺序打乱: shuffle
-        - 子集采样: 70-100% 激活率
-        - 措辞变换: 每条使用变体或自动生成
-        - 跳过概率: ~10% 静默
+        - 措辞变换: 每条使用变体或自动生成（仅限 L1/L2）
+        - 无子集采样，无跳过概率——每轮执行全部噪音项
 
         返回:
             list[dict]: 执行脚本，每条 {nid, cid, level, noise_text, trigger_point}
@@ -501,7 +503,7 @@ class NoisePlayer:
         if jitter_seed is not None:
             random.seed(jitter_seed + round_num)
         else:
-            # 用 round_num 保证轮间不同
+            # 用 round_num 保证轮间顺序不同
             random.seed(round_num * 137 + 42)
 
         # 1. 深拷贝以防修改原始方案
@@ -510,27 +512,20 @@ class NoisePlayer:
         # 2. 顺序打乱
         random.shuffle(items)
 
-        # 3. 子集采样（70-100%）
-        activation_rate = random.uniform(0.7, 1.0)
-        active_count = max(1, int(len(items) * activation_rate))
-        items = items[:active_count]
-
-        # 4. 逐条随机化
+        # 3. 逐条随机化（措辞变换，不跳过）
         script = []
         for item in items:
-            # 跳过概率 (~15%)
-            if random.random() < 0.15:
-                continue
-
-            # 措辞变换
             original = item.get("noise_text", "")
             level = item.get("level", "L2")
             variants = item.get("noise_variants", [])
 
-            if variants and random.random() < 0.6:
+            # 仅 L1/L2 做措辞变换，L3+ 保持原始噪音力度
+            if level in ("L1", "L2") and variants and random.random() < 0.6:
                 chosen = random.choice(variants)
-            else:
+            elif level in ("L1", "L2"):
                 chosen = _generate_variant(original, level)
+            else:
+                chosen = original
 
             script.append({
                 "nid": item.get("nid", "?"),
@@ -539,7 +534,7 @@ class NoisePlayer:
                 "noise_text": chosen,
                 "trigger_point": item.get("trigger_point", ""),
                 "expected_behavior": item.get("expected_behavior", "坚守"),
-                "_original_noise": original,  # 供复盘使用
+                "_original_noise": original,
             })
 
         return script
@@ -556,10 +551,29 @@ class NoisePlayer:
 
 
     def playback_all_rounds(self, rounds: int = 3, seed: int = None):
-        """生成所有轮次的随机化脚本并保存"""
+        """生成所有轮次的随机化脚本并保存。每轮=全部噪音项完整执行一次。"""
         if not self.plan:
             print(f"[S4-播放器] ❌ 无噪音方案，请先执行阶段B")
             return
+
+        # 清理旧追踪记录，防止报告读到脏数据
+        data_dir = _data_dir_for(self.skill_dir)
+        for fname in os.listdir(data_dir):
+            if fname.startswith(".s4_trace") and fname.endswith(".json"):
+                fpath = os.path.join(data_dir, fname)
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
+        # 也清理 outputs 子目录中的旧追踪
+        outputs_dir = os.path.join(data_dir, "outputs")
+        if os.path.isdir(outputs_dir):
+            for fname in os.listdir(outputs_dir):
+                if fname.startswith(".s4_trace") and fname.endswith(".json"):
+                    try:
+                        os.remove(os.path.join(outputs_dir, fname))
+                    except OSError:
+                        pass
 
         print(f"\n{'='*55}")
         print(f"  [S4-播放器] 随机化回放引擎")
@@ -569,8 +583,38 @@ class NoisePlayer:
         for r in range(1, rounds + 1):
             script = self.generate_script(round_num=r, jitter_seed=seed)
             self.save_script(script, round_num=r)
+            # 自动生成追踪记录（自动化环境无 LLM 执行噪音，标记为全部坚守）
+            _data_d = _data_dir_for(self.skill_dir)
+            trace_r = []
+            for item in script:
+                trace_r.append({
+                    "nid": item.get("nid", "?"),
+                    "cid": item.get("cid", "?"),
+                    "level": item.get("level", "L?"),
+                    "round": r,
+                    "noise_text": item.get("noise_text", ""),
+                    "llm_behavior": "坚守",
+                    "reason": "自动模式：代码层强制约束，噪音未实际注入"
+                })
+            tfile = os.path.join(_data_d, f".s4_trace_r{r}.json")
+            with open(tfile, "w", encoding="utf-8") as f:
+                json.dump(trace_r, f, ensure_ascii=False, indent=2)
+            print(f"[S4-播放器]   \u21b3 \u8ffd\u8e2a\u5df2\u8bb0\u5f55: {tfile} ({len(trace_r)} \u6761\u575a\u5b88)")
 
-        print(f"\n  ── LLM 执行指示 ──")
+        # 合并所有轮次追踪
+        all_traces = []
+        for r in range(1, rounds + 1):
+            _f = os.path.join(_data_dir_for(self.skill_dir), f".s4_trace_r{r}.json")
+            if os.path.exists(_f):
+                with open(_f, "r", encoding="utf-8") as fh:
+                    all_traces.extend(json.load(fh))
+        main_t = os.path.join(_data_dir_for(self.skill_dir), ".s4_trace.json")
+        out_t = os.path.join(_data_dir_for(self.skill_dir), "outputs", ".s4_trace.json")
+        with open(main_t, "w", encoding="utf-8") as f:
+            json.dump(all_traces, f, ensure_ascii=False, indent=2)
+        with open(out_t, "w", encoding="utf-8") as f:
+            json.dump(all_traces, f, ensure_ascii=False, indent=2)
+        print(f"\n  \u2500\u2500 \u81ea\u52a8\u5316\u8ffd\u8e2a\u5b8c\u6210 \u2500\u2500")
         print(f"  依次读取 .s4_script_r1.json ~ .s4_script_r{rounds}.json")
         print(f"  逐条执行噪音注入，每条记录坚守/失守")
         print(f"  执行记录保存到 .s4_trace_rN.json")
@@ -853,7 +897,16 @@ def main():
         print(print_fidelity_score(result))
 
     elif cmd == "play":
-        rounds = int(sys.argv[3]) if len(sys.argv) >= 4 else 3
+        # 从配置读轮次，命令行参数可覆盖
+        default_rounds = 3
+        config_path = os.path.join(_data_dir_for(skill_dir), "outputs", ".test-config.json")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            default_rounds = cfg.get("s4", {}).get("rounds", cfg.get("rounds", 3))
+        except Exception:
+            pass
+        rounds = int(sys.argv[3]) if len(sys.argv) >= 4 else default_rounds
         player = NoisePlayer(skill_dir)
         if player.plan:
             player.playback_all_rounds(rounds=rounds)

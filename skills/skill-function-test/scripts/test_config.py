@@ -186,7 +186,7 @@ def format_config(cfg: dict) -> str:
         icon = "✅" if v.get("enabled", True) else "❌"
         lines.append(f"    {icon} {k}")
     lines.append("")
-    lines.append("  ── S4 执行忠实度测试（正反交叉）──")
+    lines.append("  ── S4 执行忠实度测试（LLM编写用例）──")
     s4 = cfg.get("s4", {})
     s4_icon = "✅" if s4.get("enabled", False) else "❌"
     s4_rounds = s4.get("rounds", cfg.get("rounds", 3))
@@ -224,7 +224,7 @@ INTERACTIVE_HELP = """
   cfg rounds N                  — 设置全局轮数（1-5）
   cfg fix_mode scenario <0|1>   — 场景修复模式（0=仅报告 1=尝试修复）
   cfg fix_mode function <0|1|2> — 功能修复模式（0=仅报告 1=直接 2=询问）
-  cfg s4 on/off                 — 开启/关闭 S4 执行忠实度测试
+  cfg s4 on/off                 — 开启/关闭 S4（LLM编写噪声方案）
   cfg s4 rounds N               — 设置 S4 独立轮数
   cfg s4 fix <0|1>              — S4 修复模式（0=仅报告 1=尝试修复）
   cfg <dim> on/off              — 开启/关闭某个维度（如 S1, D2 等）
@@ -368,15 +368,18 @@ def render_html(cfg: dict) -> str:
     fm = cfg.get("fix_mode", {})
     scenario_fm = fm.get("scenario", 0)
     function_fm = fm.get("function", 0)
+    s4_fm = cfg.get("s4", {}).get("fix_mode", 0)
+    s4_fm_label = {0:"仅报告", 1:"尝试修复"}.get(s4_fm, "仅报告")
 
     # 构建各维度开关状态
+    s_labels = {"S1": "场景触发测试（LLM编写用例）", "S2": "核心能力测试（LLM编写用例）", "S3": "工作流测试（LLM编写用例）"}
     scenarios_checks = ""
     for k in ["S1", "S2", "S3"]:
         enabled = cfg.get("scenarios", {}).get(k, {}).get("enabled", True)
         checked = "checked" if enabled else ""
         scenarios_checks += f"""
             <label class="toggle-row">
-              <span>{k} 场景链路完整性</span>
+              <span>{k} {s_labels[k]}</span>
               <input type="checkbox" id="{k}" {checked} data-group="scenarios">
               <span class="slider"></span>
             </label>"""
@@ -476,11 +479,11 @@ def render_html(cfg: dict) -> str:
     <div class="section-title">轮数</div>
     <div class="param-row">
       <span>场景/功能测试轮数 <span class="badge">S1-S3 / D1-D6</span></span>
-      <input type="number" id="rounds" value="{rounds}" min="1" max="5">
+      <input type="number" id="rounds" value="{rounds}" min="1">
     </div>
     <div class="param-row">
       <span>S4 独立轮数 <span class="badge">覆盖默认轮数</span></span>
-      <input type="number" id="s4_rounds" value="{s4_rounds}" min="1" max="5">
+      <input type="number" id="s4_rounds" value="{s4_rounds}" min="1">
     </div>
   </div>
 
@@ -498,14 +501,6 @@ def render_html(cfg: dict) -> str:
       <select id="fix_function">
         <option value="0" {"selected" if function_fm==0 else ""}>0 - 仅报告</option>
         <option value="1" {"selected" if function_fm==1 else ""}>1 - 直接修复</option>
-        <option value="2" {"selected" if function_fm==2 else ""}>2 - 询问后修复</option>
-      </select>
-    </div>
-    <div class="param-row">
-      <span>S4 执行忠实度 <span class="badge">结构性修复</span></span>
-      <select id="fix_s4">
-        <option value="0" {"selected" if s4_fm==0 else ""}>0 - 仅报告</option>
-        <option value="1" {"selected" if s4_fm==1 else ""}>1 - 尝试修复</option>
       </select>
     </div>
   </div>
@@ -521,7 +516,7 @@ def render_html(cfg: dict) -> str:
   </div>
 
   <div class="section">
-    <div class="section-title">S4 执行忠实度测试（正反交叉）</div>
+    <div class="section-title">S4 执行忠实度测试（LLM编写用例）</div>
     <label class="toggle-row">
       <span>S4 执行忠实度 <span class="badge">仅报告</span></span>
       <input type="checkbox" id="S4" {"checked" if s4_enabled=="true" else ""}>
@@ -556,7 +551,7 @@ function collectConfig() {{
     s4: {{
       enabled: document.getElementById('S4').checked,
       rounds: parseInt(document.getElementById('s4_rounds').value) || 3,
-      fix_mode: parseInt(document.getElementById('fix_s4').value) || 0,
+      fix_mode: 0,
     }},
     scenarios: {{
       S1: {{ enabled: document.getElementById('S1').checked }},
@@ -614,8 +609,8 @@ function finishSetup() {{
 }}
 
 function setUI(cfg) {{
-  document.getElementById('rounds').value = cfg.rounds || 3;
-  document.getElementById('s4_rounds').value = (cfg.s4 && cfg.s4.rounds) || 3;
+  document.getElementById('rounds').value = cfg.rounds || {rounds};
+  document.getElementById('s4_rounds').value = (cfg.s4 && cfg.s4.rounds) || {s4_rounds};
   document.getElementById('fix_scenario').value = (cfg.fix_mode && cfg.fix_mode.scenario) || 0;
   document.getElementById('fix_function').value = (cfg.fix_mode && cfg.fix_mode.function) || 0;
   document.getElementById('S4').checked = cfg.s4 ? cfg.s4.enabled : true;
@@ -628,9 +623,9 @@ function setUI(cfg) {{
 function resetUI() {{
   var def = {{
     version: "0.1.0",
-    rounds: 3,
+    rounds: {rounds},
     fix_mode: {{ scenario: 0, function: 0 }},
-    s4: {{ enabled: true, rounds: 3 }},
+    s4: {{ enabled: true, rounds: {s4_rounds} }},
     scenarios: {{ S1:{{enabled:true}}, S2:{{enabled:true}}, S3:{{enabled:true}} }},
     functions: {{ D1:{{enabled:true}}, D2:{{enabled:true}}, D3:{{enabled:true}}, D4:{{enabled:true}}, D5:{{enabled:true}}, D6:{{enabled:true}} }},
   }};
@@ -747,15 +742,18 @@ def find_available_port(start=8080, end=8999):
 
 def start_server(skill_dir: str):
     """启动 HTTP 配置服务器（自动重试端口）"""
-    from test_config import render_html
+    # 兼容两种调用模式
+    try:
+        from test_config import render_html
+    except ModuleNotFoundError:
+        from scripts.test_config import render_html
 
-    # 确保 HTML 存在
+    # 总是用最新配置重新生成 HTML（现有 HTML 是静态快照，不和最新配置同步）
     html_file = os.path.join(os.path.dirname(__file__), "test_config.html")
-    if not os.path.exists(html_file):
-        cfg = load_config(skill_dir)
-        html_content = render_html(cfg)
-        with open(html_file, "w", encoding="utf-8") as f:
-            f.write(html_content)
+    cfg = load_config(skill_dir)
+    html_content = render_html(cfg)
+    with open(html_file, "w", encoding="utf-8") as f:
+        f.write(html_content)
 
     # 注入路径到 handler
     ConfigHandler.skill_dir = skill_dir

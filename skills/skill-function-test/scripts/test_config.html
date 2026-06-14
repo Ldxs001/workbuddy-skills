@@ -80,11 +80,11 @@
     <div class="section-title">轮数</div>
     <div class="param-row">
       <span>场景/功能测试轮数 <span class="badge">S1-S3 / D1-D6</span></span>
-      <input type="number" id="rounds" value="3" min="1" max="5">
+      <input type="number" id="rounds" value="3" min="1">
     </div>
     <div class="param-row">
       <span>S4 独立轮数 <span class="badge">覆盖默认轮数</span></span>
-      <input type="number" id="s4_rounds" value="3" min="1" max="5">
+      <input type="number" id="s4_rounds" value="3" min="1">
     </div>
   </div>
 
@@ -102,12 +102,7 @@
       <select id="fix_function">
         <option value="0" selected>0 - 仅报告</option>
         <option value="1" >1 - 直接修复</option>
-        <option value="2" >2 - 询问后修复</option>
       </select>
-    </div>
-    <div class="param-row" style="color:#94a3b8;">
-      <span>S4 执行忠实度 <span class="badge">固定</span></span>
-      <span style="font-size:13px;">仅报告（不可修改）</span>
     </div>
   </div>
 
@@ -115,17 +110,17 @@
     <div class="section-title">场景测试</div>
     
             <label class="toggle-row">
-              <span>S1 场景链路完整性</span>
+              <span>S1 场景触发测试（LLM编写用例）</span>
               <input type="checkbox" id="S1" checked data-group="scenarios">
               <span class="slider"></span>
             </label>
             <label class="toggle-row">
-              <span>S2 场景链路完整性</span>
+              <span>S2 核心能力测试（LLM编写用例）</span>
               <input type="checkbox" id="S2" checked data-group="scenarios">
               <span class="slider"></span>
             </label>
             <label class="toggle-row">
-              <span>S3 场景链路完整性</span>
+              <span>S3 工作流测试（LLM编写用例）</span>
               <input type="checkbox" id="S3" checked data-group="scenarios">
               <span class="slider"></span>
             </label>
@@ -167,7 +162,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">S4 执行忠实度测试（正反交叉）</div>
+    <div class="section-title">S4 执行忠实度测试（LLM编写用例）</div>
     <label class="toggle-row">
       <span>S4 执行忠实度 <span class="badge">仅报告</span></span>
       <input type="checkbox" id="S4" checked>
@@ -202,6 +197,7 @@ function collectConfig() {
     s4: {
       enabled: document.getElementById('S4').checked,
       rounds: parseInt(document.getElementById('s4_rounds').value) || 3,
+      fix_mode: 0,
     },
     scenarios: {
       S1: { enabled: document.getElementById('S1').checked },

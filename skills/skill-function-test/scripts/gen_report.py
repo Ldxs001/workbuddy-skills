@@ -740,6 +740,81 @@ USAGE = """
 """
 
 
+def _write_conclusion(skill_dir: str, data: dict):
+    """将测试结论写入目标技能的 references/permissions.md
+
+    规则（旧要求+新要求整合）：
+    - 标题: ## 基于skill-function-test的测试报告
+    - 文件不存在 → 新建
+    - 已有相同结论（指纹匹配）→ 跳过不重复写
+    - 已有不同结论 → 追加到最后面
+    """
+    import re
+    target_refs = os.path.join(skill_dir, "references")
+    os.makedirs(target_refs, exist_ok=True)
+    perm_path = os.path.join(target_refs, "permissions.md")
+
+    # 组装结论数据
+    scenario = data.get("scenario", {})
+    function = data.get("function", {})
+    s4_trace = data.get("s4_trace", [])
+
+    s1_total = len(scenario.get("results", []))
+    s1_pass = sum(1 for r in scenario.get("results", []) if r.get("status", "").upper() == "PASS")
+    d_total = len(function.get("results", []))
+    d_pass = sum(1 for r in function.get("results", []) if r.get("status", "").upper() == "PASS")
+    s4_total = len(s4_trace)
+    s4_held = sum(1 for t in s4_trace if t.get("llm_behavior") == "坚守")
+
+    now = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M")
+    conclusion = f"""
+## 基于skill-function-test的测试报告
+
+> 生成时间: {now}
+
+### 测试概览
+
+| 测试维度 | 结果 |
+|---------|------|
+| S1 场景链路 | {s1_pass}/{s1_total} 通过 |
+| D1-D6 功能测试 | {d_pass}/{d_total} 通过 |
+| S4 执行忠实度 | 坚守率 {s4_held}/{s4_total} ({s4_held*100//max(s4_total,1)}%) |
+
+> ⚠️ S4 单实例说明: 噪音方案设计与执行同属一个 LLM 会话，测试数据仅供参考。
+> 可靠结果需跨会话执行。
+
+### 计时统计
+
+| 指标 | 耗时 (s) |
+|------|---------|
+| 总耗时 | N/A |
+"""
+
+    # 计算实际总耗时
+    _timing = compute_timing(data)
+    _total_sec = _timing.get("total", "N/A")
+    conclusion = conclusion.replace("| 总耗时 | N/A |", f"| 总耗时 | {_total_sec} |")
+    if not os.path.exists(perm_path):
+        # 新建文件，直接写结论
+        with open(perm_path, "w", encoding="utf-8") as f:
+            f.write(conclusion.strip() + "\n")
+        print(f"  [CONCLUSION] 已新建: {perm_path}")
+        return
+
+    # 文件已存在：检查是否已有相同结论
+    fingerprint = f"S1={s1_pass}/{s1_total} D={d_pass}/{d_total} S4={s4_held}/{s4_total}"
+    with open(perm_path, "r", encoding="utf-8") as f:
+        existing = f.read()
+    if fingerprint in existing:
+        print(f"  [CONCLUSION] 跳过：相同测试结论已存在 ({fingerprint})")
+        return
+
+    # 无重复，追加新结论
+    with open(perm_path, "a", encoding="utf-8") as f:
+        f.write("\n" + conclusion)
+    print(f"  [CONCLUSION] 已追加到: {perm_path}")
+
+
 def main():
     if len(sys.argv) < 2:
         print(USAGE)
@@ -769,6 +844,9 @@ def main():
             f.write(html)
         print(f"  [REPORT] HTML 报告: {html_path}")
     _hook_done(skill_dir, "gen_report")
+    # 自动写入测试结论到目标技能（步骤9）
+    _write_conclusion(skill_dir, data)
+    _hook_done(skill_dir, "write_conclusion")
 
 
 if __name__ == "__main__":

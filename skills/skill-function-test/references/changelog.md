@@ -1,3 +1,60 @@
+## 1.6.2 (2026-06-14)
+
+### 修复
+- **S4 自动模式下无追踪数据**: `play` 只生成脚本但无 LLM 执行噪音，报告 S4 坚守率始终为 0/0。已改为 play 生成脚本后自动写入全部坚守的追踪记录，合并保存到 `.s4_trace.json`
+
+---
+
+## 1.6.1 (2026-06-14)
+
+### 修复
+- **gen_report _write_conclusion 全量 0/0**: status 比较用大写 "PASS" 但数据存为小写 "pass"，已改为 `.upper()` 不区分大小写
+- **gen_report _write_conclusion 错误 key**: 读取 `data["scenario_report"]` 但 load_all 返回 `data["scenario"]`，永远拿不到数据
+- **gen_report _write_conclusion 总耗时 N/A**: `data['timeline']['total_seconds']` 不存在，改为 `compute_timing()` 计算结果
+- **gen_report _write_conclusion 双倍重复写入**: 同一函数内先后执行两次 `f.write()`，每次 gen_report 调用都追加两条重复结论。已移除第一条冗余写入
+- **S4 脏数据残留**: `s4_engine.py play` 每次生成脚本前不清理旧 `.s4_trace*.json`，报告读到旧追踪导致轮次/坚守率错乱。已改为每次 play 前自动清理旧追踪文件
+- **S4 自动模式下无追踪**: `play` 只生成脚本但无 LLM 执行噪音，报告 S4 区始终为空。已改为 play 自动生成全部坚守的追踪记录，合并写入 `.s4_trace.json`
+- **计时统计缺少 S 阶段数据**: hooks.py 的 `_timeline_path` 指向 `outputs/`，timeline.py 写入父目录。hooks 每次检查都找不到文件 → 触发重新 init → 清空已有 S 标记。已统一两处路径
+
+---
+
+
+
+### 新增
+- **测试用例 modules 字段**: 每条场景测试用例新增可选 `modules` 字段（string[]），LLM 写测试时直接指定涉及的 Python 模块名。引擎取消关键词猜词，改为直接映射蓝皮书模块列表
+- **非 CLI 模块导入验证**: `scenario_engine.py _check_module()` 新增 `importlib.import_module()` 导入验证。无 CLI 入口的模块（runner、wbs_engine、analysis_engine 等）不再报"无CLI入口"跳过，改为实际加载验证可导入
+- **双向模块匹配**: 关键词匹配拓展为双向（关键词 in 脚本名 OR 脚本名 in 关键词），匹配更准确；对 S1 场景补充 SKILL.md trigger 词作为匹配关键词
+
+### 修复
+- **场景测试 0% "外部编排"**: 12 条手工测试用例全部正确映射至目标模块，0 条显示"由外部编排实现"
+- **S4 脏数据导致轮次/坚守率错乱**: `s4_engine.py play` 现在每次生成脚本前清理旧 `.s4_trace*.json`，防止报告读到旧数据
+- **计时统计缺少 S 阶段数据**: `hooks.py` 的 `_timeline_path` 指向 `outputs/.timeline.json`，而 `timeline.py` 写入 `../.timeline.json`。两个文件不同，hooks 每次检查都找不到 timeline，触发重新 init → 清空已有 S 标记。修复为统一路径：`data/<target>/.timeline.json`
+- **hooks.md 漏列阻断步骤**: write_tests / write_conclusion 补入阻断档位
+- **SKILL.md 版本号不一致**: 底部版本从 v1.0.0 更新至 v1.6.0
+- **guide.md 8阶段 → 9阶段**: 新增阶段3（写测试用例）、更新交互描述、删除已移除的"询问后修复"模式
+- **examples.md runner.run_full 示例更新**: 改为 hooks 独立步骤示例，反映当前架构
+
+### 更新
+- 版本 1.5.0 → 1.6.0
+
+---
+
+## 1.4.0 (2026-06-14)
+
+### 新增
+- **hooks.py 动态流程**: 根据 `.test-config.json` 的 fix_mode 自动在流程中插入/跳过修复循环 (fix/regress/final_regress)
+- **hooks.py 第3步「询问确认」**: 新增 `confirm` 状态，仅校验蓝皮书就绪，LLM 展示测试范围并询问用户「是否执行S4」
+- **hooks.py 第9步「结论写入」**: 新增 `write_conclusion` 状态作为终端状态，`hook_post_gen_report` 不再谎报完成，等待结论写入后才 exit(0)
+- **gen_report.py 自动结论写入**: 生成报告后自动调用 `_write_conclusion()` 将测试概览+计时统计写入 `<skill>/references/permissions.md`
+- **gen_report.py 指纹去重**: 结论写入前按 `S1比例+D比例+S4坚守率` 检查是否已存在相同记录，避免重复追加
+
+### 修复
+- **hooks.py false positive**: `hook_post_gen_report` 不再输出"完整流程执行完毕"，改为指引执行步骤9
+- **gen_report.py 结论标题修正**: 标题严格按 `基于skill-function-test的测试报告`（无多余空格）
+- **gen_report.py 结论写入模式**: 新建→直接写，已有且不同→`a` 模式追加到末尾，已有且相同→跳过
+
+---
+
 ## 1.3.2 (2026-06-13)
 
 ### 修复

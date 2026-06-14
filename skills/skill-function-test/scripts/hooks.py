@@ -83,7 +83,7 @@ def _run_py_step(cmd_args: list[str], label: str) -> bool:
 # ═══════════════════════════════════════════════════════
 
 def _timeline_path(skill_dir: str) -> str:
-    return os.path.join(_data_dir(skill_dir), ".timeline.json")
+    return os.path.join(DATA_DIR, os.path.basename(os.path.abspath(skill_dir)), ".timeline.json")
 
 def _bp_json_path(skill_dir: str) -> str:
     """蓝皮书 JSON（inspector 输出名带 function 前缀）"""
@@ -156,35 +156,18 @@ def hook_pre_scenario(skill_dir: str):
         ):
             _block("蓝皮书扫描失败", f"python {insp_script} {skill_dir}")
 
-    # LLM 必须在调用此脚本前已写好测试用例 → 检查是否有测试计划
-    bp_data = {}
-    bp_path = bp_json if os.path.exists(bp_json) else bp_legacy
-    if os.path.exists(bp_path):
-        try:
-            with open(bp_path, "r", encoding="utf-8") as f:
-                bp_data = json.load(f)
-        except Exception:
-            pass
-    has_scripts = bool(bp_data.get("cli_scripts", []))
-    if not has_scripts:
-        _block(
-            "场景测试前置: 未检测到可测试的 CLI 脚本",
-            "请先阅读蓝皮书输出，确认目标技能有可测试的 CLI 入口，"
-            "或确认是否需要执行场景测试",
-        )
-    _pass("场景测试 — 蓝皮书 + CLI 脚本已就绪")
-
-    # ── 校验: LLM 是否已在蓝皮书基础上确认测试计划 ──
-    test_config = os.path.join(skill_dir, ".test-config.json")
-    if not os.path.exists(test_config):
-        _block(
-            "场景测试前置: 测试配置未确认",
-            "请先基于蓝皮书分析确认测试范围:\n"
-            f"  1. 阅读蓝皮书中的 CLI 脚本清单和函数清单\n"
-            f"  2. 确定要测试的维度 (S1/S2/S3, D1-D6)\n"
-            f"  3. 运行 cfg 命令或写入 .test-config.json\n"
-            f"  或直接执行: python {os.path.join(_SCRIPT_DIR, 'scenario_engine.py')} {skill_dir}",
-        )
+    # 从配置读取启用的场景维度
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    enabled_scenarios = {"S1": True, "S2": True, "S3": True}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        for k in ["S1", "S2", "S3"]:
+            enabled_scenarios[k] = cfg.get("scenarios", {}).get(k, {}).get("enabled", True)
+    except Exception:
+        pass
+    active = [k for k, v in enabled_scenarios.items() if v]
+    _pass(f"场景测试 — 启用维度: {', '.join(active) if active else '无'}")
 
 
 def hook_pre_function_test(skill_dir: str):
@@ -200,23 +183,37 @@ def hook_pre_function_test(skill_dir: str):
             f"自动蓝皮书扫描 {_skill_name(skill_dir)}",
         ):
             _block("蓝皮书扫描失败", f"python {insp_script} {skill_dir}")
-    _pass("功能测试 — 蓝皮书已就绪")
 
-    # ── 校验: LLM 是否已在蓝皮书基础上确认测试计划 ──
-    test_config = os.path.join(skill_dir, ".test-config.json")
-    if not os.path.exists(test_config):
-        _block(
-            "功能测试前置: 测试配置未确认",
-            "请先基于蓝皮书分析确认测试范围:\n"
-            f"  1. 阅读蓝皮书中的函数清单\n"
-            f"  2. 确定要测试的维度 (D1-D6)\n"
-            f"  3. 写入 .test-config.json\n"
-            f"  或直接执行: python {os.path.join(_SCRIPT_DIR, 'test_engine.py')} {skill_dir}",
-        )
+    # 从配置读取启用的功能维度
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    enabled_funcs = {"D1": True, "D2": True, "D3": True, "D4": True, "D5": True, "D6": True}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        for k in enabled_funcs:
+            enabled_funcs[k] = cfg.get("functions", {}).get(k, {}).get("enabled", True)
+    except Exception:
+        pass
+    active = [k for k, v in enabled_funcs.items() if v]
+    _pass(f"功能测试 — 启用维度: {', '.join(active) if active else '无'}")
 
 
 def hook_pre_s4(skill_dir: str):
-    """S4 测试前：至少有一种测试报告 ← 没有则阻断指引"""
+    """S4 测试前：检查配置中 S4 是否开启"""
+    # 检查配置中 S4 是否启用
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    s4_enabled = True  # 默认开启
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        s4_enabled = cfg.get("s4", {}).get("enabled", True)
+    except Exception:
+        pass
+
+    if not s4_enabled:
+        print(f"  [HOOK] S4 已关闭 (s4.enabled=false)，跳过")
+        _mark_done(skill_dir, "s4")
+        return
     has_scenario = os.path.exists(_scenario_report_path(skill_dir))
     has_func = os.path.exists(_func_report_path(skill_dir))
 
@@ -247,6 +244,58 @@ def hook_pre_s4(skill_dir: str):
         _pass(f"S4 — 噪音方案已就绪 ({len(plan) if isinstance(plan, list) else '?'} 条)")
     except Exception:
         _block("S4 前置: 噪音方案 JSON 解析失败", "请修复 .s4_noise_plan.json 格式")
+
+
+def hook_pre_fix(skill_dir: str):
+    """自动修复前：检查 fix_mode 配置"""
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    need_fix = False
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        fm = cfg.get("fix_mode", {})
+        need_fix = fm.get("scenario", 0) == 1 or fm.get("function", 0) == 1
+    except Exception:
+        pass
+    if not need_fix:
+        print(f"  [HOOK] fix_mode 未启用，跳过修复步骤")
+        _mark_done(skill_dir, "fix")
+        _mark_done(skill_dir, "regress")
+        _mark_done(skill_dir, "final_regress")
+        return
+    _pass("自动修复 — 开始基于测试结果修复")
+    _mark_done(skill_dir, "fix")
+
+
+def hook_post_fix(skill_dir: str):
+    """修复完成 → 指引回归确认"""
+    print(f"  [HOOK] >> 修复完成。请执行回归确认。")
+
+
+def hook_pre_regress(skill_dir: str):
+    """回归确认前：修复已完成"""
+    state_path = _flow_state_path(skill_dir)
+    state = {}
+    if os.path.exists(state_path):
+        with open(state_path, "r") as f:
+            state = json.load(f)
+    if not state.get("steps", {}).get("fix", {}).get("done"):
+        _block("回归确认前置: 修复尚未完成", "请先执行修复步骤")
+    _pass("回归确认 — 修复已完成")
+    _mark_done(skill_dir, "regress")
+
+
+def hook_pre_final_regress(skill_dir: str):
+    """最终回归确认前：回归已完成"""
+    state_path = _flow_state_path(skill_dir)
+    state = {}
+    if os.path.exists(state_path):
+        with open(state_path, "r") as f:
+            state = json.load(f)
+    if not state.get("steps", {}).get("regress", {}).get("done"):
+        _block("最终回归前置: 回归尚未完成", "请先执行回归确认")
+    _pass("最终回归确认 — 回归已完成")
+    _mark_done(skill_dir, "final_regress")
 
 
 def hook_pre_gen_report(skill_dir: str):
@@ -315,26 +364,93 @@ def hook_post_scenario(skill_dir: str):
 
 
 def hook_post_function_test(skill_dir: str):
-    """功能测试完成 → 指引 LLM 下一步"""
+    """功能测试完成 → 如果 S4 已关闭，自动生成报告"""
     _mark_done(skill_dir, "function_test")
-    print()
-    print(f"  [HOOK] >> 功能测试完成。请审查结果。")
-    print(f"  [HOOK] >> 审查后可按需进行:")
-    print(f"  [HOOK] >>   - 场景测试: python {os.path.join(_SCRIPT_DIR, 'scenario_engine.py')} {skill_dir}")
-    print(f"  [HOOK] >>   - S4 测试:  python {os.path.join(_SCRIPT_DIR, 's4_engine.py')} {skill_dir} scope")
-    print(f"  [HOOK] >>   - 生成报告: python {os.path.join(_SCRIPT_DIR, 'gen_report.py')} {skill_dir}")
+    # 检查 S4 是否已关闭，关闭则直接自动出报告
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    s4_enabled = True
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        s4_enabled = cfg.get("s4", {}).get("enabled", True)
+    except Exception:
+        pass
+    if not s4_enabled:
+        print(f"  [HOOK] >> S4 已关闭，自动生成报告...")
+        _run_py_step(
+            [sys.executable, os.path.join(_SCRIPT_DIR, "gen_report.py"), skill_dir],
+            "自动生成报告",
+        )
 
 
 def hook_post_s4(skill_dir: str):
     _mark_done(skill_dir, "s4")
-    print(f"  [HOOK] >> S4 完成。生成报告: python {os.path.join(_SCRIPT_DIR, 'gen_report.py')} {skill_dir}")
+    print(f"  [HOOK] >> S4 完成，自动生成报告...")
+    _run_py_step(
+        [sys.executable, os.path.join(_SCRIPT_DIR, "gen_report.py"), skill_dir],
+        "自动生成报告",
+    )
 
 
 def hook_post_gen_report(skill_dir: str):
     """报告生成完成 → 清理目标技能根目录的测试残留 + 指引"""
     _mark_done(skill_dir, "report")
     _clean_skill_root(skill_dir, strict=True)
-    print(f"  [HOOK] >> 报告已生成（数据目录），完整流程执行完毕。")
+    print(f"  [HOOK] >> 报告已生成。需继续执行步骤9：测试结论写入目标技能。")
+    print(f"  请执行: python {os.path.join(_SCRIPT_DIR, 'gen_report.py')} {skill_dir} --write-conclusion")
+
+
+def hook_pre_write_conclusion(skill_dir: str):
+    """结论写入前：报告已生成"""
+    state_path = _flow_state_path(skill_dir)
+    state = {}
+    if os.path.exists(state_path):
+        with open(state_path, "r") as f:
+            state = json.load(f)
+    if not state.get("steps", {}).get("report", {}).get("done"):
+        _block("结论写入前置: 报告尚未生成", "请先生成报告: python gen_report.py <skill-dir>")
+    _pass("结论写入 — 报告已就绪")
+
+
+def hook_post_write_conclusion(skill_dir: str):
+    """结论写入完成 → 全部流程完毕（终端状态）"""
+    _mark_done(skill_dir, "write_conclusion")
+    print(f"  [HOOK] >> 测试结论已写入目标技能。全部流程完成。")
+
+
+def hook_pre_write_tests(skill_dir: str):
+    """写测试前置：蓝皮书就绪 + LLM 必须手工编写场景测试用例"""
+    hook_pre_blueprint(skill_dir)
+
+    # 检查是否已存在手工编写的测试用例
+    test_plan_path = os.path.join(_data_dir(skill_dir), ".s_test_plan.json")
+    if os.path.exists(test_plan_path):
+        try:
+            with open(test_plan_path, "r", encoding="utf-8") as f:
+                plan = json.load(f)
+            s_count = len(plan.get("S1", [])) + len(plan.get("S2", [])) + len(plan.get("S3", []))
+            if s_count >= 3:
+                _pass(f"场景测试用例已就绪 ({s_count} 条)")
+                return
+        except Exception:
+            pass
+
+    _block(
+        "写测试前置: 场景测试用例未编写",
+        "请基于目标技能的 SKILL.md 和蓝皮书，手工编写场景测试用例:\n"
+        f"  1. 阅读目标技能的 SKILL.md，理解其业务场景和能力范围\n"
+        f"  2. 阅读蓝皮书的 file_manifest.python 列表，了解全部模块名\n"
+        f"  3. 为 S1（触发场景）写真实用户触发词 + 预期行为\n"
+        f"  4. 为 S2（核心能力）写输入 + 预期输出\n"
+        f"  5. 为 S3（工作流）写多步骤链路 + 预期连贯结果\n"
+        f"  6. 每条用例建议填写 modules 字段，指定涉及的 Python 模块名（不含 .py 后缀）\n"
+        f"  7. 写入 {test_plan_path}\n"
+        f"  格式见 skill-function-test 的 references/s-test-plan-schema.md",
+    )
+
+
+def hook_post_write_tests(skill_dir: str):
+    _mark_done(skill_dir, "write_tests")
 
 
 
@@ -406,14 +522,38 @@ def cmd_status(skill_dir: str):
             state = json.load(f)
     steps = state.get("steps", {})
 
+    # 从 outputs 目录读取配置（不依赖 skill_dir 根目录，因会被清理）
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    need_fix = False
+    s4_enabled = True
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        fm = cfg.get("fix_mode", {})
+        need_fix = fm.get("scenario", 0) == 1 or fm.get("function", 0) == 1
+        s4_enabled = cfg.get("s4", {}).get("enabled", True)
+    except Exception:
+        pass
+
     flow = [
         ("init",             "初始化时间线"),
         ("backup",           "备份目标技能"),
         ("blueprint",        "蓝皮书扫描"),
+        ("write_tests",      "编写场景测试用例"),  # ← LLM 手工编写场景测试
         ("scenario",         "场景测试 (S1-S3)"),
         ("function_test",    "功能测试 (D1-D6)"),
-        ("s4",               "S4 执行忠实度"),
-        ("report",           "报告生成"),
+    ]
+    if s4_enabled:
+        flow.append(("s4", "S4 执行忠实度"))
+    if need_fix:
+        flow += [
+            ("fix",            "自动修复"),
+            ("regress",        "回归确认"),
+            ("final_regress",  "最终回归确认"),
+        ]
+    flow += [
+        ("report",           "输出报告"),
+        ("write_conclusion", "结论写入目标技能"),  # ← 新增：第9步，终端状态
     ]
 
     print("\n  ── 流程状态 ──")
@@ -446,7 +586,7 @@ def main():
         return
 
     if len(sys.argv) < 4:
-        print("请指定步骤: init | backup | blueprint | scenario | function_test | s4 | gen_report")
+        print("请指定步骤: init | backup | blueprint | write_tests | scenario | function_test | s4 | fix | regress | final_regress | gen_report | write_conclusion")
         return
 
     step = sys.argv[3]
@@ -456,10 +596,15 @@ def main():
             "init": hook_pre_init,
             "backup": hook_pre_backup,
             "blueprint": hook_pre_blueprint,
+            "write_tests": hook_pre_write_tests,
             "scenario": hook_pre_scenario,
             "function_test": hook_pre_function_test,
             "s4": hook_pre_s4,
+            "fix": hook_pre_fix,
+            "regress": hook_pre_regress,
+            "final_regress": hook_pre_final_regress,
             "gen_report": hook_pre_gen_report,
+            "write_conclusion": hook_pre_write_conclusion,
         }
         fn = pre_map.get(step)
         if fn:
@@ -473,10 +618,13 @@ def main():
             "init": hook_post_init,
             "backup": hook_post_backup,
             "blueprint": hook_post_blueprint,
+            "write_tests": hook_post_write_tests,
             "scenario": hook_post_scenario,
             "function_test": hook_post_function_test,
             "s4": hook_post_s4,
+            "fix": hook_post_fix,
             "gen_report": hook_post_gen_report,
+            "write_conclusion": hook_post_write_conclusion,
         }
         fn = post_map.get(step)
         if fn:

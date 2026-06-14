@@ -5,7 +5,7 @@
 | 档位 | 适用步骤 | 行为 |
 |------|---------|------|
 | **自动补齐** | init / backup / blueprint | 产物缺失时 Python 自动执行，LLM 不需要管 |
-| **阻断指引** | scenario / function_test / s4 / gen_report | 前置缺失时 exit(1)，明确告诉 LLM 该执行什么命令 |
+| **阻断指引** | write_tests / scenario / function_test / s4 / fix / regress / final_regress / gen_report / write_conclusion | 前置缺失时 exit(1)，明确告诉 LLM 该执行什么命令 |
 
 ## 三步校验机制
 

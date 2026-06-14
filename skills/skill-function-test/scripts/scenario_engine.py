@@ -26,6 +26,18 @@ from typing import Optional
 
 # R-12 审计锚点
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-function-test/data/"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+_SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
+DATA_DIR = os.path.normpath(os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test", "data"))
+
+
+def _data_dir_for(skill_dir: str) -> str:
+    """目标技能的数据子目录"""
+    target_name = os.path.basename(os.path.abspath(skill_dir))
+    d = os.path.join(DATA_DIR, target_name)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 # 流程钩子
 _HOOKS_SCRIPT = os.path.normpath(os.path.join(
@@ -234,8 +246,128 @@ class ScenarioRunner:
         # 解析 SKILL.md
         self.parsed_md = parse_skill_md(skill_dir)
 
-        # 自动构建测试计划
-        self.test_plan = auto_build_test_plan(self.parsed_md, blueprint)
+        # 手动场景测试用例优先，无则自动构建
+        test_plan_path = os.path.join(_data_dir_for(skill_dir), "outputs", ".s_test_plan.json")
+        if os.path.exists(test_plan_path):
+            try:
+                with open(test_plan_path, "r", encoding="utf-8") as f:
+                    manual_plan = json.load(f)
+                self.test_plan = []
+                source_map = {"S1": "trigger", "S2": "capability", "S3": "workflow"}
+                cli_scripts = self.blueprint.get("cli_scripts", [])
+                # 所有 Python 模块（含无 CLI 入口的）
+                all_modules = []
+                for p in self.blueprint.get("file_manifest", {}).get("python", []):
+                    mod_name = os.path.splitext(os.path.basename(p))[0]
+                    if mod_name not in ("__init__", "__main__"):
+                        all_modules.append({"name": mod_name, "path": p, "has_cli": False})
+                for s in cli_scripts:
+                    for m in all_modules:
+                        if m["name"] == s["name"]:
+                            m["has_cli"] = True
+                            break
+                matched_count = 0
+                module_matched_count = 0
+                # 构建模块名 → all_modules 的快速查找
+                mod_name_to_entry = {m["name"]: m for m in all_modules}
+                for s_type, items in manual_plan.items():
+                    mapped = source_map.get(s_type, s_type.lower())
+                    for item in items:
+                        item["source"] = mapped
+                        item["scene"] = item.get("name", item.get("trigger", "?"))
+                        # ★ 如果测试用例写了 modules 字段，直接用它映射
+                        specified = item.get("modules", [])
+                        if specified:
+                            matched_cli = []
+                            has_non_cli = False
+                            for mod_name in specified:
+                                m_entry = mod_name_to_entry.get(mod_name)
+                                if m_entry:
+                                    if m_entry["has_cli"]:
+                                        # 从 cli_scripts 中找同名条目（带上 supports 等元信息）
+                                        for cs in cli_scripts:
+                                            if cs["name"] == mod_name:
+                                                matched_cli.append(cs)
+                                                break
+                                    else:
+                                        has_non_cli = True
+                            item["matched_scripts"] = matched_cli[:5]
+                            item["_module_matches"] = [{"name": n} for n in specified
+                                                       if n in mod_name_to_entry]
+                            if matched_cli:
+                                matched_count += 1
+                            elif has_non_cli:
+                                module_matched_count += 1
+                        else:
+                            # ★ 没有 modules 字段 → fall back 关键词匹配
+                            keywords = []
+                            for field in ("name", "trigger", "input", "expected"):
+                                val = item.get(field, "")
+                                if val:
+                                    eng = re.findall(r'[a-zA-Z_][a-zA-Z0-9_.]*', val)
+                                    keywords.extend(e.lower() for e in eng)
+                                    for seg in re.split(r'[，。、；：（）\[\]【】/\\\s]+', val):
+                                        seg = seg.strip()
+                                        if seg and (seg.isascii() or any(c.isascii() for c in seg)):
+                                            keywords.append(seg.lower())
+                            for step in item.get("steps", []):
+                                eng = re.findall(r'[a-zA-Z_][a-zA-Z0-9_.]*', step)
+                                keywords.extend(e.lower() for e in eng)
+                            if s_type == "S1":
+                                keywords.extend(self.parsed_md.get("trigger_scenes", []))
+                            keywords = sorted(set(k for k in keywords if len(k) >= 2))
+                            matched_cli = []
+                            for s in cli_scripts:
+                                sname = s["name"].lower()
+                                spath = s["path"].lower()
+                                for k in keywords:
+                                    if k in sname or k in spath or sname in k or spath in k:
+                                        matched_cli.append(s)
+                                        break
+                            item["matched_scripts"] = matched_cli[:5]
+                            if matched_cli:
+                                matched_count += 1
+                            # 额外匹配所有 Python 模块
+                            matched_mods = []
+                            for m in all_modules:
+                                mname = m["name"].lower()
+                                mpath = m["path"].lower()
+                                for k in keywords:
+                                    if k in mname or k in mpath or mname in k or mpath in k:
+                                        matched_mods.append(m)
+                                        break
+                            item["_module_matches"] = matched_mods[:5]
+                            if matched_mods and not matched_cli:
+                                module_matched_count += 1
+                        self.test_plan.append(item)
+                if self.test_plan:
+                    print(f"  [SCENARIO] 使用手工编写的场景测试计划 ({len(self.test_plan)} 条, "
+                          f"其中 {matched_count} 条匹配到 CLI 脚本"
+                          + (f", {module_matched_count} 条匹到无CLI入口模块" if module_matched_count else "")
+                          + ")")
+            except Exception as e:
+                print(f"  [SCENARIO] 加载手工测试计划失败: {e}，将使用自动构建")
+                self.test_plan = []
+
+        if not self.test_plan:
+            self.test_plan = auto_build_test_plan(self.parsed_md, blueprint)
+
+        # 从配置读取启用的场景维度，禁用的从 test_plan 中移除
+        config_path = os.path.join(_data_dir_for(skill_dir), "outputs", ".test-config.json")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            sc = cfg.get("scenarios", {})
+            enabled_dims = [k for k in ["S1", "S2", "S3"]
+                            if sc.get(k, {}).get("enabled", True)]
+            source_to_dim = {"trigger": "S1", "capability": "S2", "workflow": "S3"}
+            self.test_plan = [t for t in self.test_plan
+                              if source_to_dim.get(t["source"], "") in enabled_dims]
+            disabled = [k for k in ["S1", "S2", "S3"] if k not in enabled_dims]
+            if disabled:
+                print(f"  [SCENARIO] 禁用的场景维度: {', '.join(disabled)}")
+        except Exception:
+            pass
 
     def add(self, r: ScenarioResult):
         self.results.append(r)
@@ -292,6 +424,39 @@ class ScenarioRunner:
             return ScenarioResult(sid, f"「{test_name}」", "fail", "block",
                                    f"执行异常: {e}", script["path"])
 
+    def _check_module(self, module_name: str, test_case: dict) -> ScenarioResult:
+        """导入非 CLI 模块，验证模块可导入"""
+        import importlib
+
+        scripts_dir = os.path.join(self.skill_dir, "scripts")
+        sid = {"trigger": "S1", "capability": "S2", "workflow": "S3"}.get(
+            test_case.get("source", ""), "S?")
+
+        try:
+            old_path = list(sys.path)
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            try:
+                importlib.import_module(module_name)
+            finally:
+                sys.path = old_path
+
+            return ScenarioResult(sid, f"「{test_case.get('scene','?')}」",
+                                   "pass", "info",
+                                   f"{module_name} 导入成功")
+        except SyntaxError as e:
+            return ScenarioResult(sid, f"「{test_case.get('scene','?')}」",
+                                   "fail", "block",
+                                   f"{module_name} 语法错误: {e}")
+        except ImportError as e:
+            return ScenarioResult(sid, f"「{test_case.get('scene','?')}」",
+                                   "fail", "block",
+                                   f"{module_name} 导入失败: {e}")
+        except Exception as e:
+            return ScenarioResult(sid, f"「{test_case.get('scene','?')}」",
+                                   "fail", "warn",
+                                   f"{module_name} 异常: {e}")
+
     def _run_suite(self, tests: list[dict], sid: str, label: str):
         """通用场景执行逻辑"""
         if not tests:
@@ -299,11 +464,19 @@ class ScenarioRunner:
             return
 
         executed = 0
+        module_checked = 0
         for test in tests:
             scripts = test["matched_scripts"]
             if not scripts:
-                self.add(ScenarioResult(sid, f"{label}「{test['scene'][:40]}」", "pass", "info",
-                                         "由外部编排实现，无直接 CLI"))
+                mods = test.get("_module_matches", [])
+                if mods:
+                    for m in mods:
+                        r = self._check_module(m["name"], test)
+                        self.results.append(r)
+                        module_checked += 1
+                else:
+                    self.add(ScenarioResult(sid, f"{label}「{test['scene'][:40]}」", "pass", "info",
+                                             "由外部编排实现，无直接 CLI"))
                 continue
             for sc in scripts:
                 self._exec(sc, ["--help"],
@@ -345,7 +518,19 @@ class ScenarioRunner:
             return
         tested = set()
         for test in wf_tests:
-            for sc in test["matched_scripts"]:
+            tname = test.get("scene", test.get("name", "?"))[:40]
+            scripts = test.get("matched_scripts", [])
+            if not scripts:
+                mods = test.get("_module_matches", [])
+                if mods:
+                    for m in mods:
+                        r = self._check_module(m["name"], test)
+                        self.results.append(r)
+                else:
+                    self.add(ScenarioResult("S3", f"工作流「{tname}」", "pass", "info",
+                                             "由外部编排实现，无直接 CLI"))
+                continue
+            for sc in scripts:
                 p = sc["path"]
                 if p in tested:
                     continue

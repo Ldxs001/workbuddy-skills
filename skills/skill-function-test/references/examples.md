@@ -6,39 +6,38 @@
 
 ---
 
-## 示例 1：完整全流程测试（skill-sub）
+## 示例 1：完整全流程测试（activity-duration-estimation）
 
 ### 场景
 
-对 `skill-sub` 执行完整测试：备份→蓝皮书+全量范围→场景+功能+S4→报告
+对 `activity-duration-estimation` 执行完整测试：备份→蓝皮书→LLM编写测试用例→场景+功能+S4→报告
 
 ### 执行命令
 
 ```bash
 cd /path/to/skill-function-test
 
-python -c "
-import sys
-sys.path.insert(0, 'scripts')
-from runner import run_full
-state = run_full('/path/to/skill-sub')
-print(state.summary())
-"
+# hooks 自动引导流程
+python scripts/hooks.py check /path/to/target-skill init
+python scripts/hooks.py check /path/to/target-skill backup
+python scripts/hooks.py check /path/to/target-skill blueprint
+python scripts/hooks.py check /path/to/target-skill write_tests    # LLM 编写场景测试用例
+python scripts/scenario_engine.py /path/to/target-skill            # 场景测试
+python scripts/test_engine.py /path/to/target-skill                # 功能测试
 ```
 
 ### 预期输出摘要
 
 ```
-阶段4/8: 执行测试（场景+功能+S4）
-  [RUN] 场景测试 (S1-S3)...
-  总计: 18 | 通过: 3 | 失败: 0  | 场景结论: PASS (BLOCK=0)
+[SCENARIO] 使用手工编写的场景测试计划 (12 条, 其中 5 条匹配到 CLI 脚本, 7 条匹到无CLI入口模块)
+总计: 16 | 通过: 16 | 失败: 0 | 跳过: 0
+F-0 BLOCK: 0 | F-1 WARN: 0 | F-2 INFO: 16
 
-  [RUN] 功能测试 (D1-D6)...
-  总计: 143 | 通过: 100 | 失败: 43  | 结论: PASS (F-0 BLOCK=0)
-
-  [S4-播放器] 随机化回放引擎: 6条噪音 × 3轮
-  S4 回顾率: 12/12 (100%)
-  S4 综合分数: 100% → S (优秀)
+── 详细结果:
+  PASS  [S1] 「全流程项目估算」 — runner 导入成功
+  PASS  [S1] 「全流程项目估算」 — wbs_engine 导入成功
+  PASS  [S1] 触发场景执行汇总 — 执行了 2 个 CLI 命令
+  ...
 ```
 
 ---

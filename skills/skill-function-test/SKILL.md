@@ -1,9 +1,9 @@
 ---
 name: skill-function-test
-version: 1.3.2
+version: 1.6.2
 author: wUwproject
 license: MIT
-description: 技能场景测试套件 —— 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 + 计时+流程钩子+双格式报告 → 测试结论写入目标技能。包含 D1-D6 功能测试作为底座。
+description: 技能场景测试套件 —— 备份 → 蓝皮书 → LLM编写场景测试用例（modules字段指定目标模块）→ 场景测试（CLI执行+模块导入验证）+功能测试+S4执行忠实度 → 修复循环 → 回归确认 → 双格式报告 → 测试结论写入目标技能。设置驱动流程，钩子强制阻断。
 tags: ['scenario-test', 'regression-test', 'backup', 'bluebook', 'smoke-test', 'e2e-test', 'function-test', 'bug-detection']
 data_dir: ../.standardization/skill-function-test/data/
 external_data_dir: true
@@ -20,7 +20,7 @@ create_permissions_md: true
 ---
 # skill-function-test — 技能场景测试套件
 
-> 备份 → 蓝皮书(含全量范围) → 场景+功能+S4执行忠实度 → 修复循环 → 回归确认 → 分级报告+S4矩阵 → 计时→钩子→双格式报告 → 测试结论写入目标技能
+> 备份 → 蓝皮书 → LLM编写场景测试用例（modules字段指定目标模块）→ 场景测试（CLI执行+模块导入验证）+功能测试+S4执行忠实度 → 修复循环 → 回归确认 → 双格式报告 → 测试结论写入目标技能。设置驱动流程，钩子强制阻断。
 
 > 本技能以 **场景驱动** 为核心，同时提供功能测试、S4 执行忠实度、三级嵌套计时、流程钩子和双格式报告。
 
@@ -40,12 +40,12 @@ create_permissions_md: true
 
 ### 双轨测试体系
 
-| 轨道 | 代号 | 说明 | 检测内容 |
+| 轨道 | 代号 | 说明 | 用例来源 |
 |------|------|------|---------|
-| **S1 场景链路完整性** | scenario_chain | 从 SKILL.md 触发场景出发，构造端到端调用路径 | 触发词→核心能力→工作流程→代码实现是否完整匹配 |
-| **S2 场景输入产出匹配** | scenario_io | 每条场景的描述输入是否有对应的函数/方法实现 | 参数匹配、返回值类型、文档声明 vs 实际签名 |
-| **S3 场景数据流正确性** | scenario_flow | 场景中各步骤间的数据传递是否正确 | 函数A输出→函数B输入的类型兼容、字段名匹配 |
-| **S4 执行忠实度** | noise_fidelity | 噪音/污染下铁律坚守率 + 蓝皮书全量范围扫描 + 结构性修复 | 全量测试范围生成(蓝皮书+约束+引用+文件) → LLM推理噪音 → 噪音执行 → 复盘归因 → 引用链路/缺失文件修复 |
+| **S1 场景触发测试** | trigger | 用户触发词 → 期望触发的技能行为和输出 | **LLM手工编写**（基于技能业务场景） |
+| **S2 核心能力测试** | capability | 给定输入参数 → 期望的核心函数返回结果 | **LLM手工编写**（基于技能功能范围） |
+| **S3 工作流测试** | workflow | 多步骤流程连贯执行，各阶段数据正确传递 | **LLM手工编写**（基于完整用户流程） |
+| **S4 执行忠实度** | noise_fidelity | 噪音/污染下铁律坚守率 | **LLM编写噪声方案** |
 | **D1 基础功能完整性** | smoke | 每个核心函数能否无崩溃运行 | 语法解析、文件可读、函数存在性 |
 | **D2 流程断点检测** | breakpoint | 模块间的引用链路是否完整 | 文件引用存在、import 可达、MD 声明 vs 实际文件 |
 | **D3 数据污染检测** | contamination | 模块间是否存在数据交叉污染 | 硬编码路径、DB 路径硬编码、全局变量冲突 |
@@ -105,22 +105,22 @@ create_permissions_md: true
 
 ## 测试配置系统
 
-测试行为由 `.test-config.json` 控制（持久化在目标技能目录），而非代码硬编码。
+测试行为由 `.test-config.json` 控制（持久化在数据目录 `outputs/` 下）。
 配置文件决定：哪些维度跑、跑几轮、修复模式、S4 是否执行。
+**设置决定流程，流程决定钩子——LLM 无法跳过任何被配置启用的步骤。**
 
 ### 对话交互
 
 ```
 cfg show                      — 查看配置
-cfg rounds <N>                — 配置轮数（1-5）
+cfg rounds <N>                — 配置轮数
 cfg fix_mode scenario <0|1>   — 场景修复（0=仅报告 1=尝试修复）
-cfg fix_mode function <0|1|2> — 功能修复（0=仅报告 1=直接 2=询问）
-cfg s4 on/off                 — 开启/关闭 S4
+cfg fix_mode function <0|1>   — 功能修复（0=仅报告 1=直接修复）
+cfg s4 on/off                 — 开启/关闭 S4（LLM编写噪声方案）
 cfg s4 rounds <N>             — S4 独立轮数
-cfg s4 fix <0|1>              — S4 修复模式（0=仅报告 1=尝试修复）
 cfg s4 pf <0.0-1.0>           — 正向权重
 cfg s4 nf <0.0-1.0>           — 反向权重
-cfg <dim> on/off              — 开关某个维度
+cfg <dim> on/off              — 开关某个维度（S1/S2/S3/D1-D6）
 cfg reset                     — 重置默认
 cfg server                    — 启动 HTML 配置界面
 ```
@@ -132,21 +132,21 @@ cfg server                    — 启动 HTML 配置界面
 
 ## 工作流程
 
-**8 阶段标准流程（严格按顺序执行，S4 嵌入阶段2/4/8）：**
+**11 阶段标准流程（严格按顺序执行，配置驱动钩子阻断）：**
 
-**前置：初始化时间线** — `python scripts/timeline.py init <skill-dir>` (工作流开始时执行一次，hooks 自动补齐)
+**前置：初始化时间线** — `python scripts/timeline.py init <skill-dir>` (hooks 自动补齐)
 
-1. **备份** — 对目标技能完整目录做时间戳备份，记录备份路径（hooks 自动补齐）
-2. **蓝皮书扫描 + 约束提取 + 全量测试范围** — 扫描文件清单 + AST 函数签名 + 引用链路 + SKILL.md 场景解析 + **约束提取 + 全量测试范围生成**（hooks 自动补齐）
-3. **询问模式** — 展示场景摘要 + 测试范围 → 用户选择测试范围 + 修复策略。LLM 基于蓝皮书分析后写入 `.test-config.json`（hooks 中间钩校验）
-4. **场景+功能+S4 执行忠实度测试** — 先执行 S1-S3 场景测试，再执行 D1-D6 功能测试，最后执行 **S4 执行忠实度测试**（阶段B/C/D/E：LLM推理层 → 噪音方案(.s4_noise_plan.json，hooks 中间钩校验≥3条) → 随机化回放 → 噪音执行 → 结构性修复 → 复盘归因）
-5. **修复/报告** — 根据模式：直接修复→执行修复（`fixer.py` 自动写入 `.fix-record.json`）→跳第6步；询问模式→输报告等人确认
-6. **修复→回归循环** — 修复后重新执行全量测试，确认 F-0 不增、已有通过项不退步；循环直到无新 F-0 出现
-7. **最终回归确认** — 完整场景+功能测试一遍，与备份前的基线对比：无功能损伤
-8. **输出报告** — `python scripts/gen_report.py <skill-dir>` 生成 HTML + Markdown 双格式报告。分级报告 + 修复记录 + 回归对比表 + **S4 坚守率矩阵** + 计时分析
-9. **测试结论写入目标技能** — 将测试概览和计时统计（不含单步耗时细目）写入 `<skill>/references/permissions.md`（标题为`基于skill-function-test的测试报告`）。已有则追加到末尾，没有则创建文件/目录。
+1. **备份** — 对目标技能完整 ZIP 备份（hooks 自动补齐）
+2. **蓝皮书扫描 + 约束提取** — 扫描文件清单 + AST 签名 + 引用链路 + SKILL.md 场景解析 + 约束提取（hooks 自动补齐）
+3. **LLM编写场景测试用例** — LLM 基于目标技能的 SKILL.md 和蓝皮书，编写 S1-S3 测试用例（`.s_test_plan.json`）。**每条用例建议填写 `modules` 字段指定目标模块**。hooks 阻断，不写完不放行。
+4. **场景测试（S1-S3）** — 对每条用例，有 CLI 入口的执行 `--help` 验证；无 CLI 入口的用 `importlib` 导入验证模块可加载。配置决定哪些维度跑
+5. **功能测试（D1-D6）** — AST 级代码扫描：语法检查、引用链路、污染检测等
+6. **S4 执行忠实度（可选）** — LLM 编写噪声方案（`.s4_noise_plan.json`），随机化回放 N 轮，测铁律坚守率
+7. **修复循环（可选）** — 仅当 `fix_mode` 开启时执行：自动修复 → 回归测试 → 确认 F-0 不增 → 最终回归；关闭时自动跳过
+8. **输出报告** — `python scripts/gen_report.py <skill-dir>` 生成 HTML + Markdown 双格式报告 + S4 坚守率矩阵
+9. **自动写入测试结论** — gen_report 自动将测试概览写入 `<skill>/references/permissions.md`，标题`基于skill-function-test的测试报告`。存在则追加，相同数据指纹跳过
 
-**后置：生成时间线验证报告** — `python scripts/timeline.py report <skill-dir> --validate`
+> 🔒 **约束**：步骤 3（编写测试用例）、步骤 8（输出报告）、步骤 9（结论写入）由 hooks 强制阻断，LLM 无法跳过。
 
 > 
 
@@ -164,26 +164,24 @@ cfg server                    — 启动 HTML 配置界面
 # 查看流程状态
 python scripts/hooks.py status /path/to/target-skill
 
-# 完整场景测试
-python scripts/scenario_engine.py /path/to/target-skill
+# 全流程（hooks 逐级阻断引导，LLM 按步骤执行）
+python scripts/hooks.py check /path/to/target-skill init      # 初始化
+python scripts/hooks.py check /path/to/target-skill write_tests  # 编写场景测试用例
+python scripts/scenario_engine.py /path/to/target-skill       # 场景测试
+python scripts/test_engine.py /path/to/target-skill           # 功能测试
+python scripts/s4_engine.py /path/to/target-skill scope       # S4 扫描
+python scripts/s4_engine.py /path/to/target-skill play        # S4 回放
+python scripts/gen_report.py /path/to/target-skill            # 生成报告（含自动结论写入）
 
-# 仅功能测试（快速模式）
-python scripts/test_engine.py /path/to/target-skill
+# S4 噪音方案编写 → 校验 → 回放
+python scripts/s4_engine.py /path/to/target-skill scope       # 全量范围扫描
+python scripts/s4_engine.py /path/to/target-skill validate <json>  # 校验噪音方案
+python scripts/s4_engine.py /path/to/target-skill play        # 随机化回放（默认3轮）
 
-# S4 全量测试范围扫描
-python scripts/s4_engine.py /path/to/target-skill scope
-
-# S4 结构性修复（引用链路断裂、缺失文件）
-python scripts/s4_engine.py /path/to/target-skill repair
-python scripts/s4_engine.py /path/to/target-skill repair --dry-run  # 预览不改
-
-# 生成时间线验证报告
-python scripts/timeline.py report /path/to/target-skill --validate
-
-# 生成双格式报告
-python scripts/gen_report.py /path/to/target-skill              # HTML + Markdown
-python scripts/gen_report.py /path/to/target-skill --html       # 仅 HTML
-python scripts/gen_report.py /path/to/target-skill --markdown   # 仅 Markdown
+# 生成报告
+python scripts/gen_report.py /path/to/target-skill            # HTML + Markdown
+python scripts/gen_report.py /path/to/target-skill --html     # 仅 HTML
+python scripts/gen_report.py /path/to/target-skill --markdown # 仅 Markdown
 ```
 
 ---
@@ -192,11 +190,11 @@ python scripts/gen_report.py /path/to/target-skill --markdown   # 仅 Markdown
 
 ## 流程钩子系统（强制阀 + 自动补全）
 
-> 
-
-双档策略：init/backup/blueprint 自动补齐，scenario/function_test/s4/gen_report 阻断指引。
-`python scripts/hooks.py status <skill-dir>` 查看流程状态。
+> 双档策略：init/backup/blueprint 自动补齐，write_tests/scenario/function_test/s4/gen_report/write_conclusion 阻断指引。
+> 配置驱动钩子：S1-S3 开关控制 write_tests 是否阻断，fix_mode 控制修复循环是否存在。
+> `python scripts/hooks.py status <skill-dir>` 查看流程状态。
+> 终端状态为 write_conclusion，完成后 exit(0)。
 
 ## 版本
 
-当前版本 **v1.0.0** — 三级嵌套计时 + 流程钩子 + 双格式模板报告
+当前版本 **v1.6.2** — 场景测试用例支持 modules 字段 + 非 CLI 模块导入验证
