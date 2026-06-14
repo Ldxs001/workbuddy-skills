@@ -3,7 +3,7 @@
 > 知识库是与「联网搜索」平行的信息获取/存储通道。
 > 设计核心：**标准硬编码 + LLM负责格式翻译**，所有数据按标准写入，确保DB结构稳定可预期。
 > 详见 `scripts/knowledge_schema.py`（标准定义）| `scripts/project_knowledge.py`（引擎实现）
-> 知识库的读写行为受 `scripts/settings_manager.py` 全局设置控制（kb_collect_mode / kb_query_mode）。
+> 知识库的读写行为受 `scripts/settings_manager.py` 全局配置控制（kb_collect_mode / kb_query_mode）。
 
 ---
 
@@ -19,7 +19,7 @@
 | **写** | 用户明确说"存下来""记录这个""入库" | 非自动，用户决定写入时机 |
 | **外部对接** | 用户要求"导入这个文件/数据库" | LLM按标准映射规则处理 |
 
-> 按需行为的强弱受 `settings_manager.py` 全局设置控制：
+> 按需行为的强弱受 `settings_manager.py` 全局配置控制：
 > - `kb_collect_mode=auto` → 估算完成后自动向用户确认"是否写入知识库"
 > - `kb_collect_mode=manual` → 仅用户明确要求时写入
 > - `kb_query_mode=auto` → 估算前自动查询历史同类项目基准

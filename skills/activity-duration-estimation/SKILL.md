@@ -1,7 +1,7 @@
 ---
 name: activity-duration-estimation
 tags: ['duration-estimation', 'pert', 'monte-carlo', 'project-management', 'semantic-analysis', 'wbs', 'work-breakdown', 'project-docs', 'html-report', 'settings', 'knowledge-base', 'economic-analysis', 'evm', 'earned-value']
-version: 1.11.0
+version: 1.11.7
 author: wUwproject
 license: MIT
 description: 活动历时估算 + WBS工作分解 + 项目文档生成 + 经济效益分析 + 挣值管理（Activity Duration Estimation & WBS & Project Docs & Economic Analysis & EVM）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）+ ROI/NPV/IRR/BCR 经济效益分析 + PV/EV/AC/SPI/CPI 挣值管理。三库隔离架构：shared.db + economic.db + evm.db。输出自包含HTML评估报告、经济效益分析报告和挣值分析报告。
@@ -14,6 +14,7 @@ trigger: 活动历时估算/三点估算/PERT/蒙特卡洛模拟/工期估算/�
 trigger_negative: 只是询问概念不执行估算/纯数学公式讨论不含实际任务
 faq_quality: improve_qa
 meta_field_sync: true
+create_permissions_md: true
 ---
 # activity-duration-estimation — 全周期项目管理
 
@@ -50,44 +51,31 @@ meta_field_sync: true
 | 10 | **紧前关系规划** | 手动指定/自动规划两种模式，支持FS/SS/FF/SF四种依赖关系 |
 | 11 | **HTML评估报告** | 自包含HTML，含甘特图/概率分布/重叠分析图表，有图有表有数据有分析 |
 | 12 | **项目文档生成** | 双模式：手动空模版/混合逐节生成；4个P0模板（立项/结项/相关方/风险） |
-| 13 | **全局设置系统** | 5项可调整设置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），每项可选 auto/manual。`scripts/settings_server.py` 提供 HTML 可视化设置面板。设置通过 `state.settings` 注入流程，LLM 可读取 `_get_setting()` 决定行为。 |
+| 13 | **全局配置系统** | 5项可调整配置（联网搜索/知识库采集/知识库调用/文档指定/文档撰写），每项可选 auto/manual。`scripts/settings_server.py` 提供 HTML 可视化配置面板。配置通过 `state.settings` 注入流程，LLM 可读取 `_get_setting()` 决定行为。 |
 | 14 | **经济效益分析** (分支子技能) | 独立于全流程，单独触发。ROI/NPV/IRR/BCR/PBP 计算引擎 + HTML 报告 + 独立 economic.db 知识库。可插入立项申请书模板。 |
 | 15 | **挣值管理** (分支子技能) | 独立于全流程，单独触发。PV/EV/AC/SPI/CPI/EAC 计算引擎 + HTML 报告 + 独立 evm.db 知识库。可插入结项报告书模板。 |
 
-### 渐进式文件索引
-
-| 文件 | 位置 | 说明 |
-|------|------|------|
-| `references/methods.md` | 方法详解 | 四种估算方法的完整公式、计算步骤和适用场景 |
-| `references/semantic-analysis.md` | 语义分析 | 任务参数提取、分类映射、方法推荐逻辑 |
-| `references/wbs-methodology.md` | WBS方法论 | WBS四种分解方法、3个参考模板、递归分解算法、100%规则验证、多格式输出 |
-| `references/project-docs-methodology.md` | 项目文档+思维工具 | 双模式设计、模板操作、12个方法论(SWOT/SMART/PDCA/RACI等)含章节映射（详见`thinking-tools.md`） |
-| `references/search-integration.md` | 搜索集成 | 两阶段外部知识搜索流程 |
-| `references/report-template.md` | 报告模板 | HTML评估报告模板说明 |
-| `references/antipatterns.md` | 反模式 | WBS+项目文档反模式 |
-| `references/risk-dimensions.md` | 风险维度 | D1~D7七类风险维度选择条件和缓解措施 |
-| `references/thinking-tools.md` | 思维工具 | SWOT/SMART/PDCA/RACI等12个项目管理思维工具 |
-| `references/faq.md` | FAQ | WBS+项目文档相关 |
-| `references/changelog.md` | 更新日志 | 版本更新记录 |
-| `references/economic-analysis-methodology.md` | 经济效益分析方法论 | ROI/NPV/IRR/BCR/PBP 公式、计算引擎 API、知识库字段、跨库引用规则 |
-| `references/evm-methodology.md` | 挣值管理方法论 | PV/EV/AC/SPI/CPI/EAC 公式、计算引擎 API、知识库字段、跨库引用规则 |
-| `references/templates/` | 模板目录 | 4个预置JSON模板文件（立项/结项/相关方/风险） |
-| `references/knowledge-interface.md` | 知识库接口 | 按需信息通道设计、标准字段定义、LLM格式解析指引、外部数据对接规范 |
-| `scripts/runner.py` | 编排层 | PipelineState + run_pipeline() 全流程Python驱动 |
-| `scripts/knowledge_schema.py` | 知识库标准 | 标准字段定义、格式转换器、外部数据库映射规则 + economic/evm/registry 字段定义 |
-| `scripts/project_knowledge.py` | 共享知识库引擎 | shared.db：SQLite+FTS5实现：查询/写入/外部对接/基准积累 |
-| `scripts/economic_knowledge.py` | 经济效益知识库引擎 | economic.db：独立CRUD、索引查询、跨库ATTACH shared.db |
-| `scripts/evm_knowledge.py` | 挣值管理知识库引擎 | evm.db：独立CRUD、索引查询、跨库ATTACH shared.db |
-| `scripts/economic_analysis_engine.py` | 经济效益分析引擎 | ROI/NPV/IRR/BCR 完整计算 + 多折现率对比 + 逐年现金流 |
-| `scripts/evm_engine.py` | 挣值管理引擎 | PV/EV/AC/SPI/CPI/EAC 完整计算 + 修正/不修正两模式 |
-| `scripts/settings_manager.py` | 全局设置管理 | 5项设置（web_search/kb_collect/kb_query/doc_template/doc_write）读/写/校验/CLI |
-| `scripts/settings_server.py` | 设置可视化服务 | HTTP服务器，浏览器打开即可可视化更新全部设置，更新后立即生效 |
-| `scripts/templates/settings.html` | 设置面板UI | 自包含HTML设置界面，约束联动（文档指定为空时禁用模板要求选项） |
-| `scripts/templates/economic-report.html` | 经济效益报告模板 | 自包含HTML：多折现率对比、NPV曲线图、逐年现金流、ROI/IRR/BCR卡片 |
-| `scripts/templates/evm-report.html` | 挣值分析报告模板 | 自包含HTML：SPI/CPI趋势图、绩效快照卡片、完工预测表 |
-
 ---
 
+### 渐进式文件索引
+
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+|--------|------|----------|----------|
+| `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
+| `references/economic-analysis-methodology.md` | 参考文档 | > **子技能定位**：独立于活动历时估算的核心全流程，单独触发、单独运行。 | 无 |
+| `references/evm-methodology.md` | 参考文档 | > **子技能定位**：独立于活动历时估算的核心全流程，单独触发、单独运行。 | 无 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
+| `references/knowledge-interface.md` | 参考文档 | > 知识库是与「联网搜索」平行的信息获取/存储通道。 | 无 |
+| `references/methods.md` | 参考文档 | > 本文件详细说明四种活动历时估算方法的公式、计算步骤和适用场景。 | 无 |
+| `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
+| `references/project-docs-methodology.md` | 参考文档 | > 本文件说明:project-docs 子技能的双模式设计、模板结构、操作流程和使用规范。 | 无 |
+| `references/report-template.md` | 参考文档 | > 本文件定义 REPORT_DATA 数据结构的完整接口，以及分析结果→格式化→填充→生成的标准化流程。 | 无 |
+| `references/risk-dimensions.md` | 参考文档 | > 内置7大类风险维度，根据项目特征自动匹配适用维度。 | 无 |
+| `references/search-integration.md` | 参考文档 | > 本文件说明外部知识搜索的两个阶段流程。 | 无 |
+| `references/semantic-analysis.md` | 参考文档 | > 本文件说明语义分析引擎如何工作：任务参数提取、任务类型分类、推荐方法映射。 | 无 |
+| `references/thinking-tools.md` | 参考文档 | > 本文件收录项目管理/文档撰写中常用的思维工具和方法论框架。 | 无 |
+| `references/wbs-methodology.md` | 参考文档 | > 本文件定义 WBS（Work Breakdown Structure）在活动历时估算技能中的完整实现：分解方法、参考模板、递归算法、验证规则以及与估算流程的 | 无 |
 ## 工作流程
 
 工作流程由 `scripts/runner.py` 自动编排，LLM 无需关心内部阶段顺序。
@@ -164,7 +152,7 @@ LLM看到异常后按提示提供数据，然后继续执行即可。
 | 只用 WBS 不做估算 | `state.run_wbs()` — 只做工作分解，不进估算流程 |
 | 指定每个任务的 OMP | 在 WBS 数据结构中填写 `{"o": 3, "m": 5, "p": 8}` 字段 |
 | 用我自己的文档模板 | `load_template() → customize_sections() → save_template()` — 增删改排章节后另存 |
-| 修改全局设置 | `python scripts/settings_manager.py set <key> <value>` — 纯 CLI，无需 LLM 参与 |
+| 更新全局配置 | `python scripts/settings_manager.py set <key> <value>` — 纯 CLI，无需 LLM 参与 |
 | HTML 报告打不开 | 报告是自包含 HTML，直接用浏览器打开 state.html_report_path |
 | 调整蒙特卡洛模拟次数 | `run_full(mc_iterations=5000)` — 默认 2000，数值越高越精确但越慢 |
 | 从历史项目参考数据 | 告诉 LLM「查一下同类项目的基准数据」— 会自动搜索 SQLite 知识库 |
@@ -172,13 +160,13 @@ LLM看到异常后按提示提供数据，然后继续执行即可。
 ---
 
 ## WBS子技能 — Phase -1：项目规划与工作分解
-> 详见 `references/wbs-methodology.md` | `scripts/wbs_engine.py`
+>  | `scripts/wbs_engine.py`
 > 全流程模式下必做，由 `run_full()` 自动触发。
 
 ---
 ## 项目文档生成子技能 — :project-docs
 
-> 详见 `references/project-docs-methodology.md` | `scripts/project_docs_engine.py`
+>  | `scripts/project_docs_engine.py`
 三种模式：`manual`（空模板，token≈0）/ `mixed`（按章节设 auto/outline/manual，推荐）/ `全自动`（所有节 auto）。
 支持模板定制：增/删/改/重排章节、每节独立模式、另存为新模板。
 
@@ -227,4 +215,4 @@ save_template(tpl, "我的模板", overwrite=True)       # 另存自定义模板
 
 ## 版本
 
-当前版本 **v1.11.0** — 详见 `references/changelog.md`
+当前版本 **v1.11.0** — 

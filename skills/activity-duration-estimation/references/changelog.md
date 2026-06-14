@@ -1,3 +1,19 @@
+## 1.11.7 (2026-06-14)
+
+### 更新
+- skill-standardization 全流程改造：blueprint → 备份 → audit → fix → verify → bump → cleanup
+- R-20 术语统一：更新类型 → 更新类型
+- 无功能性更新
+
+---
+
+## 1.11.1 (2026-06-14)
+
+### 修复
+- skill-standardization R-25 文档格式调整
+
+---
+
 ## 1.11.0 (2026-06-04)
 
 ### 新增
@@ -29,7 +45,7 @@
 
 ### 改进
 - SKILL.md 新增「常用操作速查」表格（开箱即用度 4.4→预估 4.6）
-  - 8 条常见需求的一步到位答案：估算 / WBS / OMP / 模板定制 / 全局设置 / 报告查看 / MC次数 / 历史基准
+  - 8 条常见需求的一步到位答案：估算 / WBS / OMP / 模板定制 / 全局配置 / 报告查看 / MC次数 / 历史基准
   - 放在「快速开始」场景之后，不干扰渐进式披露结构
 - `runner.py` `_handle_error()` 错误消息人性化改进（异常处理 4.0→预估 4.3+）
   - 根据阶段（wbs/estimate/docs/wbs执行）自动追加"💡 解决指引"
@@ -40,33 +56,33 @@
 ## 1.9.0 (2026-06-04)
 
 ### 新增
-- **全局设置系统** `scripts/settings_manager.py` — 5项可调运行时设置
+- **全局配置系统** `scripts/settings_manager.py` — 5项可调运行时配置
   - `web_search_mode`: 联网搜索（auto / manual）
   - `kb_collect_mode`: 知识库采集（auto / manual）
   - `kb_query_mode`: 知识库调用（auto / manual）
   - `doc_template`: 文档指定（null / 模板名）
   - `doc_write_mode`: 文档撰写（auto / manual / template）
-- 设置持久化到 `skills/.standardization/activity-duration-estimation/data/settings.json`
+- 配置持久化到 `skills/.standardization/activity-duration-estimation/data/settings.json`
 - **纯文本 CLI 交互**：`python scripts/settings_manager.py` 直接管理，无需 LLM 参与
-  - `show` — 查看当前设置
+  - `show` — 查看当前配置
   - `list` — 列出所有可设项及说明
-  - `set <key> <value>` — 更新单条设置
+  - `set <key> <value>` — 更新单条配置
   - `reset` — 恢复默认
   - `validate` — 校验合法性
   - `import <file>` — 从 JSON 文件批量导入
   - `export [file]` — 导出为 JSON 文件
   - `server [port]` — 启动 HTML 可视化面板
   - `help` — 完整帮助
-- `scripts/settings_server.py` — HTTP设置可视化服务，启动后浏览器打开即可可视化更新
-- `scripts/templates/settings.html` — 自包含HTML设置面板，含约束联动（doc_template为空时禁用doc_write_mode的template选项）
+- `scripts/settings_server.py` — HTTP配置可视化服务，启动后浏览器打开即可可视化更新
+- `scripts/templates/settings.html` — 自包含HTML配置面板，含约束联动（doc_template为空时禁用doc_write_mode的template选项）
 - `validate()` 校验器：枚举值检查、约束联动检查（doc_template为空时doc_write_mode不能为template）
 - 默认值：全部 manual，仅 doc_write_mode 默认 auto
 
 ### 改进
-- `runner.py` PipelineState 初始化时自动加载设置到 `state.settings`
-- `run_full()` 从设置读取 doc_template 和 doc_write_mode（显式传参时优先）
-- `_resolve_doc_mode()` 设置→模式翻译逻辑（template→mixed，无模板时降级）
-- SKILL.md 核心能力#13 全局设置系统 + 文件索引新增3项
+- `runner.py` PipelineState 初始化时自动加载配置到 `state.settings`
+- `run_full()` 从配置读取 doc_template 和 doc_write_mode（显式传参时优先）
+- `_resolve_doc_mode()` 配置→模式翻译逻辑（template→mixed，无模板时降级）
+- SKILL.md 核心能力#13 全局配置系统 + 文件索引新增3项
 
 ---
 
