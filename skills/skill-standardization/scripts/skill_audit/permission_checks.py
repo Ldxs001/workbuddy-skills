@@ -188,6 +188,17 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
                          "operation": "确保 permissions.md 可读，并补充 skill-standardization 权限说明头部",
                          "verification": "重新运行 audit_skill()"}
             }
+        # 检查是否含未填写的占位符
+        placeholders = ["（请填写）", "（如含敏感信息访问", "操作：" and "必要性："]
+        if any(p in pm_content for p in placeholders):
+            return {
+                "passed": False,
+                "detail": f"{filepath}:1 - permissions.md 含未填写的占位符",
+                "fix": {"key": "create_permissions_md", "value": True,
+                         "location": permissions_md,
+                         "operation": "填充 permissions.md 的风险等级和高权限操作说明",
+                         "verification": "重新运行 audit_skill()，确认 R-15 passed"}
+            }
         if "基于skill-standardization渐进式披露规范的权限说明" not in pm_content:
             return {
                 "passed": False,

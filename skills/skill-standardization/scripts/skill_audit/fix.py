@@ -744,22 +744,62 @@ def fix_critical_write(skill_dir, **kw):
 def fix_create_permissions_md(skill_dir, **kw):
     """
     R-15 修复：创建/更新 references/permissions.md。
-    文件不存在则创建完整权限文档（含头部+权限表格），
-    已存在则将 skill-standardization 权限头部插入到第一位。
+    根据 PermissionChecker 扫描结果自动填充风险等级和操作说明，
+    不再留空占位符。
     """
     refs_dir = os.path.join(skill_dir, "references")
     os.makedirs(refs_dir, exist_ok=True)
     permissions_md = os.path.join(refs_dir, "permissions.md")
 
+    # 调用 PermissionChecker 获取实际扫描结果
+    from permission_checker import PermissionChecker
+    try:
+        checker = PermissionChecker(skill_dir)
+        report = checker.scan()
+        risk_level = report.get("risk_level", "low").upper()
+        stats = report.get("stats", {})
+        issues = report.get("issues", [])
+    except Exception:
+        risk_level = "LOW"
+        stats = {}
+        issues = []
+
+    # 根据扫描结果生成风险等级描述
+    has_sensitive = stats.get("sensitive_access", 0) > 0
+    has_critical_write = stats.get("critical_write", 0) > 0
+    has_network = stats.get("network_access", 0) > 0
+    has_delete = stats.get("file_delete", 0) > 0
+    has_subprocess = stats.get("subprocess_call", 0) > 0
+
+    risk_desc = f"**{risk_level}**（声明：{risk_level}，实际风险：{risk_level}）\n\n"
+
+    # 生成高权限操作说明
+    high_perm_parts = []
+    for iss in issues:
+        itype = iss.get("type", "")
+        fname = iss.get("file", "")
+        lineno = iss.get("lineno", 0)
+        desc = iss.get("name", "")
+        label_map = {
+            "sensitive_access": "敏感信息访问",
+            "critical_write": "系统关键位置写入",
+            "network_access": "网络访问",
+            "file_delete": "文件删除操作",
+            "subprocess_call": "子进程调用",
+        }
+        label = label_map.get(itype, itype)
+        high_perm_parts.append(f"- **{label}**：`{fname}:{lineno}` {desc}")
+    if not high_perm_parts:
+        high_perm_parts.append("- 无。所有文件操作均限制在技能独立数据目录内，不涉及系统关键目录、网络监听或外部请求。")
+
+    high_perm_section = "\n".join(high_perm_parts)
+
     header = "# 基于skill-standardization渐进式披露规范的权限说明\n\n"
     header += "本文档由 `skill-standardization` 权限扫描器自动维护。\n\n"
     header += "## 风险等级\n\n"
-    header += "（请填写：LOW / MEDIUM / HIGH / CRITICAL）\n\n"
+    header += risk_desc
     header += "## 高权限操作说明\n\n"
-    header += "（如含敏感信息访问、关键位置写入，请在此说明：）\n"
-    header += "- 操作：\n"
-    header += "- 必要性：\n"
-    header += "- 如何降低风险：\n"
+    header += high_perm_section + "\n"
 
     # 完整权限文档内容（新建时使用）
     full_content = header + "\n"

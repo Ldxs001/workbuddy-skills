@@ -1,3 +1,11 @@
+## 2.73.9 (2026-06-14)
+
+### 修复
+- **R-15 permissions.md 占位符问题**: `fix_create_permissions_md()` 生成含"（请填写）"的模板，未根据 PermissionChecker 扫描结果自动填充。改为调用 `PermissionChecker.scan()` 获取实际风险等级和发现项，自动生成完整内容
+- **R-15 新增占位符检测**: 检查 `permissions.md` 中是否含有未填写的占位符文本，避免"文件存在但内容是模板"的虚假 PASS
+
+---
+
 ## 2.73.8 (2026-06-13)
 
 ### 修复
