@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.9.3 - 完整 Python 版 git-sync
+git-sync.py v2.11.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -52,6 +52,7 @@ DIST_DIR   = SKILLS_DIR / ".dist"
 EXCLUDE_PATTERNS = [
     "*.bak", "__pycache__/", "*.pyc", ".git/", ".mcp.json",
     "node_modules/", ".DS_Store", "Thumbs.db",
+    "nul", "NUL",  # Windows 保留设备名，在目录中无法删除且 copytree 崩溃
 ]
 MANIFEST_FILE = (
     SKILLS_DIR / ".standardization" / "git-sync" / "data" / "manifest.json"
@@ -332,13 +333,29 @@ def _ignore_patterns(path, names):
     return ignored
 
 def sync_files(skill_name: str, skills_dir: Path, work_repo: Path):
-    """用 Python copytree 替代 rsync"""
+    """用 Python 逐个复制文件（替代 shutil.copytree，避免 Windows 保留设备名问题）"""
     src = skills_dir / skill_name
     dst = work_repo / "skills" / skill_name
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(src, dst, ignore=_ignore_patterns)
-    # 二次保险：清理残留
+    os.makedirs(dst, exist_ok=True)
+    file_count = 0
+    for item in src.rglob("*"):
+        # Windows 保留设备名：在 Windows 上 os.path.exists('nul') 始终返回 True
+        # 即使目录中根本没有这个文件。Path.rglob 遍历时如果构造出 'nul' 路径
+        # is_file() 会返回 False（设备不是文件），但 shutil.copy2 会崩溃
+        if item.name.lower() == "nul":
+            continue
+        if item.is_file():
+            try:
+                rel = item.relative_to(src)
+                dst_file = dst / rel
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, dst_file)
+                file_count += 1
+            except (OSError, shutil.Error):
+                pass  # 跳过无法复制的文件
+    # 二次保险：清理残留的 __pycache__
     for root, dirs, _ in os.walk(dst):
         for d in dirs:
             if d == "__pycache__":
@@ -709,7 +726,19 @@ def step_pack_zip(skill_name: str, version: str, skills_dir: Path,
                 if tmp_dir.exists(): shutil.rmtree(tmp_dir)
                 tmp_dir.mkdir(parents=True)
                 dst_tmp = tmp_dir / skill_name
-                shutil.copytree(zip_source, dst_tmp, ignore=_ignore_patterns)
+                # 逐个复制（跳过 nul 等 Windows 保留设备名）
+                os.makedirs(dst_tmp, exist_ok=True)
+                for item in zip_source.rglob("*"):
+                    if item.name.lower() in ("nul", "nul "):
+                        continue
+                    if item.is_file():
+                        try:
+                            rel = item.relative_to(zip_source)
+                            dst_item = dst_tmp / rel
+                            dst_item.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(item, dst_item)
+                        except (OSError, shutil.Error):
+                            pass
                 # 脱敏
                 decisions_zip = scan_out_zip.with_suffix(".json.decisions.json")
                 make_py = SCRIPT_DIR / "make_all_sanitize.py"
@@ -824,7 +853,7 @@ def main():
             pass
     # ────────────────────────────────────────────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="git-sync.py v2.10.0")
+    parser = argparse.ArgumentParser(description="git-sync.py v2.11.0")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
     parser.add_argument("version", nargs="?", default="",

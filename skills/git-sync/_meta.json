@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.10.0",
-  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。新增错误消息标准化，git push/pull 错误归类为中文描述，防止LLM误读原始错误码。修复无变更时manifest版本号误更新问题。",
+  "version": "2.11.0",
+  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复Windows nul保留设备名导致copytree崩溃；新增git push/pull错误消息标准化；修复无变更时manifest版本号误更新。",
   "author": "wUwproject",
   "tags": [
     "sync",

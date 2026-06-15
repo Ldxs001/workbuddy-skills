@@ -18,7 +18,7 @@
 | `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。 |
 | `drawiodo` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。 |
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
-| `git-sync` | 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。新增错误消息标准化，git push/pull 错误归类为中文描述，防止LLM误读原始错误码。修复无变更时manifest版本号误更新问题。 |
+| `git-sync` | 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复Windows nul保留设备名导致copytree崩溃；新增git push/pull错误消息标准化；修复无变更时manifest版本号误更新。 |
 | `hug-html` | 8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling |
 | `latex-modular` | LaTeX 模块化组合技能。提取 LaTeX 文档头/组件（表格、图片、列表、章节样式）作为可组合模块，通过 Python 脚本稳定组合生成不报错的 lualatex 文档，支持从原始 LaTeX 代码重构进模块化体系。 |
 | `local-rag-builder` | 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理 |

@@ -1,3 +1,9 @@
+## 2.11.0 (2026-06-15)
+
+### 修复
+
+- **修复 Windows nul 保留设备名导致 copytree 崩溃**：`sync_files()` 和 `step_pack_zip` 的临时目录复制改为逐个复制并跳过 `name.lower() == "nul"` 的条目，避免 Windows 内核将 `nul` 路径解析为 `\\.\nul` 设备
+
 ## 2.10.0 (2026-06-15)
 
 ### 重构
