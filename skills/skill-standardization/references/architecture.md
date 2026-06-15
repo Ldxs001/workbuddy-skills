@@ -83,10 +83,6 @@ skill-standardization/                 # Skill 根目录
     │   └── utils.py               #   工具函数（常量、辅助函数）
     │
     ├── permission_checker.py                 # 权限检查器
-    ├── authorization_manager.py             # 授权管理器
-    ├── json_loader.py                 # 渐进式 JSON 加载器
-    │                                 #   ├─ load/list/show/refs 子命令
-    │                                 #   └─ 从 _index.json 发现模块
     │
     └── spec/                          # 规范定义（JSON Schema）
         ├── _index.json                # [v2] 模块注册索引
@@ -110,7 +106,6 @@ skill_builder/ ──读取──→ spec/*.json（规范定义）
   ├─ version_manager.py  VersionManager 类
   └─ utils.py           工具函数
 -m scripts.skill_audit   ──读取──→ spec/rules.json（审查规则）
-json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 ```
 
 ---
@@ -138,15 +133,11 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 ├─────────────────────────────────────────────────┤
 │                  数据层 (Data)                    │
 │                                                  │
-│   json_loader.py              spec/*.json        │
-│   ┌──────────┬──────────┐    ┌────────────────┐ │
-│   │ load     │ list/show│    │ frontmatter    │ │
-│   │ (按需加载)│ (元信息) │    │ body           │ │
-│   └──────────┴──────────┘    │ rules           │ │
-│                             │ structure       │ │
-│                             │ progressive_md  │ │
-│                             │ _index          │ │
-│                             └────────────────┘ │
+│   spec/*.json                                    │
+│   ┌─────────────────────────────────────────────┐│
+│   │ frontmatter    body         rules           ││
+│   │ structure      progressive_md  _index       ││
+│   └─────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────┘
 ```
 
@@ -204,40 +195,6 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 **规则分类：**
 - **ERROR 级 (R-01~R-26)**: 结构性问题（frontmatter 缺失、关键字段缺失等）
 - **WARN 级 (R-26~R-26)**: 质量性建议（命名一致、章节完整性、版本同步）
-
-### 3. json_loader.py（加载器）
-
-职责：按需加载 spec/ 下的 JSON 规范定义。
-
-**设计模式：懒加载（Lazy Loading）**
-
-```python
-# 仅在用户请求时才读取对应文件
-def load_spec(module_name):
-    spec_file = SPEC_DIR / f"{module_name}.json"
-    if spec_file.exists():
-        with open(spec_file, "r", encoding="utf-8") as f:
-            return json.load(f)   # 只在此时才读磁盘
-    return None
-```
-
-**模块发现机制：**
-```
-用户执行: python json_loader.py load <module_name>
-  ↓
-读取: spec/_index.json（模块注册表，始终加载）
-  ↓
-查找: modules 数组中匹配 module_name 的条目
-  ↓
-加载: spec/<module_name>.json 的实际内容
-  ↓
-输出: 格式化打印到标准输出
-```
-
-**特殊命令 `all`:**
-- 遍历 _index.json 中所有已注册模块
-- 依次加载并合并输出
-- 用于需要全量规范的场景
 
 ---
 
@@ -388,7 +345,7 @@ skill_dir [--json] [--strict]
 | `rules.json` | 完整规则定义（ID/级别/逻辑） | 不含执行引擎 | -m scripts.skill_audit |
 | `structure.json` | 目录结构规范 + 迁移规则 | 不含移动逻辑 | create + refactor |
 | `progressive_md.json` | MD 拆分方案 + 加载协议 | 不含文件操作 | references/ 创建 + 加载协议 |
-| `_index.json` | 模块注册表 + 依赖关系 | 不含具体规范 | json_loader.py |
+| `_index.json` | 模块注册表 + 依赖关系 | 不含具体规范 | — |
 
 ### 模块间依赖关系
 
@@ -454,7 +411,7 @@ _index.json (中心注册)
 - 减少内存占用
 - 支持未来扩展更多规范模块而不影响现有流程
 
-**实现:** json_loader.py 的 load 命令 + _index.json 模块注册。
+**实现:** spec/_index.json 模块注册 + 按需导入。
 
 ### D5: 模板驱动
 

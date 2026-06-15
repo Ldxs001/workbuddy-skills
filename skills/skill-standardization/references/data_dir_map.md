@@ -21,8 +21,7 @@
 |---|---|---|---|
 | 持久化业务数据 | `data/` | 配置快照、进度文件、用户偏好 | 永久 |
 | 临时文件 | `temp/` | 会话级中间产物、`.tmp` 文件 | 会话级（操作完即清） |
-| 操作备份 | `backup/` | `safe_io.py` 写操作备份、`skill_rollback.py` 回滚用 | 保留最新 10 个 |
-| 日志文件 | `logs/` | `op_logger.py` 操作日志 `ops.log` | 保留最新 200 条 |
+| 操作备份 | `backup/` | `safe_io.py` 写操作备份、回滚用 | 保留最新 10 个 |
 | 缓存 | `cache/` | API 响应缓存、计算中间结果 | 可重建，可随时清空 |
 | 输出产物 | `output/` | 技能生成的报告、导出文件、用户可见产物 | 永久 |
 | 状态文件 | `state/` | 进度锁、PID 文件、运行标志 | 运行时 |
@@ -43,9 +42,6 @@
 | `scripts/safe_io.py` | 30 | `DATA_DIR = os.path.join(SKILLS_ROOT, ".standardization", SKILL_NAME)` | **数据目录根（通用）** | **改此处即改全技能数据路径** |
 | `scripts/safe_io.py` | 31 | `BACKUP_DIR = os.path.join(DATA_DIR, "backup")` | 备份目录 | 随 `DATA_DIR` 自动变化 |
 | `scripts/safe_io.py` | 32 | `OPS_LOG = os.path.join(DATA_DIR, "logs", "ops.log")` | 日志文件路径 | 随 `DATA_DIR` 自动变化 |
-| `scripts/op_logger.py` | 24-32 | 同上（独立计算，值相同） | 日志记录 | 随 `DATA_DIR` 自动变化 |
-| `scripts/skill_rollback.py` | 25-32 | 同上（独立计算，值相同） | 回滚工具 | 随 `DATA_DIR` 自动变化 |
-| `scripts/authorization_manager.py` | 28-30 | `AUTH_DECISIONS_FILE = Path.home() / ".workbuddy/skills/.standardization/..."` | 授权决策存储 | 改 `storage_dir` 参数 |
 | `SKILL.md` frontmatter | 12 | `data_dir: ../.standardization/skill-standardization/` | 声明数据目录 | 改此处声明 + 所有 `.py` 中的 `DATA_DIR` 计算逻辑 |
 
 ---
@@ -57,6 +53,5 @@
 **步骤**：
 1. 更新 `SKILL.md` frontmatter 的 `data_dir:` 字段
 2. 更新各 `.py` 文件中的 `DATA_DIR` 计算逻辑，改为从 `fm["data_dir"]` 读取
-3. （可选）更新 `authorization_manager.py` 的 `storage_dir` 参数
 
 **推荐**：未来版本从 `SKILL.md` frontmatter 动态读取 `data_dir:`，不再硬编码计算逻辑。

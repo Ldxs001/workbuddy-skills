@@ -118,7 +118,6 @@ skills/
 
 ## 铁律 6：临时文件与备份必须记录并清理
 
-- 所有创建、更新、改造过程中产生的临时文件和备份文件，**必须**记录到 `op_logger` 日志（`temp_files` 和 `backup_files` 字段）
 - 主体操作完成后（审计通过 + 版本号更新 + 更新日志维护完毕），**必须**按规范清除临时文件（会话级，立即清除）和过期备份（保留最新 10 个）
 - 更新/改造前**必须**对目标技能目录执行整体备份（`cp -r`），备份命名格式：`<skill-dir>_bak_<operation>_<YYYYMMDD_HHMMSS>`
 - `scripts/safe_io.py` 所有写操作**必须**内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚
@@ -140,23 +139,7 @@ skills/
 - `permission_checker.py` 扫描脚本中的关键位置写入模式
 - 检查 frontmatter 是否声明 `critical_write: true`
 
----
 
-### R-15：高权限操作授权检查
-
-**检查内容：**
-- 脚本含文件删除/网络请求/subprocess 调用时，执行前须调用 `authorization_manager.py` 请求用户授权
-- 高权限操作包括：`os.remove`、`shutil.rmtree`、`requests.get`、`subprocess.run` 等
-
-**修复方法：**
-1. 在脚本中调用 `authorization_manager.py request` 请求授权
-2. 根据用户授权结果决定是否执行高权限操作
-
-**检查方法：**
-- 检查脚本中是否调用 `authorization_manager.py`
-- 检查是否包含授权检查逻辑（`check_authorization`、`request_authorization` 等）
-
----
 
 ### R-16：权限权重说明
 
@@ -238,7 +221,7 @@ skills/
 
 ### 规则内容
 
-- `run_audit audit` 输出审计报告后，LLM **必须**逐条阅读每条结果（含上下文行）
+- 审计输出审计报告后，LLM **必须**逐条阅读每条结果（含上下文行）
 - **不做白名单预筛**：`_reclassify_false_positive()` 仅用于报告显示时的 ⓘ 视觉标记，不影响 LLM 审查范围
 - LLM **必须**逐条判断所有 FAIL 项：
 

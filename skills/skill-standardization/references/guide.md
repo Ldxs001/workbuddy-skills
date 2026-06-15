@@ -10,16 +10,13 @@
 2. [模式 B：update — 更新已有 Skill](#模式-bupdate--更新已有-skill)
 3. [模式 C：refactor — 改造非标 Skill](#模式-crefactor--改造非标-skill)
 4. [审查模式 — 独立审计](#审查模式--独立审计)
-5. [规范加载 — 渐进式 JSON 查询](#规范加载--渐进式-json-查询)
 
 ---
-
 
 > **⚠️ 文件更新约束**：更新 `SKILL.md` 或 `references/*.md` 时，**严禁使用 Write/Edit 工具**（会损坏 UTF-8 编码）。必须使用 `scripts/` 下的 Python 脚本原子写入（`open(tmp)+os.replace()`）。更新后必须自审 0 ERROR 0 WARN。
 
 | 文件 | 更新方式 | 脚本 |
 |------|----------|------|
-| `SKILL.md` frontmatter | Python 原子写入 | `scripts/update_skill_frontmatter.py` |
 | `SKILL.md` 正文 | Python 正则替换 | `scripts/safe_io.py` 的 `safe_write()` |
 | `references/*.md` | `scripts/safe_io.py` 的 `safe_write()` | 随技能自带 |
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
@@ -102,10 +99,10 @@ python -m scripts.skill_builder update <skill-dir>
    ```bash
    python -m scripts.skill_builder update <skill-dir> --fix
    ```
-4. **操作中记录**：所有临时文件（`*.tmp`、`temp_*`）和备份文件记录到 `op_logger` 日志
+4. **操作中记录**：所有临时文件（`*.tmp`、`temp_*`）和备份文件记录到操作日志
 5. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
    ```bash
-   # 清理备份：skill_rollback 暂不支持 cleanup，手动删除旧备份即可
+   # 清理备份：手动删除旧备份即可
    ```
 
 ### 自动修复模式
@@ -197,10 +194,10 @@ Suggestion: 运行 refactor 清理根目录散落文件
    python -m scripts.skill_builder refactor <skill-dir> --dry-run
    ```
 4. **执行改造**：`-m scripts.skill_builder refactor` 自动备份 + 迁移 + 验证
-5. **操作中记录**：临时文件、备份文件记录到 `op_logger` 日志
+5. **操作中记录**：临时文件、备份文件记录到操作日志
 6. **操作后清理**：审查通过 + 版本号更新 + 更新日志完毕后，执行：
    ```bash
-   # 清理备份：skill_rollback 暂不支持 cleanup，手动删除旧备份即可
+   # 清理备份：手动删除旧备份即可
    ```
 
 ### dry-run（推荐首选）
@@ -258,7 +255,6 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 
 ---
 
-
 ---
 
 ## 临时文件与备份管理规范
@@ -272,7 +268,7 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
   │                                   │                        │
   ▼                                   ▼                        ▼
 整体备份目标技能                    记录临时/备份文件        清理临时文件
-（timestamp 命名）                （op_logger 日志）      （保留最新 10 个备份）
+（timestamp 命名）                （操作日志）            （保留最新 10 个备份）
   │                                   │                        │
   └───────────────────────────────────┴───────────────────────┘
 ```
@@ -281,12 +277,12 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 
 - 更新/改造前，对目标技能目录执行整体备份
 - 备份命名格式：`skills/.standardization/<skill-name>/backup/<skill-dir>_bak_<operation>_<YYYYMMDD_HHMMSS>`
-- 备份路径记录在 `op_logger` 日志的 `rollback_id` 字段
+- 备份路径记录在操作日志的 `rollback_id` 字段
 
 ### 操作中：临时/备份文件记录
 
-- 所有临时文件（`*.tmp`、`temp_*`、`draft_*`）的产生路径、时间记录到 `op_logger` 日志的 `temp_files` 字段
-- 所有备份文件（`data/backup/*`、`_bak_*` 目录）记录到 `op_logger` 日志的 `backup_files` 字段
+- 所有临时文件（`*.tmp`、`temp_*`、`draft_*`）的产生路径、时间记录到操作日志的 `temp_files` 字段
+- 所有备份文件（`data/backup/*`、`_bak_*` 目录）记录到操作日志的 `backup_files` 字段
 - 日志格式（JSON Lines）：
 
 ```json
@@ -314,13 +310,6 @@ mv <skill-dir>_bak_refactor_YYYYMMDD_HHMMSS <skill-dir>
 ### py 工具兜底能力
 
 `scripts/safe_io.py` 所有写操作（`safe_write`、`safe_patch_by_line`、`safe_patch_regex`、`safe_insert_after`）均内置 `backup_file()` 临时备份，返回 `rollback_id`，确保删/改动作可回滚。
-
-`scripts/skill_rollback.py` 提供：
-- `backup_file()` — 单文件备份（safe_io 内置）
-- `op_logger` — 记录操作日志（含临时/备份文件追踪）
-
-- `rollback(rollback_id)` — 单文件回滚
-- `rollback_latest(N)` — 回滚最近 N 次操作
 
 ---
 
@@ -616,41 +605,6 @@ fix_faq_progressive(skill)
 > **推荐工作流**：先运行审计 → 查看报告 → 调用 `apply_fix()` 批量修复 → 再次审计验证。
 
 
-## 规范加载 — 渐进式 JSON 查询
-
-```bash
-# 列出所有可用模块
-python scripts/json_loader.py list
-
-# 加载指定模块
-python scripts/json_loader.py load frontmatter    # Frontmatter 字段规范
-python scripts/json_loader.py load body           # 正文章节规范
-python scripts/json_loader.py load rules          # 审查规则 R-01~R-26
-python scripts/json_loader.py load structure      # 目录结构规范 [v2]
-python scripts/json_loader.py load progressive_md # 渐进式 MD 体系 [v2]
-
-# 全量加载
-python scripts/json_loader.py load all
-
-# 显示模块原始 JSON
-python scripts/json_loader.py show structure
-
-# 查看依赖关系
-python scripts/json_loader.py refs progressive_md
-```
-
-### 模块依赖图
-
-```
-frontmatter ─────┬──→ rules ──┐
-body ────────────┘            │
-                              ├──→ all
-structure ──→ progressive_md ─┘
-```
-
----
-
-
 ## 7. 安全增强功能（v2.13.0）
 
 > 本 skill 在创建/更新/改造其他 skill 时，会自动进行权限检查和授权管理。
@@ -673,7 +627,7 @@ structure ──→ progressive_md ─┘
 
 ### 授权管理流程
 
-当目标 skill 包含高权限操作（文件删除、网络请求、subprocess 调用）时，`authorization_manager.py` 会介入：
+当目标 skill 包含高权限操作（文件删除、网络请求、subprocess 调用）时，会进行授权管理：
 
 - **统一审批**：累积多个风险操作，一次性列出，由用户统一审批
 - **即时审批**：高风险操作执行前，立即请求用户授权

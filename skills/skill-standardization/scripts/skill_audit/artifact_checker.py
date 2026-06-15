@@ -564,7 +564,6 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
         # 并非自身使用数据目录。使用 os.path.join 确保 Windows 反斜杠兼容。
         R12_WHITELIST = {
             os.path.join("scripts", "artifact_checker.py"),
-            os.path.join("scripts", "authorization_manager.py"),
             os.path.join("scripts", "creator.py"),
             os.path.join("scripts", "fix.py"),
             os.path.join("scripts", "migrator.py"),

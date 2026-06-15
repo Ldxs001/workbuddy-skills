@@ -28,7 +28,7 @@
 - **正文结构规范**：三层体系（must_have 必须章节 / whitelist 白名单章节 / nonstandard 非标章节）+ 渐进式索引表
 - **审查规则**：R-01~R-26 共 25 条自动检查规则（含安全审计、写作规范、章节顺位、格式合规等）
 
-该规范定义在 `scripts/spec/frontmatter.json`、`scripts/spec/body.json` 和 `scripts/spec/rules.json` 中，可通过 `python -m scripts.json_loader load` 查看。
+该规范定义在 `scripts/spec/frontmatter.json`、`scripts/spec/body.json` 和 `scripts/spec/rules.json` 中，可直接查看 `scripts/spec/` 下的 JSON 文件。
 
 ### Q2: skill-standardization 可以独立使用吗？
 
@@ -276,11 +276,10 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 | 2 | `_meta.json` `"version"` | 元数据版本 | 与 SKILL.md 一致 |
 | 3 | `manifest.json` `"version"`（如有） | 仓库注册版本 | 与上述一致 |
 | 4 | 各 `spec/*.json` 的 `"_version"` | 规范文件自身的版本 | 通常跟随主版本 |
-| 5 | `json_loader.py` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
-| 6 | `-m scripts.skill_builder` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
-| 7 | `-m scripts.skill_audit` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
+| 5 | `-m scripts.skill_builder` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
+| 6 | `-m scripts.skill_audit` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
 
-**位置 1-3 必须严格一致**（三方一致原则）。位置 4-7 跟随主版本号更新即可。
+**位置 1-3 必须严格一致**（三方一致原则）。位置 4-6 跟随主版本号更新即可。
 
 ### Q21: 如何正确升级版本号？
 
@@ -316,7 +315,6 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 ```python
 import sys
 sys.path.append("path/to/skill-standardization/scripts")
-from json_loader import load_spec
 from skill_builder import cmd_create, cmd_update, cmd_refactor
 ```
 
@@ -326,7 +324,6 @@ from skill_builder import cmd_create, cmd_update, cmd_refactor
 
 1. 在 `scripts/spec/` 下创建 `.json` 文件
 2. 在 `spec/_index.json` 的 `modules` 数组中注册
-3. 在 `json_loader.py` 中确保能被 load 命令发现
 
 JSON 文件的推荐结构：
 ```json

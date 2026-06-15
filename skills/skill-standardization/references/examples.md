@@ -278,30 +278,7 @@ Exit code: 0 (pure warning mode — will NOT block subsequent steps)
 ### 示例 11：加载 structure 模块
 
 ```bash
-$ python scripts/json_loader.py load structure
-
-═══ SKILL.md 标准化规范 v2.0.0 ═══
-
-📦 Module: structure
-📄 Source: spec/structure.json
-📐 Dependencies: (none)
-
-Root mandatory files (must exist):
-  • SKILL.md   — 主文件（≤200行，含核心章节）
-  • _meta.json — 元数据（5字段）
-
-Subdirectories (create as needed):
-  • references/     — 渐进式 MD 辅助文档
-  • scripts/  — 可执行脚本和工具 + spec/
-  • assets/   — 静态资源（可选）
-  • tests/    — 测试（可选）
-
-Layout levels:
-  minimal  — SKILL.md + _meta.json
-  standard — + scripts/ + references/
-  full     — + assets/ + tests/
-
-Migration rules: M-01 ~ M-06 defined
+$ python -m scripts.skill_audit audit ./my-skill --json
 ```
 
 ---

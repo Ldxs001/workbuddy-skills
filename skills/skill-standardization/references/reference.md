@@ -9,7 +9,6 @@
 
 1. [skill_builder — 构建器](#skill_builder)
 2. [skill_audit — 审查器](#skill_audit)
-3. [json_loader.py — 规范加载器](#json_loaderpy)
 
 ---
 
@@ -207,7 +206,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-12 | ERROR | 外部数据目录规范性 | 外部数据目录路径符合 skills/.standardization/<skill-name>/ 约定，_meta.json 含 data_dir 字段且一致，且无数据泄露风险 |
 | R-13 | ERROR | 敏感信息访问声明 | 脚本含敏感信息访问（memory/credentials/token）时，frontmatter 须声明 sensitive_access: true 并说明用途 |
 | R-14 | ERROR | 关键位置写入声明 | 脚本含关键位置写入（skills/技能数据目录/系统目录）时，frontmatter 须声明 critical_write: true 并说明用途 |
-| R-15 | ERROR | 高权限操作授权检查 | 脚本含文件删除/网络请求/subprocess 调用时，执行前须调用 authorization_manager.py 请求用户授权 |
+| R-15 | ERROR | 高权限操作授权检查 | 脚本含文件删除/网络请求/subprocess 调用时，须在 frontmatter 声明对应权限并说明用途 |
 | R-16 | WARN | 权限权重说明 | 建议在 SKILL.md 或 references/ 中说明各操作的权限权重，便于审查时评估风险 |
 | R-17 | ERROR | 渐进加载引用（强制） | SKILL.md > 230 行时必须拆分到 references/，并通过「→ 详见 references/xxx.md」引用 |
 | R-18 | WARN | 反模式具体性 | 正文含 ## 反模式/常见错误 章节，且每条反模式含具体描述（≥20字）或代码示例 |
@@ -234,58 +233,6 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 
 ---
 
-## json_loader.py
-
-> 路径：`scripts/json_loader.py`
->
-> 用途：按需加载 spec/ 下的 JSON 规范定义
-
-### load 子命令
-
-加载指定模块的规范定义并打印到标准输出。
-
-**语法：**
-```bash
-python -m json_loader load <module_name>
-```
-
-**可用模块：**
-
-| module_name | 对应文件 | 内容概述 |
-|-------------|---------|----------|
-| `frontmatter` | `spec/frontmatter.json` | Frontmatter 字段定义（3必须+7可选） |
-| `body` | `spec/body.json` | 正文章节规范（5必须+4推荐+N可选） |
-| `rules` | `spec/rules.json` | 审查规则 R-01~R-26 完整定义 |
-| `structure` | `spec/structure.json` | 目录结构规范（三级复杂度+迁移规则） |
-| `progressive_md` | `spec/progressive_md.json` | 渐进式 MD 体系（拆分边界+加载协议+文件映射） |
-| `all` | *全部* | 加载所有模块的合并视图 |
-
-### list 子命令
-
-列出所有可用模块及其状态。
-
-```bash
-python -m json_loader list
-```
-
-### show 子命令
-
-显示模块的详细元信息（版本、依赖等）。
-
-```bash
-python -m json_loader show <module_name>
-```
-
-### refs 子命令
-
-查看模块间的引用关系图。
-
-```bash
-python -m json_loader refs
-```
-
----
-
 ## 错误码总表
 
 | 工具 | 退出码 | 含义 |
@@ -294,8 +241,6 @@ python -m json_loader refs
 | skill_builder | `1` | 参数错误/目录已存在/不存在 |
 | skill_audit | `0` | 审查完成（默认模式） |
 | skill_audit | `1` | 严格模式下有 ERROR（--strict） |
-| json_loader | `0` | 成功 |
-| json_loader | `1` | 模块不存在/文件读取失败 |
 
 ---
 
@@ -375,79 +320,6 @@ python -m permission_checker.py skills/my-skill --json
 
 ---
 
-## authorization_manager.py
-
-> 路径：`scripts/authorization_manager.py`
->
-> 用途：管理高权限操作的授权请求和检查
-
-### 基本用法
-
-```bash
-# 请求统一审批（累积多个操作）
-python -m authorization_manager.py request --type batch \
-  --operations '[{"type":"delete","file":"/path/to/file"},...]' \
-  --skill-dir <skill-dir>
-
-# 请求即时审批（单个高风险操作）
-python -m authorization_manager.py request --type immediate \
-  --operation '{"type":"delete","file":"/path/to/file"}' \
-  --reason "需要删除临时文件" \
-  --skill-dir <skill-dir>
-
-# 检查是否已授权
-python -m authorization_manager.py check \
-  --operation '{"type":"delete","file":"/path/to/file"}' \
-  --skill-dir <skill-dir>
-
-# 列出待审批操作
-python -m authorization_manager.py list --skill-dir <skill-dir>
-
-# 审批（通过/拒绝）
-python -m authorization_manager.py approve <request-id> [--approve|--reject]
-```
-
-### AI 调用示例
-
-在 skill 脚本中调用授权管理器：
-
-```python
-import subprocess
-import sys
-
-def request_authorization(operation, reason):
-    """请求用户授权（即时审批）"""
-    result = subprocess.run(
-        [
-            sys.executable,
-            os.path.join(os.path.dirname(__file__), "authorization_manager.py"),
-            "request",
-            "--type", "immediate",
-            "--operation", json.dumps(operation, ensure_ascii=False),
-            "--reason", reason,
-            "--skill-dir", skill_dir,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode == 0:
-        response = json.loads(result.stdout)
-        return response.get("approved", False)
-    return False
-
-# 使用示例
-if request_authorization(
-    {"type": "delete", "file": "/path/to/temp.txt"},
-    "需要删除临时文件"
-):
-    os.remove("/path/to/temp.txt")
-else:
-    print("❌ 用户未授权，跳过删除操作")
-```
-
----
-
 ## 版本号更新文件映射表
 
 | 更新类型 | 需同步版本号的文件位置 | 升级类型 |
@@ -506,158 +378,6 @@ python scripts/safe_io.py patch-line --file <path> --line <N> --content "<text>"
 | `--flags` | int | 否 | 0 | Python re 标志位 |
 | `--line` | int | 是 | - | 目标行号 |
 | `--output` | str | 否 | stdout | 输出文件路径(仅 read) |
-
----
-
-### skill_rollback — 备份回滚
-
-**已有 API 文档：** 见上文 [skill_rollback](#skill_rollback) 章节。
-
-**CLI 子命令：**
-
-```bash
-# 列出所有备份
-python scripts/skill_rollback.py list
-
-# 回滚到指定备份
-python scripts/skill_rollback.py rollback <rollback_id>
-
-# 查看备份差异
-python scripts/skill_rollback.py show <rollback_id>
-
-# 清理旧备份（保留最近N个，默认10）
-python scripts/skill_rollback.py purge [keep_count]
-```
-
-**参数表：**
-
-| 子命令 | 参数 | 必需 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| `list` | - | - | - | 列出 backups/ 下所有备份 |
-| `rollback` | `<id>` | 是 | - | 回滚到指定 rollback_id |
-| `show` | `<id>` | 是 | - | 显示备份与当前文件的差异 |
-| `purge` | `[N]` | 否 | 10 | 清理旧备份，保留最近N个 |
-
----
-
-### run_audit — 全量审计入口
-
-**功能：** 对指定技能目录执行全部25条规则(R-01~R-26)审计。通过子命令模式区分不同操作。
-
-```bash
-# 审查单个技能
-python scripts/run_audit.py audit <skill_dir>
-
-# JSON 格式输出 + 自动修复
-python scripts/run_audit.py audit <skill_dir> --json --fix
-
-# 带 manifest 版本比对 (R-10)
-python scripts/run_audit.py audit <skill_dir> --manifest-version 2.38.8
-
-# 指定进度文件（过程管理）
-python scripts/run_audit.py audit <skill_dir> --progress-file .progress.md
-
-# 批量审查所有技能
-python scripts/run_audit.py audit-all <skills_dir> [--json] [--manifest FILE]
-
-# 列出所有审查规则
-python scripts/run_audit.py rules
-
-# 输出创建模板（供 LLM 创建技能时参考）
-python scripts/run_audit.py create-template [--json]
-python scripts/run_audit.py template          # 别名
-
-# 针对性修复（v2.37.0+）
-python scripts/run_audit.py fix <skill_dir> --key name --value my-skill
-python scripts/run_audit.py fix <skill_dir> --key name version --dry-run
-```
-
-**子命令参数表：**
-
-| 子命令 | 位置参数 | 可选参数 | 说明 |
-|--------|----------|----------|------|
-| `audit` | `<skill_dir>` | `--json`, `--manifest-version VER`, `--progress-file FILE`, `--fix` | 审查单个技能 |
-| `audit-all` | `<skills_dir>` | `--json`, `--manifest FILE` | 批量审查所有技能 |
-| `rules` | - | - | 列出 R-01~R-26 规则清单 |
-| `create-template` / `template` | - | `--json` | 输出创建模板 |
-| `fix` | `<skill_dir>` | `--key KEY [...]`, `--value VAL`, `--dry-run` | 针对性修复(见 fix 子命令) |
-
-**fix 子命令参数：**
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `skill_dir` | str(位置) | 是 | 技能根目录路径 |
-| `--key` | str[] | 否 | 修复 key（可多个），留空列出所有可用 key |
-| `--value` | str | 否 | 修复参数值（如 `true`、`my-skill`） |
-| `--dry-run` | flag | 否 | 仅模拟，不实际更新 |
-
-**示例：**
-
-```bash
-# 审查单个技能
-python scripts/run_audit.py audit ~/.workbuddy/skills/<skill-name>
-
-# 批量审查 skills/ 目录下所有技能
-python scripts/run_audit.py audit-all ~/.workbuddy/skills --json
-
-# 修复 R-01 名称
-python scripts/run_audit.py fix ~/.workbuddy/skills/my-skill --key name --value my-skill
-
-# 查看可修复项（不指定 --key）
-python scripts/run_audit.py fix ~/.workbuddy/skills/my-skill
-```
-
----
-
-### update_all_versions — 批量版本号更新
-
-**功能：** 统一更新 SKILL.md frontmatter 和 _meta.json 中的版本号。三层保护机制。
-
-```bash
-python scripts/update_all_versions.py --skill <skill_name> --version <new_version> --confirm
-```
-
-**参数表：**
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `--skill` | str | 是 | 技能名称（如 skill-standardization） |
-| `--version` | str | 是 | 目标版本号（三段式，如 2.38.8） |
-| `--confirm` | flag | 是 | 必须显式确认，防止误操作 |
-
-**保护机制：**
-1. `--skill` / `--version` 均为必需参数，缺一报错
-2. `--confirm` 必须显式传入，缺一报错
-3. 无参数运行输出 `--help` 信息，不执行任何操作
-
-**更新范围：**
-- SKILL.md frontmatter 中的 `version` 字段
-- _meta.json 中的 `version` 字段（如存在）
-
----
-
-### update_skill_frontmatter — Frontmatter 字段更新
-
-**功能：** 更新 SKILL.md frontmatter 中的单个字段。
-
-```bash
-python scripts/update_skill_frontmatter.py <skill_dir> <field> <value>
-```
-
-**参数表：**
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `skill_dir` | str(位置) | 是 | 技能根目录路径 |
-| `field` | str(位置) | 是 | frontmatter 字段名(如 version, description) |
-| `value` | str(位置) | 是 | 新值(布尔值用 true/false) |
-
-**示例：**
-
-```bash
-python scripts/update_skill_frontmatter.py /path/to/skill version 2.38.8
-python scripts/update_skill_frontmatter.py /path/to/skill sensitive_access true
-```
 
 ---
 
@@ -780,26 +500,6 @@ md = format_progress_markdown(data_dir)
 
 ---
 
-### op_logger — 操作日志
-
-**已有 API 文档：** 见上文 [op_logger](#op_logger) 章节。
-
-**CLI 用法：**
-
-```bash
-python scripts/op_logger.py "<operation>" "<details>" [--output <path>]
-```
-
-**参数表：**
-
-| 参数 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `operation` | str(位置) | 是 | - | 操作名称(如 audit, fix) |
-| `details` | str(位置) | 是 | - | 操作详情(如 R-01 fix applied) |
-| `--output` | str | 否 | 自动路径 | 日志输出路径(默认 .standardization/<skill>/operations.log) |
-
----
-
 ### permission_checks — 权限检查函数集
 
 **功能：** R-13~R-26 权限相关规则的检查函数。被 audit 引擎调用，无独立 CLI。
@@ -848,76 +548,30 @@ result = check_sensitive_access_declaration(
 | `updater.py` | skill_builder | Update 模式标准化流程 | `standardize_update()` |
 | `migrator.py` | skill_builder | Refactor 模式迁移流程 | `standardize_refactor()` |
 | `version_manager.py` | skill_builder | 版本号检测与升级策略 | `detect_version()`, `upgrade_version()` |
-| `json_loader.py` | 顶层 | 渐进式加载 JSON 能力沉淀 | 见上文 [json_loader](#json_loader) 章节 |
-| `op_logger_patch.py` | 顶层 | op_logger 兼容补丁 | 自动加载 |
 
 ### 调用关系
 
 ```
-run_audit.py (入口)
-  └─ skill_builder
-       ├─ creator / updater / migrator  (模式路由)
-       └─ version_manager               (版本管理)
-  └─ skill_audit
-       ├─ audit_runner                  (编排25条规则)
-       ├─ frontmatter_checker           (R-01~R-26)
-       ├─ structure_checker             (R-07~R-26)
-       ├─ permission_checks             (R-13~R-26)
-       ├─ artifact_checker              (R-11)
-       ├─ data_dir_checker              (R-22)
-       ├─ fix.py                        (apply_fix分发)
-       ├─ report_generator              (输出格式化)
-       └─ utils.py                      (通用工具)
-  └─ permission_checker                 (权限扫描)
-  └─ progress_manager                   (进度追踪)
-  └─ safe_io / op_logger                (基础设施)
+skill_builder
+  ├─ creator / updater / migrator  (模式路由)
+  └─ version_manager               (版本管理)
+skill_audit
+  ├─ audit_runner                  (编排25条规则)
+  ├─ frontmatter_checker           (R-01~R-26)
+  ├─ structure_checker             (R-07~R-26)
+  ├─ permission_checks             (R-13~R-26)
+  ├─ artifact_checker              (R-11)
+  ├─ data_dir_checker              (R-22)
+  ├─ fix.py                        (apply_fix分发)
+  ├─ report_generator              (输出格式化)
+  └─ utils.py                      (通用工具)
+permission_checker                 (权限扫描)
+progress_manager                   (进度追踪)
+safe_io                            (基础设施)
 ```
 
 ## 脚本 CLI 使用参考
 以下是 skill-standardization 下所有带命令行接口的脚本的使用说明，按照渐进式加载规范放入本章节，大模型可根据需要加载本章节参考。
----
-### scripts/update_all_versions.py
-**功能**: 批量更新指定技能的版本号到目标版本，覆盖 SKILL.md 和 _meta.json。
-**三层保护**: 必须同时提供 --skill、--version、--confirm 参数，无参数运行输出 --help。
-**用法**:
-```bash
-python scripts/update_all_versions.py --skill <技能名> --version <目标版本> --confirm
-```
-**参数说明**:
-| 参数 | 说明 | 必需 | 默认值 |
-|------|------|------|--------|
-| `--skill` | 目标技能名称（如 `skill-standardization`） | 是 | — |
-| `--version` | 目标版本号（三段式，如 `2.38.8`） | 是 | — |
-| `--confirm` | 确认执行标志（必须显式传入） | 是 | — |
-**示例**:
-```bash
-python scripts/update_all_versions.py --skill skill-standardization --version 2.38.8 --confirm
-```
----
-### scripts/run_audit.py
-**功能**: 对指定技能目录执行全量规则审计（R-01~R-26），支持 audit、check、fix 三种子命令。
-**用法**:
-```bash
-# 审计模式（默认）
-python scripts/run_audit.py audit <skill_dir> [--output text|json|html] [--fix]
-# 检查模式（快速检查核心规则）
-python scripts/run_audit.py check <skill_dir>
-# 修复模式（自动修复可修复的问题）
-python scripts/run_audit.py fix <skill_dir>
-```
-**参数说明**:
-| 参数 | 说明 | 必需 | 默认值 |
-|------|------|------|--------|
-| `subcommand` | 子命令：`audit`（全量审计）、`check`（快速检查）、`fix`（自动修复） | 是 | `audit` |
-| `skill_dir` | 目标技能根目录路径 | 是（audit/fix 模式） | — |
-| `--output` | 输出格式：`text`（默认）、`json`、`html` | 否 | `text` |
-| `--fix` | 自动修复可修复的问题（仅 audit 模式） | 否 | `False` |
-**示例**:
-```bash
-python scripts/run_audit.py audit . --output json > audit_report.json
-python scripts/run_audit.py check .
-python scripts/run_audit.py audit . --fix
-```
 ---
 ### scripts/safe_io.py
 **功能**: 提供原子化、备份安全的文件读写操作，是所有 .md 文件更新的唯一合规入口。
@@ -951,31 +605,6 @@ python scripts/safe_io.py patch-regex --file SKILL.md --pattern "version: .*" --
 python scripts/safe_io.py patch-line --file SKILL.md --line 5 --content "version: 2.38.8"
 ```
 ---
-### scripts/skill_rollback.py
-**功能**: 管理技能更新的备份和回滚，支持列出备份、回滚到指定版本、查看差异、清理旧备份。
-**子命令**: `list`、`rollback`、`show`、`purge`
-**用法**:
-```bash
-python scripts/skill_rollback.py list
-python scripts/skill_rollback.py rollback <backup_id>
-python scripts/skill_rollback.py show <backup_id>
-python scripts/skill_rollback.py purge [keep_count]
-```
-**参数说明**:
-| 子命令 | 参数 | 说明 | 必需 | 默认值 |
-|---------|------|------|------|--------|
-| `list` | — | 列出所有备份（按时间倒序） | — | — |
-| `rollback` | `backup_id` | 目标备份 ID（从 `list` 获取） | 是 | — |
-| `show` | `backup_id` | 目标备份 ID | 是 | — |
-| `purge` | `keep_count` | 保留的备份数量 | 否 | 10 |
-**示例**:
-```bash
-python scripts/skill_rollback.py list
-python scripts/skill_rollback.py rollback 20260528_120000_123456_SKILL.md_abc12345.bak
-python scripts/skill_rollback.py show 20260528_120000_123456_SKILL.md_abc12345.bak
-python scripts/skill_rollback.py purge 5
-```
----
 ### scripts/permission_checker.py
 **功能**: 扫描技能目录的权限风险，检查敏感访问、关键写入、授权说明等。
 **用法**:
@@ -994,44 +623,6 @@ python scripts/permission_checker.py .
 python scripts/permission_checker.py . --verbose --output permission_report.json
 ```
 ---
-### scripts/op_logger.py
-**功能**: 记录技能操作日志到 `.standardization/<skill>/.operations.log`，用于审计操作历史。
-**用法**:
-```bash
-python scripts/op_logger.py "<操作名称>" "<操作详情>" [--output <log_path>]
-```
-**参数说明**:
-| 参数 | 说明 | 必需 | 默认值 |
-|------|------|------|--------|
-| `operation` | 操作名称（如 `audit`、`fix`、`update_version`） | 是 | — |
-| `details` | 操作详情（如 `R-01 fix applied`、`version updated to 2.38.8`） | 是 | — |
-| `--output` | 日志输出路径 | 否 | `.standardization/<skill>/.operations.log` |
-**示例**:
-```bash
-python scripts/op_logger.py "audit" "R-01~R-26 审计完成，24/24 PASS"
-python scripts/op_logger.py "update_version" "version updated to 2.38.8"
-```
----
-### scripts/update_skill_frontmatter.py
-**功能**: 更新 SKILL.md frontmatter 中的指定字段（如 version、description、author 等）。
-**用法**:
-```bash
-python scripts/update_Skill_frontmatter.py <skill_dir> <field> <value>
-```
-**参数说明**:
-| 参数 | 说明 | 必需 | 默认值 |
-|------|------|------|--------|
-| `skill_dir` | 目标技能根目录路径 | 是 | — |
-| `field` | 要更新的 frontmatter 字段名（如 `version`、`description`） | 是 | — |
-| `value` | 字段的新值 | 是 | — |
-**示例**:
-```bash
-python scripts/update_Skill_frontmatter.py . version 2.38.8
-python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范引擎，支持 R-01~R-26 规则审计"
-```
----
----
-
 ### scripts/progress_manager.py
 **功能**: 管理审计进度，支持创建进度文件、更新进度、加载进度、格式化进度条（无独立 CLI，仅作为 API 供其他脚本调用）。
 **Python API 示例**:
