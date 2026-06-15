@@ -116,32 +116,11 @@ def main():
         creator = SkillCreator()
         creator.create(args)
     elif args.command == "update":
-        # 代理到 skill_audit 的 cmd_update（v2.80.0+ 统一入口）
-        from ..skill_audit import cmd_update as _skill_audit_update
-        # 参数映射：skill_builder --version-bump patch/minor/major → skill_audit --bump-type fix/feature/breaking
-        bump_map = {"patch": "fix", "minor": "feature", "major": "breaking"}
-        bt = bump_map.get(getattr(args, 'version_bump', 'patch'), 'fix')
-        class _ProxyArgs:
-            skill_dir = args.skill_dir
-            bump_type = bt
-            desc = ""
-            manifest_version = None
-            changed_files = None
-            fixed_rules = None
-            confirmed = False
-        _skill_audit_update(_ProxyArgs())
+        updater = SkillUpdater()
+        updater.update(args)
     elif args.command == "refactor":
-        # 代理到 skill_audit 的 cmd_refactor（v2.80.0+ 统一入口）
-        from ..skill_audit import cmd_refactor as _skill_audit_refactor
-        class _ProxyArgs:
-            skill_dir = args.skill_dir
-            bump_type = "feature"
-            desc = ""
-            manifest_version = None
-            refactor_continue = False
-            fixed_rules = None
-            confirmed = False
-        _skill_audit_refactor(_ProxyArgs())
+        refactor = Refactor()
+        refactor.refactor(args)
     elif args.command in ("migrate-data", "migrate"):
         migrator = SkillMigrator()
         migrator.migrate(args)

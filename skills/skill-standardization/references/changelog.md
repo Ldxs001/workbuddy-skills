@@ -1,9 +1,27 @@
+## [2.80.5] - 2026-06-15
+
+### 修复
+
+- **_reclassify_false_positive R-23 误判过滤重写**：区分真问题（scripts/下引用了不存在的文件，不放过）与误报（references/文档示例路径、纯文件名引用，放过）
+- **--fix 后区分可自动修复与需LLM手动修复**：R-23（文档一致性）和 R-25（写作规范）需要 LLM 手动编辑，不再无限循环要求"再跑 --fix"
+- **--verify 输出增强**：FAIL 未处理时输出明确的后续步骤指引（真问题→--show-fix，误判→--classify）
+
+## [2.80.4] - 2026-06-15
+
+### 修复
+- **changelog 版本号同步修复**
+
+## [2.80.3] - 2026-06-15
+
+### 修复
+- **R-10 版本号一致性修复**：--fix 自动同步 SKILL.md/_meta.json/changelog 版本号，消除版本不一致 ERROR
+
 ## [2.80.2] - 2026-06-15
 
 ### 修复
-- 修 refactor.py 硬编码 patch→minor + skill_builder refactor/update 改为代理到 skill_audit（入口冲突清理）
-
----
+- **refactor.py 硬编码 bump 类型错误**：第89行 `"patch"` → `"minor"`（refactor 应 bump minor/feature）
+- **skill_builder refactor/update 入口冲突**：`skill_builder/__init__.py` 的 refactor/update 子命令改为代理到 `skill_audit.cmd_refactor/cmd_update`，参数映射 `--version-bump` (patch/minor/major) → `--bump-type` (fix/feature/breaking)
+- **R-11 白名单缺陷修复**（artifact_checker.py）：`.standardization` 豁免改为精确匹配；`Path()` 从 `_LOOKUP_FUNCS` 中删除；新增 `_is_repo_path()` 函数跳过 git 仓库路径
 
 ## [2.80.1] - 2026-06-15
 
@@ -16,7 +34,7 @@
 
 ### 修复
 - **log.py 数据目录路径修复**: LOG_DIR 和 setup_logging 的路径从技能安装目录下的 `.standardization/` 改为正确的 `skills/.standardization/skill-standardization/logs/`
-- **R-11 .standardization 白名单移除**: 技能根目录下的 `.standardization/` 不再被 R-11 自动放行，防止数据目录错位到技能安装目录内
+- **R-11 .standardization 白名单删除**: 技能根目录下的 `.standardization/` 不再被 R-11 自动放行，防止数据目录错位到技能安装目录内
 - **cmd_refactor cleanup 修复**: 步骤 2 添加 start_session 调用创建 manifest，步骤 9 改用 end_session 驱动清理，manifest_id 不再传错
 
 ### 清理

@@ -1,13 +1,13 @@
 ---
 name: skill-standardization
-version: 2.80.2
+version: 2.80.5
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-data_dir: ../.standardization/skill-standardization/
+data_dir: ../.standardization/skill-standardization/data
 tags: ['standardization', 'skill-builder', 'skill-audit', 'validation', 'json-loader', 'refactor', 'version-bump', 'changelog-auto', 'data-dir']
 external_data_dir: true
 trigger: ['帮我看看这个技能写得怎么样', '检查这个技能是否规范', '审计 skill', '创建新技能', '更新 skill', '重构技能', 'skill 规范', 'R-规则', '这个 skill 质量怎么样', '帮我检查一下这个 skill 的格式', '看看这个 skill 有没有问题', '给这个 skill 做个体检', '规范一下这个 skill', '标准化这个项目- 帮我看看这个技能写得怎么样', '检查这个技能是否规范', '审计 skill', '创建新技能', '更新 skill', '重构技能', 'skill 规范', 'R-规则']
@@ -78,7 +78,7 @@ create_permissions_md: true
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
 | `references/architecture.md` | 架构设计 | skill-standardization 整体架构。包含：模块关系、数据流、核心设计决策。 | 无 |
 | `references/blueprint_flow.md` | 参考文档 | > 定义蓝皮书（Blueprint）、审计（Audit）、修复循环（Fix Loop）三者的关系与流程。 | 无 |
-| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
 | `references/data_dir_map.md` | 路径参考 | 数据目录路径对照表。包含：安装目录、标准化目录、备份目录及用途。 | 无 |
 | `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
@@ -86,6 +86,29 @@ create_permissions_md: true
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 | `references/reference.md` | 命令参考 | CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。 | 无 |
 | `references/rules.md` | 审计规则 | R-01~R-26 审计规则定义。包含：检查逻辑、修复指引、设计背景。 | R-01~R-26 |
+## 快速开始
+
+### 场景 1：审计（仅检查）
+
+```bash
+python -m scripts.skill_audit audit /path/to/target-skill --confirmed
+# → 输出审查报告，包含 PASS/WARN/FAIL 逐条明细
+```
+
+### 场景 2：审计+修复
+
+```bash
+python -m scripts.skill_audit audit /path/to/target-skill --fix --confirmed
+# → 自动修复格式类问题 → 重新审计 → 输出修复前后对比
+```
+
+### 场景 3：全流程改造
+
+```bash
+python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
+# → 1/7 蓝皮书 → 2/7 备份 → 3/7 审计 → 4/7 修复 → 5/7 验证 → 6/7 bump → 7/7 清理
+```
+
 ## 工作流程
 
 ### 【流程门禁】Step 0：模式识别（强制）
@@ -131,7 +154,7 @@ create_permissions_md: true
 - **流程**：
   1. 语义确认
   2. 蓝皮书扫描 [1/7]
-  3. 变更声明（流程钩子，LLM 输出 `{"changed_files": [...], "description": "..."}`）[2/7]
+  3. 更新声明（流程钩子，LLM 输出 `{"changed_files": [...], "description": "..."}`）[2/7]
   4. 针对性审计（仅跑 changed_files 相关规则）[3/7]，内部含 **★★★ 细碎修复循环 ★★★** [4/7]：
      - 自动修复可修复项
      - LLM 修复后通过 `--fixed-rules R-23,R-26` 声明修了哪些规则
@@ -173,26 +196,16 @@ create_permissions_md: true
 
 ## 快速开始
 
-### 场景 1：审计（仅检查）
-
 ```bash
-python -m scripts.skill_audit audit /path/to/target-skill --confirmed
-# → PASS (25/25 通过)
+# 审计（仅检查）
+python -m scripts.skill_audit audit <skill-dir> --confirmed
+# 审计+修复
+python -m scripts.skill_audit audit <skill-dir> --fix --confirmed
+# 全流程改造
+python -m scripts.skill_audit refactor <skill-dir> --confirmed
 ```
 
-### 场景 2：审计+修复
-
-```bash
-python -m scripts.skill_audit audit /path/to/target-skill --fix --confirmed
-# → 修正后 PASS
-```
-
-### 场景 3：全流程改造
-
-```bash
-python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
-# → 1/7 蓝皮书 → 2/7 备份 → 3/7 审计 → 4/7 修复 → 5/7 验证 → 6/7 bump → 7/7 清理
-```
+→ 详见 `references/examples.md` 获取完整交互示例
 
 ## 数据目录说明
 
@@ -200,6 +213,15 @@ python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
 
 ```text
 ../.standardization/skill-standardization/
+├── data/
+│   ├── .verify_fix_map.json  # --verify 输出的修复指引映射
+│   ├── .verify_fp.json       # --classify 标记的误判列表
+│   └── ...
+├── backup/
+│   └── <skill>_<timestamp>.zip  # refactor 自动备份
+├── logs/
+│   └── ops.log               # 操作日志
+└── ...
 ```
 
 > 安装目录 `skills/skill-standardization/` 只保留 SKILL.md 和 scripts/，数据文件不越位。

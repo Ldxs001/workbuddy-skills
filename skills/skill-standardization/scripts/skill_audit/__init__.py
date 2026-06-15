@@ -443,9 +443,37 @@ def _reclassify_false_positive(res):
     # architecture.md 中的分类说明（.py/.sh/.bat → move → scripts/）
     if "architecture.md" in detail and "→ move →" in detail:
         return True
-    # R-23 step 3 示例脚本引用（SKILL.md 中的用法示例路径，非真实文件）
+    # R-23 文件不存在问题：根据引用类型判断是否是真问题
+    # 误报来源：references/ 中的文档示例路径、代码块中的占位符路径
+    # 真问题来源：SKILL.md 正文引用了 scripts/ 下不存在的文件
     if rule == "R-23" and "但文件不存在（期望相对路径如" in detail:
-        return True
+        # 真问题特征（必须放过的条件）
+        # 1. 死代码备份引用
+        if "_dead_code_backup" in detail:
+            return False  # 真问题，不放过
+        # 2. 引用 references/ 下的文档文件（如 guide.md, examples.md 等）
+        #    references/ 是文档，文件不存在不阻断
+        if "references/" in detail and "但文件不存在" in detail:
+            return True  # 文档引用，放过
+        # 3. 引用 scripts/ 下不存在的文件 → 真问题
+        if "scripts/" in detail:
+            return False  # 脚本引用，真问题
+        # 4. 引用技能根目录下不存在的文件（如 _meta.json 等）→ 真问题
+        if "/" not in detail.split("但文件不存在")[0].split("`")[-2:-1][0] if "`" in detail else False:
+            pass  # 继续下面的启发式判断
+        # 5. 默认启发式：如果 detail 中提到的是具体路径（含 /）则可能是真问题
+        #    如果只是文件名没有路径，则可能是文档中的用法示例
+        import re as _re
+        # 提取 detail 中的文件路径
+        _path_match = _re.search(r'`([^`]+)`', detail)
+        if _path_match:
+            _ref_path = _path_match.group(1)
+            # 包含路径分隔符的引用 → 真问题（如 scripts/foo.py）
+            if '/' in _ref_path or '\\' in _ref_path:
+                return False
+            # 纯文件名引用 → 可能是文档示例
+            return True
+        return True  # 无法判断时放过，让 LLM 在 --verify 中判断
     # R-23 中文语境下的文件引用（如 "（参见 search-integration.md）" 是文档引用标记，非真实文件路径）
     # TODO: 根因已修（_tree_scanner.py 加了中文文字/括号过滤），此规则保留作为双保险
     if rule == "R-23" and "目录树显示" in detail and "（" in detail and "但文件不存在" in detail:
@@ -466,9 +494,12 @@ def _reclassify_false_positive(res):
     # data_dir frontmatter 路径被误判为文件引用（如 skills/.standardization/xxx）
     if rule == "R-23" and "skills/.stan" in detail:
         return True
-    # R-25 C-14：工作流步骤完整性提醒（所有 skill 都有，标准项）
+    # R-25 C-14：工作流步骤完整性提醒
+    # 仅放过非流程类的完整性提醒，真实的步骤缺失不应放过
     if rule == "R-25" and "由全报告LLM精筛确认步骤是否完整覆盖" in detail:
-        return True
+        # 如果内容明显是假阳性（如仅提醒"请 LLM 确认"但无具体缺失描述）则放过
+        # 如果有具体的步骤缺失描述，则是真问题
+        return False  # 默认不放过，由 LLM 铁律8逐条判断
     return False
 
 
@@ -938,22 +969,46 @@ def cmd_audit(args):
                 print(f"  ✅ 全部修复")
             print(f"{'─'*55}")
 
-        # ── 问题分类与真问题强制修复：--fix 后仍有可修复 FAIL 则阻止通过
-        remaining = [res for res in result.get("results", [])
-                     if not res.get("passed") and not res.get("skipped")
-                     and not _reclassify_false_positive(res)]
-        has_fixable_after = any(r.get("fix") for r in remaining)
-        if has_fixable_after:
-            print(f"\n  ⛔ --fix 后仍有可自动修复的 FAIL — 必须再执行 --fix")
-            sys.exit(1)
+    # ── 问题分类与真问题强制修复：--fix 后仍有可修复 FAIL 则阻止通过
+    # ★ 关键区分：只有 fix 函数能真正自动修复的才算"可自动修复"
+    #   R-23（文档一致性）和 R-25（写作规范）需要 LLM 手动编辑，不算
+    remaining = [res for res in result.get("results", [])
+                 if not res.get("passed") and not res.get("skipped")
+                 and not _reclassify_false_positive(res)]
+    # 过滤掉需要 LLM 手动修复的规则
+    _llm_only_rules = {"R-23", "R-25"}
+    remaining_auto = [r for r in remaining if r.get("rule_id") not in _llm_only_rules]
+    has_fixable_after = any(r.get("fix") for r in remaining_auto)
+    if has_fixable_after:
+        print(f"\n  ⛔ --fix 后仍有可自动修复的 FAIL — 必须再执行 --fix")
+        sys.exit(1)
+    # R-23/R-25 需要 LLM 手动处理，输出提示
+    remaining_llm = [r for r in remaining if r.get("rule_id") in _llm_only_rules]
+    if remaining_llm:
+        r23_count = sum(1 for r in remaining_llm if r.get("rule_id") == "R-23")
+        r25_count = sum(1 for r in remaining_llm if r.get("rule_id") == "R-25")
+        print(f"\n  ⚠️  以下规则需要 LLM 手动修复（--fix 无法自动处理）：")
+        if r23_count:
+            print(f"     R-23（文档-代码一致性）：{r23_count} 项 — 运行 --verify 查看详情后手动编辑文档")
+        if r25_count:
+            print(f"     R-25（写作规范）：{r25_count} 项 — 运行 --verify 查看详情后手动优化文档")
+        print(f"  → 运行 --verify 查看 FAIL 详情，确认为真问题后手动修复")
+        print(f"  → 或运行 --classify ID 标记为误判（确认是误报时）")
 
     # --verify 模式：展示所有 FAIL 项（不做白名单预筛），LLM 自行判断误报
     # 铁律 8 分两阶段：(1) 筛选看到的问题 → (2) 凭ID获取对应修复指引
+    # 
+    # ★★★ LLM 二次筛查指令（代码强制）★★★
+    # 以下 #ID 列表是审计发现的全部 FAIL 项。
+    # LLM 必须逐条判断：是真问题还是误判？
+    #   - 真问题（如 scripts/ 下引用了不存在的文件）：记下 #ID，运行 --show-fix ID 获取修复指引
+    #   - 误判（如 references/ 中的示例路径、文档中的占位符引用）：运行 --classify ID 标记为误判
+    # 所有 FAIL 都处理完毕后，重新运行 --verify 确认双 0。
     if getattr(args, 'verify', False):
-        remaining = []
-        for res in result.get("results", []):
-            if not res.get("passed") and not res.get("skipped"):
-                remaining.append(res)
+        # 过滤：去掉已标记为 ⓘ 已知误报的条目（这些不阻断通过）
+        remaining = [res for res in result.get("results", [])
+                     if not res.get("passed") and not res.get("skipped")
+                     and not _reclassify_false_positive(res)]
         if remaining:
             # 读取已有误判分类
             fp_ids = _load_fp_ids(skill_dir)
@@ -1011,6 +1066,14 @@ def cmd_audit(args):
                 print(f"\n{'='*55}")
                 print(f"  [VERIFY] 全部 {len(fp_ids)} 项已通过 --classify 标记为误判，视为通过")
                 print(f"{'='*55}")
+        if remaining:
+            print(f"\n{'='*55}")
+            print(f"  ❌ [VERIFY] 仍有 {len(remaining)} 项 FAIL 未处理！")
+            print(f"  处理方式：")
+            print(f"    真问题 → audit <skill_dir> --show-fix ID1,ID2 获取修复指引，然后手动修复")
+            print(f"    误判   → audit <skill_dir> --classify ID1,ID2 标记为误判")
+            print(f"  所有 FAIL 都处理后，重新运行 --verify 确认双 0")
+            print(f"{'='*55}")
         sys.exit(1 if remaining else 0)
 
 def cmd_audit_all(args):

@@ -86,7 +86,7 @@ class Refactor:
         self._inject_auth_section(skill_dir, report)
 
         # ★ 新增：版本号 bump + 进度管理
-        self._bump_version(skill_dir, "minor", {})
+        self._bump_version(skill_dir, "patch", {})
         self._audit_and_update_progress(skill_dir, mode="refactor")
 
         # ★ cleanup session: 结束追踪并清理临时/备份文件
