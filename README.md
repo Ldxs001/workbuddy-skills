@@ -1,9 +1,9 @@
-# Skills Repository
+# WorkBuddy Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：2026-06-15
 
-本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
+本仓库托管技能合集，码云（Gitee）和 GitHub 双平台同步。
 
 ---
 
@@ -53,7 +53,7 @@ workbuddy-skills/
 ### 方式一：从码云（Gitee）安装
 ```bash
 cd ~/.workbuddy/skills
-git clone https://gitee.com/wUwproject/workbuddy-skills.git temp-skills
+git clone https://gitee.com/USER/REPO.git temp-skills
 cp -r temp-skills/skills/* .
 rm -rf temp-skills
 ```
@@ -61,7 +61,7 @@ rm -rf temp-skills
 ### 方式二：从 GitHub 安装
 ```bash
 cd ~/.workbuddy/skills/
-git clone https://github.com/Ldxs001/workbuddy-skills.git temp-skills
+git clone https://github.com/USER/REPO.git temp-skills
 cp -r temp-skills/skills/* .
 rm -rf temp-skills
 ```

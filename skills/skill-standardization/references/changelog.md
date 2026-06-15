@@ -1,3 +1,10 @@
+## [2.80.2] - 2026-06-15
+
+### 修复
+- 修 refactor.py 硬编码 patch→minor + skill_builder refactor/update 改为代理到 skill_audit（入口冲突清理）
+
+---
+
 ## [2.80.1] - 2026-06-15
 
 ### 修复
