@@ -470,15 +470,14 @@ apply_fix(skill_dir, 'R-07', 'R-18', 'R-19')  # 批量修复
 
 ## 七、与 git-sync 的协作（已解耦）
 
-> **注意**：`skill-standardization` 与 `git-sync` 已完全解耦。以下仅说明集成关系作为架构参考。
+> **注意**：`skill-standardization` 与 `git-sync` 已完全解耦，本技能不依赖也不包含 git-sync 的任何功能。以下仅为历史集成关系说明。
 
 ```
-git-sync 执行时
-  ├─ 步骤 3.5: skill_audit.py audit ← 可选调用（非强制）
-  └─ 审计纯警告模式，不阻断同步
+git-sync 执行时（可选集成）
+  └─ 步骤 3.5: skill_audit.py audit ← 可选调用（非强制，已从 git-sync 核心流程中移除）
 ```
 
-审计功能是独立的——即使没有 git-sync，审计器也能单独运行。两个技能各自维护，互不依赖。
+**本技能的工作流在 bump + cleanup 后即终止**，不涉及 git 推送、commit、CRLF 验证等操作。如果用户需要在推送前自动审计，应由 git-sync 技能独立调用审计功能。
 
 ---
 
@@ -504,30 +503,95 @@ _index.json → frontmatter.json → rules.json
 
 ## 九、关键流程总结
 
-### 9.1 标准化工作流
+### 9.1 标准化工作流（按模式分述）
+
+> **⚠️ 本技能无 git-sync 依赖**。标准化工作流到 bump + cleanup 即终止，不涉及 git 推送/CRLF 验证。git-sync 是独立技能，与本技能已解耦。
+
+#### audit 模式（仅审查，只读）
 
 ```
-用户提出审计/改造需求
+用户请求："检查/审计/评估这个 skill"
   ↓
-AI 加载 skill-standardization
+Step 0 模式识别 → 匹配 audit 关键词
   ↓
 读取目标 skill 的 SKILL.md
   ↓
-[update/refactor 模式] 备份 → ★ inspect 强制前置扫描
-  ↓
-执行 audit（R-01~R-26）或 update/refactor 后续步骤
+执行 R-01~R-26 全量审计
   ↓
 输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
   ↓
-**铁律8**：LLM 逐条阅读审计结果，真问题修复，误判标记通过
+[--fix 时] 自动修正可修复项（frontmatter/版本号/数据目录/反模式/FAQ 等 20+ 条规则）
   ↓
-调用 fix.py 自动修复（如有 --fix），按规则 ID 分派
+[--verify 时] 输出编号 FAIL 条目 [#ID]，每条含独立问题描述
   ↓
-**铁律9**：`audit --verify` 强制验证 0 ERROR 0 WARN
+[--show-fix ID1,ID2] 获取真问题修复指引
+```
+
+#### update 模式（轻量更新，含细碎审计循环）
+
+```
+用户请求："更新/修复/升级这个 skill"
   ↓
-更新版本号（三端同步 + changelog 自动追加）
+Step 0 模式识别 → 匹配 update 关键词 → 语义确认
   ↓
-git-sync 推送前验证 CRLF + 自审状态
+[步骤 1] 蓝皮书扫描 — inspect_skill(skill_dir) 输出结构快照
+  ↓
+[步骤 2] 更新声明（流程钩子 — 强制）
+  LLM 必须输出：{"changed_files": [...], "description": "..."}
+  ↓
+[步骤 3] 针对性审计 — 只跑跟 changed_files 相关的规则
+  ↓
+[步骤 4] ★★★ 修复 + 细碎审计循环 ★★★
+  ┌─────────────────────────────────────────────┐
+  │ LLM 修一批/一类/一个问题                      │
+  │   ↓                                          │
+  │ ★ 细碎钩子触发 ★                              │
+  │ LLM 声明 fixed_rules：{"fixed_rules": [...]} │
+  │   ↓                                          │
+  │ 代码自动跑针对性审计（filter_rules=...）       │
+  │   ↓                                          │
+  │ 还有 FAIL？→ 继续修                           │
+  │ 全部 PASS？→ 退出循环                         │
+  └─────────────────────────────────────────────┘
+  ↓
+[步骤 5] 全量审计确认 — 还有 FAIL？→ 回到步骤 4
+  ↓
+[步骤 6] 针对性一致性审查 + 修复（只审 changed_files）
+  ↓
+[步骤 7] 输出报告 → bump (PATCH) → cleanup
+```
+
+#### refactor 模式（全量改造，含细碎审计循环）
+
+```
+用户请求："改造/重构/标准化这个 skill"
+  ↓
+Step 0 模式识别 → 匹配 refactor 关键词 → 语义确认
+  ↓
+[步骤 1] 蓝皮书扫描 — inspect_skill(skill_dir) 输出结构快照
+  ↓
+[步骤 2] 备份 — zip 到 .standardization/<skill>/backup/pre_refactor_<timestamp>.zip
+  ↓
+[步骤 3] 全量审计 — R-01~R-26 全量跑 + LLM 二次筛除
+  ↓
+[步骤 4] ★★★ 修复 + 细碎审计循环 ★★★
+  ┌─────────────────────────────────────────────┐
+  │ LLM 修一批/一类/一个问题                      │
+  │   ↓                                          │
+  │ ★ 细碎钩子触发 ★                              │
+  │ LLM 声明 fixed_rules：{"fixed_rules": [...]} │
+  │   ↓                                          │
+  │ 代码自动跑针对性审计（filter_rules=...）       │
+  │   ↓                                          │
+  │ 还有 FAIL？→ 继续修                           │
+  │ 全部 PASS？→ 退出循环                         │
+  └─────────────────────────────────────────────┘
+  ↓
+[步骤 5] 全量审计确认 — 双 0 验证（全量跑，还有 FAIL → 回到步骤 4）
+  ↓
+[步骤 6] 全量一致性审查 + 修复（全量检查文档-代码一致性）
+  ↓
+[步骤 7] 输出报告 → bump (FEATURE) → cleanup（end_session 驱动）
 ```
 
 ### 9.2 update 模式完整步骤
@@ -535,28 +599,31 @@ git-sync 推送前验证 CRLF + 自审状态
 1. `start_session(skill_dir, "update")` — 创建 manifest（v2.80.0 修复）
 2. `_create_backup(skill_dir, "update", workspace)` — 时间戳完整备份
 3. `skill_inspector.inspect_skill(skill_dir)` — **强制**输出结构蓝皮书
-4. `_check_meta_json()` — 验证 _meta.json 7 字段 + 非标字段标记
-5. `_check_skill_md()` — 验证 SKILL.md 存在性、行数、必填章节
-6. `_check_dir_structure()` — 扫描根目录散落文件
-7. `_check_artifact_paths()` — 产出物路径合规（R-11）
-8. `_check_external_data_dir()` — 外部数据目录合规（R-12）
-9. `_bump_version()` — 版本号自动更新（如传 --version-bump）
-10. `_print_report()` — 输出检查报告
+4. **更新声明（流程钩子）** — LLM 输出 `{"changed_files": [...], "description": "..."}`
+5. **针对性审计** — `audit_skill(skill_dir, filter_files=changed_files)`，只跑相关规则
+6. **★★★ 细碎审计循环 ★★★** — `_run_audit_loop()`：
+   - LLM 修一批 → 声明 `fixed_rules`
+   - 代码自动跑 `audit_skill(skill_dir, filter_rules=fixed_rules)`
+   - 还有 FAIL → 继续修；全部 PASS → 退出循环
+7. **全量审计确认** — `audit_skill(skill_dir)` 全量跑，双 0 验证
+8. **针对性一致性审查** — 只审 changed_files 涉及的文档-代码一致性
+9. `_bump_version()` — 版本号自动更新（patch）
+10. `end_session()` — Manifest 驱动清理
 
 ### 9.3 refactor 模式完整步骤
 
 1. `start_session(skill_dir, "refactor")` — 创建 manifest，注册备份 zip 路径（v2.80.0 修复）
 2. `_create_backup(skill_dir, "refactor", workspace)` — 强制备份
 3. `skill_inspector.inspect_skill(skill_dir)` — **强制**输出结构蓝皮书
-4. `_dry_run()` — 生成迁移计划（仅 --dry-run 时停止）
-5. `_build_migration_plan()` — 按 M-01~M-06 规则编排文件迁移
-6. `_execute_migration()` — 执行移动（仅 move，不 delete）
-7. `_fix_code_references()` — 代码引用重写（--fix-code）
-8. `_verify_migration()` — 字节一致性验证（±1% 容差）
-9. `audit --fix` — 审计 + 自动修复
-10. `audit --verify` — 铁律验证阻断
-11. `bump` — 版本号自动升级（patch）
-12. `end_session()` — Manifest 驱动清理（v2.80.0 修复）
+4. **全量审计** — `audit_skill(skill_dir)` 全量跑 + LLM 二次筛除
+5. **★★★ 细碎审计循环 ★★★** — `_run_audit_loop()`：
+   - LLM 修一批 → 声明 `fixed_rules`
+   - 代码自动跑 `audit_skill(skill_dir, filter_rules=fixed_rules)`
+   - 还有 FAIL → 继续修；全部 PASS → 退出循环
+6. **全量审计确认** — 双 0 验证（全量跑，还有 FAIL → 回到步骤 5）
+7. **全量一致性审查 + 修复** — 全量检查文档-代码一致性（最多3轮重试）
+8. `bump` — 版本号自动升级（feature）
+9. `end_session()` — Manifest 驱动清理
 
 ### 9.4 审计结果判定
 
@@ -658,7 +725,7 @@ exit code 是 LLM 无法忽略的信号。非零退出码意味着验证绝对�
 | 2.73.8 | R-12 log.py 路径违规修复；safe_io.py Windows 写入权限 3次重试；changelog 方括号格式统一 |
 | 2.73.9 | R-15 permissions.md 自动填充（PermissionChecker.scan() 驱动）；新增占位符检测 |
 | 2.75.0 | 删除 blueprint 参数/废弃别名/清理 creator.py blueprint 注入 |
-| 2.76.0 | 流程钩子代码级强制+更新声明+一致性审查增强+规则编号迁移+修复循环（P0-3 P1-5 P2-8） |
+| 2.76.0 | 流程钩子代码级强制+更新声明+一致性审查增强+规则编号迁移+修复循环（P0-3 P1-5 P2-8）。**细碎审计循环代码级实现**：`_run_audit_loop()` 通用修复循环、`_validate_changed_files()` 更新声明校验、`--fixed-rules` CLI 参数 |
 | 2.77.0 | 自改造验证：修复 R-10 changelog 正则 + R-15 占位符检测 bug + _filter_false_positives 遗漏 |
 | 2.78.0 | 一致性审查闭环重构：误判过滤+自动修复+细碎钩子，流程调整为 bump→报告 |
 | 2.79.0 | 修复 outdated_rule_ref 方向（以实际技能为准而非 rules.json），修复误改 R-26→R-25 |
