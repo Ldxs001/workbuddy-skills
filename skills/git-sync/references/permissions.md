@@ -1,3 +1,15 @@
+---
+name: git-sync
+version: 2.9.3
+sensitive_access: false
+critical_write: false
+permission_weight: LOW
+data_dir: ../.standardization/git-sync/
+tags: ['sync', 'git', 'gitee', 'github', 'deploy']
+external_data_dir: true
+trigger: 同步/推送/发布/上传/打包/更新READ ME
+---
+
 # git-sync — 权限说明（详细版）
 
 > 本文档由 `permission_checker.py` 扫描生成，记录 git-sync 所有权限需求、风险等级及功能解释。

@@ -56,6 +56,7 @@ def pack_zip(source_dir, output_zip):
     exclude_extensions = {".pyc", ".pyo", ".pyd", ".bak", ".tmp", ".bak*"}
 
     # 空文件排除白名单（这些空文件需要保留）
+    # LICENSE.txt 已弃用，统一使用 references/LICENSE.md
     empty_file_whitelist = {".gitkeep", ".keep", ".gitignore", "readme"}
 
     parent_dir = os.path.dirname(source)

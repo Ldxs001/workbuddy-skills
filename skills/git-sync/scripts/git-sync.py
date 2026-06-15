@@ -469,6 +469,48 @@ def _get_cred_url(host: str) -> str:
             break  # 精确匹配，直接用
     return best
 
+def _classify_push_error(remote_name: str, stderr: str, stdout: str) -> str:
+    """
+    将 git push/pull 的原始错误输出归类为人类可读的中文描述。
+    防止 LLM 误读原始错误码（如 443 超时误判为"网络正常"）。
+    返回统一格式的错误描述字符串。
+    """
+    raw = (stderr or stdout or "").lower()
+    # ── 网络类错误 ──
+    if "timed out" in raw or "timeout" in raw or "443" in raw:
+        return f"⏱️ 网络超时：{remote_name} 连接超时（可能被墙），请检查网络或重试"
+    if "could not resolve host" in raw or "name or service not known" in raw:
+        return f"🌐 DNS 解析失败：{remote_name} 域名无法解析，请检查网络"
+    if "connection refused" in raw:
+        return f"🔒 连接被拒绝：{remote_name} 拒绝了连接"
+    if "connection reset by peer" in raw:
+        return f"🔌 连接被重置：{remote_name} 连接被对端重置"
+    if "network is unreachable" in raw or "no route to host" in raw:
+        return f"📡 网络不可达：{remote_name} 无法访问，请检查网络连接"
+    if "couldn't connect to server" in raw or "cannot connect" in raw:
+        return f"🔗 无法连接到服务器：{remote_name}"
+    # ── 认证类错误 ──
+    if "permission denied" in raw and "publickey" in raw:
+        return f"🔑 SSH 密钥认证失败：{remote_name} 拒绝了公钥，请检查 SSH 配置"
+    if "authentication failed" in raw or "auth failed" in raw:
+        return f"🔑 认证失败：{remote_name} 用户名或密码/Token 错误"
+    if "could not read from remote repository" in raw:
+        return f"📂 无法读取远程仓库：{remote_name}，请检查仓库地址和权限"
+    if "access denied" in raw or "access denied" in raw:
+        return f"🚫 访问被拒绝：{remote_name} 无此仓库的访问权限"
+    # ── 协议/远程拒绝类错误 ──
+    if "rejected" in raw and "fetch first" in raw or "non-fast-forward" in raw:
+        return f"🔄 推送被拒绝：{remote_name} 远程仓库有未拉取的更新，请 pull --rebase 后重试"
+    if "rejected" in raw and "push" in raw:
+        return f"🚫 推送被拒绝：{remote_name} 拒绝推送，请检查分支权限或冲突"
+    if "couldn't find remote ref" in raw:
+        return f"🔍 远程分支不存在：{remote_name} 的 {branch} 分支不存在"
+    # ── 回退：保留原始错误的前 200 字符 ──
+    truncated = (stderr or stdout or "未知错误").strip()
+    if len(truncated) > 200:
+        truncated = truncated[:200] + "..."
+    return f"❌ 推送失败：{remote_name} - {truncated}"
+
 def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """
     用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector。
@@ -504,7 +546,8 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
                      workdir=WORK_REPO, check=False)
         if r.returncode == 0:
             return True, ""
-        return False, r.stderr.strip() or r.stdout.strip()
+        error_msg = _classify_push_error(remote_name, r.stderr, r.stdout)
+        return False, error_msg
     finally:
         run_git("remote", "set-url", remote_name, raw_url,
                  workdir=WORK_REPO, check=False)
@@ -535,6 +578,9 @@ def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     try:
         r = run_git("pull", remote_name, branch, "--rebase",
                      workdir=WORK_REPO, check=False)
+        if r.returncode != 0:
+            error_msg = _classify_push_error(remote_name, r.stderr, r.stdout)
+            return False, error_msg
         return True, ""
     finally:
         run_git("remote", "set-url", remote_name, raw_url,
@@ -566,7 +612,7 @@ def step_commit_and_push(skill_name: str, version: str):
     r = run_git("diff", "--cached", "--quiet", check=False)
     if r.returncode == 0:
         log(6, 8, "没有变更需要提交", "skip")
-        return True, True
+        return False, False
 
     msg = f"feat: sync {skill_name} v{version}"
     run_git("commit", "-m", msg)
@@ -778,7 +824,7 @@ def main():
             pass
     # ────────────────────────────────────────────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="git-sync.py v2.9.3")
+    parser = argparse.ArgumentParser(description="git-sync.py v2.10.0")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
     parser.add_argument("version", nargs="?", default="",

@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.9.3
+version: 2.10.0
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复跳过同步时状态显示「成功」的误导问题，改为跳过。修复审计问题，统一术语，修正自审粒度。
@@ -8,11 +8,13 @@ sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/git-sync/
-tags: ['sync', 'git', 'zip', 'skill-manager', 'manifest', 'security']
+tags: ['sync', 'git', 'gitee', 'github', 'deploy']
 external_data_dir: true
-trigger: 同步/上传/推送/发布某个skill
+trigger: 同步/推送/发布/上传/打包/更新READ ME
 trigger_negative: 只是看文件/通用git提交/文件同步到云端
 h1_version: true
+meta_field_sync: true
+create_permissions_md: true
 ---
 # git-sync — 三端同步技能
 

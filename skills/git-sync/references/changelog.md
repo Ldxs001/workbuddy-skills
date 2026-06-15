@@ -1,3 +1,12 @@
+## 2.10.0 (2026-06-15)
+
+### 重构
+
+- **错误消息标准化**：新增 `_classify_push_error()` 函数，将 git push/pull 原始错误输出归类为中文描述（超时、DNS、认证、拒绝等），防止 LLM 误读 443 等原始错误码
+- **`_pull_with_cred_url()` 增加错误处理**：pull 失败时也调用 `_classify_push_error()` 标准化错误消息
+- **无变更时 `return True, True` → `return False, False`**：防止 manifest 版本号走在推送前面（无变更时不应更新 manifest）
+- **reference.md 新增"错误码与错误消息说明"章节**：AI 必读，速查错误消息类别和应对原则
+
 ## 2.9.3 (2026-06-09)
 
 ### 修复
