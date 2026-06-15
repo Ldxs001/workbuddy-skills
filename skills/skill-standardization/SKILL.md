@@ -130,15 +130,16 @@ create_permissions_md: true
 - **不适用**：用户说"改造/迁移/重构/大改/标准化"
 - **流程**：
   1. 语义确认
-  2. 蓝皮书扫描 → 变更声明（流程钩子，LLM 输出 `{"changed_files": [...], "description": "..."}`）
-  3. 针对性审计（仅跑 changed_files 相关规则）
-  4. **★★★ 细碎修复循环 ★★★** — 代码级强制，不依赖 LLM 自觉：
-     - LLM 修复一批问题后，通过 `--fixed-rules R-23,R-26` 声明修了哪些规则
-     - 代码自动跑针对性审计确认（`filter_rules=...`），不靠 LLM 说"修好了"
+  2. 蓝皮书扫描 [1/7]
+  3. 变更声明（流程钩子，LLM 输出 `{"changed_files": [...], "description": "..."}`）[2/7]
+  4. 针对性审计（仅跑 changed_files 相关规则）[3/7]，内部含 **★★★ 细碎修复循环 ★★★** [4/7]：
+     - 自动修复可修复项
+     - LLM 修复后通过 `--fixed-rules R-23,R-26` 声明修了哪些规则
+     - 代码自动跑针对性审计确认
      - 还有 FAIL → 继续修；全部 PASS → 退出循环
-  5. 全量审计确认（双 0 验证）
-  6. 针对性一致性审查 + 修复
-  7. bump (PATCH) → cleanup
+  5. 全量审计确认（双 0 验证）[5/7]
+  6. 针对性一致性审查 + 修复循环 [6/7] — 含细碎钩子，LLM 需对比流程描述与代码是否一致
+  7. bump (PATCH) + 最终报告 [7/7]
 - 命令：`python -m scripts.skill_audit audit <skill_dir> --confirmed`（先审计拿报告，LLM 筛查后再执行后续步骤）
 
 **refactor 模式**（全量改造——技能非标准/结构混乱/需要迁移）：
@@ -146,17 +147,17 @@ create_permissions_md: true
 - **不适用**：用户说"简单审计/检查一下"（应走 update）
 - **流程**：
   1. 语义确认 → LLM 检查目录结构，识别并排除非技能目录
-  2. 蓝皮书扫描（跳过已排除目录）
-  3. 备份（zip 到 `.standardization/<skill>/backup/`）
-  4. 全量审计
-  5. **★★★ 细碎修复循环 ★★★** — 代码级强制：
+  2. 蓝皮书扫描（跳过已排除目录）[1/8]
+  3. 备份（zip 到 `.standardization/<skill>/backup/`）+ 启动 cleanup session [2/8]
+  4. 全量审计 [3/8]
+  5. **★★★ 细碎修复循环 ★★★** [4/8] — 代码级强制：
      - 自动修复可修复项（`--fix` 自动修 frontmatter/版本号/数据目录等）
      - LLM 手动修复后通过 `--fixed-rules R-23,R-26` 声明
      - 代码自动跑针对性审计确认
      - 还有 FAIL → 继续修；全部 PASS → 退出循环
-  6. 全量审计确认（双 0 验证）
-  7. 全量一致性审查 + 修复循环（最多 3 轮重试）
-  8. bump (FEATURE) → cleanup（`end_session()` 驱动）
+  6. 全量审计确认（双 0 验证）[5/8]
+  7. 全量一致性审查 + 修复循环 [6/8] — 含细碎钩子，LLM 需对比流程描述与代码是否一致
+  8. bump (FEATURE) + 最终报告 [7/8] + cleanup（`end_session()` 驱动）[8/8]
 - 命令：`python -m scripts.skill_audit refactor <skill_dir> --confirmed`（先走蓝皮书+备份+审计，LLM 筛查后再执行后续步骤）
 
 > **⚠️ 关于细碎循环的关键认知**：

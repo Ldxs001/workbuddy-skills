@@ -1295,7 +1295,7 @@ def cmd_refactor(args):
 
     # ── 步骤 2：启动 cleanup session + 备份（强制） ──
     print(f"\n{'─'*55}")
-    print(f"  [2/9] 启动 cleanup session + 创建备份")
+    print(f"  [2/8] 启动 cleanup session + 创建备份")
     print(f"{'─'*55}")
     try:
         from scripts.cleanup_manager import start_session
@@ -1340,7 +1340,10 @@ def cmd_refactor(args):
     remaining = [r for r in result.get("results", [])
                  if not r.get("passed") and not r.get("skipped")]
 
-    # ── 步骤 4：细碎修复循环 ──
+    # ── 步骤 4：细碎修复循环（代码级强制） ──
+    print(f"\n{'─'*55}")
+    print(f"  [4/8] ★★★ 细碎修复循环 ★★★")
+    print(f"{'─'*55}")
     result, remaining, loop_count = _run_audit_loop(
         skill_dir, max_loops=20, label_prefix='4/8',
         manifest_version=args.manifest_version,
@@ -1416,12 +1419,21 @@ def cmd_refactor(args):
                 
                 # ── ★★★ 细碎一致性审查钩子 ★★★ ──
                 print(f"\n  --- ★★★ 细碎一致性审查钩子 ★★★ ---")
-                print(f"  LLM 手动修复后必须通过 --fixed-rules 声明修了哪些类型")
-                print(f"  例如: --fixed-rules outdated_rule_ref,argparse_mismatch")
-                print(f"  不声明 → 流程将继续使用全量一致性审查确认（但效率较低）")
-                print(f"  声明后 → 代码自动跑针对性一致性审查确认")
-                print()
-                
+                print(f"  LLM 需要做两件事：")
+                print(f"")
+                print(f"  ① 通过 --fixed-rules 声明已修复的机械检查项类型")
+                print(f"     例如: --fixed-rules outdated_rule_ref,argparse_mismatch")
+                print(f"     声明后 → 代码自动跑针对性一致性审查确认")
+                print(f"")
+                print(f"  ② 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
+                print(f"     检查要点：")
+                print(f"     - 步骤数量是否与 cmd_xxx() 中的 [i/N] 编号一致？")
+                print(f"     - 文档是否遗漏了关键阶段（如细碎修复循环、一致性审查循环）？")
+                print(f"     - 文档描述的阶段顺序是否与代码实际执行顺序一致？")
+                print(f"     - 如果发现不一致，LLM 手动修正 SKILL.md 的描述")
+                print(f"     注意：这是语义检查，代码无法自动判断，完全依赖 LLM")
+                print(f"")
+
                 _c_fixed_types = getattr(args, 'fixed_rules', None)
                 if _c_fixed_types:
                     # 针对性重审
@@ -1473,7 +1485,7 @@ def cmd_refactor(args):
 
     # ── 步骤 8：最终报告 ──
     print(f"\n{'─'*55}")
-    print(f"  [8/9] 最终报告")
+    print(f"  [8/8] 最终报告")
     print(f"{'─'*55}")
     print(f"  ✅ 审计: 0 ERROR 0 WARN")
     print(f"  ✅ 一致性: 无待处理问题")
@@ -1809,9 +1821,9 @@ def cmd_update(args):
         filter_files=changed_files,
         fixed_rules=getattr(args, 'fixed_rules', None))
 
-    # ── 步骤 5（原 5/6）：全量审计确认（双 0 验证） ──
+    # ── 步骤 4：全量审计确认（双 0 验证） ──
     print(f"\n{'─'*55}")
-    print(f"  [5/7] 全量审计确认（双 0 验证）")
+    print(f"  [4/7] 全量审计确认（双 0 验证）")
     print(f"{'─'*55}")
     result = audit_skill(skill_dir)
     print(format_report(result))
@@ -1877,12 +1889,21 @@ def cmd_update(args):
                 
                 # ── ★★★ 细碎一致性审查钩子 ★★★ ──
                 print(f"\n  --- ★★★ 细碎一致性审查钩子 ★★★ ---")
-                print(f"  LLM 手动修复后必须通过 --fixed-rules 声明修了哪些类型")
-                print(f"  例如: --fixed-rules outdated_rule_ref,argparse_mismatch")
-                print(f"  不声明 → 流程将继续使用全量一致性审查确认（但效率较低）")
-                print(f"  声明后 → 代码自动跑针对性一致性审查确认")
-                print()
-                
+                print(f"  LLM 需要做两件事：")
+                print(f"")
+                print(f"  ① 通过 --fixed-rules 声明已修复的机械检查项类型")
+                print(f"     例如: --fixed-rules outdated_rule_ref,argparse_mismatch")
+                print(f"     声明后 → 代码自动跑针对性一致性审查确认")
+                print(f"")
+                print(f"  ② 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
+                print(f"     检查要点：")
+                print(f"     - 步骤数量是否与 cmd_xxx() 中的 [i/N] 编号一致？")
+                print(f"     - 文档是否遗漏了关键阶段（如细碎修复循环、一致性审查循环）？")
+                print(f"     - 文档描述的阶段顺序是否与代码实际执行顺序一致？")
+                print(f"     - 如果发现不一致，LLM 手动修正 SKILL.md 的描述")
+                print(f"     注意：这是语义检查，代码无法自动判断，完全依赖 LLM")
+                print(f"")
+
                 _c_fixed_types = getattr(args, 'fixed_rules', None)
                 if _c_fixed_types:
                     c_issues = check_consistency(skill_dir, filter_files=changed_files)
@@ -1921,7 +1942,7 @@ def cmd_update(args):
 
     # ── 步骤 7：版本升级 ──
     print(f"\n{'─'*55}")
-    print(f"  [7/8] 版本升级（{bump_type}）")
+    print(f"  [7/7] 版本升级（{bump_type}）")
     print(f"{'─'*55}")
     bump_args = argparse.Namespace(
         skill_dir=skill_dir, type=bump_type,
@@ -1929,9 +1950,9 @@ def cmd_update(args):
         dry_run=False)
     cmd_bump(bump_args)
 
-    # ── 步骤 8：最终报告 ──
+    # ── 步骤 7：最终报告 ──
     print(f"\n{'─'*55}")
-    print(f"  [8/8] 最终报告")
+    print(f"  [7/7] 最终报告")
     print(f"{'─'*55}")
     print(f"  ✅ 审计: 0 ERROR 0 WARN")
     print(f"  ✅ 一致性: 无待处理问题")
