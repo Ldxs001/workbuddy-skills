@@ -76,10 +76,10 @@ skill-standardization/                 # Skill 根目录
     ├── skill_audit/                  # [v2.13.0重构] 审查器包（面向对象）
     │   ├── __init__.py            #   主入口 + argparse + audit_skill()
     │   ├── __main__.py            #   支持 python -m skill_audit 执行
-    │   ├── frontmatter_checker.py  #   R-01~R-05 检查函数
-    │   ├── structure_checker.py    #   R-06~R-09 检查函数
-    │   ├── artifact_checker.py     #   R-11~R-12 检查函数
-    │   ├── permission_checks.py   #   R-13~R-17 检查函数
+    │   ├── frontmatter_checker.py  #   R-01~R-26 检查函数
+    │   ├── structure_checker.py    #   R-06~R-26 检查函数
+    │   ├── artifact_checker.py     #   R-11~R-26 检查函数
+    │   ├── permission_checks.py   #   R-13~R-26 检查函数
     │   └── utils.py               #   工具函数（常量、辅助函数）
     │
     ├── permission_checker.py                 # 权限检查器
@@ -131,7 +131,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 │   -m scripts.skill_builder              -m scripts.skill_audit   │
 │   ┌──────────┬──────────┐      ┌──────────────┐ │
 │   │ create   │ update   │      │ 规则匹配引擎  │ │
-│   │ (模板生成)│ (检查修复)│      │ R-01~R-25    │ │
+│   │ (模板生成)│ (检查修复)│      │ R-01~R-26    │ │
 │   ├──────────┴──────────┤      └──────────────┘ │
 │   │ refactor (迁移引擎)  │                      │
 │   └─────────────────────┘                       │
@@ -184,7 +184,7 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 
 ### 2. -m scripts.skill_audit（审查器）
 
-职责：基于 R-01~R-25 对 SKILL.md 执行自动化审查。
+职责：基于 R-01~R-26 对 SKILL.md 执行自动化审查。
 
 **执行流程：**
 ```
@@ -202,8 +202,8 @@ json_loader.py   ──读取──→ spec/_index.json → spec/*.json
 ```
 
 **规则分类：**
-- **ERROR 级 (R-01~R-04)**: 结构性问题（frontmatter 缺失、关键字段缺失等）
-- **WARN 级 (R-05~R-10)**: 质量性建议（命名一致、章节完整性、版本同步）
+- **ERROR 级 (R-01~R-26)**: 结构性问题（frontmatter 缺失、关键字段缺失等）
+- **WARN 级 (R-26~R-26)**: 质量性建议（命名一致、章节完整性、版本同步）
 
 ### 3. json_loader.py（加载器）
 
@@ -341,12 +341,12 @@ skill_dir [--json] [--strict]
   R-01: re.match(r'^---', content)? → PASS/FAIL
   R-02: 'name' in parsed_fm?         → PASS/FAIL
   R-03: re.match(SemVer, version)?   → PASS/FAIL
-  R-04: 'description' in parsed_fm?  → PASS/FAIL
-  R-05: name == dirname?             → PASS/FAIL
+  R-26: 'description' in parsed_fm?  → PASS/FAIL
+  R-26: name == dirname?             → PASS/FAIL
   R-06: has '# ' line?               → PASS/FAIL
   R-07: trigger keywords in H2s?     → PASS/FAIL
   R-08: core capability keywords?    → PASS/FAIL
-  R-09: workflow keywords?           → PASS/FAIL
+  R-26: workflow keywords?           → PASS/FAIL
   R-10: version == manifest_version? → PASS/FAIL(N/A)
   ↓
 汇总结果:
@@ -383,8 +383,8 @@ skill_dir [--json] [--strict]
 
 | 模块 | 职责范围 | 不包含 | 使用者 |
 |------|---------|--------|--------|
-| `frontmatter.json` | 定义字段名/类型/必须性 | 不含验证逻辑 | create 模板 + audit R-01~R-04 |
-| `body.json` | 定义章节名/层级/必须性 | 不含写作指导 | SKILL.md 编写 + audit R-06~R-09 |
+| `frontmatter.json` | 定义字段名/类型/必须性 | 不含验证逻辑 | create 模板 + audit R-01~R-26 |
+| `body.json` | 定义章节名/层级/必须性 | 不含写作指导 | SKILL.md 编写 + audit R-06~R-26 |
 | `rules.json` | 完整规则定义（ID/级别/逻辑） | 不含执行引擎 | -m scripts.skill_audit |
 | `structure.json` | 目录结构规范 + 迁移规则 | 不含移动逻辑 | create + refactor |
 | `progressive_md.json` | MD 拆分方案 + 加载协议 | 不含文件操作 | references/ 创建 + 加载协议 |

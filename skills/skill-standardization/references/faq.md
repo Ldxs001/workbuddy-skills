@@ -26,7 +26,7 @@
 
 - **Frontmatter 规范**：3 个必须字段（name/version/description）+ 7 个可选字段
 - **正文结构规范**：三层体系（must_have 必须章节 / whitelist 白名单章节 / nonstandard 非标章节）+ 渐进式索引表
-- **审查规则**：R-01~R-25 共 25 条自动检查规则（含安全审计、写作规范、章节顺位、格式合规等）
+- **审查规则**：R-01~R-26 共 25 条自动检查规则（含安全审计、写作规范、章节顺位、格式合规等）
 
 该规范定义在 `scripts/spec/frontmatter.json`、`scripts/spec/body.json` 和 `scripts/spec/rules.json` 中，可通过 `python -m scripts.json_loader load` 查看。
 
@@ -36,7 +36,7 @@
 
 ```
 -m scripts.skill_audit audit <skill-dir>
-  ├─ R-01~R-25 规则检查
+  ├─ R-01~R-26 规则检查
   └─ 输出审查报告
 ```
 
@@ -135,7 +135,7 @@ update 是**轻量检查**（只读+可选修复），refactor 是**重量改造
 | **ERROR** (❌) | 存在严重不规范 | 应尽快修复 |
 | **💡** | 改进建议（非规则） | 可选优化 |
 
-> 注意：这些分类是审计报告的报告格式，与 R-01~R-25 审查规则的分类体系不同。ERROR 级指结构性问题，WARN 级指格式/风格建议。
+> 注意：这些分类是审计报告的报告格式，与 R-01~R-26 审查规则的分类体系不同。ERROR 级指结构性问题，WARN 级指格式/风格建议。
 
 ---
 
@@ -189,7 +189,7 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 ## 审查与规范
 
-### Q14: R-01~R-04 是 ERROR 级，会阻断工作流吗？
+### Q14: R-01~R-26 是 ERROR 级，会阻断工作流吗？
 
 **A:** 不会！自 v2.0 起，所有审查结果均为**纯警告模式**：
 

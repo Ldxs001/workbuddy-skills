@@ -1,9 +1,9 @@
 {
   "_module": "rules",
   "_version": "2.38.6",
-  "_description": "SKILL.md 审查规则 R-01 ~ R-25 完整定义（v2.38.6 基础；v2.5.0 扩展 R-17 非标章节检测、R-25 C-11 章节顺位/C-12 格式合规）",
+  "_description": "SKILL.md 审查规则 R-01 ~ R-26 完整定义（v2.38.6 基础；v2.5.0 扩展 R-17 非标章节检测、R-25 C-11 章节顺位/C-12 格式合规；v2.74.0 新增 R-26 LICENSE 声明规范）",
   "_based_on": "SKILL.md 标准化规范草案 v0.1",
-  "_total_rules": 25,
+  "_total_rules": 26,
   "_error_count": 12,
   "_warn_count": 9,
   "rules": [
@@ -256,6 +256,15 @@
       "check": "SKILL.md 正文写作格式统一性检查（11项子检查）。C-01 (ERROR)：H1 标题格式正确（# <技能名>，仅含技能名或技能名 — 简短副标题，不含版本号）；C-02 (WARN)：标题层级限制在 ## 和 ###；C-03 (WARN)：表格用于结构化信息展示；C-04 (WARN)：引用块 > 用于提示/注意/警告；C-05 (WARN)：有序列表用于步骤，无序列表用于选项；C-06 (WARN)：加粗用于关键术语/约束；C-07 (WARN)：代码块使用语言标识；C-08 (WARN)：Checklist [ ] 用于操作前自检；C-09 (WARN)：箭头引用 → 详见 用于渐进式文件引用；C-10 (WARN)：空行规范——frontmatter 后及正文中过多的连续空白行；C-11 (WARN)：章节顺位——检查正文 H2 章节出现顺序是否与 body.json section_order 一致；C-12 (WARN)：章节格式合规——检查每个 H2 章节使用的格式（表格/列表/代码块/引用）是否与 body.json content_format 定义一致。冲突排除：R-06 已检查 H1 存在性（WARN），R-25 C-01 升级为 ERROR 检查 H1 格式质量；R-21 渐进式加载模板句不受 C-02/C-04 约束；R-24 更新日志位置不受 C-02 约束。全部子检查仅作建议标准统一，不强制改造，create 模式作为模板参考。",
       "fixable": false,
       "create_template": "## 核心能力\n\n> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。\n\n| # | 功能 | 说明 |\n|---|------|------|\n| 1 | **功能一** | 描述 |\n| 2 | **功能二** | 描述 |\n\n--- 以上为 R-25 写作格式规范参考模板 ---\n\n写作格式要点：\n1. `# <技能名>` — 全文仅一个 H1（必须）\n2. `##` 主章节 / `###` 子章节 — 不用更深标题\n3. 表格 → 结构化比对数据\n4. `>` → 提示/注意/警告\n5. 有序列表 → 步骤流程；无序列表 → 选项列举\n6. `**加粗**` → 关键术语/约束\n7. ` ``` + 语言 ` → 代码块\n8. `- [ ]` → 操作前自检清单\n9. `→ 详见 references/xxx.md` → 渐进式文件引用\n\nC-11 章节顺位：章节顺序应遵循 body.json section_order（H1→触发条件→核心能力→快速开始→工作流程→...）。\nC-12 格式合规：核心能力用三列表格，触发条件用无序列表+正/否定子列表，快速开始用代码块。"
+    },
+    {
+      "_id": "R-26",
+      "name": "LICENSE 声明规范",
+      "severity": "WARN",
+      "method": "check_license_compliance",
+      "check": "License 声明必须放在 references/LICENSE.md 中，遵循渐进式加载规范。C-01 (ERROR): references/LICENSE.md 文件必须存在；C-02 (ERROR): SKILL.md 正文不得有独立 license/License 章节或声明；C-03 (WARN): 根目录不得存在 LICENSE 文件；C-04 (WARN): scripts/ 下不得存在 LICENSE 文件；C-05 (INFO): 渐进式文件索引表应包含 LICENSE.md；C-06 (ERROR): references/LICENSE.md 不应为空。冲突排除：R-01 保留 frontmatter 的 license 字段。",
+      "fixable": true,
+      "create_template": "创建 references/LICENSE.md（空白 MIT 模板），SKILL.md 正文不含 license 章节，渐进式索引表增加 LICENSE.md 行"
     }
   ],
   "verdict_logic": {

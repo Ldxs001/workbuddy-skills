@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.73.9
+version: 2.80.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
+description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -57,14 +57,14 @@ create_permissions_md: true
 
 | 能力 | 说明 | 限制 |
 |------|------|------|
-| **审计现有 skill** | R-01~R-25 全量检查，输出 PASS/WARN/FAIL 逐条明细及上下文行 | 仅检查 SKILL.md + _meta.json + scripts/ 文件结构和代码静态分析，不检查 Python 运行时行为 |
+| **审计现有 skill** | R-01~R-26 全量检查，输出 PASS/WARN/FAIL 逐条明细及上下文行 | 仅检查 SKILL.md + _meta.json + scripts/ 文件结构和代码静态分析，不检查 Python 运行时行为 |
 | **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ / scripts/） | 只生成结构模板和占位符，功能代码需要手动填充 |
 | **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码 |
 | **批量审计** | `--audit-all` 参数扫描 skills/ 下多个 skill | 仅支持 skills/ 目录下的一级子目录（不支持嵌套目录） |
-| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 触发词 / 反模式 / FAQ / 写作规范等格式问题，覆盖 R-01~R-25 共 20+ 条规则 | 仅修复格式/结构/路径/生成类问题，**不修复代码逻辑错误**。<br>修复后需运行 `--verify` + `--show-fix` 两阶段验证确认 |
+| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 触发词 / 反模式 / FAQ / 写作规范等格式问题，覆盖 R-01~R-26 共 20+ 条规则 | 仅修复格式/结构/路径/生成类问题，**不修复代码逻辑错误**。<br>修复后需运行 `--verify` + `--show-fix` 两阶段验证确认 |
 | **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析，无法检测动态代码执行的权限需求 |
 
-> 触发本技能后立即可见的能力输出：读取目标 SKILL.md 中的 frontmatter/正文/references/scripts → 执行 R-01~R-25 规则审查 → 输出审查报告（含每条规则的 PASS/WARN/FAIL 状态 + 详细原因 + 附近代码上下文）。
+> 触发本技能后立即可见的能力输出：读取目标 SKILL.md 中的 frontmatter/正文/references/scripts → 执行 R-01~R-26 规则审查 → 输出审查报告（含每条规则的 PASS/WARN/FAIL 状态 + 详细原因 + 附近代码上下文）。
 
 ## 核心能力
 
@@ -74,16 +74,18 @@ create_permissions_md: true
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
 |--------|------|----------|----------|
+| `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT）。包含：MIT 许可证完整文本。 | R-26 |
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
 | `references/architecture.md` | 架构设计 | skill-standardization 整体架构。包含：模块关系、数据流、核心设计决策。 | 无 |
-| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
+| `references/blueprint_flow.md` | 参考文档 | > 定义蓝皮书（Blueprint）、审计（Audit）、修复循环（Fix Loop）三者的关系与流程。 | 无 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
 | `references/data_dir_map.md` | 路径参考 | 数据目录路径对照表。包含：安装目录、标准化目录、备份目录及用途。 | 无 |
 | `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
 | `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 | `references/reference.md` | 命令参考 | CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。 | 无 |
-| `references/rules.md` | 审计规则 | R-01~R-25 审计规则定义。包含：检查逻辑、修复指引、设计背景。 | R-01~R-25 |
+| `references/rules.md` | 审计规则 | R-01~R-26 审计规则定义。包含：检查逻辑、修复指引、设计背景。 | R-01~R-26 |
 ## 工作流程
 
 ### 【流程门禁】Step 0：模式识别（强制）
@@ -109,7 +111,7 @@ create_permissions_md: true
 ### audit 模式（仅审查）
 1. **语义确认** — 输出模式描述，LLM 确认模式是否正确
 2. 读取目标 skill 的 SKILL.md
-3. 执行 R-01~R-25 规则检查
+3. 执行 R-01~R-26 规则检查
 4. 输出审查报告（PASS/WARN/FAIL），逐条列出通过/失败/跳过
 5. **`--fix` 自动修复** — 自动修正可修复项（frontmatter/版本号/数据目录/反模式/FAQ 等 20+ 条规则）
 6. **`--verify` 验证** — 输出编号 FAIL 条目 `[#ID]`，每条含独立问题描述

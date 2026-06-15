@@ -115,8 +115,6 @@ def _check_root_artifact_files(skill_dir, violations):
     external_data = fm.get("external_data_dir", False)
 
     _ROOT_ALLOWED_DIRS = {"scripts", "references"}
-    if external_data:
-        _ROOT_ALLOWED_DIRS = _ROOT_ALLOWED_DIRS | {".standardization"}
 
     for entry in sorted(root_entries):
         fpath = os.path.join(skill_dir, entry)

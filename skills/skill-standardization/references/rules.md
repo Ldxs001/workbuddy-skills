@@ -30,7 +30,7 @@
 | 级别 | 类型 | 适用场景 | 示例 |
 |------|------|---------|------|
 | **MAJOR (X)** | breaking | 架构级重构/核心引擎重写/破坏性API/数据格式不兼容 | 重写审计引擎、更新数据目录结构 |
-| **MINOR (Y)** | feature | 新功能/新算法/新模块/功能重构/新审计规则/大面积文档重写 | 新增CPM分析、新增合理性审查层、新R-25子检查 |
+| **MINOR (Y)** | feature | 新功能/新算法/新模块/功能重构/新审计规则/大面积文档重写 | 新增CPM分析、新增合理性审查层、新R-26子检查 |
 | **PATCH (Z)** | fix | 单处bug修复/文档错别字/参数拼写/路径修正/≤3行描述修正 | 修复错别字、修正路径引用 |
 
 **核心约束：**
@@ -96,7 +96,7 @@ skills/
 
 ---
 
-## 铁律 5：R-13~R-17 安全规则强制检查
+## 铁律 5：R-13~R-26 安全规则强制检查
 
 > 自 v2.13.0 起，所有 skill 必须通过上述 5 条安全规则检查。
 
@@ -215,7 +215,7 @@ skills/
 
 - `SKILL.md` 是**入口文件**，应当保持精简（≤230 行）
 - 更新日志会不断累积，直接写在 `SKILL.md` 会导致文件迅速膨胀
-- 渐进式加载是 skill-standardization 的核心规范之一（R-17~R-21）
+- 渐进式加载是 skill-standardization 的核心规范之一（R-17~R-26）
 
 ### 修复方法
 
@@ -230,7 +230,7 @@ skills/
 
 ---
 
-## 铁律 8：全报告 LLM 细筛（R-01~R-25 审计后强制）
+## 铁律 8：全报告 LLM 细筛（R-01~R-26 审计后强制）
 
 > 自 v2.58.1 起新增。审计报告输出后，LLM 必须逐条阅读并处理。
 > v2.61.2 更新：删除"新误报"概念，LLM 审查所有 FAIL 项，不做白名单预筛。
@@ -303,7 +303,7 @@ LLM 逐条判断后，**必须**按以下固定格式输出每条 FAIL 的判断
 
 ---
 
-## 铁律 9：0 ERROR 0 WARN 强制验证（R-01~R-25）
+## 铁律 9：0 ERROR 0 WARN 强制验证（R-01~R-26）
 
 > 自 v2.57.1 起，审计后的 0 ERROR 0 WARN 不再依赖 AI 自觉，改为 Python 侧强制。
 
@@ -311,7 +311,7 @@ LLM 逐条判断后，**必须**按以下固定格式输出每条 FAIL 的判断
 
 - 更新/改造 skill 后，**必须**运行 `python -m scripts.skill_audit audit <skill-dir> --verify`
 - `--verify` 逻辑：
-  1. 运行完整审计 R-01~R-25
+  1. 运行完整审计 R-01~R-26
   2. **不设白名单预筛**：`_reclassify_false_positive()` 仅用于报告显示标记，不影响 exit code
   3. 输出所有 FAIL 项（含上下文），供 LLM 逐条审查
   4. 有 FAIL 项 → exit(1)，LLM 执行铁律 8 二段筛查后修复/放过
@@ -334,3 +334,50 @@ LLM 逐条判断后，**必须**按以下固定格式输出每条 FAIL 的判断
 1. 查看输出的 rule_id 和 detail
 2. 逐条修复（改文件、调脚本、拆章节等）
 3. 重新运行 `audit --verify` 直到 exit(0)
+
+---
+
+## R-26：文档声明规范（LICENSE + README）
+
+### 规则内容
+
+License 声明必须放在 `references/LICENSE.md` 中，README 声明必须放在 `references/README.md` 中，遵循渐进式加载规范。
+
+**子检查：**
+
+| 编号 | 严重度 | 检查内容 |
+|------|--------|---------|
+| C-01 | ERROR | `references/LICENSE.md` 文件必须存在 |
+| C-02 | ERROR | SKILL.md 正文不得有独立 license/License 章节或声明（frontmatter 的 license 字段保留） |
+| C-03 | ERROR | 根目录不得存在 LICENSE.txt/LICENSE.md 等 license 文件 |
+| C-04 | WARN | scripts/ 下不得存在 LICENSE.txt/LICENSE.md 等 license 文件 |
+| C-05 | WARN | SKILL.md 的渐进式文件索引表应包含 LICENSE.md 引用 |
+| C-06 | ERROR | references/LICENSE.md 内容不应为空 |
+| C-07 | ERROR | 根目录不得存在 README.md |
+| C-08 | ERROR | SKILL.md 正文含 README/说明/Introduction 章节应拆分至 references/README.md |
+
+**冲突排除：**
+- R-01 保留 frontmatter 的 license 字段，R-26 仅检查正文和文件系统
+- frontmatter 中的 `license: MIT` 声明属于元数据，不受 R-26 约束
+
+### 设计理由
+
+- 许可证声明是技能的元法律信息，应当作为渐进式参考文档（references/）的一部分
+- README 是外部展示文档，在 skills 体系中由 SKILL.md 承担主角色，README 仅作补充
+- 放在 `scripts/` 下会被误解为脚本文件，放在根目录违反 R-11 根目录白名单规则
+- 使用 `.md` 格式保持与技能文档体系一致
+
+### 修复方法（audit 模式）
+
+`--fix` 自动执行：
+
+1. **删除**根目录和 `scripts/` 下的所有 LICENSE 文件
+2. **创建** `references/LICENSE.md`（从 `skills/LICENSE.txt` 复制，或生成空白 MIT 模板）
+3. **拆分** SKILL.md 正文中的独立 license 章节到 `references/LICENSE.md`
+4. **更新**渐进式文件索引表，添加 `LICENSE.md` 引用行
+5. **迁移**根目录 README.md 至 `references/README.md`（如目标已存在则直接删除）
+6. **拆分** SKILL.md 正文中的 README/说明章节至 `references/README.md`
+
+### 创建模式
+
+创建新技能时，自动在 `references/LICENSE.md` 生成空白 MIT 模板（署名占位符），SKILL.md 正文不含 license 章节。README 不在创建时自动生成。

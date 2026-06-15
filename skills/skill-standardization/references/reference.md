@@ -174,7 +174,7 @@ python -m skill_builder refactor <skill_dir> [--no-backup] [--dry-run]
 
 > 路径：`scripts/skill_audit/`
 >
-> 用途：基于 R-01~R-25 规则对 SKILL.md 进行自动化审查
+> 用途：基于 R-01~R-26 规则对 SKILL.md 进行自动化审查
 
 ### audit 命令
 
@@ -198,7 +198,7 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | R-03 | ERROR | version SemVer | 版本号匹配 `\d+\.\d+\.\d+(-\w+)?` |
 | R-04 | ERROR | description 字段 | frontmatter 包含 `description:` |
 | R-05 | WARN | name 与目录名一致 | `name == 父目录名` |
-| R-06 | WARN | 正文含一级标题 | 有 `# ` 开头的行 |
+| R-26 | WARN | 正文含一级标题 | 有 `# ` 开头的行 |
 | R-07 | ERROR | 触发条件章节（合规） | 含正向触发词≥3个、否定条件≥1个，无「自动执行」等危险表述 |
 | R-08 | WARN | 核心能力章节 | 匹配核心能力同义词 |
 | R-09 | WARN | 工作流程章节 | 匹配工作流程同义词 |
@@ -255,7 +255,7 @@ python -m json_loader load <module_name>
 |-------------|---------|----------|
 | `frontmatter` | `spec/frontmatter.json` | Frontmatter 字段定义（3必须+7可选） |
 | `body` | `spec/body.json` | 正文章节规范（5必须+4推荐+N可选） |
-| `rules` | `spec/rules.json` | 审查规则 R-01~R-25 完整定义 |
+| `rules` | `spec/rules.json` | 审查规则 R-01~R-26 完整定义 |
 | `structure` | `spec/structure.json` | 目录结构规范（三级复杂度+迁移规则） |
 | `progressive_md` | `spec/progressive_md.json` | 渐进式 MD 体系（拆分边界+加载协议+文件映射） |
 | `all` | *全部* | 加载所有模块的合并视图 |
@@ -542,7 +542,7 @@ python scripts/skill_rollback.py purge [keep_count]
 
 ### run_audit — 全量审计入口
 
-**功能：** 对指定技能目录执行全部25条规则(R-01~R-25)审计。通过子命令模式区分不同操作。
+**功能：** 对指定技能目录执行全部25条规则(R-01~R-26)审计。通过子命令模式区分不同操作。
 
 ```bash
 # 审查单个技能
@@ -578,7 +578,7 @@ python scripts/run_audit.py fix <skill_dir> --key name version --dry-run
 |--------|----------|----------|------|
 | `audit` | `<skill_dir>` | `--json`, `--manifest-version VER`, `--progress-file FILE`, `--fix` | 审查单个技能 |
 | `audit-all` | `<skills_dir>` | `--json`, `--manifest FILE` | 批量审查所有技能 |
-| `rules` | - | - | 列出 R-01~R-23 规则清单 |
+| `rules` | - | - | 列出 R-01~R-26 规则清单 |
 | `create-template` / `template` | - | `--json` | 输出创建模板 |
 | `fix` | `<skill_dir>` | `--key KEY [...]`, `--value VAL`, `--dry-run` | 针对性修复(见 fix 子命令) |
 
@@ -696,7 +696,7 @@ report = checker.generate_report()  # 等价于 checker.scan()
 
 ### skill_audit.fix — 统一修复工具
 
-**功能：** 为全部23条审计规则(R-01~R-23)提供针对性修复函数。`apply_fix()` 是统一入口。
+**功能：** 为全部23条审计规则(R-01~R-26)提供针对性修复函数。`apply_fix()` 是统一入口。
 
 **Python API（无独立 CLI）：**
 
@@ -722,7 +722,7 @@ n = apply_fix('/path/to/skill', 'artifact_paths', violations=[...]) # R-11
 | `author` | R-03 | 添加 author | value="作者名" |
 | `version` | R-04 | 更正版本号格式 | value="1.2.3" |
 | `skill_macro` | R-05 | 添加 skill_macro | value="unified" |
-| `h1` | R-06 | 添加一级标题 | value="标题" |
+| `h1` | R-26 | 添加一级标题 | value="标题" |
 | `section_trigger` | R-07 | 添加触发场景章节 | - |
 | `section_core` | R-08 | 添加核心能力章节 | - |
 | `section_workflow` | R-09 | 添加工作流程章节 | - |
@@ -802,7 +802,7 @@ python scripts/op_logger.py "<operation>" "<details>" [--output <path>]
 
 ### permission_checks — 权限检查函数集
 
-**功能：** R-13~R-17 权限相关规则的检查函数。被 audit 引擎调用，无独立 CLI。
+**功能：** R-13~R-26 权限相关规则的检查函数。被 audit 引擎调用，无独立 CLI。
 
 **Python API：**
 
@@ -839,9 +839,9 @@ result = check_sensitive_access_declaration(
 | `artifact_checker.py` | skill_audit | R-11 产出物路径检查 + 修复 | `check_artifact_paths()`, `fix_external_data_dir()` |
 | `data_dir_checker.py` | skill_audit | R-22 数据目录规范检查 + 修复 | `check_data_dir_compliance()`, `fix_data_dir_compliance()` |
 | `structure_checker.py` | skill_audit | 技能目录结构完整性检查 | `check_structure()` |
-| `frontmatter_checker.py` | skill_audit | Frontmatter 字段验证（R-01~R-06） | `check_frontmatter()` |
-| `fix.py` | skill_audit | 统一修复分发（R-01~R-23） | `apply_fix()`, `list_fixable()` — 见 [skill_audit.fix](#skill_auditfix-统一修复工具) |
-| `permission_checks.py` | skill_audit | R-13~R-17 权限检查函数 | 见 [permission_checks](#permission_checks-权限检查函数集) |
+| `frontmatter_checker.py` | skill_audit | Frontmatter 字段验证（R-01~R-26） | `check_frontmatter()` |
+| `fix.py` | skill_audit | 统一修复分发（R-01~R-26） | `apply_fix()`, `list_fixable()` — 见 [skill_audit.fix](#skill_auditfix-统一修复工具) |
+| `permission_checks.py` | skill_audit | R-13~R-26 权限检查函数 | 见 [permission_checks](#permission_checks-权限检查函数集) |
 | `report_generator.py` | skill_audit | 审计报告生成（text/json/html） | `generate_report()` |
 | `utils.py` | skill_audit | `parse_simple_yaml_frontmatter()` 等工具函数 | `parse_simple_yaml_frontmatter()` |
 | `creator.py` | skill_builder | Create 模式标准化流程 | `standardize_create()` |
@@ -860,9 +860,9 @@ run_audit.py (入口)
        └─ version_manager               (版本管理)
   └─ skill_audit
        ├─ audit_runner                  (编排25条规则)
-       ├─ frontmatter_checker           (R-01~R-06)
-       ├─ structure_checker             (R-07~R-12)
-       ├─ permission_checks             (R-13~R-17)
+       ├─ frontmatter_checker           (R-01~R-26)
+       ├─ structure_checker             (R-07~R-26)
+       ├─ permission_checks             (R-13~R-26)
        ├─ artifact_checker              (R-11)
        ├─ data_dir_checker              (R-22)
        ├─ fix.py                        (apply_fix分发)
@@ -895,7 +895,7 @@ python scripts/update_all_versions.py --skill skill-standardization --version 2.
 ```
 ---
 ### scripts/run_audit.py
-**功能**: 对指定技能目录执行全量规则审计（R-01~R-25），支持 audit、check、fix 三种子命令。
+**功能**: 对指定技能目录执行全量规则审计（R-01~R-26），支持 audit、check、fix 三种子命令。
 **用法**:
 ```bash
 # 审计模式（默认）
@@ -1008,7 +1008,7 @@ python scripts/op_logger.py "<操作名称>" "<操作详情>" [--output <log_pat
 | `--output` | 日志输出路径 | 否 | `.standardization/<skill>/.operations.log` |
 **示例**:
 ```bash
-python scripts/op_logger.py "audit" "R-01~R-25 审计完成，24/24 PASS"
+python scripts/op_logger.py "audit" "R-01~R-26 审计完成，24/24 PASS"
 python scripts/op_logger.py "update_version" "version updated to 2.38.8"
 ```
 ---
@@ -1027,7 +1027,7 @@ python scripts/update_Skill_frontmatter.py <skill_dir> <field> <value>
 **示例**:
 ```bash
 python scripts/update_Skill_frontmatter.py . version 2.38.8
-python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范引擎，支持 R-01~R-25 规则审计"
+python scripts/update_Skill_frontmatter.py . description "Skill 标准化规范引擎，支持 R-01~R-26 规则审计"
 ```
 ---
 ---
@@ -1045,7 +1045,7 @@ print(format_progress('.standardization/skill-standardization'))
 ```
 ---
 ### scripts/skill_audit/fix.py（通过 `audit --fix` 调用）
-**功能**: 统一修复入口，根据审计结果自动修复可修复的规则违规（覆盖 R-01~R-25）。
+**功能**: 统一修复入口，根据审计结果自动修复可修复的规则违规（覆盖 R-01~R-26）。
 **调用方式**: `python -m scripts.skill_audit audit <skill-dir> --fix`
 或使用子命令: `python -m scripts.skill_audit fix <skill_dir> --key <fix_key>`
 **用法**:
@@ -1063,7 +1063,7 @@ python -m scripts.skill_audit fix <skill_dir> --key R-11
 | `fix` | `--dry-run` | 仅模拟不更新 | 否 | false |
 ---
 ### scripts/skill_audit/fix.py
-**功能**: 规则级修复函数库，提供每个规则（R-01~R-25）的独立修复函数，供 `audit --fix` 或 `audit fix` 子命令调用。
+**功能**: 规则级修复函数库，提供每个规则（R-01~R-26）的独立修复函数，供 `audit --fix` 或 `audit fix` 子命令调用。
 **Python API 示例**:
 ```python
 from skill_audit.fix import apply_fix, list_fixable_rules

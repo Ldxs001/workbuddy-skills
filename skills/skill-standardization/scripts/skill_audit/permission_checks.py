@@ -188,8 +188,8 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
                          "operation": "确保 permissions.md 可读，并补充 skill-standardization 权限说明头部",
                          "verification": "重新运行 audit_skill()"}
             }
-        # 检查是否含未填写的占位符
-        placeholders = ["（请填写）", "（如含敏感信息访问", "操作：" and "必要性："]
+        # 检查是否含未填写的占位符（仅检查明确的未填写标记，不含正常文档结构词）
+        placeholders = ["（请填写）", "（如含敏感信息访问"]
         if any(p in pm_content for p in placeholders):
             return {
                 "passed": False,

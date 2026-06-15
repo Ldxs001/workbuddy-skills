@@ -1,7 +1,7 @@
 # Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-06-14
+> 最后更新：2026-06-15
 
 本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
 
@@ -27,7 +27,7 @@
 | `semantic-split` | 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于5W2H维度提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，支持自增强json沉淀机制。 |
 | `simulated-peak-plot` | 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持自定义峰参数、噪声水平、基线设置、复合峰（N个子峰组合）、自定义坐标轴标题/单位、CSV完整数据导出、可点击的file:///路径输出、以及从设备导出数据导入CSV。 |
 | `skill-function-test` | 技能场景测试套件 —— 备份 → 蓝皮书 → LLM编写场景测试用例（modules字段指定目标模块）→ 场景测试（CLI执行+模块导入验证）+功能测试+S4执行忠实度 → 修复循环 → 回归确认 → 双格式报告 → 测试结论写入目标技能。设置驱动流程，钩子强制阻断。 |
-| `skill-standardization` | Skill 标准化规范引擎。支持 R-01~R-25 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。 |
+| `skill-standardization` | Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。 |
 | `skill-sub` | 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。 |

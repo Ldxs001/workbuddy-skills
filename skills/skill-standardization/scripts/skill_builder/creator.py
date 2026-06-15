@@ -168,6 +168,10 @@ skill-sub {name} --input <input-file> --output <output-dir>
         examples_content = self._generate_examples_template(name)
         (skill_dir / "references" / "examples.md").write_text(examples_content, encoding="utf-8")
 
+        # 创建 references/LICENSE.md（空白 MIT 模板，R-26）
+        license_content = self._generate_license_template(name)
+        (skill_dir / "references" / "LICENSE.md").write_text(license_content, encoding="utf-8")
+
         # 创建 .progress.md
         progress_content = self._generate_progress_template(name)
         (skill_dir / ".progress.md").write_text(progress_content, encoding="utf-8")
@@ -552,6 +556,31 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 ---
 
 > 更多示例欢迎通过 PR 贡献到本文件的后续章节。
+"""
+
+    def _generate_license_template(self, name):
+        """生成 references/LICENSE.md 模板（空白 MIT，R-26 规范）"""
+        return f"""MIT License
+
+Copyright (c) 2026 your-name-here
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
     def _generate_progress_template(self, name):

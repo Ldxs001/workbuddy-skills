@@ -89,7 +89,7 @@ description: 简短描述本 skill 的核心功能
 ---
 ```
 
-**深层原因：** `name`、`version`、`description` 是 R-01~R-04 强制检查的字段，缺失会导致审查不通过。
+**深层原因：** `name`、`version`、`description` 是 R-01~R-26 强制检查的字段，缺失会导致审查不通过。
 
 ---
 

@@ -195,6 +195,17 @@ def inspect_skill(skill_dir, output_format="text"):
     }
 
     # ---- 组装报告 ----
+    # 新增：结构化目录元信息（供审计规则直接使用，避免重复 os.listdir）
+    root_files = sorted([f for f, is_d in all_files if os.sep not in f and not is_d])
+    root_dirs = sorted([f for f, is_d in all_files if os.sep not in f and is_d])
+    ref_files = sorted([f.split(os.sep)[-1] for f in md_files if f.startswith('references' + os.sep)])
+    scripts_dir_files = sorted([f.split(os.sep, 1)[-1] for f, is_d in all_files
+                                 if f.startswith('scripts' + os.sep) and not is_d])
+    has_data_dir = (skill_path / 'data').is_dir()
+    has_output_dir = (skill_path / 'data' / 'output').is_dir()
+    has_logs_dir = (skill_path / 'data' / 'logs').is_dir()
+    has_temp_dir = (skill_path / 'data' / 'temp').is_dir()
+
     report = {
         "name": skill_name,
         "version": fm.get("version", meta.get("version", "?")),
@@ -221,10 +232,24 @@ def inspect_skill(skill_dir, output_format="text"):
         "reference_links": ref_links,
         "doc_code_gaps": doc_code_gaps,
         "security": sec_info,
+        # ── 蓝皮书 v2 新增：结构化目录元信息 ────────────
+        "structure_tree": _format_structure_tree(skill_path, all_files),
+        "root_files": root_files,
+        "root_dirs": root_dirs,
+        "ref_files": ref_files,
+        "scripts_files": scripts_dir_files,
+        "has_data_dir": has_data_dir,
+        "has_output_dir": has_output_dir,
+        "has_logs_dir": has_logs_dir,
+        "has_temp_dir": has_temp_dir,
+        "has_scripts_dir": has_scripts_dir,
+        "has_refs_dir": has_refs_dir,
     }
 
     if output_format == "json":
         return json.dumps(report, ensure_ascii=False, indent=2)
+    elif output_format == "dict":
+        return report
 
     return _format_text_report(report, skill_path)
 
@@ -332,6 +357,14 @@ def _format_text_report(report, skill_path):
     lines.append(f"    +-- 其他: {d['other_files']} 个")
     lines.append("")
 
+    # ---- 目录结构树 ----
+    tree = report.get("structure_tree", "")
+    if tree:
+        lines.append("+-- 目录结构")
+        for line in tree.split('\n'):
+            lines.append(f"    {line}")
+        lines.append("")
+
     lines.append("-" * 40)
     lines.append("蓝皮书：结构扫描 + AST 功能清单 + 引用链路")
     lines.append(f"  python -m scripts.skill_inspector {skill_path} --json")
@@ -359,6 +392,37 @@ def main():
 
     result = inspect_skill(skill_dir, fmt)
     print(result)
+
+
+def _format_structure_tree(skill_path, all_files):
+    """
+    生成类 tree 命令的目录结构树。
+    all_files: [(rel_path, is_dir), ...]
+    排除隐藏目录（. 开头）和 __pycache__/.git。
+    """
+    tree_lines = [skill_path.name + "/"]
+    # 构建路径树
+    children = {}  # {parent_dir: [(name, is_dir, full_rel_path), ...]}
+    for rel, is_dir in all_files:
+        parts = rel.split(os.sep)
+        if len(parts) == 1:
+            children.setdefault("", []).append((parts[0], is_dir, rel))
+        else:
+            parent = os.sep.join(parts[:-1])
+            children.setdefault(parent, []).append((parts[-1], is_dir, rel))
+
+    def _render(parent, prefix=""):
+        items = sorted(children.get(parent, []), key=lambda x: (not x[1], x[0]))
+        for i, (name, is_dir, rel) in enumerate(items):
+            is_last = (i == len(items) - 1)
+            connector = "+-- " if is_last else "|-- "
+            sub_prefix = "    " if is_last else "|   "
+            tree_lines.append(prefix + connector + name)
+            if is_dir:
+                _render(rel, prefix + sub_prefix)
+
+    _render("")
+    return "\n".join(tree_lines)
 
 
 if __name__ == "__main__":

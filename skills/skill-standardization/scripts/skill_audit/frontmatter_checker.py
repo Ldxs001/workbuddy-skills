@@ -219,7 +219,7 @@ def version_matches_manifest(filepath, content, fm, body, manifest_version=None,
         try:
             with open(cl_path, 'r', encoding='utf-8') as _f:
                 cl_content = _f.read()
-            _m = re.search(r'^##\s*(v?\d+\.\d+\.\d+)', cl_content, re.MULTILINE)
+            _m = re.search(r'^##\s*\[?(v?\d+\.\d+\.\d+)\]?', cl_content, re.MULTILINE)
             if _m:
                 cl_version_raw = _m.group(1)
             raw_versions.append(("changelog.md", cl_version_raw))

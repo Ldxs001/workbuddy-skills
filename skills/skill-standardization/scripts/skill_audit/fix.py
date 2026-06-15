@@ -1684,7 +1684,8 @@ def fix_progressive_index_table(skill_dir, **kw):
         "guide.md": ("使用指南", "三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。", "无"),
         "permissions.md": ("权限与测试", "权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。", "R-15, R-16"),
         "reference.md": ("命令参考", "CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。", "无"),
-        "rules.md": ("审计规则", "R-01~R-25 审计规则定义。包含：检查逻辑、修复指引、设计背景。", "R-01~R-25"),
+        "rules.md": ("审计规则", "R-01~R-26 审计规则定义。包含：检查逻辑、修复指引、设计背景。", "R-01~R-26"),
+        "LICENSE.md": ("许可协议", "开源许可证声明（MIT）。包含：MIT 许可证完整文本。", "R-26"),
     }
     
     # 收集所有 .md 文件
@@ -1958,6 +1959,7 @@ def apply_fix(skill_dir, fix_key, **kw):
         "data_dir": fix_data_dir,
         "section_antipattern": fix_section_antipattern,
         "section_faq": fix_section_faq,
+        "license_compliance": fix_license_compliance,
     }
 
     func = dispatch.get(fix_key)
@@ -2384,4 +2386,186 @@ def list_fixable():
         "data_dir",                   # R-12 数据目录路径
         "section_antipattern",        # R-18 反模式内容
         "section_faq",                # R-19 FAQ 内容
+        "license_compliance",         # R-26 LICENSE 声明规范
     ]
+
+
+# ═══════════════════════════════════════════════════════
+# R-26: LICENSE 声明规范修复
+# ═══════════════════════════════════════════════════════
+def fix_license_compliance(skill_dir, **kw):
+    """
+    R-26 修复：确保 LICENSE 和 README 声明符合规范。
+    
+    1. 删除根目录/scripts/ 下的 LICENSE 文件
+    2. 如果 references/LICENSE.md 不存在，从 skills/LICENSE.txt 复制
+    3. 如果 SKILL.md 正文有独立 license 章节，拆分到 references/LICENSE.md
+    4. 更新渐进式文件索引表添加 LICENSE.md 引用
+    5. 删除根目录 README.md（迁移至 references/README.md）
+    6. 如果 SKILL.md 正文有 README/说明章节，拆分至 references/README.md
+    """
+    import os as _os
+    import shutil as _shutil
+
+    skill_dir = _os.path.abspath(skill_dir)
+    refs_dir = _os.path.join(skill_dir, "references")
+    license_ref_path = _os.path.join(refs_dir, "LICENSE.md")
+    skill_md_path = _os.path.join(skill_dir, "SKILL.md")
+    fixed = 0
+
+    # 确保 references/ 目录存在
+    if not _os.path.isdir(refs_dir):
+        _os.makedirs(refs_dir, exist_ok=True)
+        print(f"  [创建] {refs_dir}")
+
+    # ── 1. 删除根目录和 scripts/ 下的 LICENSE 文件 ──
+    for base_dir, label in [(skill_dir, "根目录"), (_os.path.join(skill_dir, "scripts"), "scripts/")]:
+        if not _os.path.isdir(base_dir):
+            continue
+        for entry in _os.listdir(base_dir):
+            if entry.upper().startswith("LICENSE"):
+                fpath = _os.path.join(base_dir, entry)
+                if _os.path.isfile(fpath):
+                    _os.remove(fpath)
+                    print(f"  [删除] {label}/{entry}")
+                    fixed += 1
+
+    # ── 2. 确保 references/LICENSE.md 存在 ──
+    if not _os.path.isfile(license_ref_path):
+        # 从 skills/LICENSE.txt 复制模板
+        skills_root = _os.path.dirname(skill_dir)  # skills/
+        master_license = _os.path.join(skills_root, "LICENSE.txt")
+        if _os.path.isfile(master_license):
+            _shutil.copy2(master_license, license_ref_path)
+            print(f"  [创建] references/LICENSE.md（从 skills/LICENSE.txt 复制）")
+        else:
+            # 创建空白 MIT 模板
+            mit_template = """MIT License
+
+Copyright (c) 2026 [username-redacted]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+            with open(license_ref_path, "w", encoding="utf-8") as f:
+                f.write(mit_template)
+            print(f"  [创建] references/LICENSE.md（空白 MIT 模板）")
+        fixed += 1
+
+    # ── 3. 检查 SKILL.md 正文是否有独立 license 章节并处理 ──
+    if _os.path.isfile(skill_md_path):
+        with open(skill_md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        fm, body = parse_simple_yaml_frontmatter(content)
+        if body:
+            # 查找 license 章节
+            lic_section = re.search(
+                r'^##\s*(?:License|许可证|许可协议|LICENSE|许可声明)\s*$',
+                body, re.MULTILINE | re.IGNORECASE
+            )
+            if lic_section:
+                # 提取该章节的内容
+                section_start = lic_section.start()
+                # 找到下一个 ## 或文件末尾
+                next_section = re.search(r'^##\s+', body[lic_section.end():], re.MULTILINE)
+                if next_section:
+                    section_end = lic_section.end() + next_section.start()
+                else:
+                    section_end = len(body)
+
+                # 提取 license 章节内容
+                lic_content = body[section_start:section_end].strip()
+                # 从 body 中删除
+                new_body = body[:section_start] + body[section_end:].lstrip()
+                new_content = content[:content.index("---\n", content.index("---\n") + 3) + 4] + "\n" + new_body
+
+                with open(skill_md_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+
+                # 将内容追加到 references/LICENSE.md（如果还不存在）
+                existing_lic = ""
+                if _os.path.isfile(license_ref_path):
+                    with open(license_ref_path, "r", encoding="utf-8") as f:
+                        existing_lic = f.read()
+
+                with open(license_ref_path, "w", encoding="utf-8") as f:
+                    f.write(f"# License\n\n{lic_content}\n\n---\n\n{existing_lic}" if existing_lic else f"# License\n\n{lic_content}\n")
+                print(f"  [拆分] SKILL.md license 章节 → references/LICENSE.md")
+                fixed += 1
+
+    # ── 4. 更新渐进式文件索引表 ──
+    if _os.path.isfile(skill_md_path):
+        with open(skill_md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        fm, body = parse_simple_yaml_frontmatter(content)
+        if body and 'references/LICENSE.md' not in body:
+            table_end = _re.search(r'\|.*\|.*\|.*\|.*\|\s*$', body, re.MULTILINE)
+            if table_end:
+                insert_pos = table_end.end()
+                lic_row = f"\n| `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT） | R-26 |"
+                new_body = body[:insert_pos] + lic_row + body[insert_pos:]
+                new_content = content[:content.index("---\n", content.index("---\n") + 3) + 4] + "\n" + new_body
+                with open(skill_md_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                print(f"  [索引] 渐进式文件索引表添加 LICENSE.md 引用")
+                fixed += 1
+
+    # ── 5. 删除根目录 README.md（迁移至 references/README.md）──
+    readme_root = _os.path.join(skill_dir, "README.md")
+    readme_ref_path = _os.path.join(refs_dir, "README.md")
+    if _os.path.isfile(readme_root):
+        # 如果 references/README.md 还不存在，先迁移过去
+        if not _os.path.isfile(readme_ref_path):
+            _shutil.move(readme_root, readme_ref_path)
+            print(f"  [迁移] 根目录 README.md → references/README.md")
+        else:
+            _os.remove(readme_root)
+            print(f"  [删除] 根目录 README.md（references/README.md 已存在）")
+        fixed += 1
+
+    # ── 6. 拆分 SKILL.md 正文中的 README/说明章节到 references/README.md ──
+    if _os.path.isfile(skill_md_path):
+        with open(skill_md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        fm, body = parse_simple_yaml_frontmatter(content)
+        if body:
+            readme_section = re.search(
+                r'^##\s*(?:README|说明文档|使用说明|项目说明|简介|Introduction)\s*$',
+                body, re.MULTILINE | re.IGNORECASE
+            )
+            if readme_section:
+                section_start = readme_section.start()
+                next_section = re.search(r'^##\s+', body[readme_section.end():], re.MULTILINE)
+                if next_section:
+                    section_end = readme_section.end() + next_section.start()
+                else:
+                    section_end = len(body)
+                readme_content = body[section_start:section_end].strip()
+                new_body = body[:section_start] + body[section_end:].lstrip()
+                new_content = content[:content.index("---\n", content.index("---\n") + 3) + 4] + "\n" + new_body
+                with open(skill_md_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                # 写入 references/README.md
+                with open(readme_ref_path, "w", encoding="utf-8") as f:
+                    f.write(f"# README\n\n{readme_content}\n")
+                print(f"  [拆分] SKILL.md README 章节 → references/README.md")
+                fixed += 1
+
+    print(f"  ✅ R-26 修复完成：处理了 {fixed} 项")
+    return fixed

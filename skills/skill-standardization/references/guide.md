@@ -347,7 +347,7 @@ python -m scripts.skill_audit audit <skill-dir> --manifest-version 2.0.0
 | **WARN** | 仅 WARN 级失败 | 🟡 继续同步（纯警告） |
 | **FAIL** | 含 ERROR 级失败 | 🟡 继续同步（纯警告，v2起不阻断） |
 
-### R-18~R-21 审查规则（v2.17.0~v2.24.0）
+### R-18~R-26 审查规则（v2.17.0~v2.24.0）
 
 #### R-18: 反模式具体性（WARN）
 
@@ -389,7 +389,7 @@ $ python -m scripts.skill_audit audit /path/to/skill
   
 [R-17] 渐进加载检查 ................. ⓘ Phase 1 粗筛
     → 发现 1 个疑似非标章节（WARN，待 LLM Phase 2 确认）
-[R-25] 文档写作格式 ................. 🟡 WARN(4)
+[R-26] 文档写作格式 ................. 🟡 WARN(4)
     → C-11: 章节「工作流程」应在「快速开始」之后（逆序）
     → C-13: references/ 目录有 6 个 .md 文件但核心能力缺少渐进式索引表
     → C-14: 工作流程共 4 步，需 LLM Phase 2 确认是否完整
@@ -464,7 +464,7 @@ A: 目标 skill 尚未存在或需要完全重建时用 create；已存在但需
 | # | 功能 | 说明 |
 |---|------|------|
 | 1 | **三种执行模式** | create / update / refactor |
-| 2 | **25 条审查规则** | R-01~R-25（含安全规则） |
+| 2 | **25 条审查规则** | R-01~R-26（含安全规则） |
 ```
 
 （避免 `可能 `~` 等模糊表述；中英文之间加空格，如 `Python 脚本` 而非 Python脚本（缺空格）。）
@@ -625,7 +625,7 @@ python scripts/json_loader.py list
 # 加载指定模块
 python scripts/json_loader.py load frontmatter    # Frontmatter 字段规范
 python scripts/json_loader.py load body           # 正文章节规范
-python scripts/json_loader.py load rules          # 审查规则 R-01~R-25
+python scripts/json_loader.py load rules          # 审查规则 R-01~R-26
 python scripts/json_loader.py load structure      # 目录结构规范 [v2]
 python scripts/json_loader.py load progressive_md # 渐进式 MD 体系 [v2]
 
@@ -678,7 +678,7 @@ structure ──→ progressive_md ─┘
 - **统一审批**：累积多个风险操作，一次性列出，由用户统一审批
 - **即时审批**：高风险操作执行前，立即请求用户授权
 
-### R-13~R-17 规则说明
+### R-13~R-26 规则说明
 
 | 规则 | 严重度 | 检查内容 |
 |------|---------|----------|

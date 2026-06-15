@@ -1,4 +1,58 @@
-## 2.73.9 (2026-06-14)
+## [2.80.0] - 2026-06-15
+
+### 修复
+- **log.py 数据目录路径修复**: LOG_DIR 和 setup_logging 的路径从技能安装目录下的 `.standardization/` 改为正确的 `skills/.standardization/skill-standardization/logs/`
+- **R-11 .standardization 白名单移除**: 技能根目录下的 `.standardization/` 不再被 R-11 自动放行，防止数据目录错位到技能安装目录内
+- **cmd_refactor cleanup 修复**: 步骤 2 添加 start_session 调用创建 manifest，步骤 9 改用 end_session 驱动清理，manifest_id 不再传错
+
+### 清理
+- 删除技能根目录下错位的 `.standardization/data/.verify_fix_map.json`（已合并到正确位置）
+
+---
+
+## [2.79.0] - 2026-06-15
+
+### 修复
+- 修复 outdated_rule_ref 方向: 以实际技能为准而非 rules.json，修复 apply_consistency_fix 误改 R-26→R-25
+
+---
+
+## [2.78.0] - 2026-06-15
+
+### 修复
+- 一致性审查闭环重构: 误判过滤+自动修复+细碎钩子，流程调整为 bump→报告
+
+---
+
+## [2.77.0] - 2026-06-15
+
+### 修复
+- 自改造验证: 修复 R-10 changelog 正则 + R-15 占位符检测 bug + _filter_false_positives 误报过滤遗漏
+
+---
+
+## [2.76.1] - 2026-06-15
+
+### 修复
+- 修复: 细碎审计/全量审计确认统一误判过滤 _filter_false_positives
+
+---
+
+## [2.76.0] - 2026-06-15
+
+### 修复
+- 重构: 流程钩子代码级强制+更新声明+一致性审查增强+规则编号迁移+修复循环, P0-3 P1-5 P2-8
+
+---
+
+## [2.75.0] - 2026-06-15
+
+### 修复
+- 重构: 删除 audit_skill() blueprint 参数, _audit_with_blueprint 简化为废弃别名, creator.py 清理 blueprint 注入, 全链路验证通过
+
+---
+
+## [2.73.9] - 2026-06-14
 
 ### 修复
 - **R-15 permissions.md 占位符问题**: `fix_create_permissions_md()` 生成含"（请填写）"的模板，未根据 PermissionChecker 扫描结果自动填充。改为调用 `PermissionChecker.scan()` 获取实际风险等级和发现项，自动生成完整内容
@@ -6,7 +60,7 @@
 
 ---
 
-## 2.73.8 (2026-06-13)
+## [2.73.8] - 2026-06-13
 
 ### 修复
 - **R-12 `log.py` 数据目录路径违规**：`setup_logging()` 直接 `os.path.join(skill_dir, ".standardization", ...)` 缺少合规变量，新增 `DEFAULT_DATA_DIR_RAW` 字面量 + `LOG_DIR`
@@ -115,7 +169,7 @@
 ## 2.66.0 (2026-06-10)
 
 ### 修正
-- **版本号语义纠正** — 本次改动含新功能（`--show-fix`、`--verify` v1 编号输出、两段式筛选链）和多项 bug 修复（16+ fix key 映射、R-22 数据丢失、R-25 子检查无强制力），按 R-03 应为 MINOR 升级。清除 2.65.5/2.65.6 两个错误的 PATCH 空版本号，统一以 2.66.0 发布
+- **版本号语义纠正** — 本次改动含新功能（`--show-fix`、`--verify` v1 编号输出、两段式筛选链）和多项 bug 修复（16+ fix key 映射、R-22 数据丢失、R-26 子检查无强制力），按 R-03 应为 MINOR 升级。清除 2.65.5/2.65.6 两个错误的 PATCH 空版本号，统一以 2.66.0 发布
 
 ---
 ## 2.65.4 (2026-06-10)
@@ -135,7 +189,7 @@
 ## 2.65.3 (2026-06-10)
 
 ### 修复
-- **P0c: `--verify` 1:1 问题→修复映射** — 每条 FAIL 展开为独立可编号条目（含 R-25 子项拆分），每个 `#ID` 有独立的 problem 和 fix 字段。筛选时只看 problem，确认真问题后用 `--show-fix ID1,ID2` 获取对应修复指引，不需扫描整个报告
+- **P0c: `--verify` 1:1 问题→修复映射** — 每条 FAIL 展开为独立可编号条目（含 R-26 子项拆分），每个 `#ID` 有独立的 problem 和 fix 字段。筛选时只看 problem，确认真问题后用 `--show-fix ID1,ID2` 获取对应修复指引，不需扫描整个报告
 - **新增 `--show-fix` 参数** — 接收逗号分隔 ID 列表，仅输出指定条目的修复指引
 - **数据目录白名单扩充** — `.workbuddy/` 加入 data_dir_checker 跳过列表，避免 `--verify` 写入的 fix_map.json 被 R-22 标记为违规
 
@@ -168,7 +222,7 @@
 
 ### 修复
 - **Bug: R-18/R-19 fix key 不匹配** — structure_checker.py 返回 `antipattern_reference`/`faq_reference`，但 fix.py dispatch 仅有 `antipattern_progressive`/`faq_progressive`，导致 `--fix` 静默失败。已补入缺失的 4 个 dispatch 映射
-- **Bug: R-25 C-17/C-18/C-19 质量子检查无强制力** — 此前子检查 WARN 仅注记在 detail 文本中，不影响 R-25 `passed` 状态。升级为：C-17/C-18/C-19 质量问题触发 `passed=False`，进入铁律 9 验证管道，无 fix key（由 LLM 铁律 8 细筛手动修复）
+- **Bug: R-26 C-17/C-18/C-19 质量子检查无强制力** — 此前子检查 WARN 仅注记在 detail 文本中，不影响 R-26 `passed` 状态。升级为：C-17/C-18/C-19 质量问题触发 `passed=False`，进入铁律 9 验证管道，无 fix key（由 LLM 铁律 8 细筛手动修复）
 
 ### 影响
 - `fix.py`：dispatch 表 +4 映射
@@ -308,7 +362,7 @@
 ## 2.59.0 (2026-06-02)
 
 ### 新增
-- R-25 新增 C-17（使用示例检查）、C-18（能力边界检查）、C-19（错误处理检查）
+- R-26 新增 C-17（使用示例检查）、C-18（能力边界检查）、C-19（错误处理检查）
 
 ### 改进
 - 更新 SemVer 更新语义规则：明确 PATCH 不含新功能、多更新不得打包为 PATCH、新增审计规则属于 MINOR
@@ -334,7 +388,7 @@
 ## 2.57.1 (2026-06-02)
 
 ### 修复
-- body.json: 新增「权限说明」到 allowed_sections/optional_sections/section_order，消除 R-17 与 R-13~R-17 冲突
+- body.json: 新增「权限说明」到 allowed_sections/optional_sections/section_order，消除 R-26 与 R-13~R-26 冲突
 
 ---
 
@@ -431,7 +485,7 @@
 ## 2.48.0 (2026-06-01)
 
 ### 修复
-- 新增 C-15 索引表引用冗余检测 + R-25 子检查增至15项
+- 新增 C-15 索引表引用冗余检测 + R-26 子检查增至15项
 
 ---
 
@@ -569,7 +623,7 @@
 - **SKILL.md 清理**: 多余空行收敛、独立渐进式加载说明合并到核心能力
 - **section_order**: 补充 数据目录说明、临时文件与备份管理 条目
 - **C-14 工作流程步骤完整性**: 新增 WARN 级审计，检测工作流程步骤数 + 混入的版本标记内容（类似更新日志的行文应移至 changelog.md）
-- **C-14 审计输出全部可见**: R-25 汇总显示上限从 4→20 条，LLM 不再需要翻文件查看被截断的 WARN
+- **C-14 审计输出全部可见**: R-26 汇总显示上限从 4→20 条，LLM 不再需要翻文件查看被截断的 WARN
 - **工作流程清理**: 删除混入的更新日志内容（v2.38.2/v2.38.5 版本标注 + 排错止损规则），改为 `→ 详见 references/guide.md`，仅保留 5 步核心流程
 - **根目录垃圾文件**: 清理 8 个 0 字节残留文件
 - **_record_backup**: 改为调用 cleanup_manager.register_backup()，放弃 manifest.txt

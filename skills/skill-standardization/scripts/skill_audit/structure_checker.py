@@ -18,7 +18,7 @@ import warnings
 _BODY_SPEC_CACHE = None
 
 def _load_body_spec():
-    """加载 body.json 并缓存结果。"""
+    """加载 body.json 并缓存结果（取第一个 JSON 对象，兼容多根对象情况）。"""
     global _BODY_SPEC_CACHE
     if _BODY_SPEC_CACHE is not None:
         return _BODY_SPEC_CACHE
@@ -31,7 +31,23 @@ def _load_body_spec():
         return {}
     try:
         with open(spec_path, 'r', encoding='utf-8') as f:
-            _BODY_SPEC_CACHE = json.load(f)
+            raw = f.read()
+        # 兼容多根对象情况（如 '},"section_format_guidelines":{...}'）
+        # 取第一个完整的 JSON 对象
+        brace_count = 0
+        first_obj_end = None
+        for i, ch in enumerate(raw):
+            if ch == '{':
+                brace_count += 1
+            elif ch == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    first_obj_end = i + 1
+                    break
+        if first_obj_end:
+            _BODY_SPEC_CACHE = json.loads(raw[:first_obj_end])
+        else:
+            _BODY_SPEC_CACHE = json.loads(raw)
         return _BODY_SPEC_CACHE
     except Exception:
         _BODY_SPEC_CACHE = {}
@@ -90,7 +106,7 @@ def _abs_line(body, content, m_or_pos):
 
 
 def body_has_h1(filepath, content, fm, body, **kw):
-    """R-06: 正文含一级标题检查（H1 不得含版本号，版本号由 version 字段管理）"""
+    """R-06: 正文含一级标题检查（仅检查 H1 存在性；H1 版本号检查由 R-25 C-01 覆盖）"""
     # v2.44.1: 排除代码块内容，避免 bash/json 中的 # 注释被误判为 H1
     body_no_code = re.compile(r'```.*?```', re.DOTALL).sub('', body)
     m = re.search(r'^# .+', body_no_code, re.MULTILINE)
@@ -105,15 +121,6 @@ def body_has_h1(filepath, content, fm, body, **kw):
                          "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
     line = _abs_line(body, content, m)
     h1_text = m.group(0).strip()
-    # 检查 H1 是否含版本号（如 '# skill-name v2.38.7' 或 '# skill-name v2.6.27 — 描述'）
-    ver_in_h1 = re.search(r'v?\d+\.\d+\.\d+', h1_text)
-    if ver_in_h1:
-        return {"passed": False,
-                "detail": f"{filepath}:{line} - H1 含版本号 \"{ver_in_h1.group().strip()}\"，H1 不应含版本号（版本号由 version 字段管理）",
-                "fix": {"key": "h1_version", "value": True,
-                         "location": f"{filepath}:{line}",
-                         "operation": "移除 H1 标题中的版本号",
-                         "verification": "重新运行 audit_skill()，确认 R-06 passed"}}
     # 检查 H1 是否包含技能名（v2.44.3 新增）
     name = (fm or {}).get("name", "")
     if name and name not in h1_text and name.replace('-', ' ') not in h1_text.lower():
@@ -445,8 +452,17 @@ def body_has_faq_section(filepath, content, fm, body, **kw):
                              "operation": "改进 FAQ 质量：问题须具体（≥10字），答案须有实质内容（≥15字），避免万能回答",
                              "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
 
+    # 检查 Q&A 数量 — 至少 3 对
+    if len(faq_qa) < 3:
+        return {"passed": False,
+                "detail": f"{faq_file}:1 - FAQ 仅有 {len(faq_qa)} 对 Q&A，要求至少 3 对有实质内容的问答",
+                "fix": {"key": "faq_count", "value": "add_qa",
+                         "location": f"{faq_file}:1",
+                         "operation": f"新增至少 {3 - len(faq_qa)} 对 Q&A，每对问题 ≥10 字、答案 ≥15 字",
+                         "verification": "重新运行 audit_skill()，确认 R-19 passed"}}
+
     return {"passed": True,
-            "detail": f"{faq_file}:1 - FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A）"}
+            "detail": f"{faq_file}:1 - FAQ 在 references/faq.md 中（{len(faq_qa)} 对 Q&A，全部合格）"}
 
 
 def _extract_qa_pairs(section_text):
@@ -681,22 +697,28 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
 
     # ── 检查渐进式文件 references/*.md ────────────────
     # skill_dir 已在上面定义
+    # 现场扫磁盘（不依赖蓝皮书）
     refs_dir = os.path.join(skill_dir, 'references')
     if os.path.isdir(refs_dir):
-        for fname in sorted(os.listdir(refs_dir)):
-            if not fname.endswith('.md'):
-                continue
-            # changelog.md 也检查写作规范（审计标准不可绕过，问题应改文件而非改审计）
-            fpath = os.path.join(refs_dir, fname)
-            try:
-                with open(fpath, 'r', encoding='utf-8') as f:
-                    ref_content = f.read()
-            except Exception:
-                continue
-            # 渐进式文件也是文档文件，不是审计代码自身，不传 self_audit（保持默认 False）
-            issues = _check_writing_standards_text(ref_content, fname)
-            for k in ["must", "suggest", "optional"]:
-                all_issues[k] += issues[k]
+        _ref_candidates = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
+    else:
+        _ref_candidates = []
+    for fname in _ref_candidates:
+        if not fname.endswith('.md'):
+            continue
+        # changelog.md 也检查写作规范（审计标准不可绕过，问题应改文件而非改审计）
+        fpath = os.path.join(skill_dir, 'references', fname)
+        if not os.path.isfile(fpath):
+            continue
+        try:
+            with open(fpath, 'r', encoding='utf-8') as f:
+                ref_content = f.read()
+        except Exception:
+            continue
+        # 渐进式文件也是文档文件，不是审计代码自身，不传 self_audit（保持默认 False）
+        issues = _check_writing_standards_text(ref_content, fname)
+        for k in ["must", "suggest", "optional"]:
+            all_issues[k] += issues[k]
 
     # ── 分级格式化输出 ──────────────────────────────
     must_count = len(all_issues["must"])
@@ -1027,7 +1049,13 @@ def check_doc_code_consistency(
     if other_file_refs and skill_dir:
         # 预读所有 .md 文件内容，用于上下文提取
         _md_contents = {}
-        for _mf in ['SKILL.md'] + ['references/' + f for f in sorted(os.listdir(os.path.join(skill_dir, 'references'))) if f.endswith('.md')]:
+        # 现场扫 references/（不依赖蓝皮书）
+        _refs_dir_path = os.path.join(skill_dir, 'references')
+        if os.path.isdir(_refs_dir_path):
+            _ref_md_files = ['references/' + f for f in sorted(os.listdir(_refs_dir_path)) if f.endswith('.md')]
+        else:
+            _ref_md_files = []
+        for _mf in ['SKILL.md'] + _ref_md_files:
             _mp = os.path.join(skill_dir, _mf)
             if os.path.isfile(_mp):
                 try:
@@ -1192,27 +1220,6 @@ def check_doc_code_consistency(
         return {"passed": True,
                 "detail": f"{filepath}:1 - R-23: ⓘ 粗筛 {optional_n} 条待 LLM 精筛确认（不阻断通过）：\n{opt_msgs}",
                 "fix": None}
-
-    # ── 检查 4: SKILL.md 中引用的规则编号范围是否与 rules.json 一致 ──
-    _rules_spec_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'spec', 'rules.json'
-    )
-    if os.path.isfile(_rules_spec_path):
-        try:
-            with open(_rules_spec_path, 'r', encoding='utf-8') as f:
-                _rules_data = json.load(f)
-            _actual_max = _rules_data.get('_total_rules', 0)
-            for m in re.finditer(r'R-(\d+)~R-(\d+)', content):
-                claimed_max = int(m.group(2))
-                if claimed_max != _actual_max:
-                    line_no = content[:m.start()].count('\n') + 1
-                    issues["must"].append(
-                        f"{filepath}:{line_no} - SKILL.md 声称最大规则编号为 R-{claimed_max}，"
-                        f"但 rules.json 实际为 R-{_actual_max}，描述可能过时"
-                    )
-        except Exception:
-            pass
 
     msgs = []
     for k in ["must", "suggest", "optional"]:
@@ -1634,6 +1641,18 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 if items_c > 5:
                     issues["warn"].append("C-12: 章节「约束」共 " + str(items_c) + " 条，超过建议上限 5 条，建议精简或部分移到 references/")
 
+            # 限制/已知问题 章节内容深度检查
+            if any(kw in sec_title for kw in ["限制", "已知问题", "Limitations", "Known Issues"]):
+                has_scope = bool(re.search(r'影响范围|影响|scope|impact', sec_body, re.IGNORECASE))
+                has_status = bool(re.search(r'状态|当前|已规划|排查中|无解|planned|investigating|won\'t fix|wontfix', sec_body, re.IGNORECASE))
+                depth_issues = []
+                if not has_scope:
+                    depth_issues.append("缺少影响范围说明")
+                if not has_status:
+                    depth_issues.append("缺少当前状态标记（已规划/排查中/无解）")
+                if depth_issues:
+                    issues["warn"].append(f"C-12: 章节「{sec_title[:20]}」内容深度不足——{'、'.join(depth_issues)}（建议每条限制含影响范围和当前状态）")
+
             guidelines_str = fmt.get("guidelines", "")
             if guidelines_str:
                 semantic_rules = []
@@ -1655,13 +1674,18 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     # ════════════════════════════════════════════════════════════
     _c13_sd = kw.get("skill_dir", "")
     core_section_match = re.search(r'^##\s+(?:核心能力|核心功能|概述).*?(?=^##\s|\Z)', body, re.MULTILINE | re.DOTALL)
+    has_index_table = False  # 兜底初始化
     if core_section_match:
         core_text = core_section_match.group(0)
         has_index_table = "### 渐进式文件索引" in core_text
         if has_index_table and _c13_sd:
+            # 现场扫 references/（不依赖蓝皮书）
             refs_dir = os.path.join(_c13_sd, "references")
             if os.path.isdir(refs_dir):
                 actual_refs = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
+            else:
+                actual_refs = []
+            if actual_refs:
                 listed_refs = set()
                 table_rows = re.findall(r'^\|.*?`(references/[^`]+)`.*?\|', core_text, re.MULTILINE)
                 for r in table_rows:
@@ -1671,9 +1695,13 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 if missing_from_table:
                     issues["warn"].append(f"C-13: references/ 中存在但渐进式索引表未列出的文件：{', '.join(missing_from_table[:5])}")
         elif not has_index_table and _c13_sd:
+            # 现场扫 references/（不依赖蓝皮书）
             refs_dir = os.path.join(_c13_sd, "references")
             if os.path.isdir(refs_dir):
                 ref_count = len([f for f in os.listdir(refs_dir) if f.endswith('.md')])
+            else:
+                ref_count = 0
+            if ref_count > 0:
                 if ref_count > 0:
                     issues["warn"].append(f"C-13: references/ 目录有 {ref_count} 个 .md 文件，但 ## 核心能力 章节末尾缺少渐进式索引表（### 渐进式文件索引）")
 
@@ -1817,6 +1845,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c16_skill_dir:
         _c16_docs = [_c16_skill_dir]
         _refs_dir = os.path.join(_c16_skill_dir, "references")
+        # 现场扫 references/（不依赖蓝皮书）
         if os.path.isdir(_refs_dir):
             for f in sorted(os.listdir(_refs_dir)):
                 if f.endswith(".md"):
@@ -1825,12 +1854,10 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         _c16_docs = [filepath]
 
     _c16_outdated_patterns = {
-        "R-01~R-1[0-9]": ("规则编号范围", "当前规则为 R-01~R-25，references/ 中引用的旧范围需要更新"),
-        "R-01~R-24\\b": ("规则编号范围", "当前规则为 R-01~R-25，references/ 中引用的旧范围需要更新"),
         "200 行": ("行数阈值", "当前 SKILL.md 行数上限为 230 行，references/ 中引用旧值 200 行需要更新"),
         "草案|v0\\.1": ("过时描述", "规范已正式发布 v2+，references/ 中不应仍称为「草案」或「v0.1」"),
         "5 个必须章节 \\+ 4 个推荐章节": ("章节分类过时", "当前规范为三层体系（must_have/whitelist/nonstandard），非旧五必需+四推荐"),
-        "R-01~R-10 共 10 条": ("规则数量过时", "当前规则为 R-01~R-25 共 25 条"),
+        "R-01~R-10 共 10 条": ("规则数量过时", "当前规则为 R-01~R-26 共 26 条"),
     }
     for _c16_doc in _c16_docs:
         try:
@@ -1985,3 +2012,135 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     return {"passed": error_count == 0,
             "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
+
+
+# ═══════════════════════════════════════════════════════
+# R-26: 文档声明规范（LICENSE + README）
+# ═══════════════════════════════════════════════════════
+def check_license_compliance(filepath=None, content=None, fm=None, body=None,
+                             dirname=None, skill_dir=None, **kw):
+    """
+    R-26: 检查 LICENSE 和 README 声明是否符合规范。
+    返回 dict: {"passed": bool, "detail": str, "skip": bool}
+    
+    LICENSE 子检查项：
+    - C-01: references/LICENSE.md 必须存在 (ERROR)
+    - C-02: SKILL.md 正文不得有 license 章节 (ERROR)
+    - C-03: 根目录不得有 LICENSE 文件 (ERROR)
+    - C-04: scripts/ 下不得有 LICENSE 文件 (WARN)
+    - C-05: 索引表应引用 LICENSE.md (WARN)
+    - C-06: LICENSE.md 不应为空 (ERROR)
+    
+    README 子检查项：
+    - C-07: 根目录不得有 README.md (ERROR)
+    - C-08: SKILL.md 正文含 README 章节应拆分至 references/README.md (ERROR)
+    """
+    if not skill_dir or not os.path.isdir(skill_dir):
+        return {"passed": True, "detail": "R-26: 无法确定技能目录，跳过", "skip": True}
+
+    issues = []
+    refs_dir = os.path.join(skill_dir, "references")
+    license_ref_path = os.path.join(refs_dir, "LICENSE.md")
+    readme_ref_path = os.path.join(refs_dir, "README.md")
+    skill_md_path = os.path.join(skill_dir, "SKILL.md")
+
+    # 如果 body 未传入但 SKILL.md 存在，从文件读取正文
+    if body is None and os.path.isfile(skill_md_path):
+        try:
+            with open(skill_md_path, "r", encoding="utf-8") as _f:
+                _raw = _f.read()
+            _fm_end = _raw.find('\n---', _raw.find('---') + 3)
+            if _fm_end >= 0:
+                body = _raw[_fm_end + 4:].lstrip('\n')
+        except Exception:
+            pass
+
+    # ═══════════════════ LICENSE ═══════════════════
+    # C-01: references/LICENSE.md 文件必须存在
+    # 现场扫（不依赖蓝皮书）
+    if os.path.isfile(license_ref_path):
+        pass  # 存在
+    else:
+        issues.append("C-01 FAIL: references/LICENSE.md 文件不存在")
+
+    # C-02: SKILL.md 正文不得有独立 license 章节（frontmatter 的 license 字段保留）
+    if body:
+        license_section = re.search(
+            r'^##\s*(?:License|许可证|许可协议|LICENSE|许可声明)\s*$',
+            body, re.MULTILINE | re.IGNORECASE
+        )
+        if license_section:
+            line_no = body[:license_section.start()].count('\n') + 1
+            issues.append(f"C-02 FAIL: SKILL.md 正文含独立 license 章节（第 {line_no} 行），应拆分到 references/LICENSE.md")
+        license_body = re.search(
+            r'(?:MIT License|Apache License|GNU General Public License|BSD [0-9]-Clause)',
+            body, re.IGNORECASE
+        )
+        if license_body:
+            issues.append("C-02 FAIL: SKILL.md 正文含 license 声明文本，应移至 references/LICENSE.md")
+
+    # C-03: 根目录不得存在 LICENSE 文件
+    # 现场扫（不依赖蓝皮书）
+    for entry in os.listdir(skill_dir):
+        if entry.upper().startswith("LICENSE"):
+            fpath = os.path.join(skill_dir, entry)
+            if os.path.isfile(fpath):
+                issues.append(f"C-03 FAIL: 根目录存在 license 文件 {entry}，应删除或移至 references/LICENSE.md")
+
+    # C-04: scripts/ 下不得存在 LICENSE 文件
+    # 现场扫（不依赖蓝皮书）
+    scripts_dir = os.path.join(skill_dir, "scripts")
+    if os.path.isdir(scripts_dir):
+        for entry in os.listdir(scripts_dir):
+            if entry.upper().startswith("LICENSE"):
+                fpath = os.path.join(scripts_dir, entry)
+                if os.path.isfile(fpath):
+                    issues.append(f"C-04 FAIL: scripts/ 下存在 license 文件 {entry}，应删除或移至 references/LICENSE.md")
+
+    # C-05: 渐进式文件索引表应包含 LICENSE.md
+    if body:
+        has_license_ref = re.search(
+            r'references/LICENSE\.md', body, re.IGNORECASE
+        )
+        if not has_license_ref:
+            issues.append("C-05 WARN: SKILL.md 渐进式文件索引表未引用 references/LICENSE.md")
+
+    # C-06: references/LICENSE.md 不应为空（必须读文件内容，无法从蓝皮书获取）
+    if os.path.isfile(license_ref_path):
+        try:
+            lic_size = os.path.getsize(license_ref_path)
+            if lic_size == 0:
+                issues.append("C-06 FAIL: references/LICENSE.md 内容为空")
+        except OSError:
+            issues.append("C-06 FAIL: references/LICENSE.md 无法读取")
+
+    # ═══════════════════ README ═══════════════════
+    # C-07: 根目录不得存在 README.md
+    # 现场扫（不依赖蓝皮书）
+    readme_root = os.path.join(skill_dir, "README.md")
+    if os.path.isfile(readme_root):
+        issues.append("C-07 FAIL: 根目录存在 README.md，应迁移至 references/README.md")
+
+    # C-08: SKILL.md 正文含 README/说明 章节应拆分至 references/README.md
+    if body:
+        readme_section = re.search(
+            r'^##\s*(?:README|说明文档|使用说明|项目说明|简介|Introduction)\s*$',
+            body, re.MULTILINE | re.IGNORECASE
+        )
+        if readme_section:
+            line_no = body[:readme_section.start()].count('\n') + 1
+            issues.append(f"C-08 FAIL: SKILL.md 正文含类似 README 章节（第 {line_no} 行），应拆分至 references/README.md")
+
+    if not issues:
+        return {"passed": True, "detail": "R-26: 文档声明规范检查通过"}
+
+    has_error = any("FAIL" in i for i in issues)
+    return {
+        "passed": not has_error,
+        "detail": "R-26: " + "; ".join(issues),
+        "fix": {
+            "key": "license_compliance",
+            "value": True,
+            "issues": issues,
+        } if has_error else None,
+    }

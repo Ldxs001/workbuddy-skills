@@ -20,10 +20,10 @@ _LOG_CONFIGURED = False
 
 # R-12 锚点：合规字面量
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-standardization/data/"
-LOG_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    ".standardization", "skill-standardization", "logs"
-)
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SKILL_DIR  = os.path.dirname(_SCRIPT_DIR)  # skill-standardization/
+_SKILLS_ROOT = os.path.dirname(_SKILL_DIR)  # skills/
+LOG_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-standardization", "logs")
 
 
 def setup_logging(level: str = "WARNING", skill_dir: str = None) -> None:
@@ -44,7 +44,9 @@ def setup_logging(level: str = "WARNING", skill_dir: str = None) -> None:
     root.setLevel(getattr(logging, level.upper(), logging.WARNING))
 
     if skill_dir:
-        _log_dir = os.path.join(skill_dir, ".standardization", "skill-standardization", "logs")
+        # skill_dir 是技能安装目录，数据目录应在 skills/.standardization/<skill>/
+        _skills_root = os.path.dirname(os.path.normpath(skill_dir))
+        _log_dir = os.path.join(_skills_root, ".standardization", "skill-standardization", "logs")
         os.makedirs(_log_dir, exist_ok=True)
         fh = logging.FileHandler(
             os.path.join(_log_dir, f"skill-std-{datetime.now().strftime('%Y%m%d')}.log"),
