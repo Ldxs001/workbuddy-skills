@@ -1,3 +1,10 @@
+## [2.81.0] - 2026-06-15
+
+### 修复
+- 修复 _reclassify_false_positive R-23 误判逻辑（scripts/真问题 vs references/误报）；修复 --fix 无限循环（区分可自动修复与 LLM-only 规则）；--verify 增加 _reclassify_false_positive 过滤；撤回 fix.py 自动删除行逻辑（改为仅做同名不同扩展名匹配）；skill_builder/ 引用改为真问题（文档过时）；修复 git-sync copytree 在 Windows 上因 nul 保留设备名崩溃；git-sync 新增 _classify_push_error() 错误消息标准化
+
+---
+
 ## [2.80.5] - 2026-06-15
 
 ### 修复

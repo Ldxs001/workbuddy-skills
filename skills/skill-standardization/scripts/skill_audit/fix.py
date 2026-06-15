@@ -1100,13 +1100,20 @@ def _find_actual_file(skill_dir, ref_stem, ref_ext):
 
 
 def _fix_md_file_refs(skill_dir, md_path):
-    """修复单个 .md 中不存在的文件路径引用（通用文件查找）"""
+    """修复单个 .md 中不存在的文件路径引用（通用文件查找 + 同名不同扩展名匹配）
+
+    只做两件事：
+    1. 查找同名但不同扩展名的实际文件（如 .py → .md 或 .md → .py）
+    2. 递归搜索 scripts/ 下是否有同名的实际文件
+    不做自动删除行。
+    """
     import re
     if not os.path.isfile(md_path):
         return 0
     content = _read_file(md_path)
     changed = 0
     new_content = content
+
     for m in reversed(list(re.finditer(r'([^\s`]+\.[a-zA-Z]{2,4})', content))):
         ref = m.group(1).strip().strip("'\"")
         if '/' not in ref and '\\' not in ref:
@@ -1123,7 +1130,7 @@ def _fix_md_file_refs(skill_dir, md_path):
         ref_stem = os.path.splitext(os.path.basename(ref))[0]
         ref_ext = os.path.splitext(ref)[1]
 
-        # 先查同目录
+        # 先查同目录（同名不同扩展名）
         ref_dir = os.path.dirname(full)
         found = False
         if os.path.isdir(ref_dir):

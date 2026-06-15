@@ -458,6 +458,12 @@ def _reclassify_false_positive(res):
         # 3. 引用 scripts/ 下不存在的文件 → 真问题
         if "scripts/" in detail:
             return False  # 脚本引用，真问题
+        # 3.5 skill_builder/ 模块：已废弃但文档中仍引用（已改为代理到 skill_audit）
+        #    这是文档过时问题，不是误报。R-23 应报告为真问题让 LLM 更新文档
+        #    但 _reclassify_false_positive 只做代码层分类，skill_builder 引用属于
+        #    "代码已重构但文档没更新"的真问题，不由 _reclassify 放过
+        if "skill_builder/" in detail:
+            return False  # 真问题：文档引用了已废弃模块路径，需要 LLM 更新文档
         # 4. 引用技能根目录下不存在的文件（如 _meta.json 等）→ 真问题
         if "/" not in detail.split("但文件不存在")[0].split("`")[-2:-1][0] if "`" in detail else False:
             pass  # 继续下面的启发式判断
