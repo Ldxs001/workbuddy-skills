@@ -235,12 +235,25 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 
 ## 错误码总表
 
-| 工具 | 退出码 | 含义 |
-|------|--------|------|
-| skill_builder | `0` | 成功 |
-| skill_builder | `1` | 参数错误/目录已存在/不存在 |
-| skill_audit | `0` | 审查完成（默认模式） |
-| skill_audit | `1` | 严格模式下有 ERROR（--strict） |
+| 工具 | 退出码 | 含义 | 可能原因 |
+|------|--------|------|---------|
+| skill_audit | `0` | 审查完成（全部通过或无 ERROR） | 正常执行 |
+| skill_audit | `0` | ⛔ 语义门禁阻断（未传 --confirmed） | 忘记加 `--confirmed` 参数 |
+| skill_audit | `1` | 审查失败：参数错误 | 目标目录不存在、SKILL.md 找不到 |
+| skill_audit | `1` | 审查失败：严重问题 | audit --verify 后仍有未通过的真实问题 |
+| skill_audit | `1` | 审查失败：修复循环超限 | update >10轮/refactor >20轮未清零 |
+| skill_audit | `1` | 一致性审查异常 | 代码层面报错，需查看终端 traceback |
+| skill_audit | `1` | 文件修改受阻 | safe_io 原子写入全部重试失败 |
+| skill_builder | `0` | 创建/更新成功 | 正常执行 |
+| skill_builder | `1` | 参数错误 | 目标目录已存在、目录名非法、缺少必需参数 |
+| cleanup_manager | `0` | 清理完成 | manifest 内文件已清除 |
+| cleanup_manager | `1` | manifest 加载失败 | `end_session()` 时 session.json 损坏 |
+| cleanup_manager | `1` | 清理失败 | 备份文件无法删除，保留不清理 |
+| permission_checker | `0`~`2` | 0=低风险 1=中风险 2=高风险 | 根据扫描结果自动判定 |
+| safe_io | `1` | 写入失败 | 文件锁/权限不足，3次重试+shutil.move 降级均失败 |
+| skill_inspector | `1` | 目标目录不存在 | 传入的 <skill-dir> 路径无效 |
+| skill_rollback | `1` | 备份目录不存在 | 回滚目标时间戳/路径错误 |
+| fix.py | — | 不独立退出 | fix.py 是函数库，无独立 main 入口，异常通过 traceback 输出 |
 
 ---
 

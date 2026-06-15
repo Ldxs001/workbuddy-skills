@@ -43,8 +43,7 @@ workbuddy-skills/
 ├── LICENSE
 ├── README.md
 ├── architecture/
-├── skills/
-└── work-repo/
+└── skills/
 ```
 
 ---

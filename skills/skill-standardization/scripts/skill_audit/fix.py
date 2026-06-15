@@ -17,6 +17,7 @@ import os
 import re
 import io
 import json
+import traceback
 
 from .utils import _fmt_frontmatter_value, parse_simple_yaml_frontmatter
 
@@ -368,7 +369,10 @@ def fix_section_trigger(skill_dir, **kw):
                 try:
                     with open(os.path.join(root, f), 'r', encoding='utf-8') as fh:
                         src = fh.read()
-                except: continue
+                except:
+                    print(f"[WARN] 读取 {os.path.join(root, f)} 失败，跳过")
+                    traceback.print_exc()
+                    continue
                 # 从 docstring 提取功能描述
                 docstrings = re.findall(r'"""(.*?)"""', src, re.DOTALL)
                 for ds in docstrings:

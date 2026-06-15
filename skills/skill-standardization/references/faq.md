@@ -344,3 +344,73 @@ JSON 文件的推荐结构：
 - 输出路径显示时使用正斜杠 `/` 保持跨平台一致
 
 CLI 参数传入的路径（反斜杠）会被 pathlib 自动规范化。
+
+---
+
+## 常见错误处理
+
+### Q25: 审计报 "⛔ 未传入 --confirmed 参数，拒绝执行"
+
+**A:** 这是**语义门禁**在生效——所有 audit/create/update/refactor 操作必须显式传 `--confirmed` 才能执行。
+
+```bash
+# ❌ 会被阻断
+python -m scripts.skill_audit audit <skill-dir>
+
+# ✅ 正确
+python -m scripts.skill_audit audit <skill-dir> --confirmed
+```
+
+### Q26: 运行 audit --verify 后 exit(1)，但报告里全是误报
+
+**A:** 先检查报告底部是否有 `#ID` 编号的 FAIL 条目。如果有实心 FAIL 项：
+- **真问题** → 运行 `--show-fix ID` 获取修复指引
+- **误判** → 运行 `--classify ID` 标记为误报，之后审计会自动过滤
+
+如果确实全是已标记的误报，确认 `_reclassify_false_positive()` 是否覆盖了该模式。新发现的误判模式请联系开发者补充。
+
+### Q27: git push 到 GitHub 报 443 超时
+
+**A:** 这不是 skill-standardization 的问题，是网络环境导致的 GitHub 连接失败。常见原因和解决方法：
+
+| 原因 | 解决 |
+|------|------|
+| 网络代理未配置 | 设置 git 代理：`git config --global http.proxy http://127.0.0.1:7890` |
+| DNS 污染 | 使用 `ssh` 协议替代 `https`，或修改 hosts 文件 |
+| 防火墙限制 | 尝试切换到 SSH 方式推送，或使用 Gitee 镜像仓库 |
+
+### Q28: "规则 R-XX 执行异常"是什么？
+
+**A:** 这是审计器在运行某条规则时 Python 代码抛出了未预期的异常。终端输出会附带完整的 traceback 信息，常见原因：
+
+| 原因 | 解决 |
+|------|------|
+| SKILL.md YAML 格式损坏 | 检查 frontmatter 的 `---` 闭合和缩进 |
+| 文件编码非 UTF-8 | 确保文件保存为 UTF-8 编码 |
+| 脚本内部 bug | 查看 traceback 定位具体哪行代码崩溃 |
+
+traceback 行数多不要慌，关注最后几行（`File "...", line XX`）即可定位问题文件。
+
+### Q29: refactor 步骤卡在修复循环中，一直无法退出
+
+**A:** 修复循环有内置上限——update 最多 10 轮，refactor 最多 20 轮，超限后自动 exit(1) 阻断。
+
+如果循环反复失败：
+1. 检查是否在修**不可自动修复的规则**（R-23/R-25 需要 LLM 手动编辑，`--fix` 修不了）
+2. 运行 `audit <skill-dir> --show-fix ID` 获取每条 FAIL 的具体修复指引
+3. 修完后通过 `--fixed-rules R-23,R-25` 声明，代码会自动确认
+
+### Q30: Windows 上文件写入报 "Permission denied"
+
+**A:** safe_io.py 内置了 3 次重试 + `shutil.move` 降级机制。如果仍失败：
+
+```bash
+# 检查文件是否被其他程序占用
+# 常见原因：文件已在 vscode/记事本/资源管理器中打开
+```
+
+关闭占用程序后重新运行即可。safe_io 的重试逻辑（v2.73.8+）会自动处理临时文件锁。
+
+---
+
+
