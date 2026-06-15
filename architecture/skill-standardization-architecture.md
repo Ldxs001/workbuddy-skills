@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.80.0 版的架构设计、审查规则体系、标准化执行流程与修复体系  
-> 更新：2026-06-15（v2.73.2 → v2.80.0，含 11 个版本迭代的变更同步）
+> 完整解读 v2.82.0 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 更新：2026-06-15（v2.73.2 → v2.82.0，含 14 个版本迭代的变更同步）
 
 ---
 
@@ -23,7 +23,7 @@ skill-standardization 是一个 **Skill 全生命周期标准化管理工具集*
 |---|------|------|
 | **表现层** | SKILL.md + references/*.md + CLI | 人类可读的文档和命令行交互 |
 | **业务层** | skill_builder / skill_audit / fix.py / safe_io | 创建/更新/改造/审查/修复/安全写入的核心逻辑 |
-| **数据层** | json_loader + spec/*.json | 按需加载的标准化规范定义；数据存储在 `skills/.standardization/<skill>/` |
+| **数据层** | spec/*.json | 按需加载的标准化规范定义；数据存储在 `skills/.standardization/<skill>/` |
 
 ### 1.2 目录结构
 
@@ -68,20 +68,10 @@ skill-standardization/
     │   ├── progress_manager.py     # 进度管理器
     │   ├── fix.py              # 自动修复函数（30+ 规则）
     │   └── utils.py            # 常量定义（RULES 列表、关键词映射等）
-    ├── json_loader.py          # 渐进式 JSON 加载器
     ├── safe_io.py              # 安全文件写入（原子写入 + 备份 + Windows 重试）
-    ├── log.py                  # 共享日志模块（统一日志配置，v2.73.3 新增）
-    ├── op_logger.py            # 操作日志记录
-    ├── op_logger_patch.py      # 操作日志补丁
-    ├── run_audit.py            # 独立审计入口
     ├── cleanup_manager.py      # Manifest 驱动清理（备份注册 + 收尾清理）
-    ├── authorization_manager.py # 授权管理器
     ├── permission_checker.py   # 权限检查器（AST 扫描风险操作）
     ├── skill_inspector.py      # 结构扫描器（输出技能蓝皮书）
-    ├── skill_rollback.py       # 回滚工具
-    ├── patch_utils.py          # 补丁工具
-    ├── update_all_versions.py  # 全版本更新
-    ├── update_skill_frontmatter.py # frontmatter 更新脚本
     └── spec/                   # 规范定义（JSON Schema）
         ├── _index.json         # 模块注册索引
         ├── frontmatter.json    # Frontmatter 字段规范 v2.6.0（11 required + 2 conditional + 4 optional）
@@ -91,12 +81,11 @@ skill-standardization/
         └── progressive_md.json # 渐进式 MD 体系规范
 ```
 
-**变化说明（v2.73.2 → v2.80.0）**：
-- ✅ **新增** `scripts/log.py` — 共享日志模块（v2.73.3）
+**变化说明（v2.73.2 → v2.82.0）**：
 - ✅ **新增** `skill_audit/consistency_checker.py` — 一致性审查闭环
 - ✅ **新增** `skill_audit/_tree_scanner.py` — 目录树扫描器
 - ✅ **新增** `references/LICENSE.md`、`references/permissions.md`、`references/scan_patterns.json`
-- ❌ **已删除** `scripts/_dead_code_backup/` — 50+ 死文件已清理（v2.73.3）
+- ❌ **已删除** `scripts/log.py`、`scripts/op_logger.py`、`scripts/op_logger_patch.py`、`scripts/run_audit.py`、`scripts/json_loader.py`、`scripts/authorization_manager.py`、`scripts/patch_utils.py`、`scripts/update_all_versions.py`、`scripts/update_skill_frontmatter.py`、`scripts/skill_rollback.py` — 零代码引用的死文件（v2.82.0）
 - ❌ **已删除** blueprint 参数体系（v2.75.0）
 
 ### 1.3 三层章节体系（section_tiers）
@@ -188,7 +177,7 @@ SKILL.md 新增 `## 能力与限制` 章节（v2.62.2），明确列出每项核
 
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
-| **R-11** | ERROR | 产出物路径 + 风险检测 | 产出物符合 `skills/.standardization/<skill>/` 规范，且无路径遍历/跨目录写入/敏感信息泄露风险；根目录下的 `.standardization/` 现在会被报违规（v2.80.0） |
+| **R-11** | ERROR | 产出物路径 + 风险检测 | 产出物符合 `skills/.standardization/<skill>/` 规范，且无路径遍历/跨目录写入/敏感信息泄露风险；根目录下的 `.standardization/` 报违规。<br><br>**白名单精准豁免**（v2.80.1+）：只跳过指向技能自身数据目录（`.standardization/<skill>/`）的路径；`Path()` 从 `_LOOKUP_FUNCS` 移除，赋值不再被当作查找跳过；指向 git 仓库（含 `.git` 的路径）跳过。
 | **R-12** | ERROR | 外部数据目录 + 风险检测 | 路径符合 `skills/.standardization/<skill-name>/` 约定，_meta.json 含 data_dir 字段且一致，无数据泄露风险。`DEFAULT_DATA_DIR_RAW` 变量所在行必须直接赋值合规字面量（不得通过中间变量间接赋值） |
 
 **R-12 三源证据链**：审计器对源码做三源证据链判断。推荐双变量模式：
@@ -234,7 +223,7 @@ _data_dir_abs = os.path.normpath(os.path.join(SKILL_ROOT, "..", DEFAULT_DATA_DIR
 | 规则 | 严重度 | 检查内容 | 通过条件 |
 |------|:------:|---------|---------|
 | **R-22** | WARN | 数据目录合规 | 检查安装目录是否混入应属数据目录的文件（如 cache/temp/backup）；`.standardization/` 目录被 os.walk 跳过（不会误报标准化数据目录） |
-| **R-23** | WARN | 文档-代码一致性 | SKILL.md 引用的脚本/文件/函数名真实存在，代码示例中的调用方式与实际代码一致（含目录树扫描器 `_tree_scanner.py` 辅助检测） |
+| **R-23** | WARN | 文档-代码一致性 | SKILL.md 引用的脚本/文件/函数名真实存在，代码示例中的调用方式与实际代码一致（含目录树扫描器 `_tree_scanner.py` 辅助检测）。<br><br>**误判过滤**（v2.80.5+）：区分真问题（scripts/下引用不存在的文件——不放过）与误报（references/文档示例路径、纯文件名引用——放过）。**需要 LLM 手动编辑修复**（非自动修复）。 |
 | **R-24** | WARN | 更新日志渐进加载 | 更新日志必须放在 references/changelog.md，SKILL.md 只能有引用 |
 
 ### 2.7 类别 G：文档写作格式（R-25，含 C-01~C-12 十二项子检查）
@@ -313,7 +302,7 @@ refactor 模式绝不删除任何文件——只执行 `move` 操作，执行前
 **目的**：Skill 包含用户自定义的有价值文件，即使不符合规范也不应丢失。
 
 ### D4: 渐进式加载
-SKILL.md 是轻量入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。规范定义也遵循此原则——json_loader 只在请求时才读取对应的 spec JSON 文件。
+SKILL.md 是轻量入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。规范定义也遵循此原则——审计器在需要时才读取对应的 spec JSON 文件。
 **目的**：减少一次性加载的上下文开销，让 AI 和人类都能快速理解 skill 的核心信息。
 
 ### D5: 模板驱动
@@ -354,7 +343,7 @@ create 使用硬编码字符串模板（当前），未来可能支持外部模�
 
 | 文件 | 更新方式 | 使用脚本 |
 |------|----------|---------|
-| `SKILL.md` frontmatter | Python 原子写入 | `update_skill_frontmatter.py` |
+| `SKILL.md` frontmatter | Python 原子写入 | `skill_audit/fix.py`（`fix_frontmatter_fields`） |
 | `SKILL.md` 正文 | Python 原子重写 | `safe_io.py` 的 `safe_write()` |
 | `references/*.md` | safe_io.py 的 `safe_write()` | 随技能自带 |
 | 更新日志 | Python 合并脚本 | 每次发版统一维护 `references/changelog.md` |
@@ -432,7 +421,7 @@ DEFAULT_DATA_DIR_RAW = "skills/.standardization/<skill-name>/data/"  # R-12 审�
 | `fix_faq_progressive(skill_dir)` | R-19 | 创建/更新 faq.md |
 | `fix_writing_standards(skill_dir)` | R-20 + R-18 | 统一术语 + 反模式格式修正 |
 | `fix_data_dir_compliance(skill_dir)` | R-22 | 添加 data_dir 声明 |
-| `fix_doc_code_consistency(skill_dir)` | R-23 | 修复文档-代码一致性 |
+| `fix_doc_code_consistency(skill_dir)` | R-23 | 修复文档-代码一致性（仅做同名不同扩展名匹配，不自动删除行。v2.81.0 撤回自动删除逻辑） |
 | `fix_split_nonstandard(skill_dir)` | R-17 | 非标章节拆分到 references/ |
 | `fix_section_order(skill_dir)` | R-25 C-11 | 按 body.json section_order 重排章节 |
 | `fix_section_constraint(skill_dir)` | must_have | 从目标技能脚本采集约束词生成 ## 约束 |
@@ -456,6 +445,8 @@ DEFAULT_DATA_DIR_RAW = "skills/.standardization/<skill-name>/data/"  # R-12 审�
 from scripts.skill_audit.fix import apply_fix
 apply_fix(skill_dir, 'R-07', 'R-18', 'R-19')  # 批量修复
 ```
+
+**LLM 手动修复规则**（v2.80.5+）：R-23（文档一致性）和 R-25（写作规范）无法自动修复，需要 LLM 手动编辑。`--fix` 后如果仅剩这两类规则的问题，不会触发"还有可修复项"的无限循环提示。
 
 **内容采集原则**（v2.46.0+）：所有 fix 函数生成章节内容时优先从目标技能自身采集，不照抄 skill-standardization 的模板：
 - `fix_section_constraint`：扫描 `scripts/*.py` 中 必须/不得/禁止/MUST → 生成 ≤5 条约束
@@ -687,7 +678,7 @@ python -m scripts.skill_inspector <skill-dir> --json   # JSON 格式
 
 审计报告（`run_audit audit`）输出后，LLM **必须**逐条阅读每条结果。
 
-审计输出已包含行号、上下文、问题描述，信息完整。`_reclassify_false_positive()` 已在 Python 侧自动过滤已知误报模式，过滤后的剩余项由 LLM 终审判断：
+审计输出已包含行号、上下文、问题描述，信息完整。`_reclassify_false_positive()` 已在 Python 侧自动过滤已知误报模式（v2.80.5+：verify 模式中同样生效），过滤后的剩余项由 LLM 终审判断：
 
 - **真问题** → 立即修复
 - **新误报模式** → LLM 直接放过，后续由开发者按需补充
@@ -695,6 +686,8 @@ python -m scripts.skill_inspector <skill-dir> --json   # JSON 格式
 LLM **禁止**跳过终审步骤，也**禁止**将应修复的真问题解释为误报放任不管。全报告处理完毕后，才能进入铁律9验证。
 
 **v2.62.0 变更**：`_reclassify_false_positive()` 仅用于报告显示标记（ⓘ），**不影响 exit code**。所有 FAIL 项全量输出给 LLM。
+
+**v2.80.5 增强**：`_reclassify_false_positive()` 在 verify 模式中也生效，已知误报不阻断双0。FAIL 未处理时输出明确的后续步骤指引：真问题→`--show-fix`，误判→`--classify`。
 
 ---
 
@@ -710,13 +703,11 @@ LLM **禁止**跳过终审步骤，也**禁止**将应修复的真问题解释�
 
 exit code 是 LLM 无法忽略的信号。非零退出码意味着验证绝对失败，LLM **不得**声称"审计通过"。
 
-**v2.62.0 设计理由**：
-- 之前：白名单匹配的误报提前过滤，LLM 只看"剩余项"——可能漏看边界误报
-- 之后：LLM 逐条审查所有 FAIL 项，语义判断即误报依据，无需匹配白名单
+**v2.80.5 增强**：`_reclassify_false_positive()` 在 verify 中也生效。已知误报不阻断双0。剩余 FAIL 区分处理：`_llm_only_rules`（R-23/R-25）需要 LLM 手动编辑，不再触发"再跑 --fix"的无限循环。
 
 ---
 
-## 十二、关键版本变更摘要（v2.73.2 → v2.80.0）
+## 十二、关键版本变更摘要（v2.73.2 → v2.82.0）
 
 | 版本 | 核心变更 |
 |------|---------|
@@ -730,7 +721,11 @@ exit code 是 LLM 无法忽略的信号。非零退出码意味着验证绝对�
 | 2.78.0 | 一致性审查闭环重构：误判过滤+自动修复+细碎钩子，流程调整为 bump→报告 |
 | 2.79.0 | 修复 outdated_rule_ref 方向（以实际技能为准而非 rules.json），修复误改 R-26→R-25 |
 | 2.80.0 | log.py 数据目录路径修复；R-11 .standardization 白名单移除；cmd_refactor cleanup 修复（start_session/end_session 驱动） |
+| **2.80.1** | **refactor.py 硬编码 bump 类型修复**：第89行 `"patch"` → `"minor"`（refactor 应 bump feature） |
+| **2.80.5** | **R-23 误判过滤重写 + --fix 后区分可自动修复/需 LLM 手动修复**：`_reclassify_false_positive` 区分真问题（scripts/下引用不存在文件）与误报（references/文档示例路径）；新增 `_llm_only_rules`（R-23/R-25）不再触发无限循环；verify 模式误报过滤同样生效，FAIL 未处理时输出明确后续指引 |
+| **2.81.0** | **fix.py _fix_md_file_refs 撤回自动删除**：曾加入自动删除引用不存在脚本文件的行，恢复为只做同名不同扩展名匹配 |
+| **2.82.0** | **死文件清理**：删除 10 个零代码引用的死文件（log.py/op_logger.py/op_logger_patch.py/run_audit.py/json_loader.py/authorization_manager.py/patch_utils.py/update_all_versions.py/update_skill_frontmatter.py/skill_rollback.py）及 9 份文档同步清理 |
 
 ---
 
-> 本文档基于 skill-standardization v2.80.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-standardization v2.82.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
