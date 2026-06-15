@@ -128,16 +128,47 @@ create_permissions_md: true
 **update 模式**（轻量更新——技能结构已标准，只需审计修复）：
 - **适用场景**：用户说"审计/检查/更新/修复/升级某个技能"
 - **不适用**：用户说"改造/迁移/重构/大改/标准化"
-- 流程：语义确认 → audit（输出审查报告）→ **LLM 阅读报告，判断 FAIL 项为真问题或误报** → `--classify <ID>` 标记误报 → `--show-fix <ID>` 获取真问题修复指引 → LLM 按指引手动修复 → `--verify` 确认 → bump → cleanup
+- **流程**：
+  1. 语义确认
+  2. 蓝皮书扫描 → 变更声明（流程钩子，LLM 输出 `{"changed_files": [...], "description": "..."}`）
+  3. 针对性审计（仅跑 changed_files 相关规则）
+  4. **★★★ 细碎修复循环 ★★★** — 代码级强制，不依赖 LLM 自觉：
+     - LLM 修复一批问题后，通过 `--fixed-rules R-23,R-26` 声明修了哪些规则
+     - 代码自动跑针对性审计确认（`filter_rules=...`），不靠 LLM 说"修好了"
+     - 还有 FAIL → 继续修；全部 PASS → 退出循环
+  5. 全量审计确认（双 0 验证）
+  6. 针对性一致性审查 + 修复
+  7. bump (PATCH) → cleanup
 - 命令：`python -m scripts.skill_audit audit <skill_dir> --confirmed`（先审计拿报告，LLM 筛查后再执行后续步骤）
 
 **refactor 模式**（全量改造——技能非标准/结构混乱/需要迁移）：
 - **适用场景**：用户说"改造/重构/迁移/大改/标准化/规范化某个技能"
 - **不适用**：用户说"简单审计/检查一下"（应走 update）
-- 流程：语义确认 → **LLM 检查目录结构，识别并排除非技能目录（虚拟环境、缓存、构建产物等）** → 蓝皮书扫描（跳过已排除目录） → 备份 → audit（输出审查报告）→ **LLM 阅读报告，判断 FAIL 项为真问题或误报** → `--classify <ID>` 标记误报 → `--show-fix <ID>` 获取真问题修复指引 → LLM 按指引手动修复 → `--verify` 确认 → bump → cleanup
+- **流程**：
+  1. 语义确认 → LLM 检查目录结构，识别并排除非技能目录
+  2. 蓝皮书扫描（跳过已排除目录）
+  3. 备份（zip 到 `.standardization/<skill>/backup/`）
+  4. 全量审计
+  5. **★★★ 细碎修复循环 ★★★** — 代码级强制：
+     - 自动修复可修复项（`--fix` 自动修 frontmatter/版本号/数据目录等）
+     - LLM 手动修复后通过 `--fixed-rules R-23,R-26` 声明
+     - 代码自动跑针对性审计确认
+     - 还有 FAIL → 继续修；全部 PASS → 退出循环
+  6. 全量审计确认（双 0 验证）
+  7. 全量一致性审查 + 修复循环（最多 3 轮重试）
+  8. bump (FEATURE) → cleanup（`end_session()` 驱动）
 - 命令：`python -m scripts.skill_audit refactor <skill_dir> --confirmed`（先走蓝皮书+备份+审计，LLM 筛查后再执行后续步骤）
 
+> **⚠️ 关于细碎循环的关键认知**：
+> - 循环是**代码级强制**的，不是"LLM 自觉"——`_run_audit_loop()` 在 `cmd_update()` 和 `cmd_refactor()` 中硬编码调用
+> - LLM 的角色是：修复问题 → 通过 `--fixed-rules` 声明修了什么 → 等代码自动确认
+> - LLM **不需要**手动判断"要不要继续循环"，代码会自动跑审计并决定继续或退出
+> - 循环上限：update 10 轮，refactor 20 轮，超限 exit(1) 阻断
+> - 不要在循环中做不相关的事（如改版本号、写 changelog），这些是 bump 步骤的职责
+
 > **⚠️ 关键约束**：audit 输出的报告包含 PASS/WARN/FAIL 三类。`--fix` 仅修复格式类问题（frontmatter/版本号/数据目录），**文档一致性（R-23）等问题需要 LLM 阅读报告后逐条判断并手动处理**。`--fixed` 不等于"已处理完毕"。
+>
+> **关于细碎循环**：update/refactor 模式中，`_run_audit_loop()` 是代码级强制的修复循环。LLM 修完问题后通过 `--fixed-rules` 声明，代码自动跑针对性审计确认。LLM 不需要自行判断"循环该不该继续"，代码会处理。详见 update/refactor 流程描述。
 
 ## 快速开始
 
