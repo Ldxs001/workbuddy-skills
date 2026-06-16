@@ -2,7 +2,7 @@
 """
 git-sync.py v2.12.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
-用法: python git-sync.py <skill-name> [version] [--skip-scan]
+用法: python git-sync.py <skill-name> [--skip-scan]
 """
 import os
 import sys
@@ -857,31 +857,28 @@ def main():
     parser = argparse.ArgumentParser(description="git-sync.py v2.12.0")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
-    parser.add_argument("version", nargs="?", default="",
-                        help="版本号（如 2.26.0）")
     parser.add_argument("--skip-scan", action="store_true",
                         help="跳过敏感信息扫描")
     args = parser.parse_args()
 
     skill_name = args.skill_name
-    version    = args.version
     skip_scan  = args.skip_scan
 
     if not skill_name:
-        print(f"用法: python {sys.argv[0]} <skill-name> [version] [--skip-scan]")
+        print(f"用法: python {sys.argv[0]} <skill-name> [--skip-scan]")
         sys.exit(1)
 
-    # 自动读取版本号
+    # 强制从 _meta.json 读取版本号，禁止 LLM 手动传参
     meta_file = SKILLS_DIR / skill_name / "_meta.json"
+    version = ""
+    if meta_file.exists():
+        try:
+            version = json.load(open(meta_file, encoding="utf-8"))["version"]
+        except Exception:
+            pass
     if not version:
-        if meta_file.exists():
-            try:
-                version = json.load(open(meta_file, encoding="utf-8"))["version"]
-            except Exception:
-                pass
-        if not version:
-            print("❌ 无法读取版本号，请手动指定")
-            sys.exit(1)
+        print("❌ 无法从 _meta.json 读取版本号，拒绝同步")
+        sys.exit(1)
 
     # 静默执行各步骤，收集日志
     global QUIET_MODE

@@ -1,6 +1,6 @@
 ---
 name: git-sync
-version: 2.21.0
+version: 2.21.1
 author: wUwproject
 license: MIT
 description: 将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复_push_with_cred_url/pull_with_cred_url未检查URL内嵌token的缺陷（remote URL已含token时不需查git-credentials）。
