@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.86.1
+version: 2.86.2
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -24,6 +24,9 @@ create_permissions_md: true
 - **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 `scripts/` 下的 Python 脚本原子写入
 - **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `CHANGELOG.md`
 - **0 ERROR 0 WARN 铁律强制** — 更新后用 `audit --verify` 验证，非误报项必须全部修复，exit(0) 方可提交
+- **LLM 二次筛强制** — audit 输出全部原始问题后，LLM **必须**逐条审查每条 ERROR/WARN 并分类为真问题或误报。标记误报时 `--classify add` **必须附带 `--id`**，不得跳过或笼统说"无需处理"
+- **LLM 手动修不许退出循环** — 遇到 `.remaining_llm.json` 时，LLM **必须立即读取并手动修复**，然后以 `--fixed-rules` 继续循环直到 0 ERROR 0 WARN。**禁止询问用户**、禁止停止、禁止跳过
+- **HTML 审计报告强制输出** — 每次 `audit` 执行完毕，**必须**确认 `.audit_report.html` 已生成
 - **`--fix` 自动修正后** — 将 fix_details 转化为可读 changelog 并用 safe_io 写入
 
 ## 触发条件
@@ -124,11 +127,19 @@ python -m scripts.skill_audit refactor <skill-dir> --confirmed
 1. **模式识别** → 输入 用户请求 → 输出 匹配模式表 — LLM 对照关键词表确定 audit/create/update/refactor 模式
 2. **蓝皮书扫描** → 输入 SKILL.md + scripts/ → 输出 蓝皮书 JSON — 提取技能结构：文件名、函数、依赖关系
 3. **备份** → 输入 技能目录 → 输出 .zip 备份 — 备份到 .standardization/<skill>/backup/
-4. **全量审计** → 输入 SKILL.md + references/ → 输出 审计报告 — R-01~R-26 逐条检查
-5. **细碎修复循环** → 输入 审计 FAIL 列表 → 输出 修复后的文件 — auto-fix + LLM 手动修复，代码级确认循环
-6. **双0验证** → 输入 修复后的技能 → 输出 verify 报告 — --verify 输出编号 FAIL，LLM 逐条判断
-7. **一致性审查** → 输入 文档 + 代码 → 输出 一致性报告 — 对比流程描述与实际代码是否一致
-8. **bump + cleanup** → 输入 审核通过的技能 → 输出 新版本 — 版本号三端同步 + 清理临时文件
+4. **全量审计** → 输入 SKILL.md + references/ → 输出 审计报告 — R-01~R-26 逐条输出原始问题（ERROR + WARN 全部展示，工具不做自动排除）
+5. **★ LLM 二次筛（强制，不可跳过）** →
+   - 输入：审计报告中的全部非 PASS 项（ERROR + WARN）
+   - 动作：LLM 逐条审查每条问题，判断为真问题或误报
+     - 真误报 → **必须** `--classify add <skill-dir> --id <ID>` 逐条标记。**禁止不带 `--id`**，否则会误将整个规则条目全部标记为误报
+     - 真问题 → 保留在修复列表，不执行 `--classify add`
+   - 铁律：**逐条审查**，每次 `--classify add` **必须附带 `--id`**，不得合计笼统说"无需处理"
+   - 输出：已分类的问题清单（误报 vs 真问题）
+   - 验证：重新 audit 确认分类已完成，`--classify show` 查看已标记列表
+6. **细碎修复循环** → 输入 审计 FAIL 列表（真问题）→ 输出 修复后的文件 — auto-fix + LLM 手动修复，代码级确认循环
+7. **双0验证** → 输入 修复后的技能 → 输出 verify 报告 — --verify 输出编号 FAIL，LLM 逐条判断
+8. **一致性审查** → 输入 文档 + 代码 → 输出 一致性报告 — 对比流程描述与实际代码是否一致
+9. **bump + cleanup** → 输入 审核通过的技能 → 输出 新版本 — 版本号三端同步 + 清理临时文件
 ## 数据目录说明
 
 本技能的数据文件（审查缓存、进度文件、备份、日志等）存放在：

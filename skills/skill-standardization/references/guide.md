@@ -333,8 +333,9 @@ python -m scripts.skill_audit audit <skill-dir> --manifest-version 2.0.0
 | 结果 | 含义 | 后续行为 |
 |------|------|----------|
 | **PASS** | 全部通过 | 继续后续流程 |
-| **WARN** | 仅 WARN 级失败 | 🟡 继续同步（纯警告） |
-| **FAIL** | 含 ERROR 级失败 | 🟡 继续同步（纯警告，v2起不阻断） |
+| **WARN** | 仅 WARN 级失败 | 🟡 必须修复（0 ERROR 0 WARN 铁律），不可跳过 |
+| **FAIL** | 含 ERROR 级失败 | 🔴 必须修复 |
+| **ⓘ 排除** | 工具自动猜测为误报 | 🤖 **LLM 必须逐条二次筛**：真误报 → `--classify add` 确认；真问题 → `--classify remove` 移回 WARN。禁止跳过，禁止笼统说"无需处理" |
 
 ### R-18~R-26 审查规则（v2.17.0~v2.24.0）
 
