@@ -2005,13 +2005,30 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             detail_parts[-1] += f" 等（共 {warn_count} 条建议）"
 
     # C-17/C-18/C-19 质量问题：产生规则级 FAIL，进入铁律 9 验证管道
-    # 不设 fix key → LLM 通过铁律 8 全报告细筛手动修复
     if _c171819_quality_flag:
-        return {"passed": False,
-                "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
+        result = {"passed": False,
+                  "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
+        # C-17/C-18/C-19 也接入 fix key（即使只能部分修复）
+        warn_text = "\n".join(issues["warn"])
+        if "C-17" in warn_text:
+            result["fix"] = {"key": "example_quality"}
+        elif "C-18" in warn_text:
+            result["fix"] = {"key": "capability_boundary"}
+        return result
 
-    return {"passed": error_count == 0,
-            "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
+    result = {"passed": error_count == 0,
+              "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
+
+    # 注意：单个 R-25 结果只能带一个 fix key。如果有多个 C-* 子项，
+    # cmd_audit --fix 和 _run_audit_loop 会自动扫描 detail 字符串调所有匹配的 fix 函数。
+    # 这里只需设一个非空 fix key 让 has_fixable 判断为 True 即可。
+    warn_text = "\n".join(issues["warn"])
+    if "C-10" in warn_text or "C-11" in warn_text or "C-12" in warn_text or \
+       "C-14" in warn_text or "C-15" in warn_text or "C-17" in warn_text or \
+       "C-18" in warn_text:
+        result["fix"] = {"key": "section_names"}
+
+    return result
 
 
 # ═══════════════════════════════════════════════════════

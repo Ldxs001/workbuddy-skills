@@ -831,13 +831,54 @@ def fix_create_permissions_md(skill_dir, **kw):
     full_content += "- **统一授权**：首次执行前获得用户批准，后续不再询问\n"
     full_content += "- **静默授权**：无需用户交互，自动执行并记录\n"
 
+    # 生成权限指纹（用于检测权限是否变化）
+    permission_fp = f"risk={risk_level}|sensitive={stats.get('sensitive_access',0)}|critical_write={stats.get('critical_write',0)}|network={stats.get('network_access',0)}|delete={stats.get('file_delete',0)}|subprocess={stats.get('subprocess_call',0)}|issues={len(issues)}"
+
+    perm_header = "# 基于skill-standardization渐进式披露规范的权限说明"
+
     if os.path.isfile(permissions_md):
         existing = _read_file(permissions_md)
-        if "基于skill-standardization渐进式披露规范的权限说明" not in existing:
-            content = header + "\n---\n\n" + existing
+        if perm_header in existing:
+            # 权限段落已存在：检查指纹是否一致
+            fp_marker = f"<!-- fp:{permission_fp} -->"
+            if fp_marker in existing:
+                return 0  # 权限未变化，跳过
+            # 权限已变化：替换权限段落，保留后续内容（测试报告等）
+            # 段落边界：H1 开始，到下一个 H1 或文件尾结束
+            # H2 (##) 是权限段落内部章节，不触发结束
+            lines = existing.split("\n")
+            after_perm = []
+            in_perm = False
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith(perm_header):
+                    in_perm = True
+                    continue
+                if in_perm:
+                    # 遇到下一个 H1 或测试报告 H2 时结束权限段落
+                    if stripped.startswith("# ") and perm_header not in stripped:
+                        in_perm = False
+                        after_perm.append(line)
+                        continue
+                    if stripped.startswith("## 基于skill-function-test"):
+                        in_perm = False
+                        after_perm.append(line)
+                        continue
+                    continue
+                after_perm.append(line)
+            # 写入新权限段落 + 保留的后续内容
+            full_with_fp = full_content + "\n" + fp_marker + "\n"
+            content = full_with_fp + "\n".join(after_perm)
             _write_file(permissions_md, content)
-        return 0
-    _write_file(permissions_md, full_content)
+            print(f"  [R-15] 权限已变化，已替换权限段落（指纹: {permission_fp}）")
+            return 1
+        else:
+            # 文件存在但无标准权限头：在开头插入
+            content = full_content + "\n" + f"<!-- fp:{permission_fp} -->" + "\n---\n\n" + existing
+            _write_file(permissions_md, content)
+            return 1
+    # 新建文件
+    _write_file(permissions_md, full_content + "\n" + f"<!-- fp:{permission_fp} -->" + "\n")
     return 1
 
 
@@ -1899,6 +1940,667 @@ def fix_reclassify_section(skill_dir, **kw):
 
 
 # ═══════════════════════════════════════════════════
+# R-25 C-10：压缩多余空行
+# ═══════════════════════════════════════════════════
+
+def fix_excessive_blank_lines(skill_dir, **kw):
+    """
+    R-25 C-10 修复：将正文中连续 3+ 个空行压缩为 1~2 个空行。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    with open(skill_md, "r", encoding="utf-8") as f:
+        content = f.read()
+    lines = content.split("\n")
+    fixed = []
+    blank_count = 0
+    max_blank = 2  # 最多允许 2 个连续空行
+    in_code_block = False
+    for line in lines:
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
+            fixed.append(line)
+            continue
+        if in_code_block:
+            fixed.append(line)
+            continue
+        if line.strip() == "":
+            blank_count += 1
+            if blank_count <= max_blank:
+                fixed.append(line)
+        else:
+            blank_count = 0
+            fixed.append(line)
+    new_content = "\n".join(fixed)
+    if new_content != content:
+        import shutil, os
+        # 备份到 .bak 会被 R-11 报违规，改用 data 目录
+        _bak_dir = _struct_dir(skill_dir)
+        os.makedirs(_bak_dir, exist_ok=True)
+        try:
+            shutil.copy2(skill_md, os.path.join(_bak_dir, "SKILL.md.bak"))
+        except Exception:
+            pass
+        with open(skill_md, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        return 1
+    return 0
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-15：替换正文中冗余的 references/ 文件引用
+# ═══════════════════════════════════════════════════
+
+def fix_inline_refs(skill_dir, **kw):
+    """
+    R-25 C-15 修复：将正文中冗余的 `references/xxx.md` 文件引用
+    替换为统一的索引表引用（→ 详见核心能力的渐进式文件索引）。
+    仅替换非指令上下文中的冗余引用，保留必要的用户指引。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    with open(skill_md, "r", encoding="utf-8") as f:
+        content = f.read()
+    # 替换 "-> 详见 references/xxx.md" 模式（已在索引表中列出的引用）
+    import re
+    new_content = re.sub(
+        r'>\s*→\s*详见\s*`references/[^`]+`[^\n]*',
+        '> → 详见核心能力的渐进式文件索引',
+        content
+    )
+    # 替换正文中独立的 `references/xxx.md`引用（非索引表内）
+    new_content = re.sub(
+        r'`references/[^`]+`',
+        '渐进式文件索引表',
+        new_content
+    )
+    if new_content != content:
+        import shutil, os
+        _bak_dir = _struct_dir(skill_dir)
+        os.makedirs(_bak_dir, exist_ok=True)
+        try:
+            shutil.copy2(skill_md, os.path.join(_bak_dir, "SKILL.md.bak"))
+        except Exception:
+            pass
+        with open(skill_md, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        return 1
+    return 0
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-11：章节名规范化（同义词→标准名）
+# ═══════════════════════════════════════════════════
+
+def fix_section_names(skill_dir, **kw):
+    """
+    R-25 C-11 修复：将 SKILL.md 中不在 allowed_sections 白名单的 H2 章节标题
+    通过 section_synonyms 映射为标准章节名。
+    
+    Returns: 重命名的章节数
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+
+    spec_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        'scripts', 'spec', 'body.json'
+    )
+    if not os.path.isfile(spec_path):
+        return 0
+    import json
+    with open(spec_path, 'r', encoding='utf-8') as f:
+        raw = f.read()
+    # 兼容多根 JSON 对象（取第一个完整对象）
+    brace_count = 0
+    first_end = None
+    for i, ch in enumerate(raw):
+        if ch == '{':
+            brace_count += 1
+        elif ch == '}':
+            brace_count -= 1
+            if brace_count == 0:
+                first_end = i + 1
+                break
+    spec = json.loads(raw[:first_end]) if first_end else json.loads(raw)
+    allowed = set(s.lower() for s in spec.get("allowed_sections", []))
+    for name in spec.get("section_order", []):
+        allowed.add(name.lower())
+    synonyms = spec.get("section_synonyms", {})
+    rename_map = {}
+    for canon, syns in synonyms.items():
+        for s in syns:
+            sl = s.lower()
+            if sl != canon.lower() and sl not in allowed and sl not in rename_map:
+                rename_map[sl] = canon
+
+    if not rename_map:
+        return 0
+
+    content = _read_file(skill_md)
+    idx = content.find('\n---', content.find('---') + 3)
+    if idx < 0:
+        return 0
+    idx = content.find('\n', idx + 4) + 1
+    body = content[idx:]
+    front = content[:idx]
+
+    import re
+    def _r(m):
+        t = m.group(1).strip()
+        l = t.lower()
+        return f'## {rename_map[l]}' if l in rename_map else m.group(0)
+
+    new_body = re.sub(r'^##\s+(.+)$', _r, body, flags=re.MULTILINE)
+    if new_body == body:
+        return 0
+    _write_file(skill_md, front + new_body)
+    changed = sum(1 for a, b in zip(body.split('\n'), new_body.split('\n')) if a != b)
+    return changed
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-12：表格格式修复
+# ═══════════════════════════════════════════════════
+
+def fix_table_format(skill_dir, **kw):
+    """
+    R-25 C-12 修复：修复 SKILL.md 中格式不标准的 Markdown 表格分隔线。
+    Returns: 修复的表格数
+    """
+    import os, re
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    import re
+    def _fs(m):
+        cells = m.group(0).strip('|').split('|')
+        fixed = []
+        for c in cells:
+            c = c.strip()
+            if not c:
+                fixed.append('')
+            elif c.startswith(':') and c.endswith(':'):
+                fixed.append(':' + '-' * max(3, len(c) - 2) + ':')
+            elif c.startswith(':'):
+                fixed.append(':' + '-' * max(3, len(c) - 1))
+            elif c.endswith(':'):
+                fixed.append('-' * max(3, len(c) - 1) + ':')
+            else:
+                fixed.append('-' * max(3, len(c)))
+        return '| ' + ' | '.join(fixed) + ' |'
+    new = re.sub(r'\|[ :-]+\|', _fs, content)
+    if new != content:
+        import shutil, os
+        _bak_dir = _struct_dir(skill_dir)
+        os.makedirs(_bak_dir, exist_ok=True)
+        try:
+            shutil.copy2(skill_md, os.path.join(_bak_dir, "SKILL.md.bak"))
+        except Exception:
+            pass
+        with open(skill_md, "w", encoding="utf-8") as f:
+            f.write(new)
+        return 1
+    return 0
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-14/C-17/C-18：结构化数据→MD 渲染管道
+# ═══════════════════════════════════════════════════
+
+# 结构化数据文件名约定（存于 .standardization/<skill>/data/）
+_STRUCT_FILES = {
+    "workflow_completeness": ".structure_workflow.json",
+    "example_quality": ".structure_examples.json",
+    "capability_boundary": ".structure_capabilities.json",
+}
+
+def _struct_dir(skill_dir):
+    """返回结构化数据的存储目录（data/ 下）。"""
+    skill_name = os.path.basename(os.path.abspath(skill_dir))
+    _SKILL_DIR = os.path.normpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".."
+    ))
+    _SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
+    d = os.path.normpath(os.path.join(
+        _SKILLS_ROOT, ".standardization", "skill-function-test",
+        "data", skill_name, "outputs"
+    ))
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def _read_struct(skill_dir, fix_key):
+    """从 data/ 目录读取结构化数据文件，返回 dict 或 None"""
+    import json
+    fname = _STRUCT_FILES.get(fix_key)
+    if not fname:
+        return None
+    fpath = os.path.join(_struct_dir(skill_dir), fname)
+    if not os.path.isfile(fpath):
+        return None
+    try:
+        with open(fpath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, Exception):
+        return None
+
+def _write_struct(skill_dir, fix_key, data):
+    """写入结构化数据文件到 data/ 目录"""
+    import json
+    fname = _STRUCT_FILES.get(fix_key)
+    if not fname:
+        return False
+    fpath = os.path.join(_struct_dir(skill_dir), fname)
+    with open(fpath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return True
+
+def _struct_file_path(skill_dir, fix_key):
+    """返回结构化数据文件的完整路径（用于输出指引）。"""
+    fname = _STRUCT_FILES.get(fix_key)
+    if not fname:
+        return ""
+    return os.path.join(_struct_dir(skill_dir), fname)
+
+def _render_workflow_section(data: dict) -> str:
+    """
+    从结构化数据渲染 ## 工作流程 章节正文（不含标题）。
+    data = {
+      "skill": "...",
+      "steps": [
+        {"order": 1, "name": "...", "input": "...", "output": "...", "data_flow": "...", "detail": "..."},
+        ...
+      ]
+    }
+    """
+    if not data or "steps" not in data:
+        return ""
+    lines = []
+    for s in data["steps"]:
+        o = s.get("order", "?")
+        n = s.get("name", "")
+        inp = s.get("input", "")
+        out = s.get("output", "")
+        detail = s.get("detail", "")
+        line = f"{o}. **{n}**"
+        parts = []
+        if inp:
+            parts.append(f"输入 {inp}")
+        if out:
+            parts.append(f"输出 {out}")
+        if parts:
+            line += " → ".join([""] + parts)
+        # 移除开头的 " → "
+        line = f"{o}. **{n}**" + (" → " + " → ".join(parts) if parts else "")
+        if detail:
+            line += f" — {detail}"
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+def _render_examples_section(data: dict) -> str:
+    """
+    从结构化数据渲染示例段落。
+    data = {
+      "scenarios": [
+        {"name": "...", "command": "...", "input": "...", "expected_output": "...", "description": "..."},
+        ...
+      ]
+    }
+    """
+    if not data or "scenarios" not in data:
+        return ""
+    lines = []
+    for sc in data["scenarios"]:
+        n = sc.get("name", "")
+        cmd = sc.get("command", "")
+        inp = sc.get("input", "")
+        exp = sc.get("expected_output", "")
+        desc = sc.get("description", "")
+        if n:
+            lines.append(f"**场景：{n}**")
+        if desc:
+            lines.append(f"> {desc}")
+        if cmd:
+            lines.append(f"```bash\n{cmd}\n```")
+        if inp or exp:
+            lines.append(f"  - **输入**: {inp or '无'}")
+            lines.append(f"  - **输出**: {exp or '无'}")
+        lines.append("")
+    return "\n".join(lines)
+
+def _render_capabilities_section(data: dict) -> str:
+    """
+    从结构化数据渲染 ## 能力与限制 表格。
+    data = {
+      "capabilities": [{"name": "...", "description": "...", "limit": "..."}],
+      "non_capabilities": [{"name": "...", "reason": "..."}]
+    }
+    返回表格 Markdown 正文。
+    """
+    if not data:
+        return ""
+    lines = []
+    caps = data.get("capabilities", [])
+    if caps:
+        lines.append("| 能力 | 说明 | 限制 |")
+        lines.append("|------|------|------|")
+        for c in caps:
+            lines.append(f"| **{c.get('name', '')}** | {c.get('description', '')} | {c.get('limit', '')} |")
+        lines.append("")
+    non_caps = data.get("non_capabilities", [])
+    if non_caps:
+        lines.append("**不支持：**")
+        for nc in non_caps:
+            lines.append(f"- {nc.get('name', '')}：{nc.get('reason', '')}")
+        lines.append("")
+    return "\n".join(lines)
+
+def _find_section_range(body: str, section_title: str) -> tuple:
+    """
+    在正文中查找 H2 章节的起始行号和结束行号（下一个 H2/文件尾）。
+    返回 (start_pos, end_pos) 或 (None, None)
+    """
+    import re
+    pattern = re.compile(r'^## ' + re.escape(section_title) + r'\s*$', re.MULTILINE)
+    m = pattern.search(body)
+    if not m:
+        return (None, None)
+    start = m.start()
+    # 找到下一个 ## 或文件尾
+    rest = body[m.end():]
+    next_m = re.search(r'^## ', rest, re.MULTILINE)
+    if next_m:
+        end = m.end() + next_m.start()
+    else:
+        end = len(body)
+    return (start, end)
+
+def _replace_section_in_skill(skill_dir, section_title: str, new_section_content: str) -> bool:
+    """替换 SKILL.md 中指定 H2 章节的内容（含标题）。"""
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return False
+    content = _read_file(skill_md)
+    idx = content.find('\n---', content.find('---') + 3)
+    if idx < 0:
+        return False
+    fm_end = content.find('\n', idx + 4) + 1
+    front = content[:fm_end]
+    body = content[fm_end:]
+    
+    start, end = _find_section_range(body, section_title)
+    if start is None:
+        return False
+    
+    new_body = body[:start] + new_section_content + body[end:]
+    _write_file(skill_md, front + new_body)
+    return True
+
+
+def fix_workflow_completeness(skill_dir, **kw):
+    """
+    R-25 C-14 修复：从 .structure_workflow.json 结构化数据渲染工作流章节。
+    先检查结构化数据文件是否存在，不存在则输出指引并返回 0。
+    """
+    data = _read_struct(skill_dir, "workflow_completeness")
+    if data is None:
+        struct_path = _struct_file_path(skill_dir, "workflow_completeness")
+        print(f"\n  ⛔ C-14 需结构化数据：请读取技能代码，生成 {struct_path}")
+        print(f"    格式：{{\"skill\": \"技能名\", \"steps\": [")
+        print(f"      {{\"order\": 1, \"name\": \"步骤名\", \"input\": \"...\", \"output\": \"...\", \"detail\": \"...\"}}")
+        print(f"    ]}}")
+        print(f"    生成后重新运行 --fix，脚本会自动渲染为工作流章节")
+        return 0
+    
+    rendered = _render_workflow_section(data)
+    if not rendered:
+        return 0
+    
+    # 确定替换范围：## 工作流程 到下一个 H2
+    section_content = "## 工作流程\n\n" + rendered
+    if _replace_section_in_skill(skill_dir, "工作流程", section_content):
+        return 1
+    # 尝试别名
+    for alias in ["工作流", "Workflow", "完整执行流程", "执行流程"]:
+        if _replace_section_in_skill(skill_dir, alias, section_content):
+            return 1
+    return 0
+
+
+def fix_example_quality(skill_dir, **kw):
+    """
+    R-25 C-17 修复：从 .structure_examples.json 渲染示例段落。
+    """
+    data = _read_struct(skill_dir, "example_quality")
+    if data is None:
+        struct_path = _struct_file_path(skill_dir, "example_quality")
+        print(f"\n  ⛔ C-17 需结构化数据：请读取技能代码，生成 {struct_path}")
+        print(f"    格式：{{\"scenarios\": [")
+        print(f"      {{\"name\": \"场景名\", \"command\": \"命令\", \"input\": \"输入\", \"expected_output\": \"预期输出\", \"description\": \"描述\"}}")
+        print(f"    ]}}")
+        print(f"    生成后重新运行 --fix，脚本会自动渲染为示例段落")
+        return 0
+    
+    rendered = _render_examples_section(data)
+    if not rendered:
+        return 0
+    
+    # 在 ## 快速开始 章节后插入示例段落（或在文件尾添加）
+    section_content = "## 快速开始\n\n" + rendered
+    if _replace_section_in_skill(skill_dir, "快速开始", section_content):
+        return 1
+    for alias in ["Quick Start", "快速上手", "安装"]:
+        if _replace_section_in_skill(skill_dir, alias, section_content):
+            return 1
+    return 0
+
+
+def fix_capability_boundary(skill_dir, **kw):
+    """
+    R-25 C-18 修复：从 .structure_capabilities.json 渲染能力限制表格。
+    """
+    data = _read_struct(skill_dir, "capability_boundary")
+    if data is None:
+        struct_path = _struct_file_path(skill_dir, "capability_boundary")
+        print(f"\n  ⛔ C-18 需结构化数据：请读取技能代码，生成 {struct_path}")
+        print(f"    格式：{{\"capabilities\": [")
+        print(f"      {{\"name\": \"能力名\", \"description\": \"...\", \"limit\": \"...\"}}")
+        print(f"    ], \"non_capabilities\": [{{\"name\": \"...\", \"reason\": \"...\"}}]}}")
+        print(f"    生成后重新运行 --fix，脚本会自动渲染为能力边界表格")
+        return 0
+    
+    rendered = _render_capabilities_section(data)
+    if not rendered:
+        return 0
+    
+    # 替换 ## 能力与限制 或 ## 核心能力 章节中的能力说明
+    section_content = "## 能力与限制\n\n" + rendered
+    if _replace_section_in_skill(skill_dir, "能力与限制", section_content):
+        return 1
+    # 尝试在核心能力章节后追加
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    content = _read_file(skill_md)
+    idx = content.find('\n---', content.find('---') + 3)
+    if idx < 0:
+        return 0
+    fm_end = content.find('\n', idx + 4) + 1
+    body = content[fm_end:]
+    
+    start, end = _find_section_range(body, "核心能力")
+    if start is not None:
+        # 在核心能力章节末尾追加能力限制内容
+        new_body = body[:end] + "\n" + rendered + "\n" + body[end:]
+        fm = content[:fm_end]
+        _write_file(skill_md, fm + new_body)
+        return 1
+    return 0
+
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-11：章节指纹重排
+# ═══════════════════════════════════════════════════
+
+def fix_section_reorder(skill_dir, **kw):
+    """按 body.json section_order 重排 H2 章节。纯段落指纹排序。"""
+    import json, re
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    spec_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                             'scripts', 'spec', 'body.json')
+    if not os.path.isfile(spec_path):
+        return 0
+    with open(spec_path, 'r', encoding='utf-8') as f:
+        raw = f.read()
+    brace = 0
+    first_end = None
+    for i, ch in enumerate(raw):
+        if ch == '{': brace += 1
+        elif ch == '}': brace -= 1
+        if brace == 0: first_end = i + 1; break
+    spec = json.loads(raw[:first_end]) if first_end else json.loads(raw)
+    order = spec.get("section_order", [])
+    if not order:
+        return 0
+    synonyms = spec.get("section_synonyms", {})
+    canonical = {}
+    for canon, syns in synonyms.items():
+        for s in syns:
+            canonical[s.lower()] = canon
+    for name in order:
+        if name.lower() not in canonical:
+            canonical[name.lower()] = name
+
+    content = _read_file(skill_md)
+    idx = content.find('\n---', content.find('---') + 3)
+    if idx < 0: return 0
+    fm_end = content.find('\n', idx + 4) + 1
+    body = content[fm_end:]; front = content[:fm_end]
+    h2 = [(m.start(), m.end(), m.group(1).strip()) for m in re.finditer(r'^## (.+)$', body, re.MULTILINE)]
+    sections = []
+    for i, (st, en, name) in enumerate(h2):
+        end_pos = h2[i+1][0] if i+1 < len(h2) else len(body)
+        sections.append((name, body[st:end_pos]))
+    def _mo(name):
+        nl = name.lower(); canon = canonical.get(nl, name)
+        for i, o in enumerate(order):
+            if o.lower() == canon.lower() or nl == o.lower(): return i
+        return len(order)
+    ordered = sorted(sections, key=lambda s: _mo(s[0]))
+    if [s[0] for s in sections] == [s[0] for s in ordered]:
+        return 0
+    new_body = body[:h2[0][0]]
+    for name, sect in ordered:
+        new_body += sect
+    _write_file(skill_md, front + new_body)
+    return sum(1 for a, b in zip([s[0] for s in sections], [s[0] for s in ordered]) if a != b)
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-12：触发条件格式修复
+# ═══════════════════════════════════════════════════
+
+def fix_trigger_format(skill_dir, **kw):
+    """确保 ## 触发条件 包含 **正向触发** 和 **否定条件**。"""
+    import re
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md): return 0
+    content = _read_file(skill_md)
+    idx = content.find('\n---', content.find('---') + 3)
+    if idx < 0: return 0
+    fm_end = content.find('\n', idx + 4) + 1
+    body = content[fm_end:]; front = content[:fm_end]
+    m = re.search(r'^## 触发条件$', body, re.MULTILINE)
+    if not m:
+        for alias in ['触发场景', '适用场景', '触发']:
+            m = re.search(r'^## ' + re.escape(alias) + r'$', body, re.MULTILINE)
+            if m: break
+    if not m: return 0
+    rest = body[m.end():]
+    next_h2 = re.search(r'^## ', rest, re.MULTILINE)
+    sec_end = m.end() + next_h2.start() if next_h2 else len(body)
+    sec = body[m.start():sec_end]
+    if '**正向触发**' in sec and '**否定条件**' in sec:
+        return 0
+    items = re.findall(r'^- (.+)$', body[m.end():sec_end], re.MULTILINE)
+    neg = [it for it in items if any(w in it for w in ['不', '不是', '只是', '没有'])]
+    pos = [it for it in items if it not in neg]
+    new_sec = '## 触发条件\n\n**正向触发：**\n' + '\n'.join(f'- {it}' for it in pos) + '\n\n**否定条件：**\n' + '\n'.join(f'- {it}' for it in neg) + '\n\n'
+    new_body = body[:m.start()] + new_sec + body[sec_end:]
+    _write_file(skill_md, front + new_body)
+    return 1
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-12：约束章节格式化
+# ═══════════════════════════════════════════════════
+
+def fix_constraint_format(skill_dir, **kw):
+    """格式化 ## 约束，每条以 - 开头。"""
+    import re
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md): return 0
+    content = _read_file(skill_md)
+    m = re.search(r'^## 约束$', content, re.MULTILINE)
+    if not m:
+        for alias in ['限制', '已知问题']:
+            m = re.search(r'^## ' + re.escape(alias) + r'$', content, re.MULTILINE)
+            if m: break
+    if not m: return 0
+    rest = content[m.end():]
+    next_h2 = re.search(r'^## ', rest, re.MULTILINE)
+    sec_end = m.end() + next_h2.start() if next_h2 else len(content)
+    items = re.findall(r'^- (.+)$', content[m.end():sec_end], re.MULTILINE)
+    if not items: return 0
+    if all(it.strip() for it in items) and len(items) >= 2:
+        return 0
+    new_items = []
+    for it in items:
+        it = it.strip()
+        if not it.endswith('。') and not it.endswith('）'): it += '。'
+        new_items.append(it)
+    new_sec = '## 约束\n\n' + '\n'.join(f'- {it}' for it in new_items) + '\n\n'
+    new_content = content[:m.start()] + new_sec + content[sec_end:]
+    _write_file(skill_md, new_content)
+    return 1
+
+
+# ═══════════════════════════════════════════════════
+# R-23：文档引用路径修复
+# ═══════════════════════════════════════════════════
+
+def fix_doc_references(skill_dir, **kw):
+    """修复 references/*.md 中的路径引用。"""
+    import re
+    refs_dir = os.path.join(skill_dir, "references")
+    if not os.path.isdir(refs_dir): return 0
+    fixed = 0
+    for fname in os.listdir(refs_dir):
+        if not fname.endswith('.md'): continue
+        fpath = os.path.join(refs_dir, fname)
+        content = _read_file(fpath)
+        changed = False
+        lines = content.split('\n')
+        new_lines = []
+        for line in lines:
+            if 'SKILLS_DIR/.dist' in line:
+                line = line.replace('SKILLS_DIR/.dist', '`~/.workbuddy/skills/.dist`（运行时目录）')
+                changed = True
+            elif 'SKILLS_DIR/' in line:
+                line = line.replace('SKILLS_DIR/', '`~/.workbuddy/skills/`')
+                changed = True
+            new_lines.append(line)
+        if changed:
+            _write_file(fpath, '\n'.join(new_lines))
+            fixed += 1
+    return fixed
+
+# ═══════════════════════════════════════════════════
 # 统一入口：apply_fix()
 # ═══════════════════════════════════════════════════
 
@@ -1971,6 +2673,17 @@ def apply_fix(skill_dir, fix_key, **kw):
         "section_antipattern": fix_section_antipattern,
         "section_faq": fix_section_faq,
         "license_compliance": fix_license_compliance,
+        "excessive_blank_lines": fix_excessive_blank_lines,
+        "inline_refs": fix_inline_refs,
+        "section_names": fix_section_names,
+        "table_format": fix_table_format,
+        "workflow_completeness": fix_workflow_completeness,
+        "example_quality": fix_example_quality,
+        "capability_boundary": fix_capability_boundary,
+        "section_reorder": fix_section_reorder,
+        "trigger_format": fix_trigger_format,
+        "constraint_format": fix_constraint_format,
+        "doc_references": fix_doc_references,
     }
 
     func = dispatch.get(fix_key)

@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.82.1
+version: 2.82.12
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
@@ -109,6 +109,10 @@ python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
 # → 1/7 蓝皮书 → 2/7 备份 → 3/7 审计 → 4/7 修复 → 5/7 验证 → 6/7 bump → 7/7 清理
 ```
 
+> **bump 不是独立操作**：bump 是 update/refactor 流程的最终步骤，不能跳过审计直接执行。
+> 直接调用 `python -m scripts.skill_audit bump <skill-dir>` 会触发铁律双0门禁——有 FAIL 项时 exit(1) 阻断。
+> LLM 必须走完完整流程（审计 → 修复循环 → verify 确认 → 一致性审查 → bump）后才能执行 bump。
+
 ## 工作流程
 
 ### 【流程门禁】Step 0：模式识别（强制）
@@ -124,7 +128,7 @@ python -m scripts.skill_audit refactor /path/to/target-skill --confirmed
 | 创建/生成/创建/把 xxx做成skill | **create** | `python -m scripts.skill_builder create <name> --desc "描述"` |
 | 审计/检查/审查/评估/更新/修复/升级/跑一遍规范/做个体检 | **update** | `python -m scripts.skill_audit audit <skill_dir> --fix` |
 | 改造/重构/迁移/大改/标准化/规范化 | **refactor** | `python -m scripts.skill_audit refactor <skill_dir>` |
-| 升版本/版本号更新（内部流程自动触发，非用户主动请求） | **bump** | `python -m scripts.skill_audit bump <skill_dir>` |
+| 升版本/版本号更新（仅作为 update/refactor 的最终步骤，非独立操作） | **bump** | 不直接调用，由 update/refactor 内部触发 |
 
 3. 匹配到关键词 → 走对应模式流程
 4. 未匹配到任何关键词 → **询问用户具体意图**，不得自行猜测

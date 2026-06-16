@@ -1,3 +1,80 @@
+## [2.82.12] - 2026-06-16
+
+### 修复
+- 修复：_reclassify_false_positive 新增 R-23 外部 URL 和 R-25 精筛确认的误判模式；fp_ids 未初始化 bug；移除中间轮次 _save_html_report（只在最终输出生成一份）
+
+---
+
+## [2.82.11] - 2026-06-16
+
+### 修复
+- 新增 4 个 py 修复函数：fix_section_reorder（章节指纹重排）、fix_trigger_format（触发条件结构化）、fix_constraint_format（约束格式化）、fix_doc_references（文档引用修复）；R-25 C-12 多子项调多个 fix 函数
+
+---
+
+## [2.82.10] - 2026-06-16
+
+### 修复
+- 移除 --fix 流程中的自动 _do_bump（应在双0后统一bump）；修复 fix_table_format os 变量作用域 bug
+
+---
+
+## [2.82.9] - 2026-06-16
+
+### 修复
+- HTML报告改为默认生成（去掉--html参数）；新增_save_html_report辅助函数；在cmd_audit/refactor/update/_run_audit_loop所有format_report后自动保存HTML
+
+---
+
+## [2.82.8] - 2026-06-16
+
+### 修复
+- Html报告统一为一份：审计时显示当前数据；修复时在统计卡片下增加修复前后对比栏（修复前 N ERROR M WARN → 修复后 X ERROR Y WARN + 双0徽章）
+
+---
+
+## [2.82.7] - 2026-06-16
+
+### 修复
+- HTML报告区分审计/修复模式：标题、结论、双0目标标识；修复模式传入before/after对比数据；--fix流程中输出修复后HTML报告
+
+---
+
+## [2.82.6] - 2026-06-16
+
+### 修复
+- 修复 .bak 路径冲突（改存 data 目录）；新增 --html 参数输出 HTML 审计报告（Chart.js 图表+筛选+展开）；修复 cmd_audit indent bug；统一 R-25 fix key 策略
+
+---
+
+## [2.82.5] - 2026-06-16
+
+### 修复
+- 实现结构化数据→py生成管道：新增_fix_workflow_completeness/fix_example_quality/fix_capability_boundary渲染函数；_run_audit_loop和cmd_audit --fix 自动扫描detail中所有C-*标签调用匹配fix函数；structure_checker统一fix key占位符；_expand_fail_entries保留修复指引；body.json新增section_synonyms
+
+---
+
+## [2.82.4] - 2026-06-16
+
+### 修复
+- 系统性修复：_expand_fail_entries保留修复指引；新增fix_section_names/fix_table_format章节名/格式修复；structure_checker所有R-25子项接入fix key；_run_audit_loop注入全子项fix key；body.json补充section_synonyms
+
+---
+
+## [2.82.3] - 2026-06-16
+
+### 修复
+- 修复 _run_audit_loop 循环不区分 manual-only 导致的空转；新增 fix_excessive_blank_lines/fix_inline_refs；structure_checker C-10/C-15 接入 fix key；_expand_fail_entries 修复 detail 类型错误
+
+---
+
+## [2.82.2] - 2026-06-16
+
+### 修复
+- cmd_bump 移除交互式 input 并增加 LLM 操作指引；fix_create_permissions_md 增加权限指纹检测和段落级替换
+
+---
+
 ## [2.82.1] - 2026-06-15
 
 ### 修复
