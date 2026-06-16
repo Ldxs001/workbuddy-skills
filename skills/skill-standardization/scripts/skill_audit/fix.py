@@ -590,6 +590,33 @@ def fix_artifact_paths(skill_dir, **kw):
                         break
         
         if not matched_file:
+            # 无真实文件：可能是代码中的路径引用违规，尝试修复源文件中的路径
+            src_ref = v.get("source", "")
+            if src_ref and ":" in src_ref:
+                src_file, src_line = src_ref.rsplit(":", 1)
+                src_full = os.path.join(skill_dir, src_file)
+                if os.path.isfile(src_full) and suggestion:
+                    try:
+                        with open(src_full, 'r', encoding='utf-8') as _f:
+                            _lines = _f.readlines()
+                        _ln = int(src_line) - 1  # 0-based
+                        if 0 <= _ln < len(_lines):
+                            _old = _lines[_ln]
+                            # 从 suggestion 提取目标路径中的文件名
+                            _target_fname = suggestion.rsplit("/", 1)[-1] if "/" in suggestion else suggestion
+                            if _target_fname in _old:
+                                _std_path = os.path.join(
+                                    ".standardization", skill_name, "outputs", _target_fname).replace("\\", "/")
+                                _new = _old.replace(f'os.path.join(skill_dir, "{_target_fname}")',
+                                                     f'os.path.join(datadir, "outputs", "{_target_fname}")')
+                                if _new != _old:
+                                    _lines[_ln] = _new
+                                    from .safe_io import safe_write
+                                    safe_write(src_full, "".join(_lines))
+                                    fixed += 1
+                                    print(f"  [代码修复] {src_file}:{src_line} → {_std_path}")
+                    except (ValueError, OSError, IndexError):
+                        pass
             continue
         
         full_path = os.path.join(skill_dir, matched_file)

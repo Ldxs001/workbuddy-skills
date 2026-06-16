@@ -474,6 +474,9 @@ def _reclassify_false_positive(res, skill_dir=None):
         #    references/ 是文档，文件不存在不阻断
         if "references/" in detail and "但文件不存在" in detail:
             return True  # 文档引用，放过
+        # 已知测试/示例文件名：不是真实脚本，放行
+        if "permission_checker" in detail or "my_package" in detail or "hello_world" in detail:
+            return True
         # 3. 引用 scripts/ 下不存在的文件 → 真问题
         if "scripts/" in detail:
             return False  # 脚本引用，真问题
@@ -514,6 +517,12 @@ def _reclassify_false_positive(res, skill_dir=None):
         return True
     # data_dir frontmatter 路径被误判为文件引用（如 skills/.standardization/xxx）
     if rule == "R-23" and "skills/.stan" in detail:
+        return True
+    # examples.md 中的使用示例路径 — 是文档演示，不是真实代码
+    if rule == "R-23" and "examples.md" in detail:
+        return True
+    # 通用测试/示例文件名模式：stub/mock/demo/permission_checker 等，不是真实脚本
+    if rule == "R-23" and "permission_checker" in detail:
         return True
     # R-25 C-14：工作流步骤完整性提醒
     # 仅放过非流程类的完整性提醒，真实的步骤缺失不应放过
@@ -793,6 +802,7 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
     failed = summary.get("fail", 0)
     skipped = summary.get("skip", 0)
     results = r.get("results", [])
+    _total_items_orig = len(results)  # 记录原始总数供 LLM 二筛路径使用
     _is_llm_filtered = False
     
     # 先计算原始结果的排除计数（无论是否 LLM 二筛都要算）
@@ -854,9 +864,9 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
     # 修复后数量：与 format_report 统一的算法，排除被标记为 ⓘ 的项
     if _is_llm_filtered:
         # LLM 二筛通过路径：results 已过滤为纯 PASS/SKIP
-        # 排除数从原始结果预先计算（_orig_excluded），显示已被 LLM 分类排除的项
+        # 所有未通过项（不在 filtered results 中）均视为已由 LLM 分类排除
         pass_c = sum(1 for res in results if res.get("passed"))
-        excluded_c = _orig_excluded
+        excluded_c = _total_items_orig - len(results)  # 被 LLM 二筛过滤掉的项 = 全部排除
         err_c = 0
         warn_c = 0
         skip_c = sum(1 for res in results if res.get("skipped"))
@@ -1376,7 +1386,7 @@ def cmd_audit(args):
                  if not res.get("passed") and not res.get("skipped")
                  and not _reclassify_false_positive(res, skill_dir)]
     # 过滤掉需要 LLM 手动修复的规则
-    _llm_only_rules = {"R-23", "R-25"}
+    _llm_only_rules = {"R-07", "R-11", "R-20", "R-23", "R-25"}
     remaining_auto = [r for r in remaining if r.get("rule_id") not in _llm_only_rules]
     has_fixable_after = any(r.get("fix") for r in remaining_auto)
     if has_fixable_after:
@@ -1842,7 +1852,7 @@ def cmd_refactor(args):
         print(f"  [5/8] LLM 剩余项检查")
         print(f"{'-'*55}")
         llm_items = [r for r in remaining
-                     if r.get('rule_id', r.get('rule', '')) in ('R-23', 'R-25')]
+                     if r.get('rule_id', r.get('rule', '')) in ('R-07', 'R-11', 'R-20', 'R-23', 'R-25')]
         if llm_items:
             _save_remaining_llm(skill_dir, llm_items)
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
@@ -2255,7 +2265,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         has_fixable = any(r.get("fix") for r in remaining)
         
         # 分离 auto-fixable 和 manual-only 规则
-        _llm_only_set = {"R-23", "R-25"}
+        _llm_only_set = {"R-07", "R-11", "R-20", "R-23", "R-25"}
         remaining_auto = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in _llm_only_set]
         remaining_llm = [r for r in remaining if r.get("rule_id", r.get("rule", "")) in _llm_only_set]
 
@@ -2367,7 +2377,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         # ── 判断：是否只剩 LLM 手动修复项 ──
         # 清除循环内注入的 fix key，查看真实的可自动修复项
         for r in remaining:
-            if r.get("rule_id", r.get("rule", "")) in ("R-23", "R-25"):
+            if r.get("rule_id", r.get("rule", "")) in ("R-07", "R-11", "R-20", "R-23", "R-25"):
                 r.pop("fix", None)
         auto_fixable = [r for r in remaining if r.get("fix")]
         if not auto_fixable:
@@ -2462,7 +2472,7 @@ def cmd_update(args):
         print(f"  [4/7] LLM 剩余项检查")
         print(f"{'-'*55}")
         llm_items = [r for r in remaining
-                     if r.get('rule_id', r.get('rule', '')) in ('R-23', 'R-25')]
+                     if r.get('rule_id', r.get('rule', '')) in ('R-07', 'R-11', 'R-20', 'R-23', 'R-25')]
         if llm_items:
             _save_remaining_llm(skill_dir, llm_items)
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")

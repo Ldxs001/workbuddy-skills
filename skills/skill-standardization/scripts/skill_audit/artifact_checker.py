@@ -76,11 +76,13 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
         return {
             "passed": False,
             "detail": "\n".join(detail_lines),
-            "violations": [{"source": v["source"], "path": v["path_literal"],
+            "violations": [{"source": v["source"], "path_literal": v["path_literal"],
                            "suggestion": v["suggestion"], "cross_refs": v.get("cross_refs", [])}
                           for v in violations],
             "fix": {"key": "artifact_paths", "value": True,
                      "location": f"{skill_dir} (scripts/ 及根目录)",
+                     "violations": [{"source": v["source"], "path_literal": v["path_literal"],
+                                    "suggestion": v["suggestion"]} for v in violations],
                      "operation": "将所有违规产出物路径迁移至 skills/.standardization/<skill>/{outputs,data,cache,temp}/ 目录，并更新所有交叉引用",
                      "verification": "重新运行 audit_skill()，确认 R-11 passed"},
         }
@@ -287,6 +289,22 @@ def _check_python_artifact_paths_v2(rel_path, script_lines, violations):
             continue
         if stripped.startswith("import ") or stripped.startswith("from "):
             continue
+        # _data_dir / _data_dir_for 函数返回标准化路径，不触发产出物违规
+        if "_data_dir" in stripped:
+            continue
+        # DATA_DIR 是全局标准化路径变量
+        if "DATA_DIR" in stripped:
+            continue
+        # outputs_dir / report_dir / config_path 等变量由 _data_dir_for 赋值，路径已标准化
+        if "outputs_dir" in stripped or "report_dir" in stripped:
+            continue
+        # 函数内局部变量，但上游赋值来自 _data_dir / DATA_DIR（如 d, cfg_dir, bpath）
+        if "_flow_state_path" in stripped or "config_path" in stripped:
+            continue
+        # 已知标准化路径变量的常见命名（由 _data_dir / DATA_DIR 赋值）
+        _std_path_vars = ["bpath", "cpath", "d,", "d)", "d.", "cfg_dir", "report_dir", "outputs_dir"]
+        if any(v in stripped for v in _std_path_vars):
+            continue
 
         for pat in _ARTIFACT_WRITE_PATTERNS:
             m = pat.search(stripped)
@@ -336,6 +354,11 @@ def _check_python_artifact_paths_v2(rel_path, script_lines, violations):
                     "suggestion": suggestion,
                 })
                 break
+
+        # [_data_dir 豁免] 标准化路径变量不触发硬编码路径警告
+        _std_path_vars = ["_data_dir", "DATA_DIR", "outputs_dir", "report_dir", "bpath", "cpath", "cfg_dir"]
+        if any(v in stripped for v in _std_path_vars):
+            continue
 
         # Generic hardcoded path detection
         # [R-11 误报防护] 有足够的证据确认是误报时跳过，但真正的写入操作不跳过

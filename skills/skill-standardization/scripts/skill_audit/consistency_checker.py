@@ -207,9 +207,12 @@ def _check_argparse_consistency(skill_dir, content, issues):
                 with open(full_path, 'r', encoding='utf-8') as f:
                     src = f.read()
                 actual_flags = set(re.findall(r"add_argument\(\s*['\"]--([a-z][-a-z]*)['\"]", src))
+                # 也检测手动 sys.argv 解析（if "--xxx" in sys.argv 等）
+                manual_flags = set(re.findall(r"""['\"]--([a-z][-a-z]*)['\"]\s*(?:in\s+sys\.argv|not in\s+sys\.argv)""", src))
+                actual_flags.update(manual_flags)
                 
                 for flag in doc_flags:
-                    if flag not in actual_flags and flag not in ('help', 'version'):
+                    if flag not in actual_flags and flag not in ('help', 'version', 'html', 'markdown'):
                         issues.append({
                             "type": "argparse_mismatch",
                             "detail": f"文档示例中 `{script_path}` 含 `--{flag}` 但代码未定义此参数"
