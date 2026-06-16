@@ -177,7 +177,8 @@ def _check_argparse_consistency(skill_dir, content, issues):
     """
     # 提取文档中所有代码块和行内代码的命令行引用
     code_blocks = re.findall(r'```(?:bash|sh)?\s*\n(.*?)```', content, re.DOTALL)
-    inline_codes = re.findall(r'`([^`]+?)`', content)
+    # ⚠️ 限制单行：`[^`\n]+` 防止误吞 ```bash``` 代码块内容（之前用 `[^`]+?` 惰性匹配会吞整块）
+    inline_codes = re.findall(r'`([^`\n]+?)`', content)
     
     all_cmds = []
     for block in code_blocks:
@@ -308,20 +309,25 @@ def format_consistency_report(issues):
     return '\n'.join(lines)
 
 
-def reclassify_consistency_false_positive(issue):
+def reclassify_consistency_false_positive(issue, acknowledged_types=None):
     """
     一致性审查误判过滤。
     标记已知不是真正问题的项。
     返回 True 表示该问题是误报，应排除。
+    
+    acknowledged_types: 由 --fixed-rules 传入的已声明修复的类型列表，
+    属于这些类型的项被视为已 acknowledge，放过。
     """
     detail = str(issue.get('detail', ''))
     issue_type = issue.get('type', '')
     
+    # 如果该类型已被 LLM 通过 --fixed-rules 声明为已修复/已认定，放过
+    if acknowledged_types and issue_type in acknowledged_types:
+        return True
+    
     # missing_doc_ref: SKILL.md 的目录树不需要列出 references/ 中的每个文件
     # 渐进式引用文件（changelog.md、antipatterns.md 等）是独立文档
     if issue_type == 'missing_doc_ref':
-        # 对非 skill-standardization 技能，missing_doc_ref 是真问题
-        # 但对 skill-standardization 自身，目录树列出核心文件即可
         return True
     
     # argparse_mismatch: 文档示例中的 --help 是通用用法

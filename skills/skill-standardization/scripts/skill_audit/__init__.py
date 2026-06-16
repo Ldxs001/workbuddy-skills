@@ -712,7 +712,7 @@ def _save_html_report(skill_dir, audit_result, before_summary=None, before_resul
     _dname = os.path.basename(os.path.abspath(skill_dir))
     _dd = os.path.normpath(os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "..", ".standardization", "skill-function-test", "data", _dname, "outputs"
+        "..", ".standardization", "skill-standardization", "data", _dname, "outputs"
     ))
     _html_path = os.path.join(_dd, filename)
     try:
@@ -728,7 +728,7 @@ def _save_remaining_llm(skill_dir, remaining):
     _dname = os.path.basename(os.path.abspath(skill_dir))
     _dd = os.path.normpath(os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "..", ".standardization", "skill-function-test", "data", _dname
+        "..", ".standardization", "skill-standardization", "data", _dname
     ))
     os.makedirs(_dd, exist_ok=True)
     _path = os.path.join(_dd, ".remaining_llm.json")
@@ -1895,11 +1895,12 @@ def cmd_refactor(args):
             check_consistency, format_consistency_report,
             reclassify_consistency_false_positive, apply_consistency_fix
         )
+        _c_fixed_types = getattr(args, 'fixed_rules', None) or []
         c_issues = check_consistency(skill_dir)
-        # 误判过滤
-        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+        # 误判过滤（传入 --fixed-rules 申报类型）
+        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
         for i in c_issues:
-            if reclassify_consistency_false_positive(i):
+            if reclassify_consistency_false_positive(i, _c_fixed_types):
                 i['reclassified'] = True
         print(format_consistency_report(c_issues))
         
@@ -1927,9 +1928,9 @@ def cmd_refactor(args):
                 if _c_auto_fixed > 0:
                     print(f"  自动修复 {_c_auto_fixed} 项，重新审查确认...")
                     c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
                     for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
+                        if reclassify_consistency_false_positive(i, _c_fixed_types):
                             i['reclassified'] = True
                     print(format_consistency_report(c_issues))
                     if not c_real:
@@ -1956,23 +1957,26 @@ def cmd_refactor(args):
 
                 _c_fixed_types = getattr(args, 'fixed_rules', None)
                 if _c_fixed_types:
-                    # 针对性重审
+                    # 针对性重审（将 --fixed-rules 类型注入放过逻辑）
                     c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
                     for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
+                        if reclassify_consistency_false_positive(i, _c_fixed_types):
                             i['reclassified'] = True
                     print(format_consistency_report(c_issues))
                     if not c_real:
                         print(f"  ✅ 一致性修复完成（针对性审查后双 0）")
                         break
-                    continue
+                    # 仍有剩余：清除 fixed_rules，进入全量重审
+                    print(f"  ⚠️  声明类型已放过，仍有 {len(c_real)} 项非该类型的问题待处理")
+                    # fall through to else block
+                    _c_fixed_types = None
                 else:
                     # 全量重审
                     c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
                     for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
+                        if reclassify_consistency_false_positive(i, _c_fixed_types):
                             i['reclassified'] = True
                     print(format_consistency_report(c_issues))
                     if not c_real:

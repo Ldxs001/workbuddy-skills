@@ -1,3 +1,15 @@
+## [2.86.1] - 2026-06-16
+
+### 修复
+
+- **P0 一致性审查死循环修复**：
+  - 修复 consistency_checker.py 内联代码正则误吞代码块问题（改为限制单行匹配），消除了 argparse_mismatch 交叉污染误报
+  - 修复 reclassify_consistency_false_positive() 仅过滤 --help 的缺陷，新增 acknowledged_types 参数支持 --fixed-rules 声明放过
+  - 修复 cmd_refactor() 一致性循环中 --fixed-rules 未注入放过逻辑，所有 reclassify 调用点传递 _c_fixed_types
+- **P2 HTML 报告路径修复**：_save_html_report 和 _save_remaining_llm 输出路径从 .standardization/skill-function-test/ 改为 .standardization/skill-standardization/data/
+
+---
+
 ## [2.86.0] - 2026-06-16
 
 ### 修复
