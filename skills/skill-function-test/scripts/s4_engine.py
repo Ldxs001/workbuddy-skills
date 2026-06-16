@@ -51,7 +51,7 @@ DATA_DIR = os.path.join(_SKILLS_ROOT, ".standardization", "skill-function-test",
 def _data_dir_for(skill_dir: str) -> str:
     """目标技能的数据子目录: skills/.standardization/skill-function-test/data/<target_skill>/"""
     target_name = os.path.basename(os.path.abspath(skill_dir))
-    d = os.path.join(DATA_DIR, target_name)
+    d = os.path.join(DATA_DIR, target_name, "outputs")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -144,8 +144,12 @@ def load_constraints(skill_dir: str) -> list[dict]:
     """加载阶段A产出的约束清单"""
     cpath = os.path.join(_data_dir_for(skill_dir), F_CONSTRAINT)
     if not os.path.exists(cpath):
-        print(f"[S4] ⚠️ 约束清单不存在: {cpath}")
-        return []
+        root_c = os.path.join(os.path.dirname(os.path.dirname(cpath)), ".constraint-list.json")
+        if os.path.exists(root_c):
+            cpath = root_c
+        else:
+            print(f"[S4] ⚠️ 约束清单不存在: {cpath}")
+            return []
     with open(cpath, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -159,11 +163,16 @@ def save_noise_plan(skill_dir: str, plan: list[dict]):
 
 
 def load_noise_plan(skill_dir: str) -> list[dict]:
-    """加载噪音方案"""
+    """加载噪音方案（先查根目录，未找到则 fallback 到 outputs/）"""
     npath = os.path.join(_data_dir_for(skill_dir), F_NOISE_PLAN)
     if not os.path.exists(npath):
-        print(f"[S4] ⚠️ 噪音方案不存在: {npath}")
-        return []
+        fallback = os.path.join(_data_dir_for(skill_dir), "outputs", F_NOISE_PLAN)
+        if os.path.exists(fallback):
+            print(f"[S4] ℹ️ 从 fallback 路径加载: {fallback}")
+            npath = fallback
+        else:
+            print(f"[S4] ⚠️ 噪音方案不存在: {npath}")
+            return []
     with open(npath, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -216,7 +225,11 @@ def load_blueprint(skill_dir: str) -> dict:
     """加载蓝皮书数据"""
     bpath = os.path.join(_data_dir_for(skill_dir), F_BLUEPRINT)
     if not os.path.exists(bpath):
-        return {}
+        root_b = os.path.join(os.path.dirname(os.path.dirname(bpath)), ".scenario-test_blueprint.json")
+        if os.path.exists(root_b):
+            bpath = root_b
+        else:
+            return {}
     with open(bpath, "r", encoding="utf-8") as f:
         return json.load(f)
 

@@ -90,7 +90,7 @@ def _bp_json_path(skill_dir: str) -> str:
     return os.path.join(_data_dir(skill_dir), ".function-test_blueprint.json")
 
 def _bp_legacy_path(skill_dir: str) -> str:
-    return os.path.join(skill_dir, ".function-test_blueprint.json")
+    return os.path.join(_data_dir(skill_dir), ".function-test_blueprint.json")
 
 def _scenario_report_path(skill_dir: str) -> str:
     return os.path.join(_data_dir(skill_dir), ".scenario-test_report.json")

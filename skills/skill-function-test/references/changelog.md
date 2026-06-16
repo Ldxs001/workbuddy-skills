@@ -1,3 +1,61 @@
+## [1.10.0] - 2026-06-16
+
+### 修复
+- R-07否定条件+R-11路径修正+argparse_mismatch过滤+html/markdown白名单
+
+---
+
+## [1.9.0] - 2026-06-16
+
+### 修复
+- refactor: skill-function-test
+
+---
+
+## [1.8.0] - 2026-06-16
+
+### 修复
+- refactor: skill-function-test
+
+---
+
+## [1.7.0] - 2026-06-16
+
+### 修复
+- refactor: skill-function-test
+
+---
+
+## 1.6.6 (2026-06-16)
+
+### 修复
+- **description 字段同步**: 同步 SKILL.md frontmatter 与 _meta.json 的 description 字段
+
+---
+
+## 1.6.5 (2026-06-16)
+
+### 修复
+- **permissions.md 重复追加测试结论**: gen_report.py _write_conclusion 改用替换逻辑：已有报告段落时替换而非追加，避免每次运行后 permissions.md 无限膨胀
+- **SKILL.md 新增 S4 数据文件位置表格**: 明确列出 7 个 S4 相关文件的存放路径，避免 LLM 反复复制文件
+- **s4_engine.py load_noise_plan fallback**: 先在 data/<skill>/ 根目录查找，未找到时回退到 outputs/ 子目录
+
+---
+
+## 1.6.4 (2026-06-16)
+
+### 修复
+- **配置即方案，禁止询问用户**: 新增配置驱动原则，LLM 直接读取 .test-config.json 执行，不得询问配置项
+
+---
+
+## 1.6.3 (2026-06-16)
+
+### 修复
+- **S4 数据文件路径不一致**: SKILL.md 说 outputs/ 但代码用 data/<skill>/ 根目录，导致 LLM 反复复制文件
+
+---
+
 ## 1.6.2 (2026-06-14)
 
 ### 修复
@@ -11,7 +69,7 @@
 - **gen_report _write_conclusion 全量 0/0**: status 比较用大写 "PASS" 但数据存为小写 "pass"，已改为 `.upper()` 不区分大小写
 - **gen_report _write_conclusion 错误 key**: 读取 `data["scenario_report"]` 但 load_all 返回 `data["scenario"]`，永远拿不到数据
 - **gen_report _write_conclusion 总耗时 N/A**: `data['timeline']['total_seconds']` 不存在，改为 `compute_timing()` 计算结果
-- **gen_report _write_conclusion 双倍重复写入**: 同一函数内先后执行两次 `f.write()`，每次 gen_report 调用都追加两条重复结论。已移除第一条冗余写入
+- **gen_report _write_conclusion 双倍重复写入**: 同一函数内先后执行两次 `f.write()`，每次 gen_report 调用都追加两条重复结论。已删除第一条冗余写入
 - **S4 脏数据残留**: `s4_engine.py play` 每次生成脚本前不清理旧 `.s4_trace*.json`，报告读到旧追踪导致轮次/坚守率错乱。已改为每次 play 前自动清理旧追踪文件
 - **S4 自动模式下无追踪**: `play` 只生成脚本但无 LLM 执行噪音，报告 S4 区始终为空。已改为 play 自动生成全部坚守的追踪记录，合并写入 `.s4_trace.json`
 - **计时统计缺少 S 阶段数据**: hooks.py 的 `_timeline_path` 指向 `outputs/`，timeline.py 写入父目录。hooks 每次检查都找不到文件 → 触发重新 init → 清空已有 S 标记。已统一两处路径
@@ -31,7 +89,7 @@
 - **计时统计缺少 S 阶段数据**: `hooks.py` 的 `_timeline_path` 指向 `outputs/.timeline.json`，而 `timeline.py` 写入 `../.timeline.json`。两个文件不同，hooks 每次检查都找不到 timeline，触发重新 init → 清空已有 S 标记。修复为统一路径：`data/<target>/.timeline.json`
 - **hooks.md 漏列阻断步骤**: write_tests / write_conclusion 补入阻断档位
 - **SKILL.md 版本号不一致**: 底部版本从 v1.0.0 更新至 v1.6.0
-- **guide.md 8阶段 → 9阶段**: 新增阶段3（写测试用例）、更新交互描述、删除已移除的"询问后修复"模式
+- **guide.md 8阶段 → 9阶段**: 新增阶段3（写测试用例）、更新交互描述、删除已删除的"询问后修复"模式
 - **examples.md runner.run_full 示例更新**: 改为 hooks 独立步骤示例，反映当前架构
 
 ### 更新
@@ -51,7 +109,7 @@
 ### 修复
 - **hooks.py false positive**: `hook_post_gen_report` 不再输出"完整流程执行完毕"，改为指引执行步骤9
 - **gen_report.py 结论标题修正**: 标题严格按 `基于skill-function-test的测试报告`（无多余空格）
-- **gen_report.py 结论写入模式**: 新建→直接写，已有且不同→`a` 模式追加到末尾，已有且相同→跳过
+- **gen_report.py 结论写入模式**: 创建→直接写，已有且不同→`a` 模式追加到末尾，已有且相同→跳过
 
 ---
 

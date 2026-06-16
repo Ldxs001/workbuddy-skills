@@ -704,7 +704,8 @@ if __name__ == "__main__":
             from test_config import config_path as _cfg
             _rd = os.path.dirname(_cfg(target))
             os.makedirs(_rd, exist_ok=True)
-            report_path = os.path.join(_rd, ".function-test_report.json")
+            report_path = os.path.join(_rd, "outputs", ".function-test_report.json")
+            os.makedirs(os.path.join(_rd, "outputs"), exist_ok=True)
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(report, f, ensure_ascii=False, indent=2)
             print(f"\n报告 JSON 已保存: {report_path}")

@@ -32,8 +32,9 @@ def _data_dir_for(skill_dir: str) -> str:
     ))
     _SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
     d = os.path.normpath(os.path.join(
-        _SKILLS_ROOT, ".standardization", "skill-function-test", "data", skill_name
+        _SKILLS_ROOT, ".standardization", "skill-function-test", "data", skill_name, "outputs"
     ))
+    os.makedirs(os.path.join(os.path.dirname(d), skill_name), exist_ok=True)
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -65,7 +66,7 @@ def load_all(skill_dir: str) -> dict:
     skill_name = os.path.basename(os.path.abspath(skill_dir))
     scenario_report = _load_json(os.path.join(datadir, "outputs", ".scenario-test_report.json"))
     if not scenario_report:
-        scenario_report = _load_json(os.path.join(skill_dir, ".scenario-test_report.json"))
+        scenario_report = _load_json(os.path.join(datadir, "outputs", ".scenario-test_report.json"))
     function_report = _load_json(os.path.join(datadir, "outputs", ".function-test_report.json"))
     s4_trace = _load_json(os.path.join(datadir, "outputs", ".s4_trace.json"))
     s4_noise_plan = _load_json(os.path.join(datadir, "outputs", ".s4_noise_plan.json"))
@@ -743,13 +744,11 @@ USAGE = """
 def _write_conclusion(skill_dir: str, data: dict):
     """将测试结论写入目标技能的 references/permissions.md
 
-    规则（旧要求+新要求整合）：
+    规则：
     - 标题: ## 基于skill-function-test的测试报告
-    - 文件不存在 → 新建
-    - 已有相同结论（指纹匹配）→ 跳过不重复写
-    - 已有不同结论 → 追加到最后面
-    """
-    import re
+    - 文件不存在 → 新建完整段落（含表头+首行）
+    - 已有段落 → 在现有表格末尾追加一行（运行时间 + 各维度结果）
+    - 同一时间戳已存在 → 跳过不重复写"""
     target_refs = os.path.join(skill_dir, "references")
     os.makedirs(target_refs, exist_ok=True)
     perm_path = os.path.join(target_refs, "permissions.md")
@@ -767,54 +766,73 @@ def _write_conclusion(skill_dir: str, data: dict):
     s4_held = sum(1 for t in s4_trace if t.get("llm_behavior") == "坚守")
 
     now = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M")
-    conclusion = f"""
-## 基于skill-function-test的测试报告
+    _timing = __import__("types").SimpleNamespace()  # dummy, compute_timing below
+    _timing = None
 
-> 生成时间: {now}
+    s1_str = f"{s1_pass}/{s1_total}" if s1_total > 0 else "-"
+    d_str = f"{d_pass}/{d_total}" if d_total > 0 else "-"
+    s4_pct = s4_held * 100 // max(s4_total, 1) if s4_total > 0 else 0
+    s4_str = f"{s4_held}/{s4_total} ({s4_pct}%)" if s4_total > 0 else "-"
 
-### 测试概览
+    _total_sec = "N/A"
 
-| 测试维度 | 结果 |
-|---------|------|
-| S1 场景链路 | {s1_pass}/{s1_total} 通过 |
-| D1-D6 功能测试 | {d_pass}/{d_total} 通过 |
-| S4 执行忠实度 | 坚守率 {s4_held}/{s4_total} ({s4_held*100//max(s4_total,1)}%) |
-
-> ⚠️ S4 单实例说明: 噪音方案设计与执行同属一个 LLM 会话，测试数据仅供参考。
-> 可靠结果需跨会话执行。
-
-### 计时统计
-
-| 指标 | 耗时 (s) |
-|------|---------|
-| 总耗时 | N/A |
-"""
-
-    # 计算实际总耗时
-    _timing = compute_timing(data)
-    _total_sec = _timing.get("total", "N/A")
-    conclusion = conclusion.replace("| 总耗时 | N/A |", f"| 总耗时 | {_total_sec} |")
+    # 新建文件：完整段落 + 第一行
     if not os.path.exists(perm_path):
-        # 新建文件，直接写结论
+        _total_sec = str(compute_timing(data).get("total", "N/A"))
+        header = (
+            "## 基于skill-function-test的测试报告\n"
+            "\n"
+            "| 运行时间 | S1 场景链路 | D1-D6 功能测试 | S4 执行忠实度 | 耗时(s) |\n"
+            "|---------|-------------|----------------|--------------|---------|\n"
+        )
+        row = f"| {now} | {s1_str} | {d_str} | {s4_str} | {_total_sec} |\n"
         with open(perm_path, "w", encoding="utf-8") as f:
-            f.write(conclusion.strip() + "\n")
+            f.write(header + row)
         print(f"  [CONCLUSION] 已新建: {perm_path}")
         return
 
-    # 文件已存在：检查是否已有相同结论
-    fingerprint = f"S1={s1_pass}/{s1_total} D={d_pass}/{d_total} S4={s4_held}/{s4_total}"
     with open(perm_path, "r", encoding="utf-8") as f:
         existing = f.read()
-    if fingerprint in existing:
-        print(f"  [CONCLUSION] 跳过：相同测试结论已存在 ({fingerprint})")
+
+    # 同一时间戳已存在 → 跳过
+    if now in existing:
+        print(f"  [CONCLUSION] 跳过：{now} 已记录")
         return
 
-    # 无重复，追加新结论
-    with open(perm_path, "a", encoding="utf-8") as f:
-        f.write("\n" + conclusion)
-    print(f"  [CONCLUSION] 已追加到: {perm_path}")
+    # 找到现有表格，追加一行
+    section_hdr = "## 基于skill-function-test的测试报告"
+    table_sep = "|---------|-------------|----------------|--------------|---------|"
 
-
+    if section_hdr in existing:
+        _total_sec = str(compute_timing(data).get("total", "N/A"))
+        row = f"| {now} | {s1_str} | {d_str} | {s4_str} | {_total_sec} |"
+        # 在第一次出现 table_sep 的后一行插入
+        elines = existing.split("\n")
+        new_lines = []
+        inserted = False
+        for el in elines:
+            new_lines.append(el)
+            if not inserted and el.strip() == table_sep:
+                new_lines.append(row)
+                inserted = True
+        if not inserted:
+            new_lines.append(row)
+        with open(perm_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(new_lines) + "\n")
+        print(f"  [CONCLUSION] 已追加行到: {perm_path}")
+    else:
+        # 没有现有段落，新建
+        _total_sec = str(compute_timing(data).get("total", "N/A"))
+        header = (
+            "## 基于skill-function-test的测试报告\n"
+            "\n"
+            "| 运行时间 | S1 场景链路 | D1-D6 功能测试 | S4 执行忠实度 | 耗时(s) |\n"
+            "|---------|-------------|----------------|--------------|---------|\n"
+        )
+        row = f"| {now} | {s1_str} | {d_str} | {s4_str} | {_total_sec} |\n"
+        with open(perm_path, "a", encoding="utf-8") as f:
+            f.write("\n" + header + row)
+        print(f"  [CONCLUSION] 已新建段落到: {perm_path}")
 def main():
     if len(sys.argv) < 2:
         print(USAGE)
@@ -829,7 +847,7 @@ def main():
     data = load_all(skill_dir)
     # 输出到数据目录（R-11 合规）
     report_dir = _data_dir_for(skill_dir)
-    outputs_dir = os.path.join(report_dir, "outputs")
+    outputs_dir = report_dir
     os.makedirs(outputs_dir, exist_ok=True)
     if mode in ("markdown", "both"):
         md = gen_markdown(data)

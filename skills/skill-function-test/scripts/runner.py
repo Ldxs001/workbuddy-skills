@@ -872,8 +872,10 @@ def stage_9_report(state: PipelineState) -> PipelineState:
     state.final_report = "\n".join(lines)
     print(state.final_report)
 
-    # 保存报告
-    report_path = os.path.join(state.skill_dir, ".scenario-test_final_report.md")
+    # 保存报告到标准化目录
+    report_dir = os.path.join(DATA_DIR, os.path.basename(state.skill_dir), "outputs")
+    os.makedirs(report_dir, exist_ok=True)
+    report_path = os.path.join(report_dir, ".scenario-test_final_report.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(state.final_report)
     print(f"\n  最终报告已保存: {report_path}")
