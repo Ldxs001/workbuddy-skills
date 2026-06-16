@@ -1,7 +1,96 @@
+## [2.85.0] - 2026-06-16
+
+### 新增
+- **报告格式增强**：format_report 摘要增加「ⓘ 误报(排除)」列，真实失败/误报分类显示；所有计数从 results 逐条计算，不再依赖原始 summary
+- **HTML 双表合一**：generate_html_report 支持 `before_result`，修复前/后双表上下排列；数字卡与 format_report 算法一致
+- **LLM 二筛路径修复**：`.verify_fp.json` 路径下正确显示排除计数（`_orig_excluded`），不再 PASS=23/ⓘ=0
+- **假阳性规则扩展**：R-25 C-12 触发条件/content_format/工作流 I/O 三项标记为已知误报
+- **HTML 输出强化**：所有 exit(1)/exit(2) 阻断点前置 `_save_html_report`
+- **URL 误报规则**：R-23 http/https 引用自动排除
+
+---
+
+## [2.84.0] - 2026-06-16
+
+### 新增
+- LLM 修复闭环：_run_audit_loop 返回后直接检查 remaining，**不再跑第二次全量审计**
+- 新增 `_save_remaining_llm()` 函数，将剩余 R-23/R-25 项保存为结构化 JSON
+- cmd_refactor/cmd_update 检测 remaining → 分类处理 LLM 项 vs 未知项
+- 独立步骤「LLM 剩余项检查」放在双0验证之前、一致性审查之前
+- SKILL.md 工作流补充 LLM 闭环步骤：读 JSON → 修 SKILL.md → --fixed-rules 重跑
+- reference.md 退出码表补充 exit code 2 定义
+- FAQ Q29 更新为 LLM 闭环修复流程
+- **报告增加「误报(排除)」级别**：text 报告和 HTML 报告摘要栏均显示 ⓘ 误报数量，区分真实失败与误报
+- **修复前后对比**：format_report 新增 `before_summary` 参数，双0验证时显示「修复前: N ERROR / M WARN → 修复后」
+- backup: 跳过 Windows 保留名文件（os.path.relpath ValueError）
+- **URL 误报规则**: `_reclassify_false_positive` 增加 http/https URL 自动排除（R-23 文件不存在检查跳过外部链接）
+- **HTML 输出强化**: 所有 exit(1) 阻断点前置 `_save_html_report()`，确保失败路径也有 HTML 报告
+
+---
+
+## [2.84.0] - 2026-06-16
+
+### 新增
+- LLM 修复闭环：_run_audit_loop 返回后直接检查 remaining，**不再跑第二次全量审计**
+- 新增 `_save_remaining_llm()` 函数，将剩余 R-23/R-25 项保存为结构化 JSON
+- cmd_refactor/cmd_update 检测 remaining → 分类处理 LLM 项 vs 未知项
+- 独立步骤 5/4「LLM 剩余项检查」放在双0验证之前、一致性审查之前
+- SKILL.md 工作流补充 LLM 闭环步骤：读 JSON → 修 SKILL.md → --fixed-rules 重跑
+- reference.md 退出码表补充 exit code 2 定义
+- FAQ Q29 更新为 LLM 闭环修复流程
+
+---
+
+## [2.83.4] - 2026-06-16
+
+### 修复
+- 流水线完善：_run_audit_loop修复+R-25修复+HTML统一输出
+
+---
+
+## [2.83.3] - 2026-06-16
+
+### 修复
+- 修复_run_audit_loop空转根因+删除格式建议措辞
+
+---
+
+## [2.83.2] - 2026-06-16
+
+### 修复
+- 修复_run_audit_loop空转根因+删除格式建议措辞
+
+---
+
+## 2.83.1 (2026-06-16)
+
+### 修复
+- **_run_audit_loop 正确退出**: auto-fix 后剩余全无 fix key 时 break 退出而非空转 20 轮
+- **_reclassify_false_positive 重构**: 删除 R-20 术语全量 filter；新增 changelog 历史文件引用过滤（基于规则而非 ID）
+- **fix_inline_refs 保护索引表和模板**: 跳过表格行（| 开头）和渐进式模板句（同时含'渐进式加载'+references）
+- **R-21 修复**: 删除数据目录说明中重复的渐进式模板句
+- **R-20 修复**: changelog 术语统一（更新→更新）
+- **body.json 更新**: section_order 白名单新增能力与限制；fix_inline_refs 正则修复
+
+---
+## [2.83.0] - 2026-06-16
+
+### 修复
+- refactor: skill-standardization
+
+---
+
+## [2.82.13] - 2026-06-16
+
+### 修复
+- fix_create_permissions_md 重写：基于 PermissionChecker 扫描数据生成结构化权限说明（按类型分组+文件/行号表格+授权方式）；修复 _load_patterns 的 Path(__file__).parent.parent 未 resolve() 导致的空模式加载问题；_write_file 添加 relative import fallback
+
+---
+
 ## [2.82.12] - 2026-06-16
 
 ### 修复
-- 修复：_reclassify_false_positive 新增 R-23 外部 URL 和 R-25 精筛确认的误判模式；fp_ids 未初始化 bug；移除中间轮次 _save_html_report（只在最终输出生成一份）
+- 修复：_reclassify_false_positive 新增 R-23 外部 URL 和 R-25 精筛确认的误判模式；fp_ids 未初始化 bug；删除中间轮次 _save_html_report（只在最终输出生成一份）
 
 ---
 
@@ -15,14 +104,14 @@
 ## [2.82.10] - 2026-06-16
 
 ### 修复
-- 移除 --fix 流程中的自动 _do_bump（应在双0后统一bump）；修复 fix_table_format os 变量作用域 bug
+- 删除 --fix 流程中的自动 _do_bump（应在双0后统一bump）；修复 fix_table_format os 变量作用域 bug
 
 ---
 
 ## [2.82.9] - 2026-06-16
 
 ### 修复
-- HTML报告改为默认生成（去掉--html参数）；新增_save_html_report辅助函数；在cmd_audit/refactor/update/_run_audit_loop所有format_report后自动保存HTML
+- HTML报告改为默认生成（删除--html参数）；新增_save_html_report辅助函数；在cmd_audit/refactor/update/_run_audit_loop所有format_report后自动保存HTML
 
 ---
 
@@ -71,7 +160,7 @@
 ## [2.82.2] - 2026-06-16
 
 ### 修复
-- cmd_bump 移除交互式 input 并增加 LLM 操作指引；fix_create_permissions_md 增加权限指纹检测和段落级替换
+- cmd_bump 删除交互式 input 并增加 LLM 操作指引；fix_create_permissions_md 增加权限指纹检测和段落级替换
 
 ---
 
@@ -213,9 +302,9 @@
 
 ### fix
 - **清理 **`_dead_code_backup/`** 目录**: 删除 50+ 死文件，消除 D1 语法错误和相对导入失败
-- **新增 **`scripts/log.py`** 共享日志模块**: 统一日志配置
-- **print→logging 转换**: json_loader.py / skill_rollback.py / update_skill_frontmatter.py 将调试 print 转为 logger
-- **异常处理补全**: run_audit.py / update_skill_frontmatter.py 添加 try/except
+- **新增共享日志模块（后因架构调整删除）**: 统一日志配置
+- **print→logging 转换**: 多个脚本将调试 print 转为 logger
+- **异常处理补全**: 多个脚本添加 try/except
 
 ## 2.73.2 (2026-06-12)
 
@@ -460,7 +549,7 @@
 ## 2.61.1 (2026-06-03)
 
 ### 修复
-- `updater.py` / `refactor.py` / `skill_builder/updater.py` / `skill_builder/refactor.py`:
+- 废弃的 updater.py / refactor.py 等入口文件（已合并到 skill_audit/ 模块）
   删除 `--inject-auth` 条件门控，update/refactor 模式默认执行权限扫描和 permissions.md 写入
   （原行为：不传 --inject-auth 则跳过权限扫描；现行为：默认执行）
 

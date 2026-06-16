@@ -243,7 +243,8 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | skill_audit | `1` | 审查失败：严重问题 | audit --verify 后仍有未通过的真实问题 |
 | skill_audit | `1` | 审查失败：修复循环超限 | update >10轮/refactor >20轮未清零 |
 | skill_audit | `1` | 一致性审查异常 | 代码层面报错，需查看终端 traceback |
-| skill_audit | `1` | 文件修改受阻 | safe_io 原子写入全部重试失败 |
+| skill_audit | `1` | 文件更新受阻 | safe_io 原子写入全部重试失败 |
+| skill_audit | `2` | 需 LLM 介入修复 | 双0验证发现 R-23/R-25 剩余项，已保存 `.remaining_llm.json` |
 | skill_builder | `0` | 创建/更新成功 | 正常执行 |
 | skill_builder | `1` | 参数错误 | 目标目录已存在、目录名非法、缺少必需参数 |
 | cleanup_manager | `0` | 清理完成 | manifest 内文件已清除 |
@@ -636,17 +637,9 @@ python scripts/permission_checker.py .
 python scripts/permission_checker.py . --verbose --output permission_report.json
 ```
 ---
-### scripts/progress_manager.py
-**功能**: 管理审计进度，支持创建进度文件、更新进度、加载进度、格式化进度条（无独立 CLI，仅作为 API 供其他脚本调用）。
-**Python API 示例**:
-```python
-from progress_manager import create_progress, update_progress, load_progress, format_progress
-
-create_progress('.standardization/skill-standardization')
-update_progress('.standardization/skill-standardization', audit_result)
-progress = load_progress('.standardization/skill-standardization')
-print(format_progress('.standardization/skill-standardization'))
-```
+### scripts/skill_audit/cleanup_manager.py（通过 refactor 流程调用）
+**功能**: 管理改造清理过程，基于 manifest 标记的待删除文件执行清除，支持备份注册和批量处理。
+**调用方式**: refactor 流程自动触发，无需手动调用。
 ---
 ### scripts/skill_audit/fix.py（通过 `audit --fix` 调用）
 **功能**: 统一修复入口，根据审计结果自动修复可修复的规则违规（覆盖 R-01~R-26）。

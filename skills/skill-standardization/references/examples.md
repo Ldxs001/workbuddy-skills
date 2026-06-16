@@ -188,7 +188,7 @@ Migration plan:
 │ Rule │ Source             │ Destination            │ Size   │
 ├──────┼───────────────────┼────────────────────────┼────────┤
 │ M-01 │ tool.py            │ scripts/tool.py        │ 18.2KB │
-│ M-01 │ utils.py           │ scripts/utils.py       │ 4.1KB  │
+│ M-01 │ skill_inspector.py  │ scripts/skill_inspector.py│ 4.1KB  │
 │ M-02 │ README.md          │ references/README.md         │ 2.3KB  │
 │ M-02 │ NOTES.md           │ references/NOTES.md          │ 1.8KB  │
 │ M-03 │ requirements.txt   │scripts/requirements.txt│ 0.1KB  │
@@ -216,7 +216,7 @@ Backup: ./legacy-tool_bak_refactor_20260522_191000/
 [2/5] Scanning files... ✅ 8 files found
 [3/5] Applying migrations:
       M-01 tool.py      → scripts/tool.py      ✅
-      M-01 utils.py     → scripts/utils.py     ✅
+      M-01 skill_inspector.py → scripts/skill_inspector.py ✅
       M-02 README.md    → references/README.md       ✅
       M-02 NOTES.md     → references/NOTES.md        ✅
       M-03 requirements.txt → scripts/requirements.txt ✅
@@ -322,7 +322,7 @@ tags: ["example", "demo", "template"]
 ## 快速开始
 
 ```bash
-python scripts/main.py --help
+python -m scripts.skill_audit audit . --confirmed
 ```
 
 ## 主要流程

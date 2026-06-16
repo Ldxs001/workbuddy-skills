@@ -683,7 +683,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         for script_path in script_paths:
             full_path = os.path.join(skill_dir, script_path)
             if not os.path.isfile(full_path):
-                all_issues["suggest"].append(f"SKILL.md 提到脚本 `{script_path}` 但文件不存在（应使用相对路径如 `scripts/foo.py`）")
+                all_issues["suggest"].append(f"文档 `{filepath}` 提到脚本 `{script_path}` 但文件不存在（应使用相对路径如 `scripts/foo.py`）")
             else:
                 # 静态分析：检查 Python 语法（不执行脚本，避免间接执行风险）
                 try:
@@ -994,7 +994,7 @@ def check_doc_code_consistency(
             if os.path.isfile(alt_path):
                 continue
             issues["suggest"].append(
-                f"R-23: {filepath}:1 - SKILL.md 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
+                f"R-23: {filepath}:1 - 文档 `{filepath}` 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
             )
         else:
             # 静态语法检查
@@ -1668,7 +1668,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     for rule in semantic_rules[:3]:
                         detail_preview = rule[:80].replace('\n', ' ')
                         issues["warn"].append(
-                            "C-12: 章节「" + sec_title[:16] + "」" + detail_preview + "（由全报告 LLM 精筛确认）"
+                            "C-12: 章节「" + sec_title[:16] + "」" + detail_preview + "（需 LLM 逐条判断修复）"
                         )
     # C-13 (WARN): 渐进式索引表完整性 — 检查 ## 核心能力 末尾是否包含索引表
     # ════════════════════════════════════════════════════════════
@@ -1746,7 +1746,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if len(steps) > 6:
                 step_details += f" 等（共 {len(steps)} 步）"
             issues["warn"].append(
-                f"C-14: 工作流程共 {len(steps)} 步，由全报告LLM精筛确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
+                f"C-14: 工作流程共 {len(steps)} 步，需 LLM 逐条确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
             )
 
         # ── C-14b: 检测工作流程中混入 changelog 风格内容（版本号+更新类关键词） ──
@@ -1872,7 +1872,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 _c16_context = _c16_lines[_c16_ln - 1][:60] if _c16_ln <= len(_c16_lines) else ""
                 _c16_filename = os.path.relpath(_c16_doc, _c16_skill_dir) if _c16_skill_dir else _c16_doc
                 issues["warn"].append(
-                    f"C-16: {_c16_filename}:{_c16_ln} - 发现过时{_c16_label}「{_c16_m.group()[:30]}」（上下文：{_c16_context}）。{_c16_desc}（由全报告LLM精筛确认并更新）"
+                    f"C-16: {_c16_filename}:{_c16_ln} - 发现过时{_c16_label}「{_c16_m.group()[:30]}」（上下文：{_c16_context}）。{_c16_desc}（需 LLM 判断修复）"
                 )
 
     # ════════════════════════════════════════════════════════════

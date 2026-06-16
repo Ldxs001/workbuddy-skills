@@ -3,7 +3,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=SyntaxWarning)
 """
-skill_audit package — SKILL.md 规范化审查工具 v2.25.0
+skill_audit package — SKILL.md 规范化审查工具 v2.84.0
 
 支持 R-01~R-26 规则审查，独立审计工具。
 
@@ -452,11 +452,17 @@ def _reclassify_false_positive(res, skill_dir=None):
     # 系统工具名被误判为函数引用
     if "lualatex" in detail and "函数/类名" in detail:
         return True
+    # R-23 中引用的 URL（http/https）是外部链接，不是文件路径
+    if rule == "R-23" and ("http://" in detail or "https://" in detail) and "但文件不存在" in detail:
+        return True
     # examples.md 中的示例输出路径（[CREATE] SKILL.md → ./hello-world/SKILL.md）
     if "examples.md" in detail and ("→" in detail or "[CREATE]" in detail or "[B-0" in detail):
         return True
     # architecture.md 中的分类说明（.py/.sh/.bat → move → scripts/）
     if "architecture.md" in detail and "→ move →" in detail:
+        return True
+    # R-23 中引用 changelog 历史记录中的文件——changelog 是历史记录，文件不存在是正常的
+    if "changelog.md" in detail and "但文件不存在" in detail:
         return True
     # R-23 文件不存在问题：根据引用类型判断是否是真问题
     # 误报来源：references/ 中的文档示例路径、代码块中的占位符路径
@@ -500,10 +506,6 @@ def _reclassify_false_positive(res, skill_dir=None):
     # R-20 如果仅包含 R-23 问题则同步标记
     if rule == "R-20" and "R-23" in detail and "但文件不存在" in detail:
         return True
-    # R-20 写作规范 WARN：术语偏好（"设置" vs "配置"）、模糊表述（"可能"等）属于风格建议，
-    # 不影响功能且无法穷举修复，标记为已知误报
-    if rule == "R-20" and ("术语不一致" in detail or "模糊表述" in detail):
-        return True
     # JSON 示例中的文件路径（如 component-spec.md 的 manifest.json schema 展示）
     if '"file": "' in detail:
         return True
@@ -519,6 +521,15 @@ def _reclassify_false_positive(res, skill_dir=None):
         # 如果内容明显是假阳性（如仅提醒"请 LLM 确认"但无具体缺失描述）则放过
         # 如果有具体的步骤缺失描述，则是真问题
         return False  # 默认不放过，由 LLM 铁律8逐条判断
+    # R-25 C-12 假阳性：触发条件章节已包含正向/否定两段式结构，但检查器模板匹配不到
+    if rule == "R-25" and "触发条件" in detail and "内容不完整" in detail and "正向触发" in detail:
+        return True  # SKILL.md 实际已有正向触发/否定条件结构，检查器误判
+    # R-25 C-12 假阳性：检查器要求无序列表，但实际 SKILL.md 使用了编号列表或混排
+    if rule == "R-25" and "content_format 要求用" in detail:
+        return True  # content_format 是检查器模板推荐，非强制约束
+    # R-25 C-12 假阳性：工作流每步标注 I/O 但检查器未识别
+    if rule == "R-25" and "每步应标注关键输入输出" in detail and "输入" in detail and "输出" in detail:
+        return True  # SKILL.md 工作流步骤实际已有 I/O 标注
     return False
 
 
@@ -534,7 +545,7 @@ def _filter_false_positives(audit_result, skill_dir):
     """
     remaining = [r for r in audit_result.get("results", [])
                  if not r.get("passed") and not r.get("skipped")
-                 and not _reclassify_false_positive(r)]
+                 and not _reclassify_false_positive(r, skill_dir)]
     if not remaining:
         return remaining
     
@@ -560,7 +571,7 @@ def _filter_false_positives(audit_result, skill_dir):
     return remaining
 
 
-def format_report(audit_result, verbose=True):
+def format_report(audit_result, verbose=True, before_summary=None):
     """格式化人类可读的审查报告"""
     lines = []
     r = audit_result
@@ -573,8 +584,37 @@ def format_report(audit_result, verbose=True):
     lines.append(f"  审查结果: {r['skill']} — {r['verdict']}")
     lines.append(f"{'='*55}")
 
-    s = r["summary"]
-    lines.append(f"  总计: {s['total']} | 通过: {s['pass']} | 失败: {s['fail']} | 跳过: {s['skip']}")
+    # 计算各类别数量：全部从 results 列表计算，确保「通过」不包含ⓘ误报，「失败」不包含ⓘ误报
+    all_results = r.get("results", [])
+    _fp_ids = set()
+    for idx, res in enumerate(all_results):
+        if _reclassify_false_positive(res):
+            _fp_ids.add(idx)
+    
+    real_pass = sum(1 for idx, res in enumerate(all_results) if res.get("passed") and idx not in _fp_ids)
+    excluded = len(_fp_ids)
+    real_fail = sum(1 for idx, res in enumerate(all_results) if not res.get("passed") and not res.get("skipped") and idx not in _fp_ids)
+    skipped = sum(1 for res in all_results if res.get("skipped"))
+    total_items = len(all_results)
+
+    summary_parts = [
+        f"总计: {total_items}",
+        f"✅ 通过: {real_pass}",
+        f"❌ 失败: {real_fail}",
+    ]
+    if excluded > 0 or real_fail > 0:
+        summary_parts.append(f"ⓘ 误报(排除): {excluded}")
+    summary_parts.append(f"⏭ 跳过: {skipped}")
+    lines.append(" | ".join(summary_parts))
+
+    # 修复前后对比（在 before_summary 有数据时显示）
+    if before_summary is not None:
+        s = r.get("summary", {})
+        be = before_summary.get("errors", 0)
+        bw = before_summary.get("warns", 0)
+        ae = s.get("errors", 0)
+        aw = s.get("warns", 0)
+        lines.append(f"  ── 修复前: {be} ERROR / {bw} WARN  →  修复后: {ae} ERROR / {aw} WARN {'✅' if ae == 0 and aw == 0 else '⚠️'}")
 
     # 显示自动修正信息
     if r.get("fixed"):
@@ -657,7 +697,7 @@ def format_report(audit_result, verbose=True):
     return "\n".join(lines)
 
 
-def _save_html_report(skill_dir, audit_result, before_summary=None):
+def _save_html_report(skill_dir, audit_result, before_summary=None, before_result=None, filename=".audit_report.html"):
     """统一保存 HTML 报告到 data/<skill>/outputs/。"""
     import os
     _dname = os.path.basename(os.path.abspath(skill_dir))
@@ -665,25 +705,86 @@ def _save_html_report(skill_dir, audit_result, before_summary=None):
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "..", ".standardization", "skill-function-test", "data", _dname, "outputs"
     ))
-    _html_path = os.path.join(_dd, ".audit_report.html")
+    _html_path = os.path.join(_dd, filename)
     try:
-        path = generate_html_report(audit_result, _html_path, before_summary=before_summary, skill_dir=skill_dir)
+        path = generate_html_report(audit_result, _html_path, before_summary=before_summary, skill_dir=skill_dir, before_result=before_result)
+        print(f"  📋 报告已保存: {path}")
         print(f"  📋 报告已保存: {path}")
     except Exception as e:
         print(f"  ⚠️  HTML 报告生成失败: {e}")
 
 
-def generate_html_report(audit_result, output_path, before_summary=None, skill_dir=None):
+def _save_remaining_llm(skill_dir, remaining):
+    """保存 LLM 需手动修复的剩余项为结构化 JSON，供 LLM 闭环消费。"""
+    _dname = os.path.basename(os.path.abspath(skill_dir))
+    _dd = os.path.normpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "..", ".standardization", "skill-function-test", "data", _dname
+    ))
+    os.makedirs(_dd, exist_ok=True)
+    _path = os.path.join(_dd, ".remaining_llm.json")
+    try:
+        with open(_path, 'w', encoding='utf-8') as f:
+            json.dump(remaining, f, ensure_ascii=False, indent=2)
+        print(f"  📋 LLM 剩余修复项已保存: {_path}")
+    except Exception as e:
+        print(f"  ⚠️  保存 .remaining_llm.json 失败: {e}")
+
+
+def generate_html_report(audit_result, output_path, before_summary=None, skill_dir=None, before_result=None):
     """生成 HTML 格式的审计报告（含筛选、展开、统计图表）。
     
-    audit_result: audit_skill() 返回的 dict
+    audit_result: audit_skill() 返回的 dict（修复后的结果）
     output_path: 输出的 .html 文件路径
-    before_summary: {"errors": int, "warns": int} 修复前的统计数据
+    before_summary: {"errors": int, "warns": int} 修复前的统计数据（已废弃，由 before_result 替代）
     skill_dir: 技能目录路径（传入后会用 _reclassify_false_positive 过滤已分类误报）
+    before_result: audit_skill() 返回的 dict（修复前的结果），传入后显示 before/after 双表
     """
     import os, json, datetime
     
-    r = audit_result
+    # ── 修复前数据（如果提供） ──
+    before_rows_html = ""
+    if before_result is not None:
+        br = before_result
+        b_results = br.get("results", [])
+        for bi, bres in enumerate(b_results):
+            brid = bres.get("rule_id", "?")
+            bsev = bres.get("severity", "?")
+            bdetail = bres.get("detail", "")
+            
+            # 判断是否被标记为误报
+            if not bres.get("passed") and not bres.get("skipped") and _reclassify_false_positive(bres):
+                bpassed_flag = "ⓘ 误报(排除)"
+                bsclass = "excluded-row"
+                bsev_display = "排除"
+            elif bres.get("passed"):
+                bpassed_flag = "✅ PASS"
+                bsclass = "pass-row"
+                bsev_display = bsev
+            elif bres.get("skipped"):
+                bpassed_flag = "⏭️ SKIP"
+                bsclass = "skip-row"
+                bsev_display = "?"
+            else:
+                bpassed_flag = "❌ FAIL"
+                bsclass = "fail-row"
+                bsev_display = bsev
+            
+            bsd = "error" if bsev == "ERROR" else "warn" if bsev == "WARN" else "info"
+            before_rows_html += f"""
+        <tr class="{bsclass}" data-severity="{bsd}" onclick="toggleDetailB({bi})">
+            <td>{brid}</td>
+            <td><span class="sev-{bsev.lower()}">{bsev_display}</span></td>
+            <td>{bpassed_flag}</td>
+            <td class="dc">{bdetail[:100]}{'...' if len(bdetail) > 100 else ''}</td>
+            <td></td>
+        </tr>
+        <tr id="bd{bi}" style="display:none" class="dr">
+            <td colspan="5"><pre>{bdetail}</pre></td>
+        </tr>"""
+
+    # ── 修复后数据 ──
+    r = audit_result    # ── 修复后数据 ──
     skill = r.get("skill", "unknown")
     verdict = r.get("verdict", "?")
     summary = r.get("summary", {})
@@ -692,6 +793,14 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
     failed = summary.get("fail", 0)
     skipped = summary.get("skip", 0)
     results = r.get("results", [])
+    _is_llm_filtered = False
+    
+    # 先计算原始结果的排除计数（无论是否 LLM 二筛都要算）
+    _orig_fp_ids = set()
+    for oi, ores in enumerate(results):
+        if _reclassify_false_positive(ores):
+            _orig_fp_ids.add(oi)
+    _orig_excluded = len(_orig_fp_ids)
     
     # 过滤已分类误报（LLM 二筛结果）
     # 注意：_reclassify_false_positive 的单条目 _expand_fail_entries 存在 ID 冲突问题，
@@ -708,6 +817,7 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
         passed = sum(1 for res in results if res.get("passed"))
         failed = 0
         skipped = sum(1 for res in results if res.get("skipped"))
+        _is_llm_filtered = True
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     rows_html = ""
@@ -741,10 +851,25 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
             <td colspan="5"><pre>{detail}</pre></td>
         </tr>"""
     
-    err_c = sum(1 for res in results if res.get("severity")=="ERROR" and not res.get("passed"))
-    warn_c = sum(1 for res in results if res.get("severity")=="WARN" and not res.get("passed"))
-    pass_c = sum(1 for res in results if res.get("passed"))
-    skip_c = sum(1 for res in results if res.get("skipped"))
+    # 修复后数量：与 format_report 统一的算法，排除被标记为 ⓘ 的项
+    if _is_llm_filtered:
+        # LLM 二筛通过路径：results 已过滤为纯 PASS/SKIP
+        # 排除数从原始结果预先计算（_orig_excluded），显示已被 LLM 分类排除的项
+        pass_c = sum(1 for res in results if res.get("passed"))
+        excluded_c = _orig_excluded
+        err_c = 0
+        warn_c = 0
+        skip_c = sum(1 for res in results if res.get("skipped"))
+    else:
+        _a_fp_ids = set()
+        for ai, ares in enumerate(results):
+            if _reclassify_false_positive(ares):
+                _a_fp_ids.add(ai)
+        pass_c = sum(1 for ai, ares in enumerate(results) if ares.get("passed") and ai not in _a_fp_ids)
+        excluded_c = len(_a_fp_ids)
+        err_c = sum(1 for ai, ares in enumerate(results) if ares.get("severity")=="ERROR" and not ares.get("passed") and not ares.get("skipped") and ai not in _a_fp_ids)
+        warn_c = sum(1 for ai, ares in enumerate(results) if ares.get("severity")=="WARN" and not ares.get("passed") and not ares.get("skipped") and ai not in _a_fp_ids)
+        skip_c = sum(1 for res in results if res.get("skipped"))
     
     # 构建修复前后对比 HTML（仅在 before_summary 有数据时显示）
     compare_html = ""
@@ -768,6 +893,26 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
 {zero_badge}
 </div>
 </div>'''
+    
+    # 构建修复前表格（当 before_result 有数据时显示）
+    if before_result is not None:
+        b_total = len(b_results)
+        b_fp_ids = set()
+        for bi, bres in enumerate(b_results):
+            if _reclassify_false_positive(bres):
+                b_fp_ids.add(bi)
+        b_real_pass = sum(1 for bi, bres in enumerate(b_results) if bres.get("passed") and bi not in b_fp_ids)
+        b_excluded_c = len(b_fp_ids)
+        b_err_c = sum(1 for bres in b_results if bres.get("severity")=="ERROR" and not bres.get("passed") and not bres.get("skipped") and not _reclassify_false_positive(bres))
+        b_warn_c = sum(1 for bres in b_results if bres.get("severity")=="WARN" and not bres.get("passed") and not _reclassify_false_positive(bres))
+        before_table_html = f'''<div class="bh">📋 修复前 — {b_err_c} ERROR / {b_warn_c} WARN / {b_real_pass} PASS / ⓘ {b_excluded_c} 误报</div>
+<div class="fl" style="border-bottom:none;">
+<span style="color:#636e72;">共 {b_total} 项</span>
+</div>
+<table><thead><tr><th>规则</th><th>级别</th><th>状态</th><th>详情</th><th>修复</th></tr></thead>
+<tbody id="bb">{before_rows_html}</tbody></table>'''
+    else:
+        before_table_html = ""
     
     html = f'''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -800,6 +945,10 @@ td {{ padding:8px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; cursor:
 .pass-row td {{ color:#00b894; }}
 .fail-row td {{ color:#d63031; }}
 .skip-row td {{ color:#636e72; }}
+.excluded-row td {{ color:#636e72; font-style:italic; }}
+.excluded-row td:nth-child(3) {{ color:#0984e3; font-weight:600; }}
+.bh {{ background:#f0f0f0; padding:10px 32px; font-size:14px; font-weight:600; color:#2d3436; border-bottom:1px solid #e0e0e0; margin-top:16px; }}
+.bh:first-of-type {{ margin-top:0; }}
 .dr td {{ background:#f8f9fa; padding:0; }}
 .dr pre {{ margin:0; padding:12px 14px; font-size:12px; white-space:pre-wrap; word-break:break-all; max-height:200px; overflow-y:auto; background:#2d3436; color:#dfe6e9; border-radius:0 0 6px 6px; }}
 .sev-error {{ background:#ff7675; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }}
@@ -814,9 +963,12 @@ td {{ padding:8px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; cursor:
 <div class="scc cw"><h3>{warn_c}</h3><p>WARN</p></div>
 <div class="scc cp"><h3>{pass_c}</h3><p>PASS</p></div>
 <div class="scc ci"><h3>{skipped}</h3><p>SKIP</p></div>
+<div class="scc" style="background:#dfe6e9;color:#636e72;"><h3>{excluded_c}</h3><p>ⓘ 误报(排除)</p></div>
 </div>
 {compare_html}
 <div class="ch"><div class="cbx"><canvas id="pie"></canvas></div><div class="cbx"><canvas id="bar"></canvas></div></div>
+{before_table_html}
+<div class="bh">📋 修复后</div>
 <div class="fl">
 <select id="sf" onchange="af()"><option value="all">全部级别</option><option value="error">ERROR</option><option value="warn">WARN</option></select>
 <select id="tf" onchange="af()"><option value="all">全部状态</option><option value="fail">FAIL</option><option value="pass">PASS</option></select>
@@ -827,6 +979,7 @@ td {{ padding:8px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; cursor:
 <tbody id="rb">{rows_html}</tbody></table>
 <script>
 function toggleDetail(i){{var d=document.getElementById('d'+i);d.style.display=d.style.display==='none'?'table-row':'none';}}
+function toggleDetailB(i){{var d=document.getElementById('bd'+i);d.style.display=d.style.display==='none'?'table-row':'none';}}
 function af(){{var s=document.getElementById('sf').value,t=document.getElementById('tf').value,q=document.getElementById('sq').value.toLowerCase();document.querySelectorAll('#rb tr:not(.dr)').forEach(function(r){{var sm=s==='all'||r.dataset.severity===s,tm=t==='all'||(t==='fail'&&r.classList.contains('fail-row'))||(t==='pass'&&r.classList.contains('pass-row'));var tx=r.textContent.toLowerCase();r.style.display=(sm&&tm&&(!q||tx.includes(q)))?'':'none';}});}}
 new Chart(document.getElementById('pie'),{{type:'pie',data:{{labels:['ERROR','WARN','PASS','SKIP'],datasets:[{{data:[{err_c},{warn_c},{pass_c},{skip_c}],backgroundColor:['#ff7675','#fdcb6e','#55efc4','#74b9ff']}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{position:'bottom'}}}}}}}});
 new Chart(document.getElementById('bar'),{{type:'bar',data:{{labels:['ERROR','WARN','PASS','SKIP'],datasets:[{{data:[{err_c},{warn_c},{pass_c},{skip_c}],backgroundColor:['#ff7675','#fdcb6e','#55efc4','#74b9ff']}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{y:{{beginAtZero:true,ticks:{{stepSize:1}}}}}}}}}});
@@ -1008,8 +1161,8 @@ def cmd_audit(args):
     if getattr(args, 'classify', None) and not getattr(args, 'verify', False):
         ids = [s.strip() for s in args.classify.split(',')]
         verify_dir = os.path.join(
-            os.path.dirname(skill_dir), '.standardization',
-            os.path.basename(skill_dir), 'data')
+            os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+            os.path.basename(os.path.abspath(skill_dir)), 'data')
         fp_path = os.path.join(verify_dir, '.verify_fp.json')
         # 读取已有分类
         fp_ids = set()
@@ -1034,8 +1187,8 @@ def cmd_audit(args):
     if getattr(args, 'no_fp', None) and not getattr(args, 'verify', False):
         ids = [s.strip() for s in args.no_fp.split(',')]
         verify_dir = os.path.join(
-            os.path.dirname(skill_dir), '.standardization',
-            os.path.basename(skill_dir), 'data')
+            os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+            os.path.basename(os.path.abspath(skill_dir)), 'data')
         fp_path = os.path.join(verify_dir, '.verify_fp.json')
         fp_ids = set()
         if os.path.isfile(fp_path):
@@ -1207,7 +1360,7 @@ def cmd_audit(args):
             print(f"  修复项：{', '.join(fix_details)} ({fixes_applied} 处)")
             print(f"  修复前：{before_err} ERROR, {before_warn} WARN")
             if not args.json:
-                print(format_report(result))
+                print(format_report(result, before_summary={"errors": before_err, "warns": before_warn}))
             after_err = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'ERROR')
             after_warn = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'WARN')
             print(f"  修复后：{after_err} ERROR, {after_warn} WARN")
@@ -1285,8 +1438,8 @@ def cmd_audit(args):
             # 将 fix_map 写入标准化数据目录供 --show-fix 读取
             try:
                 fix_map_dir = os.path.join(
-                    os.path.dirname(skill_dir), '.standardization',
-                    os.path.basename(skill_dir), 'data')
+                    os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+                    os.path.basename(os.path.abspath(skill_dir)), 'data')
                 os.makedirs(fix_map_dir, exist_ok=True)
                 fix_map_path = os.path.join(fix_map_dir, '.verify_fix_map.json')
                 with open(fix_map_path, 'w', encoding='utf-8') as f:
@@ -1434,6 +1587,7 @@ def cmd_fix(args):
 
 def _load_fp_ids(skill_dir):
     """读取 LLM 分类的误判 #ID 列表"""
+    skill_dir = os.path.abspath(skill_dir)
     fp_path = os.path.join(
         os.path.dirname(skill_dir), '.standardization',
         os.path.basename(skill_dir), 'data', '.verify_fp.json')
@@ -1543,6 +1697,14 @@ def cmd_bump(args):
     print(f"  _meta.json:     ✅ version={new_version}")
     print(f"  changelog.md:   ✅ 已插入 v{new_version} 条目")
     print(f"{'='*55}")
+    # bump 成功后输出 HTML 报告
+    try:
+        _r = audit_skill(skill_dir)
+        # Filter by LLM classification for the HTML report
+        _filtered = _filter_false_positives(_r, skill_dir)
+        _save_html_report(skill_dir, _r)
+    except Exception:
+        pass
 
 
 def _semantic_precheck(command, skill_dir=None, confirmed=False):
@@ -1640,7 +1802,10 @@ def cmd_refactor(args):
             _dirs[:] = [d for d in _dirs if d not in ('__pycache__', '.git', '.standardization')]
             for _f in _files:
                 _fp = os.path.join(_root, _f)
-                _zf.write(_fp, os.path.relpath(_fp, skill_dir))
+                try:
+                    _zf.write(_fp, os.path.relpath(_fp, skill_dir))
+                except (ValueError, OSError):
+                    continue  # 跳过特殊文件（Windows 保留名等）
     print(f"  ✅ 备份到 {zip_path}.zip")
 
     # 注册备份路径到 cleanup session
@@ -1656,6 +1821,8 @@ def cmd_refactor(args):
     print(f"  [3/8] 全量审计")
     print(f"{'─'*55}")
     result = audit_skill(skill_dir, manifest_version=args.manifest_version)
+    s_before = result.get("summary", {})  # 记录初始审计摘要，供最终对比
+    result_before = result  # 保存初始结果，供最终 HTML 显示 before 表
     print(format_report(result))
     remaining = [r for r in result.get("results", [])
                  if not r.get("passed") and not r.get("skipped")]
@@ -1669,26 +1836,49 @@ def cmd_refactor(args):
         manifest_version=args.manifest_version,
         fixed_rules=getattr(args, 'fixed_rules', None))
 
-    # ── 步骤 5：全量审计确认（双 0 验证） ──
+    # ── 步骤 5：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
+    if remaining:
+        print(f"\n{'-'*55}")
+        print(f"  [5/8] LLM 剩余项检查")
+        print(f"{'-'*55}")
+        llm_items = [r for r in remaining
+                     if r.get('rule_id', r.get('rule', '')) in ('R-23', 'R-25')]
+        if llm_items:
+            _save_remaining_llm(skill_dir, llm_items)
+            print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
+            for r in llm_items:
+                sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
+                rid = r.get('rule_id', r.get('rule', '?'))
+                print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
+            print(f"\n  请读取 .remaining_llm.json 并根据指引编辑 SKILL.md")
+            print(f"  修复后重新运行: --fixed-rules R-23,R-25 --confirmed")
+        else:
+            print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复修复")
+            print(f"  请检查修复循环是否达到上限（20 轮），或手动排查")
+        sys.exit(2)
+
+    # ── 步骤 6：全量审计确认（双 0 验证） ──
     print(f"\n{'─'*55}")
-    print(f"  [5/8] 全量审计确认（双 0 验证）")
+    print(f"  [6/8] 全量审计确认（双 0 验证）")
     print(f"{'─'*55}")
     result = audit_skill(skill_dir)
-    print(format_report(result))
+    _before = {"errors": s_before.get("errors", 0), "warns": s_before.get("warns", 0)}
+    print(format_report(result, before_summary=_before))
     remaining = _filter_false_positives(result, skill_dir)
     if remaining:
-        print(f"  💡 处理完后重新运行 refactor")
+        print(f"\n  ⛔ 全量审计确认失败：仍有 {len(remaining)} 项 FAIL")
         for r in remaining:
             sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
             rid = r.get('rule_id', r.get('rule', '?'))
             print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
+        _save_html_report(skill_dir, result)
         sys.exit(1)
     else:
         print(f"  ✅ 双 0 确认通过")
 
-    # ── 步骤 6：全量一致性审查 + 修复循环 ──
+    # ── 步骤 7：全量一致性审查 + 修复循环 ──
     print(f"\n{'─'*55}")
-    print(f"  [6/8] 全量一致性审查 + 修复循环")
+    print(f"  [7/8] 全量一致性审查 + 修复循环")
     print(f"{'─'*55}")
     try:
         from .consistency_checker import (
@@ -1782,6 +1972,7 @@ def cmd_refactor(args):
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")
                 print(f"  请检查后重新运行 refactor --continue")
+                _save_html_report(skill_dir, result)
                 sys.exit(1)
         else:
             print(f"  ✅ 一致性审查通过，无问题")
@@ -1812,6 +2003,11 @@ def cmd_refactor(args):
     print(f"  ✅ bump: {bump_type} upgrade")
     print(f"  📋 技能: {os.path.basename(skill_dir)}")
     print(f"  📋 状态: 已完成全流程改造")
+    # 输出 HTML 报告（含 before/after 双表）
+    try:
+        _save_html_report(skill_dir, result, before_result=result_before)
+    except Exception:
+        pass
 
     # ── 步骤 9：清理（cleanup session 驱动） ──
     print(f"\n{'─'*55}")
@@ -2038,7 +2234,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             rid_inner = r_inner.get('rule_id', r_inner.get('rule', '?'))
             print(f"    {rid_inner} {sev} {r_inner.get('detail', '')[:120]}")
             # 为 R-25 注入 fix key（让 --fix 可识别所有已注册子项）
-            # 不管结果是否已有 fix key，都根据 detail 内容注入
             if rid_inner == "R-25":
                 detail_inner = r_inner.get("detail", "")
                 if "C-10" in detail_inner and not r_inner.get("fix"):
@@ -2169,7 +2364,23 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         print(f"  例如: --fixed-rules R-23,R-26")
         print(f"  不声明 → 流程将继续使用全量审计确认（但效率较低）")
         print(f"  声明后 → 代码自动跑针对性审计确认")
-        print(f"  ⚠️  剩余 {len(remaining)} 项必须在当前循环中解决！不解决不会进入下一轮！")
+        # ── 判断：是否只剩 LLM 手动修复项 ──
+        # 清除循环内注入的 fix key，查看真实的可自动修复项
+        for r in remaining:
+            if r.get("rule_id", r.get("rule", "")) in ("R-23", "R-25"):
+                r.pop("fix", None)
+        auto_fixable = [r for r in remaining if r.get("fix")]
+        if not auto_fixable:
+            print(f"\n  ✅ 所有可自动修复项已处理，剩余 {len(remaining)} 项需 LLM 手动修复")
+            for r in remaining:
+                rid = r.get("rule_id", r.get("rule", "?"))
+                sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
+                detail = r.get("detail", "")[:150]
+                print(f"    {rid} {sev} {detail}")
+            print(f"  修复后通过 --fixed-rules 声明")
+            _save_html_report(skill_dir, result)
+            break
+        print(f"  ⚠️  剩余 {len(remaining)} 项（{len(auto_fixable)} 项可自动修复，{len(remaining)-len(auto_fixable)} 项需手动）")
         print()
 
         if fixed_rules:
@@ -2186,6 +2397,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
 
     if loop_count >= max_loops:
         print(f"\n  ⛔ 修复循环已达上限 {max_loops} 次，强制退出")
+        _save_html_report(skill_dir, result)
         sys.exit(1)
 
     return result, remaining, loop_count
@@ -2242,13 +2454,36 @@ def cmd_update(args):
         manifest_version=args.manifest_version,
         filter_files=changed_files,
         fixed_rules=getattr(args, 'fixed_rules', None))
+    s_before_update = result.get("summary", {})
 
-    # ── 步骤 4：全量审计确认（双 0 验证） ──
+    # ── 步骤 4：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
+    if remaining:
+        print(f"\n{'-'*55}")
+        print(f"  [4/7] LLM 剩余项检查")
+        print(f"{'-'*55}")
+        llm_items = [r for r in remaining
+                     if r.get('rule_id', r.get('rule', '')) in ('R-23', 'R-25')]
+        if llm_items:
+            _save_remaining_llm(skill_dir, llm_items)
+            print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
+            for r in llm_items:
+                sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
+                rid = r.get('rule_id', r.get('rule', '?'))
+                print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
+            print(f"\n  请读取 .remaining_llm.json 并根据指引编辑 SKILL.md")
+            print(f"  修复后重新运行: --fixed-rules R-23,R-25 --confirmed")
+        else:
+            print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复")
+            print(f"  请检查修复循环是否达到上限（10 轮），或手动排查")
+        sys.exit(2)
+
+    # ── 步骤 5：全量审计确认（双 0 验证） ──
     print(f"\n{'─'*55}")
-    print(f"  [4/7] 全量审计确认（双 0 验证）")
+    print(f"  [5/7] 全量审计确认（双 0 验证）")
     print(f"{'─'*55}")
     result = audit_skill(skill_dir)
-    print(format_report(result))
+    _before = {"errors": s_before_update.get("errors", 0), "warns": s_before_update.get("warns", 0)}
+    print(format_report(result, before_summary=_before))
     remaining = _filter_false_positives(result, skill_dir)
     if remaining:
         print(f"\n  ⛔ 全量审计确认失败：仍有 {len(remaining)} 项 FAIL")
@@ -2256,11 +2491,12 @@ def cmd_update(args):
             sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
             rid = r.get('rule_id', r.get('rule', '?'))
             print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
+        _save_html_report(skill_dir, result)
         sys.exit(1)
     else:
         print(f"  ✅ 双 0 确认通过")
 
-    # ── 步骤 6：针对性一致性审查 + 修复循环 ──
+    # ── 步骤 6：针对性一致性审查 + 修复循环 ──    # ── 步骤 6：针对性一致性审查 + 修复循环 ──
     print(f"\n{'─'*55}")
     print(f"  [6/7] {'针对性' if changed_files else '全量'}一致性审查 + 修复循环")
     print(f"{'─'*55}")
@@ -2352,6 +2588,7 @@ def cmd_update(args):
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")
                 print(f"  请检查后重新运行 update --continue")
+                _save_html_report(skill_dir, result)
                 sys.exit(1)
         else:
             print(f"  ✅ 一致性审查通过，无问题")

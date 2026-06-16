@@ -33,9 +33,14 @@ def _read_file(filepath):
 
 
 def _write_file(filepath, content):
-    """写入文件内容（UTF-8），使用 safe_io 原子写入 + 自动备份"""
-    from ..safe_io import safe_write
-    safe_write(filepath, content, backup=True)
+    """写入文件内容（UTF-8），优先使用 safe_io 原子写入，fallback 到内置 open"""
+    try:
+        from ..safe_io import safe_write
+        safe_write(filepath, content, backup=True)
+    except (ImportError, ValueError):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(content)
 
 
 def _update_frontmatter_field(filepath, field_name, field_value):
@@ -748,14 +753,19 @@ def fix_critical_write(skill_dir, **kw):
 def fix_create_permissions_md(skill_dir, **kw):
     """
     R-15 修复：创建/更新 references/permissions.md。
-    根据 PermissionChecker 扫描结果自动填充风险等级和操作说明，
-    不再留空占位符。
+    根据 PermissionChecker 扫描结果自动生成结构化的权限说明，
+    按权限类别分组，每组含文件/行号/匹配内容/功能解释的详细表格。
     """
     refs_dir = os.path.join(skill_dir, "references")
     os.makedirs(refs_dir, exist_ok=True)
     permissions_md = os.path.join(refs_dir, "permissions.md")
 
     # 调用 PermissionChecker 获取实际扫描结果
+    # 强制重新导入（避免 audit 流程中已加载的缓存模块使用错误路径）
+    import importlib, sys
+    for _mod_name in list(sys.modules.keys()):
+        if 'permission_checker' in _mod_name:
+            importlib.reload(sys.modules[_mod_name])
     from permission_checker import PermissionChecker
     try:
         checker = PermissionChecker(skill_dir)
@@ -763,73 +773,141 @@ def fix_create_permissions_md(skill_dir, **kw):
         risk_level = report.get("risk_level", "low").upper()
         stats = report.get("stats", {})
         issues = report.get("issues", [])
-    except Exception:
+    except Exception as e:
+        print(f"  [R-15] ⚠️ PermissionChecker 调用失败: {e}")
         risk_level = "LOW"
         stats = {}
         issues = []
 
-    # 根据扫描结果生成风险等级描述
-    has_sensitive = stats.get("sensitive_access", 0) > 0
-    has_critical_write = stats.get("critical_write", 0) > 0
-    has_network = stats.get("network_access", 0) > 0
-    has_delete = stats.get("file_delete", 0) > 0
-    has_subprocess = stats.get("subprocess_call", 0) > 0
+    n_sensi = stats.get("sensitive_access", 0)
+    n_write = stats.get("critical_write", 0)
+    n_net = stats.get("network_access", 0)
+    n_del = stats.get("file_delete", 0)
+    n_sub = stats.get("subprocess_call", 0)
+    all_stats = [
+        ("subprocess_call",    "子进程调用（subprocess）",  n_sub),
+        ("file_delete",        "文件删除",                  n_del),
+        ("network_access",     "网络访问",                   n_net),
+        ("sensitive_access",   "敏感信息访问",                n_sensi),
+        ("critical_write",     "关键位置写入",                n_write),
+    ]
 
-    risk_desc = f"**{risk_level}**（声明：{risk_level}，实际风险：{risk_level}）\n\n"
+    # ── 风险等级描述 ──
+    risk_desc = f"**{risk_level}**（实际权重: {report.get('permission_weight', '?')}）\n\n"
 
-    # 生成高权限操作说明
-    high_perm_parts = []
-    for iss in issues:
-        itype = iss.get("type", "")
-        fname = iss.get("file", "")
-        lineno = iss.get("lineno", 0)
-        desc = iss.get("name", "")
-        label_map = {
-            "sensitive_access": "敏感信息访问",
-            "critical_write": "系统关键位置写入",
-            "network_access": "网络访问",
-            "file_delete": "文件删除操作",
-            "subprocess_call": "子进程调用",
-        }
-        label = label_map.get(itype, itype)
-        high_perm_parts.append(f"- **{label}**：`{fname}:{lineno}` {desc}")
-    if not high_perm_parts:
-        high_perm_parts.append("- 无。所有文件操作均限制在技能独立数据目录内，不涉及系统关键目录、网络监听或外部请求。")
+    # ── 权限总览表（按类型汇总） ──
+    overview_rows = []
+    for tkey, tlabel, tcount in all_stats:
+        if tcount > 0:
+            overview_rows.append(f"| `{tkey}` | {tcount} 项 | 🔴 HIGH |")
+        else:
+            overview_rows.append(f"| `{tkey}` | 0 项 | ✅ LOW |")
+    overview_section = "\n".join(overview_rows)
 
-    high_perm_section = "\n".join(high_perm_parts)
+    # ── 高权限操作说明（按类型分组） ──
+    if not issues:
+        high_perm_section = "- 无。所有文件操作均限制在技能独立数据目录内，不涉及系统关键目录、网络监听或外部请求。"
+    else:
+        parts = []
+        for _tkey, _tlabel, _tcount in all_stats:
+            if _tcount > 0:
+                type_issues = [iss for iss in issues if iss.get("type") == _tkey]
+                auth_methods = set(iss.get("authorization_method", "unified") for iss in type_issues)
+                auth_str = " / ".join(auth_methods) if auth_methods else "unified"
+                parts.append(
+                    f"- **{_tlabel}**（{_tcount} 项，{auth_str}）\n"
+                )
+        high_perm_section = "\n".join(parts)
 
     header = "# 基于skill-standardization渐进式披露规范的权限说明\n\n"
     header += "本文档由 `skill-standardization` 权限扫描器自动维护。\n\n"
     header += "## 风险等级\n\n"
     header += risk_desc
+    header += "## 权限总览\n\n"
+    header += "| 权限类别 | 涉及项数 | 风险等级 |\n"
+    header += "|-----------|----------|----------|\n"
+    header += overview_section + "\n\n"
     header += "## 高权限操作说明\n\n"
     header += high_perm_section + "\n"
 
-    # 完整权限文档内容（新建时使用）
+    # ── 权限详细说明（按类型逐个生成表格） ──
+    detail_sections = []
+    type_name_map = {
+        "subprocess_call":    "子进程调用",
+        "file_delete":        "文件删除",
+        "network_access":     "网络访问",
+        "sensitive_access":   "敏感信息访问",
+        "critical_write":     "关键位置写入",
+    }
+    type_desc_map = {
+        "subprocess_call":    "技能需要通过 subprocess/操作系统调用来执行外部命令或脚本。",
+        "file_delete":        "技能在执行过程中需要删除临时文件或清理旧版产物。",
+        "network_access":     "技能需要通过网络连接到外部服务或远程仓库。",
+        "sensitive_access":   "技能代码中检测到敏感关键词（token/password等）。",
+        "critical_write":     "技能可能向系统关键目录或技能安装目录写入文件。",
+    }
+
+    # 将 issues 按 type 分组
+    from collections import defaultdict
+    by_type = defaultdict(list)
+    for iss in issues:
+        by_type[iss.get("type", "unknown")].append(iss)
+
+    for _tkey, _tlabel, _tcount in all_stats:
+        if _tcount == 0:
+            # 无此类别 → 简单说明
+            detail_sections.append(
+                f"### {_tlabel}\n\n"
+                f"**无**。\n\n"
+            )
+            continue
+        type_issues = by_type.get(_tkey, [])
+        auth_set = set()
+        file_buckets = defaultdict(list)
+        for iss in type_issues:
+            auth_set.add(iss.get("authorization_method", "unified"))
+            fname = iss.get("file", "?")
+            file_buckets[fname].append(iss)
+        auth_str = "、".join(sorted(auth_set))
+        desc = type_desc_map.get(_tkey, "")
+
+        sec = f"### {_tlabel}（{_tcount} 项）\n\n"
+        sec += f"> **功能说明**：{desc}\n> **授权方式**：{auth_str}\n\n"
+
+        # 按文件分组生成子表格
+        # 先计算所有文件的表行
+        all_rows = []
+        for fname in sorted(file_buckets.keys()):
+            fissues = file_buckets[fname]
+            for f_iss in fissues:
+                lineno = f_iss.get("line", f_iss.get("lineno", 0))
+                match = f_iss.get("match", "")
+                itype = f_iss.get("type", "")
+                explain = f_iss.get("reason", "")
+                # 补充功能说明
+                if not explain:
+                    explain = f_iss.get("description", "")
+                all_rows.append((fname, lineno, match, explain))
+        if all_rows:
+            sec += "| 文件 | 行号 | 匹配内容 | 功能说明 |\n"
+            sec += "|------|------|----------|----------|\n"
+            for _f, _ln, _m, _e in all_rows:
+                # 转义 table 中的 | 符号
+                _f = _f.replace("|", "\\|")
+                _m = _m.replace("|", "\\|") if _m else "—"
+                _e = _e.replace("|", "\\|") if _e else "—"
+                sec += f"| `{_f}` | {_ln} | `{_m}` | {_e} |\n"
+        sec += "\n"
+        detail_sections.append(sec)
+
+    # ── 完整文档 ──
     full_content = header + "\n"
-    full_content += "## 权限总览\n\n"
-    full_content += "| 工具 | 访问级别 | 风险等级 | 授权方式 | 说明 |\n"
-    full_content += "|------|----------|----------|----------|------|\n"
-    full_content += "| Read | read-only | 低 | 静默 | 读取输入文件和配置 |\n"
-    full_content += "| Write | write | 中 | 即时 | 写入输出结果到 `data/output/` |\n"
-    full_content += "| Bash | restricted | 中 | 统一 | 运行 `scripts/` 目录下的内部脚本 |\n\n"
     full_content += "## 权限详细说明\n\n"
-    full_content += "### Read（读取）\n\n"
-    full_content += "- **用途**：读取用户输入文件、配置文件、参考数据\n"
-    full_content += "- **范围限制**：仅读取技能安装目录和指定输入文件，不访问系统敏感路径\n"
-    full_content += "- **不会读取**：系统敏感路径或凭证文件\n\n"
-    full_content += "### Write（写入）\n\n"
-    full_content += "- **用途**：将处理结果写入 `data/output/` 目录\n"
-    full_content += "- **范围限制**：仅写入技能安装目录下的 `data/output/` 子目录\n"
-    full_content += "- **不会写入**：系统目录或其他技能目录\n\n"
-    full_content += "### Bash（子进程调用）\n\n"
-    full_content += "- **用途**：运行 `scripts/` 目录下的内部脚本\n"
-    full_content += "- **范围限制**：仅运行技能安装目录下的脚本\n"
-    full_content += "- **不会执行**：用户输入的命令或路径\n\n"
-    full_content += "## 授权方式说明\n\n"
-    full_content += "- **即时授权**：每次执行前需获得用户批准\n"
-    full_content += "- **统一授权**：首次执行前获得用户批准，后续不再询问\n"
-    full_content += "- **静默授权**：无需用户交互，自动执行并记录\n"
+    full_content += "\n".join(detail_sections)
+    full_content += "\n## 授权方式说明\n\n"
+    full_content += "- **immediate（即时授权）**：每次执行前需获得用户批准\n"
+    full_content += "- **unified（统一授权）**：首次执行前获得用户批准，后续不再询问\n"
+    full_content += "- **silent（静默授权）**：无需用户交互，自动执行并记录\n"
 
     # 生成权限指纹（用于检测权限是否变化）
     permission_fp = f"risk={risk_level}|sensitive={stats.get('sensitive_access',0)}|critical_write={stats.get('critical_write',0)}|network={stats.get('network_access',0)}|delete={stats.get('file_delete',0)}|subprocess={stats.get('subprocess_call',0)}|issues={len(issues)}"
@@ -1974,8 +2052,8 @@ def fix_excessive_blank_lines(skill_dir, **kw):
             fixed.append(line)
     new_content = "\n".join(fixed)
     if new_content != content:
-        import shutil, os
-        # 备份到 .bak 会被 R-11 报违规，改用 data 目录
+        import shutil
+        # 备份到 data 目录避免 R-11 报违规
         _bak_dir = _struct_dir(skill_dir)
         os.makedirs(_bak_dir, exist_ok=True)
         try:
@@ -2010,14 +2088,24 @@ def fix_inline_refs(skill_dir, **kw):
         '> → 详见核心能力的渐进式文件索引',
         content
     )
-    # 替换正文中独立的 `references/xxx.md`引用（非索引表内）
-    new_content = re.sub(
-        r'`references/[^`]+`',
-        '渐进式文件索引表',
-        new_content
-    )
+    # 替换正文中独立的 `references/xxx.md`引用（非索引表内，非表格行，非渐进式加载模板）
+    # 逐行处理：跳过特殊行
+    import re
+    lines = new_content.split("\n")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("|") and "`references/" in stripped:
+            continue  # 跳过表格行（索引表文件名列）
+        if "渐进式加载" in stripped and "`references/" in stripped:
+            continue  # 跳过渐进式加载模板句（references/*.md 是模板的一部分）
+        lines[i] = re.sub(
+            r'`references/[^`]+`',
+            '渐进式文件索引表',
+            line
+        )
+    new_content = "\n".join(lines)
     if new_content != content:
-        import shutil, os
+        import shutil
         _bak_dir = _struct_dir(skill_dir)
         os.makedirs(_bak_dir, exist_ok=True)
         try:
@@ -2135,7 +2223,7 @@ def fix_table_format(skill_dir, **kw):
         return '| ' + ' | '.join(fixed) + ' |'
     new = re.sub(r'\|[ :-]+\|', _fs, content)
     if new != content:
-        import shutil, os
+        import shutil
         _bak_dir = _struct_dir(skill_dir)
         os.makedirs(_bak_dir, exist_ok=True)
         try:

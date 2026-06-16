@@ -52,7 +52,7 @@ def _load_patterns():
     import json as _json, base64 as _b64
     from pathlib import Path as _Path
     
-    patterns_file = _Path(__file__).parent.parent / "references" / "scan_patterns.json"
+    patterns_file = _Path(__file__).resolve().parent.parent / "references" / "scan_patterns.json"
     if patterns_file.is_file():
         with open(patterns_file, "r", encoding="utf-8") as _f:
             _raw = _json.load(_f)

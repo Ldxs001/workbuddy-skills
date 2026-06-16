@@ -375,8 +375,8 @@ python -m scripts.skill_audit audit <skill-dir> --confirmed
 
 | 原因 | 解决 |
 |------|------|
-| 网络代理未配置 | 设置 git 代理：`git config --global http.proxy http://127.0.0.1:7890` |
-| DNS 污染 | 使用 `ssh` 协议替代 `https`，或修改 hosts 文件 |
+| 网络代理未配置 | 配置 git 代理：`git config --global http.proxy http://127.0.0.1:7890` |
+| DNS 污染 | 使用 `ssh` 协议替代 `https`，或更新 hosts 文件 |
 | 防火墙限制 | 尝试切换到 SSH 方式推送，或使用 Gitee 镜像仓库 |
 
 ### Q28: "规则 R-XX 执行异常"是什么？
@@ -397,8 +397,13 @@ traceback 行数多不要慌，关注最后几行（`File "...", line XX`）即�
 
 如果循环反复失败：
 1. 检查是否在修**不可自动修复的规则**（R-23/R-25 需要 LLM 手动编辑，`--fix` 修不了）
-2. 运行 `audit <skill-dir> --show-fix ID` 获取每条 FAIL 的具体修复指引
-3. 修完后通过 `--fixed-rules R-23,R-25` 声明，代码会自动确认
+2. 脚本检测到剩余 R-23/R-25 项时，会以 `exit(2)` 退出并保存 `.remaining_llm.json`
+3. **LLM 闭环修复流程**：
+   - 读取 `.remaining_llm.json`（位于 `.standardization/skill-function-test/data/<skill>/`）
+   - 逐条编辑 SKILL.md（R-23: 文档一致性 / R-25: 写作规范）
+   - 重新运行: `python -m scripts.skill_audit refactor <skill-dir> --fixed-rules R-23,R-25 --confirmed`
+   - 针对性审计确认后自动继续到全量审计 → 双0 通过
+4. 备用：也可以运行 `audit <skill-dir> --show-fix ID` 获取每条 FAIL 的具体修复指引
 
 ### Q30: Windows 上文件写入报 "Permission denied"
 
