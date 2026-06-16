@@ -20,16 +20,6 @@ from pathlib import Path
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
-
-
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/skill-sub/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-DATA_DIR = SKILL_DIR.parent / ".standardization" / "skill-sub" / "data"
 
 
 # ============================================================
@@ -252,7 +242,306 @@ def extract_cli_usage(content):
                 cli_info.append(line)
 
     return cli_info[:20]  # 限制数量
-    return cli_info[:20]  # 限制数量
+
+# ============================================================
+# v1.29.0: 步骤语义提取（Step Semantics）
+# ============================================================
+
+# I/O 语义线索正则（consumes / produces）
+_CONSUMES_PATTERNS = [
+    r'(?:读取|读入|加载|导入|接收|接受|输入|给定|传入|以)\s*([^\n，。；,.;]{2,40})',
+    r'(?:分析|审查|扫描|检测|检查|校验|验证)\s*(?:的)?\s*([^\n，。；,.;]{2,50})',
+    r'对\s*([^\n，。；\s]{2,30})\s*(?:进行|执行|做|实施)',
+    r'(?:需要|需|依赖|前置|前提|先)\s*(?:有|一个|的)?\s*([^\n，。；,.;]{2,40})',
+    r'(?:路径|文件|目录|参数|配置|数据)\s*[：:]\s*([^\n，。；,.;]{2,50})',
+    # v1.29.1: 更多常用模式
+    r'(?:获取|取得|拉取|搜集|抓取|爬取)\s*([^\n，。；,.;]{2,40})',
+    r'(?:处理|转换|解析|编译|渲染|构建|生成)\s*(?:的)?\s*([^\n，。；\s]{2,30})',
+]
+
+_PRODUCES_PATTERNS = [
+    r'(?:生成|输出|创建|产生|导出|保存|写入|返回)\s*([^\n，。；,.;]{2,50})',
+    r'(?:产生|得到|得出|计算出)\s*([^\n，。；,.;]{2,50})',
+    r'(?:结果|报告|输出|产物|产出)\s*[：:]\s*([^\n，。；,.;]{2,50})',
+    r'(?:保存|写入)\s*(?:到|至|为)\s*([^\n，。；,.;]{2,50})',
+    r'(?:返回|输出)\s*(?:一个|一份|一条)?\s*([^\n，。；,.;]{2,40})',
+    r'格式\s*[：:]\s*([^\n，。；,.;]{2,30})',
+    # v1.29.1: 更多常用模式
+    r'(?:提供|发布|部署|推送|上传)\s*([^\n，。；,.;]{2,40})',
+    r'(?:更新|修改|编辑|改写|重构)\s*([^\n，。；,.;]{2,40})',
+]
+
+_USAGE_HINT_PATTERNS = [
+    r'(?:使用方式|用法|使用说明|注意|提示)[：:]\s*([^\n。]{10,200})',
+    r'(?:需|需要|注意|请)\s*([^\n。]{5,100})',
+]
+
+
+def _deduplicate_clues(clues, max_count=5):
+    """对语义线索去重，按长度降序保留最长的"""
+    seen = set()
+    result = []
+    for item in sorted(clues, key=len, reverse=True):
+        key = item.lower().strip()
+        if key not in seen and len(key) > 2:
+            seen.add(key)
+            result.append(item.strip())
+            if len(result) >= max_count:
+                break
+    return result
+
+
+# v1.29.1: 步骤名 → I/O 推断映射表（当正则提取为空时的 fallback）
+_STEP_NAME_IO_INFERENCE = [
+    # (关键词, consumes_desc, produces_desc)
+    # 审计/检查类
+    (["审计", "audit"], "目标目录、文件", "审计报告、风险标记"),
+    (["审查", "审", "review", "check"], "代码、文件、内容", "审查结果、问题列表"),
+    (["扫描", "scan"], "目标目录、文件", "扫描报告"),
+    (["检测", "检测"], "输入数据", "检测结果"),
+    (["验证", "校验", "validate"], "待验证内容", "验证报告"),
+    # 生成/创建类
+    (["生成", "生成", "generate"], "输入参数、配置", "生成结果文件"),
+    (["创建", "create", "new"], "输入参数", "创建产物"),
+    (["输出", "输出", "export"], "源数据", "输出文件"),
+    (["报告", "report"], "分析数据", "报告文件"),
+    # 处理/分析类
+    (["分析", "analyze"], "源数据", "分析结果"),
+    (["处理", "process"], "输入数据", "处理结果"),
+    (["计算", "calc", "统计"], "输入数据", "计算结果"),
+    (["转换", "convert"], "源数据", "转换后数据"),
+    # 发布/部署类
+    (["发布", "publish", "release"], "待发布内容", "已发布产物"),
+    (["部署", "deploy"], "已构建产物", "运行环境"),
+    (["推送", "push", "sync"], "本地更改", "远程已同步"),
+    # 文件/IO类
+    (["读取", "read", "加载", "load"], "源文件", "内存数据、对象"),
+    (["保存", "save", "写入", "write"], "内存数据", "文件"),
+    (["打包", "pack", "zip"], "源目录", "压缩包"),
+    # 帮助/信息类
+    (["帮助", "help"], "无", "帮助信息"),
+    (["配置", "config", "设置"], "用户输入", "配置文件"),
+    (["搜索", "search", "查询", "query"], "搜索关键词", "搜索结果列表"),
+]
+
+
+def _fallback_io_from_step_name(step_name, step_description=""):
+    """当正则提取 I/O 为空时，从步骤名推断
+
+    先用关键词映射表匹配，匹配不到则从步骤名/描述自身推导。
+    """
+    text = (step_name + " " + step_description).lower()
+    consumes = []
+    produces = []
+
+    for keywords, c_desc, p_desc in _STEP_NAME_IO_INFERENCE:
+        for kw in keywords:
+            if kw.lower() in text:
+                consumes.append(c_desc)
+                produces.append(p_desc)
+                return consumes, produces
+
+    # 完全无匹配：从步骤名自身推导
+    if step_name:
+        # 假设步骤名本身就是做的事情，产出应该是"结果"
+        produces.append(f"{step_name} 结果")
+        # 如果步骤名含有"根据X""对X""以X"等，尝试拆出输入
+        import re
+        m = re.search(r'(?:根据|对|以|基于|从)\s*([^\s，。；]{2,20})', step_name)
+        if m:
+            consumes.append(m.group(1))
+        else:
+            consumes.append(f"{step_name} 所需输入")
+
+    return consumes, produces
+
+
+def extract_step_semantics(skill_dir):
+    """提取技能步骤的语义信息（I/O 线索、调用地址）
+
+    从 SKILL.md 解析每步的结构化语义信息，返回步骤蓝图列表。
+    每个蓝图包含：step_name, description, call_address, usage_hint, interface(consumes/produces)
+
+    核心策略：从现有 extract 结果中做二次语义提取，
+    不需要技能作者额外声明。
+    """
+    skill_path = Path(skill_dir)
+    md_file = skill_path / "SKILL.md"
+    if not md_file.exists():
+        return []
+
+    content = read_skill_md(skill_path)
+    if not content:
+        return []
+
+    # 先获取基础提取信息
+    skill_name = skill_path.name
+    frontmatter = extract_frontmatter(content)
+    description = extract_description(content)
+    commands = extract_core_commands(content)
+    steps = extract_key_steps(content)
+    cli_usage = extract_cli_usage(content)
+
+    # 读取 _meta.json
+    meta = {}
+    meta_file = skill_path / "_meta.json"
+    if meta_file.exists():
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+
+    blueprint_steps = []
+
+    # ---- 从 ### 指令提取步骤蓝图 ----
+    seen_step_names = set()
+    for cmd in commands:
+        step_name = cmd.get("name", "")
+        if not step_name or step_name in seen_step_names:
+            continue
+        seen_step_names.add(step_name)
+
+        # 找到该指令在 SKILL.md 中对应的文本区域
+        section_text = _find_section_text(content, f"### {step_name}")
+
+        # 提取 I/O 线索
+        search_text = section_text or step_name
+        consumes = _extract_io_clues(search_text, _CONSUMES_PATTERNS)
+        produces = _extract_io_clues(search_text, _PRODUCES_PATTERNS)
+
+        # v1.29.1: 正则未提取到时，用 fallback 从步骤名推断
+        if not consumes and not produces:
+            consumes, produces = _fallback_io_from_step_name(step_name, section_text or "")
+
+        # 提取使用提示
+        usage_hint = _extract_usage_hint(section_text or "")
+
+        # 构建调用地址
+        call_address = _build_call_address(cmd, cli_usage, skill_name)
+
+        blueprint = {
+            "step_id": f"{skill_name}.{step_name.replace(' ', '-')[:30]}",
+            "step_name": step_name,
+            "skill_name": skill_name,
+            "section": f"### {step_name}",
+            "description": section_text[:200].strip() if section_text else step_name,
+            "call_address": call_address,
+            "usage_hint": usage_hint,
+            "interface": {
+                "consumes": [_clue_to_io_item(c) for c in consumes],
+                "produces": [_clue_to_io_item(p) for p in produces],
+            }
+        }
+        blueprint_steps.append(blueprint)
+
+    # ---- 从编号步骤提取补充蓝图 ----
+    for step in steps:
+        step_desc = step.get("description", "")
+        step_index = step.get("index", 0)
+        step_name = f"步骤{step_index}"
+        full_name = f"{step_name}: {step_desc[:40]}"
+        if full_name in seen_step_names:
+            continue
+        seen_step_names.add(full_name)
+
+        consumes = _extract_io_clues(step_desc, _CONSUMES_PATTERNS)
+        produces = _extract_io_clues(step_desc, _PRODUCES_PATTERNS)
+
+        # v1.29.1: fallback
+        if not consumes and not produces:
+            consumes, produces = _fallback_io_from_step_name(step_desc, "")
+
+        # 编号步骤没有 call_address，标记为手动
+        blueprint = {
+            "step_id": f"{skill_name}.step-{step_index}",
+            "step_name": full_name,
+            "skill_name": skill_name,
+            "section": f"步骤{step_index}",
+            "description": step_desc[:200],
+            "call_address": {"instructions": [], "cli": ""},
+            "usage_hint": "",
+            "interface": {
+                "consumes": [_clue_to_io_item(c) for c in consumes],
+                "produces": [_clue_to_io_item(p) for p in produces],
+            },
+            "_fallback": True,
+        }
+        blueprint_steps.append(blueprint)
+
+    return blueprint_steps
+
+
+def _find_section_text(content, heading):
+    """找到 ### 标题后的文本区域（直到下一个 ### 或文件结束）"""
+    if not heading:
+        return ""
+    pattern = re.escape(heading) + r'\s*\n(.*?)(?=\n###|\Z)'
+    match = re.search(pattern, content, re.DOTALL)
+    if match:
+        text = match.group(1).strip()
+        # 去掉代码块
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        return text.strip()
+    return ""
+
+
+def _extract_io_clues(text, patterns):
+    """从文本中提取 I/O 语义线索"""
+    clues = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        clues.extend(m.strip() for m in matches if m.strip())
+    return _deduplicate_clues(clues)
+
+
+def _extract_usage_hint(section_text):
+    """从段落文本中提取使用提示"""
+    if not section_text:
+        return ""
+    for pattern in _USAGE_HINT_PATTERNS:
+        match = re.search(pattern, section_text)
+        if match:
+            hint = match.group(1).strip()
+            if len(hint) > 5:
+                return hint[:150]
+    return ""
+
+
+def _build_call_address(cmd, cli_usage, skill_name):
+    """构建步骤的调用地址"""
+    cmd_name = cmd.get("command", cmd.get("name", ""))
+
+    # 从 CLI 用法中匹配与此指令相关的命令
+    related_clis = []
+    for cli in cli_usage:
+        if cmd_name.lower() in cli.lower() or cmd_name.replace("-", "").lower() in cli.lower():
+            related_clis.append(cli)
+
+    # 构建 call_address
+    call_address = {
+        "instructions": [cmd_name] if cmd_name else [],
+        "cli": related_clis[0] if related_clis else "",
+        "cli_alternatives": related_clis[1:3] if len(related_clis) > 1 else [],
+    }
+    return call_address
+
+
+def _clue_to_io_item(clue):
+    """将语义线索转为 interface 条目"""
+    clue = clue.strip()
+    # 尝试识别类型（路径/文件/报告/配置等）
+    io_type = "other"
+    type_keywords = {
+        "路径": "path", "目录": "dir", "文件": "file",
+        "报告": "report", "结果": "result", "配置": "config",
+        "数据": "data", "列表": "list", "JSON": "json",
+        "Markdown": "markdown", "YAML": "yaml", "文本": "text",
+        "URL": "url", "名称": "name", "参数": "param",
+    }
+    for kw, t in type_keywords.items():
+        if kw in clue:
+            io_type = t
+            break
+
+    return {"type": io_type, "desc": clue}
 
 def extract_parameters(content):
     """提取技能可调用的参数列表（从 SKILL.md 的 trigger/参数表中）"""
@@ -570,7 +859,31 @@ def cmd_clear_cache(args):
     return 0
 
 def cmd_suggest(args):
-    """根据用户意图推荐技能并检测缺口（v1.25.0）"""
+    """根据用户意图推荐技能并检测缺口（v1.29.1: 同义词展开 + n-gram 匹配）"""
+    # 同义词映射（精简版）
+    _SYNONYM_MAP_SHORT = {
+        "审查": "review 审 audit 审计",
+        "审计": "audit 审 review 审查",
+        "分析": "analyze analysis",
+        "代码": "code",
+        "测试": "test",
+        "部署": "deploy release 发布 上线",
+        "发布": "publish release deploy 部署",
+        "生成": "generate create 创建",
+        "报告": "report",
+        "验证": "verify validate 校验",
+        "扫描": "scan 检测",
+        "构建": "build compile 编译",
+        "打包": "pack zip",
+        "推送": "push sync 同步",
+        "搜索": "search query 查询",
+        "处理": "process handle",
+        "配置": "config 参数 param",
+        "数据": "data",
+        "文件": "file",
+        "文档": "doc document",
+    }
+    
     try:
         sys.stdout.reconfigure(encoding='utf-8')
     except AttributeError:
@@ -610,9 +923,34 @@ def cmd_suggest(args):
         if not intent_words:
             continue
 
-        # 简单词频匹配
-        match_count = sum(1 for w in intent_words if w in search_text)
-        score = match_count / len(intent_words)
+        # v1.29.1: 同义词展开 + n-gram 匹配
+        # 同义词展开
+        syn_intent = intent
+        syn_search = search_text
+        for word, syns in _SYNONYM_MAP_SHORT.items():
+            if word in syn_intent:
+                syn_intent += " " + syns
+            if word in syn_search:
+                syn_search += " " + syns
+
+        syn_intent_words = syn_intent.split()
+        syn_search_words = syn_search.split()
+
+        # 词匹配 + 同义词匹配
+        word_matches = sum(1 for w in intent_words if w in search_text)
+        syn_matches = sum(1 for w in syn_intent_words if w in syn_search)
+
+        # 中文 bi-gram
+        intent_chars = set("".join(intent_words))
+        search_chars = set(search_text.replace(" ", ""))
+        ngram = len(intent_chars & search_chars) / max(len(intent_chars | search_chars), 1)
+
+        score = (
+            (word_matches / max(len(intent_words), 1)) * 0.4 +
+            (syn_matches / max(len(syn_intent_words), 1)) * 0.4 +
+            ngram * 0.2
+        )
+        score = min(score, 1.0)
 
         if score >= args.min_score:
             candidates.append({
@@ -626,13 +964,22 @@ def cmd_suggest(args):
     # 3. 按分数排序
     candidates.sort(key=lambda c: c["score"], reverse=True)
 
-    # 4. 缺口检测：意图中有但没有任何 skill 匹配的词
+    # 4. 缺口检测：意图中有但没有任何 skill 匹配的词（v1.29.1: 支持同义词展开）
     matched_words = set()
     for c in candidates:
         text = f"{c['name']} {c['description']} {' '.join(c['trigger'])} {' '.join(c['tags'])}".lower()
+        syn_text = text
+        for word, syns in _SYNONYM_MAP_SHORT.items():
+            if word in syn_text:
+                syn_text += " " + syns
         for w in intent_words:
             if w in text:
                 matched_words.add(w)
+            # 同义词展开匹配
+            for word, syns in _SYNONYM_MAP_SHORT.items():
+                if w == word and any(s.lower() in syn_text for s in syns.split()):
+                    matched_words.add(w)
+                    break
 
     unmatched = [w for w in intent_words if w not in matched_words and len(w) > 1]
 
