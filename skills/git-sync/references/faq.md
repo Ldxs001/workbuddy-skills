@@ -140,7 +140,7 @@ python manifest.py sync-readme workbuddy-skills
 
 ---
 
-## 审查规则 (R-01~R-10)
+## 审查规则 (R-01~R-26)
 
 ### Q13: 审查 ERROR 会阻止同步吗？
 

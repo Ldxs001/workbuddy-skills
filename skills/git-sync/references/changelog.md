@@ -1,7 +1,70 @@
+## [2.21.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.20.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.19.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.18.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.17.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.16.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.15.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.14.0] - 2026-06-16
+
+### 修复
+- refactor: git-sync
+
+---
+
+## [2.13.1] - 2026-06-16
+
+### 修复
+- references/permissions.md 重写：基于 PermissionChecker 扫描数据生成真实权限说明（CRITICAL 风险等级，15subprocess+19delete+9sensitive+2network）
+
+---
+
 ## [2.13.0] - 2026-06-16
 
 ### 修复
-- refactor 改造完成：C-10空行压缩、C-11章节指纹重排、C-12触发条件/约束格式化、C-14工作流结构化渲染、R-10版本同步、R-11 .bak清理、R-23文档引用修复、R-25误判过滤
+- refactor 改造完成：C-10空行压缩、C-11章节指纹重排、C-12触发条件/约束格式化、C-14工作流结构化渲染、R-10版本同步、R-11 .bak清理、R-23文档引用修复、R-26误判过滤
 
 ---
 
@@ -216,7 +279,7 @@
 ## 2.7.1 (2026-05-31)
 
 ### 更新
-- **skill-standardization 标准化改造第二阶段**：通过 R-01~R-25 全规则审计
+- **skill-standardization 标准化改造第二阶段**：通过 R-01~R-26 全规则审计
 
 ### 修复
 - **R-06**: H1 标题删除版本号
@@ -228,7 +291,7 @@
 ## 2.7.0 (2026-05-30)
 
 ### 更新
-- **skill-standardization 标准化改造**：通过 R-01~R-25 全规则审计（25/25 PASS，0 ERROR，0 WARN ✅）
+- **skill-standardization 标准化改造**：通过 R-01~R-26 全规则审计（25/25 PASS，0 ERROR，0 WARN ✅）
 - **R-01/R-07 frontmatter 补全**：新增 `trigger` 和 `trigger_negative` 字段
 - **R-04 description 清理**：删除 description 中的版本号信息
 - **R-10 版本号去 v 前缀**：changelog.md 所有版本号改为纯数字格式

@@ -4,254 +4,125 @@
 
 ## 风险等级
 
-**LOW**（声明：LOW，实际风险：LOW）
+**CRITICAL**（实际权重: 0.9）
+
+## 权限总览
+
+| 权限类别 | 涉及项数 | 风险等级 |
+|-----------|----------|----------|
+| `subprocess_call` | 15 项 | 🔴 HIGH |
+| `file_delete` | 19 项 | 🔴 HIGH |
+| `network_access` | 2 项 | 🔴 HIGH |
+| `sensitive_access` | 9 项 | 🔴 HIGH |
+| `critical_write` | 0 项 | ✅ LOW |
 
 ## 高权限操作说明
 
-- 无。所有文件操作均限制在技能独立数据目录内，不涉及系统关键目录、网络监听或外部请求。
+- **子进程调用（subprocess）**（15 项，unified）
 
-## 权限总览
+- **文件删除**（19 项，unified）
 
-| 工具 | 访问级别 | 风险等级 | 授权方式 | 说明 |
-|------|----------|----------|----------|------|
-| Read | read-only | 低 | 静默 | 读取输入文件和配置 |
-| Write | write | 中 | 即时 | 写入输出结果到 `data/output/` |
-| Bash | restricted | 中 | 统一 | 运行 `scripts/` 目录下的内部脚本 |
+- **网络访问**（2 项，silent）
+
+- **敏感信息访问**（9 项，unified）
+
 
 ## 权限详细说明
 
-### Read（读取）
+### 子进程调用（subprocess）（15 项）
 
-- **用途**：读取用户输入文件、配置文件、参考数据
-- **范围限制**：仅读取技能安装目录和指定输入文件，不访问系统敏感路径
-- **不会读取**：系统敏感路径或凭证文件
+> **功能说明**：技能需要通过 subprocess/操作系统调用来执行外部命令或脚本。
+> **授权方式**：unified
 
-### Write（写入）
+| 文件 | 行号 | 匹配内容 | 功能说明 |
+|------|------|----------|----------|
+| `scripts\git-sync.py` | 11 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 96 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 98 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 108 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 109 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 117 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 120 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 122 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 123 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 834 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\permission_checker.py` | 86 | `SUBPROCESS` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\permission_checker.py` | 98 | `Subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\permission_checker.py` | 259 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\permission_checker.py` | 608 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\permission_checker.py` | 616 | `SUBPROCESS` | 自动化技能：一次性授权，后续自动执行不再询问 |
 
-- **用途**：将处理结果写入 `data/output/` 目录
-- **范围限制**：仅写入技能安装目录下的 `data/output/` 子目录
-- **不会写入**：系统目录或其他技能目录
 
-### Bash（子进程调用）
+### 文件删除（19 项）
 
-- **用途**：运行 `scripts/` 目录下的内部脚本
-- **范围限制**：仅运行技能安装目录下的脚本
-- **不会执行**：用户输入的命令或路径
+> **功能说明**：技能在执行过程中需要删除临时文件或清理旧版产物。
+> **授权方式**：unified
+
+| 文件 | 行号 | 匹配内容 | 功能说明 |
+|------|------|----------|----------|
+| `scripts\clean_zip_source.py` | 62 | `os.remove` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\clean_zip_source.py` | 78 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 340 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 362 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 727 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 807 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 147 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 212 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 231 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 250 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 253 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 339 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 356 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 370 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 379 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 382 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.sh` | 395 | `rm` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\manifest.py` | 78 | `os.unlink` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\sync_with_exclude.py` | 117 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+
+
+### 网络访问（2 项）
+
+> **功能说明**：技能需要通过网络连接到外部服务或远程仓库。
+> **授权方式**：silent
+
+| 文件 | 行号 | 匹配内容 | 功能说明 |
+|------|------|----------|----------|
+| `scripts\git-sync.py` | 479 | `urllib` | 自动化技能：中风险静默执行，仅记录 |
+| `scripts\git-sync.py` | 543 | `urllib` | 自动化技能：中风险静默执行，仅记录 |
+
+
+### 敏感信息访问（9 项）
+
+> **功能说明**：技能代码中检测到敏感关键词（token/password等）。
+> **授权方式**：unified
+
+| 文件 | 行号 | 匹配内容 | 功能说明 |
+|------|------|----------|----------|
+| `scripts\git-sync.py` | 82 | `credential.helper` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 112 | `credential.helper=` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 113 | `credential.https://gitee.com.provider=` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 114 | `credential.https://github.com.provider=` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 513 | ` 用户名或密码/Token 错误` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 562 | ` 的凭证（remote URL 未内嵌 token，~/.git-credent` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 840 | `credential.helper` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\git-sync.py` | 845 | `credential.helper` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\permission_checker.py` | 449 | `credential` | 自动化技能：一次性授权，后续自动执行不再询问 |
+
+
+### 关键位置写入
+
+**无**。
+
 
 ## 授权方式说明
 
-- **即时授权**：每次执行前需获得用户批准
-- **统一授权**：首次执行前获得用户批准，后续不再询问
-- **静默授权**：无需用户交互，自动执行并记录
+- **immediate（即时授权）**：每次执行前需获得用户批准
+- **unified（统一授权）**：首次执行前获得用户批准，后续不再询问
+- **silent（静默授权）**：无需用户交互，自动执行并记录
 
-<!-- fp:risk=LOW|sensitive=0|critical_write=0|network=0|delete=0|subprocess=0|issues=0 -->
----
+<!-- fp:risk=CRITICAL|sensitive=9|critical_write=0|network=2|delete=19|subprocess=15|issues=45 -->
 
----
-name: git-sync
-version: 2.9.3
-sensitive_access: false
-critical_write: false
-permission_weight: LOW
-data_dir: ../.standardization/git-sync/
-tags: ['sync', 'git', 'gitee', 'github', 'deploy']
-external_data_dir: true
-trigger: 同步/推送/发布/上传/打包/更新READ ME
----
-
-# git-sync — 权限说明（详细版）
-
-> 本文档由 `permission_checker.py` 扫描生成，记录 git-sync 所有权限需求、风险等级及功能解释。
-> 扫描时间：2026-05-25｜风险等级：low｜通过率：17/17
-> 
-> ⚠️ **关于 sensitive_access 误报的说明**：`sensitive_scan.py` 是敏感信息**扫描器**，
-> 其代码中出现 `token`/`password`/`credential` 等关键词是**用于检测其他 skill 是否含敏感信息**，
-> 并非 git-sync 自身访问敏感信息。此类误报已在 `permission_checker.py` v2.21.0 中修复。
-
----
-
-## 权限总览
-
-| 权限类别 | 风险等级 | 涉及文件数 | 总项数 | 功能解释 |
-|-----------|-----------|-------------|--------|----------|
-| `subprocess_call` | 🔴 HIGH | 4 | 4 | 调用外部进程（git/bash/python），执行系统命令 |
-| `file_delete` | 🔴 HIGH | 7 | 21 | 删除文件/目录（仅限 `.dist/`/`.tmp/`/`.bak/` 等临时目录）|
-| `network_access` | 🟡 MEDIUM | 0 | 0 | 推送到远程仓库（git push），需要网络 |
-| `sensitive_access` | ✅ LOW | 0 | 0 | **无** — `sensitive_scan.py` 是扫描器，不访问敏感信息 |
-| `critical_write` | ✅ LOW | 0 | 0 | **无** — git-sync 不向 skills/ 安装目录写入数据 |
-
----
-
-## 1. subprocess_call（4 项，HIGH）
-
-> **功能解释**：git-sync 需要通过 subprocess 调用 git 命令、bash 脚本和 python 脚本，完成代码同步、打包、推送等操作。这是 git-sync 的核心能力，无法避免。
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 1 | `scripts/build_index.py` | 115 | `subprocess` | 调用 git 命令生成索引 |
-| 2 | `scripts/build_index.py` | 119 | `subprocess` | 调用 git 命令生成索引 |
-| 3 | `scripts/clean_dist.py` | 48 | `subprocess` | 调用 git 或 rm 清理旧打包文件 |
-| 4 | `scripts/clean_dist.py` | 52 | `subprocess` | 调用 git 或 rm 清理旧打包文件 |
-
-**授权方式**：`unified`（默认审批）—— 用户主动触发同步时才执行，非后台自动运行。
-
----
-
-## 2. file_delete（21 项，HIGH — 但仅限临时目录）
-
-> **功能解释**：git-sync 在同步过程中需要清理临时文件（.tmp/.bak）、删除旧打包文件、清理 manifest 残留数据。所有删除操作均有明确路径限制，不会误删用户文件。
-
-### 2.1 scripts/clean_dist.py（1 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 1 | `scripts/clean_dist.py` | 61 | `os.remove` | 删除 `.dist/` 目录下的旧 ZIP 包 |
-
-### 2.2 scripts/clean_zip_source.py（1 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 2 | `scripts/clean_zip_source.py` | 49 | `os.remove` | 删除临时解压目录 |
-| 3 | `scripts/clean_zip_source.py` | 61 | `shutil.rmtree` | 删除临时解压目录 |
-
-### 2.3 scripts/manifest.py（10 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 4 | `scripts/manifest.py` | 55 | `unlink` | 删除 manifest 残留条目 |
-| 5 | `scripts/manifest.py` | 168 | `del ` | 删除 manifest 内存数据 |
-| 6 | `scripts/manifest.py` | 208 | `rm ` | 删除临时文件 |
-| 7 | `scripts/manifest.py` | 209 | `rm ` | 删除临时文件 |
-| 8 | `scripts/manifest.py` | 224 | `rm ` | 删除临时文件 |
-| 9 | `scripts/manifest.py` | 238 | `rm ` | 删除临时文件 |
-| 10 | `scripts/manifest.py` | 241 | `rm ` | 删除临时文件 |
-| 11 | `scripts/manifest.py` | 247 | `rm ` | 删除临时文件 |
-| 12 | `scripts/manifest.py` | 353 | `rm ` | 删除临时文件 |
-| 13 | `scripts/manifest.py` | 368 | `rm ` | 删除临时文件 |
-| 14 | `scripts/manifest.py` | 370 | `rm ` | 删除临时文件 |
-| 15 | `scripts/manifest.py` | 481 | `rm ` | 删除临时文件 |
-| 16 | `scripts/manifest.py` | 489 | `rm ` | 删除临时文件 |
-
-### 2.4 scripts/normalize_meta.py（1 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 17 | `scripts/normalize_meta.py` | 57 | `del ` | 删除 `_meta.json` 残留字段 |
-
-### 2.5 scripts/sensitive_scan.py（1 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 18 | `scripts/sensitive_scan.py` | 158 | `rm ` | 删除敏感信息扫描临时文件 |
-
-### 2.6 scripts/sync_with_exclude.py（1 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 19 | `scripts/sync_with_exclude.py` | 86 | `shutil.rmtree` | 删除排除列表外的临时目录 |
-
-### 2.7 scripts/update_readme.py（2 项）
-
-| # | 文件 | 行号 | 匹配内容 | 功能解释 |
-|---|------|------|----------|----------|
-| 20 | `scripts/update_readme.py` | 160 | `rm ` | 删除 README.md 旧版本备份 |
-| 21 | `scripts/update_readme.py` | 168 | `rm ` | 删除 README.md 旧版本备份 |
-
-**授权方式**：`unified`（默认审批）—— 删除操作均在用户主动触发同步时执行，且有路径白名单限制（仅限 `.dist/`、`.tmp/`、`.bak/` 等临时目录）。
-
----
-
-## 3. sensitive_access（0 项，LOW — 无实际敏感信息访问）
-
-> **说明**：`sensitive_scan.py` 是敏感信息**扫描器**，其代码中出现的 `token`/`password`/`credential` 等关键词
-> 是用于**检测其他 skill 是否含敏感信息**，并非 git-sync 自身访问敏感信息。
-> 
-> `permission_checker.py` v2.21.0 已修复此误报（`_check_sensitive_access` 现在能正确识别扫描器模式）。
-
-**结论**：git-sync **不访问**任何敏感信息（memory/、credentials、token、password），`sensitive_access: false`。
-
-**授权方式**：`False`（无需授权）。
-
----
-
-## 4. critical_write（0 项，LOW — 无关键位置写入）
-
-> **说明**：git-sync 的所有文件写入操作均限于自身安装目录内的临时文件（`.dist/`、`.tmp/` 等），
-> 不向其他 skill 的安装目录或 `skills/.standardization/` 数据目录写入数据。
-
-**结论**：git-sync **不执行**关键位置写入，`critical_write: false`。
-
-**授权方式**：`False`（无需授权）。
-
----
-
-## 5. network_access（实际存在，MEDIUM）
-
-> **功能解释**：git-sync 需要通过 `git push` 将本地提交推送到远程仓库（码云 gitee / GitHub）。这是 git-sync 的核心能力。
-
-| 操作 | 命令 | 风险等级 | 功能解释 |
-|------|------|----------|----------|
-| 推送到码云 | `git push gitee main` | 🟡 MEDIUM | 推送到私有仓库，需要网络 |
-| 推送到 GitHub | `git push github main` | 🟡 MEDIUM | 推送到公开仓库，需要网络 |
-
-**授权方式**：`unified`（默认审批）—— 用户主动触发同步时才执行推送，非后台自动运行。
-
----
-
-## 行为对照表（授权方式汇总）
-
-| 操作 | 权限类别 | 风险等级 | 授权方式 | 说明 |
-|------|-----------|-----------|---------|------|
-| 执行 `git push` | `subprocess_call` + `network_access` | 🔴 HIGH | `unified` | 推送到远程仓库，需用户确认 |
-| 清理旧 ZIP 包 | `file_delete` | 🔴 HIGH | `unified` | 仅限 `.dist/` 目录 |
-| 更新 README.md | `critical_write` | 🟡 MEDIUM | `unified` | 全量重建技能列表 |
-| 调用 git 命令 | `subprocess_call` | 🔴 HIGH | `unified` | 执行 git add/commit/push |
-
----
-
-## 触发条件
-
-- 用户明确说「同步、上传、推送、打包」某个 skill 时触发
-- 未明确说「全量维护」时，只同步指定 skill（按需同步）
-- 明确说「全量维护」或「同步所有」时，遍历 `manifest.json` 所有条目
-
----
-
-## 注意事项
-
-- `subprocess_call` 和 `network_access` 为高风险权限，首次使用需经用户确认
-- `file_delete` 操作均有路径白名单限制（仅限 `.dist/`、`.tmp/`、`.bak/` 等临时目录），不会误删用户文件
-- `sensitive_access`：**无** — `sensitive_scan.py` 是扫描器，不访问敏感信息
-- `critical_write`：**无** — git-sync 不向 skills/ 安装目录写入数据
-
----
-
-## 扫描原始报告（JSON）
-
-```json
-{
-  "skill_dir": "C:\\Users\\sm001\\.workbuddy\\skills\\git-sync",
-  "risk_level": "low",
-  "permission_weight": 0.30,
-  "stats": {
-    "files_scanned": 15,
-    "lines_scanned": 2559,
-    "sensitive_access": 0,
-    "critical_write": 0,
-    "network_access": 0,
-    "file_delete": 21,
-    "subprocess_call": 4
-  },
-  "summary": {
-    "total_issues": 25,
-    "high_severity": 25,
-    "error_severity": 0,
-    "recommendation": "风险较低：建议保持当前设计。file_delete 和 subprocess_call 均有路径限制，不会造成实际危害。"
-  }
-}
-```
-
-> ⚠️ 以上 25 项 `file_delete` + `subprocess_call` 风险均为 **HIGH**，但均属于 git-sync 正常业务需求，非真正安全风险。已通过授权方式（`unified`）进行风险控制。
 ## 基于skill-function-test的测试报告
 
 | 运行时间 | S1 场景链路 | D1-D6 功能测试 | S4 执行忠实度 | 耗时(s) |
