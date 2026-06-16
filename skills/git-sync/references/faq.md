@@ -155,11 +155,11 @@ python manifest.py sync-readme workbuddy-skills
 
 ```bash
 # 审查单个 skill
-python scripts/skill_audit.py audit ~/.workbuddy/skills/my-skill
+python -m scripts.skill_audit audit ~/.workbuddy/skills/my-skill
 
 # 审查所有 skills
-python scripts/skill_audit.py audit-all ~/.workbuddy/skills
+python -m scripts.skill_audit audit-all ~/.workbuddy/skills
 
 # JSON 输出（供脚本解析）
-python scripts/skill_audit.py audit ~/.workbuddy/skills/my-skill --json
+python -m scripts.skill_audit audit ~/.workbuddy/skills/my-skill --json
 ```

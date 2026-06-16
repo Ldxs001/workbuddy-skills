@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.11.0 - 完整 Python 版 git-sync
+git-sync.py v2.12.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [version] [--skip-scan]
 """
@@ -528,32 +528,48 @@ def _classify_push_error(remote_name: str, stderr: str, stdout: str) -> str:
         truncated = truncated[:200] + "..."
     return f"❌ 推送失败：{remote_name} - {truncated}"
 
+def _resolve_push_url(remote_name: str) -> tuple:
+    """
+    解析远程 URL，优先使用 URL 内嵌凭证，其次从 ~/.git-credentials 查找。
+    返回 (cred_url: str, raw_url: str, error: str)
+    cred_url 为带凭证的可推送 URL；error 非空时表示无法解析。
+    """
+    r = run_git("remote", "get-url", remote_name,
+                 workdir=WORK_REPO, check=False)
+    if r.returncode != 0:
+        return "", "", f"获取 remote URL 失败: {r.stderr.strip()}"
+    raw_url = r.stdout.strip()
+
+    from urllib.parse import urlparse
+    parsed = urlparse(raw_url)
+    host = parsed.hostname or ""
+
+    # 情况1：URL 已内嵌凭证（如 https://user:[email-redacted]/path）
+    if parsed.password:
+        return raw_url, raw_url, ""
+
+    # 情况2：从 ~/.git-credentials 查找
+    cred_url = _get_cred_url(host)
+    if cred_url:
+        # 补全路径（凭证 URL 可能只有主机名）
+        parsed_cred = urlparse(cred_url)
+        if not parsed_cred.path or parsed_cred.path == '/':
+            parsed_raw = urlparse(raw_url)
+            cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
+        return cred_url, raw_url, ""
+
+    # 情况3：都没有
+    return "", raw_url, f"找不到 {host} 的凭证（remote URL 未内嵌 token，~/.git-credentials 中也无该 host 条目）"
+
+
 def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """
     用凭证嵌入 URL 直接 push，完全绕开 CredentialHelperSelector。
     返回 (success: bool, error_msg: str)
     """
-    # 用 run_git 读取 remote URL（带 -c credential.helper= 覆盖）
-    r = run_git("remote", "get-url", remote_name,
-                 workdir=WORK_REPO, check=False)
-    if r.returncode != 0:
-        return False, f"获取 remote URL 失败: {r.stderr.strip()}"
-    raw_url = r.stdout.strip()
-
-    # 从 raw_url 提取 host（如 github.com）
-    from urllib.parse import urlparse, urlunparse
-    parsed = urlparse(raw_url)
-    host = parsed.hostname or ""
-
-    cred_url = _get_cred_url(host)
-    if not cred_url:
-        return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
-
-    # 如果 cred_url 缺少路径（只有主机名），从 raw_url 补全
-    parsed_cred = urlparse(cred_url)
-    if not parsed_cred.path or parsed_cred.path == '/':
-        parsed_raw = urlparse(raw_url)
-        cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
+    cred_url, raw_url, error = _resolve_push_url(remote_name)
+    if error:
+        return False, error
 
     # 临时覆盖 remote URL（含凭证），push 完立刻恢复
     run_git("remote", "set-url", remote_name, cred_url,
@@ -571,24 +587,9 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
 
 def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
     """用凭证嵌入 URL 直接 pull，完全绕开 CredentialHelperSelector"""
-    r = run_git("remote", "get-url", remote_name,
-                 workdir=WORK_REPO, check=False)
-    if r.returncode != 0:
-        return False, f"获取 remote URL 失败: {r.stderr.strip()}"
-    raw_url = r.stdout.strip()
-
-    from urllib.parse import urlparse, urlunparse
-    parsed = urlparse(raw_url)
-    host = parsed.hostname or ""
-
-    cred_url = _get_cred_url(host)
-    if not cred_url:
-        return False, f"找不到 {host} 的凭证，请检查 ~/.git-credentials"
-
-    parsed_cred = urlparse(cred_url)
-    if not parsed_cred.path or parsed_cred.path == '/':
-        parsed_raw = urlparse(raw_url)
-        cred_url = f"{parsed_cred.scheme}://{parsed_cred.netloc}{parsed_raw.path}"
+    cred_url, raw_url, error = _resolve_push_url(remote_name)
+    if error:
+        return False, error
 
     run_git("remote", "set-url", remote_name, cred_url,
              workdir=WORK_REPO, check=False)
@@ -853,7 +854,7 @@ def main():
             pass
     # ────────────────────────────────────────────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="git-sync.py v2.11.0")
+    parser = argparse.ArgumentParser(description="git-sync.py v2.12.0")
     parser.add_argument("skill_name", nargs="?", default="",
                         help="技能名称（如 skill-standardization）")
     parser.add_argument("version", nargs="?", default="",

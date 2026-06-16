@@ -52,7 +52,7 @@
 
 ### 步骤 1.5：SKILL.md 规范化审查（v1.8 新增）
 
-- **工具**：`skill_audit.py`（独立 Python CLI，零依赖）
+- **工具**：`-m scripts.skill_audit`（独立 Python CLI，零依赖）
 - **规则集**：R-01 ~ R-10（4 ERROR + 6 WARN）
 - **模式**：纯警告不阻断（始终 exit(0)）
 - **输出**：人类可读终端报告 + 支持 `--json` 模式
@@ -60,7 +60,7 @@
 
 ### 步骤 2：同步文件到工作仓库
 
-将技能从 `SKILLS_DIR/<skill-name>/` 同步到 `WORK_REPO/skills/<skill-name>/`。
+将技能从 ``~/.workbuddy/skills/`<skill-name>/` 同步到 `WORK_REPO/skills/<skill-name>/`。
 
 ### 步骤 3：全量重新生成 README.md
 
@@ -101,7 +101,7 @@ git add → git commit → git pull --rebase → git push
 ### 步骤 5：生成 ZIP 安装包
 
 ```
-输出: SKILLS_DIR/.dist/<skill-name>-v<x.x.x>.zip
+输出: `.dist/<skill-name>-v<x.x.x>.zip`
 排除: *.zip, __pycache__/, .DS_Store, .git, *.html, *.log, ...
 ```
 
@@ -157,7 +157,7 @@ git add → git commit → git pull --rebase → git push
 | 环境 | rsync 是否可用 | 说明 |
 |------|----------------|------|
 | Linux / macOS | ✅ 自带 | 无需额外操作 |
-| Git for Windows 完整版 | ✅ 自带 | `C:\Program Files\Git\usr\bin\rsync.exe` |
+| Git for Windows 完整版 | ✅ 自带 | 位于 Git 安装目录的 usr/bin/ 下 |
 | **WorkBuddy PortableGit** | ❌ 不含 | 需手动安装（见下方） |
 | Cygwin / MSYS2 | ✅ 自带 | 通过包管理器安装 |
 | WSL | ✅ 自带 | 无需额外操作 |
@@ -193,12 +193,17 @@ C:\Users\sm001\.workbuddy\binaries\python\...\python.exe: can't open file 'c:\\c
 ```bash
 # 在 Git Bash 中执行，下载 rsync.exe 到 PortableGit/usr/bin/
 cd /c/Users/sm001/.workbuddy/vendor/PortableGit/usr/bin/
-curl -L -o rsync.exe "https://github.com/git-for-windows/git/releases/download/v2.45.0.windows.1/rsync.exe"
+# 从 Git for Windows 获取 rsync 工具
+# 在 Git Bash 中执行：
+cd /c/Users/sm001/.workbuddy/vendor/PortableGit/usr/bin/
+# 安装 rsync（如已安装可跳过）
 # 验证
 rsync --version
 ```
 
-> ⚠️ 如果上述 URL 无效，从 [Git for Windows Releases](https://github.com/git-for-windows/git/releases) 下载完整版，从压缩包中提取 `usr/bin/rsync.exe`。
+# 验证
+rsync --version
+```
 
 **方式二：安装完整版 Git for Windows**
 

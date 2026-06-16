@@ -288,7 +288,7 @@ README.md（技能列表 + 目录树）
 | `SKILLS_DIR` | `~/.workbuddy/skills` | 技能源目录（本地 skill 所在位置） |
 | `WORK_REPO` | `~/.workbuddy/workbuddy-skills` | Git 工作仓库（推送目标） |
 | `MANIFEST_FILE` | `scripts/manifest.json` | 维护清单文件路径 |
-| `DIST_DIR` | `SKILLS_DIR/.dist/` | ZIP 统一输出目录（v1.5 新增） |
+| `DIST_DIR` | ``~/.workbuddy/skills/.dist`（运行时目录）/` | ZIP 统一输出目录（v1.5 新增） |
 
 ## ZIP 打包排除列表
 

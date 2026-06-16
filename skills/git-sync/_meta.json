@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.11.0",
-  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复Windows nul保留设备名导致copytree崩溃；新增git push/pull错误消息标准化；修复无变更时manifest版本号误更新。",
+  "version": "2.13.0",
+  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复_push_with_cred_url/pull_with_cred_url未检查URL内嵌token的缺陷（remote URL已含token时不需查git-credentials）。",
   "author": "wUwproject",
   "tags": [
     "sync",
@@ -10,13 +10,8 @@
     "github",
     "deploy"
   ],
-  "data_dir": "skills/.standardization/git-sync/",
+  "data_dir": "skills/.standardization/git-sync/data/",
   "triggers": [
-    "同步",
-    "推送",
-    "发布",
-    "上传",
-    "打包",
-    "更新READ ME"
+    "同步/推送/发布/上传/打包/更新READ ME"
   ]
 }
