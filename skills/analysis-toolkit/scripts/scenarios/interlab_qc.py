@@ -81,6 +81,9 @@ def interlab_comparison(data, lab_col="实验室", value_col="结果"):
         import warnings as _warn
         for w in quality_warnings:
             _warn.warn(f"[数据质量] {w}")
+        print("⚠️  数据质量警告：")
+        for w in quality_warnings:
+            print(f"   • {w}")
 
     groups = {}
     group_names = sorted(data[lab_col].unique())
@@ -125,6 +128,7 @@ def interlab_comparison(data, lab_col="实验室", value_col="结果"):
         "anova_table": anova_df,
         "group_stats": group_stats,
         "conclusion": conclusion,
+        "warnings": quality_warnings,
     }
     publish(result, title="室间比对分析")
     return result

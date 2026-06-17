@@ -77,6 +77,10 @@ def internal_precision_analysis(data, level_col="水平", value_col="结果", n_
         import warnings as _warn
         for w in quality_warnings:
             _warn.warn(f"[数据质量] {w}")
+        # 同步输出到 stdout，避免 stderr 被忽略
+        print("⚠️  数据质量警告：")
+        for w in quality_warnings:
+            print(f"   • {w}")
 
     levels = data[level_col].unique()
     summaries = []
@@ -115,6 +119,7 @@ def internal_precision_analysis(data, level_col="水平", value_col="结果", n_
         "synthetic_rsd": syn_rsd,
         "synthetic_rsd_simple": syn_rsd_simple,
         "grand_mean": grand_mean,
+        "warnings": quality_warnings,
     }
     publish(per_level, title="室内精密度分析 — 各水平统计")
     publish(result, title="合成标准差")

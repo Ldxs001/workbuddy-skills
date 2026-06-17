@@ -76,6 +76,9 @@ def monitoring_dashboard(data, date_col="日期", value_col="值",
         import warnings as _warn
         for w in quality_warnings:
             _warn.warn(f"[数据质量] {w}")
+        print("⚠️  数据质量警告：")
+        for w in quality_warnings:
+            print(f"   • {w}")
 
     df = data.copy()
     df[date_col] = pd.to_datetime(df[date_col])
@@ -114,6 +117,7 @@ def monitoring_dashboard(data, date_col="日期", value_col="值",
         "trend_fig": trend_fig,
         "rolling_data": df_sorted,
         "stats_summary": summary,
+        "warnings": quality_warnings,
     }
     publish(result, title="监控看板", figure=trend_fig, html_filename="monitoring_dashboard.html")
     return result

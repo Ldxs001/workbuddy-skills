@@ -8,17 +8,29 @@ import numpy as np
 from typing import Union, List
 
 
+# 空值守卫 — 提升基础算子的错误信息可读性
+def _check_non_empty(values, func_name="该算子"):
+    """检查输入序列是否为空，为空时抛出清晰异常。"""
+    if len(values) == 0:
+        raise ValueError(
+            f"{func_name}: 输入数据为空列表（length=0），无法计算。\n"
+            f"建议：检查传递给该函数的数据源，确认 DataFrame 包含有效行且列名正确。"
+        )
+
+
 # ═══════════════════════════════════════════════════════
 # 基础描述统计
 # ═══════════════════════════════════════════════════════
 
 def calc_mean(values: Union[List[float], np.ndarray]) -> float:
     """算术均值。"""
+    _check_non_empty(values, "calc_mean")
     return float(np.mean(values))
 
 
 def calc_median(values: Union[List[float], np.ndarray]) -> float:
     """中位数。"""
+    _check_non_empty(values, "calc_median")
     return float(np.median(values))
 
 
@@ -31,11 +43,13 @@ def calc_sd(values: Union[List[float], np.ndarray], ddof: int = 1) -> float:
     values : array-like
     ddof : int — 自由度修正，默认 1（样本标准差）
     """
+    _check_non_empty(values, "calc_sd")
     return float(np.std(values, ddof=ddof))
 
 
 def calc_var(values: Union[List[float], np.ndarray], ddof: int = 1) -> float:
     """方差。"""
+    _check_non_empty(values, "calc_var")
     return float(np.var(values, ddof=ddof))
 
 
@@ -44,6 +58,7 @@ def calc_rsd(values: Union[List[float], np.ndarray]) -> float:
     相对标准偏差（RSD%）。
     RSD = SD / mean * 100
     """
+    _check_non_empty(values, "calc_rsd")
     mean = np.mean(values)
     if mean == 0:
         return 0.0
@@ -63,21 +78,25 @@ def calc_count(values: Union[List[float], np.ndarray]) -> int:
 
 def calc_min(values: Union[List[float], np.ndarray]) -> float:
     """最小值。"""
+    _check_non_empty(values, "calc_min")
     return float(np.min(values))
 
 
 def calc_max(values: Union[List[float], np.ndarray]) -> float:
     """最大值。"""
+    _check_non_empty(values, "calc_max")
     return float(np.max(values))
 
 
 def calc_range(values: Union[List[float], np.ndarray]) -> float:
     """极差。"""
+    _check_non_empty(values, "calc_range")
     return float(np.ptp(values))
 
 
 def calc_sum(values: Union[List[float], np.ndarray]) -> float:
     """求和。"""
+    _check_non_empty(values, "calc_sum")
     return float(np.sum(values))
 
 
@@ -122,6 +141,7 @@ def calc_robust_sd(values: Union[List[float], np.ndarray]) -> float:
     稳健标准差（MAD 法）。
     robust_sd = 1.4826 * median(|xi - median(x)|)
     """
+    _check_non_empty(values, "calc_robust_sd")
     arr = np.array(values, dtype=float)
     med = np.median(arr)
     mad = np.median(np.abs(arr - med))

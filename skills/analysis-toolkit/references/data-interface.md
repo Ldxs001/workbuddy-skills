@@ -347,6 +347,7 @@ Pipeline 接受以下输入格式：
 | 统计量 | float / DataFrame | 核心计算结果 |
 | fig | matplotlib Figure | 可视化图表（可选） |
 | conclusion | str | 结论文本（可选） |
+| warnings | list[str] | 数据质量警告列表（空列表=无问题）。当数据存在潜在问题（如含空值、列名不存在、标准差为0等）时，此处列出具体说明，避免静默返回错误结果。 |
 | 其他 | 依函数而定 | 见各函数文档 |
 
 图表统一为 `matplotlib.figure.Figure` 对象，可通过 `fig.savefig()` 导出为图片文件，或通过 `report.generate_report()` 嵌入 Word 报告。

@@ -18,23 +18,24 @@ from ..reporting import publish
 
 def _warn_on_data_quality(x, y, label_x="x", label_y="y", min_points=3):
     """数据质量前置校验（回归类函数）：不阻断执行，只输出警告。"""
-    import warnings as _warn
+    warnings = []
     x_arr = np.array(x, dtype=float) if x is not None else np.array([])
     y_arr = np.array(y, dtype=float) if y is not None else np.array([])
     n = min(len(x_arr), len(y_arr))
     if n == 0:
-        _warn.warn(f"[数据质量] 输入数据为空，无法拟合。")
-        return
+        warnings.append("输入数据为空，无法拟合。")
+        return warnings
     if n < min_points:
-        _warn.warn(f"[数据质量] 有效数据点仅 {n} 个（建议至少 {min_points} 个）。")
+        warnings.append(f"有效数据点仅 {n} 个（建议至少 {min_points} 个）。")
     if len(x_arr) != len(y_arr):
-        _warn.warn(f"[数据质量] {label_x} 长度 ({len(x_arr)}) 与 {label_y} 长度 ({len(y_arr)}) 不一致。")
+        warnings.append(f"{label_x} 长度 ({len(x_arr)}) 与 {label_y} 长度 ({len(y_arr)}) 不一致。")
     if np.std(x_arr) == 0:
-        _warn.warn(f"[数据质量] {label_x} 所有值相同（方差为0），无法拟合有效曲线。")
+        warnings.append(f"{label_x} 所有值相同（方差为0），无法拟合有效曲线。")
     if np.std(y_arr) == 0:
-        _warn.warn(f"[数据质量] {label_y} 所有值相同（方差为0），拟合结果参考意义有限。")
+        warnings.append(f"{label_y} 所有值相同（方差为0），拟合结果参考意义有限。")
     if np.any(np.isnan(x_arr)) or np.any(np.isnan(y_arr)):
-        _warn.warn(f"[数据质量] 输入数据中包含 NaN，将自动忽略。")
+        warnings.append(f"输入数据中包含 NaN，将自动忽略。")
+    return warnings
 
 
 def calibration_curve(x, y, force_zero=False, degree=1):
@@ -52,7 +53,14 @@ def calibration_curve(x, y, force_zero=False, degree=1):
     -------
     dict
     """
-    _warn_on_data_quality(x, y, "浓度", "响应值")
+    quality_warnings = _warn_on_data_quality(x, y, "浓度", "响应值")
+    if quality_warnings:
+        import warnings as _warn
+        for w in quality_warnings:
+            _warn.warn(f"[数据质量] {w}")
+        print("⚠️  数据质量警告：")
+        for w in quality_warnings:
+            print(f"   • {w}")
 
     if degree == 1:
         result = linear_regression(x, y, force_zero=force_zero)
@@ -63,6 +71,7 @@ def calibration_curve(x, y, force_zero=False, degree=1):
     result["degree"] = degree
     result["x"] = np.array(x).tolist()
     result["y"] = np.array(y).tolist()
+    result["warnings"] = quality_warnings
     publish(result, title="标准曲线拟合")
     return result
 
@@ -246,9 +255,11 @@ def curve_uncertainty(calibration_data, sample_responses,
     dict
     """
     # 数据质量校验
+    quality_warnings = []
     if not calibration_data:
-        import warnings as _warn
-        _warn.warn("[数据质量] calibration_data 为空，无法计算不确定度。")
+        quality_warnings.append("calibration_data 为空，无法计算不确定度。")
+        print("⚠️  数据质量警告：")
+        print(f"   • calibration_data 为空，无法计算不确定度。")
     syx = calibration_data.get("syx", calibration_data.get("residual_std", 0))
     slope = calibration_data.get("slope", calibration_data.get("b", 0))
     intercept = calibration_data.get("intercept", calibration_data.get("a", 0))
@@ -289,6 +300,7 @@ def curve_uncertainty(calibration_data, sample_responses,
         "x_sample": x_sample,
         "syx": syx,
         "slope": slope,
+        "warnings": quality_warnings,
     }
     publish(result, title="曲线引入不确定度")
     return result
