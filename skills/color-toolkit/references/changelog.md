@@ -1,7 +1,23 @@
-## [3.2.0] - 2026-06-17
+## [3.3.0] - 2026-06-17
 
-### 修复
-- refactor: color-toolkit
+### 重构
+- preview_generator.py 重写为**原子组件架构 v2**：
+  - 11 个原子组件 (atom_*): 每个 1:1 映射到单条算法输出记录，N条输出=N个原子
+  - 9 个固定组合 (comp_*): 预制分组，如 gradient-set(固定3条渐变)、color-info(1色块+8属性)
+  - 建议插槽系统: 私有建议(逐条记录) + 公有建议(全局tips, 结构化约束模板)
+  - 组装引擎: `assemble_report(color, atoms=[...], composites=[...], tips=[...])`
+- **私有化建议插槽**：每条算法输出的数据记录自带私有建议位，始终存在，空为占位
+- **共有建议插槽**（tips）：结构化约束模板，≥3条覆盖结论/操作/警示/扩展四种信息角色，唯一消耗 token
+- **数据完整性验证**：`_validate_output()` 检查组件数是否与声明一致，不匹配抛 ValueError
+- **全局 tips 钩子**：任何算法被调用时自动追加 tips 空占位
+- **参数别名机制**：除 tips 外修复 color-info/ui-preview/accessible-set/text-preview 参数名不匹配导致的静默失败
+- **视觉统一系统**：所有卡片统一 border-radius:10px、box-shadow、间距、字体栈
+- 新增 `atom_readability_card` + `comp_readability_set`: 在背景色上直接展示文字效果（上下分层：颜色演示+固定白底信息栏）
+- 新增 `atom_contrast_card` 等原子组件，可用 `.atom-grid cols-2/3/4` 统一网格对齐
+- 验证机制: `raise_on_fail=True` 时参数不匹配直接中断，不静默吞噬
+- 旧接口 `generate_full_preview_html()` / `generate_palette_page_html()` 完全兼容
+- 调用链: CLI →算法计算(0token)→声明组件→填建议(唯一token点)→组装输出
+- 版本: 3.2.0 → 3.3.0 (MINOR, 功能级重构)
 
 ---
 
