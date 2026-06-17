@@ -1,6 +1,5 @@
 # 快速使用
 
-
 ### 加载
 ```text
 使用 分析质控工具包 做室内精密度分析
@@ -52,3 +51,9 @@ from scripts.scenarios import method_validation
 curve = method_validation.calibration_curve(x, y)
 lod_loq = method_validation.calc_lod_loq(calibration_data=curve, standard="gbt27417")
 ```
+
+### 端到端完整流程（推荐顺序）
+
+以下是从数据读取到生成报告的一次性完整流程：
+
+
