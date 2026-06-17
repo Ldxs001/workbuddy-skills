@@ -47,12 +47,13 @@ def _load_json(path: str) -> dict:
 
 
 def _load_rounds(skill_dir: str) -> list[dict]:
-    datadir = _data_dir_for(skill_dir)
+    # timeline 文件在 outputs 的上一层目录
+    base_dir = os.path.dirname(_data_dir_for(skill_dir))
     rounds = []
-    tl = _load_json(os.path.join(datadir, ".timeline.json"))
+    tl = _load_json(os.path.join(base_dir, ".timeline.json"))
     if tl:
         rounds.append(tl)
-    for f in sorted(glob.glob(os.path.join(datadir, ".timeline_*.json"))):
+    for f in sorted(glob.glob(os.path.join(base_dir, ".timeline_*.json"))):
         data = _load_json(f)
         if data:
             # 标记源文件名，方便 compute_round_stats 区分 _rN 与 base
@@ -64,13 +65,13 @@ def _load_rounds(skill_dir: str) -> list[dict]:
 def load_all(skill_dir: str) -> dict:
     datadir = _data_dir_for(skill_dir)
     skill_name = os.path.basename(os.path.abspath(skill_dir))
-    scenario_report = _load_json(os.path.join(datadir, "outputs", ".scenario-test_report.json"))
+    scenario_report = _load_json(os.path.join(datadir, ".scenario-test_report.json"))
     if not scenario_report:
-        scenario_report = _load_json(os.path.join(datadir, "outputs", ".scenario-test_report.json"))
-    function_report = _load_json(os.path.join(datadir, "outputs", ".function-test_report.json"))
-    s4_trace = _load_json(os.path.join(datadir, "outputs", ".s4_trace.json"))
-    s4_noise_plan = _load_json(os.path.join(datadir, "outputs", ".s4_noise_plan.json"))
-    fix_record = _load_json(os.path.join(datadir, "outputs", ".fix-record.json"))
+        scenario_report = _load_json(os.path.join(datadir, ".scenario-test_report.json"))
+    function_report = _load_json(os.path.join(datadir, ".function-test_report.json"))
+    s4_trace = _load_json(os.path.join(datadir, ".s4_trace.json"))
+    s4_noise_plan = _load_json(os.path.join(datadir, ".s4_noise_plan.json"))
+    fix_record = _load_json(os.path.join(datadir, ".fix-record.json"))
     if isinstance(fix_record, dict):
         fix_record = fix_record.get("fixes", [])
     if not isinstance(fix_record, list):

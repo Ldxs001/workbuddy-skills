@@ -174,6 +174,9 @@ def hook_pre_function_test(skill_dir: str):
     """功能测试前：蓝皮书已完成 ← 缺了自动扫描"""
     hook_pre_blueprint(skill_dir)
 
+    # 新增：S1-S3 未完成则阻断
+    _check_scenario_done(skill_dir)
+
     bp_json = _bp_json_path(skill_dir)
     bp_legacy = _bp_legacy_path(skill_dir)
     if not os.path.exists(bp_json) and not os.path.exists(bp_legacy):
@@ -301,6 +304,9 @@ def hook_pre_final_regress(skill_dir: str):
 def hook_pre_gen_report(skill_dir: str):
     """报告生成：兜底——能自动补的自动补，不能补的阻断指引"""
 
+    # 0. S4 状态检查（配置启用时）
+    _check_s4_state(skill_dir)
+
     # 1. 时间线
     tl = _timeline_path(skill_dir)
     if not os.path.exists(tl):
@@ -313,7 +319,7 @@ def hook_pre_gen_report(skill_dir: str):
     # 2. 备份 + 蓝皮书（自动补）
     hook_pre_blueprint(skill_dir)
 
-    # 3. 检查测试报告
+    # 3. 检查测试报告（同时验证 flow state 标记）
     has_scenario = os.path.exists(_scenario_report_path(skill_dir))
     has_func = os.path.exists(_func_report_path(skill_dir))
 
@@ -324,6 +330,14 @@ def hook_pre_gen_report(skill_dir: str):
             f"  场景测试: python {os.path.join(_SCRIPT_DIR, 'scenario_engine.py')} {skill_dir}\n"
             f"  功能测试: python {os.path.join(_SCRIPT_DIR, 'test_engine.py')} {skill_dir}",
         )
+
+    # 验证 flow state 标记是否与测试文件一致（防止手动复制文件绕过）
+    if not has_scenario and not has_func:
+        _block("无任何测试数据", "请先执行测试")
+    if has_func and not _is_step_done(skill_dir, "function_test"):
+        # 功能测试报告存在但 flow state 无标记 → 可能是手动复制
+        print(f"  [HOOK] ⚠ 功能测试报告存在但 flow state 无完成标记（可能是手动复制）")
+        # 不阻断，仅警告
 
     # 4. 时间线中有 marker？
     try:
@@ -422,6 +436,23 @@ def hook_pre_write_tests(skill_dir: str):
     """写测试前置：蓝皮书就绪 + LLM 必须手工编写场景测试用例"""
     hook_pre_blueprint(skill_dir)
 
+    # 从配置读取场景维度开关
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    scenarios_enabled = {"S1": True, "S2": True, "S3": True}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        for k in scenarios_enabled:
+            scenarios_enabled[k] = cfg.get("scenarios", {}).get(k, {}).get("enabled", True)
+    except Exception:
+        pass
+    active = [k for k, v in scenarios_enabled.items() if v]
+    if not active:
+        _pass("场景测试维度全部关闭，跳过编写场景测试用例")
+        _mark_done(skill_dir, "write_tests")
+        _mark_done(skill_dir, "scenario")  # 场景关闭等同于已完成
+        return
+
     # 检查是否已存在手工编写的测试用例
     test_plan_path = os.path.join(_data_dir(skill_dir), ".s_test_plan.json")
     if os.path.exists(test_plan_path):
@@ -487,6 +518,77 @@ def _flow_state_path(skill_dir: str) -> str:
     d = os.path.join(DATA_DIR, target)
     os.makedirs(d, exist_ok=True)
     return os.path.join(d, ".flow-state.json")
+
+
+def _is_step_done(skill_dir: str, step: str) -> bool:
+    """检查 flow state 中某步骤是否已完成"""
+    state_path = _flow_state_path(skill_dir)
+    if not os.path.exists(state_path):
+        return False
+    try:
+        with open(state_path, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        s = state.get("steps", {}).get(step, {})
+        return isinstance(s, dict) and s.get("done", False)
+    except Exception:
+        return False
+
+
+def _check_scenario_done(skill_dir: str):
+    """检查 S1-S3 是否已完成（根据配置中的启用状态）"""
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    scenarios_enabled = {"S1": True, "S2": True, "S3": True}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        for k in scenarios_enabled:
+            scenarios_enabled[k] = cfg.get("scenarios", {}).get(k, {}).get("enabled", True)
+    except Exception:
+        pass
+    active = [k for k, v in scenarios_enabled.items() if v]
+    if not active:
+        return  # 所有场景都关闭了，不需要检查
+
+    # 场景测试完成标记
+    if not _is_step_done(skill_dir, "scenario"):
+        # 检查测试报告是否存在（兼容旧路径）
+        has_report = os.path.exists(os.path.join(_data_dir(skill_dir), ".scenario-test_report.json"))
+        if not has_report:
+            _block(
+                "功能测试前置: 场景测试 (S1-S3) 未执行",
+                f"配置中启用了 {', '.join(active)}，请先执行场景测试:\n"
+                f"  1. 编写场景测试用例: 阅读 SKILL.md 和蓝皮书，写入 .s_test_plan.json\n"
+                f"  2. 运行场景测试: python {os.path.join(_SCRIPT_DIR, 'scenario_engine.py')} {skill_dir}",
+            )
+    _pass("功能测试 — 场景测试 (S1-S3) 已完成")
+
+
+def _check_s4_state(skill_dir: str):
+    """检查 S4 是否已完成（配置中启用时）"""
+    config_path = os.path.join(_data_dir(skill_dir), ".test-config.json")
+    s4_enabled = True
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        s4_enabled = cfg.get("s4", {}).get("enabled", True)
+    except Exception:
+        pass
+    if not s4_enabled:
+        return  # S4 关闭，不检查
+
+    if not _is_step_done(skill_dir, "s4"):
+        # 检查 S4 追踪文件是否存在（兼容已有执行但没有标记的情况）
+        has_trace = os.path.exists(os.path.join(_data_dir(skill_dir), ".s4_trace.json"))
+        has_output_trace = os.path.exists(os.path.join(_data_dir(skill_dir), "outputs", ".s4_trace.json"))
+        if not has_trace and not has_output_trace:
+            _block(
+                "报告生成前置: S4 未执行",
+                "配置中 S4 已启用，请先执行 S4 测试:\n"
+                f"  python {os.path.join(_SCRIPT_DIR, 's4_engine.py')} {skill_dir} scope\n"
+                f"  编写噪音方案 → validate → play\n"
+                f"  python {os.path.join(_SCRIPT_DIR, 's4_engine.py')} {skill_dir} play",
+            )
+    _pass("报告生成 — S4 已完成")
 
 
 def _mark_done(skill_dir: str, step: str):

@@ -1,3 +1,21 @@
+## [1.10.2] - 2026-06-17
+
+### 修复
+- gen_report.py: load_all() 双嵌套 outputs/ 路径导致报告数据 N/A
+- gen_report.py: _load_rounds() timeline 目录指向 outputs/ 而非父级
+- hooks.py: hook_pre_function_test 新增 S1-S3 完成状态检查
+- hooks.py: hook_pre_gen_report 新增 S4 flow state + 文件一致性校验
+
+
+## v1.10.2 (2026-06-17) — 自动版本升级
+
+### Changed
+- 版本号 1.10.1 → 1.10.2（`update --fix` 自动 bump）
+
+## v1.10.1 (2026-06-17) — 自动版本升级
+
+### Changed
+- 版本号 1.10.0 → 1.10.1（`update --fix` 自动 bump）
 ## [1.10.0] - 2026-06-16
 
 ### 修复
