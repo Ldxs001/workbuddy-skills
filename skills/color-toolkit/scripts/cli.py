@@ -12,7 +12,7 @@ from typing import Optional
 
 from color_toolkit import (
     convert_color, get_contrast, get_complementary,
-    get_palette, ColorCore
+    get_palette, ColorCore, find_accessible
 )
 from preview_generator import (
     generate_full_preview_html, generate_palette_page_html
@@ -265,7 +265,35 @@ def create_parser():
     parser_compare.add_argument("colors", nargs="+", help="颜色列表")
     parser_compare.set_defaults(func=cmd_compare)
 
+    # accessible
+    parser_accessible = subparsers.add_parser("accessible", help="查找符合对比度的推荐颜色")
+    parser_accessible.add_argument("color", help="固定的颜色值")
+    parser_accessible.add_argument("--mode", "-m", choices=["fg", "bg"], default="fg",
+                                   help="fg=推荐文字色(默认), bg=推荐背景色")
+    parser_accessible.add_argument("--font-size", type=int, default=16, help="字号(px)")
+    parser_accessible.add_argument("--font-weight", choices=["normal", "bold"], default="normal", help="字重")
+    parser_accessible.add_argument("--target", choices=["AA", "AAA"], default="AA", help="目标等级")
+    parser_accessible.add_argument("--max", type=int, default=10, help="最大推荐数(上限25)")
+    parser_accessible.set_defaults(func=cmd_accessible)
+
     return parser
+
+
+def cmd_accessible(args):
+    """查找符合对比度的推荐颜色"""
+    try:
+        result = find_accessible(
+            args.color,
+            mode=args.mode,
+            font_size=args.font_size,
+            font_weight=args.font_weight,
+            target=args.target,
+            max_results=args.max,
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"错误: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def main():

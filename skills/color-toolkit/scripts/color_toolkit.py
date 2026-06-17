@@ -831,6 +831,240 @@ class ColorCore:
         rgb = ColorCore.hsl_to_rgb(h, s, l)
         return ColorCore.rgb_to_hex(rgb.r, rgb.g, rgb.b)
 
+    # ---------- 无障碍颜色推荐 ----------
+
+    @staticmethod
+    def _get_wcag_ratio(target_level: str, is_large_text: bool) -> float:
+        """获取 WCAG 目标对比度。"""
+        if target_level.upper() == "AAA":
+            return 7.0 if not is_large_text else 4.5
+        else:  # AA 或默认
+            return 4.5 if not is_large_text else 3.0
+
+    @staticmethod
+    def _is_large_text(font_size, font_weight) -> bool:
+        """判断是否为 WCAG 大文本（≥18pt/24px 或 ≥14pt/18.67px 加粗）。"""
+        px = ColorCore._resolve_font_size(font_size)
+        return px >= 24 or (px >= 18 and font_weight.lower() in ("bold", "bolder", "700", "800", "900"))
+
+    # 中文字号 ↔ px 映射（常用，不完全覆盖）
+    _CN_FONT_SIZES = {
+        "初号": 56, "小初": 48,
+        "一号": 35, "小一": 32,
+        "二号": 29, "小二": 24,
+        "三号": 21, "小三": 20,
+        "四号": 19, "小四": 16,
+        "五号": 14, "小五": 12,
+        "六号": 10, "小六": 8,
+        "七号": 7, "八号": 6,
+    }
+
+    @staticmethod
+    def _resolve_font_size(font_size) -> int:
+        """将字号统一解析为 px。支持 int (直接作为px) 或 str (中文字号名/pt值)。"""
+        if isinstance(font_size, int):
+            return font_size
+        if isinstance(font_size, float):
+            return round(font_size)
+        s = str(font_size).strip()
+        # 中文字号查找
+        if s in ColorCore._CN_FONT_SIZES:
+            return ColorCore._CN_FONT_SIZES[s]
+        # pt 单位: "12pt"
+        pt_match = re.match(r'^([\d.]+)\s*pt$', s, re.I)
+        if pt_match:
+            return round(float(pt_match.group(1)) * 4 / 3)  # 1pt = 4/3 px
+        # px 单位: "16px"
+        px_match = re.match(r'^([\d.]+)\s*px$', s, re.I)
+        if px_match:
+            return round(float(px_match.group(1)))
+        # 纯数字字符串
+        try:
+            return int(float(s))
+        except (ValueError, TypeError):
+            return 16  # fallback
+
+    @staticmethod
+    def find_accessible_colors(
+        fixed_color: str,
+        mode: str = "fg",
+        font_size: object = 16,
+        font_weight: str = "normal",
+        target: str = "AA",
+        max_results: int = 25,
+    ) -> Dict[str, Any]:
+        """
+        查找符合 WCAG 对比度要求的推荐颜色。
+
+        支持两种模式：
+        - mode="fg": 固定背景色，推荐符合对比度的文字色
+        - mode="bg": 固定文字色，推荐符合对比度的背景色
+
+        Parameters
+        ----------
+        fixed_color : str
+            固定的颜色值 (HEX / RGB / HSL)
+        mode : str
+            "fg" — 推荐前景/文字色；"bg" — 推荐背景色
+        font_size : int or str
+            字号。支持：
+            - int: 直接作为 px（如 16）
+            - str 中文字号名: "小四", "五号", "二号" 等
+            - str pt 单位: "12pt", "10.5pt"
+            - str px 单位: "16px"
+        font_weight : str
+            字重（normal / bold）
+        target : str
+            目标等级 "AA" 或 "AAA"
+        max_results : int
+            最大返回数量（上限 25）
+
+        Returns
+        -------
+        dict
+            {
+                "fixed_color": str,
+                "mode": str,
+                "font_size": int,
+                "font_weight": str,
+                "target": str,
+                "is_large_text": bool,
+                "min_ratio": float,
+                "recommendations": [
+                    {"hex": "#...", "name": "颜色名", "contrast_ratio": "4.5:1", "level": "AA"},
+                    ...
+                ],
+                "total_candidates": int,
+                "total_found": int
+            }
+        """
+        max_results = min(max_results, 25)
+
+        # 解析固定色
+        fixed_rgb = ColorCore.parse_color_input(fixed_color)
+        fixed_hex = ColorCore.rgb_to_hex(fixed_rgb.r, fixed_rgb.g, fixed_rgb.b)
+        fixed_luminance = ColorCore._calculate_relative_luminance(fixed_rgb.r, fixed_rgb.g, fixed_rgb.b)
+
+        is_large = ColorCore._is_large_text(font_size, font_weight)
+        min_ratio = ColorCore._get_wcag_ratio(target, is_large)
+
+        # 判断固定色的明暗，确定需要找亮色还是暗色
+        fixed_is_light = fixed_luminance > 0.4
+        if mode == "fg":
+            # 找文字色：亮背景找暗文字，暗背景找亮文字
+            need_lighter = not fixed_is_light
+        else:  # mode == "bg"
+            # 找背景色：亮文字找暗背景，暗文字找亮背景
+            need_lighter = fixed_is_light
+
+        # 遍历 HSL 空间生成候选色
+        candidates = []
+        seen_hex = set()
+
+        # 色调采样: 12 个主色相 + 12 个间色相 = 24 个
+        hues = list(range(0, 360, 15))
+
+        # 饱和度采样: 高/中高/中/中低 4 档
+        sats = [85, 65, 45, 25]
+
+        for h in hues:
+            for s in sats:
+                # 对每个(h,s)组合，搜索符合亮度要求的光照度
+                # 二分查找法找最佳亮度
+                lo, hi = (1, 60) if need_lighter else (40, 99)
+                step = 10
+                for l in range(lo, hi + 1, step):
+                    rgb = ColorCore.hsl_to_rgb(h, s, l)
+                    hex_color = ColorCore.rgb_to_hex(rgb.r, rgb.g, rgb.b)
+                    if hex_color in seen_hex:
+                        continue
+                    seen_hex.add(hex_color)
+
+                    l_text = ColorCore._calculate_relative_luminance(rgb.r, rgb.g, rgb.b)
+                    lighter = max(fixed_luminance, l_text)
+                    darker = min(fixed_luminance, l_text)
+                    ratio = (lighter + 0.05) / (darker + 0.05)
+
+                    if ratio >= min_ratio:
+                        # 检查是否需要额外变亮/变暗以满足对比度
+                        name = ColorCore._get_color_name_simple(hex_color)
+                        candidates.append({
+                            "hex": hex_color,
+                            "name": name,
+                            "contrast_ratio": f"{ratio:.2f}:1",
+                            "level": "AAA" if ratio >= 7.0 else ("AA" if ratio >= 4.5 else "AA大文本"),
+                            "ratio_value": ratio,
+                            "hue": h,
+                        })
+
+        # 去重并按对比度降序排列
+        seen = set()
+        unique = []
+        for c in candidates:
+            key = c["hex"]
+            if key not in seen:
+                seen.add(key)
+                unique.append(c)
+        unique.sort(key=lambda x: -x["ratio_value"])
+
+        # 按色相分散选取，保证多样性
+        hue_groups = {}
+        for c in unique:
+            hg = c["hue"] // 30
+            hue_groups.setdefault(hg, []).append(c)
+
+        # 先每个色相组取最好的1个，再按对比度补满
+        diverse = []
+        for hg in sorted(hue_groups.keys()):
+            if hue_groups[hg]:
+                diverse.append(hue_groups[hg][0])
+
+        # 补满到 max_results
+        remainder = [c for c in unique if c not in diverse]
+        for c in remainder:
+            if len(diverse) >= max_results:
+                break
+            diverse.append(c)
+
+        diverse = diverse[:max_results]
+
+        return {
+            "fixed_color": fixed_hex,
+            "mode": mode,
+            "font_size": font_size,
+            "font_weight": font_weight,
+            "target": target,
+            "is_large_text": is_large,
+            "min_ratio": min_ratio,
+            "recommendations": diverse,
+            "total_candidates": len(candidates),
+            "total_found": len(diverse),
+        }
+
+    @staticmethod
+    def _get_color_name_simple(hex_color: str) -> str:
+        """获取简洁颜色名。"""
+        rgb = ColorCore.hex_to_rgb(hex_color)
+        hsl = ColorCore.rgb_to_hsl(rgb.r, rgb.g, rgb.b)
+        h, s, l = hsl.h, hsl.s, hsl.l
+
+        if s < 10:
+            return "深灰" if l < 30 else ("浅灰" if l > 70 else "灰色")
+
+        names = [
+            (0, 15, "红"), (15, 30, "橙红"), (30, 45, "橙"),
+            (45, 60, "橙黄"), (60, 75, "黄"), (75, 90, "黄绿"),
+            (90, 120, "绿"), (120, 150, "青绿"), (150, 180, "青"),
+            (180, 210, "蓝绿"), (210, 240, "蓝"), (240, 270, "靛蓝"),
+            (270, 300, "紫"), (300, 330, "紫红"), (330, 345, "粉"),
+            (345, 360, "红"),
+        ]
+        for start, end, name in names:
+            if start <= h < end:
+                prefix = "深" if l < 35 else ("浅" if l > 70 else "")
+                return f"{prefix}{name}"
+        return "彩色"
+
 
 # ============ 便捷函数 ============
 
@@ -921,6 +1155,46 @@ def get_palette(color_input: str, palette_type: str = "triadic") -> Dict[str, An
         "colors": colors,
         "count": len(colors)
     }
+
+
+def find_accessible(fixed_color: str, mode: str = "fg", **kwargs) -> Dict[str, Any]:
+    """
+    查找符合 WCAG 对比度要求的推荐颜色（便捷函数封装）。
+
+    Parameters
+    ----------
+    fixed_color : str
+        固定的颜色值
+    mode : str
+        "fg" — 推荐文字色；"bg" — 推荐背景色
+    **kwargs : 透传给 ColorCore.find_accessible_colors 的参数
+        font_size, font_weight, target, max_results
+
+    Returns
+    -------
+    dict
+    """
+    return ColorCore.find_accessible_colors(fixed_color, mode=mode, **kwargs)
+
+
+def find_accessible(fixed_color: str, mode: str = "fg", **kwargs) -> Dict[str, Any]:
+    """
+    查找符合 WCAG 对比度要求的推荐颜色（便捷函数封装）。
+
+    Parameters
+    ----------
+    fixed_color : str
+        固定的颜色值
+    mode : str
+        "fg" — 推荐文字色；"bg" — 推荐背景色
+    **kwargs : 透传给 ColorCore.find_accessible_colors 的参数
+        font_size, font_weight, target, max_results
+
+    Returns
+    -------
+    dict
+    """
+    return ColorCore.find_accessible_colors(fixed_color, mode=mode, **kwargs)
 
 
 if __name__ == "__main__":

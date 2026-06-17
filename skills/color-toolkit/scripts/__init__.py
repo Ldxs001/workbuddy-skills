@@ -25,10 +25,19 @@ from color_toolkit import (
     get_contrast,
     get_complementary,
     get_palette,
+    find_accessible,
 )
 
 from color_recommender import recommend_color
-from preview_generator import generate_full_preview_html, generate_palette_page_html
+from preview_generator import (
+    generate_full_preview_html,
+    generate_palette_page_html,
+    assemble_report,
+    render_palette,
+    render_contrast,
+    render_text_contrast,
+    render_accessible_recommendations,
+)
 
 __all__ = [
     # 核心类
@@ -40,9 +49,15 @@ __all__ = [
     "get_contrast",
     "get_complementary",
     "get_palette",
+    "find_accessible",
     "recommend_color",
     "generate_full_preview_html",
     "generate_palette_page_html",
+    "assemble_report",
+    "render_palette",
+    "render_contrast",
+    "render_text_contrast",
+    "render_accessible_recommendations",
 ]
 
 __version__ = "1.0.0"
