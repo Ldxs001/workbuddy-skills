@@ -1,6 +1,6 @@
 {
   "name": "analysis-toolkit",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "description": "检验检测行业质量控制和数据分析工具箱。覆盖室内质控、室间比对、批次间比对、方法验证、趋势监控五大场景。方法通用，跨领域适用。",
   "author": "wUwproject",
   "tags": [

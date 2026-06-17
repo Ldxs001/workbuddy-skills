@@ -1,12 +1,22 @@
 """
 基础统计方法模块
+
+重构说明（v2）：
+  细粒度算子已拆分到 scripts/operations/ 下。
+  本模块保留高层聚合函数，内部调用 operations 层的原子算子。
 """
 import numpy as np
+from scripts.operations.operators import (
+    calc_mean, calc_median, calc_sd, calc_rsd, calc_min, calc_max,
+    calc_count, calc_pooled_sd, calc_pooled_rsd, calc_robust_sd,
+)
 
 
 def calc_precision_stats(values):
     """
     精密度统计：SD, RSD, 平均值, 中位数。
+
+    内部使用 operations 层的细粒度算子。
     """
     arr = np.array(values, dtype=float)
     n = len(arr)
@@ -16,28 +26,28 @@ def calc_precision_stats(values):
         raise ValueError("数据包含 NaN")
 
     try:
-        mean = np.mean(arr)
-        sd = np.std(arr, ddof=1)
+        mean = calc_mean(arr)
+        sd = calc_sd(arr)
     except (ZeroDivisionError, FloatingPointError) as e:
         raise ValueError(f"精密度计算失败: {e}")
-    
+
     return {
         "mean": mean,
-        "median": np.median(arr),
+        "median": calc_median(arr),
         "sd": sd,
-        "rsd": sd / mean * 100 if mean != 0 else 0,
-        "count": len(arr),
-        "min": np.min(arr),
-        "max": np.max(arr),
+        "rsd": calc_rsd(arr),
+        "count": calc_count(arr),
+        "min": calc_min(arr),
+        "max": calc_max(arr),
     }
 
 
 def calc_synthetic_std(groups, method="standard"):
     """
     合成标准差。
-    
-    适用场景：多个组（不同水平/批次）的精密度合并。
-    
+
+    内部使用 operations 层的 calc_pooled_sd 算子。
+
     Parameters
     ----------
     groups : list of array-like
@@ -45,7 +55,7 @@ def calc_synthetic_std(groups, method="standard"):
     method : str
         "standard" — 正规算法（加权合并）
         "simple" — 简单算法（SQRT((SD1²+SD2²+...+SDk²)/k)）
-    
+
     Returns
     -------
     dict
@@ -57,7 +67,6 @@ def calc_synthetic_std(groups, method="standard"):
     try:
         group_stats = []
         total_n = 0
-        total_ss = 0
         weighted_sum = 0
         sd_squares = 0
         k = len(groups)
@@ -65,20 +74,18 @@ def calc_synthetic_std(groups, method="standard"):
         for g in groups:
             arr = np.array(g, dtype=float)
             n = len(arr)
-            mean = np.mean(arr)
-            sd = np.std(arr, ddof=1)
-            ss = (n - 1) * sd ** 2
+            mean = calc_mean(arr)
+            sd = calc_sd(arr)
 
-            group_stats.append({"n": n, "mean": mean, "sd": sd, "ss": ss})
+            group_stats.append({"n": n, "mean": mean, "sd": sd})
             total_n += n
-            total_ss += ss
             weighted_sum += mean * n
             sd_squares += sd ** 2
 
         if method == "simple":
             synthetic_std = np.sqrt(sd_squares / k) if k > 0 else 0
         else:
-            synthetic_std = np.sqrt(total_ss / (total_n - k)) if total_n > k else 0
+            synthetic_std = calc_pooled_sd(groups)
 
         overall_mean = weighted_sum / total_n if total_n > 0 else 0
 
@@ -96,7 +103,5 @@ def calc_synthetic_std(groups, method="standard"):
 
 
 def calc_precision(values):
-    """
-    calc_precision_stats 的简写别名。
-    """
+    """calc_precision_stats 的简写别名。"""
     return calc_precision_stats(values)

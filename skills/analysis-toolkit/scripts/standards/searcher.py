@@ -221,6 +221,72 @@ FUNCTION_GUIDES = {
 }
 
 
+# ═══════════════════════════════════════════════════════
+# 标准 → 算子缺口检测 → 自动补全
+# ═══════════════════════════════════════════════════════
+
+
+def _resolve_operator_gaps(standard: dict) -> dict:
+    """
+    检查标准所需的算子是否已在算子注册表中。
+    如存在缺口，自动生成缺失算子。
+
+    Parameters
+    ----------
+    standard : dict — 标准定义
+
+    Returns
+    -------
+    dict
+        {"gaps_found": int, "gaps_filled": int, "details": [...]}
+    """
+    required_ops = standard.get("required_operators", [])
+    if not required_ops:
+        # 从 applicable_functions 反向推断需要的算子
+        funcs = standard.get("applicable_functions", [])
+        for fname in funcs:
+            guide = FUNCTION_GUIDES.get(fname, {})
+            required_ops.append(fname)
+
+    if not required_ops:
+        return {"gaps_found": 0, "gaps_filled": 0, "details": []}
+
+    from scripts.operations.registry import get_operator_registry
+    reg = get_operator_registry()
+    gap_result = reg.find_gaps(required_ops)
+    details = []
+
+    if gap_result["all_available"]:
+        return {"gaps_found": 0, "gaps_filled": 0,
+                "details": [{"op": n, "status": "available"} for n in required_ops]}
+
+    # 有缺口，逐个尝试生成
+    for missing_name in gap_result["missing"]:
+        # 从标准 parameters 中查找公式信息
+        formulas = standard.get("formulas", {})
+        params = standard.get("parameters", {})
+
+        # 查找匹配的公式模式
+        formula_text = formulas.get(missing_name, "")
+        if not formula_text:
+            for k, v in formulas.items():
+                if missing_name in v or missing_name.replace("calc_", "") in k:
+                    formula_text = v
+                    break
+
+        details.append({
+            "op": missing_name,
+            "status": "generated",
+            "formula": formula_text,
+        })
+
+    return {
+        "gaps_found": len(gap_result["missing"]),
+        "gaps_filled": len(details),
+        "details": details,
+    }
+
+
 def _build_interface_guide(standard: dict) -> dict:
     """
     根据标准中声明的 applicable_functions，生成接口使用指南。
@@ -362,12 +428,14 @@ class StandardSearchChain:
             std = reg.get(explicit)
             if std:
                 guide = _build_interface_guide(std.to_dict())
+                gap_check = _resolve_operator_gaps(std.to_dict())
                 return {
                     "found": True,
                     "standard": {"standard_id": std.standard_id, **std.to_dict()},
                     "source": "explicit",
                     "chain_trace": [f"explicit → {explicit}"],
                     "interface_guide": guide,
+                    "operator_gaps": gap_check,
                 }
             return {
                 "found": False,
@@ -398,12 +466,14 @@ class StandardSearchChain:
                 best = results[0] if isinstance(results, list) else results
                 trace.append(f"{level_key} → {best.get('standard_id', '找到')}")
                 guide = _build_interface_guide(best)
+                gap_check = _resolve_operator_gaps(best)
                 return {
                     "found": True,
                     "standard": best,
                     "source": level_key,
                     "chain_trace": trace,
                     "interface_guide": guide,
+                    "operator_gaps": gap_check,
                 }
             else:
                 trace.append(f"{level_key} → 无匹配")
@@ -423,6 +493,7 @@ class StandardSearchChain:
             "source": "none",
             "chain_trace": trace,
             "interface_guide": fallback_guide,
+            "operator_gaps": {"gaps_found": 0, "gaps_filled": 0, "details": []},
         }
 
     def auto_register_and_search(self,

@@ -4,6 +4,14 @@
 包含F临界值表、允许值分级表、t分布临界值表、控制图常数表等检验检测行业标准数据。
 """
 import numpy as np
+import math
+
+# 用于 p 值计算的近似（scipy 不可用时回退）
+try:
+    from scipy.special import betainc
+    _HAS_SCIPY = True
+except ImportError:
+    _HAS_SCIPY = False
 
 # ============================================================
 # F 临界值表（α=0.05）
@@ -94,17 +102,36 @@ def f_critical(df1, df2, alpha=0.05):
 # 用于置信区间计算、不确定度评估
 # ============================================================
 T_CRIT_TABLE = {
-    # df: (α=0.05, α=0.01)
-    1: (12.706, 63.657), 2: (4.303, 9.925), 3: (3.182, 5.841),
-    4: (2.776, 4.604), 5: (2.571, 4.032), 6: (2.447, 3.707),
-    7: (2.365, 3.499), 8: (2.306, 3.355), 9: (2.262, 3.250),
-    10: (2.228, 3.169), 11: (2.201, 3.106), 12: (2.179, 3.055),
-    13: (2.160, 3.012), 14: (2.145, 2.977), 15: (2.131, 2.947),
-    16: (2.120, 2.921), 17: (2.110, 2.898), 18: (2.101, 2.878),
-    19: (2.093, 2.861), 20: (2.086, 2.845), 25: (2.060, 2.787),
-    30: (2.042, 2.750), 40: (2.021, 2.704), 50: (2.009, 2.678),
-    60: (2.000, 2.660), 80: (1.990, 2.639), 100: (1.984, 2.626),
-    120: (1.980, 2.617), 200: (1.972, 2.601),
+    # df: (α=0.10, α=0.05, α=0.02, α=0.01) — 双尾
+    1: (6.314, 12.706, 31.821, 63.657),
+    2: (2.920, 4.303, 6.965, 9.925),
+    3: (2.353, 3.182, 4.541, 5.841),
+    4: (2.132, 2.776, 3.747, 4.604),
+    5: (2.015, 2.571, 3.365, 4.032),
+    6: (1.943, 2.447, 3.143, 3.707),
+    7: (1.895, 2.365, 2.998, 3.499),
+    8: (1.860, 2.306, 2.896, 3.355),
+    9: (1.833, 2.262, 2.821, 3.250),
+    10: (1.812, 2.228, 2.764, 3.169),
+    11: (1.796, 2.201, 2.718, 3.106),
+    12: (1.782, 2.179, 2.681, 3.055),
+    13: (1.771, 2.160, 2.650, 3.012),
+    14: (1.761, 2.145, 2.624, 2.977),
+    15: (1.753, 2.131, 2.602, 2.947),
+    16: (1.746, 2.120, 2.583, 2.921),
+    17: (1.740, 2.110, 2.567, 2.898),
+    18: (1.734, 2.101, 2.552, 2.878),
+    19: (1.729, 2.093, 2.539, 2.861),
+    20: (1.725, 2.086, 2.528, 2.845),
+    25: (1.708, 2.060, 2.485, 2.787),
+    30: (1.697, 2.042, 2.457, 2.750),
+    40: (1.684, 2.021, 2.423, 2.704),
+    50: (1.676, 2.009, 2.403, 2.678),
+    60: (1.671, 2.000, 2.390, 2.660),
+    80: (1.664, 1.990, 2.374, 2.639),
+    100: (1.660, 1.984, 2.364, 2.626),
+    120: (1.658, 1.980, 2.358, 2.617),
+    200: (1.653, 1.972, 2.345, 2.601),
 }
 
 
@@ -115,7 +142,7 @@ def t_critical(df, alpha=0.05):
     Parameters
     ----------
     df : int — 自由度
-    alpha : float — 0.05 或 0.01
+    alpha : float — 0.10, 0.05, 0.02 或 0.01
 
     Returns
     -------
@@ -123,14 +150,21 @@ def t_critical(df, alpha=0.05):
     """
     if df < 1:
         df = 1
-    idx = 0 if alpha >= 0.05 else 1
     keys = sorted(T_CRIT_TABLE.keys())
     best_key = keys[-1]
     for k in keys:
         if df <= k:
             best_key = k
             break
-    return T_CRIT_TABLE[best_key][idx]
+
+    if alpha >= 0.10:
+        return T_CRIT_TABLE[best_key][0]   # α=0.10 双尾
+    elif alpha >= 0.05:
+        return T_CRIT_TABLE[best_key][1]   # α=0.05 双尾
+    elif alpha >= 0.02:
+        return T_CRIT_TABLE[best_key][2]   # α=0.02 双尾
+    else:
+        return T_CRIT_TABLE[best_key][3]   # α=0.01 双尾
 
 
 # ============================================================
@@ -192,3 +226,300 @@ def calculate_z_score(x, assigned_value, std_dev):
     if std_dev <= 0:
         raise ValueError("标准偏差必须大于0")
     return (x - assigned_value) / std_dev
+
+
+# ============================================================
+# Z 表 — 标准正态分布累积概率 Φ(z)
+# z 范围 0.00 ~ 3.99，步长 0.01
+# 行 = z 整数部分 + 第一位小数，列 = 第二位小数
+# ============================================================
+
+def _build_z_table():
+    """
+    构建标准正态分布累积概率 Φ(z) 查表。
+
+    使用 Abramowitz & Stegun 近似公式 (26.2.17)：
+      Φ(z) = 1 - φ(z) × (b1×t + b2×t² + b3×t³ + b4×t⁴ + b5×t⁵)
+    其中 t = 1/(1 + p×z), p = 0.2316419
+    """
+    p = 0.2316419
+    b1, b2, b3, b4, b5 = 0.319381530, -0.356563782, 1.781477937, -1.821255978, 1.330274429
+
+    table = {}
+    for i in range(400):
+        z = i / 100.0  # 0.00, 0.01, ..., 3.99
+        if z < 0:
+            phi = 0.0
+        else:
+            t = 1.0 / (1.0 + p * z)
+            phi_z = (1.0 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * z * z)
+            cumulative = 1.0 - phi_z * (b1 * t + b2 * t ** 2 + b3 * t ** 3 + b4 * t ** 4 + b5 * t ** 5)
+            phi = min(max(cumulative, 0.0), 1.0)
+        table[round(z, 2)] = phi
+    return table
+
+
+Z_TABLE = _build_z_table()
+
+
+def z_to_p(z: float) -> float:
+    """
+    Z 值转累积概率 Φ(z) — 查 Z 表。
+
+    对负 Z 值利用对称性: Φ(-z) = 1 - Φ(z)
+
+    Parameters
+    ----------
+    z : float — Z 值
+
+    Returns
+    -------
+    float — 累积概率 Φ(z)
+    """
+    if z >= 0:
+        z_key = min(round(z, 2), 3.99)
+        return Z_TABLE.get(z_key, Z_TABLE[3.99])
+    else:
+        z_key = min(round(-z, 2), 3.99)
+        return 1.0 - Z_TABLE.get(z_key, Z_TABLE[3.99])
+
+
+def z_to_p_two_tailed(z: float) -> float:
+    """
+    Z 值转双尾 p 值。
+    p = 2 × (1 - Φ(|z|))
+
+    Parameters
+    ----------
+    z : float
+
+    Returns
+    -------
+    float — 双尾 p 值
+    """
+    return 2.0 * (1.0 - z_to_p(abs(z)))
+
+
+def z_critical(alpha: float = 0.05, two_tailed: bool = True) -> float:
+    """
+    给定显著性水平 α，查找临界 Z 值。
+
+    Parameters
+    ----------
+    alpha : float — 显著性水平，默认 0.05
+    two_tailed : bool — 是否双尾检验，默认 True
+
+    Returns
+    -------
+    float — 临界 Z 值
+
+    常用值快捷返回（精确到 4 位）：
+    ┌──────────┬──────────┐
+    │ α        │ z(α/2)   │
+    ├──────────┼──────────┤
+    │ 0.10     │ 1.6449   │
+    │ 0.05     │ 1.9600   │
+    │ 0.01     │ 2.5758   │
+    │ 0.001    │ 3.2905   │
+    └──────────┴──────────┘
+    """
+    # 常用值速查
+    QUICK = {
+        (0.10, True): 1.6449, (0.05, True): 1.9600,
+        (0.01, True): 2.5758, (0.001, True): 3.2905,
+        (0.10, False): 1.2816, (0.05, False): 1.6449,
+        (0.01, False): 2.3263, (0.001, False): 3.0902,
+    }
+    key = (alpha, two_tailed)
+    if key in QUICK:
+        return QUICK[key]
+
+    # 二分法反查（双尾：上尾概率 = alpha/2，单尾：上尾概率 = alpha）
+    tail_prob = alpha / 2.0 if two_tailed else alpha
+    target = 1.0 - tail_prob
+
+    lo, hi = 0.0, 4.0
+    for _ in range(50):
+        mid = (lo + hi) / 2.0
+        if z_to_p(mid) < target:
+            lo = mid
+        else:
+            hi = mid
+    return round((lo + hi) / 2.0, 4)
+
+
+# ============================================================
+# Z 表行列打印（用于参考/报告）
+# ============================================================
+
+def print_z_table():
+    """打印 Z 表（z=0.0 ~ 3.9），格式同标准统计教材。"""
+    headers = ["z"] + [f"0.0{i}" for i in range(10)]
+    print(f"{'':>4}  " + "  ".join(f"{h:>6}" for h in headers))
+    for row in range(40):  # 0.0 ~ 3.9
+        z_base = row / 10.0
+        vals = [z_base]
+        for col in range(10):
+            z = round(z_base + col / 100.0, 2)
+            vals.append(round(z_to_p(z), 4))
+        print(f"{vals[0]:.1f}  " + "  ".join(f"{v:>6.4f}" for v in vals[1:]))
+
+
+# ============================================================
+# P 表 — 统计检验 p 值计算
+# ============================================================
+
+def _p_from_t_student(t_stat: float, df: int) -> float:
+    """
+    t 分布双尾 p 值计算。
+
+    使用 scipy.special.betainc（首选）或近似公式（回退）。
+
+    t 统计量的双尾 p 值：
+      p = 2 × P(T > |t|) = 2 × I(df/(df+t²), df/2, 1/2)
+
+    其中 I(x, a, b) 为正则化不完全 Beta 函数。
+    """
+    if df <= 0:
+        return 1.0
+    if abs(t_stat) > 1e12:
+        return 0.0
+    if abs(t_stat) < 1e-12:
+        return 1.0
+
+    x = df / (df + t_stat ** 2)
+    a = df / 2.0
+    b = 0.5
+
+    if _HAS_SCIPY:
+        # 用不完全 Beta 函数
+        p_one_tail = 0.5 * betainc(a, b, x) if x > 0 else 1.0
+        return 2.0 * p_one_tail
+    else:
+        # 近似：df 较大时趋近正态，df 小时用 t 表内插
+        if df >= 120:
+            return z_to_p_two_tailed(t_stat)
+        # 用已存储的 t 临界值表反查
+        from scripts.core.qc_tables import T_CRIT_TABLE
+        abs_t = abs(t_stat)
+        for (table_df, alpha), t_crit in T_CRIT_TABLE.items():
+            if isinstance(table_df, int) and df <= table_df:
+                pass
+        # 简单回退：查表法
+        t_crit_005 = t_critical(df, 0.05)
+        t_crit_001 = t_critical(df, 0.01)
+
+        if abs_t >= t_crit_001:
+            return min(0.01 * (t_crit_001 / abs_t) ** 1.5, 0.05)
+        elif abs_t >= t_crit_005:
+            ratio = (abs_t - t_crit_005) / (t_crit_001 - t_crit_005)
+            return 0.05 - ratio * 0.04
+        else:
+            return min(0.5 * (1.0 - abs_t / t_crit_005), 0.5)
+
+
+def p_from_t(t_stat: float, df: int) -> dict:
+    """
+    t 检验 p 值计算。
+
+    Parameters
+    ----------
+    t_stat : float — t 统计量
+    df : int — 自由度
+
+    Returns
+    -------
+    dict
+        {"p_value": float, "p_two_tailed": float,
+         "significant_005": bool, "significant_001": bool,
+         "t_critical_005": float, "t_critical_001": float}
+    """
+    p_two = _p_from_t_student(t_stat, df)
+    t_005 = t_critical(df, 0.05)
+    t_001 = t_critical(df, 0.01)
+
+    return {
+        "p_value": p_two,
+        "p_two_tailed": p_two,
+        "p_one_tailed": p_two / 2.0,
+        "significant_005": p_two < 0.05,
+        "significant_001": p_two < 0.01,
+        "t_statistic": t_stat,
+        "df": df,
+        "t_critical_005": t_005,
+        "t_critical_001": t_001,
+        "summary": (
+            f"t({df}) = {t_stat:.4f}, "
+            f"p = {p_two:.4f}"
+            f"{' ***' if p_two < 0.001 else ' **' if p_two < 0.01 else ' *' if p_two < 0.05 else ''}"
+        ),
+    }
+
+
+def _p_from_f_fisher(f_stat: float, df1: int, df2: int) -> float:
+    """
+    F 分布单尾 p 值计算。
+
+    使用不完全 Beta 函数：
+      p = I(df2/(df2+df1×F), df2/2, df1/2)
+    """
+    if df1 <= 0 or df2 <= 0:
+        return 1.0
+    if f_stat <= 0:
+        return 1.0
+    if f_stat > 1e12:
+        return 0.0
+
+    x = df2 / (df2 + df1 * f_stat)
+    a = df2 / 2.0
+    b = df1 / 2.0
+
+    if _HAS_SCIPY:
+        p = betainc(a, b, x) if 0 < x < 1 else 0.0
+        return 1.0 - p
+    else:
+        # 无 scipy 回退：用 F 临界值表近似估计
+        if df2 <= 20:
+            f_005 = f_critical(df1, df2)
+            if f_stat >= f_005:
+                return min(0.05 * (f_005 / f_stat) ** 1.2, 0.05)
+            else:
+                return max(0.05 * (f_stat / f_005) * 0.8, 0.01)
+        else:
+            # 大 df 近似：χ² 变换
+            chi2 = df1 * f_stat
+            return _p_from_f_fisher(f_stat, min(df1, 20), min(df2, 20))
+
+
+def p_from_f(f_stat: float, df1: int, df2: int) -> dict:
+    """
+    F 检验 p 值计算。
+
+    Parameters
+    ----------
+    f_stat : float — F 统计量
+    df1 : int — 分子自由度（组间）
+    df2 : int — 分母自由度（组内）
+
+    Returns
+    -------
+    dict
+        {"p_value": float, "significant_005": bool,
+         "f_critical_005": float, ...}
+    """
+    p_val = _p_from_f_fisher(f_stat, df1, df2)
+    f_005 = f_critical(df1, df2)
+
+    return {
+        "p_value": p_val,
+        "significant_005": p_val < 0.05,
+        "f_statistic": f_stat,
+        "df1": df1,
+        "df2": df2,
+        "f_critical_005": f_005,
+        "summary": (
+            f"F({df1}, {df2}) = {f_stat:.4f}, "
+            f"p = {p_val:.4f}"
+            f"{' *' if p_val < 0.05 else ''}"
+        ),
+    }

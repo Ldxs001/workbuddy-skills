@@ -27,7 +27,7 @@ ts = time_trend_analyze(df, "检测日期", "阳性数", freq="W")
 滚动统计量（滚动均值、标准差、上下限）。
 
 ### `prophet_forecast(df, date_col, value_col, group_col=None, periods=4, freq="W")`
-基于Prophet的时序预测。
+基于Prophet 的时序预测。
 
 ```python
 from scripts.analysis.time_series import prophet_forecast

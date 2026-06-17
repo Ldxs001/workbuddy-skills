@@ -115,6 +115,17 @@ class Standard:
         missing = self.REQUIRED_FIELDS - set(data.keys())
         if missing:
             raise ValueError(f"标准定义缺少必需字段: {missing}")
+        # 参数校验：parameters 中的数值字段必须为正数
+        params = data.get("parameters", {})
+        for k, v in params.items():
+            if isinstance(v, (int, float)) and v <= 0 and k.endswith(("factor", "limit", "threshold", "min", "max")):
+                raise ValueError(f"参数 '{k}' 必须为正数，收到: {v}")
+        # standard_id 格式校验
+        sid = data.get("standard_id", "")
+        if not sid or len(sid) < 2:
+            raise ValueError(f"standard_id 无效: '{sid}'")
+        if not any(c.isalnum() for c in sid):
+            raise ValueError(f"standard_id 必须包含字母或数字: '{sid}'")
         self.data = data
 
     @property

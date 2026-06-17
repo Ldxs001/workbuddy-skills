@@ -1,3 +1,76 @@
+## [2.0.0] - 2026-06-17
+
+### 架构重构（MAJOR）
+
+analysis-toolkit 从「场景函数集合」完全重构为「四层算子注册制架构」：
+
+#### 新增：scripts/operations/ — 细粒度算子层
+- **算子注册表** registry.py：统一注册/查询/缺口发现/持久化，所有算子必须注册方可被模板引用
+- **48个基础算子** operators.py：calc_mean/sd/rsd/bias/pooled/robust/Z值/ANOVA/t临界值/F临界值/SSE等
+- **不确定度模块** uncertainty.py：覆盖因子(√3/√6/√2/2/t)，A类/B类/合成/扩展不确定度全流程
+- **总误差模块** total_error.py：TE=|bias|+t_crit×SD，含CLIA'88分级判定
+- **自动生成器** generator.py：查标准→解析公式→识别算子缺口→自动生成算子代码并注册
+- **可视化算子** viz.py：metric_card/te_breakdown/te_judgment_section/measurement_uncertainty_section等
+- **算子自测试** self_test.py：46个精确值测试用例 + 属性验证，0 FAIL
+
+#### 重构：场景层 — 算子组合模式
+- `scripts/core/stats.py` 从独立实现改为调用 operations 层算子
+- 所有场景函数 (`scenarios/internal_qc.py` 等) 保持向后兼容的外部接口
+- **Pipeline 引擎** engine.py：新增 hooks 钩子系统（pipeline:pre/step:post/report:pre）
+- **6个场景模板**全部配置 default_report 关联特色报告
+
+#### 新增：报告引擎 — 模板 = 场景 + HTML 报告包
+- **ReportEngine** report_engine.py：section 注册制渲染器，支持自定义 section 类型
+- **6个独立报告模板** templates/reports/：室内质控/室间比对/总误差/方法验证/不确定度/趋势监控
+- 场景模板与报告模板**彻底解耦**：同一场景结果可被任意报告模板消费
+- **配置面板** serve_config.py：场景×报告关联配置 + 算子注册表总览，双确认关闭
+
+#### 新增：验证体系
+- **场景交叉验证** verify.py：专用验证器（精密/ANOVA/曲线/总误差/不确定度等）+ 逼近验证兜底
+- **通用逼近验证** verify_approximation.py：不依赖公式知识的值域/稳定性/收敛性/自洽性检查
+- 拟合验证确保新增算子在无测试用例时也能被泛化覆盖
+
+#### 新增：14个功能算子
+- **4种归一化**：Z-score/MinMax/稳健(MAD)/小数定标
+- **7种修约**：向上/向下/四舍五入/五成双(GB/T 8170)/有效数字/小数位数/统一接口
+- **3种秩和**：calc_rank_sum/calc_mann_whitney_u/calc_wilcoxon_signed_rank
+
+#### 新增：Z表 + P表
+- Z表：z_to_p/双尾p/临界值
+- P表(t/F)：t统计量→p值、F统计量→p值
+
+#### 修复
+- R-11 产出物误判：scripts/output/ → scripts/reporting/（源码非产出物）
+- R-17 SKILL.md 超行：305→203行，拆分快速使用/流水线到 references/
+- permissions.md 中英文间距
+
+#### 标准化合规
+- skill-standardization R-01~R-26 全量审计：0 ERROR 0 WARN
+- skill-function-test 全流程：S1-S3 18/18, D1-D6 539项, S4 15/15
+## [1.6.0] - 2026-06-17
+
+### 修复
+- refactor: analysis-toolkit
+
+---
+
+
+
+## v2.0.0 (2026-06-17) — 自动版本升级
+
+### Changed
+- 版本号 1.7.0 → 2.0.0（`update --fix` 自动 bump）
+## v1.7.0 (2026-06-17) — 自动版本升级
+
+### Changed
+- 版本号 1.6.0 → 1.7.0（`update --fix` 自动 bump）
+## 1.5.0 (2026-06-17)
+
+### 更新
+- skill-standardization 全量审计改造：R-01~R-26 全部通过（25 PASS，1 WARN 经 verify 确认为误报）
+- 版本号更新：1.4.1 → 1.5.0（minor bump，标准化改造增量）
+
+---
 ## 1.4.1 (2026-06-09)
 
 ### 修复
@@ -19,13 +92,13 @@
 
 ### 修复
 - `regression.py`: linear_regression / polynomial_regression 添加 NaN 检测、数据量校验、try/except 除零保护
-- `core/stats.py`: calc_precision_stats / calc_synthetic_std 添加空输入保护、try/except 防护
-- `standards/template_manager.py`: 相对导入添加 `__main__` fallback 兼容
-- `core/data_prep.py`: demo() 添加 pandas 缺失 try/except 保护
+- `scripts/core/stats.py`: calc_precision_stats / calc_synthetic_std 添加空输入保护、try/except 防护
+- `scripts/standards/template_manager.py`: 相对导入添加 `__main__` fallback 兼容
+- `scripts/core/data_prep.py`: demo() 添加 pandas 缺失 try/except 保护
 - 删除技能根目录测试产物 `.function-test_blueprint.json` / `.function-test_report.json`
 
 ### Audit
-- skill-standardization R-01~R-25 审计通过（23/25 PASS，剩余 1 ERROR 为 `scripts/output/` 误判 + 2 WARN 无实际影响）
+- skill-standardization R-01~R-26 审计通过（23/25 PASS，剩余 1 ERROR 为 `scripts/output/` 误判 + 2 WARN 无实际影响）
 
 ---
 
@@ -74,7 +147,7 @@
 
 ### 更新
 - `scripts/report/` → `scripts/docgen/`（规避产出物路径误判）
-- SKILL.md 遵循 skill-standardization R-01~R-25 规范（24/25 PASS）
+- SKILL.md 遵循 skill-standardization R-01~R-26 规范（24/25 PASS）
 - 数据目录迁移至 `.standardization/analysis-toolkit/`
 - 创建 `references/antipatterns.md`、`references/faq.md`、`references/permissions.md`
 
