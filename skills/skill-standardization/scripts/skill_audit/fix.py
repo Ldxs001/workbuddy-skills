@@ -846,7 +846,7 @@ def fix_create_permissions_md(skill_dir, **kw):
                 )
         high_perm_section = "\n".join(parts)
 
-    header = "# 基于skill-standardization渐进式披露规范的权限说明\n\n"
+    header = "# 基于 skill-standardization 渐进式披露规范的权限说明\n\n"
     header += "本文档由 `skill-standardization` 权限扫描器自动维护。\n\n"
     header += "## 风险等级\n\n"
     header += risk_desc
@@ -939,7 +939,7 @@ def fix_create_permissions_md(skill_dir, **kw):
     # 生成权限指纹（用于检测权限是否变化）
     permission_fp = f"risk={risk_level}|sensitive={stats.get('sensitive_access',0)}|critical_write={stats.get('critical_write',0)}|network={stats.get('network_access',0)}|delete={stats.get('file_delete',0)}|subprocess={stats.get('subprocess_call',0)}|issues={len(issues)}"
 
-    perm_header = "# 基于skill-standardization渐进式披露规范的权限说明"
+    perm_header = "# 基于 skill-standardization 渐进式披露规范的权限说明"
 
     if os.path.isfile(permissions_md):
         existing = _read_file(permissions_md)
@@ -1150,7 +1150,16 @@ def fix_writing_standards(skill_dir, **kw):
         ("设置", "配置"),
         ("设定", "配置"),
     ]
+    # 中英文混排空格修复（常见模式）
+    spacing_fixes = [
+        ("基于skill-standardization", "基于 skill-standardization"),
+        ("skill-standardization渐进", "skill-standardization 渐进"),
+    ]
     for wrong, right in replacements:
+        if wrong in content:
+            content = content.replace(wrong, right)
+            fixed += 1
+    for wrong, right in spacing_fixes:
         if wrong in content:
             content = content.replace(wrong, right)
             fixed += 1
@@ -1166,6 +1175,10 @@ def fix_writing_standards(skill_dir, **kw):
             ref_content = _read_file(fpath)
             ref_original = ref_content
             for wrong, right in replacements:
+                if wrong in ref_content:
+                    ref_content = ref_content.replace(wrong, right)
+                    fixed += 1
+            for wrong, right in spacing_fixes:
                 if wrong in ref_content:
                     ref_content = ref_content.replace(wrong, right)
                     fixed += 1

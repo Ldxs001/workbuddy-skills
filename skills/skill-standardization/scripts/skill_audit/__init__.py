@@ -429,12 +429,11 @@ def _expand_fail_entries(remaining):
 
 
 def _reclassify_false_positive(res, skill_dir=None):
-    """检测 LLM 手动标记的误判（工具不再自动排除任何项）
-    
-    v2.86.2: 移除所有自动误报识别模式。工具只输出原始问题清单（ERROR/WARN），
-    LLM 通过 `--classify` 手动标记误判。不再有 ⓘ 排除类别。
+    """仅通过 --classify ID 标记的误判进行排除
+
+    v2.86.2: 所有误判由 LLM 通过 `--classify` 手动标记。
+    代码层不做任何自动误报排除，确保审计报告输出全部原始问题。
     """
-    # 只检查 LLM 通过 --classify 手动标记的误判（需要 skill_dir）
     if skill_dir:
         fp_ids = _load_fp_ids(skill_dir)
         if fp_ids:
@@ -446,33 +445,6 @@ def _reclassify_false_positive(res, skill_dir=None):
                         return True  # LLM 已手动标记为误判
             except Exception:
                 pass
-    return False
-    if 'my_package' in detail:
-        return True
-    # data_dir frontmatter 路径被误判为文件引用（如 skills/.standardization/xxx）
-    if rule == "R-23" and "skills/.stan" in detail:
-        return True
-    # examples.md 中的使用示例路径 — 是文档演示，不是真实代码
-    if rule == "R-23" and "examples.md" in detail:
-        return True
-    # 通用测试/示例文件名模式：stub/mock/demo/permission_checker 等，不是真实脚本
-    if rule == "R-23" and "permission_checker" in detail:
-        return True
-    # R-25 C-14：工作流步骤完整性提醒
-    # 仅放过非流程类的完整性提醒，真实的步骤缺失不应放过
-    if rule == "R-25" and "由全报告LLM精筛确认步骤是否完整覆盖" in detail:
-        # 如果内容明显是假阳性（如仅提醒"请 LLM 确认"但无具体缺失描述）则放过
-        # 如果有具体的步骤缺失描述，则是真问题
-        return False  # 默认不放过，由 LLM 铁律8逐条判断
-    # R-25 C-12 假阳性：触发条件章节已包含正向/否定两段式结构，但检查器模板匹配不到
-    if rule == "R-25" and "触发条件" in detail and "内容不完整" in detail and "正向触发" in detail:
-        return True  # SKILL.md 实际已有正向触发/否定条件结构，检查器误判
-    # R-25 C-12 假阳性：检查器要求无序列表，但实际 SKILL.md 使用了编号列表或混排
-    if rule == "R-25" and "content_format 要求用" in detail:
-        return True  # content_format 是检查器模板推荐，非强制约束
-    # R-25 C-12 假阳性：工作流每步标注 I/O 但检查器未识别
-    if rule == "R-25" and "每步应标注关键输入输出" in detail and "输入" in detail and "输出" in detail:
-        return True  # SKILL.md 工作流步骤实际已有 I/O 标注
     return False
 
 
@@ -1209,7 +1181,9 @@ def cmd_audit(args):
     remaining_pre = [res for res in result.get("results", [])
                      if not res.get("passed") and not res.get("skipped")
                      and not _reclassify_false_positive(res, skill_dir)]
-    has_fixable = any(r.get("fix") for r in remaining_pre)
+    # LLM-only rules have fix=True but are NOT auto-fixable — exclude from has_fixable check
+    _llm_only_rules = {"R-07", "R-11", "R-20", "R-23", "R-25"}
+    has_fixable = any(r.get("fix") for r in remaining_pre if r.get("rule_id") not in _llm_only_rules)
 
     # 输出标准化报告摘要（fixable 检查之前）
     if not args.fix and not getattr(args, 'verify', False) and not getattr(args, 'classify', None) and not getattr(args, 'no_fp', None) and not getattr(args, 'show_fix', None):
@@ -1583,7 +1557,6 @@ def cmd_bump(args):
     dry_run = getattr(args, 'dry_run', False)
     bump_type = getattr(args, 'type', None)
     desc = getattr(args, 'desc', '')
-    fixed_rules = getattr(args, 'fixed_rules', None)
 
     # ── 铁律 0 ERROR 0 WARN 前置检查 ──
     if not dry_run:
@@ -1591,10 +1564,6 @@ def cmd_bump(args):
         remaining = [r for r in pre_result.get("results", [])
                      if not r.get("passed") and not r.get("skipped")
                      and not _reclassify_false_positive(r, skill_dir)]
-        # bump 也尊重 fixed-rules（从 update/refactor 流程传入）
-        _bump_fr = _parse_fixed_rules(fixed_rules) if fixed_rules else None
-        if remaining and _bump_fr:
-            remaining = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in _bump_fr]
         if remaining:
             fp_ids = _load_fp_ids(skill_dir)
             if fp_ids:
@@ -1609,10 +1578,9 @@ def cmd_bump(args):
             print(f"  {'='*35}")
             print(f"  LLM 应按以下步骤修复后重新执行 bump：")
             print(f"    1. 逐条审查下方 FAIL 项，区分真问题与误报")
-            print(f"    2. 真问题 → 修复后通过 --fixed-rules R-XX,R-YY 声明")
-            print(f"    3. 误判 → 通过 --classify ID 标记")
-            print(f"    4. 运行 audit <skill> --verify 确认双0")
-            print(f"    5. 再执行 bump --type fix --desc 'xxx'")
+            print(f"    2. 误判 → 通过 --classify ID 标记")
+            print(f"    3. 运行 audit <skill> --verify 确认双0")
+            print(f"    4. 再执行 bump --type fix --desc 'xxx'")
             print(f"  {'='*35}")
             print(f"  FAIL 明细：")
             for r in remaining:
@@ -1810,8 +1778,7 @@ def cmd_refactor(args):
     print(f"{'─'*55}")
     result, remaining, loop_count = _run_audit_loop(
         skill_dir, max_loops=20, label_prefix='4/8',
-        manifest_version=args.manifest_version,
-        fixed_rules=_parse_fixed_rules(getattr(args, 'fixed_rules', None)))
+        manifest_version=args.manifest_version)
 
     # ── 步骤 5：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
     if remaining:
@@ -1828,7 +1795,6 @@ def cmd_refactor(args):
                 rid = r.get('rule_id', r.get('rule', '?'))
                 print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
             print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
-            print(f"  修复后重新运行: --fixed-rules R-23,R-25 --confirmed")
             print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
         else:
             print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复修复")
@@ -1843,10 +1809,6 @@ def cmd_refactor(args):
     _before = {"errors": s_before.get("errors", 0), "warns": s_before.get("warns", 0)}
     print(format_report(result, before_summary=_before))
     remaining = _filter_false_positives(result, skill_dir)
-    # refactor 步骤 6 也尊重 fixed-rules
-    _fr = _parse_fixed_rules(getattr(args, 'fixed_rules', None))
-    if remaining and _fr:
-        remaining = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in _fr]
     if remaining:
         print(f"\n  ⛔ 全量审计确认失败：仍有 {len(remaining)} 项 FAIL")
         for r in remaining:
@@ -1867,12 +1829,10 @@ def cmd_refactor(args):
             check_consistency, format_consistency_report,
             reclassify_consistency_false_positive, apply_consistency_fix
         )
-        _c_fixed_types = getattr(args, 'fixed_rules', None) or []
         c_issues = check_consistency(skill_dir)
-        # 误判过滤（传入 --fixed-rules 申报类型）
-        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
+        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
         for i in c_issues:
-            if reclassify_consistency_false_positive(i, _c_fixed_types):
+            if reclassify_consistency_false_positive(i):
                 i['reclassified'] = True
         print(format_consistency_report(c_issues))
         
@@ -1900,9 +1860,9 @@ def cmd_refactor(args):
                 if _c_auto_fixed > 0:
                     print(f"  自动修复 {_c_auto_fixed} 项，重新审查确认...")
                     c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
+                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
                     for i in c_issues:
-                        if reclassify_consistency_false_positive(i, _c_fixed_types):
+                        if reclassify_consistency_false_positive(i):
                             i['reclassified'] = True
                     print(format_consistency_report(c_issues))
                     if not c_real:
@@ -1912,13 +1872,9 @@ def cmd_refactor(args):
                 
                 # ── ★★★ 细碎一致性审查钩子 ★★★ ──
                 print(f"\n  --- ★★★ 细碎一致性审查钩子 ★★★ ---")
-                print(f"  LLM 需要做两件事：")
+                print(f"  LLM 需要做一件事：")
                 print(f"")
-                print(f"  ① 通过 --fixed-rules 声明已修复的机械检查项类型")
-                print(f"     例如: --fixed-rules outdated_rule_ref,argparse_mismatch")
-                print(f"     声明后 → 代码自动跑针对性一致性审查确认")
-                print(f"")
-                print(f"  ② 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
+                print(f"  ① 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
                 print(f"     检查要点：")
                 print(f"     - 步骤数量是否与 cmd_xxx() 中的 [i/N] 编号一致？")
                 print(f"     - 文档是否遗漏了关键阶段（如细碎修复循环、一致性审查循环）？")
@@ -1927,33 +1883,16 @@ def cmd_refactor(args):
                 print(f"     注意：这是语义检查，代码无法自动判断，完全依赖 LLM")
                 print(f"")
 
-                _c_fixed_types = getattr(args, 'fixed_rules', None)
-                if _c_fixed_types:
-                    # 针对性重审（将 --fixed-rules 类型注入放过逻辑）
-                    c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
-                    for i in c_issues:
-                        if reclassify_consistency_false_positive(i, _c_fixed_types):
-                            i['reclassified'] = True
-                    print(format_consistency_report(c_issues))
-                    if not c_real:
-                        print(f"  ✅ 一致性修复完成（针对性审查后双 0）")
-                        break
-                    # 仍有剩余：清除 fixed_rules，进入全量重审
-                    print(f"  ⚠️  声明类型已放过，仍有 {len(c_real)} 项非该类型的问题待处理")
-                    # fall through to else block
-                    _c_fixed_types = None
-                else:
-                    # 全量重审
-                    c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, _c_fixed_types)]
-                    for i in c_issues:
-                        if reclassify_consistency_false_positive(i, _c_fixed_types):
-                            i['reclassified'] = True
-                    print(format_consistency_report(c_issues))
-                    if not c_real:
-                        print(f"  ✅ 一致性修复完成（全量重审后双 0）")
-                        break
+                # 全量重审
+                c_issues = check_consistency(skill_dir)
+                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                for i in c_issues:
+                    if reclassify_consistency_false_positive(i):
+                        i['reclassified'] = True
+                print(format_consistency_report(c_issues))
+                if not c_real:
+                    print(f"  ✅ 一致性修复完成（全量重审后双 0）")
+                    break
             
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")
@@ -1977,8 +1916,7 @@ def cmd_refactor(args):
         skill_dir=skill_dir,
         type=bump_type,
         desc=bump_desc or f'refactor: {os.path.basename(skill_dir)}',
-        dry_run=False,
-        fixed_rules=getattr(args, 'fixed_rules', None))
+        dry_run=False)
     cmd_bump(bump_args)
 
     # ── 步骤 8：最终报告 ──
@@ -2197,30 +2135,11 @@ def _validate_changed_files(skill_dir, changed_files):
     return True, ""
 
 
-def _parse_fixed_rules(raw):
-    """解析 --fixed-rules 参数为规则ID列表
-    
-    支持两种格式：--fixed-rules R-20 R-23 或 --fixed-rules R-20,R-23
-    """
-    if not raw:
-        return None
-    result = []
-    for item in raw:
-        for part in item.split(','):
-            part = part.strip()
-            if part:
-                result.append(part)
-    return result if result else None
 
-
-def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None, fixed_rules=None):
+def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None):
     """
     修复循环通用实现。
     返回 (result, remaining, loop_count)
-    
-    - 自动修复可自动修复的项目
-    - LLM 手动修复后通过 --fixed-rules 声明修复的规则
-    - 代码自动跑针对性审计确认
     """
     # 首次审计
     if filter_files:
@@ -2263,13 +2182,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         _llm_only_set = {"R-07", "R-11", "R-20", "R-23", "R-25"}
         remaining_auto = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in _llm_only_set]
         remaining_llm = [r for r in remaining if r.get("rule_id", r.get("rule", "")) in _llm_only_set]
-        
-        # 已通过 --fixed-rules 声明的规则，从 LLM 剩余项中移除（LLM 已手动修复）
-        if fixed_rules and remaining_llm:
-            before = len(remaining_llm)
-            remaining_llm = [r for r in remaining_llm if r.get("rule_id", r.get("rule", "")) not in fixed_rules]
-            if len(remaining_llm) < before:
-                print(f"\n  ✅ {before - len(remaining_llm)} 项已通过 --fixed-rules 声明修复")
 
         # 输出 LLM 手动修复指引（给 LLM 具体操作说明）
         if remaining_llm:
@@ -2304,7 +2216,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     print(f"    {rid} {sev} {detail}")
                     print(f"    → 请读取代码，生成结构化数据文件: {struct_file}")
                     print(f"    → 参考格式见 fix.py 中对应 fix 函数的文档注释")
-                print(f"    生成结构化数据后，重新执行 --fix（或 --fixed-rules R-25），脚本会自动渲染为格式化章节")
+                print(f"    生成结构化数据后，重新执行 --fix，脚本会自动渲染为格式化章节")
             
             # 其他手动修复项
             other_llm = [r for r in remaining_llm if r.get("fix", {}).get("key") not in _struct_keys]
@@ -2317,7 +2229,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     print(f"    {rid} {sev} {detail}")
                     if r.get('fix') and r['fix'].get('key'):
                         print(f"    → apply_fix(skill_dir, \"{r['fix']['key']}\")")
-                print(f"  LLM 修复后通过 --fixed-rules R-23,R-25 声明")
 
         if has_fixable:
             print(f"\n  --- 自动修复 ---")
@@ -2370,25 +2281,12 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             except Exception:
                 pass
 
-        # ── ★★★ 细碎审计钩子（代码级强制） ★★★ ──
-        print(f"\n  --- ★★★ 细碎审计钩子（修复轮 #{loop_count}） ★★★ ---")
-        print(f"  LLM 手动修复后必须通过 --fixed-rules 声明修了哪些规则")
-        print(f"  例如: --fixed-rules R-23,R-26")
-        print(f"  不声明 → 流程将继续使用全量审计确认（但效率较低）")
-        print(f"  声明后 → 代码自动跑针对性审计确认")
         # ── 判断：是否只剩 LLM 手动修复项 ──
         # 清除循环内注入的 fix key，查看真实的可自动修复项
         for r in remaining:
             if r.get("rule_id", r.get("rule", "")) in ("R-07", "R-11", "R-20", "R-23", "R-25"):
                 r.pop("fix", None)
         auto_fixable = [r for r in remaining if r.get("fix")]
-        
-        # 已通过 --fixed-rules 声明修复的规则，直接跳过（放在 break 之前）
-        if fixed_rules:
-            remaining_before = len(remaining)
-            remaining = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in fixed_rules]
-            if len(remaining) < remaining_before:
-                print(f"\n  ✅ {remaining_before - len(remaining)} 项已通过 --fixed-rules 声明修复")
         
         if not auto_fixable:
             if remaining:
@@ -2398,7 +2296,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
                     detail = r.get("detail", "")[:150]
                     print(f"    {rid} {sev} {detail}")
-                print(f"  修复后通过 --fixed-rules 声明")
             else:
                 print(f"\n  ✅ 所有项已修复，双 0 达成")
             _save_html_report(skill_dir, result)
@@ -2406,19 +2303,12 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         print(f"  ⚠️  剩余 {len(remaining)} 项（{len(auto_fixable)} 项可自动修复，{len(remaining)-len(auto_fixable)} 项需手动）")
         print()
 
-        if fixed_rules:
-            # 已声明修复的规则直接跳过（filter_rules 是 include 语义，不能传 fixed_rules）
-            remaining = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in fixed_rules]
-            if not remaining:
-                print(f"\n  ✅ 所有 {len(fixed_rules)} 项已通过 --fixed-rules 确认修复")
-                break
-        elif filter_files:
+        if filter_files:
             result = audit_skill(skill_dir, filter_files=filter_files)
         else:
             result = audit_skill(skill_dir)
-        if not fixed_rules:
-            print(format_report(result))
-            remaining = _filter_false_positives(result, skill_dir)
+        print(format_report(result))
+        remaining = _filter_false_positives(result, skill_dir)
 
         if remaining:
             print(f"\n  ⛔ 仍有 {len(remaining)} 项 FAIL，继续修复循环（已用 {loop_count}/{max_loops} 轮）")
@@ -2502,8 +2392,7 @@ def cmd_update(args):
     result, remaining, _ = _run_audit_loop(
         skill_dir, max_loops=10, label_prefix='4/8',
         manifest_version=args.manifest_version,
-        filter_files=changed_files,
-        fixed_rules=_parse_fixed_rules(getattr(args, 'fixed_rules', None)))
+        filter_files=changed_files)
     s_before_update = result.get("summary", {})
 
     # ── 步骤 4：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
@@ -2521,7 +2410,6 @@ def cmd_update(args):
                 rid = r.get('rule_id', r.get('rule', '?'))
                 print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
             print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
-            print(f"  修复后重新运行: --fixed-rules R-23,R-25 --confirmed")
             print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
         else:
             print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复")
@@ -2536,10 +2424,6 @@ def cmd_update(args):
     _before = {"errors": s_before_update.get("errors", 0), "warns": s_before_update.get("warns", 0)}
     print(format_report(result, before_summary=_before))
     remaining = _filter_false_positives(result, skill_dir)
-    # 步骤 6 也尊重 fixed-rules：已声明修复的规则不再视为未通过
-    _fr = _parse_fixed_rules(getattr(args, 'fixed_rules', None))
-    if remaining and _fr:
-        remaining = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in _fr]
     if remaining:
         print(f"\n  ⛔ 全量审计确认失败：仍有 {len(remaining)} 项 FAIL")
         for r in remaining:
@@ -2602,13 +2486,9 @@ def cmd_update(args):
                 
                 # ── ★★★ 细碎一致性审查钩子 ★★★ ──
                 print(f"\n  --- ★★★ 细碎一致性审查钩子 ★★★ ---")
-                print(f"  LLM 需要做两件事：")
+                print(f"  LLM 需要做一件事：")
                 print(f"")
-                print(f"  ① 通过 --fixed-rules 声明已修复的机械检查项类型")
-                print(f"     例如: --fixed-rules outdated_rule_ref,argparse_mismatch")
-                print(f"     声明后 → 代码自动跑针对性一致性审查确认")
-                print(f"")
-                print(f"  ② 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
+                print(f"  ① 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
                 print(f"     检查要点：")
                 print(f"     - 步骤数量是否与 cmd_xxx() 中的 [i/N] 编号一致？")
                 print(f"     - 文档是否遗漏了关键阶段（如细碎修复循环、一致性审查循环）？")
@@ -2617,28 +2497,15 @@ def cmd_update(args):
                 print(f"     注意：这是语义检查，代码无法自动判断，完全依赖 LLM")
                 print(f"")
 
-                _c_fixed_types = getattr(args, 'fixed_rules', None)
-                if _c_fixed_types:
-                    c_issues = check_consistency(skill_dir, filter_files=changed_files)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
-                    for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
-                            i['reclassified'] = True
-                    print(format_consistency_report(c_issues))
-                    if not c_real:
-                        print(f"  ✅ 一致性修复完成（针对性审查后双 0）")
-                        break
-                    continue
-                else:
-                    c_issues = check_consistency(skill_dir, filter_files=changed_files)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
-                    for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
-                            i['reclassified'] = True
-                    print(format_consistency_report(c_issues))
-                    if not c_real:
-                        print(f"  ✅ 一致性修复完成（全量重审后双 0）")
-                        break
+                c_issues = check_consistency(skill_dir, filter_files=changed_files)
+                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                for i in c_issues:
+                    if reclassify_consistency_false_positive(i):
+                        i['reclassified'] = True
+                print(format_consistency_report(c_issues))
+                if not c_real:
+                    print(f"  ✅ 一致性修复完成（全量重审后双 0）")
+                    break
             
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")
@@ -2661,8 +2528,7 @@ def cmd_update(args):
     bump_args = argparse.Namespace(
         skill_dir=skill_dir, type=bump_type,
         desc=bump_desc or f'update: {os.path.basename(skill_dir)}',
-        dry_run=False,
-        fixed_rules=getattr(args, 'fixed_rules', None))
+        dry_run=False)
     cmd_bump(bump_args)
 
     # ── 步骤 8：最终报告 ──
@@ -2739,9 +2605,6 @@ def main():
                         help="变更类型（默认交互选择）")
     p_bump.add_argument("--desc", required=True, help="本次变更描述（将写入 changelog）")
     p_bump.add_argument("--dry-run", action="store_true", help="仅预览，不实际修改")
-    p_bump.add_argument("--fixed-rules", nargs="*", default=None,
-                        help="已修复的规则列表（如 --fixed-rules R-23 R-26），从 update/refactor 传入")
-
     # refactor 子命令（v2.66.0 新增）
     p_refactor = subparsers.add_parser("refactor",
         help="全流程改造：蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 版本升级 → 清理")
@@ -2753,8 +2616,6 @@ def main():
                             help="manifest 中记录的版本号（用于 R-10）")
     p_refactor.add_argument("--continue", dest="refactor_continue", action="store_true",
                             help="从上一次中断处继续")
-    p_refactor.add_argument("--fixed-rules", nargs="*", default=None,
-                            help="已修复的规则列表（如 --fixed-rules R-23 R-26），细碎审计钩子用")
     p_refactor.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
 
     # create 子命令（v2.66.0 新增）
@@ -2773,8 +2634,6 @@ def main():
                           help="manifest 中记录的版本号（用于 R-10）")
     p_update.add_argument("--changed-files", nargs="*", default=None,
                           help="变更文件列表（如 --changed-files scripts/foo.py references/bar.md）")
-    p_update.add_argument("--fixed-rules", nargs="*", default=None,
-                          help="已修复的规则列表（如 --fixed-rules R-23 R-26）")
     p_update.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
 
     args = parser.parse_args()

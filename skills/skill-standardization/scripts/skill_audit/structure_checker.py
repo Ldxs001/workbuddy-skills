@@ -1371,9 +1371,22 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             break
     if not has_substantial_table:
         # 检查是否有明显的键值对比数据（如文件映射、参数列表）但没有用表格
-        structured_lines = [l for l in cleaned_body.split('\n') if '→' in l or '—' in l]
-        if structured_lines and len(structured_lines) >= 5:
-            issues["warn"].append("C-03: 正文包含较多键值对应关系（→ 或 — 分隔），建议用表格结构化展示")
+        _c03_found_lines = []
+        for _c03_ln in cleaned_body.split('\n'):
+            if '→' in _c03_ln or '—' in _c03_ln:
+                _c03_found_lines.append(_c03_ln.strip()[:40])
+                if len(_c03_found_lines) >= 3:
+                    break
+        if len([l for l in cleaned_body.split('\n') if '→' in l or '—' in l]) >= 5:
+            # 定位到第一个匹配行在 body 中的行号
+            _c03_first_match = None
+            for _c03_m in re.finditer(r'[→—]', body):
+                if _c03_first_match is None:
+                    _c03_first_match = _c03_m
+                    break
+            _c03_ln_no = body[:_c03_first_match.start()].count('\n') + 1 if _c03_first_match else 1
+            _c03_examples = '; '.join(_c03_found_lines)
+            issues["warn"].append(f"{filepath}:{_c03_ln_no} - C-03: 正文包含较多键值对应关系（如「{_c03_examples}」），建议用表格结构化展示")
 
     # ════════════════════════════════════════════════════════════
     # C-04 (WARN): 引用块 > 用于提示/注意/警告
@@ -1383,9 +1396,18 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     blockquote_lines = [l for l in cleaned_body.split('\n') if l.strip().startswith('>')]
     if len(blockquote_lines) == 0:
         # 检查正文中是否有警告性提示（加粗的"注意"/"警告"/"注"）但没有用 > 包装
-        warning_keywords = re.findall(r'\*\*(?:注意|警告|提示|注)\*\*', cleaned_body)
-        if warning_keywords:
-            issues["warn"].append("C-04: 正文含「注意/警告/提示」类关键词但未使用 > 引用块包装，建议统一使用 > 块")
+        warning_keywords = re.finditer(r'\*\*(?:注意|警告|提示|注)\*\*', cleaned_body)
+        _c04_matches = list(warning_keywords)
+        if _c04_matches:
+            _c04_details = []
+            for _c04_m in _c04_matches[:3]:
+                _c04_ln = body[:_c04_m.start()].count('\n') + 1
+                _c04_ctx = cleaned_body[max(0, _c04_m.start()-20):_c04_m.end()+20].replace('\n', ' ')
+                _c04_details.append(f"第{_c04_ln}行「{_c04_ctx[:40]}」")
+            _c04_str = '; '.join(_c04_details)
+            if len(_c04_matches) > 3:
+                _c04_str += f' 等（共 {len(_c04_matches)} 处）'
+            issues["warn"].append(f"{filepath}:1 - C-04: 正文含「注意/警告/提示」类关键词但未使用 > 引用块包装，触发位置：{_c04_str}")
 
     # ════════════════════════════════════════════════════════════
     # C-05 (WARN): 有序列表用于步骤，无序列表用于选项
@@ -1413,7 +1435,10 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     # 排除引用块内的加粗（C-04 已处理）和表格内的加粗（C-03 已处理）
     # 如果正文完全没有加粗，且正文较长（>100行），建议使用加粗
     if not bold_markers and len(body) > 500:
-        issues["warn"].append("C-06: 正文未使用 **加粗** 标记，建议对关键术语/约束/规则名使用加粗强调")
+        # 定位正文中最可能使用加粗的位置：查找约束/核心能力章节
+        _c06_sec_match = re.search(r'^##\s+(?:约束|核心能力|工作流程|触发条件)', body, re.MULTILINE)
+        _c06_hint = f"（首个相关章节「{_c06_sec_match.group(0).strip()[:20]}」第{body[:_c06_sec_match.start()].count(chr(10))+1}行）" if _c06_sec_match else "（正文较长时间线较长，建议在约束/核心能力章节使用加粗）"
+        issues["warn"].append(f"{filepath}:1 - C-06: 正文未使用 **加粗** 标记，建议对关键术语/约束/规则名使用加粗强调{_c06_hint}")
 
     # ════════════════════════════════════════════════════════════
     # C-07 (WARN): 代码块使用语言标识
@@ -1475,13 +1500,37 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         after_fm = content[fm_end + 4:]  # 跳过 \n---
         trailing_newlines = len(re.match(r'\n*', after_fm).group())
         if trailing_newlines > 2:
-            issues["warn"].append(f"C-10: frontmatter 闭合 --- 后有 {trailing_newlines} 个连续空行（建议仅保留 1 个）")
-    # 检查正文（排除代码块后）是否有连续 4+ 换行
-    excess_blank = re.findall(r'\n{5,}', cleaned_body)
-    if excess_blank:
-        max_blank = max(len(b) for b in excess_blank)
-        spots = len(excess_blank)
-        issues["warn"].append(f"C-10: 正文中发现 {spots} 处连续 5+ 换行（最大 {max_blank} 行），建议精简到 1~2 个空行")
+            issues["warn"].append(f"{filepath}:{1} - C-10: frontmatter 闭合 --- 后有 {trailing_newlines} 个连续空行（建议仅保留 1 个）")
+    # 检查正文（排除代码块后）是否有连续 5+ 换行
+    # 直接在 body 上用 re.finditer 定位，跳过代码块内的匹配
+    excess_blank_spots = []
+    # 收集代码块范围（用于跳过）
+    _code_block_ranges = []
+    for _cb_m in re.finditer(r'```[\s\S]*?```', body):
+        _code_block_ranges.append(range(_cb_m.start(), _cb_m.end()))
+    for _fm_m in re.finditer(r'^---$[\s\S]*?^---$', body, re.MULTILINE):
+        _code_block_ranges.append(range(_fm_m.start(), _fm_m.end()))
+    def _is_in_code_block(pos):
+        return any(pos in r for r in _code_block_ranges)
+    # 用 finditer 在 body 中找连续 5+ 换行
+    for _eb_m in re.finditer(r'\n{5,}', body):
+        if _is_in_code_block(_eb_m.start()):
+            continue
+        _eb_line_no = body[:_eb_m.start()].count('\n') + 1
+        _eb_match_len = _eb_m.group().count('\n')
+        # 提取锚点上下文：匹配结束位置往后取一行作为锚点
+        _eb_after = body[_eb_m.end():_eb_m.end() + 60].split('\n')[0].strip()
+        _eb_anchor = _eb_after[:30] if _eb_after else "(空行后无内容)"
+        details_str = f"第 {_eb_line_no} 行附近出现 {_eb_match_len} 个连续空行（锚点：{_eb_anchor}）"
+        excess_blank_spots.append(details_str)
+    if excess_blank_spots:
+        _eb_spot_strs = '; '.join(excess_blank_spots[:5])
+        if len(excess_blank_spots) > 5:
+            _eb_spot_strs += f' 等（共 {len(excess_blank_spots)} 处）'
+        issues["warn"].append(
+            f"{filepath}:{1} - C-10: 正文中发现 {len(excess_blank_spots)} 处连续 5+ 换行"
+            f"，位置：{_eb_spot_strs}"
+        )
 
     # ════════════════════════════════════════════════════════════
     # C-11 (WARN): 章节顺位 — 检查 H2 出现顺序是否与 body.json section_order 一致
@@ -1639,7 +1688,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if "约束" in sec_title:
                 items_c = len(re.findall(r'^[-*]\s+', sec_body, re.MULTILINE))
                 if items_c > 5:
-                    issues["warn"].append("C-12: 章节「约束」共 " + str(items_c) + " 条，超过建议上限 5 条，建议精简或部分移到 references/")
+                    _c12_sec_pos = body.find(f'## {sec_title}')
+                    _c12_ln = body[:_c12_sec_pos].count('\n') + 2 if _c12_sec_pos >= 0 else 1
+                    issues["warn"].append(f"{filepath}:{_c12_ln} - C-12: 章节「约束」共 {items_c} 条，超过建议上限 5 条，建议精简或部分移到 references/")
 
             # 限制/已知问题 章节内容深度检查
             if any(kw in sec_title for kw in ["限制", "已知问题", "Limitations", "Known Issues"]):
@@ -1728,9 +1779,12 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         if header_line:
             col_count = len(header_line.split('|')) - 2  # 去掉首尾空列
             if col_count != 4:
-                issues["warn"].append(f"C-13c: 渐进式索引表列数为 {col_count}，应为 4 列（文件名 | 分类 | 包含内容 | 审计关联）")
+                # 定位表头所在行
+                _c13c_sec_pos = body.find('### 渐进式文件索引')
+                _c13c_ln = body[:_c13c_sec_pos].count('\n') + 1 if _c13c_sec_pos >= 0 else 1
+                issues["warn"].append(f"{filepath}:{_c13c_ln} - C-13c: 渐进式索引表列数为 {col_count}，应为 4 列（文件名 | 分类 | 包含内容 | 审计关联）")
         else:
-            issues["warn"].append("C-13c: 渐进式索引表缺少规范的表头行（| 文件名 | 分类 | 包含内容 | 审计关联 |）")
+            issues["warn"].append(f"{filepath}:1 - C-13c: 渐进式索引表缺少规范的表头行（| 文件名 | 分类 | 包含内容 | 审计关联 |）")
 
     # ════════════════════════════════════════════════════════════
     # C-14 (WARN): 工作流程步骤完整性 — Phase 1 正则粗筛步骤数， LLM 确认
@@ -1739,6 +1793,8 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     wf_section = re.search(r'^## 工作流程\n\n.*?(?=^## |\Z)', body, re.MULTILINE | re.DOTALL)
     if wf_section:
         wf_text = wf_section.group(0)
+        _c14_wf_pos = body.find('## 工作流程')
+        _c14_ln = body[:_c14_wf_pos].count('\n') + 2 if _c14_wf_pos >= 0 else 1  # +2: +1 for 0-index, +1 for H2 line itself
         steps = re.findall(r'^\d+\.\s+(.+)$', wf_text, re.MULTILINE)
         if steps:
             # Phase 1: 输出步骤列表供 LLM 精筛
@@ -1746,7 +1802,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if len(steps) > 6:
                 step_details += f" 等（共 {len(steps)} 步）"
             issues["warn"].append(
-                f"C-14: 工作流程共 {len(steps)} 步，需 LLM 逐条确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
+                f"{filepath}:{_c14_ln} - C-14: 工作流程共 {len(steps)} 步，需 LLM 逐条确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
             )
 
         # ── C-14b: 检测工作流程中混入 changelog 风格内容（版本号+更新类关键词） ──
@@ -1912,9 +1968,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c17_quality_issues:
         _c171819_quality_flag = True
         if '缺少使用示例' in _c17_quality_issues[0]:
-            issues['warn'].append('C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个完整输入到输出对话示例）')
+            issues['warn'].append(f'{filepath}:1 - C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个完整输入到输出对话示例）')
         else:
-            issues['warn'].append('C-17: 使用示例质量不足 -- ' + '; '.join(_c17_quality_issues))
+            issues['warn'].append(f'{filepath}:1 - C-17: 使用示例质量不足 -- ' + '; '.join(_c17_quality_issues))
 
     # ════════════════════════════════════════════════════════════
     # C-18 (WARN): 能力边界质量 — 检查边界说明是否具体、可操作
@@ -1950,9 +2006,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c18_quality_issues:
         _c171819_quality_flag = True
         if '未声明能力边界' in _c18_quality_issues[0]:
-            issues['warn'].append('C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）')
+            issues['warn'].append(f'{filepath}:1 - C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）')
         else:
-            issues['warn'].append('C-18: 能力边界质量不足 -- ' + '; '.join(_c18_quality_issues))
+            issues['warn'].append(f'{filepath}:1 - C-18: 能力边界质量不足 -- ' + '; '.join(_c18_quality_issues))
 
     # ════════════════════════════════════════════════════════════
     # C-19 (WARN): 错误处理质量 — 检查错误指导是否具体、可执行
@@ -1980,9 +2036,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c19_quality_issues:
         _c171819_quality_flag = True
         if 'FAQ缺少错误处理指导' in _c19_quality_issues[0]:
-            issues['warn'].append('C-19: FAQ缺少错误处理指导（建议新增出错或异常相关的问答条目）')
+            issues['warn'].append(f'{filepath}:1 - C-19: FAQ缺少错误处理指导（建议在 references/faq.md 中新增出错或异常相关的问答条目）')
         else:
-            issues['warn'].append('C-19: 错误处理质量不足 -- ' + '; '.join(_c19_quality_issues))
+            issues['warn'].append(f'{filepath}:1 - C-19: 错误处理质量不足 -- ' + '; '.join(_c19_quality_issues))
 
     # ════════════════════════════════════════════════════════════
     # 汇总输出

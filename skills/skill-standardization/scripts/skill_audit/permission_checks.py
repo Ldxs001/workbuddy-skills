@@ -199,7 +199,7 @@ def check_authorization_present(filepath, content, fm, body, skill_dir=None, **k
                          "operation": "填充 permissions.md 的风险等级和高权限操作说明",
                          "verification": "重新运行 audit_skill()，确认 R-15 passed"}
             }
-        if "基于skill-standardization渐进式披露规范的权限说明" not in pm_content:
+        if "基于 skill-standardization 渐进式披露规范的权限说明" not in pm_content:
             return {
                 "passed": False,
                 "detail": f"{filepath}:1 - 风险等级 {risk_level}，references/permissions.md 缺少 skill-standardization 权限说明头部",

@@ -315,13 +315,13 @@ def reclassify_consistency_false_positive(issue, acknowledged_types=None):
     标记已知不是真正问题的项。
     返回 True 表示该问题是误报，应排除。
     
-    acknowledged_types: 由 --fixed-rules 传入的已声明修复的类型列表，
+    acknowledged_types: 已知可放过的类型列表，
     属于这些类型的项被视为已 acknowledge，放过。
     """
     detail = str(issue.get('detail', ''))
     issue_type = issue.get('type', '')
     
-    # 如果该类型已被 LLM 通过 --fixed-rules 声明为已修复/已认定，放过
+    # 如果该类型已被声明为已修复/已认定，放过
     if acknowledged_types and issue_type in acknowledged_types:
         return True
     
