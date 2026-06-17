@@ -401,7 +401,7 @@ traceback 行数多不要慌，关注最后几行（`File "...", line XX`）即�
 3. **LLM 闭环修复流程**：
    - 读取 `.remaining_llm.json`（位于 `.standardization/skill-function-test/data/<skill>/`）
    - 逐条编辑 SKILL.md（R-23: 文档一致性 / R-25: 写作规范）
-   - 重新运行: `python -m scripts.skill_audit refactor <skill-dir> --fixed-rules R-23,R-25 --confirmed`
+   - 重新运行: `python -m scripts.skill_audit refactor <skill-dir> --confirmed`
    - 针对性审计确认后自动继续到全量审计 → 双0 通过
 4. 备用：也可以运行 `audit <skill-dir> --show-fix ID` 获取每条 FAIL 的具体修复指引
 

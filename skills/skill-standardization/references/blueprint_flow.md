@@ -78,10 +78,9 @@
   │   ↓                                          │
   │ ★★★ 流程钩子（强制）★★★                       │
   │ LLM 必须声明修了哪些规则：                     │
-  │   {"fixed_rules": ["R-23", "R-26"]}          │
-  │   ↓                                          │
-  │ 代码自动跑针对性审计（不依赖 LLM 自觉）：       │
-  │   audit_skill(skill_dir, filter_rules=[...]) │
+  │   代码自动跑针对性审计（每次 LLM 修复后触发）：  │
+  │   audit_skill(skill_dir)                       │
+  │   还有 FAIL？→ 继续修                           │
   │   ↓                                          │
   │ 还有 FAIL？→ 继续修                           │
   │ 全部 PASS？→ 退出循环                         │
@@ -123,10 +122,9 @@
   │   ↓                                          │
   │ ★★★ 流程钩子（强制）★★★                       │
   │ LLM 必须声明修了哪些规则：                     │
-  │   {"fixed_rules": ["R-23", "R-26"]}          │
-  │   ↓                                          │
-  │ 代码自动跑针对性审计（不依赖 LLM 自觉）：       │
-  │   audit_skill(skill_dir, filter_rules=[...]) │
+  │   代码自动跑针对性审计（每次 LLM 修复后触发）：  │
+  │   audit_skill(skill_dir)                       │
+  │   还有 FAIL？→ 继续修                           │
   │   ↓                                          │
   │ 还有 FAIL？→ 继续修                           │
   │ 全部 PASS？→ 退出循环                         │
@@ -171,8 +169,8 @@ def audit_skill(skill_dir, filter_rules=None, filter_files=None, ...):
   B. LLM 声明"手动修复完成"后（通过流程交互）
 
 钩子行为：
-  1. 要求 LLM 输出 fixed_rules（修了哪些规则）
-  2. 代码自动调用 audit_skill(skill_dir, filter_rules=fixed_rules)
+  1. LLM 修复后重新审计
+  2. 剩余问题继续循环修复
   3. 结果全部 PASS → 放行
   4. 还有 FAIL → 拦住，要求继续修
 
@@ -241,8 +239,8 @@ def audit_skill(skill_dir, filter_rules=None, filter_files=None, ...):
 - [x] 所有 `_audit_with_blueprint()` 调用点改为直接调 `audit_skill()`
 - [x] 新增 `_validate_changed_files()` 更新声明校验
 - [x] 新增 `_run_audit_loop()` 修复循环通用实现（自动修复 + LLM 手动 + 细碎审计钩子 + 针对性审计）
-- [x] `cmd_update()` 新增 `--changed-files` 和 `--fixed-rules` CLI 参数
-- [x] `cmd_refactor()` 新增 `--fixed-rules` CLI 参数
+- [x] `cmd_update()` 新增 `--changed-files` CLI 参数
+
 - [x] `cmd_update()` 步骤2更新声明从空壳改为实际校验
 - [x] refactor 一致性审查后增加修复循环（最多3轮重试）
 
