@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import json
+import importlib.util
 import argparse
 from pathlib import Path
 
@@ -69,6 +70,17 @@ from .data_dir_checker import (
     check_data_dir_compliance, fix_data_dir_compliance,
 )
 from .fix import apply_fix, list_fixable
+
+# ── safe_write 加载器：通过绝对路径加载，避免 import context 问题 ──
+def _load_safe_write():
+    """通过文件绝对路径加载 safe_write，不受任何 import 包上下文影响"""
+    _path = os.path.join(os.path.dirname(__file__), '..', 'safe_io.py')
+    _spec = importlib.util.spec_from_file_location("safe_io", os.path.abspath(_path))
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    return _mod.safe_write
+
+_safe_write = _load_safe_write()
 
 # ── 方法分派表 ─────────────────────────────────────────────
 METHOD_MAP = {
@@ -154,8 +166,7 @@ def _apply_fixes(skill_md, fixes):
     buf.write(body.lstrip("\n"))
 
     # 使用 safe_io 原子写入 + 自动备份
-    from ..safe_io import safe_write
-    safe_write(skill_md, buf.getvalue(), backup=True)
+    _safe_write(skill_md, buf.getvalue(), backup=True)
 
     return applied
 
@@ -993,22 +1004,21 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
         from skill_builder.version_manager import VersionManager
         VersionManager.bump_version(skill_dir, vm_bump_type)
     except Exception:
-        # 兜底：直接写
-        meta_path = os.path.join(skill_dir, '_meta.json')
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            meta = json.load(f)
-        meta['version'] = new_version
-        from ..safe_io import safe_write
-        safe_write(meta_path, json.dumps(meta, ensure_ascii=False, indent=2) + '\n', backup=True)
-        skill_md = os.path.join(skill_dir, 'SKILL.md')
-        with open(skill_md, 'r', encoding='utf-8') as f:
-            md_content = f.read()
-        md_content = re.sub(
+        # 兜底：直接用 stdlib + _safe_write
+        _meta_path = os.path.join(skill_dir, '_meta.json')
+        with open(_meta_path, 'r', encoding='utf-8') as f:
+            _meta = json.load(f)
+        _meta['version'] = new_version
+        _safe_write(_meta_path, json.dumps(_meta, ensure_ascii=False, indent=2) + '\n', backup=True)
+        _skill_md = os.path.join(skill_dir, 'SKILL.md')
+        with open(_skill_md, 'r', encoding='utf-8') as f:
+            _md_content = f.read()
+        _md_content = re.sub(
             r'^(version:\s*)\d+\.\d+\.\d+',
             rf'\g<1>{new_version}',
-            md_content, count=1, flags=re.MULTILINE
+            _md_content, count=1, flags=re.MULTILINE
         )
-        safe_write(skill_md, md_content, backup=True)
+        _safe_write(_skill_md, _md_content, backup=True)
 
     # 更新 changelog（--fix 模式跳过，由 LLM 根据审计结果动态翻译生成）
     if not skip_changelog:
@@ -1022,8 +1032,7 @@ def _do_bump(skill_dir, bump_type='fix', desc='自动升级', skip_changelog=Fal
             os.makedirs(os.path.dirname(cl_path), exist_ok=True)
         new_cl = cl_entry + '\n---\n\n' + cl_old if cl_old else cl_entry
         os.makedirs(os.path.dirname(cl_path), exist_ok=True)
-        from ..safe_io import safe_write
-        safe_write(cl_path, new_cl, backup=True)
+        _safe_write(cl_path, new_cl, backup=True)
 
 
 def _audit_with_blueprint(skill_dir, **kw):

@@ -11,7 +11,10 @@ import tempfile
 from pathlib import Path
 
 from .utils import _create_backup, _check_artifact_paths, _check_external_data_dir, _write_json
-from scripts.cleanup_manager import start_session, end_session
+try:
+    from ..cleanup_manager import start_session, end_session
+except ImportError:
+    from scripts.cleanup_manager import start_session, end_session
 
 
 class SkillUpdater:

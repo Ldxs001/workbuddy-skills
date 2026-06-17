@@ -125,7 +125,7 @@ def body_has_h1(filepath, content, fm, body, **kw):
     name = (fm or {}).get("name", "")
     if name and name not in h1_text and name.replace('-', ' ') not in h1_text.lower():
         return {"passed": False,
-                "detail": f"{filepath}:{line} - H1 \"{h1_text}\" 不含技能名 \"{name}\"，建议 H1 与技能名一致",
+                "detail": f"{filepath}:{line} - H1 \"{h1_text}\" 不含技能名 \"{name}\"，需 H1 与技能名一致",
                 "fix": {"key": "h1", "value": name,
                          "location": f"{filepath}:{line}",
                          "operation": f"添加一级标题: # {name}",
@@ -523,7 +523,7 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
     返回格式：
     {
         "must": [],    # 🔴 必须修：术语不一致、事实错误
-        "suggest": [], # 🟡 建议修：模糊表述、缺少空格
+        "suggest": [], # 🟡 需修：模糊表述、缺少空格
         "optional": []  # ⚪ 可选择修：风格偏好
     }
     """
@@ -570,7 +570,7 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
             if len(found_terms) > 1:
                 terms_str = ", ".join(found_terms.keys())
                 prefix = f"{filename}：" if filename else ""
-                issues["must"].append(f"{prefix}术语不一致：混用 {terms_str}，建议统一为「{preferred}」")
+                issues["must"].append(f"{prefix}术语不一致：混用 {terms_str}，需统一为「{preferred}」")
 
     # ── 检查2：禁止表述（🟡 建议修）────────────────────
     forbidden = [
@@ -620,7 +620,7 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
 def body_check_writing_standards(filepath, content, fm, body, **kw):
     """R-20: 写作规范检查（术语一致性、禁止表述、中英文混排）
     ✅ v2.22.0：同时检查 references/*.md 渐进式文件
-    ✅ v2.23.0：分级输出（必须修/建议修/可选择修）
+    ✅ v2.23.0：分级输出（必须修/需修/可选择修）
     """
     all_issues = {"must": [], "suggest": [], "optional": []}
 
@@ -743,7 +743,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         if must_count > 1:
             parts[0] += f" 等（共 {must_count} 条）"
     if suggest_count > 0:
-        parts.append(f"🟡 建议修（{suggest_count} 条）：{all_issues['suggest'][0]}")
+        parts.append(f"🟡 需修（{suggest_count} 条）：{all_issues['suggest'][0]}")
         if suggest_count > 1:
             parts[-1] += f" 等（共 {suggest_count} 条）"
     if optional_count > 0:
@@ -756,7 +756,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
               "detail": f"写作规范问题：{detail}",
               "fix": {"key": "writing_standards", "value": "fix_terms",
                        "location": f"{filepath} 正文 + references/*.md",
-                       "operation": "优先修复🔴必须修问题，建议修复🟡建议修问题（含渐进式文件）",
+                       "operation": "优先修复🔴必须修问题，修复🟡需修问题（含渐进式文件）",
                        "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
     if all_issues.get("ctx_lines"):
         result["ctx_lines"] = all_issues["ctx_lines"][:8]
@@ -1306,9 +1306,9 @@ def check_changelog_progressive(filepath, content, fm, body, **kw):
 def body_check_document_format(filepath, content, fm, body, **kw):
     """
     R-25: 文档写作格式规范 (v2.44.0, v2.6.0 C-11/C-12, v2.50.0 C-16, v2.59.0 C-17/C-18/C-19, v2.60.0 C-17/C-18/C-19质量升级)
-    19 项子检查：C-01 (ERROR) + C-02~C-10 (WARN 建议) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测 + C-17 使用示例质量检查 + C-18 能力边界质量检查 + C-19 错误处理质量检查。
+    19 项子检查：C-01 (ERROR) + C-02~C-10 (WARN) + C-11 章节顺位 + C-12 格式合规 + C-13 渐进式索引表 + C-14 工作流步骤完整性 + C-15 内容冗余检测 + C-16 references/ 文档过时检测 + C-17 使用示例质量检查 + C-18 能力边界质量检查 + C-19 错误处理质量检查。
     冲突排除：R-06 H1 存在性、R-21 渐进式加载固定模板句、R-24 更新日志位置、R-18/R-19 渐进式引用。
-    全部子检查仅作建议标准统一，不强制改造。
+    全部子检查均为必检项，属规范标准。
     """
     issues = {"error": [], "warn": []}
 
@@ -1351,7 +1351,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         line_no = body[:m.start()].count('\n') + 1
         deep_heads.append(f"第{line_no}行「{line_text.strip()[:40]}」")
     if deep_heads:
-        issues["warn"].append(f"C-02: 发现 {len(deep_heads)} 处 ####+ 深层标题（建议改用 ## 或 ###）：{'; '.join(deep_heads[:3])}")
+        issues["warn"].append(f"C-02: 发现 {len(deep_heads)} 处 ####+ 深层标题（需改用 ## 或 ###）：{'; '.join(deep_heads[:3])}")
 
     # ════════════════════════════════════════════════════════════
     # C-03 (WARN): 表格用于结构化信息展示
@@ -1386,7 +1386,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     break
             _c03_ln_no = body[:_c03_first_match.start()].count('\n') + 1 if _c03_first_match else 1
             _c03_examples = '; '.join(_c03_found_lines)
-            issues["warn"].append(f"{filepath}:{_c03_ln_no} - C-03: 正文包含较多键值对应关系（如「{_c03_examples}」），建议用表格结构化展示")
+            issues["warn"].append(f"{filepath}:{_c03_ln_no} - C-03: 正文包含较多键值对应关系（如「{_c03_examples}」），需用表格结构化展示")
 
     # ════════════════════════════════════════════════════════════
     # C-04 (WARN): 引用块 > 用于提示/注意/警告
@@ -1425,7 +1425,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             unordered_count = len(re.findall(r'^[-*]\s+', sec, re.MULTILINE))
             if ordered_count >= 3 and unordered_count >= 3:
                 sec_title = sec.split('\n')[0].strip()
-                issues["warn"].append(f"C-05: 章节「{sec_title[:20]}」同时包含有序列表({ordered_count}条)和无序列表({unordered_count}条)，建议区分：有序→步骤流程，无序→选项列举")
+                issues["warn"].append(f"C-05: 章节「{sec_title[:20]}」同时包含有序列表({ordered_count}条)和无序列表({unordered_count}条)，需区分：有序→步骤流程，无序→选项列举")
 
     # ════════════════════════════════════════════════════════════
     # C-06 (WARN): 加粗用于关键术语/约束
@@ -1437,8 +1437,8 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if not bold_markers and len(body) > 500:
         # 定位正文中最可能使用加粗的位置：查找约束/核心能力章节
         _c06_sec_match = re.search(r'^##\s+(?:约束|核心能力|工作流程|触发条件)', body, re.MULTILINE)
-        _c06_hint = f"（首个相关章节「{_c06_sec_match.group(0).strip()[:20]}」第{body[:_c06_sec_match.start()].count(chr(10))+1}行）" if _c06_sec_match else "（正文较长时间线较长，建议在约束/核心能力章节使用加粗）"
-        issues["warn"].append(f"{filepath}:1 - C-06: 正文未使用 **加粗** 标记，建议对关键术语/约束/规则名使用加粗强调{_c06_hint}")
+        _c06_hint = f"（首个相关章节「{_c06_sec_match.group(0).strip()[:20]}」第{body[:_c06_sec_match.start()].count(chr(10))+1}行）" if _c06_sec_match else "（正文较长时间线较长，需在约束/核心能力章节使用加粗）"
+        issues["warn"].append(f"{filepath}:1 - C-06: 正文未使用 **加粗** 标记，需对关键术语/约束/规则名使用加粗强调{_c06_hint}")
 
     # ════════════════════════════════════════════════════════════
     # C-07 (WARN): 代码块使用语言标识
@@ -1458,7 +1458,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 no_lang_lines.append(str(line_no))
     if code_fence_count > 0 and no_lang_count > 0:
         lines_str = ", ".join(no_lang_lines[:5])
-        issues["warn"].append(f"C-07: {no_lang_count}/{code_fence_count} 个代码块缺少语言标识（如 ```bash、```python、```json），位于第 {lines_str} 行，建议补充")
+        issues["warn"].append(f"C-07: {no_lang_count}/{code_fence_count} 个代码块缺少语言标识（如 ```bash、```python、```json），位于第 {lines_str} 行，需补充")
 
     # ════════════════════════════════════════════════════════════
     # C-08 (WARN): Checklist [ ] 用于操作前自检
@@ -1500,7 +1500,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         after_fm = content[fm_end + 4:]  # 跳过 \n---
         trailing_newlines = len(re.match(r'\n*', after_fm).group())
         if trailing_newlines > 2:
-            issues["warn"].append(f"{filepath}:{1} - C-10: frontmatter 闭合 --- 后有 {trailing_newlines} 个连续空行（建议仅保留 1 个）")
+            issues["warn"].append(f"{filepath}:{1} - C-10: frontmatter 闭合 --- 后有 {trailing_newlines} 个连续空行（需仅保留 1 个）")
     # 检查正文（排除代码块后）是否有连续 5+ 换行
     # 直接在 body 上用 re.finditer 定位，跳过代码块内的匹配
     excess_blank_spots = []
@@ -1576,9 +1576,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 inv_details = "; ".join(f"「{a}」应在「{b}」之后" for a, b in inversions[:3])
                 if len(inversions) > 3:
                     inv_details += f" 等（共 {len(inversions)} 处逆序）"
-                issues["warn"].append(f"C-11: 章节顺位异常——{inv_details}（建议按 body.json section_order 调整顺序：H1→触发条件→核心能力→快速开始→工作流程→...）")
+                issues["warn"].append(f"C-11: 章节顺位异常——{inv_details}（需按 body.json section_order 调整顺序：H1→触发条件→核心能力→快速开始→工作流程→...）")
             elif unmapped:
-                issues["warn"].append(f"C-11: 以下章节不在 section_order 白名单中：{'; '.join(unmapped[:3])}（建议按 body.json section_order 调整顺序或拆分到 references/）")
+                issues["warn"].append(f"C-11: 以下章节不在 section_order 白名单中：{'; '.join(unmapped[:3])}（需按 body.json section_order 调整顺序或拆分到 references/）")
             else:
                 pass  # 顺序正确，不报
     # 若无 section_order 数据，静默跳过 C-11
@@ -1690,7 +1690,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 if items_c > 5:
                     _c12_sec_pos = body.find(f'## {sec_title}')
                     _c12_ln = body[:_c12_sec_pos].count('\n') + 2 if _c12_sec_pos >= 0 else 1
-                    issues["warn"].append(f"{filepath}:{_c12_ln} - C-12: 章节「约束」共 {items_c} 条，超过建议上限 5 条，建议精简或部分移到 references/")
+                    issues["warn"].append(f"{filepath}:{_c12_ln} - C-12: 章节「约束」共 {items_c} 条，超过上限 5 条，需精简或部分移到 references/")
 
             # 限制/已知问题 章节内容深度检查
             if any(kw in sec_title for kw in ["限制", "已知问题", "Limitations", "Known Issues"]):
@@ -1702,7 +1702,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 if not has_status:
                     depth_issues.append("缺少当前状态标记（已规划/排查中/无解）")
                 if depth_issues:
-                    issues["warn"].append(f"C-12: 章节「{sec_title[:20]}」内容深度不足——{'、'.join(depth_issues)}（建议每条限制含影响范围和当前状态）")
+                    issues["warn"].append(f"C-12: 章节「{sec_title[:20]}」内容深度不足——{'、'.join(depth_issues)}（每条需含影响范围和当前状态）")
 
             guidelines_str = fmt.get("guidelines", "")
             if guidelines_str:
@@ -1840,7 +1840,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if fn in _index_table_refs:
                 issues["warn"].append(
                     f"C-15: 正文第 {ref_line} 行引用了 `references/{fn}`，该文件已在索引表中列出，"
-                    f"建议合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
+                    f"需合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
                 )
     
     # ── 15b: 正文引用的渐进式文件不在索引表中（C-13 反向，但 C-13 只查 references/ 目录）──
@@ -1861,7 +1861,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if m.start() < first_section_pos:
                 issues["warn"].append(
                     f"C-15: 正文第 {ref_line} 行在 H1 后独立引用了 `{ref_path}`，"
-                    f"该文件已在核心能力索引表中列出，建议移到索引表统一管理"
+                    f"该文件已在核心能力索引表中列出，需移到索引表统一管理"
                 )
     
     # ── 15c-2: 同样检测 markdown 链接语法 [text](references/xxx.md) ──
@@ -1875,7 +1875,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if m.start() < first_section_pos:
                 issues["warn"].append(
                     f"C-15: 正文第 {ref_line} 行在 H1 后使用 markdown 链接独立引用了 `references/{ref_path}`，"
-                    f"该文件已在核心能力索引表中列出，建议统一由索引表管理"
+                    f"该文件已在核心能力索引表中列出，需统一由索引表管理"
                 )
     
     # ── 15d: 同一概念在不同章节中重复提及的线索检测（ 精筛）──
@@ -1968,7 +1968,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c17_quality_issues:
         _c171819_quality_flag = True
         if '缺少使用示例' in _c17_quality_issues[0]:
-            issues['warn'].append(f'{filepath}:1 - C-17: 缺少使用示例（建议在快速开始或独立章节提供至少一个完整输入到输出对话示例）')
+            issues['warn'].append(f'{filepath}:1 - C-17: 缺少使用示例（需在快速开始或独立章节提供至少一个完整输入到输出对话示例）')
         else:
             issues['warn'].append(f'{filepath}:1 - C-17: 使用示例质量不足 -- ' + '; '.join(_c17_quality_issues))
 
@@ -1994,7 +1994,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         if not re.search(r'≤\s*\d+|≥\s*\d+|不超过\s*\d+|上限\s*\d+|建议\s*\d+', _c18_boundary_text):
             _c18_quality_issues.append(
                 f'【{_c18_loc}】边界阈值未量化 → '
-                f'LLM执行：将笼统描述改为具体数字限制（如 "建议不超过50个阶段"）')
+                f'LLM执行：将笼统描述改为具体数字限制（如 "上限50个阶段"）')
         if not re.search(r'参数|O.*M.*P|输入.*格式|输入.*范围|单位.*统一|格式.*要求', _c18_boundary_text):
             _c18_quality_issues.append(
                 f'【{_c18_loc}】缺少参数约束 → '
@@ -2006,7 +2006,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c18_quality_issues:
         _c171819_quality_flag = True
         if '未声明能力边界' in _c18_quality_issues[0]:
-            issues['warn'].append(f'{filepath}:1 - C-18: 未声明能力边界（建议在限制章节或FAQ中说明任务数量上限、参数约束等）')
+            issues['warn'].append(f'{filepath}:1 - C-18: 未声明能力边界（需在限制章节或FAQ中说明任务数量上限、参数约束等）')
         else:
             issues['warn'].append(f'{filepath}:1 - C-18: 能力边界质量不足 -- ' + '; '.join(_c18_quality_issues))
 
@@ -2036,7 +2036,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if _c19_quality_issues:
         _c171819_quality_flag = True
         if 'FAQ缺少错误处理指导' in _c19_quality_issues[0]:
-            issues['warn'].append(f'{filepath}:1 - C-19: FAQ缺少错误处理指导（建议在 references/faq.md 中新增出错或异常相关的问答条目）')
+            issues['warn'].append(f'{filepath}:1 - C-19: FAQ缺少错误处理指导（需在 references/faq.md 中新增出错或异常相关的问答条目）')
         else:
             issues['warn'].append(f'{filepath}:1 - C-19: 错误处理质量不足 -- ' + '; '.join(_c19_quality_issues))
 
@@ -2050,7 +2050,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     if total == 0:
         return {"passed": True,
-                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（16项子检查均符合建议标准）"}
+                "detail": f"{filepath}:1 - R-25: 文档写作格式规范检查通过（16项子检查均符合规范）"}
 
     detail_parts = []
     if error_count > 0:
@@ -2058,7 +2058,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     if warn_count > 0:
         detail_parts.append(f"🟡 WARN({warn_count}): {'; '.join(issues['warn'][:20])}")
         if warn_count > 20:
-            detail_parts[-1] += f" 等（共 {warn_count} 条建议）"
+            detail_parts[-1] += f" 等（共 {warn_count} 条待修复项）"
 
     # C-17/C-18/C-19 质量问题：产生规则级 FAIL，进入铁律 9 验证管道
     if _c171819_quality_flag:
