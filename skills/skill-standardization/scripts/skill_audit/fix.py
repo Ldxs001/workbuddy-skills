@@ -1437,7 +1437,7 @@ def fix_frontmatter_fields(skill_dir, **kw):
         'name': f'name: {skill_name}',
         'version': 'version: 1.0.0',
         'description': 'description: ',
-        'author': 'author: wUwproject',
+        'author': 'author: [username-redacted]',
         'license': 'license: MIT',
         'tags': 'tags: []',
         'data_dir': f'data_dir: ../.standardization/{skill_name}/',
@@ -3294,7 +3294,7 @@ def fix_license_compliance(skill_dir, **kw):
             # 创建空白 MIT 模板
             mit_template = """MIT License
 
-Copyright (c) 2026 wUwproject
+Copyright (c) 2026 [username-redacted]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
