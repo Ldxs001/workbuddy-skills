@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from ..core.stats import calc_precision, calc_synthetic_std
 from ..core.qc_tables import get_tolerance, get_magnitude_order
-from ..output import publish
+from ..reporting import publish
 
 
 def _warn_on_data_quality(data, value_col, level_col=None, min_rows=3):

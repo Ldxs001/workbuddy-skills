@@ -20,7 +20,7 @@ from scripts.analysis.time_series import time_trend_analyze
 ts = time_trend_analyze(df, "检测日期", "阳性数", freq="W")
 ```
 
-### `trend_plot(ts_data, date_col, value_col)`
+### `trend_plot(ts_data, date_col, value_col, title="时序趋势图")`
 趋势线绘制。
 
 ### `rolling_stats(ts_data, date_col, value_col, window=7)`
@@ -43,7 +43,7 @@ forecast, fig = prophet_forecast(df, "日期", "销售额", periods=12, freq="M"
 ### `prophet_plot(forecast, history, title)`
 预测结果单独可视化。
 
-### `trend_conclusion(ts_data, value_col)`
+### `trend_conclusion(ts_data, value_col, recent_n=7)`
 自动生成趋势解读文本。
 
 ## 预测参数说明

@@ -22,7 +22,7 @@ result = group_analyze(df, group_col="区域", metric_col="销售额",
                        agg_funcs={"销售额": ["count", "mean", "sum", "std"]})
 ```
 
-### `group_rate_analysis(df, group_col, result_col, positive_val)`
+### `group_rate_analysis(df, group_col, result_col, positive_val, value_col=None)`
 率指标分析。自动计算各组的正例数、总数、率。
 
 ```python
@@ -33,7 +33,7 @@ result = group_rate_analysis(df, group_col="批次",
                              result_col="检测结论", positive_val="合格")
 ```
 
-### `group_compare_plot(result_df, group_col, value_col, plot_type="bar")`
+### `group_compare_plot(result_df, group_col, value_col, title="分组对比", plot_type="bar")`
 分组对比可视化。支持柱状图和饼图。
 
 ```python
@@ -42,7 +42,7 @@ from scripts.analysis.group_analysis import group_compare_plot
 fig = group_compare_plot(result, "品种", "阳性率", plot_type="bar")
 ```
 
-### `generate_conclusion(result_df, group_col, value_col)`
+### `generate_conclusion(result_df, group_col, value_col, higher_is_riskier=True)`
 自动生成分析结论文本。
 
 ## 输出

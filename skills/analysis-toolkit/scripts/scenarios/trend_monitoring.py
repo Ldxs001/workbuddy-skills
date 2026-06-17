@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from ..analysis.time_series import time_trend_analyze, trend_plot
 from ..analysis.time_series import prophet_forecast, prophet_plot
-from ..output import publish
+from ..reporting import publish
 
 
 def _warn_on_data_quality(data, date_col, value_col, min_rows=5):

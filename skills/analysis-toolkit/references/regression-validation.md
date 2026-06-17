@@ -41,7 +41,7 @@ from scripts.analysis.regression import regression_stats
 stats = regression_stats(x, y, result)
 ```
 
-#### `regression_plot(x, y, model_result)`
+#### `regression_plot(x, y, model_result, title="回归拟合图")`
 回归拟合图 + 残差图。
 
 ### 输出
@@ -89,7 +89,7 @@ from scripts.analysis.validation import calc_recovery
 result = calc_recovery([12.6, 8.3, 8.21], spiked=10, blank=0.5)
 ```
 
-#### `uncertainty_propagation(calibration_data, sample_response)`
+#### `uncertainty_propagation(calibration_data, sample_response, sample_count=1, std_curve_count=None, force_zero=False)`
 标准曲线不确定度传递计算。
 
 ```python

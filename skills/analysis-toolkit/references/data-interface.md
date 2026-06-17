@@ -155,7 +155,7 @@ value_col: 纯数值。
 - 不提供时：指定值=所有数据中位数，SD=稳健标准差(MAD×1.4826)
 - 提供时：直接使用传入值
 
-#### youden_plot(data_a, data_b, label_a, label_b)
+#### youden_plot(data_a, data_b, label_a="实验室A", label_b="实验室B", title="Youden图 — 双实验室比对")
 
 ```
 data_a = [50.2, 51.0, 49.8, ...]   ← 实验室A的各样本结果
@@ -224,7 +224,7 @@ spiked = 100                       ← 加标浓度（或数组 [100, 100, 100]�
 blank = 0.5                        ← 空白值
 ```
 
-#### curve_uncertainty(calibration_data, sample_responses)
+#### curve_uncertainty(calibration_data, sample_responses, n_cal_points=None, n_sample_replicates=None)
 
 ```
 calibration_data 来自 calibration_curve() 的返回值。
@@ -362,14 +362,14 @@ Pipeline 接受以下输入格式：
 | 质控图 | DataFrame 连续测量值 | value_col="结果", date_col="日期"(可选) |
 | 室间ANOVA比对 | DataFrame 实验室+结果 | lab_col="实验室", value_col="结果" |
 | Z值分析 | 同上 | 同上 |
-| YYouden 图 | 两个等长数组 | data_a, data_b |
+| Youden 图 | 两个等长数组 | data_a, data_b |
 | 批次比对 | DataFrame 批次+结果 | batch_col="批次", value_col="结果" |
 | 标准曲线 | 两个等长数组（浓度, 响应） | x, y |
 | LOD/LOQ | sigma + slope 或 calibration_data | 见 calc_lod_loq |
 | 回收率 | 测定值数组 + 加标浓度 | measured, spiked |
 | 曲线不确定度 | calibration_data + 样品响应数组 | calibration_data, sample_responses |
 | 趋势监控 | DataFrame 日期+值 | date_col="日期", value_col="值" |
-| PProphet 预测 | 同上 | 同上（可选 group_col） |
+| Prophet 预测 | 同上 | 同上（可选 group_col） |
 | 分组分析 | DataFrame 分组列+数值列 | group_col, value_col |
 | PCA | 纯数值 DataFrame | 所有列参与分析 |
 | 线性回归 | 两个等长数组 | x, y |

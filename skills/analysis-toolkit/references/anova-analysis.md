@@ -39,7 +39,7 @@ from scripts.analysis.anova import anova_table
 df_table = anova_table(result)
 ```
 
-### `f_critical(df1, df2)`
+### `f_critical(df1, df2, alpha=0.05)`
 F临界值查表（α=0.05）。
 
 ```python

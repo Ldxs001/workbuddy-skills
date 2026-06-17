@@ -25,7 +25,7 @@ result = pca_analyze(df, variance_threshold=0.95)
 # result["n_selected"]   — 选定的主成分数
 ```
 
-### `scree_plot(full_pca, threshold=0.95)`
+### `scree_plot(full_pca, threshold=0.95, highlight_k=None)`
 碎石图（累积贡献率）。用于确定保留多少个主成分。
 
 ```python

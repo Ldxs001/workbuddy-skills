@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ..analysis.regression import linear_regression, polynomial_regression
-from ..output import publish
+from ..reporting import publish
 
 
 def _warn_on_data_quality(x, y, label_x="x", label_y="y", min_points=3):

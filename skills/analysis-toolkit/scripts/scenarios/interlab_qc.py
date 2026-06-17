@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from ..analysis.anova import anova_oneway, anova_table
 from ..core.qc_tables import f_critical, calculate_z_score, z_score_judgment, get_tolerance, get_magnitude_order
-from ..output import publish
+from ..reporting import publish
 
 
 def _warn_on_data_quality(data, value_col, group_col=None, min_rows=3):
