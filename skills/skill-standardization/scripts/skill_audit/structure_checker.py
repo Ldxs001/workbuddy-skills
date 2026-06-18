@@ -191,7 +191,21 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
     # 章节起始绝对行号
     base_line = _abs_line(body, content, line_no - 1)  # line_no 是 1-indexed
 
-    # ── 质量检查1：正向触发词 ≥3 个 ──────────────────
+    # ── 质量检查1：正向触发词 ≥3 个（仅计正向区域，不混入否定条件）──
+    # 按"正向触发"/"否定条件"标记分割区域，避免否定条件的 bullet 被误计入正向触发计数
+    pos_marker = re.search(r'\*{0,2}正向触发\*{0,2}\s*[：:]', section_text)
+    neg_marker = re.search(r'\*{0,2}否定条件\*{0,2}\s*[：:]', section_text)
+
+    positive_region = section_text
+    negative_region = ""
+
+    if neg_marker:
+        positive_region = section_text[:neg_marker.start()]
+        negative_region = section_text[neg_marker.start():]
+    if pos_marker and pos_marker.start() > 0:
+        # 如果"正向触发"标记不在最开头，从该标记开始截取
+        positive_region = section_text[pos_marker.start():neg_marker.start()] if neg_marker else section_text[pos_marker.start():]
+
     trigger_patterns = [
         r'当用户.*时',
         r'当.*请求.*时',
@@ -201,12 +215,12 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
     ]
     positive_triggers = set()
     for pat in trigger_patterns:
-        for m in re.finditer(pat, section_text):
+        for m in re.finditer(pat, positive_region):
             t = m.group(0).strip()
             if len(t) > 4:
                 positive_triggers.add(t[:50])
 
-    list_items = re.findall(r'^[-*]\s*.+', section_text, re.MULTILINE)
+    list_items = re.findall(r'^[-*]\s*.+', positive_region, re.MULTILINE)
     for item in list_items:
         t = item.strip()[2:].strip()
         if len(t) > 2:
@@ -214,10 +228,33 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
 
     if len(positive_triggers) < 3:
         return {"passed": False,
-                "detail": f"{filepath}:{base_line} - 触发词数量不足（当前 {len(positive_triggers)} 个，要求 ≥3 个）",
+                "detail": f"{filepath}:{base_line} - 正向触发词数量不足（当前 {len(positive_triggers)} 个，要求 ≥3 个）",
                 "fix": {"key": "trigger_quality", "value": "add_triggers",
                          "location": f"{filepath}:{base_line}",
                          "operation": "添加至少 3 个具体触发词（描述用户会说什么/做什么来触发本技能）",
+                         "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
+
+    # ── 质量检查1b：正向触发词内容质量检测 ──
+    # 检测模板式/泛化/占位符式触发描述（如"用户需要..."、"需要...功能"等通用话术）
+    boilerplate_triggers = []
+    for item_text in positive_triggers:
+        item_clean = item_text.strip().lower()
+        # 匹配已知的模板式模式
+        if re.match(r'^用户需要.*', item_clean):
+            boilerplate_triggers.append(item_text)
+        elif re.match(r'^当用户需要.*', item_clean):
+            boilerplate_triggers.append(item_text)
+        elif re.match(r'^需要.*(工具|功能|能力)$', item_clean):
+            boilerplate_triggers.append(item_text)
+        elif re.match(r'^需要.*(工具|功能|能力)', item_clean):
+            boilerplate_triggers.append(item_text)
+    if boilerplate_triggers:
+        bp_detail = '；'.join(f"「{t[:40]}」" for t in boilerplate_triggers[:5])
+        return {"passed": False,
+                "detail": f"{filepath}:{base_line} - 正向触发词内容为模板式/泛化描述，缺少具体触发场景：{bp_detail}（要求每项触发条件描述具体的用户表述或操作场景，如用户说\u201c颜色转换\u201d\u201c对比度计算\u201d等精确触发词）",
+                "fix": {"key": "trigger_quality", "value": "refine_triggers",
+                         "location": f"{filepath}:{base_line}",
+                         "operation": f"将正向触发词从泛化描述改为具体用户表述，替换：{bp_detail}",
                          "verification": "重新运行 audit_skill()，确认 R-07 passed"}}
 
     # ── 质量检查2：否定条件 ≥1 个 ──────────────────────
@@ -522,9 +559,9 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
 
     返回格式：
     {
-        "must": [],    # 🔴 必须修：术语不一致、事实错误
-        "suggest": [], # 🟡 需修：模糊表述、缺少空格
-        "optional": []  # ⚪ 可选择修：风格偏好
+        "must": [],    # 术语一致性（如"创建/建立/新建"混用）
+        "suggest": [], # 表述规范（模糊表述、中英文混排空格）
+        "optional": []  # 风格偏好
     }
     """
     issues = {"must": [], "suggest": [], "optional": []}
@@ -551,7 +588,7 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
     cleaned = re.sub(r"[a-zA-Z][a-zA-Z0-9]*_[a-zA-Z0-9_]+", " ", cleaned)
     cleaned = re.sub(r'[一-鿿]' + code_terms_pattern, ' ', cleaned, flags=re.IGNORECASE)
 
-    # ── 检查1：术语一致性（🔴 必须修）───────────────────
+    # ── 检查1：术语一致性 ───────────────────
     # self_audit=True 时跳过（审计标准不审计自身，尺子不能量自己）
     if not self_audit:
         term_groups = [
@@ -572,7 +609,7 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
                 prefix = f"{filename}：" if filename else ""
                 issues["must"].append(f"{prefix}术语不一致：混用 {terms_str}，需统一为「{preferred}」")
 
-    # ── 检查2：禁止表述（🟡 建议修）────────────────────
+    # ── 检查2：禁止表述 ────────────────────
     forbidden = [
         ("可能", "避免模糊表述，改用确定性描述"),
         ("应该", "避免建议性表述，改用确定性描述或明确标注「建议」"),
@@ -581,33 +618,13 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
     ]
     for word, suggestion in forbidden:
         if word in cleaned:
-            # v2.24.2 误判排除：如果模糊词出现在"修复"、"删除"等动词后面，说明是在描述修复动作，不是实际模糊表述
-            # v2.24.5 新增：被动语态排除（"可能被"、"应该被" 等），描述可能性而非模糊表述
-            lines = cleaned.splitlines()
-            is_false_positive = False
-            for line in lines:
-                if word in line:
-                    # 排除1：修复动作（修复、删除、统一、修改、更新、移除、去掉）
-                    if any(verb in line for verb in ["修复", "删除", "统一", "修改", "更新", "移除", "去掉"]):
-                        is_false_positive = True
-                        break
-                    # 排除2：被动语态（可能被、应该被、可以被 等）
-                    if re.search(r'(可能|应该|可以)被', line):
-                        is_false_positive = True
-                        break
-                    # 排除3：条件句式（如果可能、若可能 等）
-                    if re.search(r'(如果|若|假如|假设).*?(可能|应该)', line):
-                        is_false_positive = True
-                        break
-                    # v2.24.6 新增：疑问句排除（"应该" 在疑问句里是询问建议，不是模糊表述）
-                    if word == "应该" and ('？' in line or '？' in line):
-                        is_false_positive = True
-                        break
-            if not is_false_positive:
-                prefix = f"{filename}：" if filename else ""
-                issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
+            # v2.91.0: 移除所有硬编码误判排除规则（修复动作/被动语态/条件句式/疑问句）。
+            # 所有误判统一由 LLM 通过 audit --verify → --classify 标记，
+            # 代码层不做任何自动误报排除，确保审计报告输出全部原始问题。
+            prefix = f"{filename}：" if filename else ""
+            issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
 
-    # ── 检查3：中英文混排空格（🟡 建议修）───────────────────
+    # ── 检查3：中英文混排空格 ───────────────────
     mingled = re.findall(r'[一-鿿][A-Za-z]{2,}|[A-Za-z]{2,}[一-鿿]', cleaned)
     mingled = [m for m in mingled if not re.match(r'v\d|SKILL|MD|JSON|YAML', m)]
     if mingled:
@@ -620,7 +637,7 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
 def body_check_writing_standards(filepath, content, fm, body, **kw):
     """R-20: 写作规范检查（术语一致性、禁止表述、中英文混排）
     ✅ v2.22.0：同时检查 references/*.md 渐进式文件
-    ✅ v2.23.0：分级输出（必须修/需修/可选择修）
+    ✅ v2.23.0：分级输出（术语一致性/表述规范/风格偏好）
     """
     all_issues = {"must": [], "suggest": [], "optional": []}
 
@@ -729,25 +746,25 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         return {"passed": True,
                 "detail": "写作规范检查通过（SKILL.md + references/*.md 术语一致、无禁止表述、中英文混排规范）"}
 
-    # 仅 optional（如粗筛产物）→ 通过，detail 带 NOTE
+    # 仅 optional — 通过
     if must_count == 0 and suggest_count == 0 and optional_count > 0:
         return {"passed": True,
-                "detail": f"写作规范检查通过 ⓘ 仅可选问题（{optional_count} 条，不阻断通过）：{all_issues['optional'][0]}" +
+                "detail": f"写作规范检查通过 ⓘ 风格偏好（{optional_count} 条）：{all_issues['optional'][0]}" +
                           (f" 等（共 {optional_count} 条）" if optional_count > 1 else "")}
 
-    # 格式化输出
+    # 格式化输出（仅描述问题类型与数量，不做程度判断）
     parts = []
     parts = []
     if must_count > 0:
-        parts.append(f"🔴 必须修（{must_count} 条）：{all_issues['must'][0]}")
+        parts.append(f"术语不一致（{must_count} 条）：{all_issues['must'][0]}")
         if must_count > 1:
             parts[0] += f" 等（共 {must_count} 条）"
     if suggest_count > 0:
-        parts.append(f"🟡 需修（{suggest_count} 条）：{all_issues['suggest'][0]}")
+        parts.append(f"表述规范（{suggest_count} 条）：{all_issues['suggest'][0]}")
         if suggest_count > 1:
             parts[-1] += f" 等（共 {suggest_count} 条）"
     if optional_count > 0:
-        parts.append(f"⚪ 可选择修（{optional_count} 条）：{all_issues['optional'][0]}")
+        parts.append(f"风格偏好（{optional_count} 条）：{all_issues['optional'][0]}")
         if optional_count > 1:
             parts[-1] += f" 等（共 {optional_count} 条）"
 
@@ -756,7 +773,7 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
               "detail": f"写作规范问题：{detail}",
               "fix": {"key": "writing_standards", "value": "fix_terms",
                        "location": f"{filepath} 正文 + references/*.md",
-                       "operation": "优先修复🔴必须修问题，修复🟡需修问题（含渐进式文件）",
+                       "operation": "修复术语不一致与表述规范问题，确保中英文混排有空格",
                        "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
     if all_issues.get("ctx_lines"):
         result["ctx_lines"] = all_issues["ctx_lines"][:8]
@@ -1758,15 +1775,36 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     # C-13b: 检测正文中散落的"见xxx"渐进式引用（应统一归入索引表）
     if _c13_sd and body:
-        scattered_refs = re.findall(r'(?:见|详见|→\s*详见|参考)\s*`?(?:references/)?([a-zA-Z0-9_\-]+\.md)`?', body)
-        if scattered_refs:
+        # 模式A：普通路径引用 — `参考/见/详见 xxx.md`（反引号包裹或无反引号）
+        scattered_refs_plain = re.findall(
+            r'(?:见|详见|→\s*详见|参考)\s*`?(?:references/)?([a-zA-Z0-9_\-]+\.md)`?', body
+        )
+        # 模式B：Markdown 链接格式 — `[文本](references/xxx.md)` 或 `[文本](xxx.md)`
+        scattered_refs_mdlink = re.findall(
+            r'\[[^\]]*\]\s*\(\s*(?:references/)?([a-zA-Z0-9_\-]+\.md)\s*\)', body
+        )
+        # 模式C：残缺引用 — "详见" 或 "→ 详见" 后无有效目标（行尾或紧接换行）
+        dangling_refs = []
+        for m in re.finditer(r'(?:→\s*)?详见\s*$', body, re.MULTILINE):
+            line_start = body.rfind('\n', 0, m.start()) + 1
+            line_text = body[line_start:m.start() + len(m.group())].strip()
+            if line_text:
+                dangling_refs.append(f"第 {body[:m.start()].count(chr(10)) + 1} 行: 「{line_text}」")
+        # 合并所有引用类型
+        scattered_refs = scattered_refs_plain + scattered_refs_mdlink
+        if scattered_refs or dangling_refs:
             # 排除索引表自身行的匹配
             index_table = re.search(r'### 渐进式文件索引.*?(?=\n## |\Z)', body, re.DOTALL)
             table_text = index_table.group(0) if index_table else ''
             real_scattered = [r for r in scattered_refs if r not in table_text]
+            issues_msgs = []
             if real_scattered:
                 unique = sorted(set(real_scattered))
-                issues["warn"].append(f"C-13b: 正文中发现散落的渐进式文件引用（{', '.join(unique)}），应统一归入渐进式文件索引表，移除正文中的\"见xxx\"引用")
+                issues_msgs.append(f"正文中发现散落的渐进式文件引用（{', '.join(unique)}），应统一归入渐进式文件索引表，移除正文中的\"见xxx\"引用")
+            if dangling_refs:
+                issues_msgs.append(f"正文中发现残缺的渐进式引用（'详见'后无目标文件）：{'；'.join(dangling_refs[:5])}")
+            if issues_msgs:
+                issues["warn"].append("C-13b: " + "；".join(issues_msgs))
 
     # C-13c: 渐进式索引表列结构校验 — 必须为 4 列（文件名 | 分类 | 包含内容 | 审计关联）
     if has_index_table:
@@ -1830,6 +1868,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             _index_table_refs.add(m.group(1))
     
     if _index_table_refs:
+        # 模式A：反引号引用 `references/xxx.md`
         for m in re.finditer(r'`references/([^`]+)`', body):
             fn = m.group(1)
             ref_line = body[:m.start()].count('\n') + 1
@@ -1840,6 +1879,19 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if fn in _index_table_refs:
                 issues["warn"].append(
                     f"C-15: 正文第 {ref_line} 行引用了 `references/{fn}`，该文件已在索引表中列出，"
+                    f"需合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
+                )
+        # 模式B：Markdown 链接引用 [text](references/xxx.md)
+        for m in re.finditer(r'\[[^\]]*\]\s*\(\s*(?:references/)?([a-zA-Z0-9_\-]+\.md)\s*\)', body):
+            fn = m.group(1)
+            ref_line = body[:m.start()].count('\n') + 1
+            if index_match and m.start() >= index_match.start() and m.start() <= index_match.end():
+                continue
+            if '📚 **渐进式加载**' in body[m.start()-30:m.start()+30]:
+                continue
+            if fn in _index_table_refs:
+                issues["warn"].append(
+                    f"C-15: 正文第 {ref_line} 行引用了 `references/{fn}`（Markdown 链接格式），该文件已在索引表中列出，"
                     f"需合并到索引表，正文中改用 → 详见核心能力的渐进式文件索引"
                 )
     

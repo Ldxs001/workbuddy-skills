@@ -1,9 +1,9 @@
 ---
 name: skill-standardization
-version: 2.88.0
+version: 2.92.0
 author: wUwproject
 license: MIT
-description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。
+description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/create/update/refactor/bump/readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规、触发条件正/否定区域分离、Markdown 链接引用检测。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性，正向/否定区域分离及模板话术检测。审计输出仅描述问题本身，不做程度判断，由 LLM 二次筛分类。
 sensitive_access: true
 critical_write: false
 permission_weight: HIGH
@@ -33,6 +33,11 @@ create_permissions_md: true
   2. 在回复中**明确输出选定的模式**，格式：`【模式=xxx】`（如 `【模式=refactor】`）
   3. 如果无法输出 `【模式=xxx】`（即找不到匹配），必须**回退重走步骤1**，不得跳过、不得默认、不得猜
   4. **禁止询问用户**、禁止弹框确认、禁止把选择权交给用户
+- **★ 模式-命令映射锁（代码级强制，新增）** — 输出 `【模式=xxx】` 后，执行 CLI 命令时**必须同时传入 `--mode xxx` 参数**：
+  - 代码对比 `--mode` 值与当前子命令是否一致，不一致则 `exit(1)` 拒绝执行
+  - LLM 说"模式=refactor"但执行 `audit --mode refactor` → ❌ 阻断
+  - LLM 说"模式=refactor"且执行 `refactor --mode refactor` → ✅ 放行
+  - 不传 `--mode` 则不触发校验（向后兼容，但 LLM **不应**跳过）
 
 ## 触发条件
 
@@ -91,38 +96,36 @@ create_permissions_md: true
 
 ## 快速开始
 
-**场景：审计单个 skill**
-> 对 color-toolkit 执行全量 R-01~R-26 审计
-```bash
-python -m scripts.skill_audit audit ~/.workbuddy/skills/color-toolkit --confirmed
-```
-  - **输入**: color-toolkit
-  - **输出**: R-01~R-26 逐条检查 → PASS/WARN/FAIL 报告 → 总计: 26 | 通过: 24 | 失败: 2
-
-**场景：审计+修复**
-> 审计并自动修复格式类问题
-```bash
-python -m scripts.skill_audit audit ~/.workbuddy/skills/color-toolkit --fix --confirmed
-```
-  - **输入**: color-toolkit（有若干 R-10/R-11 问题）
-  - **输出**: 自动修正 → 重新审计 → 修复前后对比: 修复前 2 ERROR → 修复后 0 ERROR
-
-**场景：全流程改造**
-> 对非标准 skill 执行全流程改造
-```bash
-python -m scripts.skill_audit refactor ~/.workbuddy/skills/color-toolkit --confirmed
-```
-  - **输入**: color-toolkit（非标准结构）
-  - **输出**: 蓝皮书 → 备份 → 审计 → 修复循环 → 双0验证 → bump feature → cleanup
-## 快速开始
+以下命令均为 `python -m scripts.skill_audit` 的子命令，需传入 `--mode` 匹配自检闸门输出。
 
 ```bash
+# 只读查询（不过门禁也可执行，但推荐走门禁）
+python -m scripts.skill_audit rules --confirmed --mode readonly
+python -m scripts.skill_audit create-template --confirmed --mode readonly
+
 # 审计（仅检查）
-python -m scripts.skill_audit audit <skill-dir> --confirmed
-# 审计+修复
-python -m scripts.skill_audit audit <skill-dir> --fix --confirmed
+python -m scripts.skill_audit audit <skill-dir> --confirmed --mode audit
+
+# 审计+修复（只修有 fix key 的，不经过二次筛）
+python -m scripts.skill_audit audit <skill-dir> --fix --confirmed --mode audit
+
+# 审计验证（在 --classify 后确认双0）
+python -m scripts.skill_audit audit <skill-dir> --verify --confirmed --mode audit
+
+# 创建新技能
+python -m scripts.skill_audit create <skill-dir> --desc "描述" --confirmed --mode create
+
+# 轻量更新（指定变更文件）
+python -m scripts.skill_audit update <skill-dir> --changed-files scripts/foo.py --confirmed --mode update
+
 # 全流程改造
-python -m scripts.skill_audit refactor <skill-dir> --confirmed
+python -m scripts.skill_audit refactor <skill-dir> --confirmed --mode refactor
+
+# 标记误报后继续
+python -m scripts.skill_audit refactor <skill-dir> --continue --confirmed --mode refactor
+
+# 版本号升级（三端同步，需双0确认）
+python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed --mode bump
 ```
 
 → 详见 渐进式文件索引表 获取完整交互示例
@@ -133,13 +136,14 @@ python -m scripts.skill_audit refactor <skill-dir> --confirmed
    - 输入：用户请求 → 对照模式映射表逐条匹配
    - 模式映射表：
      ```
-     用户请求关键词             → 模式
-     ─────────────────────────────────────
-     审查/检查/看看/评估       → audit
-     创建/生成/新建            → create
-     审计/更新/修              → update（含备份、蓝图、bump）
-     改造/重构/标准化/大规模改 → refactor
-     版本升级（内部）          → bump
+     用户请求关键词             → 模式         → 入口命令
+     ───────────────────────────────────────────────────
+     查看规则/查看模板          → readonly      → rules / create-template
+     仅审查/看看/评估           → audit         → audit
+     创建/生成/新建             → create        → create
+     审计/检查/更新/部分修      → update        → update（含备份）
+     改造/重构/标准化/大规模改  → refactor      → refactor（含备份）
+     版本升级（单独调用）       → bump          → bump（需双0确认）
      ```
    - **自检规则**：
      1. LLM 必须逐条对照映射表匹配用户意图
@@ -149,30 +153,32 @@ python -m scripts.skill_audit refactor <skill-dir> --confirmed
 2. **蓝皮书扫描** → 输入 SKILL.md + scripts/ → 输出 蓝皮书 JSON — 提取技能结构：文件名、函数、依赖关系
 3. **备份** → 输入 技能目录 → 输出 .zip 备份 — 备份到 .standardization/<skill>/backup/
 4. **全量审计** → 输入 SKILL.md + references/ → 输出 审计报告 — R-01~R-26 逐条输出原始问题（ERROR + WARN 全部展示，工具不做自动排除）
-5. **★ LLM 二次筛（强制，不可跳过）** →
-   - 输入：审计报告中的全部非 PASS 项（ERROR + WARN）
-   - **铁律：只有三种分类，没有第四种**：
+5. **★ 前置 LLM 二次筛除（代码级阻断点，新增）** →
+   - **代码自动阻断**：`_run_audit_loop()` 首次进入时检查 `--classify` 文件，无数据则阻断
+   - 阻断输出 3 步操作指引：
+     1. `audit <skill> --verify` 查看 FAIL 详情
+     2. `audit <skill> --classify ID1,ID2` 标记误报
+     3. `refactor <skill> --continue --confirmed --mode refactor` 继续
+   - 已有 `--classify` 数据时自动放行，进入修复循环
+   - **LLM 手动分类**：逐条审查每条 ERROR/WARN，用 `--classify ID` 标记误报
      ```
-     ERROR → 真问题，必须修复
-     WARN  → 真问题，必须修复
+     WARN  → 真问题，必须修复（无"可跳过"类别）
      误判  → 确认是误报后，用 --classify ID 标记
      ```
-   - **严禁出现以下行为**：
-     - ❌ 将 WARN 归类为"样式建议""风格建议""可优化项"等非标类别跳过
-     - ❌ 说"这是建议性的，可以不修"
-     - ❌ 集体标记为误报而不说明理由
-     - ❌ 跳过不处理
-   - 正确动作：LLM 逐条审查每条问题，判断为真问题或误报
-     - 真误报 → **必须** `--classify ID1,ID2,ID3` 逐条标记（ID 从 `--verify` 输出获取）。禁止不带数字 ID
-     - 真问题 → 保留在修复列表，不执行 `--classify`
-   - 输出：已分类的问题清单（误报 vs 真问题）
    - 验证：重新 audit 确认分类已完成，`--classify` 查看已标记列表
 6. **细碎修复循环** → 输入 审计 FAIL 列表（真问题）→ 输出 修复后的文件 — auto-fix + LLM 手动修复，代码级确认循环
-7. **双0验证** → 输入 修复后的技能 → 输出 verify 报告 — --verify 输出编号 FAIL，LLM 逐条判断
-8. **一致性审查** → 输入 文档 + 代码 → 输出 一致性报告 — 对比流程描述与实际代码是否一致
-9. **bump + cleanup** → 输入 审核通过的技能 → 输出 新版本 — 版本号三端同步 + 清理临时文件
-
-10. **★ 展示报告（强制）** → 审计/改造流程全部结束后，LLM **必须**调用 `present_files` 打开生成的 `.audit_report.html`，确保用户在对话中看到结构化结果。不得默认用户能自己找到报告文件。
+   - 有 fix key 的条目 auto-fix（含 R-25 有 fix key 的子项如 C-10/C-11/C-12/C-15）
+   - 无 fix key 的条目输出 LLM 手动修复指引
+   - 每次修复后代码自动重新审计 + 过滤已分类误报
+7. **双0验证** → 全量审计确认后输出 verify 报告 — `--verify` 过滤已分类误报，展示剩余真问题
+8. **全量一致性审查 + 前置二次筛** → 输入 文档 + 代码 → 输出 一致性报告
+   - 检查文档-代码双向一致性（函数、参数、目录树、规则编号范围等）
+   - **自有 LLM 二次筛阻断点**：检查 `--classify` 中 `C-{type}` 格式的 ID
+   - auto-fix 修 outdated_rule_ref 等可自动修复项
+   - LLM 手动修语义一致性（流程描述 vs 代码执行）
+9. **bump + cleanup** → 版本号三端同步 + cleanup session 清理临时文件
+   - refactor/update 流程内部调用 `cmd_bump`，也可单独调用
+10. **★ 展示报告（强制）** → 审计/改造流程全部结束后，LLM **必须**调用 `present_files` 打开生成的 `.audit_report.html`
 ## 数据目录说明
 
 本技能的数据文件（审查缓存、进度文件、备份、日志等）存放在：

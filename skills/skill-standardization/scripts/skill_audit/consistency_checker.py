@@ -309,36 +309,39 @@ def format_consistency_report(issues):
     return '\n'.join(lines)
 
 
-def reclassify_consistency_false_positive(issue, acknowledged_types=None):
+def reclassify_consistency_false_positive(issue, skill_dir=None):
     """
     一致性审查误判过滤。
     标记已知不是真正问题的项。
     返回 True 表示该问题是误报，应排除。
     
-    acknowledged_types: 已知可放过的类型列表，
-    属于这些类型的项被视为已 acknowledge，放过。
+    v2.91.0: 读取共享 .verify_fp.json 误判标记（ID 格式 C-{type}）。
+    所有误判统一由 LLM 通过 --classify 标记，代码层不做自动排除。
+    与审计 _reclassify_false_positive 一致。
     """
     detail = str(issue.get('detail', ''))
     issue_type = issue.get('type', '')
+    severity = issue.get('severity', 'WARN')
     
-    # 如果该类型已被声明为已修复/已认定，放过
-    if acknowledged_types and issue_type in acknowledged_types:
-        return True
+    # ── 层1：共享 --classify 误判标记（读取 .verify_fp.json） ──
+    if skill_dir:
+        skill_dir = os.path.abspath(skill_dir)
+        fp_path = os.path.join(
+            os.path.dirname(skill_dir), '.standardization',
+            os.path.basename(skill_dir), 'data', '.verify_fp.json')
+        if os.path.isfile(fp_path):
+            try:
+                with open(fp_path, 'r', encoding='utf-8') as _fpf:
+                    fp_ids = set(json.load(_fpf))
+                # 一致性问题的 ID 格式: "C-{type}"
+                issue_id = f"C-{issue_type}"
+                if issue_id in fp_ids:
+                    return True
+            except Exception:
+                pass
     
-    # missing_doc_ref: SKILL.md 的目录树不需要列出 references/ 中的每个文件
-    # 渐进式引用文件（changelog.md、antipatterns.md 等）是独立文档
-    if issue_type == 'missing_doc_ref':
-        return True
-    
-    # argparse_mismatch: 文档示例中的 --help 是通用用法
-    if issue_type == 'argparse_mismatch':
-        if '--help' in detail:
-            return True
-    
-    # stale_doc_ref: 文档目录树引用了已删除的文件
-    
-    # path_mismatch: 正文中的旧路径引用
-    
+    # 所有误判统一由 LLM 通过 --classify 标记（写入 .verify_fp.json），
+    # 代码层不做任何自动误报排除。与审计 _reclassify_false_positive 一致。
     return False
 
 

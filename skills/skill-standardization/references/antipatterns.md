@@ -32,7 +32,7 @@
 ```markdown
 ## 快速开始
 \```bash
-python -m skill_builder create my-skill
+python -m scripts.skill_audit create my-skill --confirmed --mode create
 \```
 → 详细教程见 `references/guide.md`（按需加载）
 ```

@@ -83,7 +83,7 @@
 
 ### Q6: 可以自定义 create 模板吗？
 
-**A:** create 模板位于 `scripts/skill_builder/creator.py` 中的 `SKILL_TEMPLATE` 变量。当前模板已对齐 v2.45.0+ 规范：
+**A:** create 模板位于 `scripts/skill_audit` 中 `cmd_create` 的 fallback 骨架代码。当前模板已对齐 v2.91.0+ 规范：
 
 - 包含 `## 约束` must_have 章节
 - 核心能力末尾含 `### 渐进式文件索引` 表格
@@ -128,14 +128,14 @@ update 是**轻量检查**（只读+可选修复），refactor 是**重量改造
 
 **A:**
 
-| 类型 | 含义 | 处理建议 |
-|------|------|---------|
-| **PASS** (✅) | 该项检查完全通过 | 无需操作 |
-| **WARN** (⚠️) | 存在不规范但非致命的问题 | 建议修复 |
-| **ERROR** (❌) | 存在严重不规范 | 应尽快修复 |
-| **💡** | 改进建议（非规则） | 可选优化 |
+| 类型 | 含义 | 说明 |
+|------|------|------|
+| **PASS** (✅) | 该项检查完全通过 | — |
+| **WARN** (⚠️) | 存在格式/结构不规范条目 | 由 LLM 二次筛归类（真问题或误报） |
+| **ERROR** (❌) | 存在严重结构性问题 | 由 LLM 二次筛归类（真问题或误报） |
+| **💡** | 改进建议（非规则） | — |
 
-> 注意：这些分类是审计报告的报告格式，与 R-01~R-26 审查规则的分类体系不同。ERROR 级指结构性问题，WARN 级指格式/风格建议。
+> 审计报告输出仅描述问题本身、发生位置与级别（WARN/ERROR），不附加"必须修复""建议修复"等程度判断。问题分类（真问题/误报）由 LLM 二次筛统一判定。
 
 ---
 
@@ -276,7 +276,7 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 | 2 | `_meta.json` `"version"` | 元数据版本 | 与 SKILL.md 一致 |
 | 3 | `manifest.json` `"version"`（如有） | 仓库注册版本 | 与上述一致 |
 | 4 | 各 `spec/*.json` 的 `"_version"` | 规范文件自身的版本 | 通常跟随主版本 |
-| 5 | `-m scripts.skill_builder` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
+| 5 | `python -m scripts.skill_audit` CLI | 工具自身版本标识 | `vX.Y.Z` |
 | 6 | `-m scripts.skill_audit` 自述字符串 | 工具自身版本标识 | `vX.Y.Z` |
 
 **位置 1-3 必须严格一致**（三方一致原则）。位置 4-6 跟随主版本号更新即可。
@@ -315,7 +315,7 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 ```python
 import sys
 sys.path.append("path/to/skill-standardization/scripts")
-from skill_builder import cmd_create, cmd_update, cmd_refactor
+from scripts.skill_audit.__init__ import cmd_create, cmd_update, cmd_refactor
 ```
 
 ### Q23: 如何为新 skill 编写 spec JSON？
@@ -358,7 +358,7 @@ CLI 参数传入的路径（反斜杠）会被 pathlib 自动规范化。
 python -m scripts.skill_audit audit <skill-dir>
 
 # ✅ 正确
-python -m scripts.skill_audit audit <skill-dir> --confirmed
+python -m scripts.skill_audit audit <skill-dir> --confirmed --mode audit
 ```
 
 ### Q26: 运行 audit --verify 后 exit(1)，但报告里全是误报
@@ -401,7 +401,7 @@ traceback 行数多不要慌，关注最后几行（`File "...", line XX`）即�
 3. **LLM 闭环修复流程**：
    - 读取 `.remaining_llm.json`（位于 `.standardization/skill-function-test/data/<skill>/`）
    - 逐条编辑 SKILL.md（R-23: 文档一致性 / R-25: 写作规范）
-   - 重新运行: `python -m scripts.skill_audit refactor <skill-dir> --confirmed`
+   - 重新运行: `python -m scripts.skill_audit refactor <skill-dir> --confirmed --mode refactor`
    - 针对性审计确认后自动继续到全量审计 → 双0 通过
 4. 备用：也可以运行 `audit <skill-dir> --show-fix ID` 获取每条 FAIL 的具体修复指引
 

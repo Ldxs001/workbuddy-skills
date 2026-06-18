@@ -1,22 +1,25 @@
 # API / 命令参考
 
-> 本文件为 skill-standardization v2 的完整命令参考手册。
-> 涵盖所有 CLI 工具的参数、返回值、错误码及配置项。
+> ⚠️ 本文件部分内容已过时。最新准确的命令参考请见 `references/guide.md`。
+> 所有入口命令已统一到 `python -m scripts.skill_audit`，必须传 `--mode` 参数。
 
 ---
 
 ## 目录
 
-1. [skill_builder — 构建器](#skill_builder)
-2. [skill_audit — 审查器](#skill_audit)
+1. [skill_audit — 审查器（所有入口）](#skill_audit)
 
 ---
 
-## skill_builder
+## skill_audit
 
-> 路径：`scripts/skill_builder/`
+> 路径：`scripts/skill_audit/__init__.py`
 >
-> 用途：Skill 全生命周期管理（创建/更新/改造）
+> 用途：全功能入口（审计/创建/更新/改造/版本升级/只读查询）
+>
+> 6 种模式：audit / create / update / refactor / bump / readonly
+>
+> 所有模式通过门禁（`_semantic_precheck`）校验，必须传入 `--mode` 匹配自检闸门输出。
 
 ### create 命令
 
@@ -24,7 +27,7 @@
 
 **语法：**
 ```bash
-python -m skill_builder create <name> [--desc <text>] [--dir <path>] [--tags <tag1,tag2,...>]
+python -m scripts.skill_audit create <skill-dir> --desc "描述" --confirmed --mode create
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -51,7 +54,7 @@ python -m skill_builder create <name> [--desc <text>] [--dir <path>] [--tags <ta
 
 **示例：**
 ```bash
-python -m skill_builder create my-tool --desc "通用工具" --tags tool,utility
+python -m scripts.skill_audit create my-tool --desc "通用工具" --confirmed --mode create
 ```
 
 ---
@@ -62,7 +65,7 @@ python -m skill_builder create my-tool --desc "通用工具" --tags tool,utility
 
 **语法：**
 ```bash
-python -m skill_builder update <skill_dir> [--fix] [--backup]
+python -m scripts.skill_audit update <skill-dir> [--changed-files ...] --confirmed --mode update
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -107,7 +110,7 @@ python -m skill_builder update <skill_dir> [--fix] [--backup]
 
 **语法：**
 ```bash
-python -m skill_builder refactor <skill_dir> [--no-backup] [--dry-run]
+python -m scripts.skill_audit refactor <skill-dir> --confirmed --mode refactor
 ```
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
@@ -245,8 +248,9 @@ python -m skill_audit audit <skill_dir> [--json] [--strict]
 | skill_audit | `1` | 一致性审查异常 | 代码层面报错，需查看终端 traceback |
 | skill_audit | `1` | 文件更新受阻 | safe_io 原子写入全部重试失败 |
 | skill_audit | `2` | 需 LLM 介入修复 | 双0验证发现 R-23/R-25 剩余项，已保存 `.remaining_llm.json` |
-| skill_builder | `0` | 创建/更新成功 | 正常执行 |
-| skill_builder | `1` | 参数错误 | 目标目录已存在、目录名非法、缺少必需参数 |
+| skill_audit | `0` | 操作成功 | 正常执行 |
+| skill_audit | `1` | 参数错误/审计有FAIL | 需修复后重试 |
+| skill_audit | `2` | 修复循环达上限 | 需人工介入 |
 | cleanup_manager | `0` | 清理完成 | manifest 内文件已清除 |
 | cleanup_manager | `1` | manifest 加载失败 | `end_session()` 时 session.json 损坏 |
 | cleanup_manager | `1` | 清理失败 | 备份文件无法删除，保留不清理 |
@@ -545,7 +549,7 @@ result = check_sensitive_access_declaration(
 
 ## 内部模块速查表
 
-以下模块被 audit 引擎（`skill_audit` / `skill_builder`）内部调用，通常不需要直接 CLI 调用。
+以下模块被 audit 引擎（`skill_audit`）内部调用，通常不需要直接 CLI 调用。
 在排查审计故障或定制检查逻辑时按需查阅。
 
 | 模块 | 所属包 | 职责 | 关键函数 |
@@ -558,15 +562,19 @@ result = check_sensitive_access_declaration(
 | `permission_checks.py` | skill_audit | R-13~R-26 权限检查函数 | 见 [permission_checks](#permission_checks-权限检查函数集) |
 | `report_generator.py` | skill_audit | 审计报告生成（text/json/html） | `generate_report()` |
 | `utils.py` | skill_audit | `parse_simple_yaml_frontmatter()` 等工具函数 | `parse_simple_yaml_frontmatter()` |
-| `creator.py` | skill_builder | Create 模式标准化流程 | `standardize_create()` |
-| `updater.py` | skill_builder | Update 模式标准化流程 | `standardize_update()` |
-| `migrator.py` | skill_builder | Refactor 模式迁移流程 | `standardize_refactor()` |
-| `version_manager.py` | skill_builder | 版本号检测与升级策略 | `detect_version()`, `upgrade_version()` |
+| `__init__.py` | skill_audit | 主入口（6 种模式） | `cmd_audit()`, `cmd_create()`, `cmd_update()`, `cmd_refactor()`, `cmd_bump()`, `cmd_rules()`, `cmd_create_template()` |
+| `consistency_checker.py` | skill_audit | 一致性审查 | `check_consistency()`, `apply_consistency_fix()` |
+| `structure_checker.py` | skill_audit | R-06~R-26 检查函数 | `body_check_*()` |
+| `fix.py` | skill_audit | 自动修复分发 | `apply_fix()`, `dispatch_fix()` |
+| `permission_checker.py` | — | 权限扫描 | `scan_permissions()` |
+| `safe_io.py` | — | 原子写操作 | `safe_write()` |
+| `skill_inspector.py` | — | 蓝皮书扫描 | `inspect_skill()` |
+| `cleanup_manager.py` | — | 清理管理 | `start_session()`, `end_session()` |
 
 ### 调用关系
 
 ```
-skill_builder
+skill_audit
   ├─ creator / updater / migrator  (模式路由)
   └─ version_manager               (版本管理)
 skill_audit

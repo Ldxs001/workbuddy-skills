@@ -920,11 +920,13 @@ new Chart(document.getElementById('bar'),{{type:'bar',data:{{labels:['ERROR','WA
     return output_path
 
 
-def cmd_create_template():
+def cmd_create_template(args):
     """
     输出所有规则的创建模板（供 LLM 创建技能时参考）。
     包含：规则 ID、严重度、检查内容、是否可自动修正、创建模板。
     """
+    _semantic_precheck('readonly', confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     print(f"\n{'='*70}")
     print("  skill-standardization 创建模板（供 LLM 参考）")
     print(f"{'='*70}\n")
@@ -954,8 +956,10 @@ def cmd_create_template():
     print()
 
 
-def cmd_rules():
+def cmd_rules(args):
     """列出所有审查规则"""
+    _semantic_precheck('readonly', confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     print(f"\n{'ID':<8} {'严重度':<8} 名称  检查内容")
     print("-" * 65)
     for rule in RULES:
@@ -1043,7 +1047,8 @@ def _audit_with_blueprint(skill_dir, **kw):
 def cmd_audit(args):
     """审查单个 skill 目录"""
     fp_ids = set()
-    _semantic_precheck('audit', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
+    _semantic_precheck('audit', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     # 强制 UTF-8 输出（Windows 终端兼容）
     if hasattr(sys.stdout, "reconfigure"):
         try:
@@ -1090,10 +1095,10 @@ def cmd_audit(args):
             print(f"   `--classify add` 是无效用法，请换成 `--classify 42`")
             return 1
         ids = [s.strip() for s in raw.split(',')]
-        # 验证全是数字
+        # 验证：数字 ID 或 C-{type} 格式（一致性审查误报）
         for id_str in ids:
-            if not id_str.isdigit():
-                print(f"❌ 无效 ID: '{id_str}' — ID 必须是数字，如 --classify 42,55,67")
+            if not id_str.isdigit() and not id_str.startswith('C-'):
+                print(f"❌ 无效 ID: '{id_str}' — ID 必须是数字（如 42,55,67）或 C-{{type}}（如 C-missing_doc_ref）")
                 return 1
         verify_dir = os.path.join(
             os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
@@ -1190,9 +1195,10 @@ def cmd_audit(args):
     remaining_pre = [res for res in result.get("results", [])
                      if not res.get("passed") and not res.get("skipped")
                      and not _reclassify_false_positive(res, skill_dir)]
-    # LLM-only rules have fix=True but are NOT auto-fixable — exclude from has_fixable check
-    _llm_only_rules = {"R-07", "R-11", "R-20", "R-23", "R-25"}
-    has_fixable = any(r.get("fix") for r in remaining_pre if r.get("rule_id") not in _llm_only_rules)
+    # 检查是否有可自动修复的 FAIL：由各检查器返回的 fix key 自声明，
+    # 有 fix key 且在 fix.py dispatch 表中存在对应处理函数即为 auto-fixable。
+    # fix key 为 None 或不存在的 key → 不会计入 has_fixable。
+    has_fixable = any(r.get("fix") for r in remaining_pre)
 
     # 输出标准化报告摘要（fixable 检查之前）
     if not args.fix and not getattr(args, 'verify', False) and not getattr(args, 'classify', None) and not getattr(args, 'no_fp', None) and not getattr(args, 'show_fix', None):
@@ -1220,9 +1226,10 @@ def cmd_audit(args):
     if args.fix:
         print(f"\n=== 自动修正模式 ===")
         # 收集所有失败规则的 fix key
+        # v2.91.0: 遍历 remaining_pre（已排除 --classify 标记的误报），而非全量 results
         fixes_applied = 0
         fix_details = []
-        for res in result.get("results", []):
+        for res in remaining_pre:
             if not res.get("passed") and res.get("fix"):
                 fix_key = res["fix"].get("key")
                 if fix_key:
@@ -1318,27 +1325,26 @@ def cmd_audit(args):
 
     # ── 问题分类与真问题强制修复：--fix 后仍有可修复 FAIL 则阻止通过
     # ★ 关键区分：只有 fix 函数能真正自动修复的才算"可自动修复"
-    #   R-23（文档一致性）和 R-25（写作规范）需要 LLM 手动编辑，不算
+    #   各检查器返回的 fix key 自声明是否可自动修复（存在 fix key 且在 fix.py dispatch 表中有对应函数）。
+    #   fix key 为 None → 不是 auto-fixable，属于 LLM 手动修复范畴
     remaining = [res for res in result.get("results", [])
                  if not res.get("passed") and not res.get("skipped")
                  and not _reclassify_false_positive(res, skill_dir)]
-    # 过滤掉需要 LLM 手动修复的规则
-    _llm_only_rules = {"R-07", "R-11", "R-20", "R-23", "R-25"}
-    remaining_auto = [r for r in remaining if r.get("rule_id") not in _llm_only_rules]
-    has_fixable_after = any(r.get("fix") for r in remaining_auto)
+    # 按是否有 fix key 分割为"auto可以"和"LLM 手动"
+    remaining_auto = [r for r in remaining if r.get("fix")]
+    has_fixable_after = bool(remaining_auto)
     if has_fixable_after:
         print(f"\n  ⛔ --fix 后仍有可自动修复的 FAIL — 必须再执行 --fix")
         sys.exit(1)
-    # R-23/R-25 需要 LLM 手动处理，输出提示
-    remaining_llm = [r for r in remaining if r.get("rule_id") in _llm_only_rules]
+    # 无 fix key 的规则需要 LLM 手动处理，输出提示
+    remaining_llm = [r for r in remaining if not r.get("fix")]
     if remaining_llm:
-        r23_count = sum(1 for r in remaining_llm if r.get("rule_id") == "R-23")
-        r25_count = sum(1 for r in remaining_llm if r.get("rule_id") == "R-25")
-        print(f"\n  ⚠️  以下规则需要 LLM 手动修复（--fix 无法自动处理）：")
-        if r23_count:
-            print(f"     R-23（文档-代码一致性）：{r23_count} 项 — 运行 --verify 查看详情后手动编辑文档")
-        if r25_count:
-            print(f"     R-25（写作规范）：{r25_count} 项 — 运行 --verify 查看详情后手动优化文档")
+        # 按 rule_id 聚合
+        from collections import Counter
+        llm_counts = Counter(r.get("rule_id", "?") for r in remaining_llm)
+        print(f"\n  ⚠️  以下规则无 auto-fix，需 LLM 手动修复（运行 --verify 查看详情后手动编辑）：")
+        for rid, cnt in sorted(llm_counts.items()):
+            print(f"     {rid}：{cnt} 项")
         print(f"  → 运行 --verify 查看 FAIL 详情，确认为真问题后手动修复")
         print(f"  → 或运行 --classify ID 标记为误判（确认是误报时）")
         # 强制 HTML 报告输出
@@ -1560,6 +1566,8 @@ def cmd_bump(args):
     bump 不是独立操作——它是 update/refactor 流程的最终步骤。
     必须保证 0 ERROR 0 WARN 后才能执行。
     """
+    _semantic_precheck('bump', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     import os, json, datetime
 
     skill_dir = os.path.abspath(args.skill_dir)
@@ -1660,7 +1668,7 @@ def cmd_bump(args):
         pass
 
 
-def _semantic_precheck(command, skill_dir=None, confirmed=False):
+def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None):
     """
     语义前置检查（代码强制，非 LLM 自觉）。
     在进入 create/update/refactor/audit 之前输出模式选择对照表，
@@ -1670,8 +1678,9 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False):
         'audit': '仅审查，不修改。适用于查看技能合规状态、检查 FAIL 项',
         'refactor': '全流程改造。蓝图扫描 → 备份 → 审计 → 修复 → 验证 → bump → cleanup',
         'create': '创建新技能。骨架生成 → 审计 → 报告',
-        'update': '范围明确更新。蓝图扫描 → 备份 → 审计 → 修复 → 验证 → bump',
-        'bump': '版本号升级（三端同步）。由 refactor/update 内部调用',
+        'update': '范围明确更新。蓝图扫描 → 备份 → 审计 → 修复 → 验证 → bump → cleanup',
+        'bump': '版本号升级（三端同步）。在双0确认后执行',
+        'readonly': '只读操作（rules/create-template）。不修改任何文件，仅查询信息',
     }
     desc = modes.get(command, '')
     print(f"\n{'='*55}")
@@ -1684,6 +1693,7 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False):
     print(f"  审计/检查/更新/修            → update（含备份、蓝图、bump）")
     print(f"  改造/重构/标准化/大规模改    → refactor")
     print(f"  版本升级（内部）             → bump")
+    print(f"  查看规则/查看模板/只读查询   → readonly（不修改文件）")
     print(f"{'─'*55}")
     print(f"  LLM 当前选择的模式：{command}")
     if desc:
@@ -1692,6 +1702,18 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False):
         print(f"  目标技能：{os.path.basename(skill_dir)}")
     print(f"  ⚠️  如果模式与用户意图不匹配，请立即中止并重新选择")
     print(f"{'='*55}")
+
+    # ── 模式-命令映射锁（代码级强制） ──
+    if llm_mode and llm_mode != command:
+        print(f"\n  {'❌'*3} 模式-命令不匹配！流程拒绝 {'❌'*3}")
+        print(f"     LLM 语义自检闸门输出模式：{llm_mode}")
+        print(f"     当前执行的子命令：{command}")
+        print(f"")
+        print(f"     请使用正确的子命令：")
+        print(f"       python -m scripts.skill_audit {llm_mode} <skill-dir> --confirmed --mode {llm_mode}")
+        print(f"")
+        sys.exit(1)
+
     if not confirmed:
         print(f"\n  ⛔ 未传入 --confirmed 参数，拒绝执行。")
         print(f"  请确认模式正确后重新运行: python -m scripts.skill_audit {command} <skill-dir> --confirmed")
@@ -1703,7 +1725,8 @@ def cmd_refactor(args):
     refactor 子命令：强制全流程改造
     蓝皮书 → 备份 → 全量审计 → 细碎修复循环（代码级钩子强制审计）→ 全量审计确认 → 全量一致性审查 → bump + cleanup
     """
-    _semantic_precheck('refactor', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
+    _semantic_precheck('refactor', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     import shutil, datetime
 
     skill_dir = os.path.abspath(args.skill_dir)
@@ -1787,7 +1810,8 @@ def cmd_refactor(args):
     print(f"{'─'*55}")
     result, remaining, loop_count = _run_audit_loop(
         skill_dir, max_loops=20, label_prefix='4/8',
-        manifest_version=args.manifest_version)
+        manifest_version=args.manifest_version,
+        skip_llm_prefilter=getattr(args, 'refactor_continue', False))
 
     # ── 步骤 5：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
     if remaining:
@@ -1831,7 +1855,7 @@ def cmd_refactor(args):
 
     # ── 步骤 7：全量一致性审查 + 修复循环 ──
     print(f"\n{'─'*55}")
-    print(f"  [7/8] 全量一致性审查 + 修复循环")
+    print(f"  [7/9] 全量一致性审查 + 修复循环")
     print(f"{'─'*55}")
     try:
         from .consistency_checker import (
@@ -1839,9 +1863,35 @@ def cmd_refactor(args):
             reclassify_consistency_false_positive, apply_consistency_fix
         )
         c_issues = check_consistency(skill_dir)
-        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+        
+        # ── ★ 前置 LLM 二次筛除（一致性审查阻断点） ──
+        c_raw = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
+        if c_raw and not getattr(args, 'refactor_continue', False):
+            c_fp_ids = _load_fp_ids(skill_dir)
+            c_consistency_fp = {fid for fid in c_fp_ids if fid.startswith('C-')}
+            if not c_consistency_fp:
+                print(f"\n{'='*55}")
+                print(f"  ⏸  ★ 前置 LLM 二次筛除（一致性审查）")
+                print(f"{'─'*55}")
+                print(f"  一致性审查发现 {len(c_raw)} 个真实问题，需要 LLM 确认真问题 vs 误报")
+                print(f"")
+                print(f"  步骤 1: 运行 audit --verify 查看 FAIL 详情（含一致性问题）")
+                print(f"    python -m scripts.skill_audit audit {skill_dir} --verify --mode refactor")
+                print(f"")
+                print("  步骤 2: 对确认为误报的一致性项执行 --classify（ID 格式 C-类型名）")
+                print(f"    例: python -m scripts.skill_audit audit {skill_dir} --classify C-missing_doc_ref --mode refactor")
+                print(f"    python -m scripts.skill_audit audit {skill_dir} --classify C-missing_doc_ref,C-stale_doc_ref --mode refactor")
+                print(f"")
+                print(f"  步骤 3: 重新执行 refactor --continue")
+                print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
+                print(f"{'='*55}")
+                _save_remaining_llm(skill_dir, c_raw)
+                _save_html_report(skill_dir, result)
+                sys.exit(0)
+        
+        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
         for i in c_issues:
-            if reclassify_consistency_false_positive(i):
+            if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
                 i['reclassified'] = True
         print(format_consistency_report(c_issues))
         
@@ -1869,9 +1919,9 @@ def cmd_refactor(args):
                 if _c_auto_fixed > 0:
                     print(f"  自动修复 {_c_auto_fixed} 项，重新审查确认...")
                     c_issues = check_consistency(skill_dir)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
                     for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
+                        if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
                             i['reclassified'] = True
                     print(format_consistency_report(c_issues))
                     if not c_real:
@@ -1879,9 +1929,9 @@ def cmd_refactor(args):
                         break
                     continue
                 
-                # ── ★★★ 细碎一致性审查钩子 ★★★ ──
+                # ── ★★★ 细碎一致性审查钩子（不阻断，仅输出 LLM 指引） ★★★ ──
                 print(f"\n  --- ★★★ 细碎一致性审查钩子 ★★★ ---")
-                print(f"  LLM 需要做一件事：")
+                print(f"  LLM 需要：")
                 print(f"")
                 print(f"  ① 对比 SKILL.md 中的流程描述与代码实际执行流程是否一致")
                 print(f"     检查要点：")
@@ -1894,9 +1944,9 @@ def cmd_refactor(args):
 
                 # 全量重审
                 c_issues = check_consistency(skill_dir)
-                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
                 for i in c_issues:
-                    if reclassify_consistency_false_positive(i):
+                    if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
                         i['reclassified'] = True
                 print(format_consistency_report(c_issues))
                 if not c_real:
@@ -1925,14 +1975,17 @@ def cmd_refactor(args):
         skill_dir=skill_dir,
         type=bump_type,
         desc=bump_desc or f'refactor: {os.path.basename(skill_dir)}',
-        dry_run=False)
+        dry_run=False,
+        confirmed=True,
+        mode='bump')
     cmd_bump(bump_args)
 
     # ── 步骤 8：最终报告 ──
     print(f"\n{'─'*55}")
-    print(f"  [8/8] 最终报告")
+    print(f"  [8/9] 最终报告")
     print(f"{'─'*55}")
     print(f"  ✅ 审计: 0 ERROR 0 WARN")
+    print(f"  ✅ 一致性: 无待处理问题")
     print(f"  ✅ 一致性: 无待处理问题")
     print(f"  ✅ bump: {bump_type} upgrade")
     print(f"  📋 技能: {os.path.basename(skill_dir)}")
@@ -2034,7 +2087,8 @@ def cmd_create(args):
     create 子命令：全流程创建新技能
     骨架生成 → 审计 → 报告
     """
-    _semantic_precheck('create', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
+    _semantic_precheck('create', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     skill_dir = os.path.abspath(args.skill_dir)
     skill_name = os.path.basename(skill_dir)
     desc = getattr(args, 'desc', '')
@@ -2071,19 +2125,36 @@ critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/{skill_name}/
 external_data_dir: true
+h1_position: true
 ---
-
 # {skill_name}
 
 ## 触发条件
 
-**正向触发**：
+**正向触发：**
 
-**否定条件**：
+**否定条件：**
 
 ## 核心能力
 
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+
+### 渐进式文件索引
+
+| 文件名 | 分类 | 包含内容 |
+| -------- |------| ---------- |
+| `references/examples.md` | 输出示例 | 各功能输出格式示例 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答 |
+| `references/antipatterns.md` | 规范指南 | 反模式与注意事项 |
+| `references/changelog.md` | 版本管理 | 更新日志 |
+| `references/permissions.md` | 权限说明 | 权限风险与安全声明 |
+| `references/LICENSE.md` | 许可协议 | MIT 开源许可证 |
+
+## 能力与限制
+
 ## 使用方式
+
+## 快速开始
 
 ## 工作流程
 """
@@ -2098,10 +2169,25 @@ external_data_dir: true
                 'tags': [], 'data_dir': f'skills/.standardization/{skill_name}/data/',
                 'triggers': []
             }, f, ensure_ascii=False, indent=2)
+        # 生成 references/ 骨架文件
+        _refs_content = {
+            'LICENSE.md': 'MIT License\n\nCopyright (c) 2025 your-name-here\n\nPermission is hereby granted...',
+            'permissions.md': '# 权限说明\n\n## 风险等级\n\nLOW\n\n## 安全声明\n\n本技能仅操作本地文件，不涉及网络请求或敏感信息访问。',
+            'changelog.md': '# 更新日志\n\n## [1.0.0] - 初始版本\n\n### 新增\n- 初始创建\n',
+            'examples.md': '# 输出示例\n\n> 请根据实际功能补充输出示例。\n',
+            'faq.md': '# FAQ / 常见问题\n\n> 请根据实际功能补充常见问题。\n',
+            'antipatterns.md': '# 反模式与常见错误\n\n> 请根据实际功能补充反模式说明。\n',
+        }
+        for _rf, _rc in _refs_content.items():
+            _rfp = os.path.join(skill_dir, 'references', _rf)
+            if not os.path.isfile(_rfp):
+                with open(_rfp, 'w', encoding='utf-8') as f:
+                    f.write(_rc)
         # 生成 .gitkeep
-        for d in ('references', 'scripts'):
+        for d in ('scripts',):
             open(os.path.join(skill_dir, d, '.gitkeep'), 'w').close()
         print(f"  ✅ 最小骨架已生成：{skill_dir}")
+        print(f"     references/: LICENSE.md, permissions.md, changelog.md, examples.md, faq.md, antipatterns.md")
 
     # ── 步骤 2：审计 ──
     print(f"\n{'─'*55}")
@@ -2145,7 +2231,7 @@ def _validate_changed_files(skill_dir, changed_files):
 
 
 
-def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None):
+def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None, skip_llm_prefilter=False):
     """
     修复循环通用实现。
     返回 (result, remaining, loop_count)
@@ -2156,6 +2242,33 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
     else:
         result = audit_skill(skill_dir, manifest_version=manifest_version)
     print(format_report(result))
+
+    # ── ★ 前置 LLM 二次筛除（阻断点） ──
+    # 流程: ①审计输出 → ②报告展示 → ③★LLM二次筛 → ④_filter_false_positives → ⑤细碎循环
+    # 首次进入且 --continue 未传入时阻断
+    raw_remaining = [r for r in result.get("results", [])
+                     if not r.get("passed") and not r.get("skipped")]
+    if raw_remaining and not skip_llm_prefilter:
+        fp_ids = _load_fp_ids(skill_dir)
+        if not fp_ids:
+            skill_name = os.path.basename(os.path.abspath(skill_dir))
+            print(f"\n{'='*55}")
+            print(f"  ⏸  ★ 前置 LLM 二次筛除（阻断点）")
+            print(f"{'─'*55}")
+            print(f"  原始审计发现 {len(raw_remaining)} 项 FAIL，需要 LLM 确认真问题 vs 误报")
+            print(f"")
+            print(f"  步骤 1: 查看 FAIL 详情")
+            print(f"    python -m scripts.skill_audit audit {skill_dir} --verify --mode refactor")
+            print(f"")
+            print(f"  步骤 2: 对确认为误报的项执行 --classify（逐条标记ID）")
+            print(f"    python -m scripts.skill_audit audit {skill_dir} --classify ID1,ID2 --mode refactor")
+            print(f"")
+            print(f"  步骤 3: 重新执行 refactor --continue")
+            print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
+            print(f"{'='*55}")
+            _save_remaining_llm(skill_dir, raw_remaining)
+            return result, raw_remaining, 0
+
     remaining = _filter_false_positives(result, skill_dir)
     
     loop_count = 0
@@ -2335,7 +2448,8 @@ def cmd_update(args):
     update 子命令：范围明确的变更流程
     蓝皮书 → 变更声明 → 针对性审计 → 细碎修复循环 → 全量审计确认 → 针对性一致性审查 → bump
     """
-    _semantic_precheck('update', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False))
+    _semantic_precheck('update', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False),
+                       llm_mode=getattr(args, 'mode', None))
     skill_dir = os.path.abspath(args.skill_dir)
     bump_type = getattr(args, 'bump_type', 'fix')
     bump_desc = getattr(args, 'desc', '')
@@ -2347,7 +2461,7 @@ def cmd_update(args):
 
     # ── 步骤 1：蓝皮书扫描（强制） ──
     print(f"\n{'─'*55}")
-    print(f"  [1/7] 蓝皮书扫描")
+    print(f"  [1/9] 蓝皮书扫描")
     print(f"{'─'*55}")
     try:
         from ..skill_inspector import inspect_skill
@@ -2359,10 +2473,21 @@ def cmd_update(args):
         except ImportError:
             print("  [WARN] 未找到 skill_inspector，跳过蓝皮书扫描")
 
-    # ── 步骤 2：备份（强制） ──
+    # ── 步骤 2：启动 cleanup session + 备份（强制） ──
     print(f"\n{'─'*55}")
-    print(f"  [2/8] 创建备份")
+    print(f"  [2/8] 启动 cleanup session + 创建备份")
     print(f"{'─'*55}")
+    try:
+        from scripts.cleanup_manager import start_session
+        manifest_id = start_session(skill_dir, "update")
+        if manifest_id:
+            print(f"  ✅ cleanup session 已启动: {manifest_id}")
+        else:
+            print(f"  ⚠️  cleanup session 启动失败，清理将跳过")
+            manifest_id = None
+    except ImportError:
+        manifest_id = None
+        print(f"  ⚠️  未找到 cleanup_manager，清理将跳过")
 
     import shutil, datetime
     backup_id = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -2381,9 +2506,17 @@ def cmd_update(args):
                 _zf.write(fp, arcname)
     print(f"  ✅ 备份到 {zip_path}.zip")
 
+    # 注册备份路径到 cleanup session
+    if manifest_id:
+        try:
+            from scripts.cleanup_manager import register
+            register(zip_path + '.zip', category="backup")
+        except Exception:
+            pass
+
     # ── 步骤 3：变更声明（流程钩子 — 强制） ──
     print(f"\n{'─'*55}")
-    print(f"  [3/8] 变更声明")
+    print(f"  [3/9] 变更声明")
     print(f"{'─'*55}")
     if changed_files:
         valid, err = _validate_changed_files(skill_dir, changed_files)
@@ -2394,20 +2527,20 @@ def cmd_update(args):
     else:
         print(f"  ⚠️  未通过 --changed-files 声明变更文件，回退到全量审计")
 
-    # ── 步骤 3：针对性审计 ──
+    # ── 步骤 4：针对性审计 ──
     print(f"\n{'─'*55}")
-    print(f"  [4/8] {'针对性' if changed_files else '全量'}审计")
+    print(f"  [4/9] {'针对性' if changed_files else '全量'}审计")
     print(f"{'─'*55}")
     result, remaining, _ = _run_audit_loop(
-        skill_dir, max_loops=10, label_prefix='4/8',
+        skill_dir, max_loops=10, label_prefix='4/9',
         manifest_version=args.manifest_version,
         filter_files=changed_files)
     s_before_update = result.get("summary", {})
 
-    # ── 步骤 4：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
+    # ── 步骤 5：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
     if remaining:
         print(f"\n{'-'*55}")
-        print(f"  [5/8] LLM 剩余项检查")
+        print(f"  [5/9] LLM 剩余项检查")
         print(f"{'-'*55}")
         llm_items = [r for r in remaining
                      if r.get('rule_id', r.get('rule', '')) in ('R-07', 'R-11', 'R-20', 'R-23', 'R-25')]
@@ -2446,7 +2579,7 @@ def cmd_update(args):
 
     # ── 步骤 7：针对性一致性审查 + 修复循环 ──    # ── 步骤 7：针对性一致性审查 + 修复循环 ──
     print(f"\n{'─'*55}")
-    print(f"  [7/8] {'针对性' if changed_files else '全量'}一致性审查 + 修复循环")
+    print(f"  [7/9] {'针对性' if changed_files else '全量'}一致性审查 + 修复循环")
     print(f"{'─'*55}")
     try:
         from .consistency_checker import (
@@ -2454,9 +2587,9 @@ def cmd_update(args):
             reclassify_consistency_false_positive, apply_consistency_fix
         )
         c_issues = check_consistency(skill_dir, filter_files=changed_files)
-        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+        c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
         for i in c_issues:
-            if reclassify_consistency_false_positive(i):
+            if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
                 i['reclassified'] = True
         print(format_consistency_report(c_issues))
         
@@ -2483,9 +2616,9 @@ def cmd_update(args):
                 if _c_auto_fixed > 0:
                     print(f"  自动修复 {_c_auto_fixed} 项，重新审查确认...")
                     c_issues = check_consistency(skill_dir, filter_files=changed_files)
-                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                    c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
                     for i in c_issues:
-                        if reclassify_consistency_false_positive(i):
+                        if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
                             i['reclassified'] = True
                     print(format_consistency_report(c_issues))
                     if not c_real:
@@ -2507,9 +2640,9 @@ def cmd_update(args):
                 print(f"")
 
                 c_issues = check_consistency(skill_dir, filter_files=changed_files)
-                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i)]
+                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
                 for i in c_issues:
-                    if reclassify_consistency_false_positive(i):
+                    if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
                         i['reclassified'] = True
                 print(format_consistency_report(c_issues))
                 if not c_real:
@@ -2532,17 +2665,38 @@ def cmd_update(args):
 
     # ── 步骤 8：版本升级 ──
     print(f"\n{'─'*55}")
-    print(f"  [8/8] 版本升级（{bump_type}）")
+    print(f"  [8/9] 版本升级（{bump_type}）")
     print(f"{'─'*55}")
     bump_args = argparse.Namespace(
         skill_dir=skill_dir, type=bump_type,
         desc=bump_desc or f'update: {os.path.basename(skill_dir)}',
-        dry_run=False)
+        dry_run=False,
+        confirmed=True,
+        mode='bump')
     cmd_bump(bump_args)
 
-    # ── 步骤 8：最终报告 ──
+    # ── 步骤 8：清理（cleanup session 驱动） ──
     print(f"\n{'─'*55}")
-    print(f"  [8/8] 最终报告")
+    print(f"  [8/9] cleanup 清理")
+    print(f"{'─'*55}")
+    if manifest_id:
+        try:
+            from scripts.cleanup_manager import end_session
+            report = end_session(manifest_id, "update completed")
+            if report:
+                deleted = report.get('deleted', 0)
+                skipped = report.get('skipped', 0)
+                print(f"  ✅ cleanup 完成: 删除 {deleted}，跳过 {skipped}")
+            else:
+                print(f"  ✅ cleanup 完成（无操作）")
+        except Exception as e:
+            print(f"  ⚠️  cleanup 执行异常: {e}")
+    else:
+        print(f"  ⚠️  无 cleanup session，跳过清理")
+
+    # ── 步骤 9：最终报告 ──
+    print(f"\n{'─'*55}")
+    print(f"  [9/9] 最终报告")
     print(f"{'─'*55}")
     print(f"  ✅ 审计: 0 ERROR 0 WARN")
     print(f"  ✅ 一致性: 无待处理问题")
@@ -2575,6 +2729,7 @@ def main():
     p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
     p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
     p_audit.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_audit.add_argument("--mode", help="LLM 自检闸门输出的模式，用于模式-命令校验（如 --mode refactor）。不传则不校验")
     p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
     p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
     p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（如 --classify 42,55,67），后续 bump 自动跳过。禁止不带 ID")
@@ -2587,12 +2742,16 @@ def main():
     p_all.add_argument("--json", action="store_true", help="JSON 格式输出")
 
     # rules 子命令
-    subparsers.add_parser("rules", help="列出所有审查规则")
+    p_rules = subparsers.add_parser("rules", help="列出所有审查规则")
+    p_rules.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_rules.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode readonly）。不传则不校验")
 
     # create-template 子命令（v2.29.0 新增）
     p_template = subparsers.add_parser("create-template", aliases=["template"],
                                       help="输出所有规则的创建模板（供 LLM 创建技能时参考）")
     p_template.add_argument("--json", action="store_true", help="JSON 格式输出")
+    p_template.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_template.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode readonly）。不传则不校验")
 
     # fix 子命令（v2.37.0 新增）
     p_fix = subparsers.add_parser("fix", help="针对性修复工具（按 fix key 分发）")
@@ -2614,6 +2773,8 @@ def main():
                         help="变更类型（默认交互选择）")
     p_bump.add_argument("--desc", required=True, help="本次变更描述（将写入 changelog）")
     p_bump.add_argument("--dry-run", action="store_true", help="仅预览，不实际修改")
+    p_bump.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_bump.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode bump）。不传则不校验")
     # refactor 子命令（v2.66.0 新增）
     p_refactor = subparsers.add_parser("refactor",
         help="全流程改造：蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 版本升级 → 清理")
@@ -2626,12 +2787,14 @@ def main():
     p_refactor.add_argument("--continue", dest="refactor_continue", action="store_true",
                             help="从上一次中断处继续")
     p_refactor.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_refactor.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode refactor）。不传则不校验")
 
     # create 子命令（v2.66.0 新增）
     p_create = subparsers.add_parser("create", help="全流程创建新技能：骨架生成 → 审计 → 报告")
     p_create.add_argument("skill_dir", help="技能目录路径（目录名将作为技能名）")
     p_create.add_argument("--desc", default="", help="技能描述")
     p_create.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_create.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode create）。不传则不校验")
 
     # update 子命令（v2.66.0 新增）
     p_update = subparsers.add_parser("update", help="轻量更新：蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 一致性审查 → bump")
@@ -2644,6 +2807,7 @@ def main():
     p_update.add_argument("--changed-files", nargs="*", default=None,
                           help="变更文件列表（如 --changed-files scripts/foo.py references/bar.md）")
     p_update.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
+    p_update.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode update）。不传则不校验")
 
     args = parser.parse_args()
 
@@ -2652,7 +2816,7 @@ def main():
     elif args.command == "audit-all":
         cmd_audit_all(args)
     elif args.command == "rules":
-        cmd_rules()
+        cmd_rules(args)
     elif args.command == "fix":
         cmd_fix(args)
     elif args.command == "bump":
@@ -2665,6 +2829,8 @@ def main():
         cmd_update(args)
     elif args.command in ("create-template", "template"):
         if hasattr(args, "json") and args.json:
+            _semantic_precheck('readonly', confirmed=getattr(args, 'confirmed', False),
+                               llm_mode=getattr(args, 'mode', None))
             import json
             output = []
             for rule in RULES:
@@ -2678,7 +2844,7 @@ def main():
                 })
             print(json.dumps(output, ensure_ascii=False, indent=2))
         else:
-            cmd_create_template()
+            cmd_create_template(args)
     else:
         parser.print_help()
         sys.exit(1)
