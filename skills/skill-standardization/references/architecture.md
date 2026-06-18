@@ -102,7 +102,7 @@ skill-standardization/                 # Skill 根目录
 [3] 全量审计 → audit_skill()
 [4] _run_audit_loop()
       ├─ ★ 前置 LLM 二次筛阻断点
-      ├─ auto-fix（有 fix key）
+      ├─ auto-fix（按 fix key 粒度过滤 _llm_only_fix_keys 后修复）
       └─ LLM manual 指引
 [5] LLM 剩余项检查
 [6] 全量审计确认（双0）
@@ -145,7 +145,7 @@ LLM 在自检闸门输出 `【模式=xxx】` 后，执行 CLI 时必须传 `--mo
 
 ### 3. 误报分类与修复路径分离
 - **误报（是否修）**：LLM 通过 `--classify` 标记，写入 `.verify_fp.json`
-- **auto-fix / LLM manual（怎么修）**：有 fix key 的 auto-fix，无 fix key 的 LLM 手动
+- **auto-fix / LLM manual（怎么修）**：三路判断 — fix key 不在 _llm_only_fix_keys 中的 auto-fix；fix key 在 _llm_only_fix_keys 中或无 fix key 的 LLM 手动
 
 两条轴线独立运行，互不干扰。
 

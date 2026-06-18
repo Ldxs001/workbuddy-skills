@@ -2272,6 +2272,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
     remaining = _filter_false_positives(result, skill_dir)
     
     loop_count = 0
+    _prev_sig = None
     while remaining and loop_count < max_loops:
         loop_count += 1
 
@@ -2300,10 +2301,32 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         # ── 自动修复 ──
         has_fixable = any(r.get("fix") for r in remaining)
         
-        # 分离 auto-fixable 和 manual-only 规则
-        _llm_only_set = {"R-07", "R-11", "R-20", "R-23", "R-25"}
-        remaining_auto = [r for r in remaining if r.get("rule_id", r.get("rule", "")) not in _llm_only_set]
-        remaining_llm = [r for r in remaining if r.get("rule_id", r.get("rule", "")) in _llm_only_set]
+        # 按 fix key 粒度分离 auto-fixable 和 manual-only 项
+        # ★ 不按规则ID一刀切：同一规则下不同子项可能有不同的自动化能力
+        #   - 有 fix key 且 key 在 _llm_only_fix_keys 中 → LLM手动修
+        #   - 有 fix key 且 key 不在 _llm_only_fix_keys 中 → auto修
+        #   - 无 fix key → LLM手动修（没有自动修复方案）
+        _llm_only_fix_keys = {
+            "workflow_completeness",  # R-25 C-14: 需要 LLM 读代码写工作流
+            "example_quality",        # R-25 C-17: 需要 LLM 读代码创建示例
+            "capability_boundary",    # R-25 C-18: 需要 LLM 理解能力边界
+            # "section_names" → 机械重命名，auto
+            # "excessive_blank_lines" → 机械删空行，auto
+            # "table_format" → 机械格式化，auto
+            # "inline_refs" → 机械内联引用，auto
+            # "trigger_format" → 机械格式，auto
+            # "constraint_format" → 机械格式，auto
+            # "writing_standards" → 机械术语替换，auto
+            # "doc_references" → 机械路径替换，auto
+        }
+        remaining_auto = []
+        remaining_llm = []
+        for r in remaining:
+            fk = r.get("fix", {}).get("key") if isinstance(r.get("fix"), dict) else None
+            if fk and fk not in _llm_only_fix_keys:
+                remaining_auto.append(r)
+            else:
+                remaining_llm.append(r)
 
         # 输出 LLM 手动修复指引（给 LLM 具体操作说明）
         if remaining_llm:
@@ -2329,7 +2352,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     _dname = os.path.basename(os.path.abspath(skill_dir))
                     _dd = os.path.normpath(os.path.join(
                         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                        "..", ".standardization", "skill-function-test", "data", _dname, "outputs"
+                        os.pardir, ".standardization", _dname, "data", _dname, "outputs"
                     ))
                     struct_file = os.path.join(_dd, _sf_map.get(fk, f".structure_{fk}.json"))
                     sev = "[WARN]"
@@ -2340,7 +2363,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     print(f"    → 参考格式见 fix.py 中对应 fix 函数的文档注释")
                 print(f"    生成结构化数据后，重新执行 --fix，脚本会自动渲染为格式化章节")
             
-            # 其他手动修复项
+            # 其他手动修复项（无 fix key 或 fix key 不在任何 known set 中）
             other_llm = [r for r in remaining_llm if r.get("fix", {}).get("key") not in _struct_keys]
             if other_llm:
                 print(f"\n  ℹ️  其他 {len(other_llm)} 项：")
@@ -2354,7 +2377,11 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
 
         if has_fixable:
             print(f"\n  --- 自动修复 ---")
-            for res in remaining:
+            _fixes_applied = 0
+            # ★ 只处理 auto-fixable 项（按 fix key 粒度筛选）
+            _auto_targets = remaining_auto if remaining_auto else [r for r in remaining
+                if r.get("fix") and r["fix"].get("key") not in _llm_only_fix_keys]
+            for res in _auto_targets:
                 # R-25 可能有多个子项 -> 调所有匹配的 fix 函数
                 if res.get("rule_id", "") == "R-25":
                     detail = res.get("detail", "")
@@ -2375,6 +2402,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                                     try:
                                         n = apply_fix(skill_dir, c12_fk)
                                         if n > 0:
+                                            _fixes_applied += n
                                             print(f"  ✅ R-25 (C-12/{c12_fk}): 已修复 ({n} 处)")
                                     except Exception as e:
                                         pass
@@ -2382,6 +2410,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                                 try:
                                     n = apply_fix(skill_dir, fk, **res.get("fix", {}))
                                     if n > 0:
+                                        _fixes_applied += n
                                         print(f"  ✅ R-25 ({c_tag}): 已修复 ({n} 处)")
                                 except Exception as e:
                                     print(f"  ⚠️  R-25 ({c_tag}) 修复失败: {e}")
@@ -2391,6 +2420,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                         try:
                             n = apply_fix(skill_dir, fix_key, **res["fix"])
                             if n > 0:
+                                _fixes_applied += n
                                 rid = res.get('rule_id', res.get('rule', fix_key))
                                 print(f"  ✅ {rid}: 已修复")
                         except Exception as e:
@@ -2404,11 +2434,25 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                 pass
 
         # ── 判断：是否只剩 LLM 手动修复项 ──
-        # 清除循环内注入的 fix key，查看真实的可自动修复项
+        # 清除 LLM-only fix key，只留下真实的可自动修复项
         for r in remaining:
-            if r.get("rule_id", r.get("rule", "")) in ("R-07", "R-11", "R-20", "R-23", "R-25"):
+            fk = r.get("fix", {}).get("key") if isinstance(r.get("fix"), dict) else None
+            if fk and fk in _llm_only_fix_keys:
+                r.pop("fix", None)
+        # ★ 如果 auto-fix 实际修了 0 处（函数调用返回 0），说明当前 auto-fix 能力已耗尽，
+        #   再循环也不会有效果 → 清除所有剩余 fix key，直接走 LLM 手动路径
+        if has_fixable and _fixes_applied == 0:
+            for r in remaining:
                 r.pop("fix", None)
         auto_fixable = [r for r in remaining if r.get("fix")]
+        
+        # ★ 额外兜底：如果 remaining 在本次循环中没有减少（相同 rule_id）,说明 auto-fix 已达瓶颈
+        _current_sig = [(r.get("rule_id","?"), r.get("detail","")[:80]) for r in remaining]
+        if _prev_sig is not None and _current_sig == _prev_sig:
+            for r in remaining:
+                r.pop("fix", None)
+            auto_fixable = []
+        _prev_sig = _current_sig
         
         if not auto_fixable:
             if remaining:
@@ -2542,8 +2586,13 @@ def cmd_update(args):
         print(f"\n{'-'*55}")
         print(f"  [5/9] LLM 剩余项检查")
         print(f"{'-'*55}")
+        # 按 fix key 粒度判断：无 fix key 或 fix key 需 LLM 判断的 → LLM 手动修
+        _llm_only_fix_keys_cmd = {
+            "workflow_completeness", "example_quality", "capability_boundary",
+        }
         llm_items = [r for r in remaining
-                     if r.get('rule_id', r.get('rule', '')) in ('R-07', 'R-11', 'R-20', 'R-23', 'R-25')]
+                     if not r.get("fix") or r["fix"].get("key") in _llm_only_fix_keys_cmd]
+        non_llm_items = [r for r in remaining if r not in llm_items]
         if llm_items:
             _save_remaining_llm(skill_dir, llm_items)
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
@@ -2554,7 +2603,7 @@ def cmd_update(args):
             print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
             print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
         else:
-            print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复")
+            print(f"\n  ⛔ 有 {len(non_llm_items)} 项非 LLM 类 FAIL 未被自动修复")
             print(f"  请检查修复循环是否达到上限（10 轮），或手动排查")
         sys.exit(2)
 

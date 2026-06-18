@@ -702,13 +702,19 @@ def fix_artifact_paths(skill_dir, **kw):
                     with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                         content = f.read()
                     original = content
-                    # 替换所有受影响路径
                     for old_rel, new_rel in affected.items():
                         if new_rel is None:
-                            # 文件已删除：移除引用行或注释掉
-                            # 简单处理：替换文件名为警告注释
-                            old_name = os.path.basename(old_rel)
-                            content = content.replace(old_name, f"[DELETED:{old_name}]")
+                            # 文件已删除：只替换相对路径引用，不替换裸文件名
+                            # 防止 "SKILL.md" → "[DELETED:SKILL.md]" 误伤
+                            # 只匹配作为路径组件出现的引用（含引号/括号的路径上下文）
+                            import re as _re
+                            old_escaped = _re.escape(old_rel)
+                            # 匹配引号内的路径、os.path.join 中的路径段、注释中的路径
+                            content = _re.sub(
+                                rf'(?<=["\'/\\]){old_escaped}(?=["\'])',
+                                f"[DELETED:{old_rel}]",
+                                content
+                            )
                         else:
                             # 文件已移动：更新路径
                             content = content.replace(old_rel, new_rel)
@@ -960,12 +966,12 @@ def fix_create_permissions_md(skill_dir, **kw):
                     in_perm = True
                     continue
                 if in_perm:
-                    # 遇到下一个 H1 或测试报告 H2 时结束权限段落
+                    # 遇到下一个 H1 或测试报告类 H2 时结束权限段落
                     if stripped.startswith("# ") and perm_header not in stripped:
                         in_perm = False
                         after_perm.append(line)
                         continue
-                    if stripped.startswith("## 基于skill-function-test"):
+                    if stripped.startswith("## ") and ("测试报告" in stripped or "test report" in stripped.lower()):
                         in_perm = False
                         after_perm.append(line)
                         continue
@@ -2295,7 +2301,7 @@ def _struct_dir(skill_dir):
     ))
     _SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
     d = os.path.normpath(os.path.join(
-        _SKILLS_ROOT, ".standardization", "skill-function-test",
+        _SKILLS_ROOT, ".standardization", "skill-standardization",
         "data", skill_name, "outputs"
     ))
     os.makedirs(d, exist_ok=True)

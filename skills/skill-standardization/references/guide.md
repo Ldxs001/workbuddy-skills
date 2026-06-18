@@ -71,7 +71,7 @@ python -m scripts.skill_audit audit <skill-dir> --confirmed --mode audit
 ```bash
 python -m scripts.skill_audit audit <skill-dir> --fix --confirmed --mode audit
 ```
-仅修有 fix key 的条目，不经过 LLM 二次筛。修完后重新审计确认。
+按 fix key 粒度分离修复路径：fix key 不在 _llm_only_fix_keys 的条目 auto-fix；在 _llm_only_fix_keys 中或无 fix key 的条目输出 LLM 手动指引。修完后重新审计确认。
 
 ### 验证双0
 ```bash
@@ -151,7 +151,7 @@ python -m scripts.skill_audit update <skill-dir> --changed-files scripts/foo.py 
 [3/9] 变更声明 → 校验 changed-files 路径有效性
 [4/9] 针对性/全量审计 → _run_audit_loop()
         ├─ ★ 前置 LLM 二次筛阻断点（首次进入，无 --classify 数据时阻断）
-        ├─ auto-fix（有 fix key 的条目）
+        ├─ auto-fix（按 fix key 粒度过滤 _llm_only_fix_keys 后修复）
         └─ LLM manual 指引输出
 [5/9] LLM 剩余项检查
 [6/9] 全量审计确认（双 0 验证）

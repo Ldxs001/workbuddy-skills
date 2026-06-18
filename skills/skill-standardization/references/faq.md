@@ -399,7 +399,7 @@ traceback 行数多不要慌，关注最后几行（`File "...", line XX`）即�
 1. 检查是否在修**不可自动修复的规则**（R-23/R-25 需要 LLM 手动编辑，`--fix` 修不了）
 2. 脚本检测到剩余 R-23/R-25 项时，会以 `exit(2)` 退出并保存 `.remaining_llm.json`
 3. **LLM 闭环修复流程**：
-   - 读取 `.remaining_llm.json`（位于 `.standardization/skill-function-test/data/<skill>/`）
+   - 读取 `.remaining_llm.json`（位于 `.standardization/skill-standardization/data/<skill>/outputs/`）
    - 逐条编辑 SKILL.md（R-23: 文档一致性 / R-25: 写作规范）
    - 重新运行: `python -m scripts.skill_audit refactor <skill-dir> --confirmed --mode refactor`
    - 针对性审计确认后自动继续到全量审计 → 双0 通过

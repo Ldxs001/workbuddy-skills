@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.92.0
+version: 2.93.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/create/update/refactor/bump/readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规、触发条件正/否定区域分离、Markdown 链接引用检测。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性，正向/否定区域分离及模板话术检测。审计输出仅描述问题本身，不做程度判断，由 LLM 二次筛分类。
@@ -167,8 +167,11 @@ python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed
      ```
    - 验证：重新 audit 确认分类已完成，`--classify` 查看已标记列表
 6. **细碎修复循环** → 输入 审计 FAIL 列表（真问题）→ 输出 修复后的文件 — auto-fix + LLM 手动修复，代码级确认循环
-   - 有 fix key 的条目 auto-fix（含 R-25 有 fix key 的子项如 C-10/C-11/C-12/C-15）
-   - 无 fix key 的条目输出 LLM 手动修复指引
+   - 按 fix key 粒度分离 auto/LLM 路径：
+     · fix key 不在 （workflow_completeness/example_quality/capability_boundary）→ auto-fix
+     · fix key 在  中 → LLM 手动（需读代码写结构化数据文件）
+     · 无 fix key → LLM 手动
+   - 停滞检测：auto-fix 实际修复数为 0 时清空所有 fix key 不再空转
    - 每次修复后代码自动重新审计 + 过滤已分类误报
 7. **双0验证** → 全量审计确认后输出 verify 报告 — `--verify` 过滤已分类误报，展示剩余真问题
 8. **全量一致性审查 + 前置二次筛** → 输入 文档 + 代码 → 输出 一致性报告
