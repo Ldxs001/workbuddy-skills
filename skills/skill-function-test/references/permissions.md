@@ -1,4 +1,116 @@
-# 基于skill-standardization渐进式披露规范的权限说明
+# 基于 skill-standardization 渐进式披露规范的权限说明
+
+本文档由 `skill-standardization` 权限扫描器自动维护。
+
+## 风险等级
+
+**MEDIUM**（实际权重: 0.3）
+
+## 权限总览
+
+| 权限类别 | 涉及项数 | 风险等级 |
+|-----------|----------|----------|
+| `subprocess_call` | 38 项 | 🔴 HIGH |
+| `file_delete` | 5 项 | 🔴 HIGH |
+| `network_access` | 0 项 | ✅ LOW |
+| `sensitive_access` | 0 项 | ✅ LOW |
+| `critical_write` | 0 项 | ✅ LOW |
+
+## 高权限操作说明
+
+- **子进程调用（subprocess）**（38 项，unified）
+
+- **文件删除**（5 项，unified）
+
+
+## 权限详细说明
+
+### 子进程调用（subprocess）（38 项）
+
+> **功能说明**：技能需要通过 subprocess/操作系统调用来执行外部命令或脚本。
+> **授权方式**：unified
+
+| 文件 | 行号 | 匹配内容 | 功能说明 |
+|------|------|----------|----------|
+| `scripts\backup.py` | 13 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\backup.py` | 27 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\backup.py` | 177 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\backup.py` | 179 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\gen_report.py` | 8 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\gen_report.py` | 19 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\gen_report.py` | 24 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\hooks.py` | 19 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\hooks.py` | 67 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\inspector.py` | 20 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\inspector.py` | 29 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\inspector.py` | 34 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\inspector.py` | 44 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\runner.py` | 17 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\s4_engine.py` | 14 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\s4_engine.py` | 22 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\s4_engine.py` | 27 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\s4_engine.py` | 37 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 23 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 47 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 52 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 62 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 72 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 77 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 80 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 400 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 416 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 482 | `exec(` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 488 | `exec(` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\scenario_engine.py` | 538 | `exec(` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_engine.py` | 13 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_engine.py` | 30 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_engine.py` | 35 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_engine.py` | 45 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_engine.py` | 171 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_engine.py` | 187 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\timeline.py` | 54 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\timeline.py` | 161 | `subprocess` | 自动化技能：一次性授权，后续自动执行不再询问 |
+
+
+### 文件删除（5 项）
+
+> **功能说明**：技能在执行过程中需要删除临时文件或清理旧版产物。
+> **授权方式**：unified
+
+| 文件 | 行号 | 匹配内容 | 功能说明 |
+|------|------|----------|----------|
+| `scripts\backup.py` | 153 | `shutil.rmtree` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\hooks.py` | 994 | `os.remove` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\s4_engine.py` | 578 | `os.remove` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\s4_engine.py` | 587 | `os.remove` | 自动化技能：一次性授权，后续自动执行不再询问 |
+| `scripts\test_config.py` | 824 | `os.remove` | 自动化技能：一次性授权，后续自动执行不再询问 |
+
+
+### 网络访问
+
+**无**。
+
+
+### 敏感信息访问
+
+**无**。
+
+
+### 关键位置写入
+
+**无**。
+
+
+## 授权方式说明
+
+- **immediate（即时授权）**：每次执行前需获得用户批准
+- **unified（统一授权）**：首次执行前获得用户批准，后续不再询问
+- **silent（静默授权）**：无需用户交互，自动执行并记录
+
+<!-- fp:risk=MEDIUM|sensitive=0|critical_write=0|network=0|delete=5|subprocess=38|issues=43 -->
+---
+
+# 基于 skill-standardization 渐进式披露规范的权限说明
 
 本文档由 `skill-standardization` 权限扫描器自动维护。
 
@@ -49,9 +161,9 @@
 ## 风险缓解措施
 
 1. **输入验证**：所有用户输入都经过格式和范围验证
-2. **输出隔离**：输出文件限制在 `.standardization/skill-function-test/data/output/` 目录内
+2. **输出隔离**：输出文件限制在 `.standardization/skill-function-test/data/<skill>/outputs/` 目录内
 3. **错误隔离**：单个文件处理失败不影响整体流程
-4. **审计日志**：所有操作记录到 `.standardization/skill-function-test/data/logs/audit.log`
+4. **审计日志**：所有操作记录到 `.standardization/skill-function-test/data/<skill>/outputs/ops.log`
 
 ## 授权方式说明
 
@@ -64,28 +176,3 @@
 > 本文档会在每次运行 `python -m skill_audit audit . --fix` 后自动更新。
 
 ---
-
-## 基于skill-function-test的测试报告
-
-> 生成时间: 2026-06-13
-
-### 测试概览
-
-| 测试项 | 结果 |
-|--------|------|
-| 场景测试 (S1-S3) | 12/13 PASS, 0 BLOCK |
-| 功能测试 (D1-D6) | 628/864 PASS, **0 BLOCK**, 236 WARN |
-| S4 执行忠实度 | 12/12 坚守 (100%) |
-
-**评估**: F-0 BLOCK = 0，无致命问题。236 条 WARN 主要为 D4 裸 print 和 D6 异常覆盖率（CLI 工具设计选择）。
-
-### 计时统计
-
-| 指标 | 耗时 |
-|------|------|
-| 总耗时 | 236.998s |
-| 脚本执行 | 0.220s |
-| LLM 处理 | 236.778s |
-| 目标技能调用 | 0.000s |
-
-**轮次统计**: 3 轮 | 均值 39.500s/轮 | 绝对差值 12.614s

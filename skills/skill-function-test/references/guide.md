@@ -1,9 +1,7 @@
 # skill-function-test 完整使用指南
 
 > **场景测试（Scenario Testing）** — 不以函数为单位，以 **场景链路** 为单位。
-> 备份 → 蓝皮书+约束+全量范围 → LLM写场景测试用例 → 场景+功能+S4 → 修复循环 → 回归确认 → 报告+结论写入。
-
----
+> 备份 → 蓝皮书 → 配置确认 → S1-S3场景测试 → D1-D6功能测试 → S4执行忠实度 → 修复 → bump → 双格式报告 → 结论写入test-report.md。
 
 ## 核心原则
 
@@ -13,6 +11,7 @@
 4. **功能测试做底座** — D1-D6 功能测试定位到具体断点行号，场景测试定位到链路断裂位置
 5. **S4 全量范围扫描** — 从蓝皮书提取约束、引用链路、工作流程、文件清单作为测试范围，噪音下测铁律坚守率
 6. **不允许修复导致功能失效** — 修复后必须回归确认，与备份前基线对比
+7. **配置即铁律** — 配置一致性确认后生成执行清单，锁死配置，后续步骤严格按清单执行
 
 **场景测试 vs 功能测试 vs S4：**
 
@@ -25,61 +24,54 @@
 
 ---
 
-## 完整工作流程
-
-### 阶段 0：安全校验 + 时间线初始化
-
-```bash
-# 初始化时间线（hooks 自动补齐，手动也行）
-python scripts/timeline.py init /path/to/target-skill
-```
-
-| 校验项 | 规则 |
-|--------|------|
-| 路径穿越 | 拒绝 `../`、`..\\`、`C:` 开头 |
-| 目标路径范围 | 必须在 `~/.workbuddy/skills/<name>` 内 |
-| 目标存在 | 目标目录必须有 SKILL.md |
+## 完整工作流程（10 阶段）
 
 ### 阶段 1：备份
 
-```bash
-python scripts/backup.py backup /path/to/target-skill pre_test
-```
+hooks 自动补齐，无需手动操作。
 
-备份自动以时间戳命名，存储在 `.standardization/skill-function-test/data/backup/`。
+```bash
+python scripts/hooks.py check /path/to/target-skill backup
+```
 
 ### 阶段 2：蓝皮书扫描 + 约束提取
 
+hooks 自动补齐（依赖备份已完成）。
+
 ```bash
-python scripts/inspector.py /path/to/target-skill
+python scripts/hooks.py check /path/to/target-skill blueprint
 ```
 
-inspector.py 自动执行：
-- 蓝皮书扫描（文件清单、AST 函数签名、引用链路）
-- S4 约束提取
-- S4 全量测试范围生成
+### 阶段 3：强制确认配置一致性
 
-### 阶段 3：LLM 编写场景测试用例
+自动校验 `.test-config.json` 配置项（轮数、维度开关、修复模式、S4 权重），发现不一致自动修正。同时生成 `.execution-checklist.json` 执行清单。
+
+```bash
+python scripts/hooks.py check /path/to/target-skill config_check
+```
+
+> ⛔ 执行清单一旦生成，配置即被锁定。后续步骤禁止更新配置，即使更新也会被 config_hash 校验阻断。
+
+### 阶段 4：S1-S3 场景测试
 
 LLM 基于目标技能的 SKILL.md 和蓝皮书，手工编写 `.s_test_plan.json`。
 
-hooks 阻断检查：文件存在且 ≥3 条才放行。
-
-每条测试用例建议填写 `modules` 字段，指定涉及的 Python 模块名（不含 `.py` 后缀），字段对照蓝皮书的 `file_manifest.python` 列表。
-
-格式见 `references/s-test-plan-schema.md`。
-
-### 阶段 4：场景测试（S1-S3）
+hooks 阻断检查：文件存在且各维度（S1/S2/S3）均≥1 条才放行。
 
 ```bash
-python scripts/scenario_engine.py /path/to/target-skill
+python scripts/hooks.py check /path/to/target-skill write_tests   # LLM 编写测试用例
+python scripts/scenario_engine.py /path/to/target-skill            # 按配置轮次执行
 ```
 
 对每条测试用例：
 - 指定了有 CLI 入口的模块 → 执行 `python xxx.py --help` 验证返回值
 - 指定了无 CLI 入口的模块 → `importlib.import_module()` 验证模块可加载
 
-### 阶段 5：功能测试（D1-D6）
+格式见 `references/s-test-plan-schema.md`。
+
+### 阶段 5：D1-D6 功能测试
+
+AST 级代码扫描，自动执行，无需 LLM 手工写用例。
 
 ```bash
 python scripts/test_engine.py /path/to/target-skill
@@ -87,11 +79,14 @@ python scripts/test_engine.py /path/to/target-skill
 
 ### 阶段 6：S4 执行忠实度（可选）
 
+LLM 基于约束清单编写噪声方案 → validate 校验 → play 随机化回放。
+
 ```bash
-# 全量范围（手动执行）
+# 全量范围扫描
 python scripts/s4_engine.py /path/to/target-skill scope
 
-# LLM 编写噪声方案 → 校验 → 回放
+# LLM 编写噪声方案（写入 .s4_noise_plan.json）→ 校验 → 回放
+python scripts/s4_engine.py /path/to/target-skill validate /path/to/.s4_noise_plan.json
 python scripts/s4_engine.py /path/to/target-skill play
 ```
 
@@ -101,7 +96,9 @@ S4 执行忠实度测试流程：
 3. **阶段C：噪音执行** — 逐条执行噪音方案 → 记录坚守/失守
 4. **阶段D：复盘归因** — 归因分析 → 坚守率矩阵
 
-### 阶段 7：修复循环（可选）
+### 阶段 7：修复（可选）
+
+仅当 fix_mode 开启时执行。LLM 逐条判断问题为 FP（误报）或真问题，然后执行自动修复。
 
 | 模式 | 行为 |
 |------|------|
@@ -114,13 +111,21 @@ S4 执行忠实度测试流程：
 - F-0 未减少 → 回滚
 - 出现新 F-0 → 标记回归损伤，回滚
 
-### 阶段 8：输出报告
+### 阶段 8：版本号 bump
+
+修复有更新时自动执行 PATCH bump，三端同步（SKILL.md / _meta.json / CHANGELOG.md）。
+
+### 阶段 9：输出报告
 
 ```bash
-python scripts/gen_report.py /path/to/target-skill
+python scripts/gen_report.py /path/to/target-skill   # HTML + Markdown
 ```
 
-生成 HTML + Markdown 双格式报告。gen_report 自动将测试概览写入 `<skill>/references/permissions.md`，相同数据指纹跳过。
+生成 HTML + Markdown 双格式报告 + S4 坚守率矩阵。gen_report 入口会先校验执行清单全部前置步骤是否通过，未通过则阻断并列出未完成的步骤。
+
+### 阶段 10：结论写入 test-report.md
+
+gen_report 自动执行，将完整测试结论追加到 `<skill>/references/test-report.md`（相同时间戳跳过）。
 
 ---
 

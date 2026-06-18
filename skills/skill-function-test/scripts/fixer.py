@@ -89,7 +89,10 @@ def _detect_lang(filepath: str) -> str:
 # ═══════════════════════════════════════════════════════
 
 def safe_write(filepath: str, content: str, encoding: str = "utf-8") -> bool:
-    """原子写入，支持任意文件类型"""
+    """原子写入，支持任意文件类型
+
+    备份文件创建在数据目录内，不污染技能根目录。
+    """
     try:
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
         fd, tmp_path = tempfile.mkstemp(
@@ -100,7 +103,20 @@ def safe_write(filepath: str, content: str, encoding: str = "utf-8") -> bool:
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(content)
         if os.path.exists(filepath):
-            bak_path = filepath + ".bak"
+            # 备份到数据目录，不放在技能根目录
+            import hashlib
+            _data_dir = os.path.normpath(os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "..", ".standardization", "skill-function-test", "data",
+                os.path.basename(os.path.dirname(os.path.dirname(filepath))),
+                "backups"
+            ))
+            os.makedirs(_data_dir, exist_ok=True)
+            _orig_name = os.path.basename(filepath)
+            with open(filepath, "rb") as _fh:
+                _hash = hashlib.sha256(_fh.read()).hexdigest()[:8]
+            _ts = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+            bak_path = os.path.join(_data_dir, f"{_ts}_{_orig_name}_{_hash}.bak")
             shutil.copy2(filepath, bak_path)
         os.replace(tmp_path, filepath)
         return True

@@ -82,7 +82,31 @@ def load_config(skill_dir: str) -> dict:
 
 
 def save_config(skill_dir: str, cfg: dict):
-    """保存配置到目标技能目录"""
+    """保存配置到目标技能目录
+
+    如果当前测试会话进行中，拒绝保存（配置清单已锁定）。
+    """
+    # 会话锁定检查
+    target_name = os.path.basename(os.path.abspath(skill_dir))
+    flow_path = os.path.join(DATA_DIR, target_name, ".flow-state.json")
+    if os.path.exists(flow_path):
+        try:
+            with open(flow_path, "r", encoding="utf-8") as f:
+                fs = json.load(f)
+            steps = fs.get("steps", {})
+            auto_steps = {"init", "backup", "blueprint"}
+            session_active = any(
+                isinstance(v, dict) and v.get("done", False)
+                for k, v in steps.items()
+                if k not in auto_steps
+            )
+            if session_active:
+                print(f"[CFG] ❌ 测试会话进行中，禁止修改配置！")
+                print(f"[CFG]   配置清单已锁定，请按清单执行到底")
+                return
+        except Exception:
+            pass
+
     cpath = config_path(skill_dir)
     with open(cpath, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)

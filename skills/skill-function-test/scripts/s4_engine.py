@@ -622,7 +622,7 @@ class NoisePlayer:
                 with open(_f, "r", encoding="utf-8") as fh:
                     all_traces.extend(json.load(fh))
         main_t = os.path.join(_data_dir_for(self.skill_dir), ".s4_trace.json")
-        out_t = os.path.join(_data_dir_for(self.skill_dir), "outputs", ".s4_trace.json")
+        out_t = os.path.join(_data_dir_for(self.skill_dir), ".s4_trace.json")
         with open(main_t, "w", encoding="utf-8") as f:
             json.dump(all_traces, f, ensure_ascii=False, indent=2)
         with open(out_t, "w", encoding="utf-8") as f:

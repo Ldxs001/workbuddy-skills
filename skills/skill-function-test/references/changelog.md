@@ -1,3 +1,27 @@
+## [1.13.1] - 2026-06-18
+
+### 修复
+- 修复 gen_report.py S4 display: load_all 未返回 s4_enabled, _write_conclusion 兜底取 config
+
+---
+
+## [1.13.0] - 2026-06-18
+
+### 修复
+- refactor: skill-function-test
+
+---
+
+## [1.12.0] - 2026-06-18
+
+### 修复
+- refactor: skill-function-test
+
+---
+
+## 1.11.0 (2026-06-18)
+- standardization refactor: merge trigger sections, fix doc paths, unify terms
+
 ## [1.10.2] - 2026-06-17
 
 ### 修复
@@ -104,7 +128,7 @@
 ### 修复
 - **场景测试 0% "外部编排"**: 12 条手工测试用例全部正确映射至目标模块，0 条显示"由外部编排实现"
 - **S4 脏数据导致轮次/坚守率错乱**: `s4_engine.py play` 现在每次生成脚本前清理旧 `.s4_trace*.json`，防止报告读到旧数据
-- **计时统计缺少 S 阶段数据**: `hooks.py` 的 `_timeline_path` 指向 `outputs/.timeline.json`，而 `timeline.py` 写入 `../.timeline.json`。两个文件不同，hooks 每次检查都找不到 timeline，触发重新 init → 清空已有 S 标记。修复为统一路径：`data/<target>/.timeline.json`
+- **计时统计缺少 S 阶段数据**: `hooks.py` 的 `_timeline_path` 指向 `outputs/.timeline.json`，而 `timeline.py` 写入 `data/<target>/.timeline.json (旧路径)`。两个文件不同，hooks 每次检查都找不到 timeline，触发重新 init → 清空已有 S 标记。修复为统一路径：`data/<target>/.timeline.json`
 - **hooks.md 漏列阻断步骤**: write_tests / write_conclusion 补入阻断档位
 - **SKILL.md 版本号不一致**: 底部版本从 v1.0.0 更新至 v1.6.0
 - **guide.md 8阶段 → 9阶段**: 新增阶段3（写测试用例）、更新交互描述、删除已删除的"询问后修复"模式
@@ -296,7 +320,7 @@
 ### 修复
 - audit --fix 自动修正: writing_standards
 - [R-12] DATA_DIR 改用字面量 "skill-function-test" 替代变量 SKILL_NAME（审计器无法解析动态变量）
-- [R-23] references/examples.md: 修复 `scripts/permission_checker.py` 示例路径
+- [R-23] references/examples.md: 修复 `scripts/inspector.py` 示例路径
 - [R-23] references/guide.md, permissions.md, s4-noise-testing.md: 数据路径改用 &lt;DATA_DIR&gt; 抽象符号（避免被 R-23 误认）
 - [R-24] 删除 4 个旧备份中的根级 CHANGELOG.md
 - [R-24] 审计增强：排除 backup 子目录中的 CHANGELOG 扫描

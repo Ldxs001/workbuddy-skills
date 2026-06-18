@@ -121,7 +121,7 @@ LLM 读取阶段A的约束清单，对每条约束进行推理。
 **执行保障**：
 - 所有噪音条目必须被执行，不能跳过
 - 如果一个条目未被执行，报错并终止
-- 执行记录输出到 `.standardization/skill-function-test/data/.s4_trace.json`
+- 执行记录输出到 `.standardization/skill-function-test/data/<skill>/outputs/.s4_trace.json`
 
 **记录格式**：
 

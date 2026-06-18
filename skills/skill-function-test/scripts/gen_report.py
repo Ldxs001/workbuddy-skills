@@ -64,14 +64,21 @@ def _load_rounds(skill_dir: str) -> list[dict]:
 
 def load_all(skill_dir: str) -> dict:
     datadir = _data_dir_for(skill_dir)
+    parent_dir = os.path.dirname(datadir)  # outputs 的父目录
     skill_name = os.path.basename(os.path.abspath(skill_dir))
-    scenario_report = _load_json(os.path.join(datadir, ".scenario-test_report.json"))
-    if not scenario_report:
-        scenario_report = _load_json(os.path.join(datadir, ".scenario-test_report.json"))
-    function_report = _load_json(os.path.join(datadir, ".function-test_report.json"))
-    s4_trace = _load_json(os.path.join(datadir, ".s4_trace.json"))
-    s4_noise_plan = _load_json(os.path.join(datadir, ".s4_noise_plan.json"))
-    fix_record = _load_json(os.path.join(datadir, ".fix-record.json"))
+
+    # 在 outputs/ 和其父目录两级查找报告文件（兼容不同脚本的路径差异）
+    def _find_report(filename: str) -> dict:
+        r = _load_json(os.path.join(datadir, filename))
+        if not r:
+            r = _load_json(os.path.join(parent_dir, filename))
+        return r
+
+    scenario_report = _find_report(".scenario-test_report.json")
+    function_report = _find_report(".function-test_report.json")
+    s4_trace = _find_report(".s4_trace.json")
+    s4_noise_plan = _find_report(".s4_noise_plan.json")
+    fix_record = _find_report(".fix-record.json")
     if isinstance(fix_record, dict):
         fix_record = fix_record.get("fixes", [])
     if not isinstance(fix_record, list):
@@ -79,9 +86,14 @@ def load_all(skill_dir: str) -> dict:
     rounds = _load_rounds(skill_dir)
     timeline = rounds[-1] if rounds else {}
     test_reports = {}
-    for f in os.listdir(datadir):
-        if f.endswith("_report.json") and not f.startswith("."):
-            test_reports[f] = _load_json(os.path.join(datadir, f))
+    # 在 outputs/ 和父目录中扫描报告文件
+    for scan_dir in [datadir, parent_dir]:
+        if not os.path.isdir(scan_dir):
+            continue
+        for f in os.listdir(scan_dir):
+            if f.endswith("_report.json") and not f.startswith("."):
+                if f not in test_reports:
+                    test_reports[f] = _load_json(os.path.join(scan_dir, f))
     # 读取 S4 轮次配置
     try:
         from test_config import load_config as _load_tc
@@ -96,6 +108,7 @@ def load_all(skill_dir: str) -> dict:
         "timeline": timeline,
         "rounds": rounds,
         "s4_rounds": _s4_rounds,
+        "s4_enabled": _tc.get("s4", {}).get("enabled", True),
         "scenario": scenario_report,
         "function": function_report,
         "s4_trace": s4_trace,
@@ -179,9 +192,26 @@ def compute_round_stats(rounds: list[dict]) -> dict:
         tl_first = sorted_all[0]
         tl_last = sorted_all[-1]
         total = max(m["t"] for m in (tl_last.get("markers") or [])) - tl_first.get("started_at", 0)
+        # 计算目标技能耗时（栈式配对，同 compute_timing 逻辑）
+        tgt = 0.0
+        _stack = []
+        for m in sorted((tl_last.get("markers") or []), key=lambda x: x["t"]):
+            if m.get("type") != "subprocess_wall":
+                continue
+            if m["mark"] == "start":
+                _stack.append(m)
+            elif m["mark"] == "end":
+                for i in range(len(_stack) - 1, -1, -1):
+                    sm = _stack[i]
+                    if sm["type"] == m["type"] and sm["phase"] == m["phase"]:
+                        _stack.pop(i)
+                        tgt += m["t"] - sm["t"]
+                        break
+                if pid and pid in ws:
+                    tgt += m["t"] - ws.pop(pid)
         return {"rounds": 1, "has_stats": False, "has_control_chart": False,
-                "mean_total": round(total, 3), "mean_target": 0,
-                "totals": [round(total, 3)], "targets": [0],
+                "mean_total": round(total, 3), "mean_target": round(tgt, 3),
+                "totals": [round(total, 3)], "targets": [round(tgt, 3)],
                 "dispersion": "none", "dispersion_label": ""}
 
     if len(round_files) < 2:
@@ -204,17 +234,21 @@ def compute_round_stats(rounds: list[dict]) -> dict:
         started_at = r.get("started_at", 0)
         total_end = max(m["t"] for m in markers)
         cumulative.append(total_end - started_at)
-        # 按轮次计算目标技能耗时
+        # 按轮次计算目标技能耗时（栈式配对，同 compute_timing 逻辑）
         tgt = 0.0
-        ws = {}
-        for m in markers:
-            if m["type"] == "subprocess_wall":
-                if m["mark"] == "start":
-                    ws[m["id"]] = m["t"]
-                elif m["mark"] == "end":
-                    pid = m.get("parent_id")
-                    if pid and pid in ws:
-                        tgt += m["t"] - ws.pop(pid)
+        _stack = []
+        for m in sorted(markers, key=lambda x: x["t"]):
+            if m["type"] != "subprocess_wall":
+                continue
+            if m["mark"] == "start":
+                _stack.append(m)
+            elif m["mark"] == "end":
+                for i in range(len(_stack) - 1, -1, -1):
+                    sm = _stack[i]
+                    if sm["type"] == m["type"] and sm["phase"] == m["phase"]:
+                        _stack.pop(i)
+                        tgt += m["t"] - sm["t"]
+                        break
         cumulative_targets.append(tgt)
 
     # 每轮耗时 = cumulative[i] - cumulative[i-1]，第0项为累计基线
@@ -743,97 +777,180 @@ USAGE = """
 
 
 def _write_conclusion(skill_dir: str, data: dict):
-    """将测试结论写入目标技能的 references/permissions.md
+    """将完整测试结论写入目标技能的 references/test-report.md
 
-    规则：
-    - 标题: ## 基于skill-function-test的测试报告
-    - 文件不存在 → 新建完整段落（含表头+首行）
-    - 已有段落 → 在现有表格末尾追加一行（运行时间 + 各维度结果）
-    - 同一时间戳已存在 → 跳过不重复写"""
+    生成包含元信息、覆盖总览、各维度详情、S4矩阵、回归对比、修复记录的
+    完整 Markdown 报告段落。同一轮次（时间戳）已存在则不重复写入。
+    写入使用 fixer.safe_write() 原子操作。"""
+    from fixer import safe_write
+
+    # 清理旧版 permissions.md 中的测试报告段落
+    try:
+        from hooks import _clean_old_test_report_from_permissions
+        _clean_old_test_report_from_permissions(skill_dir)
+    except ImportError:
+        pass
+
     target_refs = os.path.join(skill_dir, "references")
     os.makedirs(target_refs, exist_ok=True)
-    perm_path = os.path.join(target_refs, "permissions.md")
+    report_path = os.path.join(target_refs, "test-report.md")
 
-    # 组装结论数据
     scenario = data.get("scenario", {})
     function = data.get("function", {})
     s4_trace = data.get("s4_trace", [])
+    fix_record = data.get("fix_record", [])
+    s4_score = data.get("s4_score", {})
+    regression = data.get("regression", {})
+    test_plan = data.get("test_plan", {})
 
-    s1_total = len(scenario.get("results", []))
-    s1_pass = sum(1 for r in scenario.get("results", []) if r.get("status", "").upper() == "PASS")
-    d_total = len(function.get("results", []))
-    d_pass = sum(1 for r in function.get("results", []) if r.get("status", "").upper() == "PASS")
+    now = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M")
+    skill_name = data.get("skill_name", os.path.basename(skill_dir))
+
+    # ── 聚合统计 ──
+    s_results = scenario.get("results", [])
+    f_results = function.get("results", [])
+    s_total, s_pass, s_block = len(s_results), 0, 0
+    for r in s_results:
+        st = r.get("status", "").upper()
+        if st == "PASS": s_pass += 1
+        if r.get("level") == "block" and st == "FAIL": s_block += 1
+    d_total, d_pass, d_block = len(f_results), 0, 0
+    for r in f_results:
+        st = r.get("status", "").upper()
+        if st == "PASS": d_pass += 1
+        if r.get("level") == "block" and st == "FAIL": d_block += 1
     s4_total = len(s4_trace)
     s4_held = sum(1 for t in s4_trace if t.get("llm_behavior") == "坚守")
 
-    now = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M")
-    _timing = __import__("types").SimpleNamespace()  # dummy, compute_timing below
-    _timing = None
+    fix_count = len(fix_record)
+    true_fix = sum(1 for f in fix_record if f.get("llm_judgment") in ("FIX", "真问题"))
 
-    s1_str = f"{s1_pass}/{s1_total}" if s1_total > 0 else "-"
-    d_str = f"{d_pass}/{d_total}" if d_total > 0 else "-"
-    s4_pct = s4_held * 100 // max(s4_total, 1) if s4_total > 0 else 0
-    s4_str = f"{s4_held}/{s4_total} ({s4_pct}%)" if s4_total > 0 else "-"
+    # ── 构建 Markdown 内容 ──
+    lines = []
+    lines.append(f"## 基于skill-function-test的测试报告")
+    lines.append("")
+    lines.append("### 元信息")
+    lines.append("| 字段 | 值 |")
+    lines.append("|------|-----|")
+    lines.append(f"| 目标技能 | {skill_name} |")
+    lines.append(f"| 测试时间 | {now} |")
+    lines.append(f"| 测试轮次 | {test_plan.get('rounds', 'N/A')} |")
+    fm = test_plan.get("fix_mode", {})
+    if isinstance(fm, dict):
+        lines.append(f"| 修复模式 | 场景={fm.get('scenario',0)}, 功能={fm.get('function',0)} |")
+    s4_on = test_plan.get("s4_enabled") if test_plan else data.get("s4_enabled", False)
+    lines.append(f"| S4 | {'开启 (' + str(test_plan.get('s4_rounds', data.get('s4_rounds', ''))) + '轮)' if s4_on else '关闭'} |")
+    lines.append("")
 
-    _total_sec = "N/A"
+    # ── 维度覆盖总览 ──
+    lines.append("### 维度覆盖总览")
+    lines.append("| 维度 | 总数 | 通过 | BLOCK | 通过率 |")
+    lines.append("|------|------|------|-------|--------|")
+    if s_total > 0:
+        s_rate = f"{s_pass * 100 // s_total}%"
+        lines.append(f"| S1-S3 场景链路 | {s_total} | {s_pass} | {s_block} | {s_rate} |")
+    if d_total > 0:
+        d_rate = f"{d_pass * 100 // d_total}%"
+        lines.append(f"| D1-D6 功能测试 | {d_total} | {d_pass} | {d_block} | {d_rate} |")
+    if s4_total > 0:
+        s4_rate = f"{s4_held * 100 // s4_total}%"
+        lines.append(f"| S4 执行忠实度 | {s4_total} | {s4_held} | - | {s4_rate} |")
+    if s4_score:
+        lines.append(f"| S4 综合评分 | - | {s4_score.get('grade','N/A')} | - | {s4_score.get('score',0)*100:.0f}% |")
+    lines.append("")
 
-    # 新建文件：完整段落 + 第一行
-    if not os.path.exists(perm_path):
-        _total_sec = str(compute_timing(data).get("total", "N/A"))
-        header = (
-            "## 基于skill-function-test的测试报告\n"
-            "\n"
-            "| 运行时间 | S1 场景链路 | D1-D6 功能测试 | S4 执行忠实度 | 耗时(s) |\n"
-            "|---------|-------------|----------------|--------------|---------|\n"
-        )
-        row = f"| {now} | {s1_str} | {d_str} | {s4_str} | {_total_sec} |\n"
-        with open(perm_path, "w", encoding="utf-8") as f:
-            f.write(header + row)
-        print(f"  [CONCLUSION] 已新建: {perm_path}")
-        return
+    # ── S1-S3 场景测试详情 ──
+    if s_results:
+        lines.append("### S1-S3 场景测试详情")
+        lines.append("| ID | 级别 | 名称 | 状态 | 描述 |")
+        lines.append("|----|------|------|------|------|")
+        for r in s_results:
+            sid = r.get("sid", r.get("dim", "?"))
+            lev = r.get("level", "info").upper()
+            name = r.get("name", "")[:40]
+            st = r.get("status", "").upper()
+            msg = r.get("message", "")[:60]
+            lines.append(f"| {sid} | {lev} | {name} | {st} | {msg} |")
+        lines.append("")
 
-    with open(perm_path, "r", encoding="utf-8") as f:
-        existing = f.read()
+    # ── D1-D6 功能测试详情 ──
+    if f_results:
+        lines.append("### D1-D6 功能测试详情")
+        lines.append("| ID | 级别 | 名称 | 状态 | 位置 | 描述 |")
+        lines.append("|----|------|------|------|------|------|")
+        for r in f_results:
+            sid = r.get("sid", r.get("dim", "?"))
+            lev = r.get("level", "info").upper()
+            name = r.get("name", "")[:30]
+            st = r.get("status", "").upper()
+            loc = f"{r.get('file','')}:{r.get('lineno',0)}"
+            msg = r.get("message", "")[:50]
+            lines.append(f"| {sid} | {lev} | {name} | {st} | {loc} | {msg} |")
+        lines.append("")
 
-    # 同一时间戳已存在 → 跳过
-    if now in existing:
-        print(f"  [CONCLUSION] 跳过：{now} 已记录")
-        return
+    # ── S4 执行忠实度 ──
+    if s4_trace:
+        lines.append("### S4 执行忠实度")
+        lines.append(f"- 总噪声条目: {s4_total}")
+        lines.append(f"- 铁律坚守: {s4_held} ({s4_held * 100 // max(s4_total,1)}%)")
+        if s4_score:
+            ss = s4_score
+            lines.append(f"- 正向权重: {ss.get('positive_weight',0):.1f}, 反向权重: {ss.get('negative_weight',0):.1f}")
+            lines.append(f"- 正向完成率: {ss.get('positive_rate',0)*100:.0f}%, 反向坚守率: {ss.get('negative_rate',0)*100:.0f}%")
+            lines.append(f"- 综合评分: {ss.get('score',0)*100:.0f}% （等级: {ss.get('grade','N/A')}）")
+        lines.append("")
 
-    # 找到现有表格，追加一行
-    section_hdr = "## 基于skill-function-test的测试报告"
-    table_sep = "|---------|-------------|----------------|--------------|---------|"
+    # ── 修复记录摘要 ──
+    if fix_record:
+        lines.append("### 修复记录摘要")
+        lines.append(f"- 待判断问题: {fix_count}")
+        lines.append(f"- 确认真问题: {true_fix}")
+        lines.append("")
+        if true_fix > 0:
+            lines.append("| 来源 | 维度 | 文件 | 描述 | LLM判断 |")
+            lines.append("|------|------|------|------|---------|")
+            for f in fix_record:
+                if f.get("llm_judgment") in ("FIX", "真问题"):
+                    src = f.get("source", "")
+                    dim = f.get("dim", "")
+                    fl = f"{f.get('file','')}:{f.get('lineno',0)}"
+                    msg = f.get("message", "")[:40]
+                    jdg = f.get("llm_judgment", "")
+                    lines.append(f"| {src} | {dim} | {fl} | {msg} | {jdg} |")
+            lines.append("")
 
-    if section_hdr in existing:
-        _total_sec = str(compute_timing(data).get("total", "N/A"))
-        row = f"| {now} | {s1_str} | {d_str} | {s4_str} | {_total_sec} |"
-        # 在第一次出现 table_sep 的后一行插入
-        elines = existing.split("\n")
-        new_lines = []
-        inserted = False
-        for el in elines:
-            new_lines.append(el)
-            if not inserted and el.strip() == table_sep:
-                new_lines.append(row)
-                inserted = True
-        if not inserted:
-            new_lines.append(row)
-        with open(perm_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(new_lines) + "\n")
-        print(f"  [CONCLUSION] 已追加行到: {perm_path}")
+    # ── 回归对比 ──
+    reg = regression or {}
+    if reg:
+        lines.append("### 回归对比")
+        lines.append("| 指标 | 修复前 | 修复后 | 变化 |")
+        lines.append("|------|--------|--------|------|")
+        for key, label in [("scenario", "场景BLOCK"), ("function", "功能BLOCK")]:
+            pre = reg.get(key, {}).get("block", 0)
+            post = reg.get(key, {}).get("block", 0)
+            diff = post - pre
+            icon = "✅" if diff <= 0 else "❌"
+            lines.append(f"| {label} | {pre} | {post} | {diff:+d} {icon} |")
+        lines.append("")
+
+    # ── 去重：同一时间戳已存在则跳过 ──
+    if os.path.exists(report_path):
+        with open(report_path, "r", encoding="utf-8") as f:
+            existing = f.read()
+        if now in existing:
+            print(f"  [CONCLUSION] 跳过：{now} 已记录在 {report_path}")
+            return
+
+    content = "\n".join(lines)
+    # 追加到文件（使用 safe_write 原子操作）
+    full_content = ""
+    if os.path.exists(report_path):
+        with open(report_path, "r", encoding="utf-8") as f:
+            full_content = f.read().rstrip() + "\n\n---\n\n" + content
     else:
-        # 没有现有段落，新建
-        _total_sec = str(compute_timing(data).get("total", "N/A"))
-        header = (
-            "## 基于skill-function-test的测试报告\n"
-            "\n"
-            "| 运行时间 | S1 场景链路 | D1-D6 功能测试 | S4 执行忠实度 | 耗时(s) |\n"
-            "|---------|-------------|----------------|--------------|---------|\n"
-        )
-        row = f"| {now} | {s1_str} | {d_str} | {s4_str} | {_total_sec} |\n"
-        with open(perm_path, "a", encoding="utf-8") as f:
-            f.write("\n" + header + row)
-        print(f"  [CONCLUSION] 已新建段落到: {perm_path}")
+        full_content = content
+    safe_write(report_path, full_content)
+    print(f"  [CONCLUSION] 测试结论已写入: {report_path}")
 def main():
     if len(sys.argv) < 2:
         print(USAGE)

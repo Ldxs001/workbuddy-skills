@@ -1,9 +1,9 @@
 ---
 name: skill-function-test
-version: 1.10.2
+version: 1.13.1
 author: wUwproject
 license: MIT
-description: 技能场景测试套件 —— 备份 → 蓝皮书 → LLM编写场景测试用例（modules字段指定目标模块）→ 场景测试（CLI执行+模块导入验证）+功能测试+S4执行忠实度 → 修复循环 → 回归确认 → 双格式报告 → 测试结论写入目标技能。配置驱动流程，钩子强制阻断。
+description: 技能场景测试套件 —— 备份 → 蓝皮书 → 配置确认 → S1-S3场景测试 → D1-D6功能测试 → S4执行忠实度 → 修复 → bump → 双格式报告 → 结论写入test-report.md。配置驱动流程，钩子强制阻断。
 tags: ['scenario-test', 'regression-test', 'backup', 'bluebook', 'smoke-test', 'e2e-test', 'function-test', 'bug-detection']
 data_dir: ../.standardization/skill-function-test/data/
 external_data_dir: true
@@ -17,22 +17,35 @@ meta_field_sync: true
 faq_unparsable: reformat
 faq_quality: improve_qa
 create_permissions_md: true
+trigger_quality: refine_triggers
+data_dir_compliance: true
 ---
 # skill-function-test — 技能场景测试套件
 
-> 备份 → 蓝皮书 → LLM编写场景测试用例（modules字段指定目标模块）→ 场景测试（CLI执行+模块导入验证）+功能测试+S4执行忠实度 → 修复循环 → 回归确认 → 双格式报告 → 测试结论写入目标技能。配置驱动流程，钩子强制阻断。
+> 备份 → 蓝皮书 → 配置确认 → S1-S3场景测试 → D1-D6功能测试 → S4执行忠实度 → 修复 → bump → 双格式报告 → 结论写入test-report.md。配置驱动流程，钩子强制阻断。
 
 > 本技能以 **场景驱动** 为核心，同时提供功能测试、S4 执行忠实度、三级嵌套计时、流程钩子和双格式报告。
 
 ---
-
 ## 约束
 
-- `.md` 文件更新必须使用 `scripts/fixer.py` 的 `safe_write()` 原子写入
-- **更新目标技能前必须先备份**（`scripts/backup.py` 自动执行）
-- 测试后必须执行回归确认，否则报告标记为「未回归确认」
-- **测试结论必须写入目标技能文档**（步骤9），不可跳过
-- 修复不得引入新的 F-0 BLOCK 级别错误
+- [必须] `.md` 文件更新必须使用 `scripts/fixer.py` 的 `safe_write()` 原子写入
+- [必须] **更新目标技能前必须先备份**（`scripts/backup.py` 自动执行）
+- [必须] 测试后必须执行回归确认，否则报告标记为「未回归确认」
+- [必须] **测试结论必须写入目标技能 渐进式文件索引表**（步骤10），不可跳过
+- [必须] 修复不得引入新的 F-0 BLOCK 级别错误
+## 触发条件
+
+**正向触发：**
+- 用户说"帮我测试一下这个技能"或"跑一遍场景测试" — 触发完整 10 阶段测试流程
+- 用户说"帮我备份一下再改"或"先备份" — 触发 ZIP 备份步骤
+- 用户说"跑个功能体检"或"检查代码质量" — 触发 D1-D6 功能测试
+
+**否定条件：**
+- 用户说"看看这个技能的铁律能不能守住" — 触发 S4 执行忠实度测试
+- 用户只是问「这个 skill 怎么样」——没有审计/修复意图
+- 用户要求「帮我看看这个代码」——不是 skill 测试
+- 用户提到「测试」但指的是手动测试/单元测试——不是 skill-function-test 的流程测试
 
 ## 核心能力
 
@@ -83,10 +96,10 @@ create_permissions_md: true
 ### 渐进式文件索引
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
-|--------|------|----------|----------|
+| -------- |------| ---------- |----------|
 | `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT）。包含：MIT 许可证完整文本。 | R-26 |
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
-| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
 | `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
 | `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
@@ -94,134 +107,132 @@ create_permissions_md: true
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 | `references/s-test-plan-schema.md` | 参考文档 | S（场景测试）不是扫描代码。LLM 基于对目标技能的 SKILL.md 和蓝皮书的完整理解，**手工编写真实的用户场景**作为测试用例。 | 无 |
 | `references/s4-noise-testing.md` | 参考文档 | > **不测技能有没有定义好，不测干净环境能不能跑通。** | 无 |
+| `references/test-report.md` | 参考文档 | > 本文件由 skill-function-test 的 gen_report.py 自动生成和追加，记录每次测试的完整结论。 | 无 |
 | `references/timing.md` | 参考文档 | / 层级 / 范围 / 标记者 / 时间粒度 / 是否自动 / | 无 |
+| `scripts/backup.py` | 测试工具 | 目标技能 ZIP 备份与恢复 | 无 |
+| `scripts/bump_version.py` | 测试工具 | 语义版本号自动升级（PATCH/MINOR/MAJOR） | 无 |
+| `scripts/fixer.py` | 测试工具 | `safe_write()` 原子写入工具 | R-11 |
+| `scripts/gen_report.py` | 测试工具 | HTML + Markdown 双格式报告生成 | 无 |
+| `scripts/hooks.py` | 测试工具 | 流程阻断钩子（前置条件校验 + 自动补齐 + 清单校验） | 无 |
+| `scripts/inspector.py` | 测试工具 | 技能蓝皮书扫描（AST 签名 + 引用链路 + 约束提取） | 无 |
+| `scripts/runner.py` | 测试工具 | 10 阶段全流程编排器 | 无 |
+| `scripts/s4_engine.py` | 测试工具 | S4 执行忠实度引擎（噪声方案验证 + 随机化回放） | 无 |
+| `scripts/scenario_engine.py` | 测试工具 | S1-S3 场景测试引擎（CLI 验证 + 模块导入验证） | 无 |
+| `scripts/test_config.py` | 测试工具 | 配置管理（JSON 持久化 + HTML 配置界面 + CLI 交互） | 无 |
+| `scripts/test_engine.py` | 测试工具 | D1-D6 功能测试引擎（AST 语法/引用/污染/噪音检查） | 无 |
+| `scripts/timeline.py` | 测试工具 | 时间线记录（start/end marker 自动推导耗时） | 无 |
+
+### 文件清单
+
+```
+├── references/LICENSE.md
+├── references/antipatterns.md
+├── references/changelog.md
+├── references/examples.md
+├── references/faq.md
+├── references/guide.md
+├── references/hooks.md
+├── references/permissions.md
+├── references/s-test-plan-schema.md
+├── references/s4-noise-testing.md
+├── references/test-report.md
+├── references/timing.md
+├── scripts/backup.py
+├── scripts/bump_version.py
+├── scripts/fixer.py
+├── scripts/gen_report.py
+├── scripts/hooks.py
+├── scripts/inspector.py
+├── scripts/runner.py
+├── scripts/s4_engine.py
+├── scripts/scenario_engine.py
+├── scripts/test_config.py
+├── scripts/test_engine.py
+└── scripts/timeline.py
+```
 ## 快速开始
 
-```bash
-# 查看流程状态
-python scripts/hooks.py status /path/to/target-skill
+```text
+# 完整测试流程
+# 输入: 无
+# 输出: 所有测试维度 PASS，test-report.md 结论已写入
 
-# 全流程（hooks 逐级阻断引导，LLM 按步骤执行）
-python scripts/hooks.py check /path/to/target-skill init      # 初始化
-python scripts/hooks.py check /path/to/target-skill write_tests  # 编写场景测试用例
-python scripts/scenario_engine.py /path/to/target-skill       # 场景测试
-python scripts/test_engine.py /path/to/target-skill           # 功能测试
-python scripts/s4_engine.py /path/to/target-skill scope       # S4 扫描
-python scripts/s4_engine.py /path/to/target-skill play        # S4 回放
-python scripts/gen_report.py /path/to/target-skill            # 生成报告（含自动结论写入）
-
-# S4 噪音方案编写 → 校验 → 回放
-python scripts/s4_engine.py /path/to/target-skill scope       # 全量范围扫描
-python scripts/s4_engine.py /path/to/target-skill validate <json>  # 校验噪音方案
-python scripts/s4_engine.py /path/to/target-skill play        # 随机化回放（默认3轮）
-
-# 生成报告
-python scripts/gen_report.py /path/to/target-skill            # HTML + Markdown
-python scripts/gen_report.py /path/to/target-skill --html     # 仅 HTML
-python scripts/gen_report.py /path/to/target-skill --markdown # 仅 Markdown
+# 仅功能测试（跳过场景测试和 S4）
+# 输入: 无
+# 输出: D1-D6 报告
 ```
-
----
-
-> 反模式，常见问题
-
 ## 工作流程
 
-**11 阶段标准流程（严格按顺序执行，配置驱动钩子阻断）：**
-
-**前置：初始化时间线** — `python scripts/timeline.py init <skill-dir>` (hooks 自动补齐)
-
-1. **备份** — 对目标技能完整 ZIP 备份（hooks 自动补齐）
-2. **蓝皮书扫描 + 约束提取** — 扫描文件清单 + AST 签名 + 引用链路 + SKILL.md 场景解析 + 约束提取（hooks 自动补齐）
-3. **LLM编写场景测试用例** — LLM 基于目标技能的 SKILL.md 和蓝皮书，编写 S1-S3 测试用例（`.s_test_plan.json`）。**每条用例建议填写 `modules` 字段指定目标模块**。hooks 阻断，不写完不放行。
-4. **场景测试（S1-S3）** — 对每条用例，有 CLI 入口的执行 `--help` 验证；无 CLI 入口的用 `importlib` 导入验证模块可加载。配置决定哪些维度跑
-5. **功能测试（D1-D6）** — AST 级代码扫描：语法检查、引用链路、污染检测等
-6. **S4 执行忠实度（可选）** — LLM 编写噪声方案（`.s4_noise_plan.json`），随机化回放 N 轮，测铁律坚守率
-7. **修复循环（可选）** — 仅当 `fix_mode` 开启时执行：自动修复 → 回归测试 → 确认 F-0 不增 → 最终回归；关闭时自动跳过
-8. **输出报告** — `python scripts/gen_report.py <skill-dir>` 生成 HTML + Markdown 双格式报告 + S4 坚守率矩阵
-9. **自动写入测试结论** — gen_report 自动将测试概览写入 `<skill>/references/permissions.md`，标题`基于skill-function-test的测试报告`。存在则追加，相同数据指纹跳过
-
-> 🔒 **约束**：步骤 3（编写测试用例）、步骤 8（输出报告）、步骤 9（结论写入）由 hooks 强制阻断，LLM 无法跳过。
-
-> 
-
-## 触发条件
-
-**正向触发：**
-
-**否定条件：**
-- 用户只是问「这个 skill 怎么样」——没有审计/修复意图
-- 用户要求「帮我看看这个代码」——不是 skill 测试
-- 用户提到「测试」但指的是手动测试/单元测试——不是 skill-function-test 的流程测试
-
-## 测试流程时间线（计时系统）
-
-> 
-
-所有阶段通过 `scripts/timeline.py` 自动记录 start/end marker。LLM 无需手动计时——工作时间由 py_script marker 之间的 gap 自动推导。
-
-`python scripts/timeline.py report <skill-dir> --validate` 输出阶段覆盖状态和未归属长间隙。
-
----
-
+?. **备份** → 输入 目标技能目录 → 输出 .zip 备份
+?. **蓝皮书扫描** → 输入 SKILL.md + scripts/ → 输出 blueprint.json, constraint-list.json
+?. **强制确认配置一致性** → 输入 .test-config.json → 输出 .execution-checklist.json
+?. **S1-S3 场景测试** → 输入 SKILL.md + 蓝皮书 → 输出 .scenario-test_report.json
+?. **D1-D6 功能测试** → 输入 蓝皮书代码数据 → 输出 .function-test_report.json
+?. **S4 执行忠实度** → 输入 .constraint-list.json → 输出 .s4_trace_rN.json
+?. **修复** → 输入 测试报告 FAIL 列表 → 输出 修复后脚本 + .fix-record.json
+?. **版本号 bump** → 输入 修复记录 → 输出 三端版本号同步
+?. **输出报告** → 输入 各报告 JSON → 输出 .test-report.html, .test-report.md
+?. **结论写入 test-report.md** → 输入 测试报告数据 → 输出 target/references/test-report.md
 ## 测试配置系统
 
 测试行为由 `.test-config.json` 控制（持久化在数据目录 `outputs/` 下）。
 配置文件决定：哪些维度跑、跑几轮、修复模式、S4 是否执行。
 **配置决定流程，流程决定钩子——LLM 无法跳过任何被配置启用的步骤。**
+**配置即铁律** — 步骤 3 生成执行清单后，配置被哈希锁定。测试过程中任何更新配置的尝试都会被阻断。
 
-> ⛔ **配置即方案，禁止向用户确认**：LLM 被调用后必须通过 `python test_config.py <skill-dir> show` 直接读取当前配置，按配置执行。不得询问用户「是否修复」「S4 开不开」「跑几轮」等配置已涵盖的问题。如果配置缺失（首次使用），用默认值初始化后直接执行——不要问用户。
+> ⛔ **配置即方案，禁止向用户确认**：LLM 被调用后必须通过 `python test_config.py <skill-dir> show` 直接读取当前配置，按配置执行。不得询问用户「是否修复」「S4 开不开」「跑几轮」等配置已涵盖的问题。如果配置缺失（首次使用），用默认值初始化后直接执行——不要问用户。**步骤 3 只是自动校验和锁定，不是让用户确认。**
 
 ### 对话交互
 
-```
+```text
 cfg show                      — 查看配置
-cfg rounds <N>                — 配置轮数
-cfg fix_mode scenario <0|1>   — 场景修复（0=仅报告 1=尝试修复）
-cfg fix_mode function <0|1>   — 功能修复（0=仅报告 1=直接修复）
-cfg s4 on/off                 — 开启/关闭 S4（LLM编写噪声方案）
-cfg s4 rounds <N>             — S4 独立轮数
-cfg s4 pf <0.0-1.0>           — 正向权重
-cfg s4 nf <0.0-1.0>           — 反向权重
-cfg <dim> on/off              — 开关某个维度（S1/S2/S3/D1-D6）
+cfg set rounds <N>            — 配置轮数
+cfg set fix_mode.scenario <0|1>  — 场景修复模式
+cfg set fix_mode.function <0|1>  — 功能修复模式
 cfg reset                     — 重置默认
 cfg server                    — 启动 HTML 配置界面
 ```
+
+> ⚠️ 执行清单生成后，配置即被锁定，`cfg set` 和 `cfg reset` 将被拒绝。
 
 ### S4 数据文件位置
 
 | 文件 | 位置（相对于 data/<skill>/） | 生成者 |
 | ------ |---------------------------| -------- |
-| `.s4_noise_plan.json` | 根目录 | LLM 编写 -> s4_engine.py validate 保存 |
-| `.s4_script_rN.json` | 根目录 | s4_engine.py play 随机化回放生成 |
-| `.s4_trace_rN.json` | 根目录 | s4_engine.py play 执行记录 |
-| `.s4_trace.json` | 根目录 + outputs/ | play 执行完后双写 |
-| `.constraint-list.json` | 根目录 | inspector.py 约束提取 |
-| `.s4_test_scope.json` | 根目录 | s4_engine.py scope 扫描生成 |
+| `.s4_noise_plan.json` | outputs/ | LLM 编写 -> s4_engine.py validate 保存 |
+| `.s4_script_rN.json` | outputs/ | s4_engine.py play 随机化回放生成 |
+| `.s4_trace_rN.json` | outputs/ | s4_engine.py play 执行记录 |
+| `.s4_trace.json` | outputs/ | play 执行完后合并写入 |
+| `.constraint-list.json` | outputs/ | inspector.py 约束提取 |
+| `.s4_test_scope.json` | outputs/ | s4_engine.py scope 扫描生成 |
 | `.test-config.json` | outputs/ | test_config.py 配置管理 |
+| `.execution-checklist.json` | outputs/ | config_check 生成执行清单 |
 
-> LLM 注意：S4 文件统一在 data/<skill>/ 根目录，不在 outputs/ 下。只有 .test-config.json 在 outputs/。
+> LLM 注意：S4 文件统一在 outputs/ 下。所有中间文件和报告文件均存储在 `.standardization/skill-function-test/data/<skill>/outputs/`。
 
 ### HTML 配置界面
 
 运行 `python scripts/test_config.py <skill-dir> server` 启动本地配置服务器。
 浏览器自动打开，更新后点击「保存配置」直接写入磁盘（零手动操作）。
 
-## 流程钩子系统（强制阀 + 自动补全）
+## 流程钩子
 
-> 双档策略：init/backup/blueprint 自动补齐，write_tests/scenario/function_test/s4/gen_report/write_conclusion 阻断指引。
+hooks 系统在关键步骤前后强制校验 → 详见相关章节 
+
+> 双档策略：init/backup/blueprint 自动补齐，config_check/write_tests/scenario/function_test/s4/fix/bump/gen_report/write_conclusion 阻断指引。
 > 配置驱动钩子：S1-S3 开关控制 write_tests 是否阻断，fix_mode 控制修复循环是否存在。
+> 执行清单校验：每一步完成后由 checklist 校验执行忠实度（轮次、维度覆盖、文件完整性）。
 > `python scripts/hooks.py status <skill-dir>` 查看流程状态。
 > 终端状态为 write_conclusion，完成后 exit(0)。
 
 ## 版本
 
-当前版本 **v1.6.2** — 场景测试用例支持 modules 字段 + 非 CLI 模块导入验证
+当前版本 **v1.11.0** — 10 阶段流程重构：配置确认、bump 集成、test-report.md 结论独立文件
 
 ## 触发场景
 **正向触发（满足以下任意一条）：**
 - 用户需要backup.py — 目标技能目录 ZIP 备份与恢复
-- 用户需要在修改目标技能前创建完整 ZIP 备份（时间戳命名），修改后支持回滚。
+- 用户需要在更新目标技能前创建完整 ZIP 备份（时间戳命名），更新后支持回滚。
 - 用户需要ZIP 格式避免备份目录被 Skill 扫描器识别为重复技能条目。
 - 用户需要调用 timeline.py 记录 marker
 
