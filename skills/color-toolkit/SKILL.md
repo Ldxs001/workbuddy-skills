@@ -4,7 +4,7 @@ data_dir: ../.standardization/color-toolkit/
 license: MIT
 description: 专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。
 author: wUwproject
-version: 3.3.1
+version: 3.4.0
 tags: ['color', 'color-conversion', 'contrast', 'accessibility', 'design', 'wcag']
 trigger: ['颜色转换', '对比度计算', '颜色推荐', '配色方案', '色彩空间', 'HEX.*RGB', 'HSL', 'HSV', 'CMYK', '色差', 'WCAG']
 trigger_negative: ['不触发', '不需要颜色工具', '与其他无关']
@@ -16,8 +16,24 @@ meta_field_sync: true
 faq_unparsable: reformat
 create_permissions_md: true
 data_dir_compliance: true
+trigger_quality: refine_triggers
 ---
 # Color Toolkit - 专业颜色工具集
+
+## 触发条件
+
+**正向触发：**
+- "把这个颜色转换一下" — 颜色编码转换（HEX/RGB/HSL/HSV/CMYK）
+- "计算这个颜色的对比度" — 对比度计算（WCAG/APCA/CIELAB/CIEDE2000）
+- "给我推荐一个配色方案" — 配色方案生成
+- "这个颜色对盲人友好吗" — 无障碍（WCAG 合规性检查）
+- "生成这个颜色的预览页面" — HTML 预览生成
+- "帮我推荐一个科技感的颜色" — 智能颜色推荐
+- "随机生成几个颜色" — 随机颜色生成
+
+**否定条件：**
+- 简单问答、闲聊、问候（不需要本技能）
+- 单步任务（不需要结构化执行）
 
 ## 核心能力
 
@@ -26,7 +42,7 @@ data_dir_compliance: true
 ### 渐进式文件索引
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
-|--------|------|----------|----------|
+| -------- |------| ---------- |----------|
 | `references/examples.md` | 输出示例 | 各功能输出格式示例 | R-25 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答 | R-19 |
 | `references/antipatterns.md` | 规范指南 | 反模式与注意事项 | R-18 |
@@ -47,20 +63,11 @@ Color Toolkit 是一个通用的颜色处理工具包，提供：
 - **智能颜色推荐**：根据用户描述生成完整配色方案
 - **HTML预览生成**：单色/多色 HTML 预览，含色块、渐变、对比度、UI组件
 
-## 触发条件
-
-**正向触发：**
-- 用户需要颜色转换、对比度计算或配色方案
-
-**否定条件：**
-- 简单问答、闲聊、问候（不需要本技能）
-- 单步任务（不需要结构化执行）
-
 ## 核心功能
 
 ### 1. 颜色编码转换
 
-```
+```text
 输入格式支持：
 - HEX: #FF5733, #F53
 - RGB: rgb(255, 87, 51), 255, 87, 51
@@ -99,18 +106,18 @@ Color Toolkit 是一个通用的颜色处理工具包，提供：
 
 ### 4~10. 更多功能
 
-> 详细说明、参数列表和输出示例 → 详见 
+> 详细说明、参数列表和输出示例 → 详见核心能力的渐进式文件索引
 
 ## 使用方式
 
 直接描述需求即可，AI 会自动调用颜色转换、对比度计算、调色板生成等核心功能。
 
-> 输出格式详情 → 详见 `references/examples.md`
+> 输出格式详情 → 详见 渐进式文件索引表
 
 ## 技术实现
 
 - **依赖**：Python 3.8+，仅标准库（math, re, random, dataclasses, typing）
-- **文件结构**：`color-toolkit/SKILL.md` + `references/`（examples/faq/antipatterns/changelog）
+- **文件结构**：`SKILL.md` + `references/`（examples/faq/antipatterns/changelog）
 
 ## 使用限制
 
@@ -120,10 +127,10 @@ Color Toolkit 是一个通用的颜色处理工具包，提供：
 | **性能** | 颜色转换无外部依赖，毫秒级响应 |
 | **环境要求** | Python ≥ 3.8，仅标准库，无额外依赖 |
 
-> 常见使用误区 → 详见 [反模式](references/antipatterns.md)
+> 常见使用误区 → 详见核心能力的渐进式文件索引
 
 
-```
+```text
 用户：#FF5733 是什么颜色？
 助手：
 - **HEX**: #FF5733
@@ -204,6 +211,4 @@ Color Toolkit 是一个通用的颜色处理工具包，提供：
 | `compare` | 多色比较 | `python cli.py compare "#FF0000" "#00FF00"` |
 | `accessible` | 无障碍推荐 | `python cli.py accessible "#FFF" --mode fg --font-size 16 --target AA` |
 
-> 详见 [反模式](references/antipatterns.md)
-
-> 详见 [FAQ](references/faq.md)
+> 详见核心能力的渐进式文件索引
