@@ -444,11 +444,21 @@ def _reclassify_false_positive(res, skill_dir=None):
 
     v2.86.2: 所有误判由 LLM 通过 `--classify` 手动标记。
     代码层不做任何自动误报排除，确保审计报告输出全部原始问题。
+    
+    ID 支持三种格式：
+    - 数字 eid（如 20）→ 匹配 _expand_fail_entries 的序号
+    - R-XX（如 R-23） → 匹配 rule_id
+    - C-{type}        → 匹配一致性审查 ID
     """
     if skill_dir:
         fp_ids = _load_fp_ids(skill_dir)
         if fp_ids:
             try:
+                # 检查 rule_id 直接匹配（R-XX 格式）
+                rid = res.get('rule_id', res.get('rule', ''))
+                if rid and any(fpid == rid for fpid in fp_ids):
+                    return True
+                # eid 匹配（数字 ID）
                 entries = _expand_fail_entries([res])
                 fp_id_set = {str(i) for i in fp_ids}
                 for e in entries:
@@ -640,6 +650,40 @@ def _save_html_report(skill_dir, audit_result, before_summary=None, before_resul
         print(f"  ⚠️  HTML 报告生成失败: {e}")
 
 
+_REFACTOR_LOCK = ".refactor_locked.lock"
+
+
+def _refactor_lock_path(skill_dir):
+    _dname = os.path.basename(os.path.abspath(skill_dir))
+    return os.path.normpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "..", ".standardization", "skill-standardization", "data", _dname,
+        _REFACTOR_LOCK
+    ))
+
+
+def _lock_refactor(skill_dir):
+    """创建重构锁，阻止报告生成"""
+    lp = _refactor_lock_path(skill_dir)
+    os.makedirs(os.path.dirname(lp), exist_ok=True)
+    with open(lp, "w") as f:
+        f.write("locked")
+    print(f"  🔒 重构锁已创建: {lp}")
+
+
+def _unlock_refactor(skill_dir):
+    """清除重构锁"""
+    lp = _refactor_lock_path(skill_dir)
+    if os.path.exists(lp):
+        os.unlink(lp)
+        print(f"  🔓 重构锁已清除")
+
+
+def _is_refactor_locked(skill_dir):
+    """检查重构锁是否存在"""
+    return os.path.exists(_refactor_lock_path(skill_dir))
+
+
 def _save_remaining_llm(skill_dir, remaining):
     """保存 LLM 需手动修复的剩余项为结构化 JSON，供 LLM 闭环消费。"""
     _dname = os.path.basename(os.path.abspath(skill_dir))
@@ -658,6 +702,12 @@ def _save_remaining_llm(skill_dir, remaining):
 
 
 def generate_html_report(audit_result, output_path, before_summary=None, skill_dir=None, before_result=None):
+    # ★ 重构锁检查：如果锁存在，拒绝生成报告
+    if skill_dir and _is_refactor_locked(skill_dir):
+        print(f"\n  ⛔ ⛔ ⛔ 重构锁仍处于激活状态，拒绝生成报告 ⛔ ⛔ ⛔")
+        print(f"  未达 0 ERROR 0 WARN 之前不得输出报告。")
+        print(f"  请继续修复循环后再试。")
+        return
     """生成 HTML 格式的审计报告（含筛选、展开、统计图表）。
     
     audit_result: audit_skill() 返回的 dict（修复后的结果）
@@ -1097,8 +1147,8 @@ def cmd_audit(args):
         ids = [s.strip() for s in raw.split(',')]
         # 验证：数字 ID 或 C-{type} 格式（一致性审查误报）
         for id_str in ids:
-            if not id_str.isdigit() and not id_str.startswith('C-'):
-                print(f"❌ 无效 ID: '{id_str}' — ID 必须是数字（如 42,55,67）或 C-{{type}}（如 C-missing_doc_ref）")
+            if not id_str.isdigit() and not id_str.startswith('C-') and not id_str.startswith('R-'):
+                print(f"❌ 无效 ID: '{id_str}' — ID 必须是数字（如 42,55,67）、C-{{type}}（如 C-missing_doc_ref）或 R-XX（如 R-23）")
                 return 1
         verify_dir = os.path.join(
             os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
@@ -1121,6 +1171,22 @@ def cmd_audit(args):
         print(f"  [CLASSIFY] 已标记 {len(ids)} 个 #ID 为误判：{', '.join(ids)}")
         print(f"  当前误判列表：{', '.join(sorted(fp_ids))}")
         print(f"{'='*55}")
+        print(f"\n  ⏳ 自动运行过滤验证...")
+        # 自动重跑审计并显示过滤后的结果
+        _result2 = audit_skill(skill_dir)
+        _remaining2 = [r for r in _result2.get("results", [])
+                       if not r.get("passed") and not r.get("skipped")
+                       and not _reclassify_false_positive(r, skill_dir)]
+        if _remaining2:
+            print(f"\n  ⚠️  标记后仍有 {len(_remaining2)} 项真问题未通过：")
+            for _r in _remaining2:
+                _sev2 = "[ERROR]" if _r.get('severity') == 'ERROR' else "[WARN]"
+                _rid2 = _r.get('rule_id', _r.get('rule', '?'))
+                print(f"    {_rid2} {_sev2} {_r.get('detail', '')[:120]}")
+            print(f"\n  ⚠️ 剩余项均为真问题，必须修复，不得标记为误判")
+            print(f"  请修复上述真问题后重新审计")
+        else:
+            print(f"  ✅ 过滤验证通过——剩余 FAIL 均已被正确归类为误报（非真问题）")
         sys.exit(0)
 
     # ── --no-fp 模式：从误判列表中移除指定 #ID ──
@@ -1813,15 +1879,22 @@ def cmd_refactor(args):
         manifest_version=args.manifest_version,
         skip_llm_prefilter=getattr(args, 'refactor_continue', False))
 
-    # ── 步骤 5：LLM 剩余项检查 —— 不再跑第二次全量审计 ──
+    # ── 步骤 5：LLM 剩余项检查（已过滤已分类误报） ──
     if remaining:
         print(f"\n{'-'*55}")
-        print(f"  [5/8] LLM 剩余项检查")
+        print(f"  [5/8] LLM 剩余项检查（已过滤已分类误报）")
         print(f"{'-'*55}")
+        # ★ 过滤已分类误报
+        remaining_real = [r for r in remaining
+                          if not _reclassify_false_positive(r, skill_dir)]
+        if len(remaining_real) < len(remaining):
+            print(f"  [分类过滤] 排除 {len(remaining) - len(remaining_real)} 项已标记误报")
+        remaining = remaining_real
         llm_items = [r for r in remaining
                      if r.get('rule_id', r.get('rule', '')) in ('R-07', 'R-11', 'R-20', 'R-23', 'R-25')]
         if llm_items:
             _save_remaining_llm(skill_dir, llm_items)
+            _lock_refactor(skill_dir)  # ★ 创建重构锁，阻止跳过循环直接出报告
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
             for r in llm_items:
                 sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
@@ -1829,6 +1902,7 @@ def cmd_refactor(args):
                 print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
             print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
             print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
+            print(f"  🔒 重构锁已激活——未达双 0 前任何报告生成操作都将被拒绝")
         else:
             print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复修复")
             print(f"  请检查修复循环是否达到上限（20 轮），或手动排查")
@@ -1852,6 +1926,7 @@ def cmd_refactor(args):
         sys.exit(1)
     else:
         print(f"  ✅ 双 0 确认通过")
+        _unlock_refactor(skill_dir)  # ★ 双 0 通过后清除重构锁
 
     # ── 步骤 7：全量一致性审查 + 修复循环 ──
     print(f"\n{'─'*55}")
@@ -2595,6 +2670,7 @@ def cmd_update(args):
         non_llm_items = [r for r in remaining if r not in llm_items]
         if llm_items:
             _save_remaining_llm(skill_dir, llm_items)
+            _lock_refactor(skill_dir)  # ★ 创建重构锁，阻止跳过循环直接出报告
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
             for r in llm_items:
                 sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
@@ -2602,6 +2678,7 @@ def cmd_update(args):
                 print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
             print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
             print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
+            print(f"  🔒 重构锁已激活——未达双 0 前任何报告生成操作都将被拒绝")
         else:
             print(f"\n  ⛔ 有 {len(non_llm_items)} 项非 LLM 类 FAIL 未被自动修复")
             print(f"  请检查修复循环是否达到上限（10 轮），或手动排查")
