@@ -1,3 +1,10 @@
+## [2.5.0] - 2026-06-19
+
+### 修复
+- refactor: drawiodo
+
+---
+
 ## 2.4.1 (2026-06-10)
 
 ### 修复
@@ -32,7 +39,7 @@
 ## 2.3.2 (2026-06-10)
 
 ### 标准化
-- skill-standardization v2 全量审计（R-01~R-25），25/25 PASS，0 ERROR 0 WARN
+- skill-standardization v2 全量审计（R-01~R-26），25/25 PASS，0 ERROR 0 WARN
 - 修复 R-10：三端版本号一致（SKILL.md = _meta.json = changelog = 2.3.2）
 - 修复 R-17：生成图表章节拆分到 references/generation.md，SKILL.md 从 247 行降至 196 行
 - 修复 _meta.json description 与 SKILL.md frontmatter 不一致

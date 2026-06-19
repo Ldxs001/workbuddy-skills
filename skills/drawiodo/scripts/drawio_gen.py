@@ -225,9 +225,12 @@ class DrawIOBuilder:
         self._page_id = "1"
 
     def add_node(self, label: str, x: float, y: float, width: float = 120, height: float = 60,
-                 style: NodeStyle = None, parent_id: str = "1", value: str = "") -> Node:
+                 style: NodeStyle = None, parent_id: str = "1", value: str = "",
+                 node_id: str = "") -> Node:
         node = Node(label=label, x=x, y=y, width=width, height=height,
                     style=style or Styles.DEFAULT_NODE, parent_id=parent_id, value=value)
+        if node_id:
+            node.id = node_id
         self.nodes.append(node)
         return node
 
@@ -404,8 +407,9 @@ class DrawIOBuilder:
 
         # Edges
         for e in self.edges:
-            # 构建连线样式：如果有指定端口，添加 exitX/exitY 和 entryX/entryY
             edge_style = e.style.build()
+
+            # 设置 source/target 端口
             if e.source_port is not None:
                 sp = self._port_to_point(e.source_port)
                 edge_style += f"exitX={sp[0]};exitY={sp[1]};exitDx=0;exitDy=0;"
@@ -427,6 +431,15 @@ class DrawIOBuilder:
             geom = ET.SubElement(cell, "mxGeometry")
             geom.set("relative", "1")
             geom.set("as", "geometry")
+
+            # waypoints（仅中间点，不含source/target边缘点）
+            if e.waypoints:
+                array = ET.SubElement(cell, "Array")
+                array.set("as", "points")
+                for wx, wy in e.waypoints:
+                    mp = ET.SubElement(array, "mxPoint")
+                    mp.set("x", str(wx))
+                    mp.set("y", str(wy))
 
         # Pretty print
         rough = ET.tostring(root, encoding="unicode")

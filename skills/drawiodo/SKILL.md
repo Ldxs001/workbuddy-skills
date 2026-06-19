@@ -2,15 +2,15 @@
 name: drawiodo
 author: wUwproject
 license: MIT
-version: 2.4.1
+version: 2.5.0
 description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。
 tags: ['diagram', 'drawio', 'flowchart', 'architecture', 'uml', 'er', 'visualization']
 allowed-tools: ['Bash', 'Read', 'Write', 'Edit']
 trigger: ['画一个.*图|生成.*图|做一个图表', '架构图|流程图|UML|ER图|时序图|思维导图', 'draw\\\\\\\\.io|drawio|diagrams\\\\\\\\.net', '网络拓扑|组织架构|系统架构']
 trigger_negative: true
-sensitive_access: false
+sensitive_access: true
 critical_write: false
-permission_weight: LOW
+permission_weight: HIGH
 data_dir: skills/.standardization/drawiodo/data/
 external_data_dir: true
 meta_field_sync: true
@@ -20,6 +20,7 @@ faq_quality: improve_qa
 
 ## 触发条件
 
+**正向触发**：
 当用户提出以下意图时触发：
 - "画一个 xxx 图"、"生成 xxx 图"、"做一个图表"
 - "架构图"、"流程图"、"UML 类图"、"ER 图"、"时序图"、"思维导图"
@@ -29,8 +30,7 @@ faq_quality: improve_qa
 - 用户提供截图/示例文件并要求生成类似图表
 - 任何涉及 draw.io / diagrams.net 的需求
 
-## 不触发
-
+**否定条件**：
 以下情况**不触发**本技能：
 - 用户只是问"你会画图吗"、"有什么画图工具"——闲聊
 - 用户明确要求用其他工具（如"用 mermaid 画流程图"）
@@ -49,33 +49,36 @@ faq_quality: improve_qa
 
 ### 渐进式文件索引
 
-| 文件 | 说明 |
-|------|------|
-| `references/guide.md` | 执行流程详解（思考-确认-迭代-版本回溯） |
-| `references/hooks.md` | 钩子系统详解（8 个 Hook Point 实现） |
-| `references/generation.md` | 图表生成参考（XML 结构/样式/模板） |
-| `references/api_reference.md` | API 参考（CLI/SDK/脚本接口） |
-| `references/layout_rules.md` | 坐标系与布局规则 |
-| `references/antipatterns.md` | 反模式与常见错误 |
-| `references/faq.md` | 常见问题与排错 |
-| `references/known_issues.md` | 已知问题与修复记录 |
-| `references/changelog.md` | 更新日志 |
-| `references/permissions.md` | 权限说明 |
-
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+|--------|------|----------|----------|
+| `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT）。包含：MIT 许可证完整文本。 | R-26 |
+| `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
+| `references/api_reference.md` | 参考文档 | - `DrawIOBuilder(name)` - 创建画布 | 无 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
+| `references/generation.md` | 参考文档 | 路径信息见 `_meta.json` data_dir 声明 + frontmatter data_dir 字段。 | 无 |
+| `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
+| `references/hooks.md` | 参考文档 | **本技能的所有关键约束由 Python 端强制执行，不依赖 LLM 自觉。** | 无 |
+| `references/known_issues.md` | 参考文档 | **问题**：子节点使用极坐标计算位置，导致： | 无 |
+| `references/layout_rules.md` | 参考文档 | - 画布坐标：左上角(0,0)，X向右增大，Y向下增大 | 无 |
+| `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
+| `references/test-report.md` | 参考文档 | > 生成时间: 2026-06-19T15:30:00 | 无 |
 ## 工作流程
 
-1. **思考分析（Think）**：分析用户需求，判断图表类型和输入类型，输出结构化思考结果
-2. **方案确认（Confirm）**：向用户展示分析方案，用 AskUserQuestion 等待确认 
-3. **迭代更新（Iterate）**：确认后生成/更新图表，每次更新前保存版本 
-4. **版本回溯（Version Control）**：支持随时回溯到之前的版本（v1~v5）
+1. **思考分析（Think）**
+   - **输入**：用户自然语言描述 + 可选的参考图/截图
+   - **输出**：结构化图表分析结果（类型、节点、关系、布局）
+2. **方案确认（Confirm）**
+   - **输入**：结构化分析结果
+   - **输出**：用 AskUserQuestion 向用户展示方案，等待确认
+3. **迭代更新（Iterate）**
+   - **输入**：用户确认的方案
+   - **输出**：生成的 .drawio 文件，每次更新前自动保存版本
+4. **版本回溯（Version Control）**
+   - **输入**：已保存的历史版本（v1~v5）
+   - **输出**：恢复指定版本的文件
 
-→ 详见 [执行流程详解](references/guide.md)
-
-## 执行流程（4 阶段工作流）
-
-本技能采用 **思考(Think) → 确认(Confirm) → 迭代(Iterate) → 版本回溯(Version Control)** 四阶段工作流。
-
-→ 详见 [执行流程详解](references/guide.md)
+→ 各阶段详细说明见核心能力的渐进式文件索引
 
 **各阶段要点**：
 - **Think**：分析用户需求，判断图表类型和输入类型，输出结构化思考结果 
@@ -102,7 +105,7 @@ python {SKILL_DIR}/scripts/drawio_version.py restore <文件.drawio> v2
 备份、版本管理初始化、版本上限清理均由钩子在脚本层直接完成，
 LLM 无权跳过这些操作。
 
-→ 详见 [钩子系统](references/hooks.md)
+→ 各参考文档详见核心能力的渐进式文件索引
 
 ### 8 个 Hook Point
 
@@ -171,27 +174,25 @@ python {SKILL_DIR}/scripts/drawio_hooks.py history  # 查看执行历史
 
 ## 生成图表
 
-→ 详见 [图表生成参考](references/generation.md)
+→ 详见核心能力的渐进式文件索引
 
 ---
 
-## API 参考 
+## API 参考
 
-→ 详见 [API 参考](references/api_reference.md)
+→ 详见核心能力的渐进式文件索引
 
-## 坐标系与布局规则 
+## 坐标系与布局规则
 
-→ 详见 [坐标系与布局规则](references/layout_rules.md)
+→ 详见核心能力的渐进式文件索引
 
-## 已知问题与修复记录 
+## 已知问题与修复记录
 
-→ 详见 [已知问题与修复记录](references/known_issues.md)
+→ 详见核心能力的渐进式文件索引
 
-→ 详见 [反模式](references/antipatterns.md)
-→ 详见 [常见问题](references/faq.md)
+→ 反模式和常见问题详见核心能力的渐进式文件索引
 
 ---
-
 ## 输出规范 
 
 - 文件命名：`{类型}_{描述}.drawio`，如 `architecture_microservice.drawio`
