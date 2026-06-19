@@ -15,6 +15,7 @@ timeline.py — 测试流程时间线计时引擎
 import json
 import os
 import sys
+import tempfile
 import time
 from datetime import datetime
 
@@ -91,6 +92,25 @@ def _timeline_path(skill_dir: str) -> str:
     return os.path.join(_data_dir_for(skill_dir), F_TIMELINE)
 
 
+def _safe_write_json(path: str, data: dict):
+    """原子写入 JSON：先写临时文件，replace 到目标路径，防止截断"""
+    fd, tmp = tempfile.mkstemp(suffix=".json", prefix=".tl_tmp_",
+                                dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(fd)
+        os.replace(tmp, path)
+    except Exception:
+        # 清理临时文件
+        try:
+            os.unlink(tmp)
+        except Exception:
+            pass
+        raise
+
+
 def _load_timeline(skill_dir: str) -> dict:
     path = _timeline_path(skill_dir)
     if not os.path.exists(path):
@@ -108,8 +128,7 @@ def cmd_init(skill_dir: str):
         "workflow_label": {},  # phase → 工作流标签映射
     }
     path = _timeline_path(skill_dir)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(tl, f, ensure_ascii=False, indent=2)
+    _safe_write_json(path, tl)
     print(f"  [TIMELINE] 已初始化: {path}")
 
 
@@ -138,8 +157,7 @@ def cmd_mark(skill_dir: str, phase: str, label: str, mark: str = "start",
     }
     tl["markers"].append(entry)
 
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(tl, f, ensure_ascii=False, indent=2)
+    _safe_write_json(path, tl)
 
     marker_icon = "[START]" if mark == "start" else "[END]"
     t_sec = entry["t"]
@@ -225,8 +243,7 @@ def _append_marker(skill_dir: str, mid: str, parent_id: str,
         "detail": detail,
         "tags": tags or [],
     })
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(tl, f, ensure_ascii=False, indent=2)
+    _safe_write_json(path, tl)
 
 
 # ═══════════════════════════════════════════════════════

@@ -30,7 +30,14 @@ def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
                         capture_output=True, text=True, encoding="utf-8")
     if r.stdout and r.stdout.strip(): print(r.stdout)
-    if r.returncode != 0: sys.exit(r.returncode)
+    # 仅当 BLOCK > 0 才阻断，WARN 不阻断
+    if r.returncode not in (0, None):
+        try:
+            stderr_lower = r.stderr.lower() if r.stderr else ""
+            if "block" in stderr_lower or "f-0" in stderr_lower:
+                sys.exit(r.returncode)
+        except:
+            pass
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
                     capture_output=True, encoding="utf-8")

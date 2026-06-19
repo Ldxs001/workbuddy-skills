@@ -246,33 +246,39 @@ class ScenarioRunner:
         # 解析 SKILL.md
         self.parsed_md = parse_skill_md(skill_dir)
 
-        # 手动场景测试用例优先，无则自动构建
+        # 强制要求手工测试计划，无自动构建 fallback
+        self.test_plan = []
         test_plan_path = os.path.join(_data_dir_for(skill_dir), "outputs", ".s_test_plan.json")
-        if os.path.exists(test_plan_path):
-            try:
-                with open(test_plan_path, "r", encoding="utf-8") as f:
-                    manual_plan = json.load(f)
-                self.test_plan = []
-                source_map = {"S1": "trigger", "S2": "capability", "S3": "workflow"}
-                cli_scripts = self.blueprint.get("cli_scripts", [])
-                # 所有 Python 模块（含无 CLI 入口的）
-                all_modules = []
-                for p in self.blueprint.get("file_manifest", {}).get("python", []):
-                    mod_name = os.path.splitext(os.path.basename(p))[0]
-                    if mod_name not in ("__init__", "__main__"):
-                        all_modules.append({"name": mod_name, "path": p, "has_cli": False})
-                for s in cli_scripts:
-                    for m in all_modules:
-                        if m["name"] == s["name"]:
-                            m["has_cli"] = True
-                            break
-                matched_count = 0
-                module_matched_count = 0
-                # 构建模块名 → all_modules 的快速查找
-                mod_name_to_entry = {m["name"]: m for m in all_modules}
-                for s_type, items in manual_plan.items():
-                    mapped = source_map.get(s_type, s_type.lower())
-                    for item in items:
+        if not os.path.exists(test_plan_path):
+            print("\n" + "=" * 60)
+            print("  ⛔ 阻断: 未找到 .s_test_plan.json")
+            print("  场景测试要求 LLM 手工编写测试计划。")
+            print("  请阅读 SKILL.md 和蓝皮书，按 references/s-test-plan-schema.md 格式")
+            print(f"  写入: {test_plan_path}")
+            print("=" * 60 + "\n")
+            sys.exit(1)
+
+        try:
+            with open(test_plan_path, "r", encoding="utf-8") as f:
+                manual_plan = json.load(f)
+            source_map = {"S1": "trigger", "S2": "capability", "S3": "workflow"}
+            cli_scripts = self.blueprint.get("cli_scripts", [])
+            all_modules = []
+            for p in self.blueprint.get("file_manifest", {}).get("python", []):
+                mod_name = os.path.splitext(os.path.basename(p))[0]
+                if mod_name not in ("__init__", "__main__"):
+                    all_modules.append({"name": mod_name, "path": p, "has_cli": False})
+            for s in cli_scripts:
+                for m in all_modules:
+                    if m["name"] == s["name"]:
+                        m["has_cli"] = True
+                        break
+            matched_count = 0
+            module_matched_count = 0
+            mod_name_to_entry = {m["name"]: m for m in all_modules}
+            for s_type, items in manual_plan.items():
+                mapped = source_map.get(s_type, s_type.lower())
+                for item in items:
                         item["source"] = mapped
                         item["scene"] = item.get("name", item.get("trigger", "?"))
                         # ★ 如果测试用例写了 modules 字段，直接用它映射
@@ -345,12 +351,10 @@ class ScenarioRunner:
                           f"其中 {matched_count} 条匹配到 CLI 脚本"
                           + (f", {module_matched_count} 条匹到无CLI入口模块" if module_matched_count else "")
                           + ")")
-            except Exception as e:
-                print(f"  [SCENARIO] 加载手工测试计划失败: {e}，将使用自动构建")
-                self.test_plan = []
-
-        if not self.test_plan:
-            self.test_plan = auto_build_test_plan(self.parsed_md, blueprint)
+        except Exception as e:
+            print(f"\n  ⛔ 加载 .s_test_plan.json 失败: {e}")
+            print(f"  请按 references/s-test-plan-schema.md 修正格式后重试\n")
+            sys.exit(1)
 
         # 从配置读取启用的场景维度，禁用的从 test_plan 中移除
         config_path = os.path.join(_data_dir_for(skill_dir), "outputs", ".test-config.json")

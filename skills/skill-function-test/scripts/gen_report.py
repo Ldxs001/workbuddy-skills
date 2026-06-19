@@ -42,34 +42,44 @@ def _data_dir_for(skill_dir: str) -> str:
 def _load_json(path: str) -> dict:
     if not os.path.exists(path):
         return {}
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+        print(f"  [WARN] JSON 解析失败, 跳过: {os.path.basename(path)} — {e}")
+        return {}
 
 
 def _load_rounds(skill_dir: str) -> list[dict]:
-    # timeline 文件在 outputs 的上一层目录
-    base_dir = os.path.dirname(_data_dir_for(skill_dir))
+    # timeline 文件在 datadir 或 outputs 的上一层目录
+    datadir = _data_dir_for(skill_dir)
+    base_dir = os.path.dirname(datadir)  # data/
     rounds = []
-    tl = _load_json(os.path.join(base_dir, ".timeline.json"))
+    tl = _load_json(os.path.join(datadir, ".timeline.json"))
+    if not tl:
+        tl = _load_json(os.path.join(base_dir, ".timeline.json"))
     if tl:
         rounds.append(tl)
-    for f in sorted(glob.glob(os.path.join(base_dir, ".timeline_*.json"))):
-        data = _load_json(f)
-        if data:
-            # 标记源文件名，方便 compute_round_stats 区分 _rN 与 base
-            data["_source"] = os.path.basename(f)
-            rounds.append(data)
+    for scan_dir in [datadir, base_dir]:
+        for f in sorted(glob.glob(os.path.join(scan_dir, ".timeline_*.json"))):
+            data = _load_json(f)
+            if data:
+                data["_source"] = os.path.basename(f)
+                rounds.append(data)
     return rounds
 
 
 def load_all(skill_dir: str) -> dict:
     datadir = _data_dir_for(skill_dir)
     parent_dir = os.path.dirname(datadir)  # outputs 的父目录
+    outputs_dir = os.path.join(datadir, "outputs")  # 实际报告存放目录
     skill_name = os.path.basename(os.path.abspath(skill_dir))
 
-    # 在 outputs/ 和其父目录两级查找报告文件（兼容不同脚本的路径差异）
+    # 在 outputs/, datadir, 和父目录三级查找报告文件
     def _find_report(filename: str) -> dict:
-        r = _load_json(os.path.join(datadir, filename))
+        r = _load_json(os.path.join(outputs_dir, filename))
+        if not r:
+            r = _load_json(os.path.join(datadir, filename))
         if not r:
             r = _load_json(os.path.join(parent_dir, filename))
         return r
@@ -86,8 +96,8 @@ def load_all(skill_dir: str) -> dict:
     rounds = _load_rounds(skill_dir)
     timeline = rounds[-1] if rounds else {}
     test_reports = {}
-    # 在 outputs/ 和父目录中扫描报告文件
-    for scan_dir in [datadir, parent_dir]:
+    # 在 outputs/, datadir 和父目录中扫描报告文件
+    for scan_dir in [outputs_dir, datadir, parent_dir]:
         if not os.path.isdir(scan_dir):
             continue
         for f in os.listdir(scan_dir):
