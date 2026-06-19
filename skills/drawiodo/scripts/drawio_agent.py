@@ -16,6 +16,8 @@ import argparse
 from pathlib import Path
 
 from drawio_gen import DrawIOBuilder, Styles
+from drawio_hooks import execute, HookPoint
+from drawio_version import VersionManager
 from drawio_templates import (
     create_flowchart,
     create_architecture,
@@ -217,6 +219,9 @@ def generate_from_text(text: str, output: str = None) -> str:
     Returns:
         生成的文件路径
     """
+    # ── pre_think hooks: 输入校验 ──
+    execute(HookPoint.PRE_THINK, {"input": text, "type": "text"})
+
     if not output:
         workspace = Path(__file__).parent
         output = str(workspace / "output.drawio")
@@ -270,7 +275,18 @@ def generate_from_text(text: str, output: str = None) -> str:
     else:
         builder = create_flowchart(["Step 1", "Step 2", "Step 3"])
 
+    # ── post_think hooks: 方案校验 ──
+    execute(HookPoint.POST_THINK, {"diagram_type": diag_type, "nodes": len(builder.nodes)})
+
+    # ── pre_iterate hooks: 文件存在则自动备份 ──
+    is_update = os.path.exists(output)
+    execute(HookPoint.PRE_ITERATE, {"output_path": output, "is_update": is_update})
+
     filepath = builder.save(output)
+
+    # ── post_iterate hooks: 生成文件校验 + 预览 ──
+    execute(HookPoint.POST_ITERATE, {"output_path": filepath, "nodes": len(builder.nodes)})
+
     return filepath
 
 

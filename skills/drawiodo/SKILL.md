@@ -2,7 +2,7 @@
 name: drawiodo
 author: wUwproject
 license: MIT
-version: 2.5.0
+version: 2.6.1
 description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。
 tags: ['diagram', 'drawio', 'flowchart', 'architecture', 'uml', 'er', 'visualization']
 allowed-tools: ['Bash', 'Read', 'Write', 'Edit']
@@ -42,10 +42,12 @@ faq_quality: improve_qa
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
 1. **自然语言 → 图表**：理解用户描述，自动判断图表类型，生成 .drawio 文件
-2. **8 种模板**：流程图、架构图、UML 类图、ER 图、树形图、时序图、思维导图、网络拓扑
-3. **迭代更新**：在现有文件基础上精确更新，支持版本回溯（最多 5 版本）
-4. **思考-确认-执行工作流**：先分析需求、展示方案、等待确认，再动手画图
-5. **本地预览**：生成后用 `draw.io.exe` 打开，即时查看结果
+2. **统一布局引擎**：拓扑排序分层 → 重心排序层内排列 → 动态间距计算 → 障碍感知路径路由，不区分图类型
+3. **多形状支持**：UML 类表、ER 实体、圆柱体、菱形、六边形、云朵、文档、便签等，用户指定即可
+4. **5 主题配色**：default/tech/business/bw/nature，节点和边颜色统一轮换
+5. **迭代更新**：在现有文件基础上精确更新，支持版本回溯（最多 5 版本）
+6. **思考-确认-执行工作流**：先分析需求、展示方案、等待确认，再动手画图
+7. **本地预览**：生成后用 `draw.io.exe` 打开，即时查看结果
 
 ### 渐进式文件索引
 
@@ -62,7 +64,21 @@ faq_quality: improve_qa
 | `references/known_issues.md` | 参考文档 | **问题**：子节点使用极坐标计算位置，导致： | 无 |
 | `references/layout_rules.md` | 参考文档 | - 画布坐标：左上角(0,0)，X向右增大，Y向下增大 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
-| `references/test-report.md` | 参考文档 | > 生成时间: 2026-06-19T15:30:00 | 无 |
+| `references/test-report.md` | 测试报告 | skill-function-test 全量测试结论 | 无 |
+| --- | --- | --- | --- |
+| `scripts/drawio_unified.py` | 核心引擎 | 统一图生成：拓扑分层 → 重心排序 → 位置计算 → 路由 | 无 |
+| `scripts/drawio_module.py` | 模块基类 | DiagramModule 抽象接口 + LayoutResult + 渲染层 | 无 |
+| `scripts/drawio_modules.py` | 模块注册 | GraphModule / GanttModule 注册表 | 无 |
+| `scripts/drawio_gen.py` | XML 生成 | Node / Edge / DrawIOBuilder + build_xml() | 无 |
+| `scripts/drawio_route.py` | 路径路由 | Rect / CollisionResolver / ObstacleRouter | 无 |
+| `scripts/drawio_layout.py` | 布局辅助 | text_width / auto_node_size / 间距常量 | 无 |
+| `scripts/drawio_hooks.py` | 钩子系统 | 8 个 Hook Point 实现 | 无 |
+| `scripts/drawio_version.py` | 版本管理 | VersionManager CLI：init/save/list/restore/diff | 无 |
+| `scripts/drawio.py` | CLI 入口 | 模板式图表生成 CLI（流程图/架构图/类图/ER/树/思维导图） | 无 |
+| `scripts/drawio_agent.py` | CLI 入口 | 自然语言驱动的图表生成 CLI（`--json` 接收结构化数据） | 无 |
+| `scripts/drawio_regen_all.py` | 批量生成 | 一次性生成全部示例图的脚本 | 无 |
+| `scripts/drawio_templates.py` | 模板生成 | 旧版按图类型生成模板（flowchart/architecture/class/er/tree/mindmap） | 无 |
+| `scripts/build_network.py` | 网络构建 | 网络拓扑图专用构建函数 | 无 |
 ## 工作流程
 
 1. **思考分析（Think）**

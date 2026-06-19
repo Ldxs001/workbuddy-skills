@@ -1,3 +1,17 @@
+## [2.6.1] - 2026-06-19
+
+### 修复
+- 修复: drawio_agent.py 硬编码钩子调用(PRE_THINK/POST_THINK/PRE_ITERATE/POST_ITERATE) + 版本自动备份集成
+
+---
+
+## [2.6.0] - 2026-06-19
+
+### 修复
+- refactor: drawiodo
+
+---
+
 ## [2.5.0] - 2026-06-19
 
 ### 修复
