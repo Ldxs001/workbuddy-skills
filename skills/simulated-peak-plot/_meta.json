@@ -1,7 +1,7 @@
 {
   "name": "simulated-peak-plot",
-  "version": "2.6.0",
-  "description": "生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持自定义峰参数、噪声水平、基线设置、复合峰（N个子峰组合）、自定义坐标轴标题/单位、CSV完整数据导出、可点击的file:///路径输出、以及从设备导出数据导入CSV。",
+  "version": "2.9.1",
+  "description": "生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持簇峰(N子峰各独立标注)/融峰(合成单标注)/单峰、负峰(倒峰)、标注控制(annotate)、扫描速率(scan_rate)、碰撞避让标注、自定义坐标轴/单位、CSV导出及CSV导入，**负峰（倒峰）**。",
   "tags": [
     "peak",
     "plot",
@@ -11,5 +11,7 @@
     "visualization",
     "csv-export"
   ],
-  "author": "wUwproject"
+  "author": "wUwproject",
+  "triggers": [],
+  "data_dir": "skills/.standardization/simulated-peak-plot/data/"
 }

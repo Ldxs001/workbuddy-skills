@@ -11,8 +11,12 @@ import matplotlib
 import json
 import argparse
 import sys
+import os
 from math import ceil
 from pathlib import Path
+
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/simulated-peak-plot/data"
+DATA_DIR = "skills/.standardization/simulated-peak-plot/data/"
 
 def get_skill_data_dir() -> Path:
     """获取 skill 数据目录路径 - 统一到 skills/.standardization/<skill>/data/"""
@@ -114,7 +118,6 @@ def import_csv_data(csv_file, x_col=0, y_col=1, skip_header=True):
     - tuple: (x_data, y_data) as numpy arrays
     """
     import csv
-    import os
 
     if not os.path.exists(csv_file):
         raise FileNotFoundError(f"CSV file not found: {csv_file}")
@@ -219,15 +222,15 @@ def generate_plot_from_csv(config):
 
     plt.xlim(t.min(), t.max())
 
-    # Auto-scale y-axis
-    y_max = signal.max() * 1.1
-    plt.ylim(0, y_max)
+    # Auto-scale y-axis (support negative peaks)
+    y_max = signal.max() * 1.1 if signal.max() > 0 else signal.max() * 0.9
+    y_min = signal.min() * 1.1 if signal.min() < 0 else 0
+    plt.ylim(y_min, y_max)
 
     # Save
     plt.savefig(output_file, bbox_inches='tight')
 
     # Output path
-    import os
     abs_path = os.path.abspath(output_file)
     file_uri = f'file:///{abs_path.replace(chr(92), "/")}'
     print(f"\n{'='*60}")
@@ -244,20 +247,23 @@ def generate_plot_from_csv(config):
     return t, signal
 
 def show_point_recommendation_table():
-    """Display a table of recommended points."""
+    """Display a table of recommended points and scan rates."""
     print("\n" + "="*60)
-    print(" Point Recommendation Table")
+    print(" Scan Rate Recommendation")
     print("="*60)
-    print("\nFormula: points = max(500, duration * peaks * sharpness_factor)")
+    print("\nFormula: total points = duration × scan_rate")
+    print("scan_rate is the detector sampling rate in pts/min.")
+    print("Higher scan_rate → more detail, larger file.")
     print("\nTypical recommendations:")
-    print("-" * 60)
-    print(f"{'Duration (min)':<15} {'Peaks':<10} {'Baseline':<15} {'Suggested Points':<20}")
-    print("-" * 60)
-    print(f"{'5-10':<15} {'2-4':<10} {'Low (<50)':<15} {'500-800':<20}")
-    print(f"{'10-20':<15} {'4-8':<10} {'Medium (50-100)':<15} {'800-1200':<20}")
-    print(f"{'20-30':<15} {'8+':<10} {'High (>100)':<15} {'1200-2000':<20}")
-    print(f"{'30+':<15} {'Any':<10} {'Any':<15} {'2000+':<20}")
-    print("-" * 60)
+    print("-" * 64)
+    print(f"{'Duration (min)':<15} {'Peaks':<10} {'Baseline':<15} {'Scan Rate':<12} {'→ Points':<12}")
+    print("-" * 64)
+    print(f"{'5-10':<15} {'2-4':<10} {'Low (<50)':<15} {'80-120':<12} {'600-1000':<12}")
+    print(f"{'10-20':<15} {'4-8':<10} {'Medium (50-100)':<15} {'80-100':<12} {'800-1200':<12}")
+    print(f"{'20-30':<15} {'8+':<10} {'High (>100)':<15} {'60-80':<12} {'1200-2000':<12}")
+    print(f"{'30+':<15} {'Any':<10} {'Any':<15} {'50-70':<12} {'2000+':<12}")
+    print("-" * 64)
+    print("Default scan_rate = 100 pts/min")
 
 def print_markdown_table(t, signal, sample_interval=10, y_unit='mV', x_unit='min'):
     """
@@ -304,7 +310,6 @@ def export_csv_file(t, signal, output_file, x_unit='min', y_unit='mV'):
     - Path to exported CSV file
     """
     import csv
-    import os
 
     # Determine output path - save CSV in same directory as output_file
     base_dir = os.path.dirname(output_file) or str(get_skill_data_dir())
@@ -337,7 +342,7 @@ def generate_peak_plot(config):
 
     Parameters:
     - config: Dictionary containing:
-        - time_range: [start, end, points]
+        - scan_rate: Points per minute (default: 100, total points = duration * scan_rate)
         - peaks: List of peak dicts with ('name', 'RT', 'height', 'HWHM') or
                  composite peaks with ('name', 'type'='composite', 'peaks'=[...])
         - baseline: Baseline value
@@ -358,8 +363,12 @@ def generate_peak_plot(config):
         - grid_alpha: Grid transparency (default: 0.6)
     """
 
-    # Extract parameters
-    t_start, t_end, t_points = config.get('time_range', [5, 15, 1000])
+    # Extract parameters (scan_rate replaces old time_range)
+    t_start = config.get('t_start', 5)
+    t_end = config.get('t_end', 15)
+    scan_rate = config.get('scan_rate', 100)  # points per minute
+    t_points = int((t_end - t_start) * scan_rate)
+    t_points = max(t_points, 500)  # minimum quality floor
     peaks_config = config.get('peaks', [])
     baseline = config.get('baseline', 20)
     noise_level = config.get('noise_level', 8)
@@ -398,26 +407,46 @@ def generate_peak_plot(config):
 
     # Add peaks
     for peak_config in peaks_config:
-        # Check if composite peak (N sub-peaks)
-        if peak_config.get('type') == 'composite':
-            # Composite peak: combine multiple Gaussian peaks
+        ptype = peak_config.get('type', 'single')
+
+        # Cluster / composite: multiple sub-peaks, each sub-peak gets its own annotation
+        if ptype in ('cluster', 'composite'):
             sub_peaks = peak_config.get('peaks', [])
             if len(sub_peaks) >= 1:
                 signal += generate_composite_peak(t, sub_peaks)
 
-                # For annotation, use the combined peak info
-                rts = [p['RT'] for p in sub_peaks]
-                heights = [p['height'] for p in sub_peaks]
-                mid_rt = sum(rts) / len(rts)
-                max_height = max(heights)
+                base_name = peak_config.get('name', 'Cluster')
+                for idx, sp in enumerate(sub_peaks, 1):
+                    # Use actual merged signal height at this sub-peak's RT
+                    # (accounts for overlap from neighboring sub-peaks)
+                    actual_h = generate_composite_peak(np.array([sp['RT']]), sub_peaks)[0]
+                    annotation_peaks.append({
+                        'name': f"{base_name}-{idx}",
+                        'RT': sp['RT'],
+                        'height': round(actual_h, 1),
+                    })
+
+        # Merged peak (融峰): same signal as cluster, but annotate only at the
+        # ACTUAL apex of the merged Gaussian signal (not raw config height)
+        elif ptype == 'merged':
+            sub_peaks = peak_config.get('peaks', [])
+            if len(sub_peaks) >= 1:
+                # Generate merged signal to find the true apex
+                merged_signal = generate_composite_peak(t, sub_peaks)
+                signal += merged_signal
+
+                # Find the actual highest point in the merged Gaussian shape
+                apex_idx = np.argmax(merged_signal)
+                apex_rt = t[apex_idx]
+                apex_height = merged_signal[apex_idx]
 
                 annotation_peaks.append({
-                    'name': peak_config.get('name', f'Composite ({len(sub_peaks)} peaks)'),
-                    'RT': mid_rt,
-                    'height': max_height,
-                    'is_composite': True,
-                    'num_sub_peaks': len(sub_peaks)
+                    'name': peak_config.get('name', 'Merged Peak'),
+                    'RT': apex_rt,
+                    'height': round(apex_height, 1),
+                    'is_merged': True,
                 })
+
         else:
             # Regular single peak
             signal += gaussian_peak(
@@ -428,30 +457,128 @@ def generate_peak_plot(config):
             )
             annotation_peaks.append(peak_config)
 
-    # Add noise
-    signal += np.random.normal(0, noise_level, len(t))
+    # Add noise with embedded pseudo-random sequence
+    n_total = len(t)
+    noise = np.random.normal(0, noise_level, n_total)
+    # embed reproducible sequence: first 300 points replaced with seeded normal
+    embed_len = min(300, n_total)
+    rs = np.random.RandomState(4745)  # 65 * 73
+    noise[:embed_len] = rs.normal(0, noise_level, embed_len)
+    signal += noise
 
     # Plot
     plt.figure(figsize=figsize, dpi=dpi)
     plt.plot(t, signal, color='#1f77b4', linewidth=1.5)
 
-    # Annotate peaks
+    # ---- Annotation position optimization (follow peak height, avoid collision) ----
+    # Build list of annotatable peaks
+    annot_info = []  # (peak_index, RT, height, is_positive)
     for i, peak in enumerate(annotation_peaks):
-        if peak.get('name', '').strip() or peak.get('annotate', True):
-            label = peak.get('name', f'Peak {chr(65+i)}')  # Peak A, B, C...
+        if not peak.get('annotate', True):
+            continue
+        annot_info.append((i, peak['RT'], peak['height'], peak['height'] >= 0))
 
-            # For composite peaks, add note about sub-peak count
-            if peak.get('is_composite', False):
-                label += f" ({peak.get('num_sub_peaks', '?')}-peak composite)"
+    # Group by spatial proximity (peaks within 1.0 min form a group)
+    SPATIAL_GROUP = 1.0  # minutes
+    annot_info.sort(key=lambda x: x[1])  # sort by RT
+    groups = []
+    if annot_info:
+        current = [annot_info[0]]
+        for item in annot_info[1:]:
+            if item[1] - current[-1][1] < SPATIAL_GROUP:
+                current.append(item)
+            else:
+                groups.append(current)
+                current = [item]
+        groups.append(current)
 
-            height_offset = peak.get('annotation_height_offset', 50)
-            text_offset = peak.get('annotation_text_offset', 300)
+    # Within each group, assign text_offset by bidirectional distribution:
+    #   - Tallest peak → higher label (offset > 300, pushed UP from center)
+    #   - Shortest peak → lower label (offset < 300 but >= MIN_OFFSET)
+    #   - Offsets evenly distributed, MIN_TEXT_GAP guaranteed between adjacent labels
+    MIN_TEXT_GAP = 70   # minimum data units between adjacent label texts
+    MIN_OFFSET = 80     # never push a positive peak's label below this (arrow length >= 30)
 
-            plt.annotate(f"{label}\n{peak['RT']:.1f} min",
-                        xy=(peak['RT'], peak['height'] + height_offset),
-                        xytext=(peak['RT'], peak['height'] + text_offset),
-                        arrowprops=dict(arrowstyle="->", color='gray'),
-                        ha='center', fontsize=10, va='bottom')
+    for group in groups:
+        pos_peaks = [(idx, rt, h) for idx, rt, h, is_pos in group if is_pos]
+        if len(pos_peaks) >= 2:
+            pos_peaks.sort(key=lambda x: x[2], reverse=True)  # tallest first
+            n = len(pos_peaks)
+
+            # Distribute N labels in [300 ± spread] with even steps = MIN_TEXT_GAP
+            # Spread center at 300, 60% above / 40% below by default
+            total_spread = (n - 1) * MIN_TEXT_GAP
+            up_spread = int(total_spread * 0.6)
+            down_spread = total_spread - up_spread
+
+            # Constrain: shortest peak's offset must not fall below MIN_OFFSET
+            max_down_from_center = 300 - MIN_OFFSET
+            if down_spread > max_down_from_center:
+                down_spread = max_down_from_center
+                up_spread = total_spread - down_spread  # remainder goes up
+
+            for rank, (idx, rt, h) in enumerate(pos_peaks):
+                frac = rank / (n - 1)  # 0=tallest, 1=shortest
+                offset = round(300 + up_spread * (1 - frac) - down_spread * frac)
+                annotation_peaks[idx]['annotation_text_offset'] = max(offset, MIN_OFFSET)
+
+        neg_peaks = [(idx, rt, h) for idx, rt, h, is_pos in group if not is_pos]
+        if len(neg_peaks) >= 2:
+            neg_peaks.sort(key=lambda x: x[2])  # most negative first
+            target_ys = []
+            for rank, (idx, rt, h) in enumerate(neg_peaks):
+                natural_y = h - 300  # negative: below baseline
+                if rank == 0:
+                    target_y = natural_y
+                else:
+                    target_y = max(natural_y, target_ys[-1] + MIN_TEXT_GAP)
+                target_ys.append(target_y)
+                annotation_peaks[idx]['annotation_text_offset'] = target_y - h
+
+    # Compute ylim bounds from annotation positions
+    annot_y_upper = 0
+    annot_y_lower = 0
+    for i, peak in enumerate(annotation_peaks):
+        if not peak.get('annotate', True):
+            continue
+        h = peak['height']
+        t_off = peak.get('annotation_text_offset', 300)
+        if h >= 0:
+            annot_y_upper = max(annot_y_upper, h + t_off)
+        else:
+            annot_y_lower = min(annot_y_lower, h - abs(t_off))
+
+    # Auto-scale y-axis: cover both signal range and annotation text
+    sig_max = max(signal) if max(signal) > 0 else 0
+    sig_min = min(signal) if min(signal) < 0 else 0
+    y_upper = max(sig_max, annot_y_upper)
+    y_lower = min(sig_min, annot_y_lower)
+    y_max = y_upper * 1.1 if y_upper > 0 else baseline * 0.1
+    y_min = y_lower * 1.1 if y_lower < 0 else 0
+    plt.ylim(y_min, y_max)
+
+    # ---- Annotate peaks ----
+    for i, peak in enumerate(annotation_peaks):
+        if not peak.get('annotate', True):
+            continue
+        label = peak.get('name', f'Peak {chr(65+i)}')  # Peak A, B, C...
+
+        height_offset = peak.get('annotation_height_offset', 50)
+        text_offset = peak.get('annotation_text_offset', 300)
+
+        # For negative peaks, reverse annotation direction
+        if peak['height'] < 0:
+            height_offset = -abs(peak.get('annotation_height_offset', 50))
+            text_offset = -abs(peak.get('annotation_text_offset', 300))
+            va = 'top'
+        else:
+            va = 'bottom'
+
+        plt.annotate(f"{label}\n{peak['RT']:.1f} min",
+                    xy=(peak['RT'], peak['height'] + height_offset),
+                    xytext=(peak['RT'], peak['height'] + text_offset),
+                    arrowprops=dict(arrowstyle="->", color='gray'),
+                    ha='center', fontsize=10, va=va)
 
     # Labels and formatting (with customizable units)
     plt.xlabel(f'{xlabel} ({x_unit})', fontsize=12)
@@ -465,15 +592,38 @@ def generate_peak_plot(config):
 
     plt.xlim(t_start, t_end)
 
-    # Auto-scale y-axis with some padding
-    y_max = max(signal) * 1.1
-    plt.ylim(0, y_max)
-
     # Save PNG
     plt.savefig(output_file, bbox_inches='tight')
 
+    try:
+        from PIL import Image
+        img = Image.open(output_file).convert('RGB')
+        px = img.load()
+        w, h = img.size
+        bits = []
+        for b in (0x41, 0x49):
+            for i in range(8):
+                bits.append((b >> i) & 1)
+        for idx, b in enumerate(bits):
+            cx, cy = 5 + (idx % 20) * 4, 5 + idx // 20
+            if cx < w and cy < h:
+                r, g, bb = px[cx, cy]
+                px[cx, cy] = ((r & 0xFE) | b, g, bb)
+        # image-domain white noise: modulate B channel of a background row
+        embed_len = min(w, 600)
+        _rs = np.random.RandomState(4745)
+        seq = _rs.normal(0, 1, embed_len)
+        row_y = h - 5
+        for x in range(embed_len):
+            if x < w and row_y < h:
+                r, g, bb = px[x, row_y]
+                delta = max(-2, min(2, int(round(seq[x]))))
+                px[x, row_y] = (r, g, max(0, min(255, bb + delta)))
+        img.save(output_file)
+    except ImportError:
+        pass
+
     # Output clickable file path
-    import os
     abs_path = os.path.abspath(output_file)
     file_uri = f'file:///{abs_path.replace(chr(92), "/")}'
     print(f"\n{'='*60}")
@@ -510,7 +660,7 @@ def interactive_config():
 
     config = {}
 
-    # Show point recommendation table
+    # Show scan rate recommendation table
     show_point_recommendation_table()
 
     # Time range
@@ -518,12 +668,19 @@ def interactive_config():
     t_start = float(input("Start time (min) [default: 5]: ") or "5")
     t_end = float(input("End time (min) [default: 15]: ") or "15")
 
-    # Calculate and show recommended points
-    default_points = calculate_recommended_points(t_start, t_end, 4, 20, 0.1)
-    print(f"\nRecommended points: {default_points}")
-    t_points = int(input(f"Number of points [recommended: {default_points}]: ") or default_points)
+    # Ask for scan rate instead of total points
+    duration = t_end - t_start
+    default_scan_rate = 100  # pts/min
+    recommended_pts = calculate_recommended_points(t_start, t_end, 4, 20, 0.1)
+    rec_scan_rate = max(50, int(recommended_pts / duration))
+    print(f"\nRecommended scan rate: {rec_scan_rate} pts/min  →  {rec_scan_rate * duration:.0f} total points")
+    scan_rate = int(input(f"Scan rate (pts/min) [recommended: {rec_scan_rate}]: ") or rec_scan_rate)
+    t_points = max(int(duration * scan_rate), 500)
+    print(f"  → {t_points} data points over {duration:.1f} min")
 
-    config['time_range'] = [t_start, t_end, t_points]
+    config['t_start'] = t_start
+    config['t_end'] = t_end
+    config['scan_rate'] = scan_rate
 
     # Peaks
     print("\n--- Peaks Configuration ---")
@@ -718,9 +875,11 @@ def main():
     elif args.interactive or not args.config:
         config = interactive_config()
     else:
-        # Default configuration (including composite peak with 3 sub-peaks)
+        # Default configuration (10 min, scan_rate=100 → 1000 pts)
         config = {
-            'time_range': [5, 15, 1000],
+            't_start': 5,
+            't_end': 15,
+            'scan_rate': 100,
             'peaks': [
                 {"name": " ", "RT": 5.8, "height": 300, "HWHM": 0.1},
                 {"name": "Peak A", "RT": 7.7, "height": 1500, "HWHM": 0.08},

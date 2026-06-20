@@ -1,6 +1,40 @@
+## 2.9.1 (2026-06-20)
+
+### 更新内容
+- 信息补全与测试
+
+---
+
+## 2.9.0 (2026-06-20)
+
+### 更新内容
+- 负峰支持: height 设为负数生成倒峰，Y轴自动适配，标注反向
+- annotate 标注控制: 峰配置加 "annotate": false 跳过标注
+- 簇峰 (cluster): 旧复合峰改名，每个子峰独立标注为 {name}-N
+- 融峰 (merged): 多子峰合成信号，单一标注在真实最高点
+- 扫描速率 (scan_rate: pts/min): 替代硬编码 time_range 总点数
+- 标注裁剪修复: ylim 扩展至覆盖标注区域
+- 碰撞避让 V3: 双向均摊，offset ≥ 80 硬约束，70 最小间距
+- 融峰 apex: np.argmax 扫描实际高斯合成信号找最高点
+- 簇峰标注高度: 改用实际合成信号值（含邻峰重叠贡献）
+- 修复变量遮蔽 bug
+
+### Changed
+- 复合峰 → 簇峰 (cluster)，保留 type: "composite" 兼容
+- 扫描速率替代固定点数
+
+---
+
+## 2.6.1 (2026-05-30)
+
+### 修复
+- audit --fix 自动修正
+
+---
+
 # 更新日志（Changelog）
 
-> 本文件记录 simulated-peak-plot 的版本变更历史。
+> 本文件记录 simulated-peak-plot 的版本更新历史。
 
 ---
 
@@ -10,9 +44,9 @@
 
 **改写类型：中文化改造**
 
-### 变更内容
+### 更新内容
 
-- ✅ `SKILL.md` 全中文翻译（移除所有英文段落）
+- ✅ `SKILL.md` 全中文翻译（删除所有英文段落）
 - ✅ `references/parameters.md` 全中文翻译（218行）
 - ✅ `description` 中文化（SKILL.md frontmatter 和 _meta.json）
 - 📝 更新版本号：2.5.0 → 2.6.0
@@ -31,12 +65,12 @@
 
 **改写类型：Bug 修复 — 数据路径规范化**
 
-### 变更内容
+### 更新内容
 
 - ✅ 新增 `get_skill_data_dir()` 函数（返回 `.standardization/simulated-peak-plot/data/` 路径）
-- ✅ 修改 `generate_peak_plot()` 函数，让 `output_file` 使用 `get_skill_data_dir()` 返回的路径
-- ✅ 修改 `generate_plot_from_csv()` 函数，让 `output_file` 使用正确路径
-- ✅ 修改 `export_csv_file()` 函数，让 `csv_file` 使用正确路径
+- ✅ 更新 `generate_peak_plot()` 函数，让 `output_file` 使用 `get_skill_data_dir()` 返回的路径
+- ✅ 更新 `generate_plot_from_csv()` 函数，让 `output_file` 使用正确路径
+- ✅ 更新 `export_csv_file()` 函数，让 `csv_file` 使用正确路径
 - 📝 更新版本号：2.4.0 → 2.5.0
 
 ### 影响
@@ -53,7 +87,7 @@
 
 **改写类型：标准化改造 — refactor 模式**
 
-### 变更内容
+### 更新内容
 
 - ✅ 执行 `skill-standardization refactor` 标准化改造
 - ✅ 创建备份：`simulated-peak-plot_bak_refactor_20260525_001409`
@@ -74,12 +108,12 @@
 
 **改写类型：功能增强 — 复合峰支持**
 
-### 变更内容
+### 更新内容
 
 - ✅ 支持复合峰（N 个子峰组合）
 - ✅ 支持 M-型、馒头型、泊松型等复杂峰形
 - ✅ 新增 `generate_composite_peak()` 函数
-- ✅ 交互式配置支持子峰数量设置
+- ✅ 交互式配置支持子峰数量配置
 
 ### 影响
 
@@ -94,7 +128,7 @@
 
 **改写类型：架构重构 — 配置驱动**
 
-### 变更内容
+### 更新内容
 
 - ✅ 改为配置字典驱动（替代硬编码参数）
 - ✅ 支持 JSON 配置文件导入
@@ -116,11 +150,11 @@
 
 **改写类型：初始版本**
 
-### 变更内容
+### 更新内容
 
 - ✅ 基础高斯峰生成
 - ✅ 噪声模拟
-- ✅ 基线设置
+- ✅ 基线配置
 - ✅ Matplotlib 可视化
 - ✅ Markdown 表格输出
 
