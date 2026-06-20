@@ -1,3 +1,10 @@
+## [2.93.2] - 2026-06-20
+
+### 修复
+- 修复: _run_audit_loop 前置LLM二次筛阻断点被 refactor --continue 绕过（skip_llm_prefilter=True）。移除该跳参，改为无条件检查 --classify 数据是否存在
+
+---
+
 ## [2.93.1] - 2026-06-19
 
 ### 修复

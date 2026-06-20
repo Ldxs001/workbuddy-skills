@@ -1876,8 +1876,7 @@ def cmd_refactor(args):
     print(f"{'─'*55}")
     result, remaining, loop_count = _run_audit_loop(
         skill_dir, max_loops=20, label_prefix='4/8',
-        manifest_version=args.manifest_version,
-        skip_llm_prefilter=getattr(args, 'refactor_continue', False))
+        manifest_version=args.manifest_version)
 
     # ── 步骤 5：LLM 剩余项检查（已过滤已分类误报） ──
     if remaining:
@@ -2306,7 +2305,7 @@ def _validate_changed_files(skill_dir, changed_files):
 
 
 
-def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None, skip_llm_prefilter=False):
+def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None):
     """
     修复循环通用实现。
     返回 (result, remaining, loop_count)
@@ -2320,10 +2319,10 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
 
     # ── ★ 前置 LLM 二次筛除（阻断点） ──
     # 流程: ①审计输出 → ②报告展示 → ③★LLM二次筛 → ④_filter_false_positives → ⑤细碎循环
-    # 首次进入且 --continue 未传入时阻断
+    # 首次进入且 --classify 数据为空时阻断，--continue 不能跳过此检查
     raw_remaining = [r for r in result.get("results", [])
                      if not r.get("passed") and not r.get("skipped")]
-    if raw_remaining and not skip_llm_prefilter:
+    if raw_remaining:
         fp_ids = _load_fp_ids(skill_dir)
         if not fp_ids:
             skill_name = os.path.basename(os.path.abspath(skill_dir))
