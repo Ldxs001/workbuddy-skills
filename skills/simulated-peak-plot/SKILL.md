@@ -4,7 +4,7 @@ author: wUwproject
 data_dir: ../.standardization/simulated-peak-plot/data/
 license: MIT
 tags: ['peak', 'plot', 'simulation', 'chromatography', 'spectroscopy', 'visualization', 'csv-export']
-version: 2.9.1
+version: 2.9.2
 description: 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持簇峰(N子峰各独立标注)/融峰(合成单标注)/单峰、负峰(倒峰)、标注控制(annotate)、扫描速率(scan_rate)、碰撞避让标注、自定义坐标轴/单位、CSV导出及CSV导入，**负峰（倒峰）**。
 external_data_dir: true
 sensitive_access: false
@@ -27,6 +27,7 @@ faq_quality: improve_qa
 - 说出"可视化保留时间"、"输出 Markdown 表格"
 - 说出"导入 CSV 数据"、"生成模拟数据"
 - 需要色谱/光谱峰模拟、信号可视化、数据导出等场景
+- **Python API 调用**：`from {SKILL_DIR}/scripts/generate_peak import gaussian_peak, generate_composite_peak`
 
 **否定条件**：除非用户明确提到生成峰图或模拟数据，否则不要主动触发。
 

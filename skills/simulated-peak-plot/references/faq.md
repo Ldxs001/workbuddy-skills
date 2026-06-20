@@ -20,3 +20,20 @@ A: 将峰的 height 设为负数即可生成倒峰，适用于模拟色谱溶剂
 
 Q: 出错或参数非法怎么办？
 A: 检查 JSON 格式是否合法，确保 RT/height/HWHM 为正数（负峰 height 可负）。扫描速率建议 ≥ 50 pts/min。
+
+Q: 能否在 Python 代码中直接调用？
+A: 可以。通过 import 方式调用核心函数：
+```python
+import sys
+sys.path.append("skills/simulated-peak-plot/scripts")
+from generate_peak import gaussian_peak, generate_composite_peak
+import numpy as np
+t = np.linspace(0, 10, 1000)
+signal = gaussian_peak(t, 5.0, 800, 0.08)
+```
+
+Q: 不同类型的峰（单峰/簇峰/融峰）能否混合使用？
+A: 可以。在 peaks 数组中任意排列单峰、簇峰和融峰即可，标注算法自动适配类型。
+
+Q: 能否只生成数据不画图？
+A: 可以。脚本运行后数据保存在 CSV 文件中（export_csv: true）；也可以在代码中调用 gaussian_peak() 和 generate_composite_peak() 直接获取信号数组。

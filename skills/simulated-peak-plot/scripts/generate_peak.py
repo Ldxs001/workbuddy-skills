@@ -652,6 +652,22 @@ def generate_peak_plot(config):
 
     return t, signal
 
+def _safe_float(prompt, default):
+    """安全浮点输入，非法输入返回默认值。"""
+    while True:
+        try:
+            return float(input(prompt) or str(default))
+        except ValueError:
+            print(f"  ⚠️ 输入无效，使用默认值：{default}")
+
+def _safe_int(prompt, default):
+    """安全整数输入，非法输入返回默认值。"""
+    while True:
+        try:
+            return int(input(prompt) or str(default))
+        except ValueError:
+            print(f"  ⚠️ 输入无效，使用默认值：{default}")
+
 def interactive_config():
     """Interactive dialogue to configure parameters."""
     print("=" * 60)
@@ -664,17 +680,17 @@ def interactive_config():
     show_point_recommendation_table()
 
     # Time range
-    print("\n--- Time Range ---")
-    t_start = float(input("Start time (min) [default: 5]: ") or "5")
-    t_end = float(input("End time (min) [default: 15]: ") or "15")
+    print("\n--- 时间范围 ---")
+    t_start = _safe_float("起始时间 (min) [默认: 5]: ", 5)
+    t_end = _safe_float("结束时间 (min) [默认: 15]: ", 15)
 
     # Ask for scan rate instead of total points
     duration = t_end - t_start
     default_scan_rate = 100  # pts/min
     recommended_pts = calculate_recommended_points(t_start, t_end, 4, 20, 0.1)
     rec_scan_rate = max(50, int(recommended_pts / duration))
-    print(f"\nRecommended scan rate: {rec_scan_rate} pts/min  →  {rec_scan_rate * duration:.0f} total points")
-    scan_rate = int(input(f"Scan rate (pts/min) [recommended: {rec_scan_rate}]: ") or rec_scan_rate)
+    print(f"\n推荐扫描速率: {rec_scan_rate} pts/min  →  {rec_scan_rate * duration:.0f} 总点数")
+    scan_rate = _safe_int(f"扫描速率 (pts/min) [推荐: {rec_scan_rate}]: ", rec_scan_rate)
     t_points = max(int(duration * scan_rate), 500)
     print(f"  → {t_points} data points over {duration:.1f} min")
 
@@ -688,29 +704,29 @@ def interactive_config():
     print("Note: Composite peaks combine N sub-peaks (1=single, 2+=composite shape)")
 
     peaks = []
-    num_peaks = int(input("\nNumber of peak groups (including blank and composite) [default: 4]: ") or "4")
+    num_peaks = _safe_int("\n峰组数量（含空白峰和簇峰）[默认: 4]: ", 4)
 
     for i in range(num_peaks):
-        print(f"\nPeak Group {i+1}:")
+        print(f"\n峰组 {i+1}:")
         if i == 0:
-            name = input(f"  Name (leave empty for blank peak): ") or " "
+            name = input("  名称（留空为空白峰）: ") or " "
         else:
-            default_name = f"Peak {chr(64+i)}"  # Peak A, B, C...
-            name = input(f"  Name [default: {default_name}]: ") or default_name
+            default_name = f"Peak {chr(64+i)}"
+            name = input(f"  名称 [默认: {default_name}]: ") or default_name
 
         # Ask if composite peak (N sub-peaks)
-        if i > 0:  # Not for first blank peak
-            num_sub_peaks = int(input("  Number of sub-peaks in this group (1=single, 2+=composite) [default: 1]: ") or 1)
+        if i > 0:
+            num_sub_peaks = _safe_int("  子峰数量（1=单峰，2+=簇峰）[默认: 1]: ", 1)
 
             if num_sub_peaks > 1:
                 # Composite peak with N sub-peaks
                 sub_peaks = []
-                print(f"  --- Enter {num_sub_peaks} sub-peaks ---")
+                print(f"  --- 输入 {num_sub_peaks} 个子峰 ---")
                 for j in range(num_sub_peaks):
-                    print(f"    Sub-peak {j+1}:")
-                    rt = float(input(f"      RT (min): "))
-                    height = float(input(f"      Height: "))
-                    hwhm = float(input(f"      HWHM [default: 0.15]: ") or "0.15")
+                    print(f"    子峰 {j+1}:")
+                    rt = _safe_float("      RT (min): ", 7.0)
+                    height = _safe_float("      Height: ", 100)
+                    hwhm = _safe_float("      HWHM [默认: 0.15]: ", 0.15)
                     sub_peaks.append({'RT': rt, 'height': height, 'HWHM': hwhm})
 
                 peaks.append({
@@ -725,9 +741,9 @@ def interactive_config():
         default_height = 1500 if i == 1 else 1200 if i == 2 else 1100 if i == 3 else 300
         default_hwhm = 0.08 if i == 1 else 0.12 if i == 2 else 0.15 if i == 3 else 0.1
 
-        rt = float(input(f"  Retention Time (RT) in min [default: {default_rt}]: ") or default_rt)
-        height = float(input(f"  Height [default: {default_height}]: ") or default_height)
-        hwhm = float(input(f"  HWHM [default: {default_hwhm}]: ") or default_hwhm)
+        rt = _safe_float(f"  保留时间 RT (min) [默认: {default_rt}]: ", default_rt)
+        height = _safe_float(f"  峰高 Height [默认: {default_height}]: ", default_height)
+        hwhm = _safe_float(f"  HWHM [默认: {default_hwhm}]: ", default_hwhm)
 
         peaks.append({
             'name': name,
@@ -740,34 +756,34 @@ def interactive_config():
 
     # Signal settings
     print("\n--- Signal Settings ---")
-    config['baseline'] = float(input("Baseline [default: 20]: ") or "20")
-    config['noise_level'] = float(input("Noise level (std dev) [default: 8]: ") or "8")
+    config['baseline'] = _safe_float("基线 Baseline [默认: 20]: ", 20)
+    config['noise_level'] = _safe_float("噪声水平 Noise level [默认: 8]: ", 8)
 
     # CSV Import Option
-    print("\n--- Data Source ---")
-    use_csv = input("Import data from existing CSV file? (y/n) [default: n]: ").lower() == 'y'
+    print("\n--- 数据源 ---")
+    use_csv = input("从已有 CSV 导入数据? (y/n) [默认: n]: ").lower() == 'y'
     if use_csv:
-        csv_path = input("CSV file path: ").strip()
+        csv_path = input("CSV 文件路径: ").strip()
         config['import_csv'] = csv_path
-        config['x_col'] = int(input("X column index [default: 0]: ") or "0")
-        config['y_col'] = int(input("Y column index [default: 1]: ") or "1")
-        config['skip_header'] = input("CSV has header row? (y/n) [default: y]: ").lower() != 'n'
-        config['output'] = input("Output PNG filename [default: imported_data.png]: ") or "imported_data.png"
+        config['x_col'] = _safe_int("X 数据列索引 [默认: 0]: ", 0)
+        config['y_col'] = _safe_int("Y 数据列索引 [默认: 1]: ", 1)
+        config['skip_header'] = input("CSV 包含表头? (y/n) [默认: y]: ").lower() != 'n'
+        config['output'] = input("输出 PNG 文件名 [默认: imported_data.png]: ") or "imported_data.png"
         return config  # Skip rest of config for CSV import
 
     # Output settings
-    print("\n--- Output Settings ---")
-    output_base = input("Output filename base (without extension) [default: simulated_peak]: ") or "simulated_peak"
+    print("\n--- 输出设置 ---")
+    output_base = input("输出文件名（不含扩展名）[默认: simulated_peak]: ") or "simulated_peak"
     config['output'] = output_base + '.png'
     config['figsize'] = (10, 6)
     config['dpi'] = 150
 
     # Markdown table output
-    print_markdown = input("\nPrint data as Markdown table in console? (y/n) [default: y]: ").lower() != 'n'
+    print_markdown = input("\n在控制台输出 Markdown 表格? (y/n) [默认: y]: ").lower() != 'n'
     config['print_table'] = print_markdown
 
     if print_markdown:
-        sample = input("Sample interval (print every N-th point) [default: 20]: ") or "20"
+        sample = input("采样间隔（每N行输出一条）[默认: 20]: ") or "20"
         config['table_sample'] = int(sample)
 
     # New: Axis customization
@@ -816,7 +832,11 @@ def interactive_config():
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description='Simulated Peak Plot Generator')
+    parser = argparse.ArgumentParser(
+        description='Simulated Peak Plot Generator',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="示例: python generate_peak.py --config config.json"
+    )
     parser.add_argument('--config', type=str, help='Configuration JSON file')
     parser.add_argument('--interactive', action='store_true', help='Run in interactive mode')
     parser.add_argument('--check-env', action='store_true', help='Check environment only')
@@ -852,6 +872,9 @@ def main():
 
     # CSV Import Mode (from interactive config or command line)
     if args.import_csv:
+        if not os.path.exists(args.import_csv):
+            print(f"❌ 错误：找不到 CSV 文件：{args.import_csv}")
+            sys.exit(1)
         import_config = {
             'csv_file': args.import_csv,
             'x_col': args.x_col,
@@ -863,15 +886,34 @@ def main():
             'grid_linestyle': 'dashed',
             'grid_alpha': 0.6
         }
-        t, signal = generate_plot_from_csv(import_config)
-        print("✓ Done!")
+        try:
+            t, signal = generate_plot_from_csv(import_config)
+            print("✓ 完成！")
+        except Exception as e:
+            print(f"❌ 错误：CSV 导入失败：{e}")
+            print("   提示：确认 CSV 文件格式为逗号分隔，包含数值型数据")
+            sys.exit(1)
         sys.exit(0)
 
     # Load or create configuration
     if args.config:
-        with open(args.config, 'r') as f:
-            config = json.load(f)
-        print(f"✓ Loaded configuration from: {args.config}")
+        if not os.path.exists(args.config):
+            print(f"❌ 错误：找不到配置文件：{args.config}")
+            print("   请检查文件路径是否正确")
+            sys.exit(1)
+        try:
+            with open(args.config, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"❌ 错误：配置文件格式错误（不是有效的 JSON）")
+            print(f"   文件：{args.config}")
+            print(f"   位置：第 {e.lineno} 行，第 {e.colno} 列")
+            print(f"   提示：使用 JSON 在线校验工具检查格式")
+            sys.exit(1)
+        except Exception as e:
+            print(f"❌ 错误：读取配置文件失败：{e}")
+            sys.exit(1)
+        print(f"✓ 已加载配置：{args.config}")
     elif args.interactive or not args.config:
         config = interactive_config()
     else:
@@ -925,15 +967,24 @@ def main():
             'grid_linestyle': config.get('grid_linestyle', 'dashed'),
             'grid_alpha': config.get('grid_alpha', 0.6)
         }
-        t, signal = generate_plot_from_csv(import_config)
-        print("✓ Done!")
+        try:
+            t, signal = generate_plot_from_csv(import_config)
+            print("✓ 完成！")
+        except Exception as e:
+            print(f"❌ 错误：CSV 导入失败：{e}")
+            print("   提示：确认 CSV 文件路径正确，格式为逗号分隔")
+            sys.exit(1)
         sys.exit(0)
 
     # Generate plot
-    print("\nGenerating peak plot...")
-    t, signal = generate_peak_plot(config)
-
-    print("✓ Done!")
+    print("\n正在生成峰图...")
+    try:
+        t, signal = generate_peak_plot(config)
+        print("✓ 完成！")
+    except Exception as e:
+        print(f"❌ 错误：生成峰图失败：{e}")
+        print("   提示：检查参数设置（峰数量、RT、height、HWHM 等）")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
