@@ -144,15 +144,15 @@ points = max(500, ceil(duration * num_peaks * sharpness_factor * 2))
 ### Output Filename（输出文件名，PNG）
 - **说明**：输出PNG文件的名称
 - **默认值**：`simulated_peak.png`
-- **注意**：Markdown表格打印到控制台（不保存到文件）
+- **注意**：Markdown 表格打印到控制台（不保存到文件）
 
-### Print Markdown Table（打印Markdown表格）
-- **说明**：是否将时间序列数据作为Markdown表格打印到控制台
+### Print Markdown Table（打印 Markdown 表格）
+- **说明**：是否将时间序列数据作为 Markdown 表格打印到控制台
 - **默认值**：True
 - **注意**：表格是采样的（每N个点）以避免巨大输出
 
 ### Table Sample Interval（表格采样间隔）
-- **说明**：在Markdown表格中每N个点打印一次
+- **说明**：在 Markdown 表格中每 N 个点打印一次
 - **默认值**：20
 - **典型范围**：10-100
 - **注意**：更小的值提供更多细节但表格更大
@@ -209,9 +209,9 @@ points = max(500, ceil(duration * num_peaks * sharpness_factor * 2))
 ## 真实模拟技巧
 
 1. **峰间距**：确保RT值至少间隔3×HWHM以获得清晰分辨
-2. **复合峰**：使用2-3个子峰，间隔0.2-0.5 min创建M/W形；使用相同RT但不同高度创建馒头形
+2. **复合峰**：使用 2-3 个子峰，间隔 0.2-0.5 min 创建 M/W 形；使用相同 RT 但不同高度创建馒头形
 3. **噪声水平**：配置noise_level为最小峰高度的~5-10%以获得真实外观
 4. **基线**：保持基线低（10-50）相对于峰高度
 5. **HWHM值**：更小的值（<0.1）用于尖锐峰，更大的值（0.1-0.3）用于宽峰
 6. **点数选择**：使用推荐表或公式；更尖锐的峰（小HWHM）需要更多点
-7. **Markdown表格**：使用print_table=true在控制台输出数据；调整table_sample以控制细节级别
+7. **Markdown 表格**：使用 print_table=true 在控制台输出数据；调整 table_sample 以控制细节级别

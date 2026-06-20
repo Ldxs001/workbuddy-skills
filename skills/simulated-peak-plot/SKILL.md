@@ -4,7 +4,7 @@ author: wUwproject
 data_dir: ../.standardization/simulated-peak-plot/data/
 license: MIT
 tags: ['peak', 'plot', 'simulation', 'chromatography', 'spectroscopy', 'visualization', 'csv-export']
-version: 2.9.3
+version: 2.13.0
 description: 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持簇峰(N子峰各独立标注)/融峰(合成单标注)/单峰、负峰(倒峰)、标注控制(annotate)、扫描速率(scan_rate)、碰撞避让标注、自定义坐标轴/单位、CSV导出及CSV导入，**负峰（倒峰）**。
 external_data_dir: true
 sensitive_access: false
@@ -12,7 +12,7 @@ critical_write: false
 permission_weight: LOW
 create_permissions_md: true
 trigger: ['生成峰图', '模拟信号', '创建峰谱', '可视化保留时间', '输出 Markdown 表格', '导入 CSV 数据', '生成模拟数据']
-trigger_negative: ['除非用户明确提到生成峰图或模拟数据，否则不要主动触发']
+trigger_negative: true
 meta_field_sync: true
 faq_unparsable: reformat
 faq_quality: improve_qa
@@ -21,40 +21,42 @@ faq_quality: improve_qa
 
 ## 触发条件
 
-当用户出现以下意图时，加载本技能：
-
+**正向触发：**
 - 说出"生成峰图"、"模拟信号"、"创建峰谱"
 - 说出"可视化保留时间"、"输出 Markdown 表格"
 - 说出"导入 CSV 数据"、"生成模拟数据"
 - 需要色谱/光谱峰模拟、信号可视化、数据导出等场景
 - **Python API 调用**（直接导入函数生成信号数据）：
 
-```python
-import sys
-sys.path.append("{SKILL_DIR}/scripts")
-from generate_peak import gaussian_peak, generate_composite_peak
-import numpy as np
-t = np.linspace(0, 10, 1000)
-signal = gaussian_peak(t, 5.0, 800, 0.08)
-```
+**否定条件：**
 
-**否定条件**：除非用户明确提到生成峰图或模拟数据，否则不要主动触发。
-
-→ 权限说明（低风险，unified 授权）
+除非用户明确提到生成峰图或模拟数据，否则不要主动触发。
 
 ## 快速开始
 
+**场景：混合正负峰峰谱**
+> 模拟色谱中溶剂峰倒置场景，同一谱图正峰和负峰共存
 ```bash
-# 交互式生成峰图
-python {SKILL_DIR}/scripts/generate_peak.py --interactive
-
-# 从 CSV 文件导入数据
-python {SKILL_DIR}/scripts/generate_peak.py --import-csv data.csv
-
-# 使用 JSON 配置文件
-python {SKILL_DIR}/scripts/generate_peak.py --config config.json
+生成包含正峰和负峰的峰谱
 ```
+  - **输入**: 时间范围 5~15 min, scan_rate=100, 正峰 (RT=7.7, height=1500, HWHM=0.08), 负峰 (RT=10.3, height=-1200, HWHM=0.12), baseline=20, noise=8
+  - **输出**: 生成 PNG 峰图（正峰向上、负峰向下，Y轴自动包含负区间），打印 Markdown 数据表格
 
+**场景：单峰生成 + CSV 导出**
+> 基础用法，验证单峰生成和数据导出两个核心功能
+```bash
+生成一个高斯峰并导出完整数据
+```
+  - **输入**: 时间范围 0~10 min, scan_rate=200, 单峰 (RT=5.0, height=800, HWHM=0.1), baseline=10, noise=5, export_csv=true
+  - **输出**: 生成 PNG 峰图 + CSV 文件（含全部数据点，RFC 4180 格式），打印 Markdown 采样表格
+
+**场景：簇峰 + 融峰混合谱**
+> 验证簇峰独立标注和融峰合并标注两种混合使用场景
+```bash
+生成包含簇峰和融峰的复杂谱图
+```
+  - **输入**: 时间范围 4~14 min, scan_rate=120, 单峰 (RT=5.5, height=500, HWHM=0.1), 簇峰 (3子峰: RT=7.0,8.0,9.0, height=1000,800,600, HWHM=0.15), 融峰 (2子峰: RT=11.0,12.0, height=700,500, HWHM=0.12)
+  - **输出**: 生成 PNG 峰图，簇峰各子峰独立标注为 {name}-1/2/3，融峰只有单一标注在最高点
 ## 概述
 
 本技能用于生成模拟峰图（高斯峰），适用于教学、测试或演示场景。支持：
@@ -67,10 +69,24 @@ python {SKILL_DIR}/scripts/generate_peak.py --config config.json
 - Markdown 表格数据输出（在控制台打印）
 - 交互式配置，带点数推荐
 
+### ⚠️ 重要限制（使用前必读）
+
+| 参数 | 建议范围 | 说明 |
+| ------ |---------| ------ |
+| 峰组数量（含子峰） | ≤ 20 组 | 过多会导致生成缓慢 |
+| 扫描速率 scan_rate | 50 ~ 500 pts/min | 过低锯齿，过高文件大 |
+| 总点数 | ≤ 20000 | 超过时请降 scan_rate |
+| HWHM | > 0 | 半高半宽必须为正数 |
+| RT | 应在 [t_start, t_end] 内 | 否则峰部分在画布外 |
+| 负峰 | height 为负，**HWHM 仍为正** | 不需要改 baseline |
+
+> 更多反模式与避坑指南 → 渐进式文件索引表
+> 常见问题解答 → 渐进式文件索引表
+
 ### 渐进式文件索引
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
-|--------|------|----------|----------|
+| -------- |------| ---------- |----------|
 | `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT）。包含：MIT 许可证完整文本。 | R-26 |
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
 | `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
@@ -78,9 +94,25 @@ python {SKILL_DIR}/scripts/generate_peak.py --config config.json
 | `references/features.md` | 参考文档 | 将 height 设为负数即可生成倒峰。Y轴自动缩放包含负区间，标注自动反向指向下方。 | 无 |
 | `references/parameters.md` | 参考文档 | 本文档提供模拟峰图生成中所有参数的详细信息。 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
-## 新功能
+| `references/test-report.md` | 测试报告 | 技能功能测试与场景测试结论报告。包含：测试结果、修复项、测试覆盖说明。 | 无 |
 
-支持：负峰(倒峰) / 簇峰(各子峰独立标注) / 融峰(合成信号单标注) / 扫描速率(pts/min) / 碰撞避让标注布局。
+### 文件目录结构
+
+```text
+├── SKILL.md
+├── _meta.json
+├── scripts/
+│   └── generate_peak.py
+└── references/
+    ├── antipatterns.md
+    ├── changelog.md
+    ├── faq.md
+    ├── features.md
+    ├── LICENSE.md
+    ├── parameters.md
+    ├── permissions.md
+    └── test-report.md
+```
 
 ## 工作流程
 
@@ -122,6 +154,10 @@ python {SKILL_DIR}/scripts/generate_peak.py --interactive
 ### 5. 输出
 
 PNG + Markdown 表格 + CSV(data_dir)。输出路径：`file:///...` 可直接点击。
+
+## 新功能
+
+支持：负峰(倒峰) / 簇峰(各子峰独立标注) / 融峰(合成信号单标注) / 扫描速率(pts/min) / 碰撞避让标注布局。
 
 ## 簇峰 / 融峰
 
@@ -172,3 +208,15 @@ Time_min,Signal_mV
 2.020040,46.140969
 ...
 ```
+
+
+## 触发场景
+**正向触发（满足以下任意一条）：**
+- 用户需要模拟峰图生成器 (Simulated Peak Plot Generator)
+- 用户需要生成可定制的高斯峰图，支持复合峰（N个子峰组合）和 Markdown 表格输出。
+- 用户需要复合峰可形成多种形状：M形、馒头形、泊松分布形等。
+- 用户需要优雅处理 Ctrl+C 中断信号
+
+**否定条件（满足以下任意一条，不触发）：**
+- 简单问答、闲聊、问候（不需要本技能）
+- 单步任务（不需要结构化执行）
