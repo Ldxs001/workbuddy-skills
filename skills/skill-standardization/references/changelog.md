@@ -1,3 +1,17 @@
+## [2.95.0] - 2026-06-20
+
+### 修复
+- 文档同步更新: --classify 改为必须带 --category; --mode 改为必传; _llm_only_fix_keys 新增 section_names; guide.md 命令示例全部加 --category
+
+---
+
+## [2.94.0] - 2026-06-20
+
+### 修复
+- --category 误判类别强制 + --mode 必传 + 修复循环 exit(2) 阻断 + body.json 合法化 + C-11 三层 instruction + 一致性审查嵌套目录修复 + OMP 硬编码泛化
+
+---
+
 ## [2.93.2] - 2026-06-20
 
 ### 修复

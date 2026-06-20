@@ -41,15 +41,63 @@ def check_consistency(skill_dir, filter_files=None):
         content = f.read()
     
     # ── 1. 目录树 vs 磁盘文件双向对比 ──
+    # 解析目录树：跟踪缩进层级重建完整路径
     tree_pattern = re.compile(r'^(?P<indent>[ │]+)?(?P<branch>[├└])──\s+(?P<name>.+)$', re.MULTILINE)
     doc_files = set()
+    # 维护一个按缩进深度堆叠的路径前缀栈
+    path_stack = [""]  # stack[0] = 根目录
+    prev_indent_len = -1
     for m in tree_pattern.finditer(content):
+        raw_indent = m.group('indent') or ""
+        indent_len = len(raw_indent)
         name = m.group('name').strip().rstrip()
+        # 跳过中文名称（概念描述，非真实文件）
         if re.search(r'[\u4e00-\u9fff]', name):
+            # 但如果是目录（以/结尾），仍要更新路径栈
+            if name.endswith('/') or name.endswith('\\'):
+                # 根据缩进深度调整栈
+                if indent_len > prev_indent_len:
+                    path_stack.append(name.rstrip('/\\'))
+                elif indent_len < prev_indent_len:
+                    depth_diff = (prev_indent_len - indent_len) // 2
+                    for _ in range(min(depth_diff + 1, len(path_stack) - 1)):
+                        path_stack.pop()
+                    path_stack.append(name.rstrip('/\\'))
+                else:
+                    if len(path_stack) > 1:
+                        path_stack.pop()
+                    path_stack.append(name.rstrip('/\\'))
+                prev_indent_len = indent_len
             continue
+        
+        # 判断是目录还是文件
+        if name.endswith('/') or name.endswith('\\'):
+            # 目录：更新路径栈
+            if indent_len > prev_indent_len:
+                # 子目录：推入栈
+                path_stack.append(name.rstrip('/\\'))
+            elif indent_len < prev_indent_len:
+                # 上级目录：弹出然后推入
+                depth_diff = (prev_indent_len - indent_len) // 2
+                for _ in range(min(depth_diff + 1, len(path_stack) - 1)):
+                    path_stack.pop()
+                path_stack.append(name.rstrip('/\\'))
+            else:
+                # 同级目录：替换
+                if len(path_stack) > 1:
+                    path_stack.pop()
+                path_stack.append(name.rstrip('/\\'))
+            prev_indent_len = indent_len
+            continue
+        
+        # 是文件：用当前路径栈重建完整路径
         if not name.endswith(('.md', '.py', '.json', '.txt', '.toml', '.yaml', '.yml', '.cfg', '.ini', '.csv')):
             continue
-        doc_files.add(name)
+        # 从栈重建相对路径（跳过根 ""）
+        dir_prefix = "/".join(p for p in path_stack[1:] if p) if len(path_stack) > 1 else ""
+        full_name = f"{dir_prefix}/{name}" if dir_prefix else name
+        doc_files.add(full_name)
+        prev_indent_len = indent_len
     
     if filter_files:
         for f in filter_files:
@@ -86,8 +134,7 @@ def check_consistency(skill_dir, filter_files=None):
                 })
         
         for f in sorted(disk_scripts | disk_refs):
-            basename = f.split('/')[-1]
-            if basename not in doc_files and f not in doc_files:
+            if f not in doc_files:
                 issues.append({
                     "type": "missing_doc_ref",
                     "detail": f"磁盘存在 {f} 但文档目录树未列出",

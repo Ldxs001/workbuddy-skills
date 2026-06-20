@@ -439,6 +439,102 @@ def _expand_fail_entries(remaining):
     return entries
 
 
+# ── --classify 合法类别 ──
+_CLASSIFY_LEGAL_CATEGORIES = {"engine_mistake", "engine_cant_judge"}
+_CLASSIFY_CATEGORY_HELP = (
+    "engine_mistake — 引擎技术性错误（BOM/编码导致解析失败、注释被当操作、概念图被当文件路径等）\n"
+    "engine_cant_judge — 引擎语义不足，LLM 确认后放行（如 __init__.py 无需列文档树、反模式格式引擎没认出但内容确实合规）"
+)
+
+def _load_fp_ids(skill_dir):
+    """读取 LLM 分类的误判 #ID 列表（返回 set[str]）
+    
+    仅识别 dict 格式（{id: {category, reason}}），
+    旧 format list 视为无效，返回空集。
+    """
+    skill_dir = os.path.abspath(skill_dir)
+    fp_path = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'data', '.verify_fp.json')
+    if os.path.isfile(fp_path):
+        try:
+            import json
+            data = json.load(open(fp_path, 'r', encoding='utf-8'))
+            if isinstance(data, dict):
+                return set(data.keys())
+        except Exception:
+            pass
+    return set()
+
+
+def _load_fp_details(skill_dir):
+    """读取误判详情 dict（{id: {category, reason}}）"""
+    skill_dir = os.path.abspath(skill_dir)
+    fp_path = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'data', '.verify_fp.json')
+    if os.path.isfile(fp_path):
+        try:
+            import json
+            data = json.load(open(fp_path, 'r', encoding='utf-8'))
+            if isinstance(data, dict):
+                return data
+            data = json.load(open(fp_path, 'r', encoding='utf-8'))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
+
+
+def _write_fp_classify(skill_dir, ids, category, reason=""):
+    """向 .verify_fp.json 写入误判标记（dict 格式，旧 list 格式忽略）"""
+    import json
+    skill_dir = os.path.abspath(skill_dir)
+    verify_dir = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'data')
+    fp_path = os.path.join(verify_dir, '.verify_fp.json')
+    os.makedirs(verify_dir, exist_ok=True)
+    existing = {}
+    if os.path.isfile(fp_path):
+        try:
+            old = json.load(open(fp_path, 'r', encoding='utf-8'))
+            if isinstance(old, dict):
+                existing = old
+            # list 格式忽略（历史残留）
+        except Exception:
+            pass
+    for id_str in ids:
+        existing[id_str] = {"category": category, "reason": reason}
+    with open(fp_path, 'w', encoding='utf-8') as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _remove_fp_classify(skill_dir, ids):
+    """从 .verify_fp.json 中移除指定 #ID（只认 dict 格式）"""
+    import json
+    skill_dir = os.path.abspath(skill_dir)
+    verify_dir = os.path.join(
+        os.path.dirname(skill_dir), '.standardization',
+        os.path.basename(skill_dir), 'data')
+    fp_path = os.path.join(verify_dir, '.verify_fp.json')
+    existing = {}
+    if os.path.isfile(fp_path):
+        try:
+            old = json.load(open(fp_path, 'r', encoding='utf-8'))
+            if isinstance(old, dict):
+                existing = old
+            # list 格式忽略（历史残留）
+        except Exception:
+            pass
+    for id_str in ids:
+        existing.pop(str(id_str), None)
+    os.makedirs(verify_dir, exist_ok=True)
+    with open(fp_path, 'w', encoding='utf-8') as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+
 def _reclassify_false_positive(res, skill_dir=None):
     """仅通过 --classify ID 标记的误判进行排除
 
@@ -1144,32 +1240,37 @@ def cmd_audit(args):
             print(f"❌ --classify 必须附带数字 ID（如 --classify 42,55,67）")
             print(f"   `--classify add` 是无效用法，请换成 `--classify 42`")
             return 1
+
+        # 校验 --category 参数
+        category = getattr(args, 'category', None)
+        if not category:
+            print(f"❌ --classify 必须附带 --category 参数，说明误报类别")
+            print(f"   合法类别：")
+            for cat in sorted(_CLASSIFY_LEGAL_CATEGORIES):
+                print(f"     {cat}")
+            return 1
+        if category not in _CLASSIFY_LEGAL_CATEGORIES:
+            print(f"❌ 非法类别 '{category}' — 仅支持：{', '.join(sorted(_CLASSIFY_LEGAL_CATEGORIES))}")
+            return 1
+
+        # 读取 --reason（可选）
+        reason = getattr(args, 'reason', '') or ''
+
         ids = [s.strip() for s in raw.split(',')]
-        # 验证：数字 ID 或 C-{type} 格式（一致性审查误报）
+        # 验证：数字 ID 或 C-{type} 格式
         for id_str in ids:
             if not id_str.isdigit() and not id_str.startswith('C-') and not id_str.startswith('R-'):
                 print(f"❌ 无效 ID: '{id_str}' — ID 必须是数字（如 42,55,67）、C-{{type}}（如 C-missing_doc_ref）或 R-XX（如 R-23）")
                 return 1
-        verify_dir = os.path.join(
-            os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
-            os.path.basename(os.path.abspath(skill_dir)), 'data')
-        fp_path = os.path.join(verify_dir, '.verify_fp.json')
-        # 读取已有分类
-        fp_ids = set()
-        if os.path.isfile(fp_path):
-            try:
-                import json as _json
-                fp_ids = set(_json.load(open(fp_path, 'r', encoding='utf-8')))
-            except Exception:
-                pass
-        fp_ids.update(ids)
-        os.makedirs(verify_dir, exist_ok=True)
-        import json as _json2
-        with open(fp_path, 'w', encoding='utf-8') as f:
-            _json2.dump(sorted(fp_ids), f, ensure_ascii=False, indent=2)
+
+        _write_fp_classify(skill_dir, ids, category, reason)
+
         print(f"\n{'='*55}")
-        print(f"  [CLASSIFY] 已标记 {len(ids)} 个 #ID 为误判：{', '.join(ids)}")
-        print(f"  当前误判列表：{', '.join(sorted(fp_ids))}")
+        print(f"  [CLASSIFY] 已标记 {len(ids)} 个 #ID 为误判")
+        print(f"    类别：{category}")
+        if reason:
+            print(f"    理由：{reason}")
+        print(f"    ID：{', '.join(ids)}")
         print(f"{'='*55}")
         print(f"\n  ⏳ 自动运行过滤验证...")
         # 自动重跑审计并显示过滤后的结果
@@ -1193,32 +1294,14 @@ def cmd_audit(args):
     if getattr(args, 'no_fp', None) and not getattr(args, 'verify', False):
         raw = args.no_fp.strip()
         if raw.lower() in ('', 'remove', 'delete'):
-            print(f"❌ --no-fp 必须附带数字 ID（如 --no-fp 42,55）")
+            print(f"❌ --no-fp 必须附带 ID（如 --no-fp 42,55）")
             return 1
         ids = [s.strip() for s in raw.split(',')]
-        for id_str in ids:
-            if not id_str.isdigit():
-                print(f"❌ 无效 ID: '{id_str}' — 必须是数字")
-                return 1
-        verify_dir = os.path.join(
-            os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
-            os.path.basename(os.path.abspath(skill_dir)), 'data')
-        fp_path = os.path.join(verify_dir, '.verify_fp.json')
-        fp_ids = set()
-        if os.path.isfile(fp_path):
-            try:
-                import json as _json
-                fp_ids = set(_json.load(open(fp_path, 'r', encoding='utf-8')))
-            except Exception:
-                pass
-        fp_ids.difference_update(ids)
-        import json as _json2
-        os.makedirs(verify_dir, exist_ok=True)
-        with open(fp_path, 'w', encoding='utf-8') as f:
-            _json2.dump(sorted(fp_ids), f, ensure_ascii=False, indent=2)
+        _remove_fp_classify(skill_dir, ids)
+        remaining_ids = _load_fp_ids(skill_dir)
         print(f"\n{'='*55}")
         print(f"  [NO-FP] 已取消 {len(ids)} 个 #ID 的误判标记：{', '.join(ids)}")
-        print(f"  当前误判列表：{', '.join(sorted(fp_ids))}")
+        print(f"  当前误判列表：{', '.join(sorted(remaining_ids)) if remaining_ids else '(空)'}")
         print(f"{'='*55}")
         sys.exit(0)
 
@@ -1412,7 +1495,7 @@ def cmd_audit(args):
         for rid, cnt in sorted(llm_counts.items()):
             print(f"     {rid}：{cnt} 项")
         print(f"  → 运行 --verify 查看 FAIL 详情，确认为真问题后手动修复")
-        print(f"  → 或运行 --classify ID 标记为误判（确认是误报时）")
+        print(f"  → 或运行 --classify ID --category engine_mistake/engine_cant_judge --reason '...' 标记为误判（确认是误报时）")
         # 强制 HTML 报告输出
         _save_html_report(skill_dir, result)
 
@@ -1422,8 +1505,18 @@ def cmd_audit(args):
     # ★★★ LLM 二次筛查指令（代码强制）★★★
     # 以下 #ID 列表是审计发现的全部 FAIL 项。
     # LLM 必须逐条判断：是真问题还是误判？
-    #   - 真问题（如 scripts/ 下引用了不存在的文件）：记下 #ID，运行 --show-fix ID 获取修复指引
-    #   - 误判（如 references/ 中的示例路径、文档中的占位符引用）：运行 --classify ID 标记为误判
+    #
+    # 【engine_mistake】引擎技术性错误 — 正则/AST/路径匹配产生了错误结果
+    #   适用：BOM/编码导致解析失败、注释被当实际操作、概念图路径被当真实文件引用、专有名词被当缺空格
+    #   → --classify ID --category engine_mistake --reason "..."
+    #
+    # 【engine_cant_judge】引擎能力不足，LLM 确认后放行
+    #   适用：__init__.py 无需列文档树、反模式内容引擎格式没认出但LLM确认确实合规
+    #   → --classify ID --category engine_cant_judge --reason "..."
+    #
+    # 【真问题】以上两类均不满足 → 必须修复，不得标记为误判
+    #   → 记下 #ID，运行 --show-fix ID 获取修复指引
+    #
     # 所有 FAIL 都处理完毕后，重新运行 --verify 确认双 0。
     if getattr(args, 'verify', False):
         # 过滤：去掉已标记为 ⓘ 已知误报的条目（这些不阻断通过）
@@ -1438,6 +1531,15 @@ def cmd_audit(args):
             print(f"  [VERIFY v1] {len(remaining)} 项 FAIL 待筛选，逐条判断真问题/误判")
             if fp_ids:
                 print(f"  已分类为误判的 #ID：{', '.join(sorted(fp_ids))}")
+            # 打印 [VERIFY] 文本时展示已有的分类详情
+        fp_details = _load_fp_details(skill_dir)
+        if fp_details:
+            for fid, finfo in sorted(fp_details.items()):
+                cat = finfo.get('category', '?')
+                rsn = finfo.get('reason', '')
+                tag = " ⓘ" if rsn else ""
+                print(f"    {fid}: {cat}{' — ' + rsn if rsn else ''}{tag}")
+
             print(f"  确认真问题后记下 #ID，运行 --show-fix ID1,ID2 获取修复指引")
             print(f"  #ID 为误判则运行：audit <skill_dir> --classify ID1,ID2")
             print(f"{'─'*55}")
@@ -1470,7 +1572,7 @@ def cmd_audit(args):
 
             print(f"{'─'*55}")
             print(f"  确认真问题 → audit <skill_dir> --show-fix ID1,ID2,ID3")
-            print(f"  确认为误判 → audit <skill_dir> --classify ID1,ID2")
+            print(f"  确认为误判 → audit <skill_dir> --classify ID1,ID2 --category engine_mistake/engine_cant_judge --reason '...'")
             print(f"{'='*55}")
         else:
             print(f"\n{'='*55}")
@@ -1492,7 +1594,7 @@ def cmd_audit(args):
             print(f"  ❌ [VERIFY] 仍有 {len(remaining)} 项 FAIL 未处理！")
             print(f"  处理方式：")
             print(f"    真问题 → audit <skill_dir> --show-fix ID1,ID2 获取修复指引，然后手动修复")
-            print(f"    误判   → audit <skill_dir> --classify ID1,ID2 标记为误判")
+            print(f"    误判   → audit <skill_dir> --classify ID1,ID2 --category engine_mistake/engine_cant_judge --reason '...' 标记为误判")
             print(f"  所有 FAIL 都处理后，重新运行 --verify 确认双 0")
             print(f"{'='*55}")
         # ── 最终强制钩子：HTML 报告必须生成（无论任何模式） ──
@@ -1609,21 +1711,6 @@ def cmd_fix(args):
         print(f"\n=== 重新审计 ===")
         result = audit_skill(skill_dir)
         print(format_report(result))
-
-
-def _load_fp_ids(skill_dir):
-    """读取 LLM 分类的误判 #ID 列表"""
-    skill_dir = os.path.abspath(skill_dir)
-    fp_path = os.path.join(
-        os.path.dirname(skill_dir), '.standardization',
-        os.path.basename(skill_dir), 'data', '.verify_fp.json')
-    if os.path.isfile(fp_path):
-        try:
-            import json
-            return set(json.load(open(fp_path, 'r', encoding='utf-8')))
-        except Exception:
-            pass
-    return set()
 
 
 def cmd_bump(args):
@@ -1769,8 +1856,17 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None):
     print(f"  ⚠️  如果模式与用户意图不匹配，请立即中止并重新选择")
     print(f"{'='*55}")
 
-    # ── 模式-命令映射锁（代码级强制） ──
-    if llm_mode and llm_mode != command:
+    # ── 模式-命令映射锁（代码级强制，无向后兼容） ──
+    if not llm_mode:
+        print(f"\n  {'❌'*3} 缺少 --mode 参数！流程拒绝 {'❌'*3}")
+        print(f"     LLM 必须根据模式自检闸门输出 --mode 参数")
+        print(f"     当前子命令：{command}")
+        print(f"")
+        print(f"     请携带 --mode 重新执行：")
+        print(f"       python -m scripts.skill_audit {command} <skill-dir> --confirmed --mode {command}")
+        print(f"")
+        sys.exit(1)
+    if llm_mode != command:
         print(f"\n  {'❌'*3} 模式-命令不匹配！流程拒绝 {'❌'*3}")
         print(f"     LLM 语义自检闸门输出模式：{llm_mode}")
         print(f"     当前执行的子命令：{command}")
@@ -1952,9 +2048,9 @@ def cmd_refactor(args):
                 print(f"  步骤 1: 运行 audit --verify 查看 FAIL 详情（含一致性问题）")
                 print(f"    python -m scripts.skill_audit audit {skill_dir} --verify --mode refactor")
                 print(f"")
-                print("  步骤 2: 对确认为误报的一致性项执行 --classify（ID 格式 C-类型名）")
-                print(f"    例: python -m scripts.skill_audit audit {skill_dir} --classify C-missing_doc_ref --mode refactor")
-                print(f"    python -m scripts.skill_audit audit {skill_dir} --classify C-missing_doc_ref,C-stale_doc_ref --mode refactor")
+                print(f"  步骤 2: 对确认为误报的一致性项执行 --classify（ID 格式 C-类型名），须附带 --category")
+                print(f"    例: python -m scripts.skill_audit audit {skill_dir} --classify C-missing_doc_ref --category engine_mistake --reason '概念图路径被当真实文件' --mode refactor")
+                print(f"    python -m scripts.skill_audit audit {skill_dir} --classify C-stale_doc_ref --category engine_cant_judge --reason '__init__.py 无需列文档树' --mode refactor")
                 print(f"")
                 print(f"  步骤 3: 重新执行 refactor --continue")
                 print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
@@ -2334,8 +2430,8 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             print(f"  步骤 1: 查看 FAIL 详情")
             print(f"    python -m scripts.skill_audit audit {skill_dir} --verify --mode refactor")
             print(f"")
-            print(f"  步骤 2: 对确认为误报的项执行 --classify（逐条标记ID）")
-            print(f"    python -m scripts.skill_audit audit {skill_dir} --classify ID1,ID2 --mode refactor")
+            print(f"  步骤 2: 对确认为误报的项执行 --classify，须附带 --category（如 --category engine_mistake --reason '...'）")
+            print(f"    python -m scripts.skill_audit audit {skill_dir} --classify ID1,ID2 --category engine_mistake --reason '...' --mode refactor")
             print(f"")
             print(f"  步骤 3: 重新执行 refactor --continue")
             print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
@@ -2384,7 +2480,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             "workflow_completeness",  # R-25 C-14: 需要 LLM 读代码写工作流
             "example_quality",        # R-25 C-17: 需要 LLM 读代码创建示例
             "capability_boundary",    # R-25 C-18: 需要 LLM 理解能力边界
-            # "section_names" → 机械重命名，auto
+            "section_names",          # R-25 C-11: 非标章节归类需 LLM 判断内容语义
             # "excessive_blank_lines" → 机械删空行，auto
             # "table_format" → 机械格式化，auto
             # "inline_refs" → 机械内联引用，auto
@@ -2536,9 +2632,21 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
                     detail = r.get("detail", "")[:150]
                     print(f"    {rid} {sev} {detail}")
+                # ⛔ 铁律：剩余项不为空则不能退出循环
+                # 保存 .remaining_llm.json 并创建重构锁，阻止后续步骤
+                _save_remaining_llm(skill_dir, remaining)
+                _save_html_report(skill_dir, result)
+                _create_refactor_lock(skill_dir)
+                print(f"\n{'='*55}")
+                print(f"  🔒 重构锁已激活——剩余 {len(remaining)} 项未修复")
+                print(f"  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复")
+                print(f"     不得询问用户、不得停止循环、不得跳过")
+                print(f"     重复此循环直到 0 ERROR 0 WARN")
+                print(f"{'='*55}")
+                sys.exit(2)  # ★ 强制退出——LLM 无法继续，必须手动修复后再 --continue
             else:
                 print(f"\n  ✅ 所有项已修复，双 0 达成")
-            _save_html_report(skill_dir, result)
+                _save_html_report(skill_dir, result)
             break
         print(f"  ⚠️  剩余 {len(remaining)} 项（{len(auto_fixable)} 项可自动修复，{len(remaining)-len(auto_fixable)} 项需手动）")
         print()
@@ -2663,6 +2771,7 @@ def cmd_update(args):
         # 按 fix key 粒度判断：无 fix key 或 fix key 需 LLM 判断的 → LLM 手动修
         _llm_only_fix_keys_cmd = {
             "workflow_completeness", "example_quality", "capability_boundary",
+            "section_names",
         }
         llm_items = [r for r in remaining
                      if not r.get("fix") or r["fix"].get("key") in _llm_only_fix_keys_cmd]
@@ -2854,10 +2963,12 @@ def main():
     p_audit.add_argument("--progress-file", metavar="FILE", help=".progress.md 文件路径（用于过程管理）")
     p_audit.add_argument("--fix", action="store_true", help="自动修正 R-11/R-12 违规（修改脚本和 _meta.json）")
     p_audit.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_audit.add_argument("--mode", help="LLM 自检闸门输出的模式，用于模式-命令校验（如 --mode refactor）。不传则不校验")
+    p_audit.add_argument("--mode", help="LLM 自检闸门输出的模式，用于模式-命令校验（必传，如 --mode refactor）")
     p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
     p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
-    p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（如 --classify 42,55,67），后续 bump 自动跳过。禁止不带 ID")
+    p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（如 --classify 42,55,67），须附带 --category engine_mistake|engine_cant_judge，可选 --reason")
+    p_audit.add_argument("--category", metavar="CAT", help=f"误报类别：{', '.join(sorted(_CLASSIFY_LEGAL_CATEGORIES))}（仅与 --classify 配合使用）")
+    p_audit.add_argument("--reason", metavar="TEXT", help="误报理由（仅与 --classify 配合使用，可选）")
     p_audit.add_argument("--no-fp", metavar="IDS", help="将指定 #ID 从误判列表中移除（取消分类）")
 
     # audit-all 子命令
@@ -2869,14 +2980,14 @@ def main():
     # rules 子命令
     p_rules = subparsers.add_parser("rules", help="列出所有审查规则")
     p_rules.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_rules.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode readonly）。不传则不校验")
+    p_rules.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode readonly）")
 
     # create-template 子命令（v2.29.0 新增）
     p_template = subparsers.add_parser("create-template", aliases=["template"],
                                       help="输出所有规则的创建模板（供 LLM 创建技能时参考）")
     p_template.add_argument("--json", action="store_true", help="JSON 格式输出")
     p_template.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_template.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode readonly）。不传则不校验")
+    p_template.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode readonly）")
 
     # fix 子命令（v2.37.0 新增）
     p_fix = subparsers.add_parser("fix", help="针对性修复工具（按 fix key 分发）")
@@ -2899,7 +3010,7 @@ def main():
     p_bump.add_argument("--desc", required=True, help="本次变更描述（将写入 changelog）")
     p_bump.add_argument("--dry-run", action="store_true", help="仅预览，不实际修改")
     p_bump.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_bump.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode bump）。不传则不校验")
+    p_bump.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode bump）")
     # refactor 子命令（v2.66.0 新增）
     p_refactor = subparsers.add_parser("refactor",
         help="全流程改造：蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 版本升级 → 清理")
@@ -2912,14 +3023,14 @@ def main():
     p_refactor.add_argument("--continue", dest="refactor_continue", action="store_true",
                             help="从上一次中断处继续")
     p_refactor.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_refactor.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode refactor）。不传则不校验")
+    p_refactor.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode refactor）")
 
     # create 子命令（v2.66.0 新增）
     p_create = subparsers.add_parser("create", help="全流程创建新技能：骨架生成 → 审计 → 报告")
     p_create.add_argument("skill_dir", help="技能目录路径（目录名将作为技能名）")
     p_create.add_argument("--desc", default="", help="技能描述")
     p_create.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_create.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode create）。不传则不校验")
+    p_create.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode create）")
 
     # update 子命令（v2.66.0 新增）
     p_update = subparsers.add_parser("update", help="轻量更新：蓝图扫描 → 备份 → 审计 → 修复 → 验证 → 一致性审查 → bump")
@@ -2932,7 +3043,7 @@ def main():
     p_update.add_argument("--changed-files", nargs="*", default=None,
                           help="变更文件列表（如 --changed-files scripts/foo.py references/bar.md）")
     p_update.add_argument("--confirmed", action="store_true", help="语义门禁确认标记（必须传入才能执行）")
-    p_update.add_argument("--mode", help="LLM 自检闸门输出的模式（如 --mode update）。不传则不校验")
+    p_update.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode update）")
 
     args = parser.parse_args()
 

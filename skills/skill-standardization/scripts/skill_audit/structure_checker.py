@@ -1554,6 +1554,15 @@ def body_check_document_format(filepath, content, fm, body, **kw):
     # ════════════════════════════════════════════════════════════
     _section_order = _load_section_order()
     if _section_order:
+        _body_spec_data = _load_body_spec()
+        _allowed_sections = _body_spec_data.get("allowed_sections", [])
+        _section_tiers = _body_spec_data.get("section_tiers", {})
+        _must_have_names = [s.lower() for s in _section_tiers.get("must_have", [])]
+        _whitelist_data = _section_tiers.get("whitelist", {})
+        _whitelist_names = [s.lower() for s in (
+            _whitelist_data.get("optional_progressive", []) +
+            _whitelist_data.get("always_progressive", [])
+        )]
         # 从 body（原始）提取 H2 标题（按出现顺序）
         h2_titles = []
         for m in re.finditer(r'^##\s+(.+)$', body, re.MULTILINE):
@@ -1580,8 +1589,12 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                             found = True
                             break
                     if not found:
-                        unmapped.append(t)
-                        actual_positions.append(-1)
+                        # 最后尝试 allowed_sections（非标准但允许的章节名）
+                        if tl in [s.lower() for s in _allowed_sections]:
+                            actual_positions.append(-2)  # 已允许，位置不计入逆序
+                        else:
+                            unmapped.append(t)
+                            actual_positions.append(-1)
 
             # 检查逆序（相邻两个章节位置递减即为逆序）
             inversions = []
@@ -1595,7 +1608,24 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     inv_details += f" 等（共 {len(inversions)} 处逆序）"
                 issues["warn"].append(f"C-11: 章节顺位异常——{inv_details}（需按 body.json section_order 调整顺序：H1→触发条件→核心能力→快速开始→工作流程→...）")
             elif unmapped:
-                issues["warn"].append(f"C-11: 以下章节不在 section_order 白名单中：{'; '.join(unmapped[:3])}（需按 body.json section_order 调整顺序或拆分到 references/）")
+                _fix_hint = (
+                    "处理方案（逐节判断，不可跳过）：\n"
+                    "  第1优先 — 内容属于 must_have 章节职责范围？改标题为标准名（如「概述」→「核心能力」）\n"
+                    "  第2优先 — 内容属于 whitelist 章节职责范围？改标题为对应标准名\n"
+                    "  第3优先 — 与某标准章节部分相关？降级为 ### 子节归入该章节\n"
+                    "  第4优先 — 完全不匹配？拆分到 references/<slug>.md，SKILL.md 保留引用\n"
+                    "⚠️ must_have 章节（核心能力/工作流程/约束/触发条件/H1）不可空不可删\n"
+                    "⚠️ always_progressive 章节（版本日志/更新日志）不可出现在 SKILL.md 正文"
+                )
+                issues["warn"].append(
+                    f"C-11: 非标章节「{'」「'.join(unmapped[:3])}」— {_fix_hint}")
+                if len(unmapped) > 3:
+                    issues["warn"][-1] += f"\n    （共 {len(unmapped)} 个非标章节）"
+                # 写入 fix key，使其进入修复循环（_llm_only_fix_keys）
+                result = {"passed": False,
+                          "detail": issues["warn"][-1],
+                          "severity": "WARN",
+                          "fix": {"key": "section_nonstandard"}}
             else:
                 pass  # 顺序正确，不报
     # 若无 section_order 数据，静默跳过 C-11
@@ -2008,15 +2038,15 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             _c17_quality_issues.append(
                 f'【{_c17_section}】示例缺少完整交互流程：当前示例未展示系统响应 → '
                 f'LLM执行：在用户输入之后补充系统推荐/计算结果/输出内容的描述')
-        if not re.search(r'\d+\s*[天/小时]|\d+[.,]\s*\d+\s*[天/小时]|[OoMmPp]\s*[=:]\s*\d+', _c17_body):
+        if not re.search(r'\d+[.,]?\s*[-~到至]\s*\d+|\d+\s*[参单]位|=\s*\d+', _c17_body):
             _c17_quality_issues.append(
                 f'【{_c17_section}】示例缺乏具体数值参数 → '
-                f'LLM执行：将示例中的输入改为带真实OMP值（如 O=3/M=6/P=15）的场景')
+                f'LLM执行：将示例中的输入参数替换为具体数值（如时间、高度、数量等真实场景值）')
         if not re.search(r'用户[：:].*?\n.*?用户[：:]', body, re.DOTALL):
             _c17_quality_issues.append(
                 f'【{_c17_section}】仅提供1种场景 → '
                 f'LLM执行：在现有示例之后新增至少1个不同场景的示例'
-                f'（如完整OMP:单阶段直接估算 + 含紧前关系:多阶段CPM分析）')
+                f'（覆盖该技能的另外一组核心功能组合）')
     if _c17_quality_issues:
         _c171819_quality_flag = True
         if '缺少使用示例' in _c17_quality_issues[0]:
@@ -2047,7 +2077,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             _c18_quality_issues.append(
                 f'【{_c18_loc}】边界阈值未量化 → '
                 f'LLM执行：将笼统描述改为具体数字限制（如 "上限50个阶段"）')
-        if not re.search(r'参数|O.*M.*P|输入.*格式|输入.*范围|单位.*统一|格式.*要求', _c18_boundary_text):
+        if not re.search(r'参数.*约束|输入.*(格式|范围)|(单位|格式).*要求|建议.*参数', _c18_boundary_text):
             _c18_quality_issues.append(
                 f'【{_c18_loc}】缺少参数约束 → '
                 f'LLM执行：补充输入参数的范围、单位、格式要求说明')

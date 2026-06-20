@@ -85,14 +85,14 @@ python -m scripts.skill_audit audit <skill-dir> --verify --confirmed --mode audi
 # 先获取 ID（从 --verify 输出获取）
 python -m scripts.skill_audit audit <skill-dir> --verify --mode audit
 
-# 标记指定 ID 为误报
-python -m scripts.skill_audit audit <skill-dir> --classify 42,55,67 --confirmed --mode audit
+# 标记指定 ID 为误报（须带 --category）
+python -m scripts.skill_audit audit <skill-dir> --classify 42,55,67 --category engine_mistake --reason "BOM字符" --confirmed --mode audit
 
 # 取消误报标记
 python -m scripts.skill_audit audit <skill-dir> --no-fp 42,55 --confirmed --mode audit
 
 # 一致性审查误报 ID 格式: C-missing_doc_ref, C-stale_doc_ref
-python -m scripts.skill_audit audit <skill-dir> --classify C-missing_doc_ref --confirmed --mode audit
+python -m scripts.skill_audit audit <skill-dir> --classify C-missing_doc_ref --category engine_mistake --reason "概念图路径被当真实文件" --confirmed --mode audit
 ```
 
 ---
@@ -230,8 +230,8 @@ python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed
 步骤 1: 查看 FAIL 详情
   python -m scripts.skill_audit audit <skill-dir> --verify --mode refactor
 
-步骤 2: 对确认为误报的项执行 --classify
-  python -m scripts.skill_audit audit <skill-dir> --classify ID1,ID2 --mode refactor
+步骤 2: 对确认为误报的项执行 --classify（须带 --category）
+  python -m scripts.skill_audit audit <skill-dir> --classify ID1,ID2 --category engine_mistake --reason "..." --mode refactor
 
 步骤 3: 重新执行 refactor --continue
   python -m scripts.skill_audit refactor <skill-dir> --continue --confirmed --mode refactor

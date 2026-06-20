@@ -27,7 +27,7 @@
 | `semantic-split` | 语义拆分与智能规划技能。将自然语言拆分为结构化需求块，基于5W2H维度提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，支持自增强json沉淀机制。 |
 | `simulated-peak-plot` | 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持簇峰(N子峰各独立标注)/融峰(合成单标注)/单峰、负峰(倒峰)、标注控制(annotate)、扫描速率(scan_rate)、碰撞避让标注、自定义坐标轴/单位、CSV导出及CSV导入，**负峰（倒峰）**。 |
 | `skill-function-test` | 技能场景测试套件 —— 备份 → 蓝皮书 → 配置确认 → S1-S3场景测试 → D1-D6功能测试 → S4执行忠实度 → 修复 → bump → 双格式报告 → 结论写入test-report.md。配置驱动流程，钩子强制阻断。 |
-| `skill-standardization` | Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/refactor/create 三模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性。 |
+| `skill-standardization` | Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/create/update/refactor/bump/readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规、触发条件正/否定区域分离、Markdown 链接引用检测。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性，正向/否定区域分离及模板话术检测。审计输出仅描述问题本身，不做程度判断，由 LLM 二次筛分类。 |
 | `skill-sub` | 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。 |
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。 |

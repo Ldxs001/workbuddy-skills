@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.93.2
+version: 2.95.0
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/create/update/refactor/bump/readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规、触发条件正/否定区域分离、Markdown 链接引用检测。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性，正向/否定区域分离及模板话术检测。审计输出仅描述问题本身，不做程度判断，由 LLM 二次筛分类。
@@ -24,7 +24,7 @@ create_permissions_md: true
 - **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 `scripts/` 下的 Python 脚本原子写入
 - **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `CHANGELOG.md`
 - **0 ERROR 0 WARN 铁律强制** — 更新后用 `audit --verify` 验证，非误报项必须全部修复，exit(0) 方可提交
-- **LLM 二次筛强制** — audit 输出全部原始问题后，LLM **必须**逐条审查每条 ERROR/WARN 并分类为真问题或误报。标记误报时 `--classify ID1,ID2,ID3`（如 `--classify 42,55,67`），不得跳过或笼统说"无需处理"。**WARN 就是真问题，不是"样式建议"——没有"可跳过"类别。**
+- **LLM 二次筛强制** — audit 输出全部原始问题后，LLM **必须**逐条审查每条 ERROR/WARN 并分类为真问题或误报。标记误报时 `--classify ID --category engine_mistake/engine_cant_judge --reason "..."`（如 `--classify 42 --category engine_mistake --reason "BOM字符导致frontmatter未识别"`），不得跳过或笼统说"无需处理"。**WARN 就是真问题，不是"样式建议"——没有"可跳过"类别。**
 - **LLM 手动修不许退出循环** — 遇到 `.remaining_llm.json` 时，LLM **必须立即读取并手动修复**，然后重新审计直到 0 ERROR 0 WARN。**禁止询问用户**、禁止停止、禁止跳过
 - **HTML 审计报告强制输出** — 每次 `audit` 执行完毕，**必须**确认 `.audit_report.html` 已生成，**且必须**调用 `present_files` 工具打开报告让用户查看
 - **`--fix` 自动修正后** — 将 fix_details 转化为可读 changelog 并用 safe_io 写入
@@ -33,11 +33,11 @@ create_permissions_md: true
   2. 在回复中**明确输出选定的模式**，格式：`【模式=xxx】`（如 `【模式=refactor】`）
   3. 如果无法输出 `【模式=xxx】`（即找不到匹配），必须**回退重走步骤1**，不得跳过、不得默认、不得猜
   4. **禁止询问用户**、禁止弹框确认、禁止把选择权交给用户
-- **★ 模式-命令映射锁（代码级强制，新增）** — 输出 `【模式=xxx】` 后，执行 CLI 命令时**必须同时传入 `--mode xxx` 参数**：
+- **★ 模式-命令映射锁（代码级强制，不可跳过）** — 输出 `【模式=xxx】` 后，执行 CLI 命令时**必须同时传入 `--mode xxx` 参数**：
   - 代码对比 `--mode` 值与当前子命令是否一致，不一致则 `exit(1)` 拒绝执行
   - LLM 说"模式=refactor"但执行 `audit --mode refactor` → ❌ 阻断
   - LLM 说"模式=refactor"且执行 `refactor --mode refactor` → ✅ 放行
-  - 不传 `--mode` 则不触发校验（向后兼容，但 LLM **不应**跳过）
+  - 不传 `--mode` → ❌ 阻断（exit 1），拒绝执行
 
 ## 触发条件
 
@@ -153,23 +153,25 @@ python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed
 2. **蓝皮书扫描** → 输入 SKILL.md + scripts/ → 输出 蓝皮书 JSON — 提取技能结构：文件名、函数、依赖关系
 3. **备份** → 输入 技能目录 → 输出 .zip 备份 — 备份到 .standardization/<skill>/backup/
 4. **全量审计** → 输入 SKILL.md + references/ → 输出 审计报告 — R-01~R-26 逐条输出原始问题（ERROR + WARN 全部展示，工具不做自动排除）
-5. **★ 前置 LLM 二次筛除（代码级阻断点，新增）** →
-   - **代码自动阻断**：`_run_audit_loop()` 首次进入时检查 `--classify` 文件，无数据则阻断
+5. **★ 前置 LLM 二次筛除（代码级阻断点）** →
+   - **代码自动阻断**：`_run_audit_loop()` 首次进入时检查 `--classify` 数据（含 `--category`），无数据则阻断
    - 阻断输出 3 步操作指引：
      1. `audit <skill> --verify` 查看 FAIL 详情
-     2. `audit <skill> --classify ID1,ID2` 标记误报
+     2. `audit <skill> --classify ID1,ID2 --category engine_mistake --reason "..."` 标记误报（须带类别）
      3. `refactor <skill> --continue --confirmed --mode refactor` 继续
    - 已有 `--classify` 数据时自动放行，进入修复循环
-   - **LLM 手动分类**：逐条审查每条 ERROR/WARN，用 `--classify ID` 标记误报
+   - **LLM 手动分类**：逐条审查每条 ERROR/WARN，用 `--classify ID --category engine_mistake/engine_cant_judge --reason "..."` 标记误报
      ```
-     WARN  → 真问题，必须修复（无"可跳过"类别）
-     误判  → 确认是误报后，用 --classify ID 标记
+     误报类别：
+       engine_mistake  — 引擎技术性错误（BOM/编码/注释误识别/概念图路径）
+       engine_cant_judge — 引擎语义不足，LLM确认后放行（__init__.py约定/格式模板域差异）
+     真问题 → 必须修复，不得标记为误判
      ```
    - 验证：重新 audit 确认分类已完成，`--classify` 查看已标记列表
 6. **细碎修复循环** → 输入 审计 FAIL 列表（真问题）→ 输出 修复后的文件 — auto-fix + LLM 手动修复，代码级确认循环
    - 按 fix key 粒度分离 auto/LLM 路径：
-     · fix key 不在 （workflow_completeness/example_quality/capability_boundary）→ auto-fix
-     · fix key 在  中 → LLM 手动（需读代码写结构化数据文件）
+     · fix key 在 _llm_only_fix_keys 中（workflow_completeness/example_quality/capability_boundary/section_names）→ LLM 手动
+     · fix key 不在其中 → auto-fix
      · 无 fix key → LLM 手动
    - 停滞检测：auto-fix 实际修复数为 0 时清空所有 fix key 不再空转
    - 每次修复后代码自动重新审计 + 过滤已分类误报
@@ -190,7 +192,7 @@ python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed
 ../.standardization/skill-standardization/
 ├── data/
 │   ├── .verify_fix_map.json  # --verify 输出的修复指引映射
-│   ├── .verify_fp.json       # --classify 标记的误判列表
+│   ├── .verify_fp.json       # --classify 标记的误判详情（{id: {category, reason}}）
 │   └── ...
 ├── backup/
 │   └── <skill>_<timestamp>.zip  # refactor 自动备份
