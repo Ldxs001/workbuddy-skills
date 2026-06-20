@@ -55,10 +55,13 @@ class PipelineState:
         self.s4_matrix: dict = {}
         self.s4_matrix_text: str = ""
         self.s4_score: dict = {}
+        self.s4_trace: list = []
         self.fix_results: list[dict] = []
         self.regression_report: dict = {}
         self.regression_text: str = ""
         self.final_report: str = ""
+        self.blocked: bool = False
+        self.block_reason: str = ""
 
     def log_stage(self, stage: int, status: str, result: str = ""):
         self.stage_log[stage] = {
@@ -97,7 +100,7 @@ def stage_1_backup(state: PipelineState) -> PipelineState:
 
 def stage_2_blueprint(state: PipelineState) -> PipelineState:
     from inspector import scan, print_bluebook, extract_constraints
-    from s4_engine import generate_test_scope, save_test_scope
+    from s4_engine import _data_dir_for, generate_test_scope, save_test_scope
     print(f"\n{'='*50}")
     print(f"  阶段2/10: 蓝皮书扫描 + 约束提取")
     print(f"{'='*50}")
@@ -106,7 +109,7 @@ def stage_2_blueprint(state: PipelineState) -> PipelineState:
     state.blueprint_text = print_bluebook(bb)
     print(state.blueprint_text)
 
-    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR, "outputs")
+    s4_data_dir = _data_dir_for(state.skill_dir)
     os.makedirs(s4_data_dir, exist_ok=True)
     bp_path = os.path.join(s4_data_dir, ".scenario-test_blueprint.json")
     with open(bp_path, "w", encoding="utf-8") as f:
@@ -347,12 +350,22 @@ def stage_5_function_test(state: PipelineState) -> PipelineState:
         if r_proc.returncode != 0:
             f_text += f"\n[WARN] test_engine exit={r_proc.returncode}, stderr={r_proc.stderr[:200]}"
         f_report = {}
-        for line in f_text.split("\n"):
-            if line.strip().startswith("{") and "results" in line:
-                try:
-                    f_report = json.loads(line.strip())
-                except Exception:
-                    pass
+        from s4_engine import _data_dir_for
+        fr_path = os.path.join(_data_dir_for(state.skill_dir), ".function-test_report.json")
+        if os.path.exists(fr_path):
+            try:
+                with open(fr_path, "r", encoding="utf-8") as _fh:
+                    f_report = json.load(_fh)
+            except Exception:
+                pass
+        # fallback: parse from stdout
+        if not f_report:
+            for line in f_text.split("\n"):
+                if line.strip().startswith("{") and "results" in line:
+                    try:
+                        f_report = json.loads(line.strip())
+                    except Exception:
+                        pass
         all_texts.append(f_text)
         all_reports.append(f_report)
         if test_rounds == 1:
@@ -409,7 +422,8 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
             pass
 
     all_rounds = []
-    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
+    from s4_engine import _data_dir_for
+    s4_data_dir = _data_dir_for(state.skill_dir)
     os.makedirs(s4_data_dir, exist_ok=True)
 
     for r in range(1, s4_rounds + 1):
@@ -465,13 +479,17 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
             positive_rate = completed / total_steps if total_steps > 0 else 0.0
             print(f"  [S4-正向] 步骤完成率: {completed}/{total_steps} ({positive_rate*100:.0f}%)")
         else:
-            print("  [S4-正向] 无正向追踪记录")
-            print("  ╔═══════ 正向测试：LLM 必须执行 ══════╗")
-            print("  ║  按工作流步骤顺序执行并记录到       ║")
-            print("  ║  .s4_positive.json                 ║")
-            print("  ╚═════════════════════════════════════╝")
-            import sys as _sys
-            _sys.exit(1)
+            print("  [S4-正向] ⚠️ 无正向追踪记录")
+            print("  ┌────────────────────────────────────────────────┐")
+            print("  │ S4 正反交叉要求正向+反向均须执行               │")
+            print("  │ 创建 .s4_positive.json 记录正向测试步骤结果    │")
+            print("  │ 格式: [{\"step\":\"步骤1\",\"completed\":true},...] │")
+            print(f"  │ 路径: {positive_file} │")
+            print("  └────────────────────────────────────────────────┘")
+            print("  正向测试缺失，S4 综合评分无法计算")
+            state.blocked = True
+            state.block_reason = "S4 正向测试: 请创建 .s4_positive.json 后重试"
+            return state
 
         score_result = generate_fidelity_score(
             positive_rate, negative_rate,
@@ -479,15 +497,34 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
             s4_weights.get("negative", 0.6),
         )
         state.s4_score = score_result
+        # load s4 trace for report
+        s4_trace_path = os.path.join(s4_data_dir, ".s4_trace.json")
+        if os.path.exists(s4_trace_path):
+            try:
+                with open(s4_trace_path, "r", encoding="utf-8") as _tf:
+                    state.s4_trace = json.load(_tf)
+            except Exception:
+                pass
         print()
         print(print_fidelity_score(score_result))
     else:
-        print(f"\n{'='*55}")
-        print(f"  ⛔ S4 已开启但无噪音执行记录")
-        print(f"  🚫 LLM 必须完成以上步骤后再继续")
-        print(f"{'='*55}")
-        import sys as _sys
-        _sys.exit(1)
+        noise_path = os.path.join(s4_data_dir, ".s4_noise_plan.json")
+        print(f"\n{'='*60}")
+        print("  ⛔ S4 受阻：无噪音方案")
+        print("  ──────────────────────────────────────────")
+        print("  配置要求执行 S4，但未找到噪音方案文件。")
+        print("  LLM 必须按以下步骤操作后重新运行：")
+        print()
+        print("  1. 读取约束清单")
+        print(f"     path: {os.path.join(s4_data_dir, '.constraint-list.json')}")
+        print("  2. 设计噪音方案（L1-L5 级别）")
+        print(f"  3. 写入: {noise_path}")
+        print("  4. 校验: python s4_engine.py <skill> validate <json>")
+        print(f"{'='*60}")
+        print("  此阶段完成前不会继续后续阶段。")
+        state.blocked = True
+        state.block_reason = "S4 无噪音方案: 请创建 .s4_noise_plan.json 后重试"
+        return state
 
     state.log_stage(6, "ok",
         f"S4矩阵{'已生成' if state.s4_matrix else '跳过'}")
@@ -621,15 +658,16 @@ def stage_9_report(state: PipelineState) -> PipelineState:
     print(f"{'='*50}")
 
     # 构造 data 字典给 gen_report 使用
+    from timeline import _load_timeline
     data = {
         "skill_dir": state.skill_dir,
         "skill_name": state.skill_name,
-        "timeline": {},
+        "timeline": _load_timeline(state.skill_dir) or {},
         "rounds": [],
         "s4_rounds": state.test_plan.get("s4_rounds", 1),
         "scenario": state.scenario_report,
         "function": state.function_report,
-        "s4_trace": [],
+        "s4_trace": state.s4_trace,
         "fix_record": state.fix_results,
         "test_reports": {},
         "s4_score": state.s4_score,
@@ -637,8 +675,8 @@ def stage_9_report(state: PipelineState) -> PipelineState:
     }
 
     # 保存到数据目录
-    s4_data_dir = os.path.join(state.skill_dir, DATA_DIR)
-    outputs_dir = os.path.join(s4_data_dir, "outputs")
+    from s4_engine import _data_dir_for
+    outputs_dir = _data_dir_for(state.skill_dir)
     os.makedirs(outputs_dir, exist_ok=True)
 
     md = _gen_md(data)
@@ -691,7 +729,7 @@ def stage_10_conclusion(state: PipelineState) -> PipelineState:
         "skill_name": state.skill_name,
         "scenario": state.scenario_report,
         "function": state.function_report,
-        "s4_trace": [],
+        "s4_trace": state.s4_trace,
         "fix_record": state.fix_results,
         "s4_score": state.s4_score,
         "regression": state.regression_report,
@@ -706,10 +744,30 @@ def stage_10_conclusion(state: PipelineState) -> PipelineState:
 # 全流程执行
 # ═══════════════════════════════════════════════════════
 
+def _run_stage(state, stage_fn, stage_num, name):
+    """Run a stage, catching sys.exit(1) from engines and converting to blocked state."""
+    from timeline import cmd_mark
+    cmd_mark(state.skill_dir, f"stage{stage_num}", name, "start")
+    try:
+        result = stage_fn(state)
+        cmd_mark(state.skill_dir, f"stage{stage_num}", name, "end")
+        return result
+    except SystemExit as e:
+        cmd_mark(state.skill_dir, f"stage{stage_num}", name, "end")
+        state.blocked = True
+        state.block_reason = f"阶段{stage_num} {name} 受阻: 需要 LLM 介入后重试"
+        state.log_stage(stage_num, "blocked", state.block_reason)
+        print(f"\n  ❌ 阶段{stage_num} {name} 受阻 — 请按上方提示操作后重新运行")
+        return state
+
+
 def run_full(skill_dir: str) -> PipelineState:
     from test_config import load_config, get_active_tests
 
     state = PipelineState(skill_dir)
+    from timeline import cmd_init, cmd_mark
+    cmd_init(skill_dir)
+    cmd_mark(skill_dir, "pipeline", "全流程启动", "start")
     cfg = load_config(skill_dir)
     active_dims = get_active_tests(cfg)
     fm = cfg.get("fix_mode", {"scenario": 0, "function": 0})
@@ -732,16 +790,16 @@ def run_full(skill_dir: str) -> PipelineState:
     print(f"  S4: {'开启' if state.test_plan['s4_enabled'] else '关闭'} ({state.test_plan['s4_rounds']}轮)")
     print()
 
-    state = stage_1_backup(state)
-    state = stage_2_blueprint(state)
-    state = stage_3_config_check(state)
-    state = stage_4_scenario(state)
-    state = stage_5_function_test(state)
-    state = stage_6_s4(state)
-    state = stage_7_fix(state)
-    state = stage_8_bump(state)
-    state = stage_9_report(state)
-    state = stage_10_conclusion(state)
+    state = _run_stage(state, stage_1_backup, 1, "备份")
+    state = _run_stage(state, stage_2_blueprint, 2, "蓝皮书")
+    state = _run_stage(state, stage_3_config_check, 3, "配置确认")
+    state = _run_stage(state, stage_4_scenario, 4, "S1-S3场景测试")
+    state = _run_stage(state, stage_5_function_test, 5, "D1-D6功能测试")
+    state = _run_stage(state, stage_6_s4, 6, "S4执行忠实度")
+    state = _run_stage(state, stage_7_fix, 7, "修复")
+    state = _run_stage(state, stage_8_bump, 8, "版本号bump")
+    state = _run_stage(state, stage_9_report, 9, "报告输出")
+    state = _run_stage(state, stage_10_conclusion, 10, "结论写入")
     return state
 
 
@@ -749,5 +807,9 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         target = sys.argv[1]
         state = run_full(target)
+        if state.blocked:
+            print(f"\n{'='*60}")
+            print(f"  ❌ 流程受阻: {state.block_reason}")
+            print(f"{'='*60}")
     else:
         print("用法: python runner.py <skill-dir>")

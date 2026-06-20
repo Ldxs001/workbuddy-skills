@@ -1,3 +1,11 @@
+## 1.14.0 (2026-06-20)
+- 修复runner多处阻断/路径/计时/报告问题: S4正反交叉阻塞改为blocked状态, 蓝皮书路径统一到_data_dir_for, 添加timeline计时, 修复功能测试报告读取, test-report.md改为全量覆盖
+
+## 1.13.2 (2026-06-20)
+- 修复runner多出阻断/路径/计时/报告问题: S4正反交叉阻塞改为blocked状态, 蓝皮书路径统一到_data_dir_for, 添加timeline计时, 修复功能测试报告读取, test-report.md改为全量覆盖
+- --mode
+- minor
+
 ## [1.13.2] - 2026-06-19
 
 ### 修复

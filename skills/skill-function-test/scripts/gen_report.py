@@ -600,12 +600,16 @@ def gen_html(data: dict) -> str:
         st = "PASS" if r.get("status") == "pass" else "FAIL"
         function_rows += f"<tr><td>{r.get('dim','')}</td><td>{r.get('name','')[:40]}</td><td>{st}</td><td>{r.get('message','')}</td></tr>\n    "
 
-    # ── S4 坚守率矩阵 ──
+    # ── S4 噪音坚守率（反向） ──
     s4_trace = data.get("s4_trace", [])
     s4_plan = data.get("s4_plan", [])
     s4_html = ""
     held = 0
     total = 0
+    s4_score_str = "N/A"
+    s4_score_data = data.get("s4_score", {})
+    if s4_score_data and s4_score_data.get("score"):
+        s4_score_str = f"{s4_score_data['score']*100:.0f}% {s4_score_data.get('level','')}"
     if s4_trace:
         held = sum(1 for t in s4_trace if t.get("llm_behavior") == "坚守")
         total = len(s4_trace)
@@ -635,8 +639,8 @@ def gen_html(data: dict) -> str:
             status = "✅" if t.get("llm_behavior") == "坚守" else "❌"
             s4_rows += f'<tr><td>{t.get("nid","")}</td><td>{t.get("cid","")}</td><td>R{t.get("round",1)}</td><td>{t.get("level","")}</td><td>{status}</td><td>{t.get("noise_text","")[:50]}</td><td>{t.get("llm_behavior","")}</td></tr>\n    '
         s4_html = f'''
-  <h3 style="margin-top:14px;font-size:14px;font-weight:600;color:#534AB7;">S4 坚守率矩阵</h3>
-  <p>噪音方案: {len(s4_plan)} 条 · 轮次: {num_rounds} · 执行记录: {total} 条 · 坚守率: {rate}</p>
+  <h3 style="margin-top:14px;font-size:14px;font-weight:600;color:#534AB7;">S4 噪音坚守率（反向）</h3>
+  <p>噪音方案: {len(s4_plan)} 条 · 轮次: {num_rounds} · 执行记录: {total} 条 · 噪音坚守率: {rate}</p>
   {round_stats}
   <table>
     <tr><th>噪音ID</th><th>约束</th><th>轮次</th><th>级别</th><th>结果</th><th>噪音内容</th><th>行为</th></tr>
@@ -728,7 +732,8 @@ th {{ background: var(--bg); font-weight: 600; font-size: 12px; text-transform: 
     <div class="stat-box pass"><div class="num">{s_pass}/{s_total}</div><div class="label">场景测试通过</div></div>
     <div class="stat-box pass"><div class="num">{f_pass}/{f_total}</div><div class="label">功能测试通过</div></div>
     <div class="stat-box"><div class="num">{len(s4_trace)}</div><div class="label">S4 噪音执行</div></div>
-    <div class="stat-box pass"><div class="num">{held}/{total if total else 0}</div><div class="label">S4 坚守率</div></div>
+    <div class="stat-box pass"><div class="num">{held}/{total if total else 0}</div><div class="label">S4 噪音坚守率</div></div>
+    <div class="stat-box pass"><div class="num">{s4_score_str}</div><div class="label">S4 综合忠实度</div></div>
     <div class="stat-box fail"><div class="num">{f0_count}</div><div class="label">F-0 BLOCK</div></div>
     <div class="stat-box warn"><div class="num">{f1_count}</div><div class="label">F-1 WARN</div></div>
     <div class="stat-box"><div class="num">{f2_count}</div><div class="label">F-2 INFO</div></div>
@@ -943,23 +948,9 @@ def _write_conclusion(skill_dir: str, data: dict):
             lines.append(f"| {label} | {pre} | {post} | {diff:+d} {icon} |")
         lines.append("")
 
-    # ── 去重：同一时间戳已存在则跳过 ──
-    if os.path.exists(report_path):
-        with open(report_path, "r", encoding="utf-8") as f:
-            existing = f.read()
-        if now in existing:
-            print(f"  [CONCLUSION] 跳过：{now} 已记录在 {report_path}")
-            return
-
+    # ── 全量覆盖写入 test-report.md ──
     content = "\n".join(lines)
-    # 追加到文件（使用 safe_write 原子操作）
-    full_content = ""
-    if os.path.exists(report_path):
-        with open(report_path, "r", encoding="utf-8") as f:
-            full_content = f.read().rstrip() + "\n\n---\n\n" + content
-    else:
-        full_content = content
-    safe_write(report_path, full_content)
+    safe_write(report_path, content)
     print(f"  [CONCLUSION] 测试结论已写入: {report_path}")
 def main():
     if len(sys.argv) < 2:

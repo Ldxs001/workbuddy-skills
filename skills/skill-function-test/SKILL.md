@@ -1,6 +1,6 @@
 ---
 name: skill-function-test
-version: 1.13.2
+version: 1.14.0
 author: wUwproject
 license: MIT
 description: 技能场景测试套件 —— 备份 → 蓝皮书 → 配置确认 → S1-S3场景测试 → D1-D6功能测试 → S4执行忠实度 → 修复 → bump → 双格式报告 → 结论写入test-report.md。配置驱动流程，钩子强制阻断。
