@@ -1,3 +1,10 @@
+## [2.9.3] - 2026-06-20
+
+### 修复
+- 修复R-20术语统一与中英文空格、R-25能力边界声明与FAQ补充、R-11路径引用移入代码块
+
+---
+
 ## 2.9.2 (2026-06-20)
 
 ### 更新内容
@@ -102,7 +109,7 @@
 
 - ✅ 执行 `skill-standardization refactor` 标准化改造
 - ✅ 创建备份：`simulated-peak-plot_bak_refactor_20260525_001409`
-- ✅ 生成 `references/permission.md`（风险 low，无需授权）
+- ✅ 生成 `references/permissions.md`（风险 low，无需授权）
 - 📝 更新版本号：2.3.2 → 2.4.0
 
 ### 影响

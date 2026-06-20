@@ -4,7 +4,7 @@ author: wUwproject
 data_dir: ../.standardization/simulated-peak-plot/data/
 license: MIT
 tags: ['peak', 'plot', 'simulation', 'chromatography', 'spectroscopy', 'visualization', 'csv-export']
-version: 2.9.2
+version: 2.9.3
 description: 生成模拟峰图（高斯峰），用于色谱、光谱或任何信号可视化。支持簇峰(N子峰各独立标注)/融峰(合成单标注)/单峰、负峰(倒峰)、标注控制(annotate)、扫描速率(scan_rate)、碰撞避让标注、自定义坐标轴/单位、CSV导出及CSV导入，**负峰（倒峰）**。
 external_data_dir: true
 sensitive_access: false
@@ -27,7 +27,16 @@ faq_quality: improve_qa
 - 说出"可视化保留时间"、"输出 Markdown 表格"
 - 说出"导入 CSV 数据"、"生成模拟数据"
 - 需要色谱/光谱峰模拟、信号可视化、数据导出等场景
-- **Python API 调用**：`from {SKILL_DIR}/scripts/generate_peak import gaussian_peak, generate_composite_peak`
+- **Python API 调用**（直接导入函数生成信号数据）：
+
+```python
+import sys
+sys.path.append("{SKILL_DIR}/scripts")
+from generate_peak import gaussian_peak, generate_composite_peak
+import numpy as np
+t = np.linspace(0, 10, 1000)
+signal = gaussian_peak(t, 5.0, 800, 0.08)
+```
 
 **否定条件**：除非用户明确提到生成峰图或模拟数据，否则不要主动触发。
 
@@ -55,7 +64,7 @@ python {SKILL_DIR}/scripts/generate_peak.py --config config.json
 - **可自定义坐标轴标题和单位**（X/Y标签，mV/V/吸光度等）
 - **CSV完整数据导出**（全部数据点）
 - **可点击的 file:/// 路径**，方便直接打开图片
-- Markdown表格数据输出（在控制台打印）
+- Markdown 表格数据输出（在控制台打印）
 - 交互式配置，带点数推荐
 
 ### 渐进式文件索引
@@ -64,7 +73,7 @@ python {SKILL_DIR}/scripts/generate_peak.py --config config.json
 |--------|------|----------|----------|
 | `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT）。包含：MIT 许可证完整文本。 | R-26 |
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
-| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
 | `references/features.md` | 参考文档 | 将 height 设为负数即可生成倒峰。Y轴自动缩放包含负区间，标注自动反向指向下方。 | 无 |
 | `references/parameters.md` | 参考文档 | 本文档提供模拟峰图生成中所有参数的详细信息。 | 无 |
@@ -112,7 +121,7 @@ python {SKILL_DIR}/scripts/generate_peak.py --interactive
 
 ### 5. 输出
 
-PNG + Markdown表格 + CSV(data_dir)。输出路径：`file:///...` 可直接点击。
+PNG + Markdown 表格 + CSV(data_dir)。输出路径：`file:///...` 可直接点击。
 
 ## 簇峰 / 融峰
 
@@ -138,7 +147,7 @@ PNG + Markdown表格 + CSV(data_dir)。输出路径：`file:///...` 可直接点
 1. 检查环境
 2. 显示点数推荐表
 3. 询问峰参数
-4. 生成带Markdown表格输出的光谱
+4. 生成带 Markdown 表格输出的光谱
 5. 保存PNG文件并在控制台打印表格
 
 ## 自定义选项
