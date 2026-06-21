@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.95.0
+version: 2.95.1
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit/create/update/refactor/bump/readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、更新日志渐进加载强制、_meta.json 字段规范性、LICENSE 声明合规、触发条件正/否定区域分离、Markdown 链接引用检测。R-07 增强：frontmatter trigger/trigger_negative 与正文一致性，正向/否定区域分离及模板话术检测。审计输出仅描述问题本身，不做程度判断，由 LLM 二次筛分类。

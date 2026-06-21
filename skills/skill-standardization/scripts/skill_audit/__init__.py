@@ -2111,17 +2111,12 @@ def cmd_refactor(args):
                 print(f"     - 如果发现不一致，LLM 手动修正 SKILL.md 的描述")
                 print(f"     注意：这是语义检查，代码无法自动判断，完全依赖 LLM")
                 print(f"")
-
-                # 全量重审
-                c_issues = check_consistency(skill_dir)
-                c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
-                for i in c_issues:
-                    if reclassify_consistency_false_positive(i, skill_dir=skill_dir):
-                        i['reclassified'] = True
-                print(format_consistency_report(c_issues))
-                if not c_real:
-                    print(f"  ✅ 一致性修复完成（全量重审后双 0）")
-                    break
+                print(f"  --- 余下 {len(c_real)} 项不可自动修复（missing_doc_ref 等），需 LLM 用 --classify 处理 ---")
+                print(f"")
+                _save_remaining_llm(skill_dir, c_real)
+                _save_html_report(skill_dir, result)
+                print(f"  ⏸ 一致性审查剩余项已保存至 .remaining_llm.json，请用 --classify 处理误报后重新 --continue")
+                sys.exit(0)
             
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")

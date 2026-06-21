@@ -1689,9 +1689,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 for clue in clues:
                     found = False
                     if clue == "正向触发":
-                        found = "**正向触发**" in sec_body
+                        found = bool(re.search(r'\*\*正向触发(：)?\*\*', sec_body))
                     elif clue == "否定条件":
-                        found = "**否定条件**" in sec_body
+                        found = bool(re.search(r'\*\*否定条件(：)?\*\*', sec_body))
                     elif clue == "表格":
                         found = bool(re.search(r'^\|.+\|$', sec_body_no_code, re.MULTILINE))
                     elif clue == "加粗":
