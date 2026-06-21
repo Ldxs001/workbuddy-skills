@@ -1,3 +1,10 @@
+## [1.1.3] - 2026-06-21
+
+### 修复
+- changelog: 补充 1.1.0 遗漏的 rerank 开发记录（路由层三层架构、rerank 三种模式、排序规则、模型下载三源轮换等）
+
+---
+
 ## [1.1.2] - 2026-06-21
 
 ### 修复
@@ -14,7 +21,43 @@
 ## [1.1.1] - 2026-06-21
 
 ### 修复
-- refactor: local-rag-builder
+- refactor: 标准化改造（sensitive_access / permission_weight 自动修正、LICENSE 声明、渐进式索引表、非标章节拆分至 references/、工作流输入/输出标注、限制章节）
+
+---
+
+## [1.1.0] - 2026-06-21
+
+### 新增
+- **多知识库路由层（Router）**：三层路由架构
+  - HardcodedRouter：基于 KB 规则的硬编码路由（知识库签名自动归纳 + 关键词匹配）
+  - FallbackRouter：BGE-Reranker-v2-M3 语义回退路由，用户查询自动路由到最相关知识库
+  - Broadcast：全量广播模式（查询同时发送到所有知识库）
+- **Rerank 层（Reranker）**：检索后重排序
+  - ModelReranker：transformer 模型重排序（默认 BAAI/bge-reranker-v2-m3）
+  - RuleReranker：排序规则引擎（score_weight / recency / source_weight / boost_keywords 四种规则类型）
+  - HybridReranker：模型 + 规则混合重排，支持权重叠加
+- **路由/Rerank 共享模型体系**：`RECOMMENDED_RERANK_MODELS` 专用列表（BGE-Reranker-v2-M3 / bge-reranker-base / bge-reranker-large 等），与嵌入模型独立
+- **排序规则编辑器**：Web UI 覆盖层弹窗（与知识库规则编辑器一致），支持新增/编辑/删除排序规则
+- **模型下载系统三源轮换**：
+  - ModelScope / hf-mirror.com / hf-direct（直连）三源自动切换
+  - 断点续传：`.incomplete` 标记文件 + blobs 缓存检测
+  - 后台下载线程：旋转动画 + 实时下载速度显示 + 30 分钟硬超时
+  - 0KB 持续 3 分钟自动切换下载源 + 每个源 3 次重试
+  - 下载前自动清理残留 `.incomplete` 文件
+
+### 修复
+- 下载源 key 不匹配（`hf_mirror` vs `huggingface_mirror`）：统一命名
+- tqdm `\r` 阻塞 readline：设置 `HF_HUB_DISABLE_PROGRESS_BARS=1`
+- 监控目录不区分 modelscope/HF 缓存结构：统一扫描 `model_downloads/` 下匹配模型名的所有文件
+- hf_direct 默认走 hf-mirror.com 而非 huggingface.co（国内网络友好）
+- Web UI API handler 缺少 return：空 mid 时正确返回不再继续执行
+- 排序规则弹窗点击无响应：改为覆盖层弹窗模式（与 KB 规则编辑器一致）
+- 嵌入模型默认选中：无默认值时自动选中推荐模型列表第一个
+- 极客模式/模板管理功能恢复：`--gen-html` 模式下可编辑所有 32+ 参数
+
+### 重构
+- Web UI 设置面板卡片重新排序：输入源 → Prompt → 嵌入 → 守卫 → 切片 → 检索 → LLM → 知识库 → 路由 → Rerank → 极客
+- 路由/Rerank 配置从键盘输入改为下拉选择（与嵌入模型一致，横向撑满布局）
 
 ---
 
