@@ -1,3 +1,18 @@
+## [1.1.1] - 2026-06-21
+
+### 修复
+- references/test-report.md: skill-function-test 测试结论写入
+- SKILL.md 约束章节格式规范统一
+
+---
+
+## [1.1.0] - 2026-06-21
+
+### 修复
+- refactor: local-rag-builder
+
+---
+
 ## 1.0.5 (2026-06-13)
 
 ### 修复
