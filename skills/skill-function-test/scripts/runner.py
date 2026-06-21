@@ -37,9 +37,10 @@ STAGES = {
 
 class PipelineState:
     """全流程状态对象"""
-    def __init__(self, skill_dir: str):
+    def __init__(self, skill_dir: str, continue_mode: bool = False):
         self.skill_dir = os.path.abspath(skill_dir)
         self.skill_name = os.path.basename(self.skill_dir)
+        self.continue_mode = continue_mode
         self.current_stage = 0
         self.stage_log = {}
 
@@ -62,6 +63,8 @@ class PipelineState:
         self.final_report: str = ""
         self.blocked: bool = False
         self.block_reason: str = ""
+        self.pending_stage: int = 0
+        self.pending_reason: str = ""
 
     def log_stage(self, stage: int, status: str, result: str = ""):
         self.stage_log[stage] = {
@@ -271,6 +274,7 @@ def stage_4_scenario(state: PipelineState) -> PipelineState:
     """阶段4: S1-S3 场景测试 — LLM 编写用例 → 按轮次执行"""
     from scenario_engine import run_scenario_test
     from test_config import load_config
+    from s4_engine import _data_dir_for
     print(f"\n{'='*50}")
     print(f"  阶段4/10: S1-S3 场景测试")
     print(f"{'='*50}")
@@ -288,10 +292,31 @@ def stage_4_scenario(state: PipelineState) -> PipelineState:
             return name in dims
         return False
 
+    # ① 先检查 S1-S3 是否启用，没开直接跳过
     if not any(_has_s_dim(f"S{i}") for i in (1, 2, 3)):
         print("  [SKIP] 场景维度均未启用")
         state.log_stage(4, "skip", "场景维度未启用")
         return state
+
+    # ② S 已启用 → 检查测试计划文件
+    plan_path = os.path.join(_data_dir_for(state.skill_dir), ".s_test_plan.json")
+    if not os.path.exists(plan_path):
+        if not state.continue_mode:
+            print(f"\n{'='*60}")
+            print(f"  需要编写场景测试计划")
+            print(f"{'─'*60}")
+            print(f"  读取蓝皮书后手工编写 .s_test_plan.json")
+            print(f"  格式: references/s-test-plan-schema.md")
+            print(f"  路径: {plan_path}")
+            print(f"{'='*60}")
+            state.pending_stage = 4
+            state.pending_reason = "缺少 .s_test_plan.json，LLM 编写后 --continue"
+            state.log_stage(4, "pending", state.pending_reason)
+            return state
+        else:
+            print("  [SKIP] 未提供 .s_test_plan.json，跳过 S1-S3")
+            state.log_stage(4, "skip", "无计划文件")
+            return state
 
     all_reports, all_texts = [], []
     for r in range(1, test_rounds + 1):
@@ -397,6 +422,27 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
         state.log_stage(6, "skip", "S4 关闭")
         return state
 
+    # S4 已启用 → 检查噪音方案文件
+    from s4_engine import _data_dir_for as _s4_data
+    noise_plan_path = os.path.join(_s4_data(state.skill_dir), ".s4_noise_plan.json")
+    if not os.path.exists(noise_plan_path):
+        if not state.continue_mode:
+            print(f"\n{'='*60}")
+            print(f"  需要编写噪音方案")
+            print(f"{'─'*60}")
+            print(f"  读取约束清单后手工编写 .s4_noise_plan.json")
+            print(f"  格式: references/s4-noise-testing.md")
+            print(f"  路径: {noise_plan_path}")
+            print(f"{'='*60}")
+            state.pending_stage = 6
+            state.pending_reason = "缺少 .s4_noise_plan.json，LLM 编写后 --continue"
+            state.log_stage(6, "pending", state.pending_reason)
+            return state
+        else:
+            print("  [SKIP] 未提供 .s4_noise_plan.json，跳过 S4")
+            state.log_stage(6, "skip", "无噪音方案")
+            return state
+
     s4_rounds = config.get("s4", {}).get("rounds",
         state.test_plan.get("s4_rounds", config.get("rounds", 3)))
 
@@ -466,6 +512,15 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
         negative_rate = n_held / n_total if n_total > 0 else 0.0
         print(f"  [S4] 反向坚守率: {n_held}/{n_total} ({negative_rate*100:.0f}%)")
 
+        # load s4 trace for report (must happen before positive check)
+        s4_trace_path = os.path.join(s4_data_dir, ".s4_trace.json")
+        if os.path.exists(s4_trace_path):
+            try:
+                with open(s4_trace_path, "r", encoding="utf-8") as _tf:
+                    state.s4_trace = json.load(_tf)
+            except Exception:
+                pass
+
         print(f"\n  [S4-正向] 提取工作流步骤...")
         steps = extract_workflow_steps(state.skill_dir)
         print(print_workflow_steps(steps))
@@ -479,17 +534,10 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
             positive_rate = completed / total_steps if total_steps > 0 else 0.0
             print(f"  [S4-正向] 步骤完成率: {completed}/{total_steps} ({positive_rate*100:.0f}%)")
         else:
-            print("  [S4-正向] ⚠️ 无正向追踪记录")
-            print("  ┌────────────────────────────────────────────────┐")
-            print("  │ S4 正反交叉要求正向+反向均须执行               │")
-            print("  │ 创建 .s4_positive.json 记录正向测试步骤结果    │")
-            print("  │ 格式: [{\"step\":\"步骤1\",\"completed\":true},...] │")
-            print(f"  │ 路径: {positive_file} │")
-            print("  └────────────────────────────────────────────────┘")
-            print("  正向测试缺失，S4 综合评分无法计算")
-            state.blocked = True
-            state.block_reason = "S4 正向测试: 请创建 .s4_positive.json 后重试"
-            return state
+            print("  [S4-正向] ⚠️ 无正向追踪记录，S4 综合评分仅基于反向（噪音坚守率）")
+            positive_rate = 0.0
+            state.pending_stage = 6
+            state.pending_reason = "缺少 .s4_positive.json（可选），仅反向评分"
 
         score_result = generate_fidelity_score(
             positive_rate, negative_rate,
@@ -761,10 +809,10 @@ def _run_stage(state, stage_fn, stage_num, name):
         return state
 
 
-def run_full(skill_dir: str) -> PipelineState:
+def run_full(skill_dir: str, continue_mode: bool = False) -> PipelineState:
     from test_config import load_config, get_active_tests
 
-    state = PipelineState(skill_dir)
+    state = PipelineState(skill_dir, continue_mode=continue_mode)
     from timeline import cmd_init, cmd_mark
     cmd_init(skill_dir)
     cmd_mark(skill_dir, "pipeline", "全流程启动", "start")
@@ -804,12 +852,25 @@ def run_full(skill_dir: str) -> PipelineState:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) >= 2:
-        target = sys.argv[1]
-        state = run_full(target)
-        if state.blocked:
-            print(f"\n{'='*60}")
-            print(f"  ❌ 流程受阻: {state.block_reason}")
-            print(f"{'='*60}")
+    import argparse
+    parser = argparse.ArgumentParser(description="skill-function-test 全流程编排器")
+    parser.add_argument("skill_dir", help="目标技能目录")
+    parser.add_argument("--continue", action="store_true", dest="continue_mode",
+                        help="继续模式：跳过 LLM 编写计划的提示，有文件则执行，无文件则跳过")
+    args = parser.parse_args()
+
+    state = run_full(args.skill_dir, continue_mode=args.continue_mode)
+
+    if state.pending_stage:
+        stage_name = STAGES.get(state.pending_stage, f"阶段{state.pending_stage}")
+        print(f"\n{'='*60}")
+        print(f"  ⏸ 流程暂停: {stage_name}")
+        print(f"  {state.pending_reason}")
+        print(f"{'='*60}")
+        print(f"  编写完成后运行: python runner.py {args.skill_dir} --continue")
+    elif state.blocked:
+        print(f"\n{'='*60}")
+        print(f"  ❌ 流程受阻: {state.block_reason}")
+        print(f"{'='*60}")
     else:
         print("用法: python runner.py <skill-dir>")
