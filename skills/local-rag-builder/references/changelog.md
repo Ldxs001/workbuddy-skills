@@ -1,12 +1,17 @@
-## [1.1.1] - 2026-06-21
+## [1.1.2] - 2026-06-21
 
 ### 修复
-- references/test-report.md: skill-function-test 测试结论写入
-- SKILL.md 约束章节格式规范统一
+- SKILL.md 文档描述与实际代码对齐：
+  - 移除不存在的 `--retrieve-only` / `--mode integrated` 参数引用
+  - 下载源描述"LLM 找源"改为"直连（hf_direct）"
+  - 支持文件类型从"md / txt / pdf / URL"修正为"txt / md / py / json / yaml"
+  - `chunk_size` 范围 50–2000 → 50–5000，`chunk_overlap` 范围 0–500 → 0–1000
+- references/commands.md 补充缺失的 CLI 参数（`--no-router`, `--no-reranker`, `--show-routing`, `--import-file`, `--kb-list`, `--k`, `--threshold` 等）
+- references/architecture.md 索引表描述修复（skill-standardization → local-rag-builder）
 
 ---
 
-## [1.1.0] - 2026-06-21
+## [1.1.1] - 2026-06-21
 
 ### 修复
 - refactor: local-rag-builder
