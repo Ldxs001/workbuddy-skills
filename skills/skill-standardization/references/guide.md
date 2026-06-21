@@ -83,7 +83,7 @@ python -m scripts.skill_audit audit <skill-dir> --verify --confirmed --mode audi
 ### 标记误报
 ```bash
 # 先获取 ID（从 --verify 输出获取）
-python -m scripts.skill_audit audit <skill-dir> --verify --mode audit
+python -m scripts.skill_audit audit <skill-dir> --verify --confirmed --mode audit
 
 # 标记指定 ID 为误报（须带 --category）
 python -m scripts.skill_audit audit <skill-dir> --classify 42,55,67 --category engine_mistake --reason "BOM字符" --confirmed --mode audit
@@ -163,10 +163,10 @@ python -m scripts.skill_audit update <skill-dir> --changed-files scripts/foo.py 
 [9/9] cleanup 清理
 ```
 
-### --continue
+### --continue（仅 refactor 支持）
 LLM 标记误报后继续：
 ```bash
-python -m scripts.skill_audit update <skill-dir> --continue --confirmed --mode update
+python -m scripts.skill_audit refactor <skill-dir> --continue --confirmed --mode refactor
 ```
 
 ---

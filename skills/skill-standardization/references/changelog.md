@@ -1,3 +1,14 @@
+## [2.95.2] - 2026-06-21
+
+### 修复
+- SKILL.md 能力与限制表：`--audit-all` 参数形式修正为 `audit-all` 子命令
+- references/guide.md：`audit --verify` 示例补齐缺失的 `--confirmed` 参数；`update --continue` 改为 `refactor --continue`（update 实际不支持 --continue）
+- references/reference.md：从"部分内容已过时"模糊状态改为明确的已废弃声明，指向 guide.md 和 rules.md
+- references/faq.md：删除无关的 `_skillhub_meta.json` 历史遗留 QA
+- SKILL.md + _meta.json：description 精简，去除旧 changelog 残留文字
+
+---
+
 ## [2.95.1] - 2026-06-21
 
 ### 修复

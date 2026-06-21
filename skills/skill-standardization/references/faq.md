@@ -177,16 +177,6 @@ mv ./my-skill_bak_refactor_20260522_190000 ./my-skill
 
 > 如果用了 `--no-backup`，则无法自动回滚！
 
-### Q13: 我的旧版 `_skillhub_meta.json` 会被怎么处理？
-
-**A:** 保留在原位，不参与迁移。refactor 检测到此文件时会在报告中标注为 "legacy meta (keep)"。
-
-你可以：
-- 手动将其内容迁移到新版 `_meta.json` 后删除
-- 或者继续保留（不影响正常使用）
-
----
-
 ## 审查与规范
 
 ### Q14: R-01~R-26 是 ERROR 级，会阻断工作流吗？
