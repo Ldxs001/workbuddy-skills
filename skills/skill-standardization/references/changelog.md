@@ -1,3 +1,15 @@
+## [2.95.3] - 2026-06-22
+
+### 修复
+- `_run_audit_loop()` 锁函数名 typo：`_create_refactor_lock()` → `_lock_refactor()`
+  - 之前 NameError 导致 `.refactor_locked.lock` 从未被创建，`sys.exit(2)` 也跑不到
+  - 剩余 LLM 修复项时 exit code=1（崩溃）而非 2（强制锁定），LLM 可绕过循环
+- `_semantic_precheck()` 模式锁：refactor 模式下允许 `audit --classify` 通过（二次筛除是 refactor 流程的内置步骤）
+
+### 新增
+- `--classify --category engine_cant_judge` 的 `--reason` 改为**必填**，且必须包含文件路径/行号证据
+- 纯嘴说"引擎无法理解"不再被接受，须提供如 `permissions.md:91 YYYY 是年份通配符` 的具体定位
+
 ## [2.95.2] - 2026-06-21
 
 ### 修复

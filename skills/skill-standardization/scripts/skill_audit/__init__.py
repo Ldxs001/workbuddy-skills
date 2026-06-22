@@ -1194,7 +1194,7 @@ def cmd_audit(args):
     """审查单个 skill 目录"""
     fp_ids = set()
     _semantic_precheck('audit', getattr(args, 'skill_dir', None), confirmed=getattr(args, 'confirmed', False),
-                       llm_mode=getattr(args, 'mode', None))
+                       llm_mode=getattr(args, 'mode', None), classify=getattr(args, 'classify', None))
     # 强制 UTF-8 输出（Windows 终端兼容）
     if hasattr(sys.stdout, "reconfigure"):
         try:
@@ -1253,8 +1253,23 @@ def cmd_audit(args):
             print(f"❌ 非法类别 '{category}' — 仅支持：{', '.join(sorted(_CLASSIFY_LEGAL_CATEGORIES))}")
             return 1
 
-        # 读取 --reason（可选）
+        # 读取 --reason
         reason = getattr(args, 'reason', '') or ''
+
+        # ── engine_cant_judge 须附带证据 ──
+        if category == "engine_cant_judge":
+            if not reason:
+                print(f"❌ engine_cant_judge 必须附带 --reason 提供证据")
+                print(f"   证据应为具体的文件路径、代码行号或函数签名，证明引擎确实无法判断")
+                print(f"   例: --reason 'foo/bar.py:42 中的 BazQuux 模式是领域约定，引擎无法区分'")
+                return 1
+            # 证据校验：reason 必须包含至少一个路径关键字（/ 或 \ 或 : 或 行）
+            has_path_evidence = any(kw in reason for kw in ['/', '\\', '.py:', '.md:', '第', '行'])
+            if not has_path_evidence:
+                print(f"❌ engine_cant_judge 的 --reason 缺少具体路径证据")
+                print(f"   必须引用具体文件路径、行号或代码标识")
+                print(f"   例: --reason 'permissions.md:91 引用的 YYYY 是年份通配符，非字面文件名'")
+                return 1
 
         ids = [s.strip() for s in raw.split(',')]
         # 验证：数字 ID 或 C-{type} 格式
@@ -1821,7 +1836,7 @@ def cmd_bump(args):
         pass
 
 
-def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None):
+def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None, classify=None):
     """
     语义前置检查（代码强制，非 LLM 自觉）。
     在进入 create/update/refactor/audit 之前输出模式选择对照表，
@@ -1867,14 +1882,18 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None):
         print(f"")
         sys.exit(1)
     if llm_mode != command:
-        print(f"\n  {'❌'*3} 模式-命令不匹配！流程拒绝 {'❌'*3}")
-        print(f"     LLM 语义自检闸门输出模式：{llm_mode}")
-        print(f"     当前执行的子命令：{command}")
-        print(f"")
-        print(f"     请使用正确的子命令：")
-        print(f"       python -m scripts.skill_audit {llm_mode} <skill-dir> --confirmed --mode {llm_mode}")
-        print(f"")
-        sys.exit(1)
+        # 豁免：refactor 模式下允许 audit --classify（二次筛除的必要操作）
+        if llm_mode == "refactor" and command == "audit" and classify:
+            pass
+        else:
+            print(f"\n  {'❌'*3} 模式-命令不匹配！流程拒绝 {'❌'*3}")
+            print(f"     LLM 语义自检闸门输出模式：{llm_mode}")
+            print(f"     当前执行的子命令：{command}")
+            print(f"")
+            print(f"     请使用正确的子命令：")
+            print(f"       python -m scripts.skill_audit {llm_mode} <skill-dir> --confirmed --mode {llm_mode}")
+            print(f"")
+            sys.exit(1)
 
     if not confirmed:
         print(f"\n  ⛔ 未传入 --confirmed 参数，拒绝执行。")
@@ -2631,7 +2650,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                 # 保存 .remaining_llm.json 并创建重构锁，阻止后续步骤
                 _save_remaining_llm(skill_dir, remaining)
                 _save_html_report(skill_dir, result)
-                _create_refactor_lock(skill_dir)
+                _lock_refactor(skill_dir)
                 print(f"\n{'='*55}")
                 print(f"  🔒 重构锁已激活——剩余 {len(remaining)} 项未修复")
                 print(f"  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复")
@@ -2963,7 +2982,7 @@ def main():
     p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
     p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（如 --classify 42,55,67），须附带 --category engine_mistake|engine_cant_judge，可选 --reason")
     p_audit.add_argument("--category", metavar="CAT", help=f"误报类别：{', '.join(sorted(_CLASSIFY_LEGAL_CATEGORIES))}（仅与 --classify 配合使用）")
-    p_audit.add_argument("--reason", metavar="TEXT", help="误报理由（仅与 --classify 配合使用，可选）")
+    p_audit.add_argument("--reason", metavar="TEXT", help="误报理由（engine_cant_judge 必填，须含具体路径证据；engine_mistake 可选）")
     p_audit.add_argument("--no-fp", metavar="IDS", help="将指定 #ID 从误判列表中移除（取消分类）")
 
     # audit-all 子命令
