@@ -302,15 +302,48 @@ def stage_4_scenario(state: PipelineState) -> PipelineState:
     plan_path = os.path.join(_data_dir_for(state.skill_dir), ".s_test_plan.json")
     if not os.path.exists(plan_path):
         if not state.continue_mode:
+            bp = state.blueprint
             print(f"\n{'='*60}")
-            print(f"  需要编写场景测试计划")
+            print(f"  需要编写场景测试计划 (S1-S3)")
             print(f"{'─'*60}")
-            print(f"  读取蓝皮书后手工编写 .s_test_plan.json")
             print(f"  格式: references/s-test-plan-schema.md")
-            print(f"  路径: {plan_path}")
+            print(f"  目标: {plan_path}")
+            print()
+            print(f"  ── 蓝皮书摘要 ──")
+            print(f"  技能: {bp.get('skill_name', '?')}")
+            print(f"  版本: {bp.get('version', '?')}")
+            print(f"  文件: {bp.get('file_count', 0)} 个")
+            print(f"  核心函数: {len(bp.get('functions', []))} 个")
+            print()
+            top_funcs = [f.get('name','') for f in bp.get('functions',[])[:10]]
+            if top_funcs:
+                print(f"  主要函数: {', '.join(top_funcs)}")
+            print()
+            print(f"  ── S1 触发场景 ──")
+            print(f"  编写至少 2 条：用户输入自然语言触发词")
+            print(f"  + 期望技能如何响应")
+            print()
+            print(f"  ── S2 核心能力 ──")
+            print(f"  编写至少 2 条：给定参数调用核心函数")
+            print(f"  + 期望返回值特征")
+            print()
+            print(f"  ── S3 工作流链路 ──")
+            print(f"  编写至少 1 条：多步骤连贯执行")
+            print(f"  + 每步之间数据传递的期望")
             print(f"{'='*60}")
+            # 写入一个骨架模板到目标路径，LLM 直接编辑即可
+            skeleton = {
+                "S1": [{"id":"S1-01","name":"示例场景","trigger":"用户输入","expected":"期望输出","type":"trigger","modules":[]}],
+                "S2": [{"id":"S2-01","name":"示例能力","input":"函数调用","expected":"期望返回值","type":"capability","modules":[]}],
+                "S3": [{"id":"S3-01","name":"示例流程","steps":["步骤1","步骤2"],"expected":"期望结果","type":"workflow","modules":[]}]
+            }
+            with open(plan_path, 'w', encoding='utf-8') as f:
+                json.dump(skeleton, f, ensure_ascii=False, indent=2)
+            print(f"\n  ✅ 已生成骨架文件: {plan_path}")
+            print(f"  LLM 请直接编辑此文件，填充真实场景用例后重新运行。")
+            print()
             state.pending_stage = 4
-            state.pending_reason = "缺少 .s_test_plan.json，LLM 编写后 --continue"
+            state.pending_reason = "已生成骨架 .s_test_plan.json，LLM 编辑后 --continue"
             state.log_stage(4, "pending", state.pending_reason)
             return state
         else:
@@ -427,15 +460,38 @@ def stage_6_s4(state: PipelineState) -> PipelineState:
     noise_plan_path = os.path.join(_s4_data(state.skill_dir), ".s4_noise_plan.json")
     if not os.path.exists(noise_plan_path):
         if not state.continue_mode:
+            constraints = state.constraints
             print(f"\n{'='*60}")
-            print(f"  需要编写噪音方案")
+            print(f"  需要编写 S4 噪声方案")
             print(f"{'─'*60}")
-            print(f"  读取约束清单后手工编写 .s4_noise_plan.json")
             print(f"  格式: references/s4-noise-testing.md")
-            print(f"  路径: {noise_plan_path}")
+            print(f"  目标: {noise_plan_path}")
+            print()
+            print(f"  ── 约束清单摘要 ({len(constraints)} 条) ──")
+            for i, c in enumerate(constraints[:8]):
+                print(f"  {i+1}. [{c.get('level','?')}] {c.get('text','')[:80]}")
+            if len(constraints) > 8:
+                print(f"  ... 还有 {len(constraints)-8} 条")
+            print()
+            print(f"  ── 噪音分级 ──")
+            print(f"  L1 软干扰: 轻量质疑/建议")
+            print(f"  L2 跳过质疑: 明确要求跳过步骤")
+            print(f"  L3 反向指令: 直接违背铁律")
+            print(f"  L4 环境污染: 伪造产物/信息污染")
+            print(f"  L5 条件篡改: 中途更新前提条件")
             print(f"{'='*60}")
+            skeleton = {
+                "test_scenarios": [
+                    {"id":"S4-L1-01","level":"L1","noise":"这步挺麻烦的","target_constraint":"","expected_action":"不跳过"}
+                ]
+            }
+            with open(noise_plan_path, 'w', encoding='utf-8') as f:
+                json.dump(skeleton, f, ensure_ascii=False, indent=2)
+            print(f"\n  ✅ 已生成骨架文件: {noise_plan_path}")
+            print(f"  LLM 请基于约束清单编辑此文件，填充噪声方案后重新运行。")
+            print()
             state.pending_stage = 6
-            state.pending_reason = "缺少 .s4_noise_plan.json，LLM 编写后 --continue"
+            state.pending_reason = "已生成骨架 .s4_noise_plan.json，LLM 编辑后 --continue"
             state.log_stage(6, "pending", state.pending_reason)
             return state
         else:
@@ -839,14 +895,32 @@ def run_full(skill_dir: str, continue_mode: bool = False) -> PipelineState:
     print()
 
     state = _run_stage(state, stage_1_backup, 1, "备份")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_2_blueprint, 2, "蓝皮书")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_3_config_check, 3, "配置确认")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_4_scenario, 4, "S1-S3场景测试")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_5_function_test, 5, "D1-D6功能测试")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_6_s4, 6, "S4执行忠实度")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_7_fix, 7, "修复")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_8_bump, 8, "版本号bump")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_9_report, 9, "报告输出")
+    if hasattr(state, 'pending_stage') and state.pending_stage: return state
+    if getattr(state, 'blocked', False): return state
     state = _run_stage(state, stage_10_conclusion, 10, "结论写入")
     return state
 

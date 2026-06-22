@@ -45,13 +45,11 @@ def _skill_name(skill_dir: str) -> str:
 # ── 阻断 / 通过 / 自动 ──
 
 def _block(msg: str, action: str = "", exit_code: int = 1):
-    print(f"\n{'='*55}")
-    print(f"  [HOOK] ⛔ 流程阻断")
-    print(f"  {msg}")
+    msg_text = f"\n{'='*55}\n  [HOOK] ⛔ 流程阻断\n  {msg}\n"
     if action:
-        print(f"")
-        print(f"  >> 请执行: {action}")
-    print(f"{'='*55}")
+        msg_text += f"\n  >> 请执行: {action}\n"
+    msg_text += f"{'='*55}\n"
+    print(msg_text, file=sys.stderr)
     sys.exit(exit_code)
 
 

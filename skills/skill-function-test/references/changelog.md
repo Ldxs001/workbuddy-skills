@@ -1,3 +1,15 @@
+## [1.16.1] - 2026-06-22
+
+### 修复
+- hooks.py `_block()` 输出改为 stderr，不再被管道过滤吞没
+- test_engine.py `_hook_check()` 同时检查 stdout+stderr + 中文"阻断"+英文"block"，阻断信号不再丢失
+- runner.py run_full() 每个阶段后检查 `state.pending_stage`，管线不再跳过 S1-S3/S4 继续执行
+
+### 新增
+- stage_4_scenario() 自动读取蓝皮书摘要并生成 `.s_test_plan.json` 骨架（S1/S2/S3 三表 + 预期结果模板）
+- stage_6_s4() 自动读取约束清单并生成 `.s4_noise_plan.json` 骨架
+- 骨架文件格式：s-test-plan-schema.md + s4-noise-testing.md 标准
+
 ## [1.16.0] - 2026-06-21
 
 ### 新增

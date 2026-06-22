@@ -30,14 +30,13 @@ def _hook_check(skill_dir, step):
     r = subprocess.run([sys.executable, _HOOKS_SCRIPT, "check", skill_dir, step],
                         capture_output=True, text=True, encoding="utf-8")
     if r.stdout and r.stdout.strip(): print(r.stdout)
-    # 仅当 BLOCK > 0 才阻断，WARN 不阻断
+    if r.stderr and r.stderr.strip(): print(r.stderr, file=sys.stderr)
+    # 钩子阻断信号输出在 stdout（_block() 用 print 输出），
+    # 非零退出码 + stdout 含 "block" 即为阻断，WARN 不阻断
     if r.returncode not in (0, None):
-        try:
-            stderr_lower = r.stderr.lower() if r.stderr else ""
-            if "block" in stderr_lower or "f-0" in stderr_lower:
-                sys.exit(r.returncode)
-        except:
-            pass
+        output = (r.stdout or "") + (r.stderr or "")
+        if "block" in output.lower() or "阻断" in output or "f-0" in output.lower():
+            sys.exit(r.returncode)
 def _hook_done(skill_dir, step):
     subprocess.run([sys.executable, _HOOKS_SCRIPT, "done", skill_dir, step],
                     capture_output=True, encoding="utf-8")
@@ -536,7 +535,8 @@ class TestRunner:
                 summary[r.level] += 1
             dim_key = r.dim
             if dim_key not in dims:
-                dims[dim_key] = {"total": 0, "pass": 0, "fail": 0, "block": 0, "warn": 0}
+                dims[dim_key] = {"total": 0, "pass": 0, "fail": 0, "skip": 0,
+                                 "error": 0, "block": 0, "warn": 0, "info": 0}
             dims[dim_key]["total"] += 1
             dims[dim_key][r.status] += 1
             if r.level in ("block", "warn"):
