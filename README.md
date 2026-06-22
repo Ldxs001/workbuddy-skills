@@ -40,6 +40,7 @@
 
 ```
 workbuddy-skills/
+├── Cogito_Scribit/
 ├── LICENSE
 ├── README.md
 ├── architecture/
