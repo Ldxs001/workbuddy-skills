@@ -1,6 +1,6 @@
 {
-  "version": "1.6.5",
-  "description": "智能周历系统。skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点）",
+  "version": "2.2.0",
+  "description": "智能周历系统。支持法定假日、补班日、轮休系统（跳过/不跳过法定假双模式）、特殊休息（公休/临修）、个人日程管理。",
   "author": "wUwproject",
   "name": "workday-calendar",
   "tags": [
@@ -8,6 +8,9 @@
     "workday",
     "holiday",
     "schedule",
+    "rotation",
+    "gongxiu",
+    "linxiu",
     "excel-export"
   ],
   "data_dir": "skills/.standardization/workday-calendar/data/",
@@ -22,6 +25,10 @@
     "年度工日",
     "日程",
     "安排",
-    "空闲时间"
+    "空闲时间",
+    "轮休",
+    "公休",
+    "临修",
+    "排班"
   ]
 }

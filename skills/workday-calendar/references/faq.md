@@ -16,3 +16,15 @@ A: 周历（calendar）是按周展示的年度工作日/假日视图，用于�
 
 Q: 为什么计算的工作日数和官方不一致？
 A: 请先执行 `python scripts/workday_calendar.py rules <year>` 查看规则确认表，核对假日区间和补班日是否正确配置。配置错误是计算结果偏差的最常见原因。
+
+Q: add_schedule_event() 返回"冲突"怎么办？
+A: 该时间段已有日程。先用 `list <date>` 查看现有日程，调整起止时间避开冲突。更新日程时也会重新检测冲突，冲突则自动还原。
+
+Q: 导入规则模板时报 JSON 解析错误？
+A: 检查模板 JSON 是否符合 `export_rules_template` 格式（version/year/base_type/rules 字段）。可先用 `export-rules-template` 导出正确格式作为对照。
+
+Q: HTML 导出后页面空白/乱码？
+A: 确保使用 UTF-8 编码保存 .html 文件。用浏览器打开时若显示乱码，在浏览器菜单中手动选择 UTF-8 编码。
+
+Q: settings.py 配置中心无法访问？
+A: 确认端口 8765 未被占用。如被占用，运行 `python scripts/settings.py <其他端口>` 指定端口。防火墙可能需放行。

@@ -1,7 +1,7 @@
 # Skills Repository
 
 > **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-06-21
+> 最后更新：2026-06-22
 
 本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
 
@@ -32,7 +32,7 @@
 | `svg-composer` | SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式 |
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。支持文件 CRUD、Python 代码质量流水线、沙箱测试、流程钩子系统。 |
-| `workday-calendar` | 智能周历系统。skill-standardization 改造（R-12 数据目录路径合规修复、_meta.json data_dir 字段补充、代码中新增 DEFAULT_DATA_DIR_RAW 审计锚点） |
+| `workday-calendar` | 智能周历系统。支持法定假日、补班日、轮休系统（跳过/不跳过法定假双模式）、特殊休息（公休/临修）、个人日程管理。 |
 
 ---
 
