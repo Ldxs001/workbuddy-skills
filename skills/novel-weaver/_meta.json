@@ -1,0 +1,11 @@
+{
+  "name": "novel-weaver",
+  "version": "1.0.0",
+  "description": "结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 基于大纲的200行分段写作 → 子结构连通性补充 → 跨章节融合 → 风格一致性校验 → 大纲忠实度报告。支持用户确认/修正环节，确保每级产出符合预期。",
+  "author": "wUwproject",
+  "tags": [],
+  "data_dir": "skills/.standardization/novel-weaver/data/",
+  "triggers": [
+    "写小说/写故事/写文章/长文写作/故事大纲/场景配置/我想写个故事"
+  ]
+}
