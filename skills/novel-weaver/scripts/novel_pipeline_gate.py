@@ -64,6 +64,12 @@ def set_phase(state_path, new_phase):
     data = json.loads(sp.read_text(encoding="utf-8"))
     if "meta" not in data:
         data["meta"] = {}
+    # 门禁检查：关键阶段转换必须通过对应门禁
+    if new_phase == "writing":
+        require_gate(state_path, "outline_causality")
+    elif new_phase == "stage3_ready":
+        require_gate(state_path, "fidelity")
+        require_gate(state_path, "ending_verify")
     data["meta"]["current_phase"] = new_phase
     sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[阶段] → {new_phase}")
@@ -77,7 +83,7 @@ if __name__ == "__main__":
     if cmd == "status":
         status(state_path)
     elif cmd == "pass":
-        require_gate(state_path, sys.argv[3])
+        pass_gate(state_path, sys.argv[3])
     elif cmd == "require":
         require_gate(state_path, sys.argv[3])
     elif cmd == "set-phase":

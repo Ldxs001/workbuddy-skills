@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.8.1
+version: 1.8.2
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -27,7 +27,7 @@ external_data_dir: true
 
 - 🔴 **[强制] 流程门禁系统** — 每步完成后自动记录到 `novel_state.json` 的 `pipeline` 字段。`set-phase` 在 phase 转换前检查前置门禁，未通过则阻断。`novel_pipeline_gate.py status` 查看状态
 - **[必须] 先确认再写作** — 场景配置和大纲必须经用户确认后才能进入写作阶段
-- **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `verify-causality-sub`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
+- **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `novel_causality_check.py sub-structure`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
 - **[必须] 每章三检** — 完成后必须运行：连通性检查（novel_continuity.py）、风格校验（novel_style_check.py）、逻辑检查（novel_logic_check.py），然后 `novel_workflow_engine.py finalize-chapter` 推进 phase
@@ -69,26 +69,26 @@ external_data_dir: true
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
 |--------|------|----------|----------|
-| `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT）。包含：MIT 许可证完整文本。 | R-26 |
+| `references/LICENSE.md` | 许可协议 | MIT 许可证。包含：许可证完整文本。 | R-26 |
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
 | `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
 | `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
-| `references/execution_standards.md` | 参考文档 | / 层级 / 上限 / 说明 / | 无 |
+| `references/execution_standards.md` | 参考文档 | 执行规范全集：字数管理/文体规范/子结构规划/情绪系统/人格系统/文风系统/收束规范/时间线/角色表。 | 无 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
-| `references/hooks.md` | 参考文档 | 每个钩子成功完成后自动调用 `pipeline_gate.py pass` 更新全局状态。`set-phase` 在 phase 转换前自动调用 `pipeli | 无 |
+| `references/hooks.md` | 参考文档 | 16 个流程钩子 + 门禁系统一览（类型/行为/脚本），含门禁状态查看命令。 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
-| `scripts/novel_workflow_engine.py` | 主入口 | `plan-chapter`/`write-sub`/`finalize-chapter` 等命令的入口调度器，含 DATA_DIR 声明 | 无 |
-| `scripts/novel_state_manager.py` | 状态管理 | `add-char`/`update-sub`/`complete-sub` 状态文件管理 | 无 |
+| `scripts/novel_workflow_engine.py` | 主入口 | `plan-chapter`/`write-sub`/`finalize-chapter`/`finalize-novel` 等命令的入口调度器，含 DATA_DIR 声明 | 无 |
+| `scripts/novel_state_manager.py` | 状态管理 | `add-char`/`update-sub`/`finalize`/`add-timeline` 状态文件管理 | 无 |
 | `scripts/novel_atomic_writer.py` | 写入校验 | `validate_and_write()` 原子写入 + 格式阻断 | 无 |
-| `scripts/novel_context_loader.py` | 上下文加载 | 命题指令输出 + 中断恢复检测 | 无 |
-| `scripts/novel_continuity.py` | 连通性检查 | `check`(章内)/`cross-chapter`(跨章)/`auto-fix` | 无 |
-| `scripts/novel_pipeline_gate.py` | 门禁系统 | `pass`/`require`/`status` 三状态门禁 | 无 |
+| `scripts/novel_context_loader.py` | 上下文加载 | 命题指令输出 + 中断恢复检测 + 人格/情绪/文风三段硬约束 | 无 |
+| `scripts/novel_continuity.py` | 连通性检查 | `check`(章内)/`cross-chapter`(跨章) | 无 |
+| `scripts/novel_pipeline_gate.py` | 门禁系统 | `pass`/`require`/`status`/`set-phase` 四命令门禁，阶段转换自动检查前置门禁 | 无 |
 | `scripts/novel_style_check.py` | 风格校验 | `check-chapter` 风格一致性检查 | 无 |
-| `scripts/novel_causality_check.py` | 因果链验证 | `verify-sub` 子结构因果递进检查 | 无 |
-| `scripts/novel_character_registry.py` | 角色登记 | 新角色注册 + 属性变更 | 无 |
-| `scripts/novel_fidelity.py` | 忠实度检查 | 逐章对比 overview 与实际内容 | 无 |
-| `scripts/novel_logic_check.py` | 逻辑检查 | 内容逻辑一致性校验 | 无 |
-| `scripts/novel_timeline.py` | 时间线 | `add` 时间事件登记 | 无 |
+| `scripts/novel_causality_check.py` | 因果链验证 | `outline`(章级)/`sub-structure`(子结构) 双模式因果递进检查 | 无 |
+| `scripts/novel_character_registry.py` | 角色登记（已弃用） | 被 `novel_state_manager.py add-char` 取代，保留兼容 | 无 |
+| `scripts/novel_fidelity.py` | 忠实度检查 | 大纲忠实度报告 + `verify-ending` 结尾收束验证（封闭式/开放式/悬停式） | 无 |
+| `scripts/novel_logic_check.py` | 逻辑检查 | 内容逻辑一致性校验（人物/时间线/概述匹配） | 无 |
+| `scripts/novel_timeline.py` | 时间线 | `add`/`list` 时间事件登记 | 无 |
 ## 工作流程
 
 ### 阶段1：场景配置与大纲
@@ -99,9 +99,9 @@ external_data_dir: true
 2. LLM生成一级大纲（L01-L15 编号 + 标题 + 每章模糊概述）
 3. **因果链验证**
    ```
-   novel_workflow_engine.py verify-causality-outline <state_path>
+   python novel_causality_check.py outline <state_path>
    ```
-   逐链节检查 L01→L02→…L15 的因果递进。每节的概述必须显式承载"上一章的果 → 下一章的因"。全部 PASS 后才可进入下一步。
+   逐链节检查 L01→L02→…L15 的章概述因果递进（关键词重叠分析）。全部 PASS 后才可进入下一步。
 4. 输出给用户确认
 5. 钩子：用户确认/修正（阻断式）→ 未确认不得进入阶段2
 6. 输出：初始化 novel_state.json（style_guide / chapters / characters / timeline）
@@ -121,7 +121,7 @@ external_data_dir: true
       — 注册成功后自动写入 pipeline 门禁
    d. **因果链验证**
       ```
-      novel_workflow_engine.py verify-causality-sub <state_path> <L##>
+      ```python novel_causality_check.py sub-structure <state_path> <L##>```
       ```
       逐链节检查 S01→S02→… 的因果递进，全部 PASS 后才可开始写作。
       — PASS 时自动写入 pipeline 门禁

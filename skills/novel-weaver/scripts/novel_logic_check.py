@@ -110,8 +110,8 @@ def _check_timeline_logic(chapter_dir: str, state_path: str) -> list:
         with open(state_path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
-    timeline = state.get("timeline", {})
-    entries = timeline.get("entries", [])
+    timeline = state.get("timeline", [])
+    entries = timeline if isinstance(timeline, list) else []
 
     if not entries:
         # 没有 timeline 数据时做简单检查：扫描 subfiles 中的时间引用
@@ -172,7 +172,15 @@ def _check_summary_fidelity(chapter_dir: str, state_path: str) -> list:
     if not ch_key:
         return issues
 
-    chapter = state.get("chapters", {}).get(ch_key, {})
+    chapters = state.get("chapters", [])
+    chapter = {}
+    if isinstance(chapters, list):
+        for ch in chapters:
+            if ch.get("id") == ch_key:
+                chapter = ch
+                break
+    elif isinstance(chapters, dict):
+        chapter = chapters.get(ch_key, {})
     subs = chapter.get("sub_structures", {})
 
     if not subs:

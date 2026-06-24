@@ -44,12 +44,13 @@ def plan_chapter(state_path, chapter, subs_json):
             ch["sub_structures"] = {}
         for i, s in enumerate(subs):
             s_key = s["s_key"]
+            existing = ch["sub_structures"].get(s_key, {})
             entry = {
                 "title": s.get("title", ""),
                 "summary": s.get("summary", ""),
                 "tone": s.get("tone", ""),
-                "word_count": 0,
-                "status": "pending"
+                "word_count": existing.get("word_count", 0),
+                "status": existing.get("status", "pending")
             }
             # 情绪混合系统：emotions 数组（可选）
             if "emotions" in s and isinstance(s["emotions"], list) and len(s["emotions"]) > 0:
@@ -161,7 +162,6 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     sys.path.insert(0, str(SCRIPTS_DIR))
     from novel_continuity import check_continuity, cross_chapter
     from novel_style_check import check_chapter as style_check
-    from novel_pipeline_gate import pass_gate, load_gates, save_gates
 
     chapters_dir = str(Path(chapter_dir).parent)
 
@@ -178,10 +178,18 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     style_check(chapter_dir, chapter, state_path)
 
     print(f"\n---")
+    print(f"[完结] {chapter}: 逻辑检查...")
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    try:
+        from novel_logic_check import check_logic as logic_check
+        logic_check(chapter_dir, chapter, state_path)
+    except Exception as e:
+        print(f"[完结] 逻辑检查异常: {e}（跳过）")
+
+    print(f"\n---")
     print(f"[完结] {chapter}: 通过完结门禁")
-    gates = load_gates(state_path)
-    gates[f"chapter_finalized:{chapter}"] = "PASS"
-    save_gates(state_path, gates)
+    from novel_pipeline_gate import pass_gate
+    pass_gate(state_path, f"chapter_finalized:{chapter}")
     print(f"[完结] {chapter}: [OK] 全部完成")
 
 

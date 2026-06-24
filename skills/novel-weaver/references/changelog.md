@@ -1,12 +1,24 @@
-## [1.8.1] - 2026-06-24
+## [1.8.2] - 2026-06-24
 
 ### 修复
-- **致命 Bug：update-sub 毁灭式替换** — `novel_state_manager.py` `update_sub()` 第 57-60 行用 `{word_count, status}` 全量替换子结构条目，清空 `title`/`summary`/`tone`/`emotions`/`is_ending`/`ending_type` 等字段。改为合并写入，保留现有字段。
-- **影响范围**：写入任意子结构后，`verify_ending` 找不到 `is_ending` 标记→降级到 fallback→`ending_type=未指定`→验证 FAIL，情绪系统在写完后数据丢失
+- **[P0] pipeline_gate.py pass 命令挂错函数** — `pass` CLI 调用了 `require_gate()` 而非 `pass_gate()`，导致门禁标记失败。修改为 `pass_gate()`。
+- **[P0] plan_chapter 毁灭式写入** — `ch["sub_structures"][s_key] = entry` 覆盖已有 word_count/status。改用合并模式保留已有字段。
+- **[P0] fidelity.py generate_report 重复定义** — 第二个定义读不存在的 `outline.json`，覆盖第一个。已统一为从 `novel_state.json` 读取。
+- **[P1] logic_check.py chapters/timeline 数据结构不匹配** — chapters 预期 dict 实际 list，timeline 预期 dict 实际 list。已改为兼容访问。
+- **[P1] fidelity.py os.system 调用** — 改用 `subprocess.run()` 替代 `os.system()`，修复 shell 注入风险。
+- **finalize_chapter 绕过 pass_gate API** — 直接操作 gates dict，改为调用 `pass_gate()`。
+- **finalize_chapter 缺少逻辑检查** — 三检只跑了连通性和风格，未调用 logic_check。已补上。
+- **set_phase 不做门禁检查** — →writing 不检查 outline_causality，→stage3_ready 不检查 fidelity/ending_verify。已补上门禁检查。
+- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 [username-redacted]。
+
+### 文档
+- SKILL.md 渐进式文件索引表修正：execution_standards/hooks/license/causality_check/fidelity/character_registry 描述与实际对齐
+- SKILL.md CLI 示例修正：verify-causality-* 命令从 workflow_engine 更正为 causality_check
+- 约束描述中的 `verify-causality-sub` 更正为 `novel_causality_check.py sub-structure`
 
 ---
 
-## [1.8.0] - 2026-06-24
+## [1.8.1] - 2026-06-24
 
 ### 新增
 - **人格系统** — characters 增加 `mbti`（16 类型）和 `archetype`（荣格 12 原型）双轴，驱动角色思维方式与叙事功能。`novel_state_manager.py add-char` 支持第 7/8 位置参数

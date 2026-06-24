@@ -281,34 +281,15 @@ def _write_ending_report(project_dir: str, result: dict, ch_id: str, ending_key:
 
 
 def generate_report(project_dir: str):
-    """读取已完成的章节内容"""
-    chapters_dir = os.path.join(project_dir, "chapters")
-    result = {}
-    if not os.path.isdir(chapters_dir):
-        return result
-    for ch_dir in sorted(os.listdir(chapters_dir)):
-        ch_path = os.path.join(chapters_dir, ch_dir)
-        if not os.path.isdir(ch_path):
-            continue
-        ch_text = ""
-        sub_files = sorted([f for f in os.listdir(ch_path) if f.endswith(".txt")])
-        for sf in sub_files:
-            with open(os.path.join(ch_path, sf), "r", encoding="utf-8") as f:
-                ch_text += f.read() + "\n"
-        result[ch_dir] = ch_text[:500]  # 前500字作为摘要样本
-    return result
-
-
-def generate_report(project_dir: str):
-    outline_path = os.path.join(project_dir, "data", "outline.json")
-    if not os.path.exists(outline_path):
-        print(f"ERROR: novel_state.json 未找到（尝试从 {outline_path} 加载）")
-        print(f"  → 阶段1未完成或项目数据目录不完整。")
+    """大纲忠实度报告：从 novel_state.json 读取大纲 vs 实际内容"""
+    state_path = os.path.join(project_dir, "data", "novel_state.json")
+    if not os.path.exists(state_path):
+        print(f"ERROR: novel_state.json 未找到（{state_path}）")
         sys.exit(1)
 
     # 阶段门禁：需要 ≥ stage3_ready
     _order = {"none": 0, "init": 10, "stage1_done": 20, "writing": 30, "chapter_done": 40, "stage3_ready": 50, "complete": 60}
-    with open(outline_path, "r", encoding="utf-8") as f:
+    with open(state_path, "r", encoding="utf-8") as f:
         _state = json.load(f)
     _p = _order.get(_state.get("current_phase", "none"), 0)
     if _p < 50:
@@ -316,7 +297,7 @@ def generate_report(project_dir: str):
         print(f"  全文写作未完成，不能生成大纲忠实度报告。")
         sys.exit(1)
 
-    with open(outline_path, "r", encoding="utf-8") as f:
+    with open(state_path, "r", encoding="utf-8") as f:
         outline = json.load(f)
 
     chapters_raw = outline.get("chapters", [])
@@ -412,7 +393,9 @@ def generate_report(project_dir: str):
     state_path = os.path.join(project_dir, "data", "novel_state.json")
     if os.path.exists(state_path):
         gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
-        os.system(f'"{sys.executable}" "{gate_script}" pass "{state_path}" fidelity')
+        import subprocess as _sp
+        _sp.run([sys.executable, gate_script, "pass", state_path, "fidelity"],
+                capture_output=True, check=False)
     print(f"OK report={report_path} pass={pass_count} info={info_count} warn={warn_count} error={error_count}")
 
 
