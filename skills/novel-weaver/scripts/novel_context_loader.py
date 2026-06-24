@@ -84,15 +84,27 @@ def load_context(state_path: str, sub_id: str) -> None:
     ch_summary = chapter.get("summary", "")
     s_title = sub.get("title", "未知")
     s_summary = sub.get("summary", "")
+    s_tone = sub.get("tone", "")
 
-    # 格式化输出
+    # 格式化输出 — 命题指令格式
     lines = []
-    lines.append("[写作前上下文]")
-    lines.append(f"风格：{genre}，{perspective}，{narrative}")
-    lines.append(f"出场角色：{'，'.join(char_list)}")
-    lines.append(f"时间线：{start_date}，穿越后第 {current_day} 天")
-    lines.append(f"当前章节 {ch_key}「{ch_title}」概述：{ch_summary}")
-    lines.append(f"当前子结构 {s_key}「{s_title}」概述：{s_summary}")
+    lines.append("=" * 55)
+    lines.append("  📌 命题作文 — 严格按以下要求写作")
+    lines.append("=" * 55)
+    lines.append(f"  标题：{s_title}")
+    lines.append(f"  概述：{s_summary}")
+    if s_tone:
+        lines.append(f"  情绪基调：{s_tone}")
+    lines.append(f"  字数上限：200 行（自然段落结束）")
+    lines.append(f"  要求：严格按照标题和概述写作，不可偏离命题")
+    lines.append("=" * 55)
+    lines.append("")
+    lines.append("[背景参考]")
+    lines.append(f"  文体风格：{genre}，{perspective}，{narrative}")
+    lines.append(f"  出场角色：{'，'.join(char_list)}")
+    lines.append(f"  时间线：{start_date}，穿越后第 {current_day} 天")
+    lines.append(f"  当前章节：{ch_key}「{ch_title}」— {ch_summary}")
+    lines.append(f"  当前子结构：{ch_key}{s_key}「{s_title}」")
     lines.append("")
 
     output = "\n".join(lines)

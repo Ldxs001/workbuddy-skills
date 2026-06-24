@@ -213,9 +213,14 @@ def cmd_finalize_chapter(state_path: str, ch_key: str, chapter_dir: str, report_
     logic_script = os.path.join(SCRIPTS_DIR, "novel_logic_check.py")
     if os.path.exists(logic_script):
         print(f"\n[3/3] 逻辑检查...")
-        ret = os.system(f'"{python_exe}" "{logic_script}" "{chapter_dir}" "{state_path}" "{logic_report}"')
+        ret = os.system(f'"{python_exe}" "{logic_script}" "{chapter_dir}" "{state_path}" "{logic_report}" --auto-fix')
         if ret != 0:
             print(f"  WARN: 逻辑检查返回非零 {ret}，继续")
+        # 检查是否有修复项生成
+        fix_json = os.path.join(report_dir, "_fixes.json")
+        if os.path.exists(fix_json):
+            print(f"  🔧 发现 {ch_key} 存在可修复问题，写入 {fix_json}")
+            print(f"  → LLM 请读取 {fix_json} 并按建议修复后重新运行 finalize-chapter")
     else:
         print(f"\n[3/3] 逻辑检查 — 跳过（脚本不存在）")
 

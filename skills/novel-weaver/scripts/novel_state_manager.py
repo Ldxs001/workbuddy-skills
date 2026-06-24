@@ -208,6 +208,38 @@ def cmd_update_sub(path: str, sub_id: str, *kv_pairs):
     _save(path, data)
     print(f"OK {sub_id} updated")
 
+    # ── 自动检测：该章所有子结构是否全部完成 → 自动触发 finalize-chapter ──
+    if sub.get("status") == "done":
+        chapter_subs = data.get("chapters", {}).get(ch_key, {}).get("sub_structures", {})
+        all_done = all(
+            info.get("status") == "done"
+            for info in chapter_subs.values()
+        )
+        if all_done and len(chapter_subs) >= 2:
+            print(f"  🎯 {ch_key} 全部 {len(chapter_subs)} 个子结构已完成，自动触发完结检查...")
+            python_exe = sys.executable
+            project_dir = os.path.dirname(os.path.dirname(path))
+            chapters_dir = os.path.join(project_dir, "chapters")
+            ch_num = ch_key.replace("L", "")
+            chapter_dir = None
+            if os.path.isdir(chapters_dir):
+                for d in sorted(os.listdir(chapters_dir)):
+                    if d.startswith(ch_num):
+                        chapter_dir = os.path.join(chapters_dir, d)
+                        break
+            report_dir = os.path.join(os.path.dirname(path), "reports")
+            workflow_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "novel_workflow_engine.py")
+            if chapter_dir and os.path.isdir(chapter_dir):
+                print(f"  → 正在运行 finalize-chapter（{ch_key}）...")
+                ret = os.system(f'"{python_exe}" "{workflow_script}" finalize-chapter "{path}" "{ch_key}" "{chapter_dir}" "{report_dir}"')
+                if ret == 0:
+                    print(f"  ✅ {ch_key} 完结检查全部通过")
+                else:
+                    print(f"  ⚠️ {ch_key} 完结检查发现需关注的问题（不影响推进）")
+            else:
+                print(f"  ⚠️ 章节目录 {chapters_dir}/{ch_num}_* 未找到，跳过自动完结")
+                print(f"  → 请手动运行: novel_workflow_engine.py finalize-chapter <state> {ch_key} <chapter_dir> <report_dir>")
+
 
 def cmd_add_char(path: str, name: str, role: str, first_appearance: str):
     data = _require_phase(path, "add-char")

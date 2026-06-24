@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.3.3
+version: 1.3.4
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ pipeline 流程门禁（LLM 跳过任何步骤即阻断）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 连通性补充（含 auto-fix）→ 跨章节融合 → 风格校验 + 逻辑检查 + 大纲忠实度报告。全流程硬约束 + 门禁跟踪。
@@ -112,7 +112,7 @@ external_data_dir: true
 
 输入：当前一级标题 + 模糊概述
 
-0. **写作前加载上下文** — 从 novel_state.json 读取风格/角色/时间线/当前子结构概述
+0. **写作前加载上下文（命题指令）** — novel_context_loader.py 输出硬性命题指令（标题/概述/情绪基调），LLM 必须作为命题作文严格遵守，不可偏离
 
 1. **子结构先行规划（v1.2 新增硬约束）**
    a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone**）

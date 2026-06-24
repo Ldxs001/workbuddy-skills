@@ -319,15 +319,101 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
         os.fsync(f.fileno())
 
     print(f"OK report={report_path} info={info_count} warn={warn_count}")
+    return all_issues
+
+
+def write_fixes_json(chapter_dir: str, state_path: str, report_path: str, issues: list) -> str:
+    """
+    Auto-fix 模式：生成 _fixes.json，列出所有需要修复的问题及修复建议。
+    返回 fixes JSON 文件路径，或空字符串（无需修复）。
+    """
+    if not issues:
+        return ""
+
+    needs_fix = [i for i in issues if i.get("level") in ("WARN", "ERROR") or i.get("dimension") == "内容与概述匹配度"]
+    if not needs_fix:
+        return ""
+
+    report_dir = os.path.dirname(report_path)
+    json_path = os.path.join(report_dir, "_fixes.json")
+
+    fix_items = []
+    for i in needs_fix:
+        dim = i.get("dimension", "")
+        detail = i.get("detail", "")
+        level = i.get("level", "WARN")
+
+        # 推断需要修复的文件
+        target_file = ""
+        action_type = ""  # rewrite / append / link
+        action_desc = ""
+
+        if dim == "内容与概述匹配度":
+            # "L01S01 (S01): 概述关键词命中率 40%..." → 提取文件名
+            if "(" in detail:
+                fname = detail.split("(")[0].strip()
+                target_file = os.path.join(chapter_dir, fname) if os.path.exists(os.path.join(chapter_dir, fname)) else ""
+            action_type = "rewrite"
+            action_desc = f"正文偏离了规划概述，需要重写或补充内容以匹配「{detail.split('概述: ')[-1][:40] if '概述: ' in detail else '规划'}」"
+
+        elif dim == "人物行为一致性":
+            action_type = "append"
+            # 提取文件名
+            fname_part = detail.split(":")[0].strip() if ":" in detail else ""
+            target_file = os.path.join(chapter_dir, fname_part) if fname_part and os.path.exists(os.path.join(chapter_dir, fname_part)) else ""
+            action_desc = f"角色出场/消失不自然，需要在受影响子结构中增加合理过渡"
+
+        elif dim == "时间线逻辑":
+            fname_part = detail.split(":")[0].strip() if ":" in detail else ""
+            target_file = os.path.join(chapter_dir, fname_part) if fname_part and os.path.exists(os.path.join(chapter_dir, fname_part)) else ""
+            action_type = "append"
+            action_desc = f"时间引用或跳跃需要确认，可能需要在受影响子结构中增加时间标记或过渡"
+
+        if action_type:
+            fix_items.append({
+                "dimension": dim,
+                "level": level,
+                "detail": detail,
+                "target_file": target_file,
+                "action_type": action_type,
+                "action_desc": action_desc,
+                "fixed": False
+            })
+
+    if not fix_items:
+        return ""
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(fix_items, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+
+    print(f"OK auto-fix fixes={len(fix_items)} json={json_path}")
+    print(f"  → 请修复以下问题后重新运行:")
+    for item in fix_items:
+        print(f"    [{item['level']}] {item['dimension']}: {item['detail'][:60]}")
+        print(f"      操作: {item['action_desc'][:60]}")
+    print(f"  → 修复完成后重新运行 finalize-chapter")
+    print(f"  → 也可由 workflow_engine 自动处理")
+
+    return json_path
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
-        print("用法: novel_logic_check.py <chapter_dir> <state_path> <report_path>")
+        print("用法: novel_logic_check.py <chapter_dir> <state_path> <report_path> [--auto-fix]")
         sys.exit(1)
 
-    generate_report(
+    issues = generate_report(
         chapter_dir=sys.argv[1],
         state_path=sys.argv[2],
         report_path=sys.argv[3]
     )
+
+    if len(sys.argv) >= 5 and sys.argv[4] == "--auto-fix":
+        write_fixes_json(
+            chapter_dir=sys.argv[1],
+            state_path=sys.argv[2],
+            report_path=sys.argv[3],
+            issues=issues
+        )
