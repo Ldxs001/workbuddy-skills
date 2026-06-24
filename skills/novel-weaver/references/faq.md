@@ -45,6 +45,16 @@ python novel_state_manager.py add-sub <state_path> <L##> <S##> <title> <summary>
 pip install <模块名>
 ```
 
+### Q: context_loader 报 "子结构已完成，禁止重复写作"
+
+**原因：** 尝试加载一个已经写完（status=done）的子结构。
+
+**修复：** 用 resume 命令查找下一个待写的子结构：
+```bash
+python novel_workflow_engine.py resume <state_path>
+```
+系统会输出当前进度表，标明已完成/待写的子结构，并给出续写命令。
+
 ### Q: 提示 "novel_state.json not found"
 
 **原因：** 项目未初始化或路径不对。

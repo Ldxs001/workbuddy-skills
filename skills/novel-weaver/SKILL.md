@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.3.8
+version: 1.3.9
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ pipeline 流程门禁（LLM 跳过任何步骤即阻断）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 连通性补充（含 auto-fix）→ 跨章节融合 → 风格校验 + 逻辑检查 + 大纲忠实度报告。全流程硬约束 + 门禁跟踪。
@@ -118,30 +118,31 @@ external_data_dir: true
    a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone**）
    b. 展示给用户（可选确认）
    c. **调用 novel_workflow_engine.py plan-chapter 批量注册所有子结构到 novel_state.json**
+      — 自动校验每条概述 ≥12 有效字符，不达标则阻断
+      — 若通过 outline_causality 门禁，自动推进 phase 到 writing
+      — 注册成功后自动写入 pipeline 门禁
    d. **因果链验证**
       ```
       novel_workflow_engine.py verify-causality-sub <state_path> <L##>
       ```
       逐链节检查 S01→S02→… 的因果递进，全部 PASS 后才可开始写作。
+      — PASS 时自动写入 pipeline 门禁
    e. 验证：novel_workflow_engine.py verify-chapter 检查全部注册
-   f. **phase 推进**：若通过 outline_causality 门禁检查，自动推进到 writing
 
-2. **逐子结构写作循环（硬约束：context_loader 会检查子结构必须已注册）**
-   a. 调用 novel_context_loader.py 加载上下文（无子结构 → 报错阻断）
-      - 新写模式：输出命题指令框 + 背景参考
-      - **续写模式（中断恢复）**：自动检测 .progress 文件，输出已写行数 + 末5行锚点，LLM 从断点继续
+2. **逐子结构写作循环（硬约束：context_loader 双重阻断）**
+   a. 调用 novel_context_loader.py 加载上下文
+      — 子结构未注册 → 报错阻断
+      — 子结构已完成（status=done）→ 报错阻断，提示用 resume 找下一步
+      — 新写模式：输出命题指令框（标题+概述+情绪基调）+ 背景参考
+      — **续写模式（中断恢复）**：检测到 .progress 文件，输出已写行数 + 末5行锚点
    b. 用 novel_atomic_writer.py tail 读上一个子结构的末3行（跳过编号标记）作为连接锚点
-   c. 写作 ≤200 行，自然段落结束
+   c. 写作 ≤200 行，自然段落结束（命题指令框约束，无硬强制）
    d. 用 novel_atomic_writer.py 写入（正文含标记行 L##S## → 报错阻断）
-   e. 用 novel_state_manager.py update-sub 更新字数 / 状态
-   > **中断恢复**：无论中断发生在子结构开始前还是写作中，下次进入时必须重新调用 context_loader 获取命题指令 + 已写内容锚点，确保文风/人物/时间线一致
-
-3. **本章完成 → 自动执行三道检查**
-   a. 连通性补充（novel_continuity.py + auto-fix）
-   b. 风格校验（novel_style_check.py）
-   c. 逻辑检查（novel_logic_check.py — 人物行为一致性 / 时间线逻辑 / 内容-概述匹配度）
-
-4. **阶段推进** — 调用 novel_workflow_engine.py finalize-chapter 一键完成检查+set-phase chapter_done
+   e. 用 novel_state_manager.py update-sub 更新字数 / 状态（status=done）
+      — **自动触发**：该章全部子结构 done → 自动调用 finalize-chapter
+        （连通性检查 + 风格校验 + 逻辑检查 + set-phase chapter_done）
+      — 逻辑检查发现问题时生成 _fixes.json，LLM 修复后重新跑 finalize-chapter
+   > **中断恢复**：下次进入时先运行 resume <state_path> 找到续写点，再调 context_loader 获取命题指令 + 已写内容锚点
 
 **阶段3：全文整合**
 
