@@ -20,6 +20,23 @@ import os
 import sys
 import json
 
+ATOMIC_WRITER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "novel_atomic_writer.py")
+
+
+def _find_sub_file(state_path: str, ch_key: str, s_key: str) -> str | None:
+    """尝试定位子结构文件路径"""
+    project_dir = os.path.dirname(os.path.dirname(state_path))
+    chapters_dir = os.path.join(project_dir, "chapters")
+    ch_num = ch_key.replace("L", "")
+    if not os.path.isdir(chapters_dir):
+        return None
+    for d in sorted(os.listdir(chapters_dir)):
+        if d.startswith(ch_num):
+            candidate = os.path.join(chapters_dir, d, f"{ch_key}{s_key}.txt")
+            if os.path.exists(candidate):
+                return candidate
+    return None
+
 
 def load_context(state_path: str, sub_id: str) -> None:
     if not os.path.exists(state_path):
@@ -105,6 +122,49 @@ def load_context(state_path: str, sub_id: str) -> None:
     lines.append(f"  时间线：{start_date}，穿越后第 {current_day} 天")
     lines.append(f"  当前章节：{ch_key}「{ch_title}」— {ch_summary}")
     lines.append(f"  当前子结构：{ch_key}{s_key}「{s_title}」")
+    lines.append("")
+
+    # ── 断点续写检测 ──
+    sub_file = _find_sub_file(state_path, ch_key, s_key)
+    if sub_file:
+        # 检查 .progress 文件
+        progress_path = sub_file + ".progress"
+        written_lines = 0
+        if os.path.exists(progress_path):
+            with open(progress_path, "r", encoding="utf-8") as pf:
+                try:
+                    written_lines = int(pf.read().strip())
+                except ValueError:
+                    written_lines = 0
+
+        if written_lines > 0:
+            # 已写内容，断点续写模式
+            lines.append("[续写模式 — 已写内容]")
+            lines.append(f"  已写 {written_lines} 行（上限 200 行），剩余 {200 - written_lines} 行")
+            # 读取末5行作为续写锚点
+            try:
+                import subprocess
+                result = subprocess.run(
+                    [sys.executable, ATOMIC_WRITER_SCRIPT, "tail", sub_file, "5"],
+                    capture_output=True, text=True, encoding="utf-8"
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    tail_lines = json.loads(result.stdout.strip())
+                    if tail_lines:
+                        lines.append(f"  末5行锚点：")
+                        for tl in tail_lines:
+                            lines.append(f"    {tl}")
+            except Exception:
+                pass
+            lines.append(f"  → 请从断点继续写作，保持命题风格一致")
+            lines.append(f"  → 写完后运行 atomic_writer finalize {sub_file} {ch_key}{s_key}")
+        else:
+            lines.append("[新写模式]")
+            lines.append(f"  → 请开始写作，遵循命题要求")
+    else:
+        lines.append("[新写模式]")
+        lines.append(f"  → 请开始写作，遵循命题要求")
+
     lines.append("")
 
     output = "\n".join(lines)

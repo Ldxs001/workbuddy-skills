@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.3.4
+version: 1.3.6
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ pipeline 流程门禁（LLM 跳过任何步骤即阻断）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 连通性补充（含 auto-fix）→ 跨章节融合 → 风格校验 + 逻辑检查 + 大纲忠实度报告。全流程硬约束 + 门禁跟踪。
@@ -128,10 +128,13 @@ external_data_dir: true
 
 2. **逐子结构写作循环（硬约束：context_loader 会检查子结构必须已注册）**
    a. 调用 novel_context_loader.py 加载上下文（无子结构 → 报错阻断）
+      - 新写模式：输出命题指令框 + 背景参考
+      - **续写模式（中断恢复）**：自动检测 .progress 文件，输出已写行数 + 末5行锚点，LLM 从断点继续
    b. 用 novel_atomic_writer.py tail 读上一个子结构的末3行（跳过编号标记）作为连接锚点
    c. 写作 ≤200 行，自然段落结束
    d. 用 novel_atomic_writer.py 写入（正文含标记行 L##S## → 报错阻断）
    e. 用 novel_state_manager.py update-sub 更新字数 / 状态
+   > **中断恢复**：无论中断发生在子结构开始前还是写作中，下次进入时必须重新调用 context_loader 获取命题指令 + 已写内容锚点，确保文风/人物/时间线一致
 
 3. **本章完成 → 自动执行三道检查**
    a. 连通性补充（novel_continuity.py + auto-fix）
