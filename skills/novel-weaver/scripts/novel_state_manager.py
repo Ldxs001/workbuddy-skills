@@ -54,10 +54,10 @@ def update_sub(path, chapter, sub_key, word_count):
         if "sub_structures" not in ch:
             ch["sub_structures"] = {}
         prev_wc = ch["sub_structures"].get(sub_key, {}).get("word_count", 0)
-        ch["sub_structures"][sub_key] = {
-            "word_count": int(word_count),
-            "status": "completed"
-        }
+        prev = ch["sub_structures"].get(sub_key, {})
+        prev["word_count"] = int(word_count)
+        prev["status"] = "completed"
+        ch["sub_structures"][sub_key] = prev
         # 更新章总字数（减去旧字数+新字数）
         ch["word_count"] = ch.get("word_count", 0) - prev_wc + int(word_count)
         break

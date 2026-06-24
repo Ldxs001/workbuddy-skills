@@ -1,3 +1,11 @@
+## [1.8.1] - 2026-06-24
+
+### 修复
+- **致命 Bug：update-sub 毁灭式替换** — `novel_state_manager.py` `update_sub()` 第 57-60 行用 `{word_count, status}` 全量替换子结构条目，清空 `title`/`summary`/`tone`/`emotions`/`is_ending`/`ending_type` 等字段。改为合并写入，保留现有字段。
+- **影响范围**：写入任意子结构后，`verify_ending` 找不到 `is_ending` 标记→降级到 fallback→`ending_type=未指定`→验证 FAIL，情绪系统在写完后数据丢失
+
+---
+
 ## [1.8.0] - 2026-06-24
 
 ### 新增
