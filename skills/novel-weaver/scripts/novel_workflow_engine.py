@@ -51,6 +51,9 @@ def plan_chapter(state_path, chapter, subs_json):
                 "word_count": 0,
                 "status": "pending"
             }
+            # 情绪混合系统：emotions 数组（可选）
+            if "emotions" in s and isinstance(s["emotions"], list) and len(s["emotions"]) > 0:
+                entry["emotions"] = s["emotions"]
             # 末章 + 最后一个子结构 → 标记 is_ending
             if is_last_chapter and i == len(subs) - 1:
                 entry["is_ending"] = True

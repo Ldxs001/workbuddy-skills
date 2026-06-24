@@ -17,7 +17,7 @@ def load_state(path):
 def save_state(path, data):
     Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-def add_char(path, name, role_attr, first_appearance, traits=""):
+def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype=""):
     data = load_state(path)
     chars = data.get("characters", [])
     for c in chars:
@@ -25,16 +25,22 @@ def add_char(path, name, role_attr, first_appearance, traits=""):
             if role_attr: c["role"] = role_attr
             if first_appearance: c["first_appearance"] = first_appearance
             if traits: c["traits"] = [t.strip() for t in traits.split(",")]
+            if mbti: c["mbti"] = mbti
+            if archetype: c["archetype"] = archetype
             save_state(path, data)
-            print(f"[角色更新] {name}")
+            print(f"[角色更新] {name} (MBTI={mbti or '无'}, 原型={archetype or '无'})")
             return
     entry = {"name": name, "role": role_attr, "first_appearance": first_appearance}
     if traits:
         entry["traits"] = [t.strip() for t in traits.split(",")]
+    if mbti:
+        entry["mbti"] = mbti
+    if archetype:
+        entry["archetype"] = archetype
     chars.append(entry)
     data["characters"] = chars
     save_state(path, data)
-    print(f"[角色新增] {name} (出场: {first_appearance})")
+    print(f"[角色新增] {name} (出场: {first_appearance}, MBTI={mbti or '无'}, 原型={archetype or '无'})")
 
 def update_sub(path, chapter, sub_key, word_count):
     """
@@ -82,7 +88,10 @@ if __name__ == "__main__":
     cmd = sys.argv[1]
     sp = sys.argv[2]
     if cmd == "add-char":
-        add_char(sp, sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6] if len(sys.argv) > 6 else "")
+        add_char(sp, sys.argv[3], sys.argv[4], sys.argv[5],
+                 sys.argv[6] if len(sys.argv) > 6 else "",
+                 sys.argv[7] if len(sys.argv) > 7 else "",
+                 sys.argv[8] if len(sys.argv) > 8 else "")
     elif cmd == "update-sub":
         update_sub(sp, sys.argv[3], sys.argv[4], sys.argv[5])
     elif cmd == "finalize":

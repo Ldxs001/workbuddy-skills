@@ -1,9 +1,13 @@
 ---
 name: novel-weaver
+<<<<<<< HEAD
 version: 1.7.0
+=======
+version: 1.8.0
+>>>>>>> f725864 (feat: sync novel-weaver v1.8.0)
 author: wUwproject
 license: MIT
-description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ pipeline 流程门禁（LLM 跳过任何步骤即阻断）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 连通性补充（含 auto-fix）→ 跨章节融合 → 风格校验 + 逻辑检查 + 大纲忠实度报告。全流程硬约束 + 门禁跟踪。
+description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -27,7 +31,7 @@ external_data_dir: true
 
 - 🔴 **[强制] 流程门禁系统** — 每步完成后自动记录到 `novel_state.json` 的 `pipeline` 字段。`set-phase` 在 phase 转换前检查前置门禁，未通过则阻断。`novel_pipeline_gate.py status` 查看状态
 - **[必须] 先确认再写作** — 场景配置和大纲必须经用户确认后才能进入写作阶段
-- **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone）→ `verify-causality-sub`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
+- **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `verify-causality-sub`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
 - **[必须] 每章三检** — 完成后必须运行：连通性检查（novel_continuity.py）、风格校验（novel_style_check.py）、逻辑检查（novel_logic_check.py），然后 `novel_workflow_engine.py finalize-chapter` 推进 phase
@@ -113,7 +117,7 @@ external_data_dir: true
 0. **写作前加载上下文（命题指令）** — novel_context_loader.py 输出硬性命题指令（标题/概述/情绪基调），LLM 必须作为命题作文严格遵守，不可偏离
 
 1. **子结构先行规划（v1.2 新增硬约束）**
-   a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone**）
+   a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone** + **可选 emotions 数组**）
    b. 展示给用户（可选确认）
    c. **调用 novel_workflow_engine.py plan-chapter 批量注册所有子结构到 novel_state.json**
       — 自动校验每条概述 ≥12 有效字符，不达标则阻断
