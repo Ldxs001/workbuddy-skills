@@ -135,10 +135,10 @@ def generate_report(project_dir: str):
 
     report_lines.append(f"")
     report_lines.append(f"## 统计")
-    report_lines.append(f"- ✅ PASS: {pass_count}")
+    report_lines.append(f"- [OK] PASS: {pass_count}")
     report_lines.append(f"- ℹ️ INFO: {info_count}")
-    report_lines.append(f"- ⚠️ WARN: {warn_count}")
-    report_lines.append(f"- ❌ ERROR: {error_count}")
+    report_lines.append(f"- [WARN] WARN: {warn_count}")
+    report_lines.append(f"- [FAIL] ERROR: {error_count}")
     report_lines.append(f"")
     report_lines.append(f"---")
     report_lines.append(f"*报告由 novel-fidelity 生成*")

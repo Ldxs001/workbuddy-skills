@@ -2,7 +2,7 @@
 """
 novel-character-registry — 角色信息表管理（已弃用）。
 
-⚠️ 已弃用 — 请使用 `novel_state_manager.py add-char` 替代。
+[WARN] 已弃用 — 请使用 `novel_state_manager.py add-char` 替代。
 本脚本保留用于向前兼容，新项目不应调用。
 
 维护 characters.json，记录每章出场角色及其关键属性。

@@ -271,10 +271,10 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
     char_issues = _check_character_consistency(chapter_dir, state_path)
     if char_issues:
         for i in char_issues:
-            icon = "ℹ️" if i["level"] == "INFO" else "⚠️"
+            icon = "ℹ️" if i["level"] == "INFO" else "[WARN]"
             report_lines.append(f"- {icon} [{i['dimension']}] {i['detail']}")
     else:
-        report_lines.append("- ✅ 未发现明显人物一致性问题")
+        report_lines.append("- [OK] 未发现明显人物一致性问题")
     report_lines.append(f"")
 
     report_lines.append(f"## 2️⃣ 时间线逻辑")
@@ -282,10 +282,10 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
     tl_issues = _check_timeline_logic(chapter_dir, state_path)
     if tl_issues:
         for i in tl_issues:
-            icon = "ℹ️" if i["level"] == "INFO" else "⚠️"
+            icon = "ℹ️" if i["level"] == "INFO" else "[WARN]"
             report_lines.append(f"- {icon} [{i['dimension']}] {i['detail']}")
     else:
-        report_lines.append("- ✅ 时间线逻辑正常")
+        report_lines.append("- [OK] 时间线逻辑正常")
     report_lines.append(f"")
 
     report_lines.append(f"## 3️⃣ 子结构内容与概述匹配度")
@@ -293,10 +293,10 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
     fidelity_issues = _check_summary_fidelity(chapter_dir, state_path)
     if fidelity_issues:
         for i in fidelity_issues:
-            icon = {"INFO": "ℹ️", "WARN": "⚠️"}.get(i["level"], "ℹ️")
+            icon = {"INFO": "ℹ️", "WARN": "[WARN]"}.get(i["level"], "ℹ️")
             report_lines.append(f"- {icon} [{i['dimension']}] {i['detail']}")
     else:
-        report_lines.append("- ✅ 所有子结构内容与概述一致")
+        report_lines.append("- [OK] 所有子结构内容与概述一致")
     report_lines.append(f"")
 
     # 统计
@@ -307,7 +307,7 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
 
     report_lines.append(f"## 统计")
     report_lines.append(f"- ℹ️ INFO: {info_count}")
-    report_lines.append(f"- ⚠️ WARN: {warn_count}")
+    report_lines.append(f"- [WARN] WARN: {warn_count}")
     report_lines.append(f"")
     report_lines.append(f"---")
     report_lines.append(f"*报告由 novel-logic-check 生成*")

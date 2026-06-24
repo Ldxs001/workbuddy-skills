@@ -1,182 +1,99 @@
 #!/usr/bin/env python3
 """
-novel-atomic-writer — 行级别原子写入器。
+Atomic Writer — 原子写入器（v2，格式硬约束版）
 
-用途：
-  - 按行写入正文文件，每行后 os.fsync()，防止断电丢失整篇
-  - 维护 .progress 标记文件，记录已写入的行数，支持断点续写
-  - 读取上一个子结构的末 N 行作为连接锚点（自动跳过末尾编号标记行）
-  - 写入末尾编号标记行（如 L10S04）
+格式规范（钩子强制执行，阻断式）：
+  第1行: L## · S##《标题》
+  第2..N-1行: 正文（纯叙事，不得含子结构标记行）
+  末行: L##S##（由本脚本自动追加）
 
-用法：
-  python novel_atomic_writer.py write <filepath> <line>          # 写入单行（追加）
-  python novel_atomic_writer.py write-batch <filepath> <lines>   # 写入多行（追加）
-  python novel_atomic_writer.py finalize <filepath> <marker>     # 写入末尾编号标记行（如 L10S04）
-  python novel_atomic_writer.py tail <filepath> <n>              # 读取末 N 行（跳过编号标记行）
-  python novel_atomic_writer.py head <filepath> <n>              # 读取首 N 行
-  python novel_atomic_writer.py progress <filepath>              # 获取已写入行数
+流程门禁：
+  1. title_line 正则校验（阻断）
+  2. body 标记行检测（阻断）
+  3. 正文非空检测（阻断）
+  4. 原子写入 → fsync → 追加编号标记 → 再次 fsync
 """
+import sys, os, re
+from pathlib import Path
 
-import os
-import sys
-import json
-import re
+TITLE_PATTERN = re.compile(r'^L\d+ · S\d+《.+》$')
+MARKER_PATTERN = re.compile(r'^L\d+S\d+$')
 
-# 标记行模式：L##S##（如 L10S04），禁止出现在正文中
-_MARKER_PATTERN = re.compile(r'^L\d{1,2}S\d{1,3}$')
+def validate_and_write(content, filepath, chapter, sub_key):
+    fp = Path(filepath)
+    fp.parent.mkdir(parents=True, exist_ok=True)
 
+    sub_marker = f"{chapter}{sub_key}"
+    lines = content.split("\n")
 
-def _validate_body_line(line: str):
-    """检查一行是否看起来像子结构标记行，若是则阻断（标记行只能用 finalize 写入）"""
-    stripped = line.strip()
-    if _MARKER_PATTERN.match(stripped):
-        print(f"ERROR: 正文中不能包含子结构标记行 '{stripped}'")
-        print(f"  → 标记行只能通过 finalize 命令写入文件末尾")
-        print(f"  → 如果需要引用子结构编号，请使用其他格式（如“第5小节”或“S05”）")
-        sys.exit(1)
+    # ── 钩子1: 第1行标题格式校验（阻断） ──
+    first_line = lines[0].strip() if lines else ""
+    if not TITLE_PATTERN.match(first_line):
+        print(f"[HOOK-BLOCK] 第1行不是合法标题格式")
+        print(f"  期望: L{chapter} · {sub_key}《标题》")
+        print(f"  实际: {first_line}")
+        return False
 
+    # ── 钩子2: 正文非空检测（阻断） ──
+    body_lines = lines[1:]
+    body_text = "\n".join(body_lines).strip()
+    if not body_text:
+        print(f"[HOOK-BLOCK] 正文为空，拒绝写入")
+        return False
 
-def _progress_path(filepath: str) -> str:
-    return filepath + ".progress"
+    # ── 钩子3: 正文标记行检测（阻断） ──
+    for i, line in enumerate(body_lines, 2):  # 行号从2开始计数（第1行是标题）
+        stripped = line.strip()
+        if MARKER_PATTERN.match(stripped):
+            print(f"[HOOK-BLOCK] 正文第{i}行含非法子结构标记: {line.strip()}")
+            return False
 
+    # ── 写入前确认: 最终内容不含元注释污染 ──
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        # 禁止助手元注释（**S01 完成（字数： 之类的模式）
+        if re.match(r'^\*\*(S\d+|L\d+)\s*(完成|全章完成)', stripped):
+            print(f"[HOOK-BLOCK] 正文第{i}行含元注释污染: {line.strip()}")
+            print(f"  禁止将助手工作记录写入作品文件")
+            return False
 
-def write_line(filepath: str, line: str) -> int:
-    """写入单行并 fsync，返回当前行数"""
-    _validate_body_line(line)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    # ── 原子写入 ──
+    # 写入正文（不含末行标记）
+    with open(fp, "w", encoding="utf-8") as f:
+        f.write(content)
         f.flush()
         os.fsync(f.fileno())
-    # 更新 progress
-    count = _update_progress(filepath, 1)
-    return count
 
+    # 追加子结构编号标记
+    with open(fp, "a", encoding="utf-8") as f:
+        f.write(f"\n{sub_marker}\n")
+        f.flush()
+        os.fsync(f.fileno())
 
-def write_batch(filepath: str, lines: list) -> int:
-    """写入多行（每行独立 fsync），返回总行数"""
-    for line in lines:
-        _validate_body_line(line)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    count = 0
-    with open(filepath, "a", encoding="utf-8") as f:
-        for line in lines:
-            f.write(line + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-            count += 1
-    _update_progress(filepath, count)
-    # 读取 progress 文件中的累计值
-    prog_path = _progress_path(filepath)
-    if os.path.exists(prog_path):
-        with open(prog_path, "r", encoding="utf-8") as pf:
-            return int(pf.read().strip())
-    return count
-
-
-def _update_progress(filepath: str, added: int):
-    """累加进度"""
-    prog_path = _progress_path(filepath)
-    current = 0
-    if os.path.exists(prog_path):
-        with open(prog_path, "r", encoding="utf-8") as pf:
-            try:
-                current = int(pf.read().strip())
-            except ValueError:
-                current = 0
-    current += added
-    with open(prog_path, "w", encoding="utf-8") as pf:
-        pf.write(str(current))
-        pf.flush()
-        os.fsync(pf.fileno())
-    return current
-
-
-def finalize(filepath: str, marker: str) -> str:
-    """写入末尾编号标记行（如 L10S04）"""
-    write_line(filepath, marker)
-    return marker
-
-
-def read_tail(filepath: str, n: int = 3) -> list:
-    """读取文件末 N 行（跳过末尾编号标记行，如 L10S04）"""
-    if not os.path.exists(filepath):
-        return []
-    with open(filepath, "r", encoding="utf-8") as f:
-        lines = [l.rstrip("\n\r") for l in f.readlines()]
-
-    # 跳过末尾的空行和编号标记行
-    while lines and (not lines[-1] or lines[-1].startswith("L") and len(lines[-1]) <= 8):
-        lines.pop()
-
-    return [l for l in lines[-n:] if l]
-
-
-def read_head(filepath: str, n: int = 3) -> list:
-    """读取文件首 N 行"""
-    if not os.path.exists(filepath):
-        return []
-    with open(filepath, "r", encoding="utf-8") as f:
-        lines = []
-        for i, line in enumerate(f):
-            if i >= n:
-                break
-            stripped = line.rstrip("\n\r")
-            if stripped:
-                lines.append(stripped)
-    return lines
-
-
-def get_progress(filepath: str) -> int:
-    """获取已写入行数"""
-    prog_path = _progress_path(filepath)
-    if not os.path.exists(prog_path):
-        return 0
-    with open(prog_path, "r", encoding="utf-8") as pf:
-        try:
-            return int(pf.read().strip())
-        except ValueError:
-            return 0
+    print(f"[WRITE-OK] {filepath}")
+    print(f"  标题: {first_line}")
+    print(f"  正文: {len(body_lines)} 行")
+    print(f"  标记: {sub_marker}")
+    return True
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("用法: atomic_writer.py <write|write-batch|tail|head|progress> <filepath> [args...]")
+    if len(sys.argv) < 5:
+        print("用法: python novel_atomic_writer.py <content_file|-> <filepath> <chapter> <sub_key>")
+        print("  - 表示从 stdin 读取内容")
+        print("  示例: echo '内容' | python novel_atomic_writer.py - /path/to/L01/S01.txt L01 S01")
         sys.exit(1)
 
-    command = sys.argv[1]
+    content_src = sys.argv[1]
     filepath = sys.argv[2]
+    chapter = sys.argv[3]
+    sub_key = sys.argv[4]
 
-    if command == "write" and len(sys.argv) >= 4:
-        line = sys.argv[3]
-        count = write_line(filepath, line)
-        print(f"OK line={count}")
-
-    elif command == "write-batch" and len(sys.argv) >= 4:
-        lines_raw = sys.argv[3]
-        lines = lines_raw.split("\\n")
-        count = write_batch(filepath, lines)
-        print(f"OK lines={count}")
-
-    elif command == "finalize" and len(sys.argv) >= 4:
-        marker = sys.argv[3]
-        result = finalize(filepath, marker)
-        print(f"OK marker={result}")
-
-    elif command == "tail":
-        n = int(sys.argv[3]) if len(sys.argv) >= 4 else 3
-        result = read_tail(filepath, n)
-        print(json.dumps(result, ensure_ascii=False))
-
-    elif command == "head":
-        n = int(sys.argv[3]) if len(sys.argv) >= 4 else 3
-        result = read_head(filepath, n)
-        print(json.dumps(result, ensure_ascii=False))
-
-    elif command == "progress":
-        count = get_progress(filepath)
-        print(count)
-
+    if content_src == "-":
+        content = sys.stdin.read()
     else:
-        print(f"未知命令: {command}")
+        content = Path(content_src).read_text(encoding="utf-8")
+
+    success = validate_and_write(content, filepath, chapter, sub_key)
+    if not success:
         sys.exit(1)

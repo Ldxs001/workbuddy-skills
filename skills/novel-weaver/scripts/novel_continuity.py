@@ -1,271 +1,222 @@
 #!/usr/bin/env python3
 """
-novel-continuity — 子结构间连通性补充 + 过渡段落合成。
-
-流程：
-  1. 读取指定章节目录下所有按编号排序的子结构 .txt 文件
-  2. 对每对相邻子结构取前3行+后3行
-  3. 读取 outline.json 中该章的模糊概述
-  4. 输出 transition 段落 + 写入 continuity_report.md
-
-用法：
-  python novel_continuity.py <chapter_dir> <state_path> <report_path>
+Continuity Check — 连通性补充与校验
+- check: 章内子结构首尾3行连续性（时间词重叠）
+- cross-chapter: 跨章承诺链检查（上一章尾的关键词是否在下一章头被续接）
+- auto-fix: 生成过渡信息
 """
-
-import os
-import sys
-import json
-import re
+import json, sys, re
+from pathlib import Path
 
 
-_SORTED_SUBSTRUCTURE_FILES_CACHE = {}
-
-
-def _sorted_substructure_files(chapter_dir: str) -> list:
-    """读取按编号排序的子结构文件列表"""
-    if not os.path.isdir(chapter_dir):
-        return []
-    files = [f for f in os.listdir(chapter_dir) if f.endswith(".txt") and not f.startswith(".")]
-    files.sort(key=lambda x: int(re.sub(r'\D', '', x.split('_')[0]) or 0))
-    return [os.path.join(chapter_dir, f) for f in files]
-
-
-def _read_head(filepath: str, n: int = 3) -> list:
-    with open(filepath, "r", encoding="utf-8") as f:
-        lines = [l.strip() for l in f.readlines() if l.strip()]
-    # 跳过末尾的编号标记行
-    while lines and (lines[-1].startswith("L") and len(lines[-1]) <= 8):
-        lines.pop()
-    return lines[:n]
-
-
-def _read_tail(filepath: str, n: int = 3) -> list:
-    with open(filepath, "r", encoding="utf-8") as f:
-        all_lines = [l.strip() for l in f.readlines() if l.strip()]
-    # 跳过末尾的编号标记行
-    while all_lines and (all_lines[-1].startswith("L") and len(all_lines[-1]) <= 8):
-        all_lines.pop()
-    return all_lines[-n:]
-
-
-def _load_chapter_summary_from_state(state_path: str, ch_key: str) -> str:
-    """从 novel_state.json 中读取指定章的模糊概述（chapters 为 dict，keyed by L01..L15）"""
-    if not os.path.exists(state_path):
-        return ""
-    with open(state_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    chapter = data.get("chapters", {}).get(ch_key, {})
-    if isinstance(chapter, dict):
-        return chapter.get("summary", "")
-    return ""
-
-
-def generate_continuity_report(chapter_dir: str, state_path: str, report_path: str):
-    if not os.path.exists(state_path):
-        print(f"ERROR: novel_state.json 未找到: {state_path}")
-        print(f"  → 必须先运行 novel_state_manager.py init")
-        sys.exit(1)
-
-    # 阶段门禁：需要 ≥ writing
-    _order = {"none": 0, "init": 10, "stage1_done": 20, "writing": 30, "chapter_done": 40, "stage3_ready": 50, "complete": 60}
-    with open(state_path, "r", encoding="utf-8") as f:
-        _state = json.load(f)
-    _p = _order.get(_state.get("current_phase", "none"), 0)
-    if _p < 30:
-        print(f"ERROR: novel_continuity 需要阶段 ≥ writing(30)，当前为 {_state.get('current_phase', 'none')}({_p})")
-        print(f"  请至少完成一个子结构的写作后再执行连通性检查。")
-        sys.exit(1)
-    files = _sorted_substructure_files(chapter_dir)
-    if len(files) < 2:
-        print("SKIP: 子结构不足2个，无需连通性补充")
+def check_continuity(chapter_dir, chapter, state_path):
+    """章内子结构首尾3行连续性（时间词重叠）"""
+    cd = Path(chapter_dir)
+    files = sorted(cd.glob("S*.txt"))
+    if not files:
+        print(f"[连通性] {chapter}: 无子结构文件")
         return
 
-    # 从目录名推断章节键名（如 "09_法律听证会" → "L09"）
-    dir_name = os.path.basename(chapter_dir)
-    ch_match = re.search(r'(\d+)', dir_name)
-    ch_key = f"L{int(ch_match.group(1)):02d}" if ch_match else ""
-    chapter_summary = _load_chapter_summary_from_state(state_path, ch_key)
+    issues = []
+    for i in range(1, len(files)):
+        prev_content = files[i-1].read_text(encoding="utf-8").strip()
+        curr_content = files[i].read_text(encoding="utf-8").strip()
+        prev_lines = [l for l in prev_content.split("\n") if l.strip() and not re.match(rf'{chapter}S\d+', l.strip())]
+        curr_lines = [l for l in curr_content.split("\n") if l.strip() and not re.match(rf'{chapter}S\d+', l.strip())]
+        prev_tail = "\n".join(prev_lines[-3:]) if len(prev_lines) >= 3 else "\n".join(prev_lines)
+        curr_head = "\n".join(curr_lines[:3]) if len(curr_lines) >= 3 else "\n".join(curr_lines)
 
-    report_lines = []
-    report_lines.append(f"# 连通性补充报告 — {dir_name}")
-    report_lines.append(f"")
-    report_lines.append(f"**章节概述**: {chapter_summary}")
-    report_lines.append(f"")
-    report_lines.append(f"| 过渡段 | 前段末3行 | 后段首3行 | 衔接判定 |")
-    report_lines.append(f"|--------|---------|---------|---------|")
+        time_pattern = re.compile(r'(新元历|星期|周|上午|下午|晚上|清晨|中午|傍晚|深夜)')
+        prev_times = time_pattern.findall(prev_tail)
+        curr_times = time_pattern.findall(curr_head)
 
-    transitions_needed = False
+        issues.append({
+            "from": files[i-1].stem,
+            "to": files[i].stem,
+            "prev_tail": prev_tail[:100],
+            "curr_head": curr_head[:100],
+            "time_overlap": len(set(prev_times) & set(curr_times)) > 0
+        })
 
-    for i in range(len(files) - 1):
-        f_prev = files[i]
-        f_next = files[i + 1]
-        prev_name = os.path.splitext(os.path.basename(f_prev))[0]
-        next_name = os.path.splitext(os.path.basename(f_next))[0]
-        prev_tail = _read_tail(f_prev, 3)
-        next_head = _read_head(f_next, 3)
+    print(f"[连通性报告] {chapter}")
+    for issue in issues:
+        status = "[OK]" if issue["time_overlap"] else "[WARN]"
+        print(f"  {status} {issue['from']} -> {issue['to']}")
+        print(f"    前段尾: {issue['prev_tail'][:60]}...")
+        print(f"    后段头: {issue['curr_head'][:60]}...")
 
-        prev_tail_text = " | ".join(prev_tail[-3:]) if prev_tail else "(空)"
-        next_head_text = " | ".join(next_head[:3]) if next_head else "(空)"
+    sp = Path(state_path)
+    if sp.exists():
+        data = json.loads(sp.read_text(encoding="utf-8"))
+        for ch in data.get("chapters", []):
+            if ch["id"] == chapter:
+                ch["continuity_notes"] = issues
+                break
+        sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        report_lines.append(f"| {prev_name} → {next_name} | {prev_tail_text[:40]}... | {next_head_text[:40]}... | 待判断 |")
-
-        # 检查衔接是否自然
-        need_transition = False
-        if prev_tail and next_head:
-            last_prev = prev_tail[-1] if prev_tail else ""
-            first_next = next_head[0] if next_head else ""
-            if last_prev and first_next:
-                # 如果末句和首句的主题不同，需要过渡
-                if len(set(last_prev.split()) & set(first_next.split())) < 2:
-                    need_transition = True
-
-        if need_transition:
-            transitions_needed = True
-
-    report_lines.append(f"")
-    report_lines.append(f"## 过渡段落")
-
-    if not transitions_needed:
-        report_lines.append(f"")
-        report_lines.append(f"各子结构之间逻辑链完整，无需额外过渡段落。")
-    else:
-        for i in range(len(files) - 1):
-            f_prev = files[i]
-            f_next = files[i + 1]
-            prev_name = os.path.splitext(os.path.basename(f_prev))[0]
-            next_name = os.path.splitext(os.path.basename(f_next))[0]
-            prev_tail = _read_tail(f_prev, 3)
-            next_head = _read_head(f_next, 3)
-
-            report_lines.append(f"")
-            report_lines.append(f"### {prev_name} → {next_name}")
-            report_lines.append(f"")
-            if prev_tail and next_head:
-                report_lines.append(f"**前段结尾**: {' '.join(prev_tail[-3:])}")
-                report_lines.append(f"**后段开头**: {' '.join(next_head[:3])}")
-            report_lines.append(f"*（此处应由 LLM 在现场生成过渡段落）*")
-
-    report_lines.append(f"")
-    report_lines.append(f"---")
-    report_lines.append(f"*报告由 novel-continuity 生成*")
-
-    os.makedirs(os.path.dirname(report_path), exist_ok=True)
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(report_lines))
-        f.flush()
-        os.fsync(f.fileno())
-
-    print(f"OK report={report_path} transitions={transitions_needed}")
-
-    return transitions_needed
+    print(f"[连通性] {chapter} 检查完成 ({len(issues)} 处)")
 
 
-def write_transitions_json(chapter_dir: str, state_path: str, report_path: str) -> str:
-    """
-    Auto-fix 模式：生成 _transitions.json（列出所有需要过渡的子结构对）。
-    返回 transitions JSON 文件路径，或空字符串表示无需过渡。
-    """
-    if not os.path.isdir(chapter_dir):
-        return ""
-    files = _sorted_substructure_files(chapter_dir)
-    if len(files) < 2:
-        return ""
-
+def auto_fix(chapter_dir, chapter):
+    """生成子结构间过渡信息"""
+    cd = Path(chapter_dir)
+    files = sorted(cd.glob("S*.txt"))
     transitions = []
+    for i in range(1, len(files)):
+        prev_content = files[i-1].read_text(encoding="utf-8").strip()
+        prev_lines = [l for l in prev_content.split("\n") if l.strip()]
+        prev_tail = prev_lines[-1] if prev_lines else ""
+        transitions.append({
+            "from": files[i-1].stem,
+            "to": files[i].stem,
+            "prev_last_line": prev_tail
+        })
+    out_path = cd / f"_{chapter}_transitions.json"
+    out_path.write_text(json.dumps(transitions, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[auto-fix] 过渡信息写入 {out_path}")
+    return transitions
 
-    for i in range(len(files) - 1):
-        f_prev = files[i]
-        f_next = files[i + 1]
-        prev_name = os.path.splitext(os.path.basename(f_prev))[0]
-        next_name = os.path.splitext(os.path.basename(f_next))[0]
-        prev_tail = _read_tail(f_prev, 3)
-        next_head = _read_head(f_next, 3)
 
-        # 检查衔接是否需要过渡
-        need_transition = False
-        if prev_tail and next_head:
-            last_prev = prev_tail[-1] if prev_tail else ""
-            first_next = next_head[0] if next_head else ""
-            if last_prev and first_next:
-                if len(set(last_prev.split()) & set(first_next.split())) < 2:
-                    need_transition = True
+def _extract_keywords(data):
+    """
+    从 novel_state.json 动态提取关键词，无需硬编码。
+    来源：
+      1. characters[].name（角色名）
+      2. technical_notes 的 key 和 value（技术概念）
+      3. chapters[].overview（章概述中的话题词，≥2字非虚词）
+    """
+    import re
+    kws = set()
 
-        if need_transition:
-            transitions.append({
-                "from_file": prev_name,
-                "to_file": next_name,
-                "from_path": f_prev,
-                "to_path": f_next,
-                "prev_tail": prev_tail[-3:] if prev_tail else [],
-                "next_head": next_head[:3] if next_head else [],
-                "transition_text": ""  # 由 LLM 填充
+    # 角色名
+    for c in data.get("characters", []):
+        name = c.get("name", "")
+        if len(name) >= 2:
+            kws.add(name)
+        # 如果 name 包含其他角色名（如 "归元会散人"），
+        # 取 members 内的具体名字
+        if "members" in c:
+            for m in c["members"]:
+                mn = m.get("name", "")
+                if len(mn) >= 2:
+                    kws.add(mn)
+
+    # 技术概念
+    tn = data.get("technical_notes", {})
+    for k, v in tn.items():
+        if len(k) >= 2:
+            kws.add(k)
+        if len(v) >= 2:
+            # 从 value 中提取 ≥2字的片段
+            for seg in re.findall(r'[\u4e00-\u9fff]{2,10}', v):
+                kws.add(seg)
+
+    # 章概述
+    for ch in data.get("chapters", []):
+        ov = ch.get("overview", "")
+        for seg in re.findall(r'[\u4e00-\u9fff]{2,10}', ov):
+            kws.add(seg)
+
+    return kws
+
+
+def cross_chapter(state_path, chapters_dir):
+    """
+    跨章承诺链检查（通用版，无硬编码）：
+    从 novel_state.json 动态提取关键词，检测上章尾 vs 下章头的匹配度。
+    """
+    sp = Path(state_path)
+    data = json.loads(sp.read_text(encoding="utf-8"))
+    chs = [c["id"] for c in data.get("chapters", []) if c.get("status") == "completed"]
+
+    # 动态提取关键词
+    kw_set = _extract_keywords(data)
+    # 按长度降序排列（避免长词被短词的前缀覆盖）
+    kw_list = sorted(kw_set, key=len, reverse=True)
+    if not kw_list:
+        print("[跨章检查] 无可用关键词（characters/technical_notes 为空）")
+        return []
+    key_pattern = re.compile('|'.join(re.escape(p) for p in kw_list))
+
+    issues = []
+    for i in range(len(chs) - 1):
+        prev_ch = chs[i]
+        next_ch = chs[i + 1]
+        prev_dir = Path(chapters_dir) / prev_ch
+        next_dir = Path(chapters_dir) / next_ch
+
+        prev_files = sorted(prev_dir.glob("S*.txt"))
+        if not prev_files:
+            continue
+        last_file = prev_files[-1]
+        last_content = last_file.read_text(encoding="utf-8").strip()
+        last_lines = [l for l in last_content.split("\n") if l.strip() and not re.match(rf'{prev_ch}S\d+', l.strip())]
+        prev_tail = "\n".join(last_lines[-3:]) if len(last_lines) >= 3 else "\n".join(last_lines)
+
+        next_files = sorted(next_dir.glob("S*.txt"))
+        if not next_files:
+            continue
+        first_file = next_files[0]
+        first_content = first_file.read_text(encoding="utf-8").strip()
+        first_lines = [l for l in first_content.split("\n") if l.strip() and not re.match(rf'{next_ch}S\d+', l.strip())]
+        next_head = "\n".join(first_lines[:3]) if len(first_lines) >= 3 else "\n".join(first_lines)
+
+        tail_keys = set(key_pattern.findall(prev_tail))
+        head_keys = set(key_pattern.findall(next_head))
+
+        # 只报告实际缺失的语义关键词（排除单字/通用语气词）
+        missing = tail_keys - head_keys
+        missing = {w for w in missing if len(w) >= 2}
+
+        print(f"\n--- {prev_ch} -> {next_ch} ---")
+        print(f"  尾: {prev_tail[:80]}...")
+        print(f"  头: {next_head[:80]}...")
+
+        if missing:
+            print(f"  [WARN] 未续接的承诺: {missing}")
+            issues.append({
+                "from_chapter": prev_ch,
+                "to_chapter": next_ch,
+                "prev_tail": prev_tail[:100],
+                "next_head": next_head[:100],
+                "unresolved_promises": list(missing)
             })
+        else:
+            print(f"  [OK] 承诺链完整")
 
-    if not transitions:
-        return ""
+    sp = Path(state_path)
+    if sp.exists():
+        data = json.loads(sp.read_text(encoding="utf-8"))
+        data["cross_chapter_check"] = issues
+        sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 写入 transitions JSON
-    report_dir = os.path.dirname(report_path)
-    json_path = os.path.join(report_dir, "_transitions.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(transitions, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
+    if not issues:
+        print("\n[跨章检查] 全部通过")
+    else:
+        print(f"\n[跨章检查] 发现 {len(issues)} 处断点")
+        for iss in issues:
+            print(f"  [WARN] {iss['from_chapter']} -> {iss['to_chapter']}: {iss['unresolved_promises']}")
 
-    print(f"OK auto-fix transitions={len(transitions)} json={json_path}")
-    print(f"  → 请生成过渡段落文本后，运行本脚本 write-transition 写入")
-    print(f"  → 或由 workflow_engine 自动处理")
-
-    return json_path
-
-
-def cmd_write_transition(chapter_dir: str, from_name: str, to_name: str, text: str):
-    """
-    将一个过渡段落到指定子结构之间。
-    创建 _transition_{from}_{to}.txt 文件。
-    """
-    filename = f"_transition_{from_name}_{to_name}.txt"
-    filepath = os.path.join(chapter_dir, filename)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(text.rstrip() + "\n")
-        f.flush()
-        os.fsync(f.fileno())
-    print(f"OK 过渡段落已写入: {filepath}")
+    return issues
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print(__doc__)
+    if len(sys.argv) < 4:
+        print("用法:")
+        print("  章内: python novel_continuity.py check <chapter_dir> <chapter> <state_path>")
+        print("  跨章: python novel_continuity.py cross-chapter <state_path> <chapters_dir>")
+        print("  fix:  python novel_continuity.py auto-fix <chapter_dir> <chapter> <state_path>")
         sys.exit(1)
 
-    command = sys.argv[1]
-
-    if command == "generate":
-        # novel_continuity.py generate <chapter_dir> <state_path> <report_path> [--auto-fix]
-        if len(sys.argv) < 5:
-            print("用法: generate <chapter_dir> <state_path> <report_path> [--auto-fix]")
-            sys.exit(1)
-        transitions_needed = generate_continuity_report(
-            chapter_dir=sys.argv[2],
-            state_path=sys.argv[3],
-            report_path=sys.argv[4]
-        )
-        if len(sys.argv) >= 6 and sys.argv[5] == "--auto-fix" and transitions_needed:
-            write_transitions_json(
-                chapter_dir=sys.argv[2],
-                state_path=sys.argv[3],
-                report_path=sys.argv[4]
-            )
-
-    elif command == "write-transition":
-        # novel_continuity.py write-transition <chapter_dir> <from_name> <to_name> <text>
-        if len(sys.argv) < 6:
-            print("用法: write-transition <chapter_dir> <from_name> <to_name> <text>")
-            sys.exit(1)
-        cmd_write_transition(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
-
+    cmd = sys.argv[1]
+    if cmd == "check":
+        check_continuity(sys.argv[2], sys.argv[3], sys.argv[4])
+    elif cmd == "cross-chapter":
+        cross_chapter(sys.argv[2], sys.argv[3])
+    elif cmd == "auto-fix":
+        auto_fix(sys.argv[2], sys.argv[3])
+        if len(sys.argv) > 4:
+            # 也跑个章内检查作为辅助
+            check_continuity(sys.argv[2], sys.argv[3], sys.argv[4])
     else:
-        print(f"未知命令: {command}")
-        print(__doc__)
-        sys.exit(1)
+        print(f"[错误] 未知命令: {cmd}")

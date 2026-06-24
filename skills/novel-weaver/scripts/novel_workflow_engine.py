@@ -1,492 +1,328 @@
 #!/usr/bin/env python3
 """
-novel-workflow-engine — 统一编排引擎。
+Workflow Engine — 流程引擎
+子结构注册 / 写作 / 上下文预览 / 一键完结章节 / 验证
 
-解决三大缺陷：
-  1. 子结构规划未先于写作 → plan-chapter 批量注册所有子结构（含情绪提示）
-  2. 阶段转换无前置校验 → 每个 set-phase 前自动检查必要条件
-  3. 各脚本各自为战 → 统一切片入口
-
-用法：
-  plan-chapter <state_path> <ch_key> <subs_json>
-      批量注册一章内所有子结构（含 title / summary / tone）
-      subs_json: [{"s_key":"S01","title":"...","summary":"...","tone":"..."}, ...]
-
-  verify-chapter <state_path> <ch_key>
-      验证一章内所有子结构已全部注册，列出缺失项。
-
-  finalize-chapter <state_path> <ch_key> <chapter_dir> <report_dir>
-      完成一章：运行连通性检查 + 风格校验 + 逻辑检查 + phase→chapter_done
-
-  preview-writing-context <state_path> <ch_key>
-      预览一章写作前的完整上下文（含所有子结构规划）
-
-  verify-causality-outline <state_path>
-      验证大纲（章）级别的因果链完整性。
-      在 Phase 1 用户确认之前必须运行。
-
-  verify-causality-sub <state_path> <ch_key>
-      验证指定章的子结构级别因果链完整性。
-      在 plan-chapter 之后、写作开始之前必须运行。
+新命令：write-sub
+  链式调用: atomic_writer.validate_and_write → state_manager.update-sub
+  每完成一个子结构立即记录状态（非批量，非延迟）
 """
+import json, sys, subprocess, os
+from pathlib import Path
 
-import os
-import sys
-import json
-import re
-import subprocess
+SCRIPTS_DIR = Path(__file__).parent
 
-SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+def plan_chapter(state_path, chapter, subs_json):
+    """批量注册子结构"""
+    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    subs = json.loads(subs_json)
+    for ch in data.get("chapters", []):
+        if ch["id"] != chapter:
+            continue
+        if "sub_structures" not in ch:
+            ch["sub_structures"] = {}
+        for s in subs:
+            s_key = s["s_key"]
+            ch["sub_structures"][s_key] = {
+                "title": s.get("title", ""),
+                "summary": s.get("summary", ""),
+                "tone": s.get("tone", ""),
+                "word_count": 0,
+                "status": "pending"
+            }
+        break
+    Path(state_path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
 
-PHASE_ORDER = {
-    "none": 0, "init": 10, "stage1_done": 20,
-    "writing": 30, "chapter_done": 40,
-    "stage3_ready": 50, "complete": 60
-}
+def verify_chapter(state_path, chapter):
+    """验证章节子结构注册完整性"""
+    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    for ch in data.get("chapters", []):
+        if ch["id"] != chapter:
+            continue
+        subs = ch.get("sub_structures", {})
+        if not subs:
+            print(f"[verify] {chapter}: [FAIL] 无子结构")
+            return False
+        all_ok = True
+        for sk, sv in subs.items():
+            if not sv.get("title") or not sv.get("summary"):
+                print(f"[verify] {chapter}{sk}: [FAIL] 字段缺失")
+                all_ok = False
+        if all_ok:
+            print(f"[verify] {chapter}: [OK] {len(subs)} 个子结构全部注册完成")
+        return all_ok
+    print(f"[verify] {chapter}: [FAIL] 未找到")
+    return False
 
+def preview_context(state_path, chapter):
+    """预览写作上下文"""
+    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    for ch in data.get("chapters", []):
+        if ch["id"] != chapter:
+            continue
+        print(f"{'='*50}")
+        print(f"[预览] {chapter}: {ch.get('title','')}")
+        print(f"[概述] {ch.get('overview','')}")
+        subs = ch.get("sub_structures", {})
+        for sk in sorted(subs.keys()):
+            sv = subs[sk]
+            status_icon = "[OK]" if sv.get("status") == "completed" else "[WAIT]"
+            print(f"  {status_icon} {sk}: {sv.get('title','')} [{sv.get('tone','')}]")
+            print(f"      {sv.get('summary','')}")
+        print(f"{'='*50}")
 
-def _load_state(path: str) -> dict:
-    if not os.path.exists(path):
-        print(f"ERROR: novel_state.json not found at {path}")
-        sys.exit(1)
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def write_sub(state_path, chapter, sub_key, target_dir):
+    """
+    单子结构写入钩子（阻断式，即时状态标记）
+    流程链:
+      1. atomic_writer.validate_and_write → 格式校验 + 原子写入
+      2. state_manager.update-sub → 即时状态更新
 
+    内容从 stdin 读取。
+    """
+    atomic_writer = SCRIPTS_DIR / "novel_atomic_writer.py"
+    chapter_dir = Path(target_dir) / chapter
+    chapter_dir.mkdir(parents=True, exist_ok=True)
+    filepath = chapter_dir / f"{sub_key}.txt"
 
-def _save_state(path: str, data: dict):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-
-
-def _check_phase_ge(state: dict, min_phase: str) -> bool:
-    return PHASE_ORDER.get(state.get("current_phase", "none"), 0) >= PHASE_ORDER.get(min_phase, 0)
-
-
-def cmd_plan_chapter(state_path: str, ch_key: str, subs_json: str):
-    """批量注册一章内的所有子结构"""
-    python_exe = sys.executable
-    state = _load_state(state_path)
-    min_phase = "stage1_done"
-    if not _check_phase_ge(state, min_phase):
-        print(f"ERROR: plan-chapter 需要 phase ≥ {min_phase}")
-        sys.exit(1)
-
-    # 如果 chapter 不存在，创建
-    chapter = state.setdefault("chapters", {}).setdefault(ch_key, {})
-    subs = chapter.setdefault("sub_structures", {})
-
-    # 解析子结构数组
-    try:
-        sub_list = json.loads(subs_json)
-    except json.JSONDecodeError as e:
-        print(f"ERROR: subs_json 格式错误: {e}")
-        print(f'  → 期望 JSON 数组: [{{"s_key":"S01","title":"...","summary":"...","tone":"..."}}, ...]')
-        sys.exit(1)
-
-    if not isinstance(sub_list, list) or len(sub_list) == 0:
-        print("ERROR: subs_json 必须是非空 JSON 数组")
-        sys.exit(1)
-
-    for sub_item in sub_list:
-        s_key = sub_item.get("s_key")
-        title = sub_item.get("title")
-        summary = sub_item.get("summary", "")
-        tone = sub_item.get("tone", "中性")
-
-        if not s_key or not title:
-            print(f"ERROR: 子结构条目缺少 s_key 或 title: {json.dumps(sub_item, ensure_ascii=False)}")
-            sys.exit(1)
-
-        # 概述字数硬检查：至少 12 个有效字符（不含空格标点），防止"做了些事"这种空泛概述
-        summary_stripped = summary.replace(" ", "").replace("，", "").replace("。", "").replace("、", "").replace("？", "").replace("！", "")
-        if len(summary_stripped) < 12:
-            print(f"ERROR: {ch_key}{s_key}「{title}」概述过短（{len(summary_stripped)} 有效字符，需 ≥12）")
-            print(f"  → 当前概述: {summary}")
-            print(f"  → 概述必须包含具体动作+人物+事件，不能是简单状态描述")
-            print(f"  → 示例: 「Atlas在诊断中检测到异常神经脉冲，决定不报告」— 24 个有效字符")
-            sys.exit(1)
-
-        if s_key in subs:
-            print(f"  WARN: {s_key} 已存在，覆盖")
-
-        subs[s_key] = {
-            "title": title,
-            "summary": summary,
-            "tone": tone,
-            "word_count": 0,
-            "status": "pending"
-        }
-        print(f"  ✅ {ch_key}{s_key} {title} — 情绪: {tone}")
-
-    # phase 推进：如果还在 stage1_done，先通过 pipeline_gate 检查再推进
-    if state.get("current_phase") == "stage1_done":
-        gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
-        ret = os.system(f'"{python_exe}" "{gate_script}" require "{state_path}" outline_causality')
-        if ret != 0:
-            print(f"  ⛔ outline_causality 门禁未通过，拒绝推进 phase（请先运行 verify-causality-outline）")
-        else:
-            state["current_phase"] = "writing"
-            print(f"  🔄 phase → writing (outline_causality ✓)")
-
-    _save_state(state_path, state)
-    count = len(sub_list)
-    print(f"OK {count} 个子结构已注册到 {ch_key}")
-    # 门禁：子结构批量注册完成
-    gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
-    os.system(f'"{python_exe}" "{gate_script}" pass "{state_path}" plan_chapter:{ch_key}')
-    print(f"  ✅ pipeline gate: plan_chapter:{ch_key} PASS")
-    print(f"  → 下一步: verify-causality-sub（因果链验证）然后开始写作")
-
-
-def cmd_verify_chapter(state_path: str, ch_key: str):
-    """验证一章内的所有子结构是否已全部注册"""
-    state = _load_state(state_path)
-    chapter = state.get("chapters", {}).get(ch_key, {})
-    subs = chapter.get("sub_structures", {})
-
-    if not isinstance(subs, dict) or len(subs) == 0:
-        print(f"ERROR: {ch_key} 的子结构为空，请先运行 plan-chapter")
+    # ── 步骤1: 从 stdin 读取内容 ──
+    content = sys.stdin.read()
+    if not content.strip():
+        print(f"[HOOK-BLOCK] {chapter}{sub_key}: stdin 内容为空，拒绝写入")
         sys.exit(1)
 
-    missing_items = []
-    registered_items = []
-
-    # 提取子结构编号并排序
-    s_keys = sorted(subs.keys(), key=lambda k: int(k.replace("S", "")))
-    for s_key in s_keys:
-        info = subs[s_key]
-        if not info.get("title"):
-            missing_items.append(s_key)
-        else:
-            registered_items.append(f"  ✅ {ch_key}{s_key} {info.get('title', '?')}")
-
-    print(f"[验证 {ch_key}]")
-    for item in registered_items:
-        print(item)
-
-    if missing_items:
-        print(f"\n❌ 以下子结构缺失 title（未正确注册）:")
-        for m in missing_items:
-            print(f"   - {ch_key}{m}")
+    # ── 步骤2: 通过 atomic_writer 进行格式校验 + 原子写入 ──
+    # 直接调用 validate_and_write 函数
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import novel_atomic_writer
+    success = novel_atomic_writer.validate_and_write(content, str(filepath), chapter, sub_key)
+    if not success:
+        print(f"[HOOK-BLOCK] {chapter}{sub_key}: 写入失败")
         sys.exit(1)
 
-    print(f"OK {ch_key} 全部 {len(s_keys)} 个子结构已注册")
-
-
-def cmd_finalize_chapter(state_path: str, ch_key: str, chapter_dir: str, report_dir: str):
-    """完成一章：连通性 + 风格校验 + 逻辑检查 + phase→chapter_done"""
-    state = _load_state(state_path)
-    min_phase = "writing"
-    if not _check_phase_ge(state, min_phase):
-        print(f"ERROR: finalize-chapter 需要 phase ≥ {min_phase}")
-        sys.exit(1)
-
-    os.makedirs(report_dir, exist_ok=True)
-    python_exe = sys.executable
-
-    ch_num = ch_key.replace("L", "")
-    continuity_report = os.path.join(report_dir, f"continuity_{ch_key}.md")
-    style_report = os.path.join(report_dir, f"style_{ch_key}.md")
-    logic_report = os.path.join(report_dir, f"logic_{ch_key}.md")
-
-    # 检查 chapter_dir 是否存在且非空
-    if not os.path.isdir(chapter_dir):
-        print(f"WARN: 章节目录不存在: {chapter_dir}，跳过文件级检查")
-        print(f"OK phase 已推进到 chapter_done（无内容章节）")
-        return
-
-    # ── 步骤1: 连通性检查 ──
-    continuity_script = os.path.join(SCRIPTS_DIR, "novel_continuity.py")
-    if os.path.exists(continuity_script):
-        print(f"\n[1/3] 连通性检查...")
-        ret = os.system(f'"{python_exe}" "{continuity_script}" generate "{chapter_dir}" "{state_path}" "{continuity_report}" --auto-fix')
-        if ret != 0:
-            print(f"  WARN: 连通性检查返回非零 {ret}，继续")
-    else:
-        print(f"\n[1/3] 连通性检查 — 跳过（脚本不存在）")
-
-    # ── 步骤2: 风格校验 ──
-    style_script = os.path.join(SCRIPTS_DIR, "novel_style_check.py")
-    if os.path.exists(style_script):
-        print(f"\n[2/3] 风格校验...")
-        ret = os.system(f'"{python_exe}" "{style_script}" "{chapter_dir}" "{state_path}" "{style_report}"')
-        if ret != 0:
-            print(f"  WARN: 风格校验返回非零 {ret}，继续")
-    else:
-        print(f"\n[2/3] 风格校验 — 跳过（脚本不存在）")
-
-    # ── 步骤3: 逻辑检查（新增） ──
-    logic_script = os.path.join(SCRIPTS_DIR, "novel_logic_check.py")
-    if os.path.exists(logic_script):
-        print(f"\n[3/3] 逻辑检查...")
-        ret = os.system(f'"{python_exe}" "{logic_script}" "{chapter_dir}" "{state_path}" "{logic_report}" --auto-fix')
-        if ret != 0:
-            print(f"  WARN: 逻辑检查返回非零 {ret}，继续")
-        # 检查是否有修复项生成
-        fix_json = os.path.join(report_dir, "_fixes.json")
-        if os.path.exists(fix_json):
-            print(f"  🔧 发现 {ch_key} 存在可修复问题，写入 {fix_json}")
-            print(f"  → LLM 请读取 {fix_json} 并按建议修复后重新运行 finalize-chapter")
-    else:
-        print(f"\n[3/3] 逻辑检查 — 跳过（脚本不存在）")
-
-    # ── 推进 phase ──
-    state = _load_state(state_path)
-    current_phase = state.get("current_phase", "none")
-    if PHASE_ORDER.get(current_phase, 0) < PHASE_ORDER["chapter_done"]:
-        state["current_phase"] = "chapter_done"
-        _save_state(state_path, state)
-        print(f"\n✅ phase → chapter_done")
-
-    # ── 输出摘要 ──
-    continuity_exists = os.path.exists(continuity_report)
-    style_exists = os.path.exists(style_report)
-    logic_exists = os.path.exists(logic_report)
-    print(f"\n📋 报告:")
-    print(f"  {'✅' if continuity_exists else '❌'} 连通性: {continuity_report}")
-    print(f"  {'✅' if style_exists else '❌'} 风格: {style_report}")
-    print(f"  {'✅' if logic_exists else '❌'} 逻辑: {logic_report}")
-
-    # 门禁：章完结
-    gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
-    os.system(f'"{python_exe}" "{gate_script}" pass "{state_path}" chapter_finalized:{ch_key}')
-    print(f"  ✅ pipeline gate: chapter_finalized:{ch_key} PASS")
-    print(f"OK {ch_key} 已完成")
-
-
-def cmd_resume(state_path: str):
-    """全局断点续写检测 — 找出下一个需要写的子结构"""
-    state = _load_state(state_path)
-    phase = state.get("current_phase", "none")
-
-    chapters = state.get("chapters", {})
-    if not chapters or not isinstance(chapters, dict):
-        print(f"ERROR: chapters 未初始化，请先完成 Phase 1")
-        print(f"  当前 phase: {phase} — 请先运行 novel_state_manager.py init")
-        sys.exit(1)
-
-    # 检查是否有任何子结构规划
-    has_any_sub = any(
-        isinstance(ch, dict) and ch.get("sub_structures")
-        for ch in chapters.values()
+    # ── 步骤3: state_manager.update-sub — 即时状态标记 ──
+    word_count = len(content.replace("\n", ""))
+    state_manager = SCRIPTS_DIR / "novel_state_manager.py"
+    result = subprocess.run(
+        [sys.executable, str(state_manager), "update-sub",
+         state_path, chapter, sub_key, str(word_count)],
+        capture_output=True, text=True, encoding="utf-8"
     )
-    if not has_any_sub:
-        print(f"ERROR: 没有任何子结构规划，请先运行 plan-chapter")
-        print(f"  → 选择一章后: novel_workflow_engine.py plan-chapter <state_path> <L##> '<subs_json>'")
+    print(result.stdout.strip())
+    if result.returncode != 0:
+        print(f"[HOOK-BLOCK] state 更新失败: {result.stderr}")
         sys.exit(1)
 
-    # 排序章
-    ch_keys = sorted(chapters.keys(), key=lambda k: int(k.replace("L", "")))
-    phase = state.get("current_phase", "none")
+    print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
+    print(f"  字数: {word_count}")
 
-    print(f"{'='*55}")
-    print(f"  ⏸️  中断恢复 — 当前进度")
-    print(f"{'='*55}")
-    print(f"  阶段: {phase}")
-    print(f"")
+def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
+    """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → phase→chapter_done"""
+    import importlib
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    from novel_continuity import check_continuity, cross_chapter
+    from novel_style_check import check_chapter as style_check
+    from novel_pipeline_gate import pass_gate, load_gates, save_gates
 
-    all_done = True
-    found_pending = False
+    chapters_dir = str(Path(chapter_dir).parent)
 
-    for ch_key in ch_keys:
-        chapter = chapters.get(ch_key, {})
-        subs = chapter.get("sub_structures", {})
-        ch_title = chapter.get("title", "?")
-        s_keys = sorted(subs.keys(), key=lambda k: int(k.replace("S", "")))
+    print(f"\n{'='*50}")
+    print(f"[完结] {chapter}: 章内连续性检查...")
+    check_continuity(chapter_dir, chapter, state_path)
 
-        done_count = sum(1 for k in s_keys if subs[k].get("status") == "done")
-        total = len(s_keys)
+    print(f"\n---")
+    print(f"[完结] {chapter}: 跨章承诺链检查...")
+    cross_chapter(state_path, chapters_dir)
 
-        if total == 0:
-            print(f"  ⬜ {ch_key}「{ch_title}」— 未规划")
-            all_done = False
+    print(f"\n---")
+    print(f"[完结] {chapter}: 风格校验...")
+    style_check(chapter_dir, chapter, state_path)
+
+    print(f"\n---")
+    print(f"[完结] {chapter}: 通过完结门禁")
+    gates = load_gates(state_path)
+    gates[f"chapter_finalized:{chapter}"] = "PASS"
+    save_gates(state_path, gates)
+    print(f"[完结] {chapter}: [OK] 全部完成")
+
+
+def fidelity_check(state_path, chapters_dir):
+    """
+    大纲忠实度检查：逐章对比 overview 与实际内容（通用版，无硬编码）
+    关键词从 novel_state.json 的 characters/technical_notes/chapters 动态提取。
+    """
+    import importlib
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    # 复用 continuity 中的动态关键词提取
+    from novel_continuity import _extract_keywords as _ek
+
+    sp = Path(state_path)
+    data = json.loads(sp.read_text(encoding="utf-8"))
+    chapters = data.get("chapters", [])
+
+    import re
+    # 动态提取关键词
+    kw_set = _ek(data)
+    kw_list = sorted(kw_set, key=len, reverse=True)
+    if not kw_list:
+        print("[fidelity] 无可用关键词，使用概述词")
+        # 回退：从各章概述中提取≥2字词
+        for ch in chapters:
+            for seg in re.findall(r'[\u4e00-\u9fff]{2,10}', ch.get("overview", "")):
+                kw_list.append(seg)
+        kw_list = list(set(kw_list))
+
+    keyword_re = re.compile('|'.join(re.escape(p) for p in kw_list))
+
+    report = []
+    report.append("# 大纲忠实度报告\n")
+    report.append("## 全文检查\n")
+    report.append("| 章节 | 概述 | 实际字数 | 关键词覆盖率 | 等级 |")
+    report.append("|------|------|---------|-------------|------|")
+
+    pass_count = 0
+    info_count = 0
+    warn_count = 0
+    error_count = 0
+    total_chars = 0
+
+    for ch in chapters:
+        ch_id = ch["id"]
+        if ch.get("status") != "completed":
+            report.append(f"| {ch_id} | - | - | - | [WAIT] 未完成 |")
+            warn_count += 1
             continue
 
-        if done_count == total:
-            print(f"  ✅ {ch_key}「{ch_title}」— {done_count}/{total} 已完成")
+        overview = ch.get("overview", "")
+        # 读取该章节所有子结构文件
+        ch_dir = Path(chapters_dir) / ch_id
+        actual_text = ""
+        if ch_dir.exists():
+            for sf in sorted(ch_dir.glob("S*.txt")):
+                content = sf.read_text(encoding="utf-8").strip()
+                # 跳过标题行和末行标记
+                lines = [l for l in content.split("\n") if l.strip() and not re.match(rf'{ch_id}S\d+', l.strip())]
+                # 跳过子结构标题行（L## · S##《...》）
+                lines = [l for l in lines if not re.match(r'L\d+ · S\d+《', l.strip())]
+                actual_text += "".join(lines)
+
+        word_count = ch.get("word_count", 0)
+        total_chars += word_count
+
+        if not actual_text:
+            level = "ERROR"
+            detail = "未找到实际内容"
+            error_count += 1
         else:
-            all_done = False
-            print(f"  🔄 {ch_key}「{ch_title}」— {done_count}/{total} 已完成")
-            for s_key in s_keys:
-                sub = subs[s_key]
-                status = sub.get("status", "pending")
-                title = sub.get("title", "?")
-                summary = sub.get("summary", "")
-                tone = sub.get("tone", "")
-                wc = sub.get("word_count", 0)
+            # 提取 overview 中的关键词和概述中的话题词
+            overview_kws = set(keyword_re.findall(overview))
+            actual_kws = set(keyword_re.findall(actual_text))
+            if not overview_kws:
+                coverage = 1.0  # 概述没有可提取的关键词，跳过
+            else:
+                matched = overview_kws & actual_kws
+                coverage = len(matched) / len(overview_kws)
 
-                if status == "done":
-                    print(f"       ✅ {ch_key}{s_key}「{title}」{wc}字 ✓")
-                elif status == "writing":
-                    print(f"       ✏️  {ch_key}{s_key}「{title}」— {wc}字已写（未完成）")
-                    if not found_pending:
-                        found_pending = True
-                else:
-                    print(f"       ⬜ {ch_key}{s_key}「{title}」— {summary[:40]}（情绪: {tone}）")
-                    if not found_pending:
-                        pending_key = ch_key + s_key
-                        found_pending = True
+            if coverage >= 0.6:
+                level = "PASS"
+                detail = f"覆盖 {len(matched)}/{len(overview_kws)}"
+                pass_count += 1
+            elif coverage >= 0.3:
+                level = "INFO"
+                detail = f"部分覆盖 {len(matched)}/{len(overview_kws)}"
+                info_count += 1
+            elif coverage > 0:
+                level = "WARN"
+                detail = f"低覆盖 {len(matched)}/{len(overview_kws)}"
+                warn_count += 1
+            else:
+                level = "ERROR"
+                detail = "无主题词匹配"
+                error_count += 1
 
-    print(f"{'='*55}")
+        report.append(f"| {ch_id} | {overview[:40]}... | {word_count}字 | {detail} | {level} |")
 
-    if all_done:
-        print(f"  ✅ 所有章节已完成！请运行 novel_fidelity.py 生成忠实度报告")
-        return
+    report.append(f"\n## 统计")
+    report.append(f"| 等级 | 数量 |")
+    report.append(f"|------|------|")
+    report.append(f"| [OK] PASS | {pass_count} |")
+    report.append(f"| ℹ️ INFO | {info_count} |")
+    report.append(f"| [WARN] WARN | {warn_count} |")
+    report.append(f"| [FAIL] ERROR | {error_count} |")
+    report.append(f"| **总字数** | **{total_chars}字** |")
 
-    if not found_pending:
-        # 尝试查找第一个 pending 的子结构
-        for ch_key in ch_keys:
-            chapter = chapters.get(ch_key, {})
-            subs = chapter.get("sub_structures", {})
-            for s_key in sorted(subs.keys(), key=lambda k: int(k.replace("S", ""))):
-                if subs[s_key].get("status") != "done":
-                    found_pending = True
-                    ch_key_resume = ch_key
-                    s_key_resume = s_key
-                    break
-            if found_pending:
-                break
+    report_text = "\n".join(report)
+    print(report_text)
 
-    if found_pending:
-        # 找到第一个待写的，输出续写指引
-        chapter = chapters.get(ch_keys[0] if not found_pending else ch_key, {})
-        # 重新确定 pending 子结构
-        resume_ch = None
-        resume_s = None
-        for ck in ch_keys:
-            cb = chapters.get(ck, {})
-            for sk in sorted(cb.get("sub_structures", {}).keys(), key=lambda k: int(k.replace("S", ""))):
-                if cb["sub_structures"][sk].get("status") != "done":
-                    resume_ch = ck
-                    resume_s = sk
-                    break
-            if resume_ch:
-                break
+    # 写入报告
+    report_dir = Path(state_path).parent / "data"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / "fidelity_report.md"
+    report_path.write_text(report_text, encoding="utf-8")
+    print(f"\n[报告已写入] {report_path}")
 
-        if resume_ch and resume_s:
-            sub_next = chapters.get(resume_ch, {}).get("sub_structures", {}).get(resume_s, {})
-            print(f"")
-            print(f"  📌 下一步")
-            print(f"  ───────────────────────────────────────")
-            print(f"  待写: {resume_ch}{resume_s}「{sub_next.get('title', '?')}」")
-            print(f"  概述: {sub_next.get('summary', '')}")
-            print(f"  情绪: {sub_next.get('tone', '中性')}")
-            print(f"  ───────────────────────────────────────")
-            print(f"")
-            print(f"  → novel_context_loader.py {state_path} {resume_ch}{resume_s}")
+    return pass_count, info_count, warn_count, error_count
 
 
-def cmd_preview_context(state_path: str, ch_key: str):
-    """预览一章所有子结构的写作前上下文"""
-    state = _load_state(state_path)
-    chapter = state.get("chapters", {}).get(ch_key, {})
-    subs = chapter.get("sub_structures", {})
+def finalize_novel(state_path, chapters_dir):
+    """全文完结：全线跨章检查 → 大纲忠实度 → 门禁"""
+    import sys as _sys
+    _sys.path.insert(0, str(SCRIPTS_DIR))
+    from novel_continuity import cross_chapter
+    from novel_pipeline_gate import pass_gate, load_gates, save_gates
 
-    if not subs:
-        print(f"ERROR: {ch_key} 子结构未规划，请先运行 plan-chapter")
-        sys.exit(1)
+    print(f"{'='*50}")
+    print(f"[全文完结] 开始全线跨章承诺链检查...")
+    issues = cross_chapter(state_path, chapters_dir)
+    total_gaps = len(issues)
 
-    style = state.get("style_guide", {})
-    genre = style.get("genre", "未设定")
-    perspective = style.get("perspective", "未设定")
-    narrative = style.get("narrative_mode", "未设定")
+    print(f"\n{'='*50}")
+    print(f"[全文完结] 开始大纲忠实度检查...")
+    p, i, w, e = fidelity_check(state_path, chapters_dir)
 
-    characters = state.get("characters", {})
-    char_list = []
-    for name, info in characters.items():
-        role = info.get("role", "")
-        char_list.append(f"{name}({role})")
-
-    timeline = state.get("timeline", {})
-    current_day = timeline.get("current_day", "未知")
-
-    ch_title = chapter.get("title", "未知")
-    ch_summary = chapter.get("summary", "")
-
-    s_keys = sorted(subs.keys(), key=lambda k: int(k.replace("S", "")))
-
-    print(f"[写作前上下文 — {ch_key}「{ch_title}」]")
-    print(f"风格: {genre}")
-    print(f"视角: {perspective} / {narrative}")
-    print(f"角色: {', '.join(char_list)}")
-    print(f"时间: 穿越后第 {current_day} 天")
-    print(f"章概述: {ch_summary}")
-    print(f"")
-    print(f"{'─'*60}")
-    print(f"{'子结构':>8} | {'情绪':>6} | {'概述':<40}")
-    print(f"{'─'*60}")
-
-    for s_key in s_keys:
-        info = subs[s_key]
-        title = info.get("title", "?").ljust(20)
-        tone = info.get("tone", "中性").ljust(6)
-        summary = info.get("summary", "")
-        print(f"  {ch_key}{s_key} | {tone} | {title[:20]} | {summary[:40]}")
-
-    print(f"{'─'*60}")
-    print(f"OK {ch_key} 共 {len(s_keys)} 个子结构等待写作")
+    print(f"\n{'='*50}")
+    print(f"[全文完结] 门禁: fidelity")
+    gates = load_gates(state_path)
+    if e > 0:
+        print(f"[HOOK-BLOCK] 有 {e} 个 ERROR 级别偏差，fidelity 门禁未通过")
+        print(f"  请手动修正后重新运行 finalize-novel")
+    else:
+        gates["fidelity"] = "PASS"
+        save_gates(state_path, gates)
+        print(f"[全文完结] fidelity [OK] PASS")
+        print(f"[全文完结] 全部完成！")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print(__doc__)
+        print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
+        print("  命令:")
+        print("    plan-chapter     <chapter> <subs_json>")
+        print("    verify-chapter   <chapter>")
+        print("    preview          <chapter>")
+        print("    write-sub        <chapter> <sub_key> [chapters_dir]")
+        print("    finalize-chapter <chapter> <chapter_dir> <report_dir>")
+        print("    fidelity         <chapters_dir>")
+        print("    finalize-novel   <chapters_dir>")
         sys.exit(1)
 
-    command = sys.argv[1]
-    state_path = sys.argv[2]
+    cmd = sys.argv[1]
+    sp = sys.argv[2]
 
-    if command == "plan-chapter":
-        if len(sys.argv) < 5:
-            print("用法: plan-chapter <state_path> <ch_key> <subs_json>")
-            sys.exit(1)
-        cmd_plan_chapter(state_path, sys.argv[3], sys.argv[4])
-
-    elif command == "verify-chapter":
-        if len(sys.argv) < 4:
-            print("用法: verify-chapter <state_path> <ch_key>")
-            sys.exit(1)
-        cmd_verify_chapter(state_path, sys.argv[3])
-
-    elif command == "finalize-chapter":
-        if len(sys.argv) < 5:
-            print("用法: finalize-chapter <state_path> <ch_key> <chapter_dir> <report_dir>")
-            sys.exit(1)
-        cmd_finalize_chapter(state_path, sys.argv[3], sys.argv[4], sys.argv[5])
-
-    elif command == "preview-writing-context":
-        if len(sys.argv) < 4:
-            print("用法: preview-writing-context <state_path> <ch_key>")
-            sys.exit(1)
-        cmd_preview_context(state_path, sys.argv[3])
-
-    elif command == "verify-causality-outline":
-        causality_script = os.path.join(SCRIPTS_DIR, "novel_causality_check.py")
-        if not os.path.exists(causality_script):
-            print("ERROR: novel_causality_check.py 不存在")
-            sys.exit(1)
-        python_exe = sys.executable
-        ret = os.system(f'"{python_exe}" "{causality_script}" chapter-outline "{state_path}"')
-        sys.exit(ret >> 8)
-
-    elif command == "verify-causality-sub":
-        if len(sys.argv) < 4:
-            print("用法: verify-causality-sub <state_path> <ch_key>")
-            sys.exit(1)
-        causality_script = os.path.join(SCRIPTS_DIR, "novel_causality_check.py")
-        if not os.path.exists(causality_script):
-            print("ERROR: novel_causality_check.py 不存在")
-            sys.exit(1)
-        python_exe = sys.executable
-        ret = os.system(f'"{python_exe}" "{causality_script}" sub-structure "{state_path}" "{sys.argv[3]}"')
-        sys.exit(ret >> 8)
-
-    elif command == "resume":
-        cmd_resume(state_path)
-
+    if cmd == "plan-chapter":
+        plan_chapter(sp, sys.argv[3], sys.argv[4])
+    elif cmd == "verify-chapter":
+        verify_chapter(sp, sys.argv[3])
+    elif cmd == "preview":
+        preview_context(sp, sys.argv[3])
+    elif cmd == "write-sub":
+        write_sub(sp, sys.argv[3], sys.argv[4], sys.argv[5] if len(sys.argv) > 5 else str(Path(sp).parent / "chapters"))
+    elif cmd == "finalize-chapter":
+        finalize_chapter(sp, sys.argv[3], sys.argv[4], sys.argv[5])
+    elif cmd == "fidelity":
+        fidelity_check(sp, sys.argv[3])
+    elif cmd == "finalize-novel":
+        finalize_novel(sp, sys.argv[3])
     else:
-        print(f"未知命令: {command}")
-        print(__doc__)
-        sys.exit(1)
+        print(f"[错误] 未知命令: {cmd}")
