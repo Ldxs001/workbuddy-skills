@@ -100,6 +100,15 @@ def cmd_plan_chapter(state_path: str, ch_key: str, subs_json: str):
             print(f"ERROR: 子结构条目缺少 s_key 或 title: {json.dumps(sub_item, ensure_ascii=False)}")
             sys.exit(1)
 
+        # 概述字数硬检查：至少 12 个有效字符（不含空格标点），防止"做了些事"这种空泛概述
+        summary_stripped = summary.replace(" ", "").replace("，", "").replace("。", "").replace("、", "").replace("？", "").replace("！", "")
+        if len(summary_stripped) < 12:
+            print(f"ERROR: {ch_key}{s_key}「{title}」概述过短（{len(summary_stripped)} 有效字符，需 ≥12）")
+            print(f"  → 当前概述: {summary}")
+            print(f"  → 概述必须包含具体动作+人物+事件，不能是简单状态描述")
+            print(f"  → 示例: 「Atlas在诊断中检测到异常神经脉冲，决定不报告」— 24 个有效字符")
+            sys.exit(1)
+
         if s_key in subs:
             print(f"  WARN: {s_key} 已存在，覆盖")
 
@@ -248,6 +257,116 @@ def cmd_finalize_chapter(state_path: str, ch_key: str, chapter_dir: str, report_
     print(f"OK {ch_key} 已完成")
 
 
+def cmd_resume(state_path: str):
+    """全局断点续写检测 — 找出下一个需要写的子结构"""
+    state = _load_state(state_path)
+
+    chapters = state.get("chapters", {})
+    if not chapters:
+        print("ERROR: chapters 为空，请先完成 Phase 1")
+        sys.exit(1)
+
+    # 排序章
+    ch_keys = sorted(chapters.keys(), key=lambda k: int(k.replace("L", "")))
+    phase = state.get("current_phase", "none")
+
+    print(f"{'='*55}")
+    print(f"  ⏸️  中断恢复 — 当前进度")
+    print(f"{'='*55}")
+    print(f"  阶段: {phase}")
+    print(f"")
+
+    all_done = True
+    found_pending = False
+
+    for ch_key in ch_keys:
+        chapter = chapters.get(ch_key, {})
+        subs = chapter.get("sub_structures", {})
+        ch_title = chapter.get("title", "?")
+        s_keys = sorted(subs.keys(), key=lambda k: int(k.replace("S", "")))
+
+        done_count = sum(1 for k in s_keys if subs[k].get("status") == "done")
+        total = len(s_keys)
+
+        if total == 0:
+            print(f"  ⬜ {ch_key}「{ch_title}」— 未规划")
+            all_done = False
+            continue
+
+        if done_count == total:
+            print(f"  ✅ {ch_key}「{ch_title}」— {done_count}/{total} 已完成")
+        else:
+            all_done = False
+            print(f"  🔄 {ch_key}「{ch_title}」— {done_count}/{total} 已完成")
+            for s_key in s_keys:
+                sub = subs[s_key]
+                status = sub.get("status", "pending")
+                title = sub.get("title", "?")
+                summary = sub.get("summary", "")
+                tone = sub.get("tone", "")
+                wc = sub.get("word_count", 0)
+
+                if status == "done":
+                    print(f"       ✅ {ch_key}{s_key}「{title}」{wc}字 ✓")
+                elif status == "writing":
+                    print(f"       ✏️  {ch_key}{s_key}「{title}」— {wc}字已写（未完成）")
+                    if not found_pending:
+                        found_pending = True
+                else:
+                    print(f"       ⬜ {ch_key}{s_key}「{title}」— {summary[:40]}（情绪: {tone}）")
+                    if not found_pending:
+                        pending_key = ch_key + s_key
+                        found_pending = True
+
+    print(f"{'='*55}")
+
+    if all_done:
+        print(f"  ✅ 所有章节已完成！请运行 novel_fidelity.py 生成忠实度报告")
+        return
+
+    if not found_pending:
+        # 尝试查找第一个 pending 的子结构
+        for ch_key in ch_keys:
+            chapter = chapters.get(ch_key, {})
+            subs = chapter.get("sub_structures", {})
+            for s_key in sorted(subs.keys(), key=lambda k: int(k.replace("S", ""))):
+                if subs[s_key].get("status") != "done":
+                    found_pending = True
+                    ch_key_resume = ch_key
+                    s_key_resume = s_key
+                    break
+            if found_pending:
+                break
+
+    if found_pending:
+        # 找到第一个待写的，输出续写指引
+        chapter = chapters.get(ch_keys[0] if not found_pending else ch_key, {})
+        # 重新确定 pending 子结构
+        resume_ch = None
+        resume_s = None
+        for ck in ch_keys:
+            cb = chapters.get(ck, {})
+            for sk in sorted(cb.get("sub_structures", {}).keys(), key=lambda k: int(k.replace("S", ""))):
+                if cb["sub_structures"][sk].get("status") != "done":
+                    resume_ch = ck
+                    resume_s = sk
+                    break
+            if resume_ch:
+                break
+
+        if resume_ch and resume_s:
+            sub_next = chapters.get(resume_ch, {}).get("sub_structures", {}).get(resume_s, {})
+            print(f"")
+            print(f"  📌 下一步")
+            print(f"  ───────────────────────────────────────")
+            print(f"  待写: {resume_ch}{resume_s}「{sub_next.get('title', '?')}」")
+            print(f"  概述: {sub_next.get('summary', '')}")
+            print(f"  情绪: {sub_next.get('tone', '中性')}")
+            print(f"  ───────────────────────────────────────")
+            print(f"")
+            print(f"  → novel_context_loader.py {state_path} {resume_ch}{resume_s}")
+
+
 def cmd_preview_context(state_path: str, ch_key: str):
     """预览一章所有子结构的写作前上下文"""
     state = _load_state(state_path)
@@ -351,6 +470,9 @@ if __name__ == "__main__":
         python_exe = sys.executable
         ret = os.system(f'"{python_exe}" "{causality_script}" sub-structure "{state_path}" "{sys.argv[3]}"')
         sys.exit(ret >> 8)
+
+    elif command == "resume":
+        cmd_resume(state_path)
 
     else:
         print(f"未知命令: {command}")
