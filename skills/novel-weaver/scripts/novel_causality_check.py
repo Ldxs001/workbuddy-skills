@@ -19,6 +19,9 @@ novel-causality-check — 因果链验证钩子。
 import os
 import sys
 import json
+import subprocess
+
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 PHASE_ORDER = {
     "none": 0, "init": 10, "stage1_done": 20,
@@ -154,6 +157,9 @@ def cmd_chapter_outline(state_path: str):
         sys.exit(1)
     else:
         print(f"✅ 大纲因果链完整，可进入下一阶段")
+        # 门禁：通过大纲因果链
+        gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
+        ret = os.system(f'"{sys.executable}" "{gate_script}" pass "{state_path}" outline_causality')
 
 
 def cmd_substructure(state_path: str, ch_key: str):
@@ -274,6 +280,10 @@ def cmd_substructure(state_path: str, ch_key: str):
         sys.exit(1)
     else:
         print(f"✅ {ch_key} 子结构因果链完整，可开始写作")
+        # 门禁：通过子结构因果链
+        gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
+        os.system(f'"{sys.executable}" "{gate_script}" pass "{state_path}" sub_causality:{ch_key}')
+        print(f"  → pipeline gate: sub_causality:{ch_key} PASS")
 
 
 if __name__ == "__main__":

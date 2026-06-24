@@ -119,7 +119,11 @@ def cmd_plan_chapter(state_path: str, ch_key: str, subs_json: str):
     _save_state(state_path, state)
     count = len(sub_list)
     print(f"OK {count} 个子结构已注册到 {ch_key}")
-    print(f"  → 下一步: context_loader 或直接开始写作")
+    # 门禁：子结构批量注册完成
+    gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
+    os.system(f'"{python_exe}" "{gate_script}" pass "{state_path}" plan_chapter:{ch_key}')
+    print(f"  ✅ pipeline gate: plan_chapter:{ch_key} PASS")
+    print(f"  → 下一步: verify-causality-sub（因果链验证）然后开始写作")
 
 
 def cmd_verify_chapter(state_path: str, ch_key: str):
@@ -225,6 +229,11 @@ def cmd_finalize_chapter(state_path: str, ch_key: str, chapter_dir: str, report_
     print(f"  {'✅' if continuity_exists else '❌'} 连通性: {continuity_report}")
     print(f"  {'✅' if style_exists else '❌'} 风格: {style_report}")
     print(f"  {'✅' if logic_exists else '❌'} 逻辑: {logic_report}")
+
+    # 门禁：章完结
+    gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
+    os.system(f'"{python_exe}" "{gate_script}" pass "{state_path}" chapter_finalized:{ch_key}')
+    print(f"  ✅ pipeline gate: chapter_finalized:{ch_key} PASS")
     print(f"OK {ch_key} 已完成")
 
 

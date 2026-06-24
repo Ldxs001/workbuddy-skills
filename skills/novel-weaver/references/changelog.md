@@ -1,6 +1,26 @@
 # 更新日志
 
-## 1.2.1 (2026-06-24)
+## 1.3.0 (2026-06-24)
+
+### 新增
+- **`novel_pipeline_gate.py`** — 全局流程门禁系统：
+  - `pass` 命令：关键脚本成功时自动标记门禁通过（写入 novel_state.json.pipeline）
+  - `require` 命令：phase 转换前检查前置门禁，未通过则阻断
+  - `status` 命令：可视化显示所有门禁状态
+  - `reset` 命令：调试用重置
+- **全流程门禁集成**（5 个关键脚本自动 pass 门禁）：
+  - `novel_causality_check.py` → PASS 时自动 pass `outline_causality` / `sub_causality:L##`
+  - `novel_workflow_engine.py` → plan-chapter 后 pass `plan_chapter:L##`；finalize-chapter 后 pass `chapter_finalized:L##`
+  - `novel_fidelity.py` → PASS 时自动 pass `fidelity`
+- **`set-phase` 强制门禁检查**：
+  - → `writing`：require `outline_causality`
+  - → `chapter_done`：报告存在性检查（已有）
+  - → `stage3_ready`：require `fidelity`
+  - 未通过则阻断，LLM 无法跳过步骤
+- **hooks.md 重写** — 新增门禁系统章节 + 门禁点列表表 + 查看命令
+
+### 变更
+- 版本 1.2.1 → 1.3.0（核心架构层新增，功能可追踪）
 
 ### 新增
 - **`novel_causality_check.py`** — 因果链双重验证钩子：

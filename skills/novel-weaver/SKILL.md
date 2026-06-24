@@ -1,9 +1,9 @@
 ---
 name: novel-weaver
-version: 1.2.1
+version: 1.3.0
 author: wUwproject
 license: MIT
-description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 子结构连通性补充（含 auto-fix）→ 跨章节融合 → 风格一致性校验 + 逻辑一致性检查（人物/时间线/概述匹配度）→ 大纲忠实度报告。全流程硬约束：context_loader 阻断未注册子结构，atomic_writer 禁止正文标记行，set-phase 前置检查报告存在。
+description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ pipeline 流程门禁（LLM 跳过任何步骤即阻断）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 连通性补充（含 auto-fix）→ 跨章节融合 → 风格校验 + 逻辑检查 + 大纲忠实度报告。全流程硬约束 + 门禁跟踪。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -25,9 +25,10 @@ external_data_dir: true
 
 ## 约束
 
+- 🔴 **[强制] 流程门禁系统** — 每个关键步骤完成后自动更新 `novel_state.json` 的 `pipeline` 字段。`set-phase` 在 phase 转换前检查前置门禁是否全部通过。**未通过则阻断，LLM 无法跳过任何步骤。** 查看门禁状态：`pipeline_gate.py status <state_path>`
 - **[必须] 场景配置和大纲必须经用户确认后才能进入写作阶段** — 跳过确认视为未完成
-- **[必须] 大纲级因果链验证** — 用户确认大纲前，必须运行 workflow_engine.py verify-causality-outline，逐链节检查 L01→L02→… 的因果递进，全部 PASS 后才可确认
-- **[必须] 子结构级因果链验证** — plan-chapter 完成后、写作开始前，必须运行 workflow_engine.py verify-causality-sub，逐链节检查 S01→S02→… 的因果递进，全部 PASS 后才可开始写作
+- **[必须] 大纲级因果链验证** — 用户确认大纲前，必须运行 workflow_engine.py verify-causality-outline（自动 pass outline_causality 门禁）
+- **[必须] 子结构级因果链验证** — plan-chapter 完成后、写作开始前，必须运行 workflow_engine.py verify-causality-sub（自动 pass sub_causality:L## 门禁）
 - **[必须] 子结构必须先规划再写作** — 调用 workflow_engine.py plan-chapter 批量注册所有子结构（含情绪提示 tone），然后 context_loader 才能通过硬检查
 - **[必须] 写作分段最多200行，以自然叙事段落结束**
 - **[必须] 每段写完后立即 atomic write（scripts/novel_atomic_writer.py 按行 fsync + .progress 标记）**
@@ -37,7 +38,7 @@ external_data_dir: true
 - **[必须] 连通性补充不可跳过（用 novel_continuity.py）**
 - **[必须] 每章完成后用 novel_style_check.py 生成风格校验报告**
 - **[必须] 每章完成后用 novel_logic_check.py 生成逻辑一致性报告**
-- **[必须] 全文完成后用 novel_fidelity.py 生成大纲忠实度报告**
+- **[必须] 全文完成后用 novel_fidelity.py 生成大纲忠实度报告（自动 pass fidelity 门禁）**
 - **[必须] 阶段门禁：set-phase chapter_done 前会检查各报告是否存在**
 
 ## 触发条件

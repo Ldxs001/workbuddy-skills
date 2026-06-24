@@ -123,8 +123,20 @@ def cmd_set_phase(path: str, new_phase: str):
         sys.exit(1)
     data = _require_phase(path, "set-phase")
 
-    # ── phase→chapter_done 前置检查 ──
-    if new_phase == "chapter_done":
+    python_exe = sys.executable
+    gate_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "novel_pipeline_gate.py")
+
+    # ── 全局流程门禁：phase 转换前检查前置步骤是否已通过 ──
+    if new_phase == "writing":
+        # 必须先完成大纲因果链验证
+        ret = os.system(f'"{python_exe}" "{gate_script}" require "{path}" outline_causality')
+        if ret != 0:
+            print(f"  → 拒绝推进到 {new_phase}，请先完成因果链验证")
+            sys.exit(1)
+
+    elif new_phase == "chapter_done":
+        # pipeline 层已经由 finalize-chapter 设置了 chapter_finalized 门禁
+        # 这里做文件存在性检查（兼容直接调用 set-phase 的情况）
         data_dir = os.path.dirname(path)
         ch_key = data.get("current_chapter", "")
         continuity_path = os.path.join(data_dir, f"continuity_{ch_key}.md" if ch_key else "continuity_report.md")
@@ -140,6 +152,12 @@ def cmd_set_phase(path: str, new_phase: str):
             for m in missing:
                 print(f"  - {m}")
             print(f"  → 继续执行 set-phase（如需强制检查请运行 novel_workflow_engine.py finalize-chapter）")
+
+    elif new_phase == "stage3_ready":
+        ret = os.system(f'"{python_exe}" "{gate_script}" require "{path}" fidelity')
+        if ret != 0:
+            print(f"  → 拒绝推进到 {new_phase}，请先完成大纲忠实度报告")
+            sys.exit(1)
 
     _set_phase_and_save(data, path, new_phase)
 

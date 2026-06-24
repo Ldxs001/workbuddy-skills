@@ -19,6 +19,8 @@ import sys
 import json
 import re
 
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def _load_chapters(project_dir: str) -> dict:
     """读取已完成的章节内容"""
@@ -147,6 +149,12 @@ def generate_report(project_dir: str):
         f.write("\n".join(report_lines))
         f.flush()
         os.fsync(f.fileno())
+
+    # 门禁：大纲忠实度报告完成
+    state_path = os.path.join(project_dir, "data", "novel_state.json")
+    if os.path.exists(state_path):
+        gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
+        os.system(f'"{sys.executable}" "{gate_script}" pass "{state_path}" fidelity')
     print(f"OK report={report_path} pass={pass_count} info={info_count} warn={warn_count} error={error_count}")
 
 
