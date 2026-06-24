@@ -20,6 +20,14 @@ novel-workflow-engine — 统一编排引擎。
 
   preview-writing-context <state_path> <ch_key>
       预览一章写作前的完整上下文（含所有子结构规划）
+
+  verify-causality-outline <state_path>
+      验证大纲（章）级别的因果链完整性。
+      在 Phase 1 用户确认之前必须运行。
+
+  verify-causality-sub <state_path> <ch_key>
+      验证指定章的子结构级别因果链完整性。
+      在 plan-chapter 之后、写作开始之前必须运行。
 """
 
 import os
@@ -302,6 +310,27 @@ if __name__ == "__main__":
             print("用法: preview-writing-context <state_path> <ch_key>")
             sys.exit(1)
         cmd_preview_context(state_path, sys.argv[3])
+
+    elif command == "verify-causality-outline":
+        causality_script = os.path.join(SCRIPTS_DIR, "novel_causality_check.py")
+        if not os.path.exists(causality_script):
+            print("ERROR: novel_causality_check.py 不存在")
+            sys.exit(1)
+        python_exe = sys.executable
+        ret = os.system(f'"{python_exe}" "{causality_script}" chapter-outline "{state_path}"')
+        sys.exit(ret >> 8)
+
+    elif command == "verify-causality-sub":
+        if len(sys.argv) < 4:
+            print("用法: verify-causality-sub <state_path> <ch_key>")
+            sys.exit(1)
+        causality_script = os.path.join(SCRIPTS_DIR, "novel_causality_check.py")
+        if not os.path.exists(causality_script):
+            print("ERROR: novel_causality_check.py 不存在")
+            sys.exit(1)
+        python_exe = sys.executable
+        ret = os.system(f'"{python_exe}" "{causality_script}" sub-structure "{state_path}" "{sys.argv[3]}"')
+        sys.exit(ret >> 8)
 
     else:
         print(f"未知命令: {command}")

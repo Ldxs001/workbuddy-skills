@@ -1,6 +1,6 @@
 {
   "name": "novel-weaver",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 子结构连通性补充（含 auto-fix）→ 跨章节融合 → 风格一致性校验 + 逻辑一致性检查（人物/时间线/概述匹配度）→ 大纲忠实度报告。全流程硬约束：context_loader 阻断未注册子结构，atomic_writer 禁止正文标记行，set-phase 前置检查报告存在。",
   "author": "wUwproject",
   "tags": ["novel", "writing", "story", "outline", "scene-setting", "character", "narrative", "workflow"],

@@ -1,6 +1,25 @@
 # 更新日志
 
-## 1.2.0 (2026-06-24)
+## 1.2.1 (2026-06-24)
+
+### 新增
+- **`novel_causality_check.py`** — 因果链双重验证钩子：
+  - `chapter-outline` 模式：逐链节检查 L01→L02→…L15 的章概述因果递进（关键词重叠分析，WARN/ERROR 阻断）
+  - `sub-structure` 模式：逐链节检查 S01→S02→… 的子结构概述因果递进（含情绪递进提示）
+  - 结构化的因果链矩阵输出 + 每链节状态标记 + 修复指引
+- **workflow_engine.py 新增 2 个编排命令**：
+  - `verify-causality-outline` — 委托 causation_check chapter-outline
+  - `verify-causality-sub` — 委托 causation_check sub-structure
+- **hooks.md 新增 2 条阻断式钩子**：
+  - 大纲因果链验证（用户确认大纲前必须 PASS）
+  - 子结构因果链验证（plan-chapter 后、写作前必须 PASS）
+- **SKILL.md 约束新增 2 条**：
+  - 大纲级因果链验证（必须运行 verify-causality-outline 通过后才能确认）
+  - 子结构级因果链验证（必须运行 verify-causality-sub 通过后才能写作）
+
+### 修复
+- workflow_engine.py verify-chapter 在子结构为空时报告 ERROR（替代无声返回）
+- 所有子结构写作前必须通过因果链检查，从设计层面解决因果断裂问题（前置规划保障，不依赖后置检测）
 
 ### 新增
 - **`novel_workflow_engine.py`** — 统一编排引擎，提供 4 个编排命令：

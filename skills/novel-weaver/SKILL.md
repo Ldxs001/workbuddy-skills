@@ -1,9 +1,9 @@
 ---
 name: novel-weaver
-version: 1.2.0
+version: 1.2.1
 author: wUwproject
 license: MIT
-description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 子结构连通性补充（含 auto-fix）→ 跨章节融合 → 风格一致性校验 + 逻辑一致性检查（人物/时间线/概述匹配度）→ 大纲忠实度报告。全流程硬约束：context_loader 阻断未注册子结构，atomic_writer 禁止正文标记行，set-phase 前置检查报告存在。
+description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 子结构连通性补充（含 auto-fix）→ 跨章节融合 → 风格一致性校验 + 逻辑一致性检查（人物/时间线/概述匹配度）→ 大纲忠实度报告。全流程硬约束：context_loader 阻断未注册子结构，atomic_writer 禁止正文标记行，set-phase 前置检查报告存在。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -26,6 +26,8 @@ external_data_dir: true
 ## 约束
 
 - **[必须] 场景配置和大纲必须经用户确认后才能进入写作阶段** — 跳过确认视为未完成
+- **[必须] 大纲级因果链验证** — 用户确认大纲前，必须运行 workflow_engine.py verify-causality-outline，逐链节检查 L01→L02→… 的因果递进，全部 PASS 后才可确认
+- **[必须] 子结构级因果链验证** — plan-chapter 完成后、写作开始前，必须运行 workflow_engine.py verify-causality-sub，逐链节检查 S01→S02→… 的因果递进，全部 PASS 后才可开始写作
 - **[必须] 子结构必须先规划再写作** — 调用 workflow_engine.py plan-chapter 批量注册所有子结构（含情绪提示 tone），然后 context_loader 才能通过硬检查
 - **[必须] 写作分段最多200行，以自然叙事段落结束**
 - **[必须] 每段写完后立即 atomic write（scripts/novel_atomic_writer.py 按行 fsync + .progress 标记）**
@@ -77,9 +79,14 @@ external_data_dir: true
 
 1. LLM生成完整场景配置（人物/时代/地点/风土人情/核心冲突）
 2. LLM生成一级大纲（L01-L15 编号 + 标题 + 每章模糊概述）
-3. 输出给用户
-4. 钩子：用户确认/修正（阻断式）→ 未确认不得进入阶段2
-5. 输出：初始化 novel_state.json（style_guide / chapters / characters / timeline）
+3. **因果链验证（v1.2.1 新增阻断式钩子）**
+   ```
+   workflow_engine.py verify-causality-outline <state_path>
+   ```
+   逐链节检查 L01→L02→…L15 的因果递进。每节的概述必须显式承载"上一章的果 → 下一章的因"。全部 PASS 后才可进入下一步。
+4. 输出给用户确认
+5. 钩子：用户确认/修正（阻断式）→ 未确认不得进入阶段2
+6. 输出：初始化 novel_state.json（style_guide / chapters / characters / timeline）
 
 ### 阶段2：逐章写作
 
@@ -91,8 +98,13 @@ external_data_dir: true
    a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone**）
    b. 展示给用户（可选确认）
    c. **调用 workflow_engine.py plan-chapter 批量注册所有子结构到 novel_state.json**
-   d. 验证：workflow_engine.py verify-chapter 检查全部注册
-   e. **此时 phase 自动推进到 writing**
+   d. **因果链验证（v1.2.1 新增）**
+      ```
+      workflow_engine.py verify-causality-sub <state_path> <L##>
+      ```
+      逐链节检查 S01→S02→… 的因果递进，全部 PASS 后才可开始写作。
+   e. 验证：workflow_engine.py verify-chapter 检查全部注册
+   f. **此时 phase 自动推进到 writing**
 
 2. **逐子结构写作循环（硬约束：context_loader 会检查子结构必须已注册）**
    a. 调用 novel_context_loader.py 加载上下文（无子结构 → 报错阻断）

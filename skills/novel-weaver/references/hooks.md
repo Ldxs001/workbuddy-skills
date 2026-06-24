@@ -4,7 +4,9 @@
 |------|---------|------|------|------|
 | 大纲确认 | 阶段1完成时 | 阻断式 | 未确认则禁止进入阶段2 | — |
 | 初始化状态文件 | 阶段1完成后 | 阻断式+阶段门禁 | novel_state_manager.py init → phase=init，禁止重复 | `scripts/novel_state_manager.py` |
+| **大纲因果链验证** | 用户确认大纲前 | **阻断式钩子** | novel_causality_check.py chapter-outline 逐链节检查章概述因果递进，PASS 后才可确认（v1.2.1 新增） | `scripts/novel_causality_check.py` |
 | 子结构先行规划 | 每章写作前 | **代码级硬约束** | workflow_engine.py plan-chapter 批量注册子结构（含情绪 tone）→ context_loader 要求子结构已存在 | `scripts/novel_workflow_engine.py` |
+| **子结构因果链验证** | plan-chapter 后、写作前 | **阻断式钩子** | novel_causality_check.py sub-structure 检查 S01→S02→… 概述因果递进，PASS 后才可写作（v1.2.1 新增） | `scripts/novel_causality_check.py` |
 | 子结构存在性验证 | 每段写作前 | **代码级硬约束** | novel_context_loader.py 读 sub_structures[s_key].title，为空则报错退出（v1.2 新增） | `scripts/novel_context_loader.py` |
 | 写作前加载上下文 | 每段写作前 | 阻断式+阶段门禁 | novel_context_loader.py（需 phase≥stage1_done + 子结构已注册） | `scripts/novel_context_loader.py` |
 | 写后即存 | 每段写作完成后 | 阻断式+原子 | novel_atomic_writer.py 按行 fsync + 正文禁止标记行检测（v1.2 新增） + finalize 编号标记 | `scripts/novel_atomic_writer.py` |
