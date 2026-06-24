@@ -59,7 +59,23 @@ def generate_report(project_dir: str):
     with open(outline_path, "r", encoding="utf-8") as f:
         outline = json.load(f)
 
-    chapters = outline.get("chapters", [])
+    chapters_raw = outline.get("chapters", [])
+    # 兼容两种 chapters 数据格式：
+    #   list[dict]：每个元素有 chapter_number / title / summary / themes
+    #   dict[L##]：key 为 "L01".."L15"，每个值有 title / summary / themes
+    if isinstance(chapters_raw, dict):
+        chapters = []
+        for ch_key in sorted(chapters_raw.keys()):
+            ch = chapters_raw[ch_key]
+            num = int(ch_key.replace("L", ""))
+            chapters.append({
+                "chapter_number": num,
+                "title": ch.get("title", ""),
+                "summary": ch.get("summary", ""),
+                "themes": ch.get("themes", [])
+            })
+    else:
+        chapters = chapters_raw
     actual = _load_chapters(project_dir)
 
     report_lines = []

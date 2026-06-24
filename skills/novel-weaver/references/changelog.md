@@ -1,12 +1,38 @@
 # 更新日志
 
-## 1.1.1 (2026-06-24)
+## 1.2.0 (2026-06-24)
+
+### 新增
+- **`novel_workflow_engine.py`** — 统一编排引擎，提供 4 个编排命令：
+  - `plan-chapter` — 批量注册一章所有子结构（含情绪 tone），自动推进 phase→writing
+  - `verify-chapter` — 验证子结构是否全部注册
+  - `finalize-chapter` — 一键运行连通性+风格+逻辑检查 + set-phase chapter_done
+  - `preview-writing-context` — 预览一章所有子结构的写作上下文
+- **`novel_logic_check.py`** — 逻辑一致性检查器，覆盖 3 个维度：
+  - 人物行为一致性：同一角色在不同子结构中的出现/消失检查
+  - 时间线逻辑：时间回退检测 + 时间引用扫描
+  - 子结构内容与概述匹配度：规划关键词在正文中的命中率
+- **代码级硬约束**（三段式阻断链）：
+  1. `context_loader.py` — 子结构未注册 → 报错退出（"未知"无声降级 → 硬阻断）
+  2. `atomic_writer.py` — 正文中含 `L##S##` 标记行 → 报错退出（格式混乱 → 硬阻断）
+  3. `state_manager.py` — `set-phase chapter_done` 前置检查报告是否存在（无报告 → WARN）
+- **`novel_continuity.py` auto-fix 模式**：
+  - `--auto-fix` 生成 `_transitions.json` 列出所有需要过渡的子结构对
+  - `write-transition` 命令写入过渡段落
+- **子结构规划扩展** — 增加 `tone`（情绪提示）字段，在规划阶段前置解决情绪连贯性问题
 
 ### 修复
-- 阶段门禁读错文件：novel_character_registry.py 和 novel_timeline.py 从自身的 characters.json/timeline.json 读 current_phase，永远返回 "none" 导致始终阻断。改为从 novel_state.json 读取
-- novel_continuity.py outline_path 参数冲突：同一参数同时当 novel_state.json（读 current_phase）和 outline.json（读 chapters 列表）用，但 novel_state.json 的 chapters 是 dict 而非 list，_load_chapter_outline 永远返回空。改为 _load_chapter_summary_from_state 直接读取 dict 结构
-- hooks.md vs execution_standards.md 角色登记脚本矛盾：hooks.md 写 novel_state_manager.py add-char，execution_standards.md 写 novel_character_registry.py add。统一为 novel_state_manager.py add-char
-- SKILL.md 约束第31行：描述从 novel_character_registry.py 改为 novel_state_manager.py add-char
+- **`novel_fidelity.py` 数据格式冲突**：`chapters` 期望 list 但 state_manager 存 dict，新增 dict→list 兼容转换
+- **`novel_continuity.py` CLI 接口改造**：从直接执行改为 `generate` 子命令，支持 `--auto-fix` 旗标
+- **`novel_state_manager.py` phase 检查增强**：`set-phase chapter_done` 前检查三道报告文件是否存在（提供 WARN）
+
+### 更新
+- **SKILL.md 工作流程重构**：
+  - 阶段2步骤1 从"生成→追加"改为"生成→**plan-chapter批量注册**→验证"
+  - 阶段2步骤5 从"连通性+风格"改为"**三道检查+finalize-chapter一键完结**"
+  - 新增 7 条硬约束（子结构先行、正文禁标记、报告前检等）
+- **hooks.md 翻新**：从 11 个钩子扩展到 15 个，新增代码级硬约束条目
+- **`_meta.json` 版本**：1.1.1 → 1.2.0
 
 ## 1.1.0 (2026-06-24)
 

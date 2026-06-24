@@ -122,10 +122,29 @@ def cmd_set_phase(path: str, new_phase: str):
         print(f"ERROR: 无效阶段 '{new_phase}'。可选：{', '.join(PHASE_ORDER.keys())}")
         sys.exit(1)
     data = _require_phase(path, "set-phase")
+
+    # ── phase→chapter_done 前置检查 ──
+    if new_phase == "chapter_done":
+        data_dir = os.path.dirname(path)
+        ch_key = data.get("current_chapter", "")
+        continuity_path = os.path.join(data_dir, f"continuity_{ch_key}.md" if ch_key else "continuity_report.md")
+        style_path = os.path.join(data_dir, f"style_{ch_key}.md" if ch_key else "style_report.md")
+        logic_path = os.path.join(data_dir, f"logic_{ch_key}.md" if ch_key else "logic_report.md")
+        missing = []
+        if not os.path.exists(continuity_path):
+            missing.append(continuity_path)
+        if not os.path.exists(style_path):
+            missing.append(style_path)
+        if missing:
+            print(f"WARN: 以下报告不存在，建议先运行 finalize-chapter 生成:")
+            for m in missing:
+                print(f"  - {m}")
+            print(f"  → 继续执行 set-phase（如需强制检查请运行 novel_workflow_engine.py finalize-chapter）")
+
     _set_phase_and_save(data, path, new_phase)
 
 
-def cmd_add_sub(path: str, ch_key: str, s_key: str, title: str, summary: str):
+def cmd_add_sub(path: str, ch_key: str, s_key: str, title: str, summary: str, tone: str = "中性"):
     data = _require_phase(path, "add-sub")
     chapter = data.setdefault("chapters", {}).setdefault(ch_key, {})
     subs = chapter.setdefault("sub_structures", {})
@@ -134,11 +153,12 @@ def cmd_add_sub(path: str, ch_key: str, s_key: str, title: str, summary: str):
     subs[s_key] = {
         "title": title,
         "summary": summary,
+        "tone": tone,
         "word_count": 0,
         "status": "pending"
     }
     _save(path, data)
-    print(f"OK {s_key} added: {title}")
+    print(f"OK {s_key} added: {title} (tone: {tone})")
 
 
 def cmd_update_sub(path: str, sub_id: str, *kv_pairs):
@@ -257,9 +277,11 @@ if __name__ == "__main__":
 
     elif command == "add-sub":
         if len(sys.argv) < 7:
-            print("用法: add-sub <path> <L##> <S##> <title> <summary>")
+            print("用法: add-sub <path> <L##> <S##> <title> <summary> [tone]")
             sys.exit(1)
-        cmd_add_sub(path, sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+        summary = sys.argv[6]
+        tone = sys.argv[7] if len(sys.argv) >= 8 else "中性"
+        cmd_add_sub(path, sys.argv[3], sys.argv[4], sys.argv[5], summary, tone)
 
     elif command == "update-sub":
         if len(sys.argv) < 4:

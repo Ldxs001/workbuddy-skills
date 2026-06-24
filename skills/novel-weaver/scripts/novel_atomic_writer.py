@@ -20,6 +20,20 @@ novel-atomic-writer — 行级别原子写入器。
 import os
 import sys
 import json
+import re
+
+# 标记行模式：L##S##（如 L10S04），禁止出现在正文中
+_MARKER_PATTERN = re.compile(r'^L\d{1,2}S\d{1,3}$')
+
+
+def _validate_body_line(line: str):
+    """检查一行是否看起来像子结构标记行，若是则阻断（标记行只能用 finalize 写入）"""
+    stripped = line.strip()
+    if _MARKER_PATTERN.match(stripped):
+        print(f"ERROR: 正文中不能包含子结构标记行 '{stripped}'")
+        print(f"  → 标记行只能通过 finalize 命令写入文件末尾")
+        print(f"  → 如果需要引用子结构编号，请使用其他格式（如“第5小节”或“S05”）")
+        sys.exit(1)
 
 
 def _progress_path(filepath: str) -> str:
@@ -28,6 +42,7 @@ def _progress_path(filepath: str) -> str:
 
 def write_line(filepath: str, line: str) -> int:
     """写入单行并 fsync，返回当前行数"""
+    _validate_body_line(line)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "a", encoding="utf-8") as f:
         f.write(line + "\n")
@@ -40,6 +55,8 @@ def write_line(filepath: str, line: str) -> int:
 
 def write_batch(filepath: str, lines: list) -> int:
     """写入多行（每行独立 fsync），返回总行数"""
+    for line in lines:
+        _validate_body_line(line)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     count = 0
     with open(filepath, "a", encoding="utf-8") as f:

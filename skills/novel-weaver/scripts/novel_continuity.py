@@ -157,14 +157,115 @@ def generate_continuity_report(chapter_dir: str, state_path: str, report_path: s
 
     print(f"OK report={report_path} transitions={transitions_needed}")
 
+    return transitions_needed
+
+
+def write_transitions_json(chapter_dir: str, state_path: str, report_path: str) -> str:
+    """
+    Auto-fix 模式：生成 _transitions.json（列出所有需要过渡的子结构对）。
+    返回 transitions JSON 文件路径，或空字符串表示无需过渡。
+    """
+    if not os.path.isdir(chapter_dir):
+        return ""
+    files = _sorted_substructure_files(chapter_dir)
+    if len(files) < 2:
+        return ""
+
+    transitions = []
+
+    for i in range(len(files) - 1):
+        f_prev = files[i]
+        f_next = files[i + 1]
+        prev_name = os.path.splitext(os.path.basename(f_prev))[0]
+        next_name = os.path.splitext(os.path.basename(f_next))[0]
+        prev_tail = _read_tail(f_prev, 3)
+        next_head = _read_head(f_next, 3)
+
+        # 检查衔接是否需要过渡
+        need_transition = False
+        if prev_tail and next_head:
+            last_prev = prev_tail[-1] if prev_tail else ""
+            first_next = next_head[0] if next_head else ""
+            if last_prev and first_next:
+                if len(set(last_prev.split()) & set(first_next.split())) < 2:
+                    need_transition = True
+
+        if need_transition:
+            transitions.append({
+                "from_file": prev_name,
+                "to_file": next_name,
+                "from_path": f_prev,
+                "to_path": f_next,
+                "prev_tail": prev_tail[-3:] if prev_tail else [],
+                "next_head": next_head[:3] if next_head else [],
+                "transition_text": ""  # 由 LLM 填充
+            })
+
+    if not transitions:
+        return ""
+
+    # 写入 transitions JSON
+    report_dir = os.path.dirname(report_path)
+    json_path = os.path.join(report_dir, "_transitions.json")
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(transitions, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+
+    print(f"OK auto-fix transitions={len(transitions)} json={json_path}")
+    print(f"  → 请生成过渡段落文本后，运行本脚本 write-transition 写入")
+    print(f"  → 或由 workflow_engine 自动处理")
+
+    return json_path
+
+
+def cmd_write_transition(chapter_dir: str, from_name: str, to_name: str, text: str):
+    """
+    将一个过渡段落到指定子结构之间。
+    创建 _transition_{from}_{to}.txt 文件。
+    """
+    filename = f"_transition_{from_name}_{to_name}.txt"
+    filepath = os.path.join(chapter_dir, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(text.rstrip() + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    print(f"OK 过渡段落已写入: {filepath}")
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("用法: novel_continuity.py <chapter_dir> <state_path> <report_path>")
+    if len(sys.argv) < 3:
+        print(__doc__)
         sys.exit(1)
 
-    generate_continuity_report(
-        chapter_dir=sys.argv[1],
-        state_path=sys.argv[2],
-        report_path=sys.argv[3]
-    )
+    command = sys.argv[1]
+
+    if command == "generate":
+        # novel_continuity.py generate <chapter_dir> <state_path> <report_path> [--auto-fix]
+        if len(sys.argv) < 5:
+            print("用法: generate <chapter_dir> <state_path> <report_path> [--auto-fix]")
+            sys.exit(1)
+        transitions_needed = generate_continuity_report(
+            chapter_dir=sys.argv[2],
+            state_path=sys.argv[3],
+            report_path=sys.argv[4]
+        )
+        if len(sys.argv) >= 6 and sys.argv[5] == "--auto-fix" and transitions_needed:
+            write_transitions_json(
+                chapter_dir=sys.argv[2],
+                state_path=sys.argv[3],
+                report_path=sys.argv[4]
+            )
+
+    elif command == "write-transition":
+        # novel_continuity.py write-transition <chapter_dir> <from_name> <to_name> <text>
+        if len(sys.argv) < 6:
+            print("用法: write-transition <chapter_dir> <from_name> <to_name> <text>")
+            sys.exit(1)
+        cmd_write_transition(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+
+    else:
+        print(f"未知命令: {command}")
+        print(__doc__)
+        sys.exit(1)

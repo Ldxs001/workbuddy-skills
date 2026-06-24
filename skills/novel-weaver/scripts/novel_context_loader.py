@@ -53,6 +53,14 @@ def load_context(state_path: str, sub_id: str) -> None:
     chapter = state.get("chapters", {}).get(ch_key, {})
     sub = chapter.get("sub_structures", {}).get(s_key, {})
 
+    # 硬检查：子结构必须已通过 add-sub 注册到 state（title 为空表示未注册）
+    if not sub.get("title"):
+        print(f"ERROR: 子结构 {s_key} 未在 novel_state.json 中注册")
+        print(f"  → chapters.{ch_key}.sub_structures.{s_key} 不存在或 title 为空")
+        print(f"  → 必须先运行: novel_state_manager.py add-sub <path> {ch_key} {s_key} <title> <summary>")
+        print(f"  → 或使用: novel_workflow_engine.py plan-chapter <path> {ch_key} '<subs_json>'")
+        sys.exit(1)
+
     # 风格指南
     style = state.get("style_guide", {})
     genre = style.get("genre", "未设定")

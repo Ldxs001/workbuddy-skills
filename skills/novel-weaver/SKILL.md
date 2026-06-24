@@ -1,14 +1,14 @@
 ---
 name: novel-weaver
-version: 1.1.1
+version: 1.2.0
 author: wUwproject
 license: MIT
-description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 基于大纲的200行分段写作 → 子结构连通性补充 → 跨章节融合 → 风格一致性校验 → 大纲忠实度报告。支持用户确认/修正环节，确保每级产出符合预期。
+description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 子结构连通性补充（含 auto-fix）→ 跨章节融合 → 风格一致性校验 + 逻辑一致性检查（人物/时间线/概述匹配度）→ 大纲忠实度报告。全流程硬约束：context_loader 阻断未注册子结构，atomic_writer 禁止正文标记行，set-phase 前置检查报告存在。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/novel-weaver/data
-tags: ['novel', 'writing', 'story', 'outline', 'scene-setting', 'character', 'narrative']
+tags: ['novel', 'writing', 'story', 'outline', 'scene-setting', 'character', 'narrative', 'workflow']
 trigger: 写小说/写故事/写文章/长文写作/故事大纲/场景配置/我想写个故事
 trigger_negative: 翻译/改写/润色/校对/简洁回答/做PPT/画图
 h1_position: true
@@ -26,14 +26,17 @@ external_data_dir: true
 ## 约束
 
 - **[必须] 场景配置和大纲必须经用户确认后才能进入写作阶段** — 跳过确认视为未完成
+- **[必须] 子结构必须先规划再写作** — 调用 workflow_engine.py plan-chapter 批量注册所有子结构（含情绪提示 tone），然后 context_loader 才能通过硬检查
 - **[必须] 写作分段最多200行，以自然叙事段落结束**
 - **[必须] 每段写完后立即 atomic write（scripts/novel_atomic_writer.py 按行 fsync + .progress 标记）**
+- **[必须] 正文中禁止出现子结构标记行（L##S##）— atomic_writer 会阻断**
 - **[必须] 新角色出场时用 novel_state_manager.py add-char 更新角色信息表**
 - **[必须] 每章结束时用 novel_timeline.py 记录故事内时间线**
 - **[必须] 连通性补充不可跳过（用 novel_continuity.py）**
 - **[必须] 每章完成后用 novel_style_check.py 生成风格校验报告**
+- **[必须] 每章完成后用 novel_logic_check.py 生成逻辑一致性报告**
 - **[必须] 全文完成后用 novel_fidelity.py 生成大纲忠实度报告**
-- **[必须] 阶段门禁：novel_state.json 初始化前所有钩子均会报错阻断**
+- **[必须] 阶段门禁：set-phase chapter_done 前会检查各报告是否存在**
 
 ## 触发条件
 
@@ -83,20 +86,32 @@ external_data_dir: true
 输入：当前一级标题 + 模糊概述
 
 0. **写作前加载上下文** — 从 novel_state.json 读取风格/角色/时间线/当前子结构概述
-1. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述）
-2. 展示给用户（可选确认）
-3. 追加到 novel_state.json
-4. 逐子结构写作循环：
-   a. 读上一个子结构的末3行（跳过编号标记）作为连接锚点
-   b. 写作 ≤200 行，自然段落结束
-   c. 写入 [project]/chapters/[chapter]/[L##S##].txt，末行追加编号标记
-   d. 更新 novel_state.json（字数 / 状态）
-5. 本章完成 → 连通性补充 + 风格校验（自动）
+
+1. **子结构先行规划（v1.2 新增硬约束）**
+   a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone**）
+   b. 展示给用户（可选确认）
+   c. **调用 workflow_engine.py plan-chapter 批量注册所有子结构到 novel_state.json**
+   d. 验证：workflow_engine.py verify-chapter 检查全部注册
+   e. **此时 phase 自动推进到 writing**
+
+2. **逐子结构写作循环（硬约束：context_loader 会检查子结构必须已注册）**
+   a. 调用 novel_context_loader.py 加载上下文（无子结构 → 报错阻断）
+   b. 读上一个子结构的末3行（跳过编号标记）作为连接锚点
+   c. 写作 ≤200 行，自然段落结束
+   d. 用 atomic_writer.py 写入（正文含标记行 L##S## → 报错阻断）
+   e. 用 state_manager.py update-sub 更新字数 / 状态
+
+3. **本章完成 → 自动执行三道检查**
+   a. 连通性补充（novel_continuity.py + auto-fix）
+   b. 风格校验（novel_style_check.py）
+   c. 逻辑检查（novel_logic_check.py — 人物行为一致性 / 时间线逻辑 / 内容-概述匹配度）
+
+4. **阶段推进** — 调用 workflow_engine.py finalize-chapter 一键完成检查+set-phase chapter_done
 
 **阶段3：全文整合**
 
 输入：全部章节完成
 
 1. 跨章节连通性补充（每章末3行 + 下章首3行）
-2. 大纲忠实度报告（逐章对比概述 vs 实际内容）
+2. 大纲忠实度报告（novel_fidelity.py — 逐章对比概述 vs 实际内容）
 3. 可选精修（用户触发）：备份 → 定位 → 更新 → 局部重新连通
