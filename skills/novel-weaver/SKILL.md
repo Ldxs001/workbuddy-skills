@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.1.0
+version: 1.1.1
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 基于大纲的200行分段写作 → 子结构连通性补充 → 跨章节融合 → 风格一致性校验 → 大纲忠实度报告。支持用户确认/修正环节，确保每级产出符合预期。
@@ -28,7 +28,7 @@ external_data_dir: true
 - **[必须] 场景配置和大纲必须经用户确认后才能进入写作阶段** — 跳过确认视为未完成
 - **[必须] 写作分段最多200行，以自然叙事段落结束**
 - **[必须] 每段写完后立即 atomic write（scripts/novel_atomic_writer.py 按行 fsync + .progress 标记）**
-- **[必须] 每章开始时用 novel_character_registry.py 更新角色信息表**
+- **[必须] 新角色出场时用 novel_state_manager.py add-char 更新角色信息表**
 - **[必须] 每章结束时用 novel_timeline.py 记录故事内时间线**
 - **[必须] 连通性补充不可跳过（用 novel_continuity.py）**
 - **[必须] 每章完成后用 novel_style_check.py 生成风格校验报告**

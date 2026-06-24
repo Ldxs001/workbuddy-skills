@@ -1,6 +1,14 @@
 # 更新日志
 
-## 1.1.0 (2026-06-24) — 版本未变
+## 1.1.1 (2026-06-24)
+
+### 修复
+- 阶段门禁读错文件：novel_character_registry.py 和 novel_timeline.py 从自身的 characters.json/timeline.json 读 current_phase，永远返回 "none" 导致始终阻断。改为从 novel_state.json 读取
+- novel_continuity.py outline_path 参数冲突：同一参数同时当 novel_state.json（读 current_phase）和 outline.json（读 chapters 列表）用，但 novel_state.json 的 chapters 是 dict 而非 list，_load_chapter_outline 永远返回空。改为 _load_chapter_summary_from_state 直接读取 dict 结构
+- hooks.md vs execution_standards.md 角色登记脚本矛盾：hooks.md 写 novel_state_manager.py add-char，execution_standards.md 写 novel_character_registry.py add。统一为 novel_state_manager.py add-char
+- SKILL.md 约束第31行：描述从 novel_character_registry.py 改为 novel_state_manager.py add-char
+
+## 1.1.0 (2026-06-24)
 
 ### 标准化改造（无功能变更，版本号不变）
 - SKILL.md 重构为渐进式加载结构：约束/触发条件/工作流程保留在入口，字数管理/文体规范/状态文件/钩子系统/数据目录拆分到 references/

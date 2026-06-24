@@ -9,13 +9,16 @@ novel-continuity — 子结构间连通性补充 + 过渡段落合成。
   4. 输出 transition 段落 + 写入 continuity_report.md
 
 用法：
-  python novel_continuity.py <chapter_dir> <outline_path> <report_path>
+  python novel_continuity.py <chapter_dir> <state_path> <report_path>
 """
 
 import os
 import sys
 import json
 import re
+
+
+_SORTED_SUBSTRUCTURE_FILES_CACHE = {}
 
 
 def _sorted_substructure_files(chapter_dir: str) -> list:
@@ -45,28 +48,27 @@ def _read_tail(filepath: str, n: int = 3) -> list:
     return all_lines[-n:]
 
 
-def _load_chapter_outline(outline_path: str, chapter_number: int) -> str:
-    """从 outline.json 中读取指定章的模糊概述"""
-    if not os.path.exists(outline_path):
+def _load_chapter_summary_from_state(state_path: str, ch_key: str) -> str:
+    """从 novel_state.json 中读取指定章的模糊概述（chapters 为 dict，keyed by L01..L15）"""
+    if not os.path.exists(state_path):
         return ""
-    with open(outline_path, "r", encoding="utf-8") as f:
+    with open(state_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    chapters = data.get("chapters", [])
-    for ch in chapters:
-        if ch.get("chapter_number") == chapter_number:
-            return ch.get("summary", "")
+    chapter = data.get("chapters", {}).get(ch_key, {})
+    if isinstance(chapter, dict):
+        return chapter.get("summary", "")
     return ""
 
 
-def generate_continuity_report(chapter_dir: str, outline_path: str, report_path: str):
-    if not os.path.exists(outline_path):
-        print(f"ERROR: novel_state.json 或 outline 文件未找到: {outline_path}")
+def generate_continuity_report(chapter_dir: str, state_path: str, report_path: str):
+    if not os.path.exists(state_path):
+        print(f"ERROR: novel_state.json 未找到: {state_path}")
         print(f"  → 必须先运行 novel_state_manager.py init")
         sys.exit(1)
 
     # 阶段门禁：需要 ≥ writing
     _order = {"none": 0, "init": 10, "stage1_done": 20, "writing": 30, "chapter_done": 40, "stage3_ready": 50, "complete": 60}
-    with open(outline_path, "r", encoding="utf-8") as f:
+    with open(state_path, "r", encoding="utf-8") as f:
         _state = json.load(f)
     _p = _order.get(_state.get("current_phase", "none"), 0)
     if _p < 30:
@@ -78,11 +80,11 @@ def generate_continuity_report(chapter_dir: str, outline_path: str, report_path:
         print("SKIP: 子结构不足2个，无需连通性补充")
         return
 
-    # 从目录名推断章节号
+    # 从目录名推断章节键名（如 "09_法律听证会" → "L09"）
     dir_name = os.path.basename(chapter_dir)
     ch_match = re.search(r'(\d+)', dir_name)
-    chapter_number = int(ch_match.group(1)) if ch_match else 0
-    chapter_summary = _load_chapter_outline(outline_path, chapter_number)
+    ch_key = f"L{int(ch_match.group(1)):02d}" if ch_match else ""
+    chapter_summary = _load_chapter_summary_from_state(state_path, ch_key)
 
     report_lines = []
     report_lines.append(f"# 连通性补充报告 — {dir_name}")
@@ -158,11 +160,11 @@ def generate_continuity_report(chapter_dir: str, outline_path: str, report_path:
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
-        print("用法: novel_continuity.py <chapter_dir> <outline_path> <report_path>")
+        print("用法: novel_continuity.py <chapter_dir> <state_path> <report_path>")
         sys.exit(1)
 
     generate_continuity_report(
         chapter_dir=sys.argv[1],
-        outline_path=sys.argv[2],
+        state_path=sys.argv[2],
         report_path=sys.argv[3]
     )

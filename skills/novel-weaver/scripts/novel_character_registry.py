@@ -32,16 +32,21 @@ def init_registry(project_dir: str):
     print(f"OK registry initialized at {path}")
 
 
+def _state_path(project_dir: str) -> str:
+    return os.path.join(project_dir, "data", "novel_state.json")
+
+
 def add_character(project_dir: str, name: str, data_json: str):
     path = _chr_path(project_dir)
-    if not os.path.exists(path):
-        print(f"ERROR: novel_state.json 未初始化于 {path}")
+    state_path = _state_path(project_dir)
+    if not os.path.exists(state_path):
+        print(f"ERROR: novel_state.json 未初始化（预期路径 {state_path}）")
         print(f"  → 必须在阶段1完成后运行 init")
         sys.exit(1)
 
-    # 阶段门禁：需要 ≥ stage1_done
+    # 阶段门禁：从 novel_state.json 读取 current_phase
     _order = {"none": 0, "init": 10, "stage1_done": 20, "writing": 30, "chapter_done": 40, "stage3_ready": 50, "complete": 60}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(state_path, "r", encoding="utf-8") as f:
         _state = json.load(f)
     _p = _order.get(_state.get("current_phase", "none"), 0)
     if _p < 20:

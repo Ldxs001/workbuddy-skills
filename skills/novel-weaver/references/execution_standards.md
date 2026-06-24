@@ -66,7 +66,7 @@ L10S04
 ## 角色信息表
 
 新出场角色或已有角色属性变化时调用：
-`novel_character_registry.py add <project_dir> <name> '{"role":"...","appearances":["ChX"],"attributes":{...}}'`
+`novel_state_manager.py add-char <path> <name> <role> <first_appearance>`
 
 ## 结尾收束规范
 
