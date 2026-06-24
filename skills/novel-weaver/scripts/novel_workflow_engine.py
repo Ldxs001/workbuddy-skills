@@ -67,6 +67,7 @@ def _check_phase_ge(state: dict, min_phase: str) -> bool:
 
 def cmd_plan_chapter(state_path: str, ch_key: str, subs_json: str):
     """批量注册一章内的所有子结构"""
+    python_exe = sys.executable
     state = _load_state(state_path)
     min_phase = "stage1_done"
     if not _check_phase_ge(state, min_phase):
@@ -111,10 +112,15 @@ def cmd_plan_chapter(state_path: str, ch_key: str, subs_json: str):
         }
         print(f"  ✅ {ch_key}{s_key} {title} — 情绪: {tone}")
 
-    # 自动推进 phase 到 writing（如果还在 stage1_done）
+    # phase 推进：如果还在 stage1_done，先通过 pipeline_gate 检查再推进
     if state.get("current_phase") == "stage1_done":
-        state["current_phase"] = "writing"
-        print(f"  🔄 phase → writing")
+        gate_script = os.path.join(SCRIPTS_DIR, "novel_pipeline_gate.py")
+        ret = os.system(f'"{python_exe}" "{gate_script}" require "{state_path}" outline_causality')
+        if ret != 0:
+            print(f"  ⛔ outline_causality 门禁未通过，拒绝推进 phase（请先运行 verify-causality-outline）")
+        else:
+            state["current_phase"] = "writing"
+            print(f"  🔄 phase → writing (outline_causality ✓)")
 
     _save_state(state_path, state)
     count = len(sub_list)

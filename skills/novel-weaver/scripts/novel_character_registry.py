@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-novel-character-registry — 角色信息表管理。
+novel-character-registry — 角色信息表管理（已弃用）。
+
+⚠️ 已弃用 — 请使用 `novel_state_manager.py add-char` 替代。
+本脚本保留用于向前兼容，新项目不应调用。
 
 维护 characters.json，记录每章出场角色及其关键属性。
 支持逐章更新，防止 Observer_Alpha 式身份摇摆。
 
-用法：
+用法（已弃用）：
   python novel_character_registry.py init <project_dir>               # 初始化
   python novel_character_registry.py add <project_dir> <name> <data_json>
   python novel_character_registry.py get <project_dir> <name>

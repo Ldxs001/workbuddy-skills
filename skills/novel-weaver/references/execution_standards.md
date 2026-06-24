@@ -10,7 +10,7 @@
 
 ## 文体规范
 
-文体风格由项目 `scene_setting.json` 中的 `tone_style` 字段决定。以下规则适用于所有风格：
+文体风格由项目 `novel_state.json` 中的 `style_guide` 字段决定。以下规则适用于所有风格：
 
 允许使用的通用修辞工具：
 - 代码/协议块

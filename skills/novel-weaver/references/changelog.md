@@ -1,6 +1,21 @@
 # 更新日志
 
-## 1.3.0 (2026-06-24)
+## 1.3.1 (2026-06-24)
+
+### 修复
+- **致命 Bug 修复**: `novel_workflow_engine.py plan-chapter` 中使用未定义变量 `python_exe`（NameError），已添加 `python_exe = sys.executable`
+- **门禁绕过修复**: `plan-chapter` 直接修改 `current_phase` 跳过 `set-phase` 的 outline_causality 门禁检查，改为先 `pipeline_gate.require` 再推进
+- **文档-代码一致性修复**（~20 处）:
+  - `SKILL.md`: 脚本名统一加 `novel_` 前缀（8 处缩写 → 完整名）
+  - `SKILL.md`: 约束节 15→8 条（合并归并，满足 ≤9 上限）
+  - `SKILL.md`: 修复 context_loader 功能归属（末3行读取 → atomic_writer tail）
+  - `SKILL.md`: `.pipeline` 独立文件 → `pipeline` 嵌套字段
+  - `hooks.md`: 门禁表缩写名 → 完整 `novel_` 前缀
+  - `hooks.md`: 16 个钩子计数（与 SKILL.md 一致）
+  - `execution_standards.md`: `scene_setting.json` → `novel_state.json`
+  - `faq.md`: 新增 `add-sub` 替代解决方案
+  - `examples.md`: 完整填充示例内容
+  - `novel_character_registry.py`: 标记为"已弃用"，指引到 `add-char`
 
 ### 新增
 - **`novel_pipeline_gate.py`** — 全局流程门禁系统：
@@ -19,7 +34,7 @@
   - 未通过则阻断，LLM 无法跳过步骤
 - **hooks.md 重写** — 新增门禁系统章节 + 门禁点列表表 + 查看命令
 
-### 变更
+### 更新
 - 版本 1.2.1 → 1.3.0（核心架构层新增，功能可追踪）
 
 ### 新增
@@ -75,12 +90,12 @@
 
 ## 1.1.0 (2026-06-24)
 
-### 标准化改造（无功能变更，版本号不变）
+### 标准化改造（无功能更新，版本号不变）
 - SKILL.md 重构为渐进式加载结构：约束/触发条件/工作流程保留在入口，字数管理/文体规范/状态文件/钩子系统/数据目录拆分到 references/
 - references/execution_standards.md（字数管理/文体规范/novel_state.json 结构/章节输出/时间线/角色表/结尾收束）
 - references/hooks.md（11 个流程钩子一览）
 - references/antipatterns.md 填充 2 条反模式；references/faq.md 填充 5 条 Q&A
-- 移除 SKILL.md 正文中所有散落"详见"引用，统一由渐进式文件索引表导航
+- 删除 SKILL.md 正文中所有散落"详见"引用，统一由渐进式文件索引表导航
 - 通过 skill-standardization v2.95.4 全流程 refactor 审计（0 ERROR 0 WARN）
 
 ### 新增
