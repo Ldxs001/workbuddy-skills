@@ -3300,7 +3300,7 @@ def fix_license_compliance(skill_dir, **kw):
             # 创建空白 MIT 模板
             mit_template = """MIT License
 
-Copyright (c) 2026 [username-redacted]
+Copyright (c) 2026 your-name-here
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

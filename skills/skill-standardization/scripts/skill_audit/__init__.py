@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import json
+import datetime
 import importlib.util
 import argparse
 from pathlib import Path
@@ -2387,7 +2388,7 @@ h1_position: true
             }, f, ensure_ascii=False, indent=2)
         # 生成 references/ 骨架文件
         _refs_content = {
-            'LICENSE.md': 'MIT License\n\nCopyright (c) 2025 your-name-here\n\nPermission is hereby granted...',
+            'LICENSE.md': 'MIT License\n\nCopyright (c) {year} {author}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.',
             'permissions.md': '# 权限说明\n\n## 风险等级\n\nLOW\n\n## 安全声明\n\n本技能仅操作本地文件，不涉及网络请求或敏感信息访问。',
             'changelog.md': '# 更新日志\n\n## [1.0.0] - 初始版本\n\n### 新增\n- 初始创建\n',
             'examples.md': '# 输出示例\n\n> 请根据实际功能补充输出示例。\n',
@@ -2397,8 +2398,11 @@ h1_position: true
         for _rf, _rc in _refs_content.items():
             _rfp = os.path.join(skill_dir, 'references', _rf)
             if not os.path.isfile(_rfp):
+                # 替换占位符
+                _rc_filled = _rc.replace('{year}', str(datetime.now().year))
+                _rc_filled = _rc_filled.replace('{author}', 'your-name-here')
                 with open(_rfp, 'w', encoding='utf-8') as f:
-                    f.write(_rc)
+                    f.write(_rc_filled)
         # 生成 .gitkeep
         for d in ('scripts',):
             open(os.path.join(skill_dir, d, '.gitkeep'), 'w').close()

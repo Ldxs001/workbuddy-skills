@@ -1,3 +1,13 @@
+## [2.95.10] - 2026-06-24
+
+### 修复
+- **`__init__.py` create-template LICENSE 截断** — `_refs_content['LICENSE.md']` 只写了 `Permission is hereby granted...`（含字面 `...`），改为完整 MIT 许可证文本 + `{year}`/`{author}` 占位符
+- **`__init__.py` 写入未替换占位符** — `f.write(_rc)` 不做 `.replace()`，`{year}`/`{author}` 留在文件里。已补 `.replace()` + `import datetime`
+- **`fix.py` license 模板含 `[username-redacted]`** — copyright 行为 `[username-redacted]`（敏感扫描脱敏产物），改回 `your-name-here`
+- **创建 master `skills/LICENSE.txt`** — 供 fix 工具 `fix_license_compliance` 复制使用，含 `{year}`/`{author}` 占位符
+
+---
+
 ## [2.95.9] - 2026-06-24
 
 ### 修复
