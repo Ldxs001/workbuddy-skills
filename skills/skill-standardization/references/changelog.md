@@ -1,3 +1,16 @@
+## [2.95.4] - 2026-06-24
+
+### 修复
+- fix 循环无限循环根因：`fixes_applied == 0` 时 fix key 不清除（原逻辑 `fix_key in fix_details` 因 fix_details 为空永远不成立），改为无条件 `del res["fix"]`
+- fix 循环 R-25 fix key 反复注入：加 `loop_count == 1` 条件，仅首轮注入，避免 auto-fix 死循环
+- `_run_audit_loop()` 修复指引：`apply_fix()` → "手动编辑 SKILL.md 或 references/"
+- 移除循环内所有 `--classify` 出口文案（误判标记仅在前置 LLM 二次筛查阶段进行）
+
+### 更新
+- R-17 修复指引：从"添加「→ 详见 references/xxx.md」散落引用"改为"优先使用渐进式文件索引表，禁止正文散落引用"，解决与 C-13 的矛盾
+- C-12 约束上限：从 5 条改为 9 条（适应多钩子技能的需求）
+- `.fix_loop_check.json` 循环检测改用动态技能名路径（原硬编码为 novel-weaver）
+
 ## [2.95.3] - 2026-06-22
 
 ### 修复

@@ -1463,11 +1463,11 @@ def cmd_audit(args):
             # ★ v2.63.0: --fix 执行了但 0 处修正 → 这些 FAIL 不是真可修复
             #   清除其 fix 属性，使其进入 LLM 二段筛查的「误判→放过」流程
             #   而不是无限循环 "存在可自动修复的 FAIL — 必须再跑 --fix"
+            # ★ v2.63.0 bug: 原逻辑检查 fix_key in fix_details（空列表），导致 fix key 永不清除，
+            #   造成 --fix 无限循环。修正为 fixes_applied == 0 时无条件清除所有 fix key。
             for res in result.get("results", []):
                 if not res.get("passed") and not res.get("skipped") and res.get("fix"):
-                    fix_key = res["fix"].get("key")
-                    if fix_key in fix_details:
-                        del res["fix"]
+                    del res["fix"]
 
         # 出二次审计报告 + 修复前后对比
         if fixes_applied > 0:
@@ -1498,7 +1498,35 @@ def cmd_audit(args):
     remaining_auto = [r for r in remaining if r.get("fix")]
     has_fixable_after = bool(remaining_auto)
     if has_fixable_after:
-        print(f"\n  ⛔ --fix 后仍有可自动修复的 FAIL — 必须再执行 --fix")
+        # 循环检测：用 .fix_loop_check 文件记录上次 remaining IDs
+        _skill_name = os.path.basename(os.path.abspath(skill_dir))
+        _loop_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(skill_dir))),
+            ".standardization", _skill_name, "data", "outputs", ".fix_loop_check.json"
+        )
+        current_ids = sorted(set(r.get("id", "") for r in remaining_auto))
+        _prev_ids = []
+        if os.path.exists(_loop_path):
+            try:
+                with open(_loop_path, "r") as _f:
+                    _prev_ids = json.load(_f)
+            except Exception:
+                _prev_ids = []
+        if _prev_ids and current_ids == _prev_ids:
+            print(f"\n  ⚠️  --fix 后剩余 FAIL 与上次相同，检测到 fix 循环。以下 FAIL 有 fix key 但 --fix 无法完全修复：")
+            for r in remaining_auto:
+                print(f"     ID={r.get('id','')} rule={r.get('rule_id','')} fix={r.get('fix','')}")
+            print(f"  → 这些项已无 auto-fix 路径，需要 LLM 手动编辑修复。")
+            print(f"  → 运行 --verify 查看完整 FAIL 列表，手动编辑 SKILL.md 或 references/")
+            print(f"  → 编辑完成后重新运行 audit 验证。误判标记仅在前置 LLM 二次筛查阶段进行。")
+            # 清理 loop 标记文件，避免二次运行时误阻断
+            os.remove(_loop_path)
+            sys.exit(1)
+        # 保存当前 IDs 供下次循环检测
+        os.makedirs(os.path.dirname(_loop_path), exist_ok=True)
+        with open(_loop_path, "w") as _f:
+            json.dump(current_ids, _f)
+        print(f"\n  ⛔ --fix 后仍有 {len(remaining_auto)} 项 FAIL — 必须再执行 --fix")
         sys.exit(1)
     # 无 fix key 的规则需要 LLM 手动处理，输出提示
     remaining_llm = [r for r in remaining if not r.get("fix")]
@@ -1509,8 +1537,8 @@ def cmd_audit(args):
         print(f"\n  ⚠️  以下规则无 auto-fix，需 LLM 手动修复（运行 --verify 查看详情后手动编辑）：")
         for rid, cnt in sorted(llm_counts.items()):
             print(f"     {rid}：{cnt} 项")
-        print(f"  → 运行 --verify 查看 FAIL 详情，确认为真问题后手动修复")
-        print(f"  → 或运行 --classify ID --category engine_mistake/engine_cant_judge --reason '...' 标记为误判（确认是误报时）")
+        print(f"  → 运行 --verify 查看 FAIL 详情，手动编辑修复")
+        print(f"  → 编辑完成后重新运行 audit。误判标记仅在前置 LLM 二次筛查阶段进行。")
         # 强制 HTML 报告输出
         _save_html_report(skill_dir, result)
 
@@ -2464,8 +2492,9 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             sev = "[ERROR]" if r_inner.get('severity') == 'ERROR' else "[WARN]"
             rid_inner = r_inner.get('rule_id', r_inner.get('rule', '?'))
             print(f"    {rid_inner} {sev} {r_inner.get('detail', '')[:120]}")
-            # 为 R-25 注入 fix key（让 --fix 可识别所有已注册子项）
-            if rid_inner == "R-25":
+            # 为 R-25 注入 fix key（仅首次进入循环时注入，避免反复注入导致无限循环）
+            # 首次循环 (loop_count == 1) 时注入 fix key；后续循环中不再重新注入已被清除的 key
+            if rid_inner == "R-25" and loop_count == 1:
                 detail_inner = r_inner.get("detail", "")
                 if "C-10" in detail_inner and not r_inner.get("fix"):
                     r_inner["fix"] = {"key": "excessive_blank_lines"}
@@ -2557,7 +2586,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     detail = r.get('detail', '')[:200]
                     print(f"    {rid} {sev} {detail}")
                     if r.get('fix') and r['fix'].get('key'):
-                        print(f"    → apply_fix(skill_dir, \"{r['fix']['key']}\")")
+                        print(f"    → 手动编辑 SKILL.md 或 references/ 中的对应章节后重新 audit")
 
         if has_fixable:
             print(f"\n  --- 自动修复 ---")

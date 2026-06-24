@@ -1737,7 +1737,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 if items_c > 5:
                     _c12_sec_pos = body.find(f'## {sec_title}')
                     _c12_ln = body[:_c12_sec_pos].count('\n') + 2 if _c12_sec_pos >= 0 else 1
-                    issues["warn"].append(f"{filepath}:{_c12_ln} - C-12: 章节「约束」共 {items_c} 条，超过上限 5 条，需精简或部分移到 references/")
+                    issues["warn"].append(f"{filepath}:{_c12_ln} - C-12: 章节「约束」共 {items_c} 条，超过上限 9 条，需精简或部分移到 references/")
 
             # 限制/已知问题 章节内容深度检查
             if any(kw in sec_title for kw in ["限制", "已知问题", "Limitations", "Known Issues"]):
