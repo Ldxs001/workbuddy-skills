@@ -11,6 +11,13 @@ import json, sys, subprocess, os
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
+# R-12 审计锚点：数据目录变量声明
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/data/"
+SKILLS_ROOT = SCRIPTS_DIR.parent.parent
+DATA_DIR = SKILLS_ROOT / ".standardization" / "novel-weaver" / "data"
+DATA_STATE = DATA_DIR / "novel_state.json"
+DATA_CHAPTERS = DATA_DIR / "chapters"
+DATA_REPORTS = DATA_DIR / "reports"
 
 def plan_chapter(state_path, chapter, subs_json):
     """批量注册子结构"""
@@ -256,7 +263,7 @@ def fidelity_check(state_path, chapters_dir):
     print(report_text)
 
     # 写入报告
-    report_dir = Path(state_path).parent / "data"
+    report_dir = DATA_REPORTS
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "fidelity_report.md"
     report_path.write_text(report_text, encoding="utf-8")
@@ -295,20 +302,21 @@ def finalize_novel(state_path, chapters_dir):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
+    if len(sys.argv) < 2:
+        print("用法: python novel_workflow_engine.py <命令> [state_path] [args...]")
+        print("  state_path 默认: " + str(DATA_STATE))
         print("  命令:")
         print("    plan-chapter     <chapter> <subs_json>")
         print("    verify-chapter   <chapter>")
         print("    preview          <chapter>")
         print("    write-sub        <chapter> <sub_key> [chapters_dir]")
         print("    finalize-chapter <chapter> <chapter_dir> <report_dir>")
-        print("    fidelity         <chapters_dir>")
-        print("    finalize-novel   <chapters_dir>")
+        print("    fidelity         [chapters_dir]")
+        print("    finalize-novel   [chapters_dir]")
         sys.exit(1)
 
     cmd = sys.argv[1]
-    sp = sys.argv[2]
+    sp = sys.argv[2] if len(sys.argv) > 2 else str(DATA_STATE)
 
     if cmd == "plan-chapter":
         plan_chapter(sp, sys.argv[3], sys.argv[4])
@@ -317,12 +325,17 @@ if __name__ == "__main__":
     elif cmd == "preview":
         preview_context(sp, sys.argv[3])
     elif cmd == "write-sub":
-        write_sub(sp, sys.argv[3], sys.argv[4], sys.argv[5] if len(sys.argv) > 5 else str(Path(sp).parent / "chapters"))
+        write_sub(sp, sys.argv[3], sys.argv[4],
+                  sys.argv[5] if len(sys.argv) > 5 else str(DATA_CHAPTERS))
     elif cmd == "finalize-chapter":
-        finalize_chapter(sp, sys.argv[3], sys.argv[4], sys.argv[5])
+        finalize_chapter(sp, sys.argv[3],
+                         sys.argv[4] if len(sys.argv) > 4 else str(DATA_CHAPTERS / sys.argv[3]),
+                         sys.argv[5] if len(sys.argv) > 5 else str(DATA_REPORTS))
     elif cmd == "fidelity":
-        fidelity_check(sp, sys.argv[3])
+        fidelity_check(sp,
+                       sys.argv[3] if len(sys.argv) > 3 else str(DATA_CHAPTERS))
     elif cmd == "finalize-novel":
-        finalize_novel(sp, sys.argv[3])
+        finalize_novel(sp,
+                       sys.argv[3] if len(sys.argv) > 3 else str(DATA_CHAPTERS))
     else:
         print(f"[错误] 未知命令: {cmd}")

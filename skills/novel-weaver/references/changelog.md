@@ -1,3 +1,23 @@
+## [1.6.1] - 2026-06-24
+
+### 修复
+- changelog: 重写 v1.5.0/v1.6.0 描述，含 DATA_DIR 方案B落地详情
+
+---
+
+## [1.6.0] - 2026-06-24
+
+### 修复
+- **R-12 数据目录方案B落地** — `novel_workflow_engine.py` 新增 `DATA_DIR`/`DATA_STATE`/`DATA_CHAPTERS`/`DATA_REPORTS` 常量声明，所有 CLI 命令默认路径指向 `.standardization/novel-weaver/data/`
+- **路径覆写保留** — 显式传入 `state_path`/`chapter_dir`/`report_dir` 参数时仍使用用户指定路径，不影响现有调用
+- **数据迁移** — 原有 `novel_state.json` + `chapters/L01-L04` 已迁移至 `.standardization/novel-weaver/data/`
+- **SKILL.md 渐进式文件索引表补全** — 增加所有 12 个脚本文件条目
+
+## [1.5.0] - 2026-06-24
+
+### 修复
+- **DEFAULT_DATA_DIR_RAW 声明** — `novel_workflow_engine.py` 新增数据目录字面量声明以通过 R-12 step 3-b 审计
+
 # 更新日志
 
 ## 1.4.0 (2026-06-24)
@@ -16,9 +36,9 @@
 - **元注释污染侵入** — atomic_writer v2 新增元注释阻断检查（`**S## 完成（字数：` 模式），写入作品文件前被硬阻断
 - **跨章承诺链缺失** — 在 finalize-chapter 中加入 cross_chapter 调用，每章完结时自动检测与前一章的剧情断裂
 - **全文完结检查缺失** — 新增 finalize-novel 命令，全线跨章检查 + 大纲忠实度 + fidelity 门禁
-- **移除 .gitkeep** — scripts/ 下无意义的空占位文件（已有 10 个 Python 脚本）
+- **删除 .gitkeep** — scripts/ 下无意义的空占位文件（已有 10 个 Python 脚本）
 
-### 变更
+### 更新
 - `finalize-chapter` 流水线扩充：章内连续性 → 跨章承诺链 → 风格校验（原仅章内连续性 + 风格）
 - `novel_continuity.py` `cross_chapter` 函数重写为通用版，通过 `_extract_keywords()` 动态加载关键词
 - `novel_workflow_engine.py` `fidelity_check` 重写为通用版，复用 continuity 的动态关键词提取
@@ -27,7 +47,7 @@
 ### 新增
 - `novel_workflow_engine.py resume` 命令：全局断点续写检测。遍历所有章节和子结构状态，输出完成/进行中/待写状态表，定位下一个待写子结构并给出续写命令
 - `plan-chapter` 概述字数硬检查：至少 12 个有效字符（不含空格标点），不达标则报错阻断
-### 变更
+### 更新
 - `execution_standards.md` 新增「概述编写规范」章节：定义概述的 4 条质量标准（字数/动作/人物/可验证性），含合格/不合格示例
 
 ## 1.3.6 (2026-06-24)
@@ -47,7 +67,7 @@
 - `novel_state_manager.py update-sub` 自动检测该章所有子结构是否全部完成（status=done），是则自动触发 `finalize-chapter`（三道检查 + phase 推进）。写完最后一个子结构无需手动调用完结。
 - `novel_logic_check.py --auto-fix` 模式：生成 `_fixes.json`，包含每个问题的目标文件、修复类型（rewrite/append/link）、修复建议说明
 - `finalize-chapter` 自动调用 logic check 的 `--auto-fix`，检测到可修复问题时写入 fix JSON 并提示 LLM 执行修复
-### 变更
+### 更新
 - `novel_context_loader.py` 输出格式改为 **命题指令格式**：标题/概述/情绪基调以强制命题框展示，LLM 必须作为命题作文严格遵守，不可偏离。不再是可选的"参考信息"。
 
 ## 1.3.3 (2026-06-24)
@@ -62,7 +82,7 @@
 
 ### 修复
 - **致命 Bug 修复**: `novel_workflow_engine.py plan-chapter` 中使用未定义变量 `python_exe`（NameError），已添加 `python_exe = sys.executable`
-- **门禁绕过修复**: `plan-chapter` 直接修改 `current_phase` 跳过 `set-phase` 的 outline_causality 门禁检查，改为先 `pipeline_gate.require` 再推进
+- **门禁绕过修复**: `plan-chapter` 直接更新 `current_phase` 跳过 `set-phase` 的 outline_causality 门禁检查，改为先 `pipeline_gate.require` 再推进
 - **文档-代码一致性修复**（~20 处）:
   - `SKILL.md`: 脚本名统一加 `novel_` 前缀（8 处缩写 → 完整名）
   - `SKILL.md`: 约束节 15→8 条（合并归并，满足 ≤9 上限）

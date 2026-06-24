@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.4.0
+version: 1.6.1
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置 → 大纲生成与逐级细化 → 因果链双重验证（章级+子结构级）→ pipeline 流程门禁（LLM 跳过任何步骤即阻断）→ workflow_engine 强制子结构先行规划（含情绪提示）→ 基于大纲的200行分段写作 → 连通性补充（含 auto-fix）→ 跨章节融合 → 风格校验 + 逻辑检查 + 大纲忠实度报告。全流程硬约束 + 门禁跟踪。
@@ -77,20 +77,18 @@ external_data_dir: true
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
 | `references/hooks.md` | 参考文档 | 每个钩子成功完成后自动调用 `pipeline_gate.py pass` 更新全局状态。`set-phase` 在 phase 转换前自动调用 `pipeli | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
-
-### 限制与边界
-
-| 维度 | 说明 |
-|------|------|
-| 适用场景 | 长篇小说/故事的结构化写作（8000字+），含三阶段流水线和质量控制 |
-| 不适用场景 | 短文/散文/诗歌/新闻稿；改写/润色/翻译 — 不是本技能范围 |
-| 输入要求 | 用户至少提供一个模糊的故事想法或主题方向。支持续写（已有 novel_state.json） |
-| 输出格式 | 纯文本书写文件（`.txt`）+ 结构化元数据（`novel_state.json`）+ Markdown 报告 |
-| 依赖环境 | Python 3.8+，标准库（json/os/sys/re/subprocess），无外部包依赖 |
-| 离线可用 | 完全离线，本地运行，无网络请求 |
-| 参数约束 | 子结构 1-99（S01~S99），每段 ≤200 行；章节 1-15（L01~L15），每章 3-5 个子结构 |
-| 数据安全 | 数据存储在项目目录内，无外部传输。pipeline 门禁状态记录到 novel_state.json |
-
+| `scripts/novel_workflow_engine.py` | 主入口 | `plan-chapter`/`write-sub`/`finalize-chapter` 等命令的入口调度器，含 DATA_DIR 声明 | 无 |
+| `scripts/novel_state_manager.py` | 状态管理 | `add-char`/`update-sub`/`complete-sub` 状态文件管理 | 无 |
+| `scripts/novel_atomic_writer.py` | 写入校验 | `validate_and_write()` 原子写入 + 格式阻断 | 无 |
+| `scripts/novel_context_loader.py` | 上下文加载 | 命题指令输出 + 中断恢复检测 | 无 |
+| `scripts/novel_continuity.py` | 连通性检查 | `check`(章内)/`cross-chapter`(跨章)/`auto-fix` | 无 |
+| `scripts/novel_pipeline_gate.py` | 门禁系统 | `pass`/`require`/`status` 三状态门禁 | 无 |
+| `scripts/novel_style_check.py` | 风格校验 | `check-chapter` 风格一致性检查 | 无 |
+| `scripts/novel_causality_check.py` | 因果链验证 | `verify-sub` 子结构因果递进检查 | 无 |
+| `scripts/novel_character_registry.py` | 角色登记 | 新角色注册 + 属性变更 | 无 |
+| `scripts/novel_fidelity.py` | 忠实度检查 | 逐章对比 overview 与实际内容 | 无 |
+| `scripts/novel_logic_check.py` | 逻辑检查 | 内容逻辑一致性校验 | 无 |
+| `scripts/novel_timeline.py` | 时间线 | `add` 时间事件登记 | 无 |
 ## 工作流程
 
 ### 阶段1：场景配置与大纲

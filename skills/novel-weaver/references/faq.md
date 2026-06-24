@@ -72,7 +72,7 @@ python novel_state_manager.py init <path> <project_name> '<style_json>' '<chapte
 
 **修复：**
 ```bash
-# 设置环境变量
+# 配置环境变量
 set PYTHONUTF8=1
 # 或使用 PowerShell
 $env:PYTHONUTF8=1
