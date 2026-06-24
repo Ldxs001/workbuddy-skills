@@ -260,10 +260,22 @@ def cmd_finalize_chapter(state_path: str, ch_key: str, chapter_dir: str, report_
 def cmd_resume(state_path: str):
     """全局断点续写检测 — 找出下一个需要写的子结构"""
     state = _load_state(state_path)
+    phase = state.get("current_phase", "none")
 
     chapters = state.get("chapters", {})
-    if not chapters:
-        print("ERROR: chapters 为空，请先完成 Phase 1")
+    if not chapters or not isinstance(chapters, dict):
+        print(f"ERROR: chapters 未初始化，请先完成 Phase 1")
+        print(f"  当前 phase: {phase} — 请先运行 novel_state_manager.py init")
+        sys.exit(1)
+
+    # 检查是否有任何子结构规划
+    has_any_sub = any(
+        isinstance(ch, dict) and ch.get("sub_structures")
+        for ch in chapters.values()
+    )
+    if not has_any_sub:
+        print(f"ERROR: 没有任何子结构规划，请先运行 plan-chapter")
+        print(f"  → 选择一章后: novel_workflow_engine.py plan-chapter <state_path> <L##> '<subs_json>'")
         sys.exit(1)
 
     # 排序章

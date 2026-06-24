@@ -70,6 +70,13 @@ def load_context(state_path: str, sub_id: str) -> None:
     chapter = state.get("chapters", {}).get(ch_key, {})
     sub = chapter.get("sub_structures", {}).get(s_key, {})
 
+    # 阻断：已完成的子结构不可再次加载
+    if sub.get("status") == "done":
+        print(f"ERROR: 子结构 {s_key}「{sub.get('title', '?')}」已完成（status=done），禁止重复写作")
+        print(f"  → 如需修改已完成内容，请直接编辑对应 .txt 文件")
+        print(f"  → 下一个待写子结构: novel_workflow_engine.py resume {state_path}")
+        sys.exit(1)
+
     # 硬检查：子结构必须已通过 add-sub 注册到 state（title 为空表示未注册）
     if not sub.get("title"):
         print(f"ERROR: 子结构 {s_key} 未在 novel_state.json 中注册")
