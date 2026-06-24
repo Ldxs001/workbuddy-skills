@@ -666,6 +666,98 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
             "detail": f"_meta.json missing data_dir field ({source_desc})",
         })
 
+    # 3-b. [v2.95.6] meta.json 声明了 data_dir，但脚本未引用 .standardization
+    #       → 扫描写入操作，提取路径清单，区分硬编码/CLI模式
+    if meta_has_data_dir and not data_dir_vars:
+        has_any_standardization_ref = False
+        write_ops = []  # [(rel_file, lineno, mode, path_desc, context)]
+        has_cli_mode = False
+        if os.path.isdir(scripts_dir):
+            for fname in sorted(os.listdir(scripts_dir)):
+                fpath = os.path.join(scripts_dir, fname)
+                if not os.path.isfile(fpath):
+                    continue
+                ext = os.path.splitext(fname)[1].lower()
+                if ext not in (".py", ".sh", ".bat", ".ps1"):
+                    continue
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        text = f.read()
+                        lines = text.splitlines(keepends=False)
+                except Exception:
+                    continue
+                for lineno, line in enumerate(lines, 1):
+                    stripped = line.strip()
+                    if ".standardization" in stripped:
+                        has_any_standardization_ref = True
+                    # 检测写入操作：write_text / open("...", "w"/"a"/"w+"/"a+")
+                    if ".write_text(" in stripped or re.search(r'open\s*\(', stripped):
+                        is_write = ".write_text(" in stripped
+                        is_open = re.search(r'open\s*\(', stripped)
+                        if not is_write and is_open:
+                            # 检查 open 的 mode 参数是否有 w/a
+                            if not re.search(r'["\']([wa]+)["\']', stripped):
+                                continue
+                        # 判断模式：硬编码字面量 vs CLI 参数 vs 变量路径
+                        has_literal_path = bool(re.search(r'["\'][^"\']+\.(json|txt|md|csv)["\']', stripped))
+                        has_sys_argv = "sys.argv" in stripped
+                        has_variable_path = not has_literal_path and not has_sys_argv
+                        if has_sys_argv:
+                            mode = "CLI 参数"
+                            path_desc = "sys.argv[N]"
+                            has_cli_mode = True
+                        elif has_literal_path:
+                            lp = re.search(r'["\']([^"\']+\.[^"\']+)["\']', stripped)
+                            mode = "硬编码"
+                            path_desc = lp.group(1) if lp else "(字面量路径)"
+                        else:
+                            mode = "变量路径"
+                            path_desc = "(变量, 运行时确定)"
+                        write_ops.append((os.path.join("scripts", fname), lineno, mode, path_desc, stripped[:120]))
+        if not has_any_standardization_ref and write_ops:
+            detail_lines = [
+                f"_meta.json 声明了 data_dir={meta_data_dir}，但所有脚本中未引用 .standardization/",
+                "实际写入路径清单（按模式分类）：",
+                "",
+                "| 路径模式 | 写入路径描述 | 脚本 | 行 | 代码上下文 |",
+                "|---|----|----|----|------|",
+            ]
+            for rel_file, lineno, mode, path_desc, ctx in write_ops:
+                safe_ctx = ctx.replace("|", "\\|")
+                detail_lines.append(f"| {mode} | {path_desc} | {rel_file} | {lineno} | {safe_ctx} |")
+            if has_cli_mode:
+                detail_lines.extend([
+                    "",
+                    "⚠️ 检测到 CLI 参数传路径模式（sys.argv）。这是 CLI 技能的标准数据管理方式，",
+                    "   但需要按照以下三层模式才能正确使用 data_dir：",
+                    "",
+                    "   第1层: 在脚本顶层声明 DATA_DIR 常量",
+                    f"          DATA_DIR = Path(__file__).parent.parent.parent / \".standardization\" / \"{dirname}\" / \"data\"",
+                    "",
+                    "   第2层: CLI 参数默认值指向 DATA_DIR",
+                    "          parser.add_argument('--state-path', default=str(DATA_DIR / 'novel_state.json'))",
+                    "          或: sp = sys.argv[2] if len(sys.argv) > 2 else str(DATA_DIR / 'novel_state.json')",
+                    "",
+                    "   第3层: 保留 CLI 覆写能力",
+                    "          python script.py --state-path /path/to/user/novel_state.json",
+                    "",
+                    f"   完整修改指引见 references/data_dir_guide.md 或参考 skill-standardization 自身的 cleanup_manager.py",
+                ])
+            else:
+                detail_lines.extend([
+                    "",
+                    "修复方向：",
+                    f"  B) 在脚本中声明 DATA_DIR 常量指向 .standardization/{dirname}/data/",
+                    "     并将写入路径改为 DATA_DIR 下的子目录",
+                ])
+            violations.append({
+                "source": "_meta.json",
+                "var_name": "data_dir",
+                "path_value": meta_data_dir,
+                "expected": ".standardization/" + dirname + "/",
+                "detail": "\n".join(detail_lines),
+            })
+
     # 4. check _meta.json data_dir matches code path
     #     path_val 可能是 Python 表达式（含空格/引号/运算符），只有字面路径（无空格/引号）才可比
     if meta_has_data_dir and data_dir_vars:
