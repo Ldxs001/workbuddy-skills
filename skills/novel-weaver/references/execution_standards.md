@@ -55,21 +55,25 @@
 ### 规划流程
 
 1. LLM 根据章标题和概述，生成该章全部子结构的规划（S01-S05）
-2. 每个子结构规划包含 4 个字段：
+2. 每个子结构规划包含以下字段：
    - `s_key`: 如 `S01`
    - `title`: 子结构标题（如"实验室初试"）
    - `summary`: 模糊概述（20-40字，描述该段核心内容）
    - `tone`: **情绪提示**（如"紧张"、"宁静"、"悬疑"、"温馨"等）— 保证跨子结构情绪连贯性
+   - `emotions`: **可选** 混合情绪数组 — 每项 `{"type":"愤怒","intensity":0.8}`，强度 0.0-1.0，多维度表达复杂情绪
 3. 用 workflow_engine.py 批量注册：
    ```
    python novel_workflow_engine.py plan-chapter <state_path> <L##> '<json_array>'
    ```
-   JSON 示例：
+   JSON 示例（含 emotions）：
    ```json
    [
-     {"s_key":"S01","title":"实验室初试","summary":"主角第一次接触实验设备，紧张","tone":"紧张"},
-     {"s_key":"S02","title":"意外发现","summary":"意外发现异常数据，兴奋","tone":"兴奋"},
-     {"s_key":"S03","title":"导师的警告","summary":"导师对发现表示怀疑，压抑","tone":"压抑"}
+     {"s_key":"S01","title":"实验室初试","summary":"主角第一次接触实验设备，紧张","tone":"紧张",
+      "emotions":[{"type":"紧张","intensity":0.7},{"type":"好奇","intensity":0.5}]},
+     {"s_key":"S02","title":"意外发现","summary":"意外发现异常数据，兴奋","tone":"兴奋",
+      "emotions":[{"type":"兴奋","intensity":0.8},{"type":"不安","intensity":0.3}]},
+     {"s_key":"S03","title":"导师的警告","summary":"导师对发现表示怀疑，压抑","tone":"压抑",
+      "emotions":[{"type":"压抑","intensity":0.7},{"type":"愤怒","intensity":0.4}]}
    ]
    ```
 4. 验证：
@@ -152,6 +156,131 @@ python novel_workflow_engine.py finalize-chapter <path> <L##> <chapter_dir> <dat
 
 新出场角色或已有角色属性变化时调用：
 `novel_state_manager.py add-char <path> <name> <role> <first_appearance>`
+
+## 角色人格系统（v1.7.0 新增）
+
+每个角色可设置 `mbti`（16 类型）和 `archetype`（荣格 12 原型），驱动角色行为和叙事功能。
+
+### MBTI 16 类型
+
+| 维度 | 取值 | 含义 |
+|------|------|------|
+| E/I | E / I | 外向 / 内向 |
+| S/N | S / N | 实感 / 直觉 |
+| T/F | T / F | 思考 / 情感 |
+| J/P | J / P | 判断 / 感知 |
+
+完整类型如 `INTJ`、`ENFP`、`ISTP` 等。
+
+### 荣格 12 原型
+
+| 原型 | 叙事功能 |
+|------|---------|
+| Innocent | 天真者，追寻理想 |
+| Sage | 智者，追求真理 |
+| Explorer | 探险者，渴望自由 |
+| Outlaw | 反叛者，挑战权威 |
+| Magician | 魔法师，转化现实 |
+| Hero | 英雄，证明价值 |
+| Lover | 爱人者，建立连接 |
+| Jester | 小丑，享受当下 |
+| Everyperson | 普通人，归属群体 |
+| Caregiver | 照顾者，保护他人 |
+| Ruler | 统治者，掌控秩序 |
+| Creator | 创造者，留下遗产 |
+
+### 注册方式
+
+```bash
+python novel_state_manager.py add-char <state_path> <name> <role> <first_appearance> [traits] [mbti] [archetype]
+```
+
+### context_loader 输出
+
+涉及角色有人格设定时自动输出：
+```
+🔴 人格约束（硬性）
+  三浦: MBTI=INTJ, 原型=Sage
+  提示: 角色言行必须符合其人格设定
+```
+
+## 情绪混合系统（v1.7.0 新增）
+
+子结构可设置多维度情绪，每项情绪带强度数值（0.0-1.0）。
+
+### 格式
+
+子结构注册时在 JSON 中加入 `emotions` 数组：
+
+```json
+{"s_key":"S01","title":"...","summary":"...","tone":"紧张",
+ "emotions":[
+   {"type":"愤怒","intensity":0.8},
+   {"type":"恐惧","intensity":0.3}
+ ]}
+```
+
+### 强度分级
+
+| 区间 | 标签 | 描述 |
+|------|------|------|
+| 0.0-0.2 | 微弱 | 几乎不可察觉的底色 |
+| 0.2-0.4 | 轻度 | 偶尔流露 |
+| 0.4-0.6 | 中等 | 明显可感知 |
+| 0.6-0.8 | 强烈 | 主导当前场景 |
+| 0.8-1.0 | 极致 | 情绪爆点/崩溃/狂喜 |
+
+### context_loader 输出
+
+```
+[情绪基调] 愤怒 强烈[0.8/1] + 恐惧 轻度[0.3/1]
+           → 色厉内荏：愤怒主导，恐惧底色
+```
+
+### 向后兼容
+
+仅有 `tone` 无 `emotions` 时，输出同旧版：`[情绪提示] 紧张`。
+
+## 文风系统（v1.7.0 新增）
+
+项目级文风格式，在 `novel_state.json` 顶层设置，全局生效。
+
+### 字段说明
+
+| 字段 | 可选值 | 说明 |
+|------|--------|------|
+| `narrative_voice` | 第一人称/第三人称有限视角/第三人称全知视角/第二人称 | 叙事视角 |
+| `tense` | 过去式/现在式 | 时态 |
+| `sentence_preference` | 短句为主/长句为主/长短句交错 | 句式偏好 |
+| `vocabulary_register` | 文学化/平实/学术/口语化 | 词汇风格 |
+| `description_depth` | 详尽/中等/克制 | 描写密度 |
+| `custom_rules` | 自由文本 | 自定义约束 |
+
+### 设置方式
+
+项目初始化时在 `novel_state.json` 顶层添加：
+
+```json
+"writing_style": {
+  "narrative_voice": "第三人称有限视角",
+  "tense": "过去式",
+  "sentence_preference": "长短句交错",
+  "vocabulary_register": "文学化",
+  "description_depth": "中等",
+  "custom_rules": "每段不超过3句对话；环境描写不超过2句"
+}
+```
+
+### context_loader 输出（每个子结构写作前重复输出）
+
+```
+🔴 文风约束（硬性）
+  叙事视角: 第三人称有限视角（仅从三浦的视角出发）
+  句式偏好: 长短句交错
+  词汇: 文学化
+  描写深度: 中等
+  提示: 全文文风一致，不可偏离
+```
 
 ## 结尾收束规范 v2
 

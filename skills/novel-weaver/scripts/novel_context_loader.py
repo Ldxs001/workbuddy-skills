@@ -6,8 +6,100 @@ Context Loader — 上下文加载器
 import json, sys
 from pathlib import Path
 
+# ── 情绪强度映射表 ──
+INTENSITY_LABELS = [
+    (0.0, 0.2, "微弱"),
+    (0.2, 0.4, "轻度"),
+    (0.4, 0.6, "中等"),
+    (0.6, 0.8, "强烈"),
+    (0.8, 1.0, "极致"),
+]
+
+def _intensity_label(val: float) -> str:
+    """数值 → 标签"""
+    for lo, hi, label in INTENSITY_LABELS:
+        if lo <= val < hi:
+            return label
+    return "极致" if val >= 0.8 else "微弱"
+
+
+# ── 情绪混合解读映射 ──
+EMOTION_MIX_MAP = [
+    # (primary, secondary, description)
+    ({"愤怒", "恐惧"}, "色厉内荏：愤怒主导，恐惧底色"),
+    ({"悲伤", "释然"}, "含泪释怀：悲伤中透出解脱"),
+    ({"喜悦", "不安"}, "隐忧之喜：表面快乐，心底不安"),
+    ({"恐惧", "好奇"}, "战栗探索：在恐惧中前行"),
+    ({"爱", "悲伤"}, "悲伤爱意：深爱伴随失去的痛"),
+    ({"平静", "期待"}, "静待之姿：宁静中暗涌期待"),
+    ({"愤怒", "悲伤"}, "悲愤交加：愤怒源于深层悲伤"),
+    ({"恐惧", "坚定"}, "凛然：恐惧但不退缩"),
+    ({"喜悦", "释然"}, "释然喜悦：解脱后的轻松"),
+]
+
+def _emotion_mix_description(emotions: list) -> str:
+    """分析情绪混合，返回人类可读描述"""
+    if not emotions or len(emotions) < 2:
+        return ""
+    types = {e.get("type", "") for e in emotions}
+    for ps, desc in EMOTION_MIX_MAP:
+        if ps == types:
+            return desc
+    # 默认根据主次比描述
+    primary = max(emotions, key=lambda e: e.get("intensity", 0))
+    secondary = max([e for e in emotions if e != primary], key=lambda e: e.get("intensity", 0)) if len(emotions) > 1 else None
+    if secondary and secondary.get("intensity", 0) > 0.3:
+        return f"混合情绪：{primary.get('type','')}主导，{secondary.get('type','')}底色"
+    return f"单一主导：{primary.get('type','')}"
+
+
+def _format_emotions(sub: dict) -> str:
+    """格式化情绪输出：愤怒 强烈[0.8/1] + 恐惧 轻度[0.3/1]"""
+    emos = sub.get("emotions", [])
+    if not emos:
+        tone = sub.get("tone", "")
+        if tone:
+            return f"[情绪基调] {tone}"
+        return ""
+    parts = []
+    for e in emos:
+        t = e.get("type", "")
+        v = e.get("intensity", 0)
+        label = _intensity_label(v)
+        parts.append(f"{t} {label}[{v:.1f}/1]")
+    line = " + ".join(parts)
+    mix = _emotion_mix_description(emos)
+    if mix:
+        line += f"\n           → {mix}"
+    return line
+
+
+def _find_characters_in_chapter(data: dict, chapter_id: str, sub_key: str) -> list:
+    """扫描本章涉及的角色（基于子结构概述匹配角色名）"""
+    chars = data.get("characters", [])
+    if not chars:
+        return []
+    ch_info = None
+    for ch in data.get("chapters", []):
+        if ch["id"] == chapter_id:
+            ch_info = ch
+            break
+    if not ch_info:
+        return []
+    subs = ch_info.get("sub_structures", {})
+    involved = []
+    # 从本章所有子结构概述中匹配角色名
+    combined = ch_info.get("overview", "")
+    for sk, sv in subs.items():
+        combined += " " + sv.get("summary", "")
+    for c in chars:
+        if c.get("name") in combined:
+            involved.append(c)
+    return involved
+
+
 def load_context(state_path, chapter, sub_key):
-    """加载写作上下文：上一子结构的末3行+当前子结构规划"""
+    """加载写作上下文：上一子结构的末3行+当前子结构规划+人格/情绪/文风约束"""
     sp = Path(state_path)
     if not sp.exists():
         print(f"[错误] state 文件不存在: {state_path}")
@@ -17,7 +109,6 @@ def load_context(state_path, chapter, sub_key):
 
     # 查找当前章节
     ch_info = None
-    ch_dir = None
     for ch in data.get("chapters", []):
         if ch["id"] == chapter:
             ch_info = ch
@@ -43,24 +134,60 @@ def load_context(state_path, chapter, sub_key):
         prev_file = Path(sp.parent) / "chapters" / chapter / f"{prev_key}.txt"
         if prev_file.exists():
             lines = prev_file.read_text(encoding="utf-8").strip().split("\n")
-            # 跳过末行标记行，取末3行正文
             prev_text = [l for l in lines if not l.strip().startswith(f"{chapter}")]
             prev_lines = prev_text[-3:] if len(prev_text) >= 3 else prev_text
 
-    # 输出上下文
+    # ── 输出标准上下文 ──
     print(f"{'='*50}")
     print(f"[上下文] {chapter}{sub_key}")
     print(f"[章节概述] {ch_info.get('overview', '')}")
     print(f"[子结构规划] title={subs[sub_key].get('title','')}")
     print(f"[子结构概述] {subs[sub_key].get('summary','')}")
-    print(f"[情绪提示] {subs[sub_key].get('tone','')}")
+    print(f"{_format_emotions(subs[sub_key])}")
     if prev_lines:
         print(f"[上一子结构末3行]:")
         for l in prev_lines:
             print(f"  | {l}")
     print(f"{'='*50}")
 
-    # 🔴 收尾命题框（is_ending=true 时追加）
+    # ── 🔴 人格约束（硬性） ──
+    involved = _find_characters_in_chapter(data, chapter, sub_key)
+    if involved:
+        has_personality = any(c.get("mbti") or c.get("archetype") for c in involved)
+        if has_personality:
+            print(f"\n{'='*50}")
+            print(f"🔴 人格约束（硬性）")
+            print(f"{'='*50}")
+            for c in involved:
+                mbti = c.get("mbti", "")
+                archetype = c.get("archetype", "")
+                if mbti or archetype:
+                    parts = []
+                    if mbti: parts.append(f"MBTI={mbti}")
+                    if archetype: parts.append(f"原型={archetype}")
+                    print(f"  {c['name']}: {', '.join(parts)}")
+            print(f"  提示: 角色言行必须符合其人格设定")
+            print(f"{'='*50}\n")
+
+    # ── 🔴 文风约束（硬性） ──
+    ws = data.get("writing_style", {})
+    if ws:
+        print(f"\n{'='*50}")
+        print(f"🔴 文风约束（硬性）")
+        print(f"{'='*50}")
+        for key, label in [("narrative_voice", "叙事视角"),
+                           ("tense", "时态"),
+                           ("sentence_preference", "句式偏好"),
+                           ("vocabulary_register", "词汇"),
+                           ("description_depth", "描写深度"),
+                           ("custom_rules", "自定义规则")]:
+            val = ws.get(key, "")
+            if val:
+                print(f"  {label}: {val}")
+        print(f"  提示: 全文文风一致，不可偏离")
+        print(f"{'='*50}\n")
+
+    # ── 🔴 收尾命题框（is_ending=true 时追加） ──
     if subs[sub_key].get("is_ending"):
         ending_type = subs[sub_key].get("ending_type", "未指定")
         project = data.get("project", "未知项目")
