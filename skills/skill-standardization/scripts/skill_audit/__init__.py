@@ -1870,6 +1870,10 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None, 
     在进入 create/update/refactor/audit 之前输出模式选择对照表，
     必须带 --confirmed 参数才放行，否则 exit(0) 阻断。
     """
+    # --json 模式下门禁文字输出到 stderr，避免污染 JSON stdout
+    _json_mode = '--json' in sys.argv
+    _out = sys.stderr if _json_mode else sys.stdout
+
     modes = {
         'audit': '仅审查，不修改。适用于查看技能合规状态、检查 FAIL 项',
         'refactor': '全流程改造。蓝图扫描 → 备份 → 审计 → 修复 → 验证 → bump → cleanup',
@@ -1879,53 +1883,53 @@ def _semantic_precheck(command, skill_dir=None, confirmed=False, llm_mode=None, 
         'readonly': '只读操作（rules/create-template）。不修改任何文件，仅查询信息',
     }
     desc = modes.get(command, '')
-    print(f"\n{'='*55}")
-    print(f"  🧠 【流程门禁】LLM 必须根据用户意图确认模式")
-    print(f"{'─'*55}")
-    print(f"  用户请求关键词 → 模式选择")
-    print(f"  ——————————————")
-    print(f"  仅审查/不要修改/只看检查报告 → audit")
-    print(f"  创建/生成/新建/从头开始     → create")
-    print(f"  审计/检查/更新/修            → update（含备份、蓝图、bump）")
-    print(f"  改造/重构/标准化/大规模改    → refactor")
-    print(f"  版本升级（内部）             → bump")
-    print(f"  查看规则/查看模板/只读查询   → readonly（不修改文件）")
-    print(f"{'─'*55}")
-    print(f"  LLM 当前选择的模式：{command}")
+    print(f"\n{'='*55}", file=_out)
+    print(f"  🧠 【流程门禁】LLM 必须根据用户意图确认模式", file=_out)
+    print(f"{'─'*55}", file=_out)
+    print(f"  用户请求关键词 → 模式选择", file=_out)
+    print(f"  ——————————————", file=_out)
+    print(f"  仅审查/不要修改/只看检查报告 → audit", file=_out)
+    print(f"  创建/生成/新建/从头开始     → create", file=_out)
+    print(f"  审计/检查/更新/修            → update（含备份、蓝图、bump）", file=_out)
+    print(f"  改造/重构/标准化/大规模改    → refactor", file=_out)
+    print(f"  版本升级（内部）             → bump", file=_out)
+    print(f"  查看规则/查看模板/只读查询   → readonly（不修改文件）", file=_out)
+    print(f"{'─'*55}", file=_out)
+    print(f"  LLM 当前选择的模式：{command}", file=_out)
     if desc:
-        print(f"  此模式将执行：{desc}")
+        print(f"  此模式将执行：{desc}", file=_out)
     if skill_dir:
-        print(f"  目标技能：{os.path.basename(skill_dir)}")
-    print(f"  ⚠️  如果模式与用户意图不匹配，请立即中止并重新选择")
-    print(f"{'='*55}")
+        print(f"  目标技能：{os.path.basename(skill_dir)}", file=_out)
+    print(f"  ⚠️  如果模式与用户意图不匹配，请立即中止并重新选择", file=_out)
+    print(f"{'='*55}", file=_out)
 
     # ── 模式-命令映射锁（代码级强制，无向后兼容） ──
     if not llm_mode:
-        print(f"\n  {'❌'*3} 缺少 --mode 参数！流程拒绝 {'❌'*3}")
-        print(f"     LLM 必须根据模式自检闸门输出 --mode 参数")
-        print(f"     当前子命令：{command}")
-        print(f"")
-        print(f"     请携带 --mode 重新执行：")
-        print(f"       python -m scripts.skill_audit {command} <skill-dir> --confirmed --mode {command}")
-        print(f"")
+        print(f"\n  {'❌'*3} 缺少 --mode 参数！流程拒绝 {'❌'*3}", file=_out)
+        print(f"     LLM 必须根据模式自检闸门输出 --mode 参数", file=_out)
+        print(f"     当前子命令：{command}", file=_out)
+        print(f"", file=_out)
+        print(f"     请携带 --mode 重新执行：", file=_out)
+        print(f"       python -m scripts.skill_audit {command} <skill-dir> --confirmed --mode {command}", file=_out)
+        print(f"", file=_out)
         sys.exit(1)
     if llm_mode != command:
         # 豁免：refactor 模式下允许 audit --classify（二次筛除的必要操作）
         if llm_mode == "refactor" and command == "audit" and classify:
             pass
         else:
-            print(f"\n  {'❌'*3} 模式-命令不匹配！流程拒绝 {'❌'*3}")
-            print(f"     LLM 语义自检闸门输出模式：{llm_mode}")
-            print(f"     当前执行的子命令：{command}")
-            print(f"")
-            print(f"     请使用正确的子命令：")
-            print(f"       python -m scripts.skill_audit {llm_mode} <skill-dir> --confirmed --mode {llm_mode}")
-            print(f"")
+            print(f"\n  {'❌'*3} 模式-命令不匹配！流程拒绝 {'❌'*3}", file=_out)
+            print(f"     LLM 语义自检闸门输出模式：{llm_mode}", file=_out)
+            print(f"     当前执行的子命令：{command}", file=_out)
+            print(f"", file=_out)
+            print(f"     请使用正确的子命令：", file=_out)
+            print(f"       python -m scripts.skill_audit {llm_mode} <skill-dir> --confirmed --mode {llm_mode}", file=_out)
+            print(f"", file=_out)
             sys.exit(1)
 
     if not confirmed:
-        print(f"\n  ⛔ 未传入 --confirmed 参数，拒绝执行。")
-        print(f"  请确认模式正确后重新运行: python -m scripts.skill_audit {command} <skill-dir> --confirmed")
+        print(f"\n  ⛔ 未传入 --confirmed 参数，拒绝执行。", file=_out)
+        print(f"  请确认模式正确后重新运行: python -m scripts.skill_audit {command} <skill-dir> --confirmed", file=_out)
         sys.exit(0)
 
 

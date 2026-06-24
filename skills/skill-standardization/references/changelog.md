@@ -1,3 +1,12 @@
+## [2.95.5] - 2026-06-24
+
+### 修复
+- `--json` 输出污染：`_semantic_precheck()` 检测到 `--json` 参数时将门禁文字写入 stderr 而非 stdout，确保 JSON 流可解析
+
+### 更新
+- `.standardization/skill-standardization/` 数据目录文档修正为 per-skill 子目录结构，移除不存在的 `logs/ops.log`，backup 格式修正为 `.bak`
+- `audit-all` 能力边界描述修正：从"仅支持一级子目录"改为"遍历所有子目录，不自动排除"
+
 ## [2.95.4] - 2026-06-24
 
 ### 修复
@@ -7,6 +16,9 @@
 - 移除循环内所有 `--classify` 出口文案（误判标记仅在前置 LLM 二次筛查阶段进行）
 
 ### 更新
+- `.standardization/skill-standardization/` 数据目录结构说明：调整为 per-skill 子目录结构，移除不存在的 `logs/ops.log`，backup 格式修正为 `.bak`（原文档写 `.zip`）
+- `audit-all` 能力边界描述：从"仅支持一级子目录"改为"遍历所有子目录，不自���排除"
+- 修复 `--json` 模式输出污染：`_semantic_precheck()` 在 `--json` 请求时将门禁文字输出到 stderr 而非 stdout，确保 JSON 流纯净
 - R-17 修复指引：从"添加「→ 详见 references/xxx.md」散落引用"改为"优先使用渐进式文件索引表，禁止正文散落引用"，解决与 C-13 的矛盾
 - C-12 约束上限：从 5 条改为 9 条（适应多钩子技能的需求）
 - `.fix_loop_check.json` 循环检测改用动态技能名路径（原硬编码为 novel-weaver）

@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.95.4
+version: 2.95.5
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit / create / update / refactor / bump / readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、LLM 二次筛分类。
@@ -88,7 +88,7 @@ create_permissions_md: true
 | **审计现有 skill** | R-01~R-26 全量检查，输出 PASS/WARN/FAIL 逐条明细及上下文行 | 仅检查 SKILL.md + _meta.json + scripts/ 文件结构和代码静态分析，不检查 Python 运行时行为 |
 | **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ / scripts/） | 只生成结构模板和占位符，功能代码需要手动填充 |
 | **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码 |
-| **批量审计** | `audit-all` 子命令扫描 skills/ 下多个 skill | 仅支持 skills/ 目录下的一级子目录（不支持嵌套目录） |
+| **批量审计** | `audit-all` 子命令扫描 skills/ 下多个 skill | 遍历 skills/ 下的所有一级子目录（不支持嵌套目录），每个子目录中的非技能目录需自行排除 |
 | **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 触发词 / 反模式 / FAQ / 写作规范等格式问题，覆盖 R-01~R-26 共 20+ 条规则 | 仅修复格式/结构/路径/生成类问题，**不修复代码逻辑错误**。<br>修复后需运行 `--verify` + `--show-fix` 两阶段验证确认 |
 | **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析，无法检测动态代码执行的权限需求 |
 
@@ -191,13 +191,14 @@ python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed
 ```text
 ../.standardization/skill-standardization/
 ├── data/
-│   ├── .verify_fix_map.json  # --verify 输出的修复指引映射
-│   ├── .verify_fp.json       # --classify 标记的误判详情（{id: {category, reason}}）
-│   └── ...
+│   ├── <target-skill>/              # 被审计技能的数据
+│   │   ├── .verify_fp.json          # --classify 标记的误判详情
+│   │   ├── .remaining_llm.json      # LLM 手动修复项
+│   │   └── outputs/
+│   │       ├── .audit_report.html   # HTML 审计报告
+│   │       └── .verify_fix_map.json # --verify 输出的修复指引映射
 ├── backup/
-│   └── <skill>_<timestamp>.zip  # refactor 自动备份
-├── logs/
-│   └── ops.log               # 操作日志
+│   └── <skill>_<timestamp>.bak      # auto-fix 操作前的单文件备份
 └── ...
 ```
 
