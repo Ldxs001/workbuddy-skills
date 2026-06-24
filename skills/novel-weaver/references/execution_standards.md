@@ -153,10 +153,41 @@ python novel_workflow_engine.py finalize-chapter <path> <L##> <chapter_dir> <dat
 新出场角色或已有角色属性变化时调用：
 `novel_state_manager.py add-char <path> <name> <role> <first_appearance>`
 
-## 结尾收束规范
+## 结尾收束规范 v2
 
-最后一章的特殊要求：
-1. 完成标记替换为"---全文 完---"
-2. 不预告下一章
-3. 结尾场景与第 1 章第一个场景呼应
-4. 最后一句用动作收束（"推门。""关灯。""转身。"）
+### 收尾类型标签
+
+末章最后一个子结构的概述**必须**以 `【收尾类型: xxx】` 结尾，三选一：
+- `【收尾类型: 封闭式】` — 核心冲突彻底解决，所有角色弧闭合
+- `【收尾类型: 开放式】` — 核心冲突有明确结果，但留有合理延续空间
+- `【收尾类型: 悬停式】` — 冲突暂不解决，在节奏最高处戛然而止
+
+### 命题约束
+
+末子结构写作前，`novel_context_loader.py` 检测到 `is_ending: true` 时自动输出收尾类型对应的强制命题框。命题框中每一项均为硬约束，LLM 不可偏离。
+
+### 自动标记
+
+`novel_workflow_engine.py plan-chapter` 在执行时自动检测：
+- 如果当前注册的章节是末章（chapters[-1]）
+- 且当前注册的子结构是该章的最后一个
+- → 自动在 novel_state.json 中标记 `is_ending: true`，并从概述中解析 `ending_type`
+
+### 收尾验证
+
+`finalize-novel` 在 fidelity 检查通过后自动调用 `verify-ending`。验证逻辑在 `novel_fidelity.py verify_ending()` 中，分为三种收尾类型的独立检查项：
+
+| 类型 | 检查项数 | 硬性通过要求 |
+|------|---------|-------------|
+| 封闭式 | 4 | 全部通过 |
+| 开放式 | 4（2硬+2软） | 2硬全过 + 2软至少1过 |
+| 悬停式 | 6 | 全部通过 |
+
+不通过则阻断 finalize-novel，不推进 phase → complete。报告写入 `data/reports/ending_report.md`。
+
+### 通用规范
+
+- 完成标记替换为 `---全文 完---`
+- 不预告下一章
+- 末子结构 ≥200 字（防止一句话结尾）
+- 最后一句用动作收束（推门。/关灯。/转身。）

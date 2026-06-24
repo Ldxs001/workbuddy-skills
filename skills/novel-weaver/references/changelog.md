@@ -1,3 +1,22 @@
+## [1.7.0] - 2026-06-24
+
+### 新增
+- **结尾收束验证系统** — 末章末子结构自动标记 `is_ending` + 解析 `ending_type`（封闭式/开放式/悬停式）
+- **收尾命题框** — `novel_context_loader.py` 检测 `is_ending` 时按类型注入硬约束命题框（冲突落点/主角弧/主题回扣/动作收束等）
+- **三类收尾检查器** — `novel_fidelity.py verify_ending()` 覆盖：
+  - 封闭式：冲突落点/主角变化/主题回扣/末句动作（4项全过）
+  - 开放式：冲突结果[硬]/留白意图[软]/情绪收束[软]/禁逃[硬]（2硬全过+2软至少1过）
+  - 悬停式：悬念存在/位置合理/主角成长/情绪锚定/节奏检测/禁逃（6项全过，不支持自动修复→人工）
+- **ending_verify 门禁** — `novel_pipeline_gate.py` GATES 追加 `ending_verify`，`finalize-novel` 中与 fidelity 双门禁阻断
+- **验证报告** — 写入 `data/ending_report.md`，CLI 支持 `novel_fidelity.py verify-ending <project_dir>`
+- **文档** — `references/execution_standards.md` 结尾收束规范升级至 v2（收尾类型标签/命题约束/验证流程/通用规范）
+
+### 架构
+- 验证仅读末子结构内容 + project 配置，不通读全文（大纲驱动，fidelity 子集）
+- 收尾类型从 LLM 生成的大纲概述中的 `【收尾类型: xxx】` 标签自动解析，零耦合
+
+---
+
 ## [1.6.1] - 2026-06-24
 
 ### 修复

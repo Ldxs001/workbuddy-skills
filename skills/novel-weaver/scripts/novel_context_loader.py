@@ -60,6 +60,42 @@ def load_context(state_path, chapter, sub_key):
             print(f"  | {l}")
     print(f"{'='*50}")
 
+    # 🔴 收尾命题框（is_ending=true 时追加）
+    if subs[sub_key].get("is_ending"):
+        ending_type = subs[sub_key].get("ending_type", "未指定")
+        project = data.get("project", "未知项目")
+        core_conflict = data.get("core_conflict", "未知冲突")
+        protagonist = data.get("protagonist", "未知主角")
+        theme = data.get("theme", "未知主题")
+
+        print(f"\n{'='*50}")
+        print(f"🔴 收尾约束（硬性）")
+        print(f"{'='*50}")
+        print(f"  收尾类型: {ending_type}")
+        print(f"  {'─'*40}")
+        if ending_type == "封闭式":
+            print(f"  □ 核心冲突必须落地（起始于: {core_conflict}）")
+            print(f"  □ 主角弧必须闭合（起始于: {protagonist}）")
+            print(f"  □ 主题必须回扣（{theme}）")
+            print(f"  □ 末句用动作收束（推门。/关灯。/转身。）")
+        elif ending_type == "开放式":
+            print(f"  □ 核心冲突必须有明确结果（起始于: {core_conflict}）")
+            print(f"  □ 留白必须服务于主题（{theme}）")
+            print(f"  □ 情绪基调必须收敛")
+            print(f"  □ 禁止: 未完待续/预知后事如何/一切才刚刚开始")
+        elif ending_type == "悬停式":
+            print(f"  □ 留下一个具体悬念（必须可命名）")
+            print(f"  □ 悬停点必须是节奏最高处")
+            print(f"  □ 主角必须有阶段性成长（起始于: {protagonist}）")
+            print(f"  □ 情绪必须有明确指向（焦虑/希望/恐惧/期待）")
+            print(f"  □ 禁止: 未完待续/一切才刚刚开始")
+        else:
+            print(f"  ⚠️ 末子结构概述缺少【收尾类型】标签（应为封闭式/开放式/悬停式）")
+            print(f"  □ 请修正概述后重新 plan-chapter")
+        print(f"  {'─'*40}")
+        print(f"  提示: 以上为命题约束，不可偏离")
+        print(f"{'='*50}\n")
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("用法: python novel_context_loader.py <state_path> <chapter> <sub_key>")

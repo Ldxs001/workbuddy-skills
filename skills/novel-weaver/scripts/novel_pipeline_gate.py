@@ -11,6 +11,7 @@ GATES = [
     "sub_causality",
     "chapter_finalized",
     "fidelity",
+    "ending_verify",
 ]
 PHASES = ["setup", "stage1_init", "stage1_done", "writing", "stage3_ready", "complete"]
 

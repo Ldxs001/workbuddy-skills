@@ -7,7 +7,7 @@ Workflow Engine — 流程引擎
   链式调用: atomic_writer.validate_and_write → state_manager.update-sub
   每完成一个子结构立即记录状态（非批量，非延迟）
 """
-import json, sys, subprocess, os
+import json, sys, subprocess, os, re
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
@@ -19,27 +19,55 @@ DATA_STATE = DATA_DIR / "novel_state.json"
 DATA_CHAPTERS = DATA_DIR / "chapters"
 DATA_REPORTS = DATA_DIR / "reports"
 
+def _parse_ending_tag(summary: str) -> str | None:
+    """从概述中解析【收尾类型: xxx】标签"""
+    m = re.search(r'【收尾类型:\s*(\S+?)】', summary)
+    if m:
+        t = m.group(1)
+        if t in ("封闭式", "开放式", "悬停式"):
+            return t
+    return None
+
 def plan_chapter(state_path, chapter, subs_json):
-    """批量注册子结构"""
+    """批量注册子结构。末章末子结构自动标记 is_ending。"""
     data = json.loads(Path(state_path).read_text(encoding="utf-8"))
     subs = json.loads(subs_json)
+
+    # 判断是否为末章
+    chapters = data.get("chapters", [])
+    is_last_chapter = bool(chapters and chapters[-1]["id"] == chapter)
+
     for ch in data.get("chapters", []):
         if ch["id"] != chapter:
             continue
         if "sub_structures" not in ch:
             ch["sub_structures"] = {}
-        for s in subs:
+        for i, s in enumerate(subs):
             s_key = s["s_key"]
-            ch["sub_structures"][s_key] = {
+            entry = {
                 "title": s.get("title", ""),
                 "summary": s.get("summary", ""),
                 "tone": s.get("tone", ""),
                 "word_count": 0,
                 "status": "pending"
             }
+            # 末章 + 最后一个子结构 → 标记 is_ending
+            if is_last_chapter and i == len(subs) - 1:
+                entry["is_ending"] = True
+                ending_type = _parse_ending_tag(s.get("summary", ""))
+                if ending_type:
+                    entry["ending_type"] = ending_type
+            ch["sub_structures"][s_key] = entry
         break
+
     Path(state_path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
+
+    if is_last_chapter:
+        last_sub = subs[-1]["s_key"] if subs else "?"
+        print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
+        print(f"[收尾] 末章标记 → 末子结构 {last_sub} 的 is_ending=True")
+    else:
+        print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
 
 def verify_chapter(state_path, chapter):
     """验证章节子结构注册完整性"""
@@ -273,11 +301,12 @@ def fidelity_check(state_path, chapters_dir):
 
 
 def finalize_novel(state_path, chapters_dir):
-    """全文完结：全线跨章检查 → 大纲忠实度 → 门禁"""
+    """全文完结：全线跨章检查 → 大纲忠实度 → 结尾验证 → 门禁"""
     import sys as _sys
     _sys.path.insert(0, str(SCRIPTS_DIR))
     from novel_continuity import cross_chapter
     from novel_pipeline_gate import pass_gate, load_gates, save_gates
+    from novel_fidelity import verify_ending
 
     print(f"{'='*50}")
     print(f"[全文完结] 开始全线跨章承诺链检查...")
@@ -288,16 +317,30 @@ def finalize_novel(state_path, chapters_dir):
     print(f"[全文完结] 开始大纲忠实度检查...")
     p, i, w, e = fidelity_check(state_path, chapters_dir)
 
+    # 🔴 结尾收束验证
     print(f"\n{'='*50}")
-    print(f"[全文完结] 门禁: fidelity")
+    print(f"[全文完结] 开始结尾收束验证...")
+    project_dir = str(Path(state_path).parent)  # state_path 是 project_dir/data/novel_state.json
+    ending_result = verify_ending(project_dir)
+
+    print(f"\n{'='*50}")
+    print(f"[全文完结] 门禁: fidelity + ending_verify")
     gates = load_gates(state_path)
     if e > 0:
         print(f"[HOOK-BLOCK] 有 {e} 个 ERROR 级别偏差，fidelity 门禁未通过")
         print(f"  请手动修正后重新运行 finalize-novel")
+    elif not ending_result.get("pass", False):
+        print(f"[HOOK-BLOCK] 结尾收束验证未通过")
+        for d in ending_result.get("details", []):
+            if not d.get("pass"):
+                print(f"  [FAIL] {d.get('name', '?')}: {d.get('reason', '?')}")
+        print(f"  请手动修正后重新运行 finalize-novel")
     else:
         gates["fidelity"] = "PASS"
+        gates["ending_verify"] = "PASS"
         save_gates(state_path, gates)
         print(f"[全文完结] fidelity [OK] PASS")
+        print(f"[全文完结] ending_verify [OK] PASS")
         print(f"[全文完结] 全部完成！")
 
 
