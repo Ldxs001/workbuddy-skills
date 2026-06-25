@@ -100,14 +100,22 @@ def set_signature(path, enabled, text=""):
 LENGTH_RANGES = {"short": (3, 6), "medium": (8, 10), "long": (11, 99)}
 LENGTH_LABELS = {"short": "短篇(3-6章)", "medium": "中篇(8-10章)", "long": "长篇(11章+)"}
 
-def init_project(path, project_name, length="medium", num_chapters=None):
+def init_project(name, project_name, length="medium", num_chapters=None):
     """
     初始化 novel_state.json 骨架。
+    name: 项目名（自动创建在 projects/<name>/data/）或完整路径
     length: short/medium/long（默认 medium）
     num_chapters: 不传则按 length 范围取中值
     """
-    if Path(path).exists():
-        print(f"[HOOK-BLOCK] {path} 已存在，禁止重复初始化")
+    p = Path(name)
+    # 如果名字不含路径分隔符，视为项目名，自动创建标准化子目录
+    if "/" not in name and "\\" not in name:
+        SCRIPTS_DIR = Path(__file__).parent
+        base = SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"
+        p = base / name / "data" / "novel_state.json"
+        print(f"[初始化] 项目目录: {p.parent}")
+    if p.exists():
+        print(f"[HOOK-BLOCK] {p} 已存在，禁止重复初始化")
         sys.exit(1)
     if length not in LENGTH_RANGES:
         print(f"[HOOK-BLOCK] 无效篇幅: {length}，可选: short/medium/long")
@@ -121,13 +129,6 @@ def init_project(path, project_name, length="medium", num_chapters=None):
         if num_chapters < lo or num_chapters > hi:
             print(f"[HOOK-BLOCK] {LENGTH_LABELS[length]} 章数应在 {lo}-{hi} 之间，收到 {num_chapters}")
             sys.exit(1)
-    """
-    初始化 novel_state.json 骨架。
-    涵盖所有标准字段，确保格式正确。
-    """
-    if Path(path).exists():
-        print(f"[HOOK-BLOCK] {path} 已存在，禁止重复初始化")
-        sys.exit(1)
     today = datetime.now().strftime("%Y-%m-%d")
     chapters = []
     for i in range(1, num_chapters + 1):
@@ -163,9 +164,9 @@ def init_project(path, project_name, length="medium", num_chapters=None):
         "timeline": [],
         "signature": {"enabled": False, "text": ""}
     }
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[初始化] {project_name} → {path}")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[初始化] {project_name} → {p}")
     print(f"[初始化] 篇幅: {LENGTH_LABELS.get(length, length)}（{num_chapters} 章）")
     print(f"[初始化] 当前阶段: stage1_init")
     print(f"[下一步] 设置场景配置和大纲后:")
@@ -179,8 +180,10 @@ if __name__ == "__main__":
     elif len(sys.argv) < 3:
         print("用法: python novel_state_manager.py <命令> <state_path> [args...]")
         print("  命令:")
-        print("    init       <project_name> [length] [num_chapters]  初始化新小说")
+        print("    init       <项目名> [length] [num_chapters]  初始化新小说")
         print("                   length: short(3-6章), medium(8-10章,默认), long(11章+)")
+        print("                   也可传入完整路径: init ./my/path/data/novel_state.json 小说名")
+        print("    add-char   <name> <role> <first_appearance> [traits] [mbti] [archetype]")
         print("    add-char   <name> <role> <first_appearance> [traits] [mbti] [archetype]")
         print("    update-sub <chapter> <sub_key> <word_count>")
         print("    finalize   <chapter>")
@@ -191,24 +194,27 @@ if __name__ == "__main__":
         print("    list-projects                     列出所有已创建的项目")
         print("")
         print("  示例:")
-        print("    python novel_state_manager.py init <path> 我的小说 12")
+        print("    python novel_state_manager.py init my-novel 我的小说   # 自动创建")
+        print("    python novel_state_manager.py init ./path/state.json 小说名  # 指定路径")
         sys.exit(1)
     cmd = sys.argv[1]
     if cmd == "list-projects":
         SCRIPTS_DIR = Path(__file__).parent
-        scan_base = SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver"
+        scan_base = SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"
         found = []
-        for state_file in scan_base.rglob("novel_state.json"):
-            try:
-                d = json.loads(state_file.read_text(encoding="utf-8-sig"))
-                name = d.get("project", "?")
-                length = d.get("meta", {}).get("length", "?")
-                phase = d.get("meta", {}).get("current_phase", "?")
-                ch_count = len(d.get("chapters", []))
-                done = sum(1 for c in d.get("chapters", []) if c.get("status") == "completed")
-                found.append((str(state_file), name, length, phase, ch_count, done))
-            except Exception:
-                continue
+        if scan_base.exists():
+            for proj_dir in scan_base.iterdir():
+                state_file = proj_dir / "data" / "novel_state.json"
+                try:
+                    d = json.loads(state_file.read_text(encoding="utf-8-sig"))
+                    name = d.get("project", "?")
+                    length = d.get("meta", {}).get("length", "?")
+                    phase = d.get("meta", {}).get("current_phase", "?")
+                    ch_count = len(d.get("chapters", []))
+                    done = sum(1 for c in d.get("chapters", []) if c.get("status") == "completed")
+                    found.append((str(state_file), name, length, phase, ch_count, done))
+                except Exception:
+                    continue
         if not found:
             print("没有找到已创建的项目。")
         else:
@@ -247,8 +253,10 @@ if __name__ == "__main__":
         save_state(sp, data)
         print(f"[篇幅] 已设为 {LENGTH_LABELS[length]}")
     elif cmd == "init":
+        # sys.argv[2] = 项目名（可含路径）; sys.argv[3] = 显示名; [4]=length; [5]=num
+        display_name = sys.argv[3] if len(sys.argv) > 3 else sys.argv[2]
         length = sys.argv[4] if len(sys.argv) > 4 else "medium"
         num = sys.argv[5] if len(sys.argv) > 5 else None
-        init_project(sp, sys.argv[3], length, num)
+        init_project(sys.argv[2], display_name, length, num)
     else:
         print(f"[错误] 未知命令: {cmd}")

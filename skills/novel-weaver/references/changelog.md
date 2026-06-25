@@ -1,3 +1,16 @@
+## [1.13.3] - 2026-06-25
+
+### 修复
+- **`init` 自动项目目录** — `init <项目名>` 自动创建在 `.standardization/novel-weaver/projects/<项目名>/data/novel_state.json`，各项目完全隔离
+- **`list-projects` 扫描路径修复** — 扫描 `.standardization/novel-weaver/projects/` 下所有项目子目录
+- **workflow_engine 路径推导修复** — `_chapters_dir`/`_report_dir` 从 `state_path` 自动推导每个项目的 chapters/reports 路径
+- **清除旧版扁平目录** — 移除 `skills/.standardization/novel-weaver/data/` 下的过期文件（已迁移到 `projects/`）
+
+### 新增
+- **`init` 支持自动/手动双模式** — 传项目名自动建子目录，传完整路径精确控制
+
+---
+
 ## [1.13.2] - 2026-06-25
 
 ### 文档同步

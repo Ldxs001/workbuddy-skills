@@ -12,16 +12,24 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
 # R-12 审计锚点：数据目录变量声明 — 与 _meta.json data_dir 一致
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/data/"
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/"
 SKILLS_ROOT = SCRIPTS_DIR.parent.parent  # skills/novel-weaver/
 # _meta.json data_dir 相对于 skills/ 目录，所以用 SKILLS_ROOT.parent
-DATA_DIR = SKILLS_ROOT.parent / ".standardization" / "novel-weaver" / "data"
-DATA_STATE = DATA_DIR / "novel_state.json"
-DATA_CHAPTERS = DATA_DIR / "chapters"
-DATA_REPORTS = DATA_DIR / "reports"
+DATA_DIR = SKILLS_ROOT.parent / ".standardization" / "novel-weaver" / "projects"
+DATA_STATE = DATA_DIR / "novel_state.json"  # 占位（实际用 _chapters_dir 推导）
+DATA_CHAPTERS = DATA_DIR / "chapters"       # 占位
+DATA_REPORTS = DATA_DIR / "reports"          # 占位
 
 LENGTH_RANGES = {"short": (3, 6), "medium": (8, 10), "long": (11, 99)}
 LENGTH_LABELS = {"short": "短篇", "medium": "中篇", "long": "长篇"}
+
+def _chapters_dir(state_path):
+    """从 state_path 推导项目 chapters 目录: projects/<name>/chapters/"""
+    return Path(state_path).parent.parent / "chapters"
+
+def _report_dir(state_path):
+    """从 state_path 推导项目 reports 目录: projects/<name>/data/reports/"""
+    return Path(state_path).parent / "reports"
 
 
 def _parse_ending_tag(summary: str) -> str | None:
@@ -459,15 +467,15 @@ if __name__ == "__main__":
     elif cmd == "preview":
         preview_context(sp, sys.argv[3])
     elif cmd == "write-sub":
-        write_sub(sp, sys.argv[3], sys.argv[4], str(DATA_CHAPTERS))
+        write_sub(sp, sys.argv[3], sys.argv[4], str(_chapters_dir(sp)))
     elif cmd == "finalize-chapter":
         finalize_chapter(sp, sys.argv[3],
-                         str(DATA_CHAPTERS / sys.argv[3]),
-                         str(DATA_REPORTS))
+                         str(_chapters_dir(sp) / sys.argv[3]),
+                         str(_report_dir(sp)))
     elif cmd == "fidelity":
-        fidelity_check(sp, str(DATA_CHAPTERS))
+        fidelity_check(sp, str(_chapters_dir(sp)))
     elif cmd == "finalize-novel":
-        finalize_novel(sp, str(DATA_CHAPTERS))
+        finalize_novel(sp, str(_chapters_dir(sp)))
     elif cmd == "next-step":
         next_step(sp)
     else:
