@@ -61,6 +61,9 @@ def plan_chapter(state_path, chapter, subs_json):
                 ending_type = _parse_ending_tag(s.get("summary", ""))
                 if ending_type:
                     entry["ending_type"] = ending_type
+            # 非末章 + 最后一个子结构 → 标记 is_hook_possible（建议伏笔位，不阻断）
+            if not is_last_chapter and i == len(subs) - 1:
+                entry["is_hook_possible"] = True
             ch["sub_structures"][s_key] = entry
         break
 
@@ -71,7 +74,9 @@ def plan_chapter(state_path, chapter, subs_json):
         print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
         print(f"[收尾] 末章标记 → 末子结构 {last_sub} 的 is_ending=True")
     else:
+        last_sub = subs[-1]["s_key"] if subs else "?"
         print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
+        print(f"[伏笔] 非末章 → 末子结构 {last_sub} 标记 is_hook_possible（可选伏笔位）")
 
 def verify_chapter(state_path, chapter):
     """验证章节子结构注册完整性"""

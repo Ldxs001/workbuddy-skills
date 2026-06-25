@@ -150,6 +150,29 @@ def load_context(state_path, chapter, sub_key):
             print(f"  | {l}")
     print(f"{'='*50}")
 
+    # ── 💡 钩子位建议（is_hook_possible=true 时输出，不阻断） ──
+    if subs[sub_key].get("is_hook_possible"):
+        # 找下一章标题
+        chapters_list = data.get("chapters", [])
+        next_ch_title = ""
+        for ci, ch in enumerate(chapters_list):
+            if ch["id"] == chapter and ci + 1 < len(chapters_list):
+                next_ch = chapters_list[ci + 1]
+                next_ch_title = f"{next_ch.get('id', '')}: {next_ch.get('title', '')}"
+                break
+        print(f"\n{'='*50}")
+        print(f"💡 钩子位建议（不强制）")
+        print(f"{'='*50}")
+        print(f"  本子结构是本章末子结构，可考虑设为伏笔/悬念/承诺")
+        if next_ch_title:
+            print(f"  下章: {next_ch_title}")
+        print(f"  可选类型:")
+        print(f"    - 悬念：留下一个未解答的问题")
+        print(f"    - 伏笔：埋设一个日后才揭示的线索")
+        print(f"    - 承诺：暗示下一章将有重要发展")
+        print(f"  如不设伏笔，请确保本子结构自然收束（非悬停式结尾）")
+        print(f"{'='*50}\n")
+
     # ── 🔴 人格约束（硬性） ──
     involved = _find_characters_in_chapter(data, chapter, sub_key)
     if involved:
