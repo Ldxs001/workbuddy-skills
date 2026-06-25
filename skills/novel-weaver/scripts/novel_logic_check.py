@@ -133,7 +133,10 @@ def _check_timeline_logic(chapter_dir: str, state_path: str) -> list:
             prev_day = day
 
     # 检查 text 中是否有明显的时间跳跃但未在 timeline 中记录
-    current_day = timeline.get("current_day", 0)
+    if isinstance(timeline, dict):
+        current_day = timeline.get("current_day", 0)
+    else:
+        current_day = 0
     files = _sorted_substructure_files(chapter_dir)
 
     for fpath in files:

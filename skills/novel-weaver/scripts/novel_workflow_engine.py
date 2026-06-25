@@ -215,7 +215,13 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
         logic_issues = logic_check(chapter_dir, state_path, str(report_path))
         all_issues += logic_issues
     except Exception as e:
-        print(f"[完结] 逻辑检查异常: {e}（跳过）")
+        print(f"[HOOK-BLOCK] 逻辑检查异常: {e}")
+        print(f"  这是一个硬性问题 — 修复后重新运行 finalize-chapter")
+        all_issues.append({
+            "file": chapter, "problem": f"逻辑检查执行失败: {e}",
+            "position": "logic_check()", "severity": "HARD",
+            "suggestion": "检查 novel_state.json 和 chapter 文件完整性后重试"
+        })
 
     # ── 聚合决策 ──
     hard_issues = [i for i in all_issues if i.get("severity") == "HARD"]

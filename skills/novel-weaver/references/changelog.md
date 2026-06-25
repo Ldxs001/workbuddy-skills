@@ -1,3 +1,11 @@
+## [1.12.5] - 2026-06-25
+
+### 修复
+- **逻辑检查异常改为 HARD 阻断** — 原 `finalize_chapter` 中 `except Exception: print("跳过")` 会静默吞掉逻辑检查失败，章节继续推进。改为追加 HARD 问题，正常阻断+写入修复指引。
+- **logic_check.py timeline.list.get() 崩溃** — `_check_timeline_logic` 中 `timeline.get("current_day")` 在 timeline 为 list 时报 `AttributeError`，改为 `if isinstance(dict):` 安全访问。
+
+---
+
 ## [1.12.4] - 2026-06-25
 
 ### 修复
