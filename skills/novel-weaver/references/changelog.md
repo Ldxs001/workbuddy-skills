@@ -1,7 +1,14 @@
+## [1.15.1] - 2026-06-25
+
+### 修复
+- 标准化改造:_meta.json路径修正/examples.md路径修正/术语统一/约束9to8/路径bug修复
+
+---
+
 ## [1.15.0] - 2026-06-25
 
 ### 新增
-- **[novel_state_manager.py] 核心规划字段保护** — 新增 `_fingerprint()` 指纹校验，首次 plan-chapter 后锁定以下字段：章节 title/overview、子结构 title/summary/tone、角色 name/role/traits/mbti/archetype、novel_info/writing_style/setting。任何非法修改被阻断并打印来源。运行时字段（word_count, status, timeline, continuity_notes）不受影响
+- **[novel_state_manager.py] 核心规划字段保护** — 新增 `_fingerprint()` 指纹校验，首次 plan-chapter 后锁定以下字段：章节 title/overview、子结构 title/summary/tone、角色 name/role/traits/mbti/archetype、novel_info/writing_style/setting。任何非法更新被阻断并打印来源。运行时字段（word_count, status, timeline, continuity_notes）不受影响
 - **[novel_workflow_engine.py] plan-chapter --generate 模式** — `python novel_workflow_engine.py plan-chapter <state> <L##> --generate` 输出子结构 JSON 模板供 LLM 填写
 - **[novel_workflow_engine.py] 字数代码级校验** — write-sub 写入后根据篇幅(short/medium/long)检查每子结构字数是否达到下限，低于目标打印 WARN
 - **[novel_workflow_engine.py] list-projects 集成** — 新增 `list-projects` 命令，列出所有项目名称/路径/阶段/章节进度
@@ -55,7 +62,7 @@
 - **`init` 自动项目目录** — `init <项目名>` 自动创建在 `.standardization/novel-weaver/projects/<项目名>/data/novel_state.json`，各项目完全隔离
 - **`list-projects` 扫描路径修复** — 扫描 `.standardization/novel-weaver/projects/` 下所有项目子目录
 - **workflow_engine 路径推导修复** — `_chapters_dir`/`_report_dir` 从 `state_path` 自动推导每个项目的 chapters/reports 路径
-- **清除旧版扁平目录** — 移除 `skills/.standardization/novel-weaver/data/` 下的过期文件（已迁移到 `projects/`）
+- **清除旧版扁平目录** — 删除 `skills/.standardization/novel-weaver/data/` 下的过期文件（已迁移到 `projects/`）
 
 ### 新增
 - **`init` 支持自动/手动双模式** — 传项目名自动建子目录，传完整路径精确控制
@@ -86,11 +93,11 @@
   - `medium`: 中篇 8-10 章（默认）
   - `long`: 长篇 11+ 章
 - **`init` 命令篇幅支持** — `init <name> [length] [num]`，不传 length 则默认 medium，按篇幅自动计算默认章数（取范围中值）
-- **`set-length` 命令** — 中途修改篇幅：`novel_state_manager.py set-length <path> short|medium|long`
+- **`set-length` 命令** — 中途更新篇幅：`novel_state_manager.py set-length <path> short|medium|long`
 - **`next_step` 篇幅检查** — 输出篇幅信息 + 当前章数是否在范围内（不阻断，仅提示）
 
 ### 架构
-- 所有旧项目（无 `meta.length` 字段）→ `next_step` 在 writing 阶段后提示设置篇幅
+- 所有旧项目（无 `meta.length` 字段）→ `next_step` 在 writing 阶段后提示配置篇幅
 - 不改变子结构规划/写作/完结流程
 
 ---
@@ -144,7 +151,7 @@
 ## [1.12.1] - 2026-06-25
 
 ### 修复
-- **路径系统统一** — 移除 `workflow_engine.py` 内部的 `DATA_STATE`/`DATA_CHAPTERS`/`DATA_REPORTS` 默认路径（指向 `.standardization/` 内部目录），改为从 `state_path` 入参自动推导：`<project>/data/novel_state.json` → chapters=父目录的父目录/chapters、reports=父目录/reports
+- **路径系统统一** — 删除 `workflow_engine.py` 内部的 `DATA_STATE`/`DATA_CHAPTERS`/`DATA_REPORTS` 默认路径（指向 `.standardization/` 内部目录），改为从 `state_path` 入参自动推导：`<project>/data/novel_state.json` → chapters=父目录的父目录/chapters、reports=父目录/reports
 - **CLI 强制 state_path** — 不再提供默认值，缺失则报错退出。避免 LLM 无意识走错目录
 - **所有命令统一使用 `<project>/data/novel_state.json` 作为 state_path**，examples.md 同步更新
 
@@ -157,8 +164,8 @@
 - **CLI help 中文说明** — workflow_engine.py 帮助信息全部中文 + 命令功能简述 + 快速开始提示
 
 ### 文档
-- **references/examples.md 完全重写** — 覆盖从零开始、续写、中断恢复、署名设置 4 个场景；所有 CLI 命令更新为当前真实接口；补充 `next-step` 入口说明
-- **SKILL.md 工作流程章节重写** — 每步附带精确 CLI 命令；引入 `next-step` 作为流程核心入口；去掉过时描述（`resume`/`atomic_writer tail` 等）
+- **references/examples.md 完全重写** — 覆盖从零开始、续写、中断恢复、署名配置 4 个场景；所有 CLI 命令更新为当前真实接口；补充 `next-step` 入口说明
+- **SKILL.md 工作流程章节重写** — 每步附带精确 CLI 命令；引入 `next-step` 作为流程核心入口；删除过时描述（`resume`/`atomic_writer tail` 等）
 
 ---
 
@@ -210,7 +217,7 @@
 ## [1.8.2] - 2026-06-24
 
 ### 修复
-- **[P0] pipeline_gate.py pass 命令挂错函数** — `pass` CLI 调用了 `require_gate()` 而非 `pass_gate()`，导致门禁标记失败。修改为 `pass_gate()`。
+- **[P0] pipeline_gate.py pass 命令挂错函数** — `pass` CLI 调用了 `require_gate()` 而非 `pass_gate()`，导致门禁标记失败。更新为 `pass_gate()`。
 - **[P0] plan_chapter 毁灭式写入** — `ch["sub_structures"][s_key] = entry` 覆盖已有 word_count/status。改用合并模式保留已有字段。
 - **[P0] fidelity.py generate_report 重复定义** — 第二个定义读不存在的 `outline.json`，覆盖第一个。已统一为从 `novel_state.json` 读取。
 - **[P1] logic_check.py chapters/timeline 数据结构不匹配** — chapters 预期 dict 实际 list，timeline 预期 dict 实际 list。已改为兼容访问。

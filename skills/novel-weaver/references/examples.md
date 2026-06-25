@@ -3,13 +3,13 @@
 ## 路径约定
 
 所有数据存储在技能的标准化数据目录（由 `_meta.json` 的 `data_dir` 声明）：
-`<skill_install_dir>/.standardization/novel-weaver/data/`
+`<skill_install_dir>/.standardization/novel-weaver/projects/`
 
 实际路径可通过以下命令获取：
 ```bash
 # skill 安装位置
 SKILL_DIR=~/.workbuddy/skills/novel-weaver
-echo $SKILL_DIR/.standardization/novel-weaver/data/novel_state.json
+ls $SKILL_DIR/.standardization/novel-weaver/projects/*/data/novel_state.json
 ```
 
 在文档中 `<state_path>` 即上述完整路径的简写。
@@ -96,7 +96,7 @@ python novel_workflow_engine.py next-step <state_path>
 # 因果链验证（大纲级）
 python novel_causality_check.py outline <project>/data/novel_state.json
 
-# 用户确认大纲 → 设置阶段
+# 用户确认大纲 → 配置阶段
 python novel_pipeline_gate.py set-phase <project>/data/novel_state.json stage1_done
 ```
 
@@ -115,7 +115,7 @@ python novel_workflow_engine.py plan-chapter <project>/data/novel_state.json L01
 # 子结构因果链验证
 python novel_causality_check.py sub-structure <project>/data/novel_state.json L01
 
-# 设置写作阶段
+# 配置写作阶段
 python novel_pipeline_gate.py set-phase <project>/data/novel_state.json writing
 ```
 
@@ -167,7 +167,7 @@ python novel_workflow_engine.py finalize-chapter <state_path> L01
 ### 阶段3：全文整合
 
 ```bash
-# 全部章节写完后，设置完结准备阶段
+# 全部章节写完后，配置完结准备阶段
 python novel_pipeline_gate.py set-phase <project>/data/novel_state.json stage3_ready
 
 # 大纲忠实度报告
@@ -176,7 +176,7 @@ python novel_workflow_engine.py fidelity <project>/data/novel_state.json
 # 结尾收束验证
 python novel_fidelity.py verify-ending <project>
 
-# 设置完结
+# 配置完结
 python novel_pipeline_gate.py set-phase <project>/data/novel_state.json complete
 ```
 
@@ -209,7 +209,7 @@ python novel_context_loader.py <state_path> L01 S02
 
 ---
 
-## 场景4：设置署名
+## 场景4：配置署名
 
 ```bash
 # 默认关闭，禁止任何署名/代名内容出现在正文中

@@ -183,7 +183,7 @@ python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 
 ## 角色人格系统（v1.7.0 新增）
 
-每个角色可设置 `mbti`（16 类型）和 `archetype`（荣格 12 原型），驱动角色行为和叙事功能。
+每个角色可配置 `mbti`（16 类型）和 `archetype`（荣格 12 原型），驱动角色行为和叙事功能。
 
 ### MBTI 16 类型
 
@@ -206,7 +206,7 @@ python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 | Outlaw | 反叛者，挑战权威 |
 | Magician | 魔法师，转化现实 |
 | Hero | 英雄，证明价值 |
-| Lover | 爱人者，建立连接 |
+| Lover | 爱人者，创建连接 |
 | Jester | 小丑，享受当下 |
 | Everyperson | 普通人，归属群体 |
 | Caregiver | 照顾者，保护他人 |
@@ -221,16 +221,16 @@ python novel_state_manager.py add-char <state_path> <name> <role> <first_appeara
 
 ### context_loader 输出
 
-涉及角色有人格设定时自动输出：
+涉及角色有人格配置时自动输出：
 ```
 🔴 人格约束（硬性）
   三浦: MBTI=INTJ, 原型=Sage
-  提示: 角色言行必须符合其人格设定
+  提示: 角色言行必须符合其人格配置
 ```
 
 ## 情绪混合系统（v1.7.0 新增）
 
-子结构可设置多维度情绪，每项情绪带强度数值（0.0-1.0）。
+子结构可配置多维度情绪，每项情绪带强度数值（0.0-1.0）。
 
 ### 格式
 
@@ -267,7 +267,7 @@ python novel_state_manager.py add-char <state_path> <name> <role> <first_appeara
 
 ## 文风系统（v1.7.0 新增）
 
-项目级文风格式，在 `novel_state.json` 顶层设置，全局生效。
+项目级文风格式，在 `novel_state.json` 顶层配置，全局生效。
 
 ### 字段说明
 
@@ -280,7 +280,7 @@ python novel_state_manager.py add-char <state_path> <name> <role> <first_appeara
 | `description_depth` | 详尽/中等/克制 | 描写密度 |
 | `custom_rules` | 自由文本 | 自定义约束 |
 
-### 设置方式
+### 配置方式
 
 项目初始化时在 `novel_state.json` 顶层添加：
 
