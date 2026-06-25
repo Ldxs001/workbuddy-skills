@@ -23,7 +23,7 @@ def check_chapter(chapter_dir, chapter, state_path):
     result = []
 
     for f in files:
-        content = f.read_text(encoding="utf-8")
+        content = f.read_text(encoding="utf-8-sig")
         lines = content.strip().split("\n")
 
         # 1. 检查禁止模式
@@ -89,7 +89,7 @@ def check_chapter(chapter_dir, chapter, state_path):
     # 更新 state
     sp = Path(state_path)
     if sp.exists():
-        data = json.loads(sp.read_text(encoding="utf-8"))
+        data = json.loads(sp.read_text(encoding="utf-8-sig"))
         for ch in data.get("chapters", []):
             if ch["id"] == chapter:
                 ch["style_check_notes"] = issues

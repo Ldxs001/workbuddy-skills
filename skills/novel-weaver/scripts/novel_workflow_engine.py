@@ -46,7 +46,7 @@ def _parse_ending_tag(summary: str) -> str | None:
 
 def plan_chapter(state_path, chapter, subs_json):
     """批量注册子结构。末章末子结构自动标记 is_ending。"""
-    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     subs = json.loads(subs_json)
 
     # 判断是否为末章
@@ -96,7 +96,7 @@ def plan_chapter(state_path, chapter, subs_json):
 
 def verify_chapter(state_path, chapter):
     """验证章节子结构注册完整性"""
-    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     for ch in data.get("chapters", []):
         if ch["id"] != chapter:
             continue
@@ -117,7 +117,7 @@ def verify_chapter(state_path, chapter):
 
 def preview_context(state_path, chapter):
     """预览写作上下文"""
-    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     for ch in data.get("chapters", []):
         if ch["id"] != chapter:
             continue
@@ -147,7 +147,7 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     filepath = chapter_dir / f"{sub_key}.txt"
 
     # ── 读取签名配置 ──
-    ws_data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    ws_data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     sig_cfg = ws_data.get("signature", {"enabled": False, "text": ""})
 
     # ── 步骤1: 从 stdin 读取内容 ──
@@ -270,7 +270,7 @@ def fidelity_check(state_path, chapters_dir):
     from novel_continuity import _extract_keywords as _ek
 
     sp = Path(state_path)
-    data = json.loads(sp.read_text(encoding="utf-8"))
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
     chapters = data.get("chapters", [])
 
     import re
@@ -312,7 +312,7 @@ def fidelity_check(state_path, chapters_dir):
         actual_text = ""
         if ch_dir.exists():
             for sf in sorted(ch_dir.glob("S*.txt")):
-                content = sf.read_text(encoding="utf-8").strip()
+                content = sf.read_text(encoding="utf-8-sig").strip()
                 # 跳过标题行和末行标记
                 lines = [l for l in content.split("\n") if l.strip() and not re.match(rf'{ch_id}S\d+', l.strip())]
                 # 跳过子结构标题行（L## · S##《...》）
@@ -477,7 +477,7 @@ def next_step(state_path):
         print(f"  请先初始化 novel_state.json（场景配置 + 大纲 + 用户确认）")
         return
 
-    data = json.loads(sp.read_text(encoding="utf-8"))
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
     phase = data.get("meta", {}).get("current_phase", "")
     chapters = data.get("chapters", [])
     project = data.get("project", "未知项目")
@@ -485,7 +485,7 @@ def next_step(state_path):
     gate_path = Path(state_path).parent / ".workbuddy" / "gate_state.json"
     gates = {}
     if gate_path.exists():
-        gates = json.loads(gate_path.read_text(encoding="utf-8"))
+        gates = json.loads(gate_path.read_text(encoding="utf-8-sig"))
 
     print(f"\n{'='*55}")
     print(f"  📋 项目: {project}")
@@ -592,7 +592,7 @@ def next_step(state_path):
             fixes_file = ch_dir / f"_{ch_id}_fixes.json"
             if fixes_file.exists():
                 try:
-                    fixes = json.loads(fixes_file.read_text(encoding="utf-8"))
+                    fixes = json.loads(fixes_file.read_text(encoding="utf-8-sig"))
                     if fixes:
                         ch_gate = gates.get(f"chapter_finalized:{ch_id}", "PENDING")
                         if ch_gate != "PASS":

@@ -21,7 +21,7 @@ def gate_path(state_path):
 def load_gates(state_path):
     gp = gate_path(state_path)
     if gp.exists():
-        return json.loads(gp.read_text(encoding="utf-8"))
+        return json.loads(gp.read_text(encoding="utf-8-sig"))
     return {}
 
 def save_gates(state_path, gates):
@@ -48,7 +48,7 @@ def status(state_path):
     sp = Path(state_path)
     phase = "unknown"
     if sp.exists():
-        data = json.loads(sp.read_text(encoding="utf-8"))
+        data = json.loads(sp.read_text(encoding="utf-8-sig"))
         phase = data.get("meta", {}).get("current_phase", "unknown")
     print(f"[门禁状态] 当前阶段: {phase}")
     for g in GATES:
@@ -61,7 +61,7 @@ def set_phase(state_path, new_phase):
     if not sp.exists():
         print(f"[错误] novel_state.json 不存在: {state_path}")
         sys.exit(1)
-    data = json.loads(sp.read_text(encoding="utf-8"))
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
     if "meta" not in data:
         data["meta"] = {}
     # 门禁检查：关键阶段转换必须通过对应门禁

@@ -1,10 +1,37 @@
-﻿{
+{
   "novel_info": {
     "title": "肉身与机械：赛博搏杀记",
     "author": "WorkBuddy（基于腾讯混元大模型）",
-    "theme": "后赛博朋克社会中的三重和解：与世界和解、与生活和解、与自己和解"
+    "theme": "后赛博朋克社会中的三重和解"
   },
-  "chapters": [],
+  "style_guide": {
+    "narrative_style": "现实主义，第一人称过去式",
+    "tone_progression": "闲适→紧张→温馨带沉思",
+    "custom_rules": [
+      "INTJ 人格通过事件展现不贴标签",
+      "李梅维权线贯穿全文",
+      "铁心为花瓶/氛围组不参与核心决策"
+    ]
+  },
+  "setting": {
+    "era": "新元历 2087 年",
+    "location": "深港特区垂直城市"
+  },
+  "characters": [],
+  "timeline": [
+    {"event": "淘到《实用擒拿格斗术》", "time_point": "新元历 2087 年春·第 1 日"},
+    {"event": "初次应用搏杀原理反击混混", "time_point": "第 3 日"}
+  ],
+  "chapters": [
+    {
+      "id": "L01",
+      "title": "旧书",
+      "status": "pending",
+      "word_count": 0,
+      "overview": "我在新元历 2087 年春淘到《实用擒拿格斗术》，被混混挑衅后下意识用搏杀原理反击发现真有用。埋下后续索赔线伏笔",
+      "sub_structures": []
+    }
+  ],
   "meta": {
     "version": "v8.0-init",
     "last_updated": "2026-06-25T12:02:00+08:00"

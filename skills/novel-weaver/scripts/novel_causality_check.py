@@ -9,7 +9,7 @@ from pathlib import Path
 MIN_SUMMARY_CHARS = 12
 
 def check_causality(state_path, mode, chapter=None):
-    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     issues = []
 
     if mode == "outline":

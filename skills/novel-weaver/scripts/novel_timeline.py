@@ -7,7 +7,7 @@ import json, sys
 from pathlib import Path
 
 def add_timeline(state_path, time_point, event):
-    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     tl = data.get("timeline", [])
     tl.append({"event": event, "time_point": time_point})
     data["timeline"] = tl
@@ -15,7 +15,7 @@ def add_timeline(state_path, time_point, event):
     print(f"[时间线] {time_point}: {event}")
 
 def list_timeline(state_path):
-    data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     tl = data.get("timeline", [])
     print(f"[时间线一览] (共{len(tl)}条)")
     for t in tl:

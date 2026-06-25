@@ -22,8 +22,8 @@ def check_continuity(chapter_dir, chapter, state_path):
     result = []
     issues = []
     for i in range(1, len(files)):
-        prev_content = files[i-1].read_text(encoding="utf-8").strip()
-        curr_content = files[i].read_text(encoding="utf-8").strip()
+        prev_content = files[i-1].read_text(encoding="utf-8-sig").strip()
+        curr_content = files[i].read_text(encoding="utf-8-sig").strip()
         prev_lines = [l for l in prev_content.split("\n") if l.strip() and not re.match(rf'{chapter}S\d+', l.strip())]
         curr_lines = [l for l in curr_content.split("\n") if l.strip() and not re.match(rf'{chapter}S\d+', l.strip())]
         prev_tail = "\n".join(prev_lines[-3:]) if len(prev_lines) >= 3 else "\n".join(prev_lines)
@@ -76,7 +76,7 @@ def check_continuity(chapter_dir, chapter, state_path):
 
     sp = Path(state_path)
     if sp.exists():
-        data = json.loads(sp.read_text(encoding="utf-8"))
+        data = json.loads(sp.read_text(encoding="utf-8-sig"))
         for ch in data.get("chapters", []):
             if ch["id"] == chapter:
                 ch["continuity_notes"] = issues
@@ -93,7 +93,7 @@ def auto_fix(chapter_dir, chapter):
     files = sorted(cd.glob("S*.txt"))
     transitions = []
     for i in range(1, len(files)):
-        prev_content = files[i-1].read_text(encoding="utf-8").strip()
+        prev_content = files[i-1].read_text(encoding="utf-8-sig").strip()
         prev_lines = [l for l in prev_content.split("\n") if l.strip()]
         prev_tail = prev_lines[-1] if prev_lines else ""
         transitions.append({
@@ -156,7 +156,7 @@ def cross_chapter(state_path, chapters_dir):
     从 novel_state.json 动态提取关键词，检测上章尾 vs 下章头的匹配度。
     """
     sp = Path(state_path)
-    data = json.loads(sp.read_text(encoding="utf-8"))
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
     chs = [c["id"] for c in data.get("chapters", []) if c.get("status") == "completed"]
 
     # 动态提取关键词
@@ -179,7 +179,7 @@ def cross_chapter(state_path, chapters_dir):
         if not prev_files:
             continue
         last_file = prev_files[-1]
-        last_content = last_file.read_text(encoding="utf-8").strip()
+        last_content = last_file.read_text(encoding="utf-8-sig").strip()
         last_lines = [l for l in last_content.split("\n") if l.strip() and not re.match(rf'{prev_ch}S\d+', l.strip())]
         prev_tail = "\n".join(last_lines[-3:]) if len(last_lines) >= 3 else "\n".join(last_lines)
 
@@ -187,7 +187,7 @@ def cross_chapter(state_path, chapters_dir):
         if not next_files:
             continue
         first_file = next_files[0]
-        first_content = first_file.read_text(encoding="utf-8").strip()
+        first_content = first_file.read_text(encoding="utf-8-sig").strip()
         first_lines = [l for l in first_content.split("\n") if l.strip() and not re.match(rf'{next_ch}S\d+', l.strip())]
         next_head = "\n".join(first_lines[:3]) if len(first_lines) >= 3 else "\n".join(first_lines)
 
@@ -216,7 +216,7 @@ def cross_chapter(state_path, chapters_dir):
 
     sp = Path(state_path)
     if sp.exists():
-        data = json.loads(sp.read_text(encoding="utf-8"))
+        data = json.loads(sp.read_text(encoding="utf-8-sig"))
         data["cross_chapter_check"] = issues
         sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 

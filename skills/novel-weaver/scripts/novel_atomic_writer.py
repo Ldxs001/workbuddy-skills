@@ -139,7 +139,7 @@ if __name__ == "__main__":
     if content_src == "-":
         content = sys.stdin.read()
     else:
-        content = Path(content_src).read_text(encoding="utf-8")
+        content = Path(content_src).read_text(encoding="utf-8-sig")
 
     success = validate_and_write(content, filepath, chapter, sub_key)
     if not success:

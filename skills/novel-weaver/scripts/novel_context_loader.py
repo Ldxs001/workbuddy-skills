@@ -105,7 +105,7 @@ def load_context(state_path, chapter, sub_key):
         print(f"[错误] state 文件不存在: {state_path}")
         sys.exit(1)
 
-    data = json.loads(sp.read_text(encoding="utf-8"))
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
 
     # 查找当前章节
     ch_info = None
@@ -133,7 +133,7 @@ def load_context(state_path, chapter, sub_key):
         prev_key = sub_keys[current_idx - 1]
         prev_file = Path(sp.parent) / "chapters" / chapter / f"{prev_key}.txt"
         if prev_file.exists():
-            lines = prev_file.read_text(encoding="utf-8").strip().split("\n")
+            lines = prev_file.read_text(encoding="utf-8-sig").strip().split("\n")
             prev_text = [l for l in lines if not l.strip().startswith(f"{chapter}")]
             prev_lines = prev_text[-3:] if len(prev_text) >= 3 else prev_text
 

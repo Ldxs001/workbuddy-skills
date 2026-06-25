@@ -1,3 +1,10 @@
+## [1.12.4] - 2026-06-25
+
+### 修复
+- **BOM 兼容** — 全部 12 个 `.py` 脚本中 `json.loads(read_text(encoding="utf-8"))` 改为 `encoding="utf-8-sig"`。PowerShell 写入 JSON 文件时默认带 BOM 头，Python utf-8 不识别导致解析失败。`utf-8-sig` 自动剥离 BOM，无 BOM 时行为与 utf-8 一致。
+
+---
+
 ## [1.12.3] - 2026-06-25
 
 ### 文档同步
