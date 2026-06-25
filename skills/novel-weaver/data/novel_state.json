@@ -29,7 +29,10 @@
       "status": "pending",
       "word_count": 0,
       "overview": "我在新元历 2087 年春淘到《实用擒拿格斗术》，被混混挑衅后下意识用搏杀原理反击发现真有用。埋下后续索赔线伏笔",
-      "sub_structures": []
+      "sub_structures": {
+        "S01": {"title": "", "summary": "", "tone": ""},
+        "S02": {"title": "", "summary": "", "tone": ""}
+      }
     }
   ],
   "meta": {

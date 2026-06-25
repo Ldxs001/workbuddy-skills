@@ -1,3 +1,14 @@
+## [1.12.6] - 2026-06-25
+
+### 新增
+- **`init` 命令** — `novel_state_manager.py init <state_path> <项目名> [章数]` 创建完整的 `novel_state.json` 骨架（含 chapters、writing_style、signature、timeline 等所有标准字段），禁止重复初始化。LLM 不再需要手动写 JSON。
+- **plan-chapter 输入校验** — subs_json 格式错误时给出明确阻断信息（非法 JSON/类型错误/缺少字段），不再静默崩溃。
+
+### 修复
+- **`_parse_ending_tag` 函数重复定义** — 两段完全相同的函数体首尾相接，第二个覆盖第一个但无影响。已删除重复。
+
+---
+
 ## [1.12.5] - 2026-06-25
 
 ### 修复

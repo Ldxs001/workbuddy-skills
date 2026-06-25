@@ -36,18 +36,24 @@ def _parse_ending_tag(summary: str) -> str | None:
         if t in ("封闭式", "开放式", "悬停式"):
             return t
     return None
-    """从概述中解析【收尾类型: xxx】标签"""
-    m = re.search(r'【收尾类型:\s*(\S+?)】', summary)
-    if m:
-        t = m.group(1)
-        if t in ("封闭式", "开放式", "悬停式"):
-            return t
-    return None
 
 def plan_chapter(state_path, chapter, subs_json):
     """批量注册子结构。末章末子结构自动标记 is_ending。"""
     data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
-    subs = json.loads(subs_json)
+    try:
+        subs = json.loads(subs_json)
+    except json.JSONDecodeError as e:
+        print(f"[HOOK-BLOCK] subs_json 不是合法 JSON: {e}")
+        print(f"  接收到的内容: {subs_json[:200]}")
+        print(f"  期望格式: [{{\"s_key\":\"S01\",\"title\":\"...\",\"summary\":\"...\",\"tone\":\"...\"}}]")
+        sys.exit(1)
+    if not isinstance(subs, list):
+        print(f"[HOOK-BLOCK] subs_json 应为数组，收到 {type(subs).__name__}")
+        sys.exit(1)
+    for i, s in enumerate(subs):
+        if not isinstance(s, dict) or "s_key" not in s:
+            print(f"[HOOK-BLOCK] subs[{i}] 缺少 s_key 字段: {s}")
+            sys.exit(1)
 
     # 判断是否为末章
     chapters = data.get("chapters", [])
