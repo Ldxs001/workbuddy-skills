@@ -13,9 +13,9 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).parent
 # R-12 审计锚点：数据目录变量声明 — 与 _meta.json data_dir 一致
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/"
-SKILLS_ROOT = SCRIPTS_DIR.parent.parent  # skills/novel-weaver/
-# _meta.json data_dir 相对于 skills/ 目录，所以用 SKILLS_ROOT.parent
-DATA_DIR = SKILLS_ROOT.parent / ".standardization" / "novel-weaver" / "projects"
+SKILLS_ROOT = SCRIPTS_DIR.parent.parent  # = C:/Users/sm001/.workbuddy/skills
+# _meta.json data_dir 相对于 skills/ 目录，所以用 SKILLS_ROOT（skills/ 根）
+DATA_DIR = SKILLS_ROOT / ".standardization" / "novel-weaver" / "projects"
 DATA_STATE = DATA_DIR / "novel_state.json"  # 占位（实际用 _chapters_dir 推导）
 DATA_CHAPTERS = DATA_DIR / "chapters"       # 占位
 DATA_REPORTS = DATA_DIR / "reports"          # 占位
@@ -437,51 +437,6 @@ def finalize_novel(state_path, chapters_dir):
         print(f"[全文完结] 全部完成！")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
-        print("  state_path = <项目>/data/novel_state.json")
-        print("  命令:")
-        print("    plan-chapter     <chapter> <subs_json>       注册子结构")
-        print("    verify-chapter   <chapter>                   验证注册完整性")
-        print("    preview          <chapter>                   预览章节规划")
-        print("    write-sub        <chapter> <sub_key>         写入子结构（stdin）")
-        print("    finalize-chapter <chapter>                  完结一章（含 HARD 阻断）")
-        print("    fidelity                                     大纲忠实度报告")
-        print("    finalize-novel                               全文完结")
-        print("    next-step                                    分析当前状态，输出下一步命令")
-        print("")
-        print("  缺省路径指向统一数据目录:")
-        print("    state:  " + str(DATA_STATE))
-        print("    章节:   " + str(DATA_CHAPTERS))
-        print("    报告:   " + str(DATA_REPORTS))
-        sys.exit(1)
-
-    cmd = sys.argv[1]
-    sp = sys.argv[2]
-
-    if cmd == "plan-chapter":
-        plan_chapter(sp, sys.argv[3], sys.argv[4])
-    elif cmd == "verify-chapter":
-        verify_chapter(sp, sys.argv[3])
-    elif cmd == "preview":
-        preview_context(sp, sys.argv[3])
-    elif cmd == "write-sub":
-        write_sub(sp, sys.argv[3], sys.argv[4], str(_chapters_dir(sp)))
-    elif cmd == "finalize-chapter":
-        finalize_chapter(sp, sys.argv[3],
-                         str(_chapters_dir(sp) / sys.argv[3]),
-                         str(_report_dir(sp)))
-    elif cmd == "fidelity":
-        fidelity_check(sp, str(_chapters_dir(sp)))
-    elif cmd == "finalize-novel":
-        finalize_novel(sp, str(_chapters_dir(sp)))
-    elif cmd == "next-step":
-        next_step(sp)
-    else:
-        print(f"[错误] 未知命令: {cmd}")
-
-
 def next_step(state_path):
     """
     分析当前状态，输出下一步应执行的命令。
@@ -632,3 +587,48 @@ def next_step(state_path):
                             break
                 except Exception:
                     pass
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
+        print("  state_path = <项目>/data/novel_state.json")
+        print("  命令:")
+        print("    plan-chapter     <chapter> <subs_json>       注册子结构")
+        print("    verify-chapter   <chapter>                   验证注册完整性")
+        print("    preview          <chapter>                   预览章节规划")
+        print("    write-sub        <chapter> <sub_key>         写入子结构（stdin）")
+        print("    finalize-chapter <chapter>                  完结一章（含 HARD 阻断）")
+        print("    fidelity                                     大纲忠实度报告")
+        print("    finalize-novel                               全文完结")
+        print("    next-step                                    分析当前状态，输出下一步命令")
+        print("")
+        print("  缺省路径指向统一数据目录:")
+        print("    state:  " + str(DATA_STATE))
+        print("    章节:   " + str(DATA_CHAPTERS))
+        print("    报告:   " + str(DATA_REPORTS))
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    sp = sys.argv[2]
+
+    if cmd == "plan-chapter":
+        plan_chapter(sp, sys.argv[3], sys.argv[4])
+    elif cmd == "verify-chapter":
+        verify_chapter(sp, sys.argv[3])
+    elif cmd == "preview":
+        preview_context(sp, sys.argv[3])
+    elif cmd == "write-sub":
+        write_sub(sp, sys.argv[3], sys.argv[4], str(_chapters_dir(sp)))
+    elif cmd == "finalize-chapter":
+        finalize_chapter(sp, sys.argv[3],
+                         str(_chapters_dir(sp) / sys.argv[3]),
+                         str(_report_dir(sp)))
+    elif cmd == "fidelity":
+        fidelity_check(sp, str(_chapters_dir(sp)))
+    elif cmd == "finalize-novel":
+        finalize_novel(sp, str(_chapters_dir(sp)))
+    elif cmd == "next-step":
+        next_step(sp)
+    else:
+        print(f"[错误] 未知命令: {cmd}")

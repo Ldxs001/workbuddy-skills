@@ -1,3 +1,14 @@
+## [1.13.6] - 2026-06-25
+
+### 修复
+- **[novel_workflow_engine.py] DATA_DIR 路径错误** — `SKILLS_ROOT.parent / ".standardization" / "novel-weaver" / "projects"` 多了一层 `.parent`，导致路径跳到 `.workbuddy/.standardization/` 而非 `skills/.standardization/`，造成：
+  - 帮助信息显示的默认 state 路径指向错误目录
+  - next_step 中 HARD 残留检查的 `DATA_CHAPTERS` 路径同样失效
+  - 修正为 `SKILLS_ROOT / ".standardization" / "novel-weaver" / "projects"` ✅
+- **[novel_workflow_engine.py] next_step 函数定义在 __main__ 块之后** — 导致 `next-step` 命令 NameError: name 'next_step' is not defined。函数定义已移至 `__main__` 之前。
+
+---
+
 ## [1.13.5] - 2026-06-25
 
 ### 修复
@@ -186,7 +197,7 @@
 - **finalize_chapter 绕过 pass_gate API** — 直接操作 gates dict，改为调用 `pass_gate()`。
 - **finalize_chapter 缺少逻辑检查** — 三检只跑了连通性和风格，未调用 logic_check。已补上。
 - **set_phase 不做门禁检查** — →writing 不检查 outline_causality，→stage3_ready 不检查 fidelity/ending_verify。已补上门禁检查。
-- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 wUwproject。
+- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 [username-redacted]。
 
 ### 文档
 - SKILL.md 渐进式文件索引表修正：execution_standards/hooks/license/causality_check/fidelity/character_registry 描述与实际对齐
