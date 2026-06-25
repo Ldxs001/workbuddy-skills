@@ -1,3 +1,20 @@
+## [1.13.0] - 2026-06-25
+
+### 新增
+- **篇幅系统（规划前置参数）** — `novel_state.json` 新增 `meta.length` 字段，分三档：
+  - `short`: 短篇 3-6 章
+  - `medium`: 中篇 8-10 章（默认）
+  - `long`: 长篇 11+ 章
+- **`init` 命令篇幅支持** — `init <name> [length] [num]`，不传 length 则默认 medium，按篇幅自动计算默认章数（取范围中值）
+- **`set-length` 命令** — 中途修改篇幅：`novel_state_manager.py set-length <path> short|medium|long`
+- **`next_step` 篇幅检查** — 输出篇幅信息 + 当前章数是否在范围内（不阻断，仅提示）
+
+### 架构
+- 所有旧项目（无 `meta.length` 字段）→ `next_step` 在 writing 阶段后提示设置篇幅
+- 不改变子结构规划/写作/完结流程
+
+---
+
 ## [1.12.6] - 2026-06-25
 
 ### 新增

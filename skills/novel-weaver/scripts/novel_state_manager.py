@@ -97,7 +97,30 @@ def set_signature(path, enabled, text=""):
     if not enabled_bool:
         print(f"[署名] 已关闭，LLM 不得在正文中写入任何署名/代名内容（atomic_writer 代码级阻断）")
 
-def init_project(path, project_name, num_chapters=10):
+LENGTH_RANGES = {"short": (3, 6), "medium": (8, 10), "long": (11, 99)}
+LENGTH_LABELS = {"short": "短篇(3-6章)", "medium": "中篇(8-10章)", "long": "长篇(11章+)"}
+
+def init_project(path, project_name, length="medium", num_chapters=None):
+    """
+    初始化 novel_state.json 骨架。
+    length: short/medium/long（默认 medium）
+    num_chapters: 不传则按 length 范围取中值
+    """
+    if Path(path).exists():
+        print(f"[HOOK-BLOCK] {path} 已存在，禁止重复初始化")
+        sys.exit(1)
+    if length not in LENGTH_RANGES:
+        print(f"[HOOK-BLOCK] 无效篇幅: {length}，可选: short/medium/long")
+        sys.exit(1)
+    if num_chapters is None:
+        lo, hi = LENGTH_RANGES[length]
+        num_chapters = (lo + hi) // 2
+    else:
+        num_chapters = int(num_chapters)
+        lo, hi = LENGTH_RANGES[length]
+        if num_chapters < lo or num_chapters > hi:
+            print(f"[HOOK-BLOCK] {LENGTH_LABELS[length]} 章数应在 {lo}-{hi} 之间，收到 {num_chapters}")
+            sys.exit(1)
     """
     初始化 novel_state.json 骨架。
     涵盖所有标准字段，确保格式正确。
@@ -124,7 +147,8 @@ def init_project(path, project_name, num_chapters=10):
         "created": today,
         "meta": {
             "current_phase": "stage1_init",
-            "version": "1.12.5"
+            "version": "1.12.6",
+            "length": length
         },
         "writing_style": {
             "narrative_voice": "",
@@ -142,7 +166,7 @@ def init_project(path, project_name, num_chapters=10):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[初始化] {project_name} → {path}")
-    print(f"[初始化] {num_chapters} 章骨架已创建")
+    print(f"[初始化] 篇幅: {LENGTH_LABELS.get(length, length)}（{num_chapters} 章）")
     print(f"[初始化] 当前阶段: stage1_init")
     print(f"[下一步] 设置场景配置和大纲后:")
     print(f"  python novel_causality_check.py outline <state_path>")
@@ -152,7 +176,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("用法: python novel_state_manager.py <命令> <state_path> [args...]")
         print("  命令:")
-        print("    init       <project_name> [num_chapters]  初始化新人小说")
+        print("    init       <project_name> [length] [num_chapters]  初始化新小说")
+        print("                   length: short(3-6章), medium(8-10章,默认), long(11章+)")
         print("    add-char   <name> <role> <first_appearance> [traits] [mbti] [archetype]")
         print("    update-sub <chapter> <sub_key> <word_count>")
         print("    finalize   <chapter>")
@@ -178,8 +203,18 @@ if __name__ == "__main__":
     elif cmd == "set-signature":
         text = sys.argv[4] if len(sys.argv) > 4 else ""
         set_signature(sp, sys.argv[3], text)
+    elif cmd == "set-length":
+        length = sys.argv[3]
+        data = load_state(sp)
+        if length not in LENGTH_RANGES:
+            print(f"[HOOK-BLOCK] 无效篇幅: {length}，可选: short/medium/long")
+            sys.exit(1)
+        data.setdefault("meta", {})["length"] = length
+        save_state(sp, data)
+        print(f"[篇幅] 已设为 {LENGTH_LABELS[length]}")
     elif cmd == "init":
-        num = int(sys.argv[4]) if len(sys.argv) > 4 else 10
-        init_project(sp, sys.argv[3], num)
+        length = sys.argv[4] if len(sys.argv) > 4 else "medium"
+        num = sys.argv[5] if len(sys.argv) > 5 else None
+        init_project(sp, sys.argv[3], length, num)
     else:
         print(f"[错误] 未知命令: {cmd}")

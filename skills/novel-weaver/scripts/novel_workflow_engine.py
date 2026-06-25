@@ -20,13 +20,9 @@ DATA_STATE = DATA_DIR / "novel_state.json"
 DATA_CHAPTERS = DATA_DIR / "chapters"
 DATA_REPORTS = DATA_DIR / "reports"
 
-def _chapters_dir(state_path):
-    """从 state_path 推导 chapters 目录：<project>/chapters"""
-    return Path(state_path).parent.parent / "chapters"
+LENGTH_RANGES = {"short": (3, 6), "medium": (8, 10), "long": (11, 99)}
+LENGTH_LABELS = {"short": "短篇", "medium": "中篇", "long": "长篇"}
 
-def _report_dir(state_path):
-    """从 state_path 推导 reports 目录：<project>/data/reports"""
-    return Path(state_path).parent / "reports"
 
 def _parse_ending_tag(summary: str) -> str | None:
     """从概述中解析【收尾类型: xxx】标签"""
@@ -501,8 +497,23 @@ def next_step(state_path):
 
     print(f"\n{'='*55}")
     print(f"  📋 项目: {project}")
-    print(f"  📍 当前阶段: {phase or '未初始化'}")
+    meta = data.get("meta", {})
+    length = meta.get("length", "")
+    status = phase or '未初始化'
+    if length:
+        lbl = LENGTH_LABELS.get(length, length)
+        status += f" | 篇幅: {lbl}"
+    print(f"  📍 {status}")
     print(f"{'─'*55}")
+
+    # 篇幅检查（不阻断，仅提示）
+    if length:
+        lo, hi = LENGTH_RANGES.get(length, (0, 99))
+        actual = len(chapters)
+        if actual > 0 and (actual < lo or actual > hi):
+            print(f"  ⚠️ 当前 {actual} 章, 篇幅 {length} 建议 {lo}-{hi} 章")
+    elif phase in ("writing", "stage3_ready", "complete"):
+        print(f"  ⚠️ 篇幅未设置，建议运行: python novel_state_manager.py set-length <path> <short|medium|long>")
 
     if not phase or phase in ("setup", "stage1_init"):
         print(f"  → 场景配置未完成")
