@@ -173,7 +173,10 @@ def init_project(path, project_name, length="medium", num_chapters=None):
     print(f"  python novel_pipeline_gate.py set-phase <state_path> stage1_done")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    # list-projects 不需要 state_path，优先处理
+    if len(sys.argv) >= 2 and sys.argv[1] == "list-projects":
+        cmd = "list-projects"
+    elif len(sys.argv) < 3:
         print("用法: python novel_state_manager.py <命令> <state_path> [args...]")
         print("  命令:")
         print("    init       <project_name> [length] [num_chapters]  初始化新小说")
@@ -183,11 +186,42 @@ if __name__ == "__main__":
         print("    finalize   <chapter>")
         print("    add-timeline <time_point> <event>")
         print("    set-signature <true|false> [text]")
+        print("    set-length    <short|medium|long>")
+        print("    list-projects                     列出所有已创建的项目")
+        print("    list-projects                     列出所有已创建的项目")
         print("")
         print("  示例:")
         print("    python novel_state_manager.py init <path> 我的小说 12")
         sys.exit(1)
     cmd = sys.argv[1]
+    if cmd == "list-projects":
+        SCRIPTS_DIR = Path(__file__).parent
+        scan_base = SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver"
+        found = []
+        for state_file in scan_base.rglob("novel_state.json"):
+            try:
+                d = json.loads(state_file.read_text(encoding="utf-8-sig"))
+                name = d.get("project", "?")
+                length = d.get("meta", {}).get("length", "?")
+                phase = d.get("meta", {}).get("current_phase", "?")
+                ch_count = len(d.get("chapters", []))
+                done = sum(1 for c in d.get("chapters", []) if c.get("status") == "completed")
+                found.append((str(state_file), name, length, phase, ch_count, done))
+            except Exception:
+                continue
+        if not found:
+            print("没有找到已创建的项目。")
+        else:
+            print(f"\n{'='*55}")
+            print(f"  已创建的项目 ({len(found)}):")
+            print(f"{'='*55}")
+            for path, name, length, phase, total, done in found:
+                print(f"  📖 {name}")
+                print(f"    路径: {path}")
+                print(f"    篇幅: {length} | 阶段: {phase}")
+                print(f"    章节: {done}/{total}")
+                print()
+        sys.exit(0)
     sp = sys.argv[2]
     if cmd == "add-char":
         add_char(sp, sys.argv[3], sys.argv[4], sys.argv[5],
