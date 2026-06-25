@@ -67,6 +67,7 @@ def set_phase(state_path, new_phase):
     # 门禁检查：关键阶段转换必须通过对应门禁
     if new_phase == "writing":
         require_gate(state_path, "outline_causality")
+        require_gate(state_path, "sub_causality")
     elif new_phase == "stage3_ready":
         require_gate(state_path, "fidelity")
         require_gate(state_path, "ending_verify")

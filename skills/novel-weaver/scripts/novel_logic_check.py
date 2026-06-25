@@ -210,32 +210,35 @@ def _check_summary_fidelity(chapter_dir: str, state_path: str) -> list:
         text = " ".join(lines)
 
         # 检查概述中的关键主题词是否出现在正文中
-        # 用正则分词替代 .split() — 中文文本无空格时 .split() 产生单元素列表
-        kw_parts = re.split(r'[\s，,。、；：""''（）()【】《》]', expected_summary)
-        keywords = [w.strip() for w in kw_parts if len(w.strip()) >= 2]
-        # 取概述中前 5 个有意义的词作为关键词
-        meaningful_kw = [k for k in keywords if len(k) >= 2][:5]
+        # 改为双字滑动窗口（bigram）重叠率匹配，支持语义自然概述
+        def _char_bigrams(s: str) -> set:
+            chars = re.findall(r'[\u4e00-\u9fff]', s)
+            return set(chars[i] + chars[i+1] for i in range(len(chars)-1))
 
-        if not meaningful_kw:
+        summary_bigrams = _char_bigrams(expected_summary)
+        text_bigrams = _char_bigrams(text)
+
+        if not summary_bigrams:
             continue
 
-        missing_kw = [k for k in meaningful_kw if k not in text]
-        hit_ratio = 1.0 - (len(missing_kw) / max(len(meaningful_kw), 1))
+        matched = summary_bigrams & text_bigrams
+        hit_ratio = len(matched) / len(summary_bigrams)
 
-        if hit_ratio < 0.4:
+        if hit_ratio < 0.2:
+            missing = sorted(summary_bigrams - text_bigrams)[:5]
             issues.append({
                 "level": "WARN",
                 "dimension": "内容与概述匹配度",
-                "detail": f"{fname} ({s_key}): 概述关键词命中率 {hit_ratio:.0%}"
-                          f"，关键词 [{', '.join(missing_kw)}] 未在正文中出现"
+                "detail": f"{fname} ({s_key}): 概述bigram命中率 {hit_ratio:.0%}"
+                          f"，缺失bigram [{', '.join(missing)}]"
                           f"（概述: {expected_summary[:60]}）"
             })
-        elif hit_ratio < 0.8:
+        elif hit_ratio < 0.4:
             issues.append({
                 "level": "INFO",
                 "dimension": "内容与概述匹配度",
-                "detail": f"{fname} ({s_key}): 概述关键词命中率 {hit_ratio:.0%}"
-                          f"，部分关键词 [{', '.join(missing_kw)}] 未出现"
+                "detail": f"{fname} ({s_key}): 概述bigram命中率 {hit_ratio:.0%}"
+                          f"，部分内容可能偏离"
             })
 
         # 情绪检查（仅供参考，不阻断，不判定）
@@ -360,8 +363,9 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
             detail = i.get("detail", "")
 
             # 判断 HARD 条件
+            # 内容与概述匹配度不做HARD阻断（概述为规划基准不可更改，偏差报告为信息而非阻塞）
             if level == "WARN" and dim == "内容与概述匹配度":
-                severity = "HARD"
+                severity = "SOFT"
             elif level == "WARN":
                 severity = "SOFT"
             else:

@@ -14,21 +14,37 @@ echo $SKILL_DIR/.standardization/novel-weaver/data/novel_state.json
 
 在文档中 `<state_path>` 即上述完整路径的简写。
 
+**路径缓存**：首次使用后，路径自动保存到 `.project` 文件。后续命令可省略 `<state_path>`：
+```
+python novel_workflow_engine.py finalize-chapter L02     # 从 .project 自动读路径
+python novel_workflow_engine.py plan-chapter L03 --generate  # 同上
+```
+
+查看所有项目：
+```
+python novel_workflow_engine.py list-projects
+```
+
 目录结构：
 
 ```
-<skill_install_dir>/.standardization/novel-weaver/data/
-├── novel_state.json        # 全局状态（单源真理）
-├── reports/                # 检查报告输出
-├── .workbuddy/
-│   └── gate_state.json     # 门禁状态（自动管理）
-├── chapters/
-│   ├── L01/
-│   │   ├── S01.txt
-│   │   ├── S02.txt
-│   │   └── ...
-│   ├── L02/
-│   └── ...
+<skill_install_dir>/.standardization/novel-weaver/
+├── .project                    # 当前项目路径缓存
+├── projects/
+│   └── <project_name>/
+│       ├── data/
+│       │   ├── novel_state.json    # 单源真理（含MD5指纹保护）
+│       │   ├── .state_fingerprint.txt  # 规划字段指纹
+│       │   ├── .workbuddy/
+│       │   │   └── gate_state.json # 门禁状态（自动管理）
+│       │   └── reports/            # 检查报告输出
+│       └── chapters/               # 写作内容
+│           ├── L01/
+│           │   ├── S01.txt
+│           │   ├── S02.txt
+│           │   └── ...
+│           ├── L02/
+│           └── ...
 ```
 
 脚本路径假设在 `~/.workbuddy/skills/novel-weaver/scripts/`，实际以安装位置为准。

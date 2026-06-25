@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.13.6
+version: 1.15.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -25,14 +25,15 @@ external_data_dir: true
 
 ## 约束
 
-- 🔴 **[强制] 流程门禁系统** — 每步完成后自动记录到 `novel_state.json` 的 `pipeline` 字段。`set-phase` 在 phase 转换前检查前置门禁，未通过则阻断。`novel_pipeline_gate.py status` 查看状态
+- 🔴 **[强制] 流程门禁系统** — 阶段转换时 `set-phase` 自动检查前置门禁，未通过则阻断。门禁状态存于 `.workbuddy/gate_state.json`。`novel_pipeline_gate.py status` 查看状态
+- 🔴 **[强制] 核心规划字段保护** — `novel_state_manager.py` 对 `chapters[].title/overview`、`sub_structures[].title/summary/tone`、`characters[].name/role/traits/mbti/archetype`、`novel_info/writing_style/setting` 做 MD5 指纹校验，**LLM 不可修改**。仅 `word_count/status/timeline/notes` 等运行时字段可变更
 - **[必须] 先确认再写作** — 场景配置和大纲必须经用户确认后才能进入写作阶段
 - **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `novel_causality_check.py sub-structure`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
 - **[必须] 每章四检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
 - **[必须] 全文三检** — 全文完成后必须：`novel_fidelity.py`（大纲忠实度）+ `verify-ending`（结尾收束验证）+ `set-phase stage3_ready`
-- **[必须] 阶段门禁** — `set-phase` 在 →writing（检查 outline_causality 门禁）和 →stage3_ready（检查 fidelity + ending_verify 门禁）时自动调用 `novel_pipeline_gate.py require` 阻断
+- **[必须] 阶段门禁** — `set-phase` 在 →writing（检查 outline_causality + sub_causality 门禁）和 →stage3_ready（检查 fidelity + ending_verify 门禁）时自动调用 `novel_pipeline_gate.py require` 阻断
 
 ## 触发条件
 
@@ -88,10 +89,18 @@ external_data_dir: true
 | `scripts/novel_character_registry.py` | 角色登记（已弃用） | 被 `novel_state_manager.py add-char` 取代，保留兼容 | 无 |
 | `scripts/novel_fidelity.py` | 忠实度检查 | 大纲忠实度报告 + `verify-ending` 结尾收束验证（封闭式/开放式/悬停式） | 无 |
 | `scripts/novel_logic_check.py` | 逻辑检查 | 内容逻辑一致性校验（人物/时间线/概述匹配） | 无 |
+| `scripts/_path_utils.py` | 路径工具 | 中文路径编码修复 + `.project` 缓存 + `list-projects` | 无 |
 | `scripts/novel_timeline.py` | 时间线 | `add`/`list` 时间事件登记 | 无 |
 ## 工作流程
 
 > 完整 CLI 示例见 `references/examples.md`。任何时候不知道下一步该做什么，运行 `next-step`。
+> 
+> **路径缓存**：首次指定 `state_path` 后自动缓存到 `.project`，后续命令可省略路径参数。
+> 如只有一个项目，会自动选择。
+> 
+> **核心字段保护**：plan-chapter 注册子结构后，所有规划字段（title/overview/summary/tone/
+> 角色核心信息/writing_style）被 MD5 指纹锁定，LLM 无法修改。仅 word_count/status/timeline/
+> notes 可变更。违规操作被 HOOK-BLOCK 阻断。
 
 ### 阶段1：场景配置与大纲
 
@@ -99,11 +108,11 @@ external_data_dir: true
 
 1. LLM生成完整场景配置（人物/时代/地点/风土人情/核心冲突）
 2. LLM生成一级大纲（L01-L15 编号 + 标题 + 每章模糊概述）
-3. **因果链验证**
+3. **因果链验证**（自动 pass outline_causality 门禁）
    ```
    python novel_causality_check.py outline <state_path>
    ```
-   逐链节检查 L01→L02→…L15 的章概述因果递进（关键词重叠分析）。全部 PASS 后才可进入下一步。
+   逐链节检查 L01→L02→…L15 的章概述因果递进（关键词重叠分析）。全部 PASS 后自动标记 `outline_causality` 门禁。
 4. 输出给用户确认
 5. 钩子：用户确认/修正（阻断式）→ 未确认不得进入阶段2
 6. 输出：初始化 novel_state.json（chapters / characters / timeline）
@@ -115,26 +124,29 @@ external_data_dir: true
 
 输入：当前一级标题 + 模糊概述
 
-0. **不确定下一步？**
+0. **查看项目列表或生成子结构JSON模板**
    ```
-   python novel_workflow_engine.py next-step <state_path>
+   python novel_workflow_engine.py list-projects                                        # 列出所有项目
+   python novel_workflow_engine.py plan-chapter <state_path> <chapter> --generate       # 生成子结构JSON模板
    ```
-   自动检测当前阶段和进度，输出下一步应执行的命令。
 
 1. **子结构先行规划**
    a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + tone + 可选 emotions）
-   b. **注册到 state**
+      也可用 `--generate` 获取 JSON 模板后填写。
+   b. **注册到 state**（自动记录核心字段指纹）
       ```
       python novel_workflow_engine.py plan-chapter <state_path> <chapter> '<subs_json>'
       ```
       自动校验每条概述 ≥12 有效字符（由 novel_causality_check.py 完成，不达标则阻断）。自动标记末章末子结构 `is_ending`、非末章末子结构 `is_hook_possible`。
-   c. **子结构因果链验证**
+      首次 plan-chapter 后，规划字段被 MD5 指纹锁定不可更改。
+   c. **子结构因果链验证**（自动 pass sub_causality 门禁）
       ```
       python novel_causality_check.py sub-structure <state_path> <chapter>
       ```
    d. ```
       python novel_pipeline_gate.py set-phase <state_path> writing
       ```
+      注：set-phase → writing 同时 require outline_causality + sub_causality。
 
 2. **逐子结构写作循环**
    a. **加载命题指令**
@@ -151,6 +163,7 @@ external_data_dir: true
       EOF
       ```
       atomic_writer 代码级校验：标题格式、正文非空、无标记行、无元注释、**署名检测**（signature=off 时阻断）。
+      写入后自动检查字数：短篇子结构建议 1,000-1,500 字，中篇 1,500-2,000 字，长篇 2,000-4,000 字。低于下限打印 WARN。
 
    c. 重复 a-b 直到该章所有子结构完成。
 
@@ -158,7 +171,7 @@ external_data_dir: true
    ```
    python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
    ```
-   聚合运行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查。
+   聚合运行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查（内容与概述匹配度仅 SOFT 不阻断）。
    ✅ 全部通过 → 标记 `chapter_finalized:L##` 门禁。
    ❌ 有 HARD 问题 → 阻断，写入 `_{chapter}_fixes.json`，修复后重跑。
 

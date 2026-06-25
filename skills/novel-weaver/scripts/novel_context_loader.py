@@ -298,6 +298,18 @@ def load_context(state_path, chapter, sub_key):
         print(f"  提示: 以上为命题约束，不可偏离")
         print(f"{'='*50}\n")
 
+    # ── 🚀 下一步命令提示 ──
+    print(f"\n{'='*50}")
+    print(f"🚀 下一步 - 写入命令")
+    print(f"{'='*50}")
+    print(f"  # 将以下内容通过 stdin 管道写入:")
+    print(f"  cat <<'EOF' | python novel_workflow_engine.py write-sub \\")
+    print(f"    \"{state_path}\" {chapter} {sub_key}")
+    print(f"  L{chapter[1:]} · S{sub_key[1:]}\u300a{subs[sub_key].get('title','')}\u300b")
+    print(f"  ...正文内容...")
+    print(f"  EOF")
+    print(f"{'='*50}\n")
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("用法: python novel_context_loader.py <state_path> <chapter> <sub_key>")

@@ -8,15 +8,127 @@ update-sub 命令特点（即时标记）：
   - 不接受批量/延迟模式调用
   - 记录实际字数和完成时间
 """
-import json, sys
+import json, sys, hashlib
 from pathlib import Path
 from datetime import datetime
+
+# ── 核心规划字段保护 ──
+# 这些字段一旦写入即不可修改（仅 status/word_count 等运行字段可变更）
+IMMUTABLE_SCOPE = {
+    "chapters": {"id", "title", "overview"},
+    "sub_structures": {"title", "summary", "tone"},
+    "characters": {"name", "role", "traits", "mbti", "archetype"},
+    "top_level": {"project", "novel_info", "writing_style", "setting", "technical_notes"},
+}
+
+def _fingerprint(data: dict) -> str:
+    """提取规划字段的指纹（剔除动态字段）"""
+    parts = []
+    # 顶层不可变
+    for key in IMMUTABLE_SCOPE.get("top_level", set()):
+        val = data.get(key)
+        if val is not None:
+            parts.append(json.dumps({key: val}, sort_keys=True, ensure_ascii=False))
+    # 章节
+    for ch in data.get("chapters", []):
+        ch_id = ch.get("id", "")
+        for f in IMMUTABLE_SCOPE["chapters"]:
+            parts.append(f"{ch_id}.{f}={ch.get(f,'')}")
+        # 子结构
+        for sk, sv in sorted(ch.get("sub_structures", {}).items()):
+            for f in IMMUTABLE_SCOPE["sub_structures"]:
+                parts.append(f"{ch_id}.{sk}.{f}={sv.get(f,'')}")
+    # 角色
+    for c in data.get("characters", []):
+        for f in IMMUTABLE_SCOPE["characters"]:
+            parts.append(f"char.{c.get('name','')}.{f}={json.dumps(c.get(f,''), ensure_ascii=False)}")
+    return hashlib.md5("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _fingerprint_path(path: str) -> Path:
+    p = Path(path)
+    return p.parent / ".state_fingerprint.txt"
+
 
 def load_state(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
-def save_state(path, data):
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_state(path, data, caller="auto"):
+    """保存 state 并验证核心规划字段完整性"""
+    state_file = Path(path)
+    old_data = None
+    if state_file.exists():
+        old_data = json.loads(state_file.read_text(encoding="utf-8-sig"))
+
+    # ── 核心字段完整性保护 ──
+    fp_path = _fingerprint_path(path)
+    if fp_path.exists():
+        expected_fp = fp_path.read_text(encoding="utf-8").strip()
+        current_fp = _fingerprint(data)
+        if current_fp != expected_fp:
+            print(f"[HOOK-BLOCK] 核心规划字段被非法修改！指纹不匹配")
+            print(f"  允许修改的字段: word_count, status, continuity_notes, style_check_notes, timeline")
+            print(f"  禁止修改: title, overview, summary, tone, 角色核心信息, novel_info, writing_style, setting")
+            print(f"  来源: {caller}")
+            # 恢复旧数据中的运行时字段到新数据
+            if old_data is not None:
+                _merge_runtime_fields(data, old_data)
+                new_fp = _fingerprint(data)
+                if new_fp == expected_fp:
+                    print(f"  [自动修复] 运行时字段已合并，指纹恢复")
+                else:
+                    print(f"  [HOOK-BLOCK] 无法自动修复，拒绝写入。指纹仍不匹配")
+                    print(f"  期望: {expected_fp}")
+                    print(f"  实际: {new_fp}")
+                    sys.exit(1)
+
+    # 首次写入时记录指纹（仅当至少有子结构注册完成，由 plan-chapter 触发）
+    if (not fp_path.exists() and old_data is not None 
+        and any(ch.get("sub_structures") for ch in old_data.get("chapters", []))):
+        fp_path.parent.mkdir(parents=True, exist_ok=True)
+        sub_count = sum(len(ch.get("sub_structures", {})) for ch in old_data.get("chapters", []))
+        fp_path.write_text(_fingerprint(old_data), encoding="utf-8")
+        print(f"  [指纹] 已记录核心规划字段指纹（{sub_count} 个子结构）")
+
+    state_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _merge_runtime_fields(new_data: dict, old_data: dict):
+    """将旧数据的运行时字段合并到新数据，修复指纹"""
+    # 1) 结构清理：删除新数据中多余的章节/子结构
+    old_ch_ids = {ch["id"] for ch in old_data.get("chapters", [])}
+    new_data["chapters"] = [ch for ch in new_data.get("chapters", []) if ch["id"] in old_ch_ids]
+
+    # 2) 合并运行时字段
+    for new_ch in new_data.get("chapters", []):
+        for old_ch in old_data.get("chapters", []):
+            if new_ch["id"] != old_ch["id"]:
+                continue
+            new_ch["word_count"] = old_ch.get("word_count", 0)
+            new_ch["status"] = old_ch.get("status", "pending")
+            new_ch["continuity_notes"] = old_ch.get("continuity_notes", [])
+            new_ch["style_check_notes"] = old_ch.get("style_check_notes", [])
+            # 子结构: 还原规划字段 + 保留运行时字段
+            old_subs = old_ch.get("sub_structures", {})
+            if old_subs:
+                for sk, sv in new_ch.get("sub_structures", {}).items():
+                    old_sv = old_subs.get(sk)
+                    if old_sv is None:
+                        # 新数据中的多余子结构 → 删除
+                        continue
+                    sv["word_count"] = old_sv.get("word_count", 0)
+                    sv["status"] = old_sv.get("status", "pending")
+                # 删除不在 old_subs 中的子结构
+                new_ch["sub_structures"] = {k: v for k, v in new_ch.get("sub_structures", {}).items() if k in old_subs}
+            break
+    # 3) 元数据
+    new_data["meta"] = old_data.get("meta", {})
+    # 4) 时间线
+    if "timeline" in old_data:
+        new_data["timeline"] = old_data["timeline"]
+    # 5) 签名
+    if "signature" in old_data:
+        new_data["signature"] = old_data["signature"]
 
 def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype=""):
     data = load_state(path)
@@ -28,7 +140,7 @@ def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archet
             if traits: c["traits"] = [t.strip() for t in traits.split(",")]
             if mbti: c["mbti"] = mbti
             if archetype: c["archetype"] = archetype
-            save_state(path, data)
+            save_state(path, data, caller="add-char")
             print(f"[角色更新] {name} (MBTI={mbti or '无'}, 原型={archetype or '无'})")
             return
     entry = {"name": name, "role": role_attr, "first_appearance": first_appearance}
@@ -40,7 +152,7 @@ def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archet
         entry["archetype"] = archetype
     chars.append(entry)
     data["characters"] = chars
-    save_state(path, data)
+    save_state(path, data, caller="add-char")
     print(f"[角色新增] {name} (出场: {first_appearance}, MBTI={mbti or '无'}, 原型={archetype or '无'})")
 
 def update_sub(path, chapter, sub_key, word_count):
@@ -62,7 +174,7 @@ def update_sub(path, chapter, sub_key, word_count):
         # 更新章总字数（减去旧字数+新字数）
         ch["word_count"] = ch.get("word_count", 0) - prev_wc + int(word_count)
         break
-    save_state(path, data)
+    save_state(path, data, caller="update-sub")
     print(f"[SUB-COMPLETE] {chapter}{sub_key}: {word_count}字, status=completed")
 
 def finalize_chapter(path, chapter):
@@ -71,7 +183,7 @@ def finalize_chapter(path, chapter):
         if ch["id"] == chapter:
             ch["status"] = "completed"
             break
-    save_state(path, data)
+    save_state(path, data, caller="finalize-chapter")
     print(f"[章节] {chapter} [OK] 完成")
 
 def add_timeline(path, time_point, event):
@@ -79,7 +191,7 @@ def add_timeline(path, time_point, event):
     tl = data.get("timeline", [])
     tl.append({"event": event, "time_point": time_point})
     data["timeline"] = tl
-    save_state(path, data)
+    save_state(path, data, caller="add-timeline")
     print(f"[时间线] {time_point}: {event}")
 
 def set_signature(path, enabled, text=""):
@@ -87,7 +199,7 @@ def set_signature(path, enabled, text=""):
     data = load_state(path)
     enabled_bool = enabled.lower() in ("true", "1", "yes")
     data["signature"] = {"enabled": enabled_bool, "text": text}
-    save_state(path, data)
+    save_state(path, data, caller="set-signature")
     status = "开" if enabled_bool else "关"
     print(f"[署名] signature.enabled={enabled_bool} ({status})")
     if enabled_bool and text:
@@ -250,7 +362,7 @@ if __name__ == "__main__":
             print(f"[HOOK-BLOCK] 无效篇幅: {length}，可选: short/medium/long")
             sys.exit(1)
         data.setdefault("meta", {})["length"] = length
-        save_state(sp, data)
+        save_state(sp, data, caller="set-length")
         print(f"[篇幅] 已设为 {LENGTH_LABELS[length]}")
     elif cmd == "init":
         # sys.argv[2] = 项目名（可含路径）; sys.argv[3] = 显示名; [4]=length; [5]=num

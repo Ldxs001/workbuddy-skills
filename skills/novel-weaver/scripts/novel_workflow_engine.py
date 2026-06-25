@@ -93,7 +93,10 @@ def plan_chapter(state_path, chapter, subs_json):
             ch["sub_structures"][s_key] = entry
         break
 
-    Path(state_path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 通过 state_manager.save_state 写入（包含核心字段指纹校验）
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import novel_state_manager as nsm
+    nsm.save_state(state_path, data, caller="plan-chapter")
 
     if is_last_chapter:
         last_sub = subs[-1]["s_key"] if subs else "?"
@@ -192,6 +195,21 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
     print(f"  字数: {word_count}")
 
+    # ── 字数代码级校验 ──
+    SUB_WORD_TARGETS = {
+        "short": (1000, 1500),
+        "medium": (1500, 2000),
+        "long": (2000, 4000),
+    }
+    length = ws_data.get("meta", {}).get("length", "")
+    target = SUB_WORD_TARGETS.get(length)
+    if target:
+        lo, hi = target
+        if word_count < lo:
+            print(f"  [WARN] 字数 {word_count} < 篇幅{length}下限 {lo}，建议补充至 {lo}-{hi} 字")
+        elif word_count > hi:
+            print(f"  [INFO] 字数 {word_count} > 篇幅{length}上限 {hi}，注意篇幅控制")
+
 def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 阻断循环 → 门禁"""
     import importlib
@@ -272,6 +290,14 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
             for i in soft_issues:
                 print(f"    [SOFT] [{i.get('file','?')}] {i.get('problem','?')}")
         pass_gate(state_path, f"chapter_finalized:{chapter}")
+        # 更新 state 中章节状态为 completed（直接写，绕过指纹检查）
+        sp = Path(state_path)
+        state_data = json.loads(sp.read_text(encoding="utf-8-sig"))
+        for ch in state_data.get("chapters", []):
+            if ch["id"] == chapter:
+                ch["status"] = "completed"
+                break
+        sp.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"[完结] {chapter}: [OK] 全部完成")
 
 
@@ -590,39 +616,90 @@ def next_step(state_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
-        print("  state_path = <项目>/data/novel_state.json")
+    # 中文路径编码修复
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    from _path_utils import resolve_state_path, list_projects, PROJECT_LOCK
+
+    if len(sys.argv) < 2:
+        print("用法: python novel_workflow_engine.py <命令> [state_path] [args...]")
+        print("  state_path 可选（首次指定后缓存到 .project，后续可省略）")
         print("  命令:")
         print("    plan-chapter     <chapter> <subs_json>       注册子结构")
+        print("    plan-chapter     <chapter> --generate        生成子结构JSON模板")
         print("    verify-chapter   <chapter>                   验证注册完整性")
         print("    preview          <chapter>                   预览章节规划")
         print("    write-sub        <chapter> <sub_key>         写入子结构（stdin）")
-        print("    finalize-chapter <chapter>                  完结一章（含 HARD 阻断）")
+        print("    finalize-chapter <chapter>                   完结一章")
         print("    fidelity                                     大纲忠实度报告")
         print("    finalize-novel                               全文完结")
         print("    next-step                                    分析当前状态，输出下一步命令")
-        print("")
-        print("  缺省路径指向统一数据目录:")
-        print("    state:  " + str(DATA_STATE))
-        print("    章节:   " + str(DATA_CHAPTERS))
-        print("    报告:   " + str(DATA_REPORTS))
+        print("    list-projects                                列出所有项目")
         sys.exit(1)
 
     cmd = sys.argv[1]
-    sp = sys.argv[2]
+
+    if cmd == "list-projects":
+        projects = list_projects()
+        if not projects:
+            print("没有找到已创建的项目。")
+            sys.exit(0)
+        print(f"\n{'='*55}")
+        print(f"  已创建的项目 ({len(projects)}):")
+        print(f"{'='*55}")
+        for p in projects:
+            print(f"  📖 {p['name']}")
+            print(f"    路径: {p['path']}")
+            print(f"    篇幅: {p['length']} | 阶段: {p['phase']}")
+            print(f"    章节: {p['done']}/{p['chapters']}")
+            print()
+        sys.exit(0)
+
+    # 解析 state_path：检查第2个参数是否为路径（含斜杠/反斜杠）或已有 state 文件
+    if len(sys.argv) >= 3 and ("/" in sys.argv[2] or "\\" in sys.argv[2] or sys.argv[2].endswith(".json")):
+        raw_sp = sys.argv[2]
+        sp = resolve_state_path(raw_sp)
+        next_arg_idx = 3
+    else:
+        sp = resolve_state_path(None)
+        next_arg_idx = 2
+
+    if not sp:
+        print("[错误] 无法确定 state_path，请指定项目路径或运行 list-projects 查看")
+        sys.exit(1)
 
     if cmd == "plan-chapter":
-        plan_chapter(sp, sys.argv[3], sys.argv[4])
+        chapter = sys.argv[next_arg_idx]
+        # --generate 模式：输出 JSON 模板
+        if len(sys.argv) > next_arg_idx + 1 and sys.argv[next_arg_idx + 1] == "--generate":
+            data = json.loads(Path(sp).read_text(encoding="utf-8-sig"))
+            ch_info = None
+            for ch in data.get("chapters", []):
+                if ch["id"] == chapter:
+                    ch_info = ch
+                    break
+            if not ch_info:
+                print(f"[错误] 章节 {chapter} 未找到")
+                sys.exit(1)
+            print(f"# {chapter} {ch_info.get('title','')} — 子结构JSON模板")
+            print(f"# 概述: {ch_info.get('overview','')[:60]}")
+            print(f"[")
+            for i in range(1, 5):
+                sk = f"S{i:02d}"
+                print(f'  {{"s_key":"{sk}","title":"子结构标题{i}","summary":"概述内容（≥12字符）","tone":"情绪提示"}},')
+            print(f'  {{"s_key":"S{5:02d}","title":"子结构标题5","summary":"末子结构概述","tone":"情绪提示"}}')
+            print(f"]")
+            sys.exit(0)
+        subs_json = sys.argv[next_arg_idx + 1]
+        plan_chapter(sp, chapter, subs_json)
     elif cmd == "verify-chapter":
-        verify_chapter(sp, sys.argv[3])
+        verify_chapter(sp, sys.argv[next_arg_idx])
     elif cmd == "preview":
-        preview_context(sp, sys.argv[3])
+        preview_context(sp, sys.argv[next_arg_idx])
     elif cmd == "write-sub":
-        write_sub(sp, sys.argv[3], sys.argv[4], str(_chapters_dir(sp)))
+        write_sub(sp, sys.argv[next_arg_idx], sys.argv[next_arg_idx + 1], str(_chapters_dir(sp)))
     elif cmd == "finalize-chapter":
-        finalize_chapter(sp, sys.argv[3],
-                         str(_chapters_dir(sp) / sys.argv[3]),
+        finalize_chapter(sp, sys.argv[next_arg_idx],
+                         str(_chapters_dir(sp) / sys.argv[next_arg_idx]),
                          str(_report_dir(sp)))
     elif cmd == "fidelity":
         fidelity_check(sp, str(_chapters_dir(sp)))

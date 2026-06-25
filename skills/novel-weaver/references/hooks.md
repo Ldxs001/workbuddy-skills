@@ -29,8 +29,8 @@
 
 | 门禁 | 在读什么 | 由谁 pass | 被谁 require | 阻断后果 |
 |------|---------|-----------|-------------|---------|
-| `outline_causality` | 章概述因果链 | 手动（代码未自动标记） | set-phase → writing | LLM 无法开始写作 |
-| `sub_causality:L##` | 子结构因果链 | 手动（代码未自动标记） | — | 间接阻断 |
+| `outline_causality` | 章概述因果链 | novel_causality_check.py outline（自动） | set-phase → writing | LLM 无法开始写作 |
+| `sub_causality` | 子结构因果链 | novel_causality_check.py sub-structure（自动） | set-phase → writing | LLM 无法开始写作 |
 | `chapter_finalized:L##` | 章完结检查 | finalize-chapter（HARD全过时） | — | 不阻断 phase，只标记完成 |
 | `fidelity` | 大纲忠实度 | novel_fidelity.py generate-report | set-phase → stage3_ready | LLM 无法推进到完结阶段 |
 | `ending_verify` | 结尾收束验证 | novel_fidelity.py verify-ending | set-phase → stage3_ready | LLM 无法推进到完结阶段 |

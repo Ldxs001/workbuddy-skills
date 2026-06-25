@@ -8,6 +8,12 @@ from pathlib import Path
 
 MIN_SUMMARY_CHARS = 12
 
+# 门禁映射: mode → gate name
+GATE_MAP = {
+    "outline": "outline_causality",
+    "sub-structure": "sub_causality",
+}
+
 def check_causality(state_path, mode, chapter=None):
     data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
     issues = []
@@ -55,6 +61,17 @@ def check_causality(state_path, mode, chapter=None):
     print(f"[因果链验证] {mode_label}")
     if not issues:
         print(f"  [OK] 全部通过")
+        # 自动 pass 对应门禁
+        gate_name = GATE_MAP.get(mode)
+        if gate_name:
+            try:
+                # 动态导入避免循环依赖
+                import importlib
+                pg = importlib.import_module("novel_pipeline_gate")
+                pg.pass_gate(state_path, gate_name)
+                print(f"  [门禁自动] {gate_name} [OK] PASS")
+            except Exception as e:
+                print(f"  [门禁自动] {gate_name} [SKIP] {e}")
     else:
         for issue in issues:
             print(f"  [FAIL] [{issue.get('chapter','')} {issue.get('sub','')}] {issue['type']}: {issue['desc']}")

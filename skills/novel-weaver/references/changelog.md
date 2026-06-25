@@ -1,3 +1,24 @@
+## [1.15.0] - 2026-06-25
+
+### 新增
+- **[novel_state_manager.py] 核心规划字段保护** — 新增 `_fingerprint()` 指纹校验，首次 plan-chapter 后锁定以下字段：章节 title/overview、子结构 title/summary/tone、角色 name/role/traits/mbti/archetype、novel_info/writing_style/setting。任何非法修改被阻断并打印来源。运行时字段（word_count, status, timeline, continuity_notes）不受影响
+- **[novel_workflow_engine.py] plan-chapter --generate 模式** — `python novel_workflow_engine.py plan-chapter <state> <L##> --generate` 输出子结构 JSON 模板供 LLM 填写
+- **[novel_workflow_engine.py] 字数代码级校验** — write-sub 写入后根据篇幅(short/medium/long)检查每子结构字数是否达到下限，低于目标打印 WARN
+- **[novel_workflow_engine.py] list-projects 集成** — 新增 `list-projects` 命令，列出所有项目名称/路径/阶段/章节进度
+- **[_path_utils.py] 中文路径编码修复** — 新增路径解析模块，通过.resolve() + .project 缓存机制，后续命令无需反复传路径
+
+### 修复
+- **[novel_logic_check.py] 概述匹配度不再HARD阻断** — 概述为写作前规划的基准文件，一旦确认不可更改。内容与概述的偏离仅做信息性标记(SOFT)，不阻塞finalize-chapter
+
+## [1.14.0] - 2026-06-25
+
+### 修复
+- **[novel_logic_check.py] 关键词匹配算法改用bigram重叠率** — 旧算法将概述按标点切段后要求整段逐字出现在正文，导致语义概述永远无法通过HARD检查。改用`2字滑动窗口(bigram)重叠率`匹配，语义自然概述即可正常通行。阈值：WARN=<20%, INFO=<40%
+- **[novel_logic_check.py] 概述匹配度不再HARD阻断** — 概述为写作前规划的基准文件，一旦确认不可更改。内容与概述的偏离仅做信息性标记(SOFT)，不阻塞finalize-chapter。偏差信息写入reports供参考
+- **[novel_causality_check.py] 检查通过后自动pass门禁** — outline/sub-structure检查全部通过后自动调用`pass_gate()`，消除手动pass_outline_causality/sub_causality门禁的步骤
+- **[novel_pipeline_gate.py] set-phase writing增加sub_causality检查** — 转换到writing阶段时除了require outline_causality，现在也require sub_causality
+- **[novel_context_loader.py] 末尾输出write-sub命令** — 每个子结构上下文加载后，自动输出下步应执行的完整`write-sub`管道命令
+
 ## [1.13.6] - 2026-06-25
 
 ### 修复
