@@ -1,13 +1,13 @@
 ---
 name: novel-weaver
-version: 1.15.1
+version: 1.16.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-data_dir: ../.standardization/novel-weaver/data
+data_dir: ../.standardization/novel-weaver/projects
 tags: ['novel', 'writing', 'story', 'outline', 'scene-setting', 'character', 'personality', 'emotion', 'writing-style', 'narrative', 'workflow']
 trigger: 写小说/写故事/写文章/长文写作/故事大纲/场景配置/我想写个故事
 trigger_negative: 翻译/改写/润色/校对/简洁回答/做PPT/画图
@@ -33,6 +33,21 @@ external_data_dir: true
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
 - **[必须] 每章四检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
 - **[必须] 全文三检** — 全文完成后必须：`novel_fidelity.py`（大纲忠实度）+ `verify-ending`（结尾收束验证）+ `set-phase stage3_ready`
+
+## 数据目录
+
+项目文件存放在标准化路径下，**LLM 不得猜测路径，必须从这读**：
+
+```
+~/.workbuddy/skills/.standardization/novel-weaver/projects/<项目名>/
+├── data/novel_state.json          ← 状态文件（章节/角色/时间线）
+├── data/.workbuddy/gate_state.json ← 门禁状态
+├── data/reports/                   ← 检查报告
+├── chapters/L##/S##.txt          ← 章节正文（每子结构一个文件）
+└── .project                       ← 路径缓存
+```
+
+代码路径计算在 `scripts/_path_utils.py`，`SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"`。
 
 ## 触发条件
 
