@@ -132,21 +132,26 @@ L10S04
 python novel_workflow_engine.py finalize-chapter <state_path> <ch_key> <chapter_dir> <report_dir>
 ```
 
-此命令自动执行：连通性检查 → 风格校验 → 逻辑检查 → phase→chapter_done
+此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
 
-## 一键完结篇章（v1.2 新增）
+## 一键完结篇章（v1.9.0 质量闭环）
 
-代替手动依次调用 continuity → style → logic → set-phase 的繁琐流程：
+代替手动依次调用各检查器的繁琐流程。内部执行 4 步检查 + 1 步阻断决策：
 
 ```
-python novel_workflow_engine.py finalize-chapter <path> <L##> <chapter_dir> <data/reports/>
+章内连通性    → 检查子结构间时间/角色断链     → HARD: 双断裂阻断
+跨章承诺链    → 检查上章尾 vs 下章头关键词续接 → SOFT: 仅建议
+风格校验      → 检查禁用词/末行编号/行数       → HARD: 发现问题阻断
+逻辑检查      → 检查角色+时间线+概述忠实度     → HARD: 关键词命中<30%阻断
+    ↓
+聚合决策：有 HARD 问题 → 写入 _fixes.json → 阻断
+         全部通过      → 标记门禁 → phase → chapter_done
 ```
 
 输出：
-- `data/reports/continuity_L##.md`
-- `data/reports/style_L##.md`
-- `data/reports/logic_L##.md`
-- phase → chapter_done
+- `data/reports/logic_L##.md` — 逻辑一致性报告
+- `data/chapters/L##/_L##_fixes.json` — 修复指引（仅 HARD 阻断时生成）
+- phase → chapter_done（仅全部通过时）
 
 ## 时间线追踪
 

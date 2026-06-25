@@ -21,8 +21,8 @@
 | 时间线记录 | 每章完成后 | 阻断式+阶段门禁 | novel_timeline.py add（需 phase≥stage1_done） | `scripts/novel_timeline.py` |
 | 连通性补充 | 子结构/章节完成后 | 阻断式+阶段门禁+auto-fix | novel_continuity.py generate（需 phase≥writing），--auto-fix 生成 `_transitions.json` | `scripts/novel_continuity.py` |
 | 风格一致性校验 | 每章完成后 | 自动式+阶段门禁 | novel_style_check.py（需 phase≥writing） | `scripts/novel_style_check.py` |
-| 逻辑一致性检查 | 每章完成后 | 自动式+阶段门禁+auto-fix | novel_logic_check.py（人物行为/时间线/内容匹配度），--auto-fix 生成 `_fixes.json` | `scripts/novel_logic_check.py` |
-| 一键完结章节 | 全部检查后 | 编排式+门禁 | novel_workflow_engine.py finalize-chapter → cont+style+logic+pass chapter_finalized:L## | `scripts/novel_workflow_engine.py` |
+| 逻辑一致性检查 | 每章完成后 | 自动式+阶段门禁+auto-fix | novel_logic_check.py（人物行为/时间线/内容匹配度） | `scripts/novel_logic_check.py` |
+| 一键完结章节 | 全部检查后 | **编排式+门禁+HARD阻断循环** | novel_workflow_engine.py finalize-chapter → 章内连通性+跨章承诺链+风格+逻辑 → HARD阻断决策：有HARD问题则写入`_{chapter}_fixes.json`并阻断，不标记门禁；全部通过才pass `chapter_finalized:L##` | `scripts/novel_workflow_engine.py` |
 | 大纲忠实度报告 | 全文完成后 | 自动式+阶段门禁+门禁 | novel_fidelity.py（需 phase≥stage3_ready）→ PASS 时自动 pass fidelity 门禁 | `scripts/novel_fidelity.py` |
 
 ## 门禁点列表（有序、不可逆）

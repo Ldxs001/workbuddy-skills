@@ -82,11 +82,11 @@ $ python ~/.workbuddy/skills/novel-weaver/scripts/novel_state_manager.py \
 $ python ~/.workbuddy/skills/novel-weaver/scripts/novel_workflow_engine.py \
     finalize-chapter ./my-novel/data/novel_state.json L01 \
     ./my-novel/chapters/01_觉醒/ ./my-novel/data/reports/
-[1/3] 连通性检查... 
-[2/3] 风格校验... 
-[3/3] 逻辑检查... 
-✅ phase → chapter_done
-✅ pipeline gate: chapter_finalized:L01 PASS
+[完结] 章内连续性检查...     [OK] 全部通过
+[完结] 跨章承诺链检查...     [OK] 全部通过
+[完结] 风格校验...           [OK] 无问题
+[完结] 逻辑检查...           [OK] 通过
+✅ [完结] L01: 全部检查通过 → chapter_finalized:L01 PASS
 ```
 
 ## 场景2：续写已有小说

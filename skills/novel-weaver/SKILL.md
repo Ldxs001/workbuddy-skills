@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.9.0
+version: 1.10.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -8,7 +8,7 @@ sensitive_access: false
 critical_write: false
 permission_weight: LOW
 data_dir: ../.standardization/novel-weaver/data
-tags: ['novel', 'writing', 'story', 'outline', 'scene-setting', 'character', 'narrative', 'workflow']
+tags: ['novel', 'writing', 'story', 'outline', 'scene-setting', 'character', 'personality', 'emotion', 'writing-style', 'narrative', 'workflow']
 trigger: 写小说/写故事/写文章/长文写作/故事大纲/场景配置/我想写个故事
 trigger_negative: 翻译/改写/润色/校对/简洁回答/做PPT/画图
 h1_position: true
@@ -30,9 +30,9 @@ external_data_dir: true
 - **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `novel_causality_check.py sub-structure`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
-- **[必须] 每章三检** — 完成后必须运行：连通性检查（novel_continuity.py）、风格校验（novel_style_check.py）、逻辑检查（novel_logic_check.py），然后 `novel_workflow_engine.py finalize-chapter` 推进 phase
-- **[必须] 全文两检** — 全文完成后必须 `novel_fidelity.py`（大纲忠实度）+ `set-phase stage3_ready`
-- **[必须] 阶段门禁** — `set-phase` 在 →writing（检查 outline_causality 门禁）和 →stage3_ready（检查 fidelity 门禁）时自动调用 `novel_pipeline_gate.py require` 阻断
+- **[必须] 每章四检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
+- **[必须] 全文三检** — 全文完成后必须：`novel_fidelity.py`（大纲忠实度）+ `verify-ending`（结尾收束验证）+ `set-phase stage3_ready`
+- **[必须] 阶段门禁** — `set-phase` 在 →writing（检查 outline_causality 门禁）和 →stage3_ready（检查 fidelity + ending_verify 门禁）时自动调用 `novel_pipeline_gate.py require` 阻断
 
 ## 触发条件
 
@@ -68,7 +68,7 @@ external_data_dir: true
 ### 渐进式文件索引
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
-|--------|------|----------|----------|
+| -------- |------| ---------- |----------|
 | `references/LICENSE.md` | 许可协议 | MIT 许可证。包含：许可证完整文本。 | R-26 |
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
 | `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
@@ -138,8 +138,10 @@ external_data_dir: true
    d. 用 novel_atomic_writer.py 写入（正文含标记行 L##S## → 报错阻断）
    e. 用 novel_state_manager.py update-sub 更新字数 / 状态（status=done）
       — **自动触发**：该章全部子结构 done → 自动调用 finalize-chapter
-        （连通性检查 + 风格校验 + 逻辑检查 + set-phase chapter_done）
-      — 逻辑检查发现问题时生成 _fixes.json，LLM 修复后重新跑 finalize-chapter
+        （章内连通性 + 跨章承诺链 + 风格校验 + 逻辑检查）
+      — **阻断循环**：上述检查发现 HARD 问题时阻断，不标记门禁、不推进 phase，
+        并写入 `_{chapter}_fixes.json`（含问题位置+修复方向建议）。
+        LLM 修复后重新运行 finalize-chapter，直到全部 HARD 问题清零才放行通过。
    > **中断恢复**：下次进入时先运行 resume <state_path> 找到续写点，再调 context_loader 获取命题指令 + 已写内容锚点
 
 **阶段3：全文整合**
