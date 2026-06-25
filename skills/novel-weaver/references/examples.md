@@ -41,8 +41,8 @@ python novel_workflow_engine.py next-step <project>/data/novel_state.json
 📝 当前章节: L01 觉醒
 📄 下一个子结构: S02 异常信号
 ───
-⏳ 加载上下文: python novel_context_loader.py <path> L01 S02
-⏳ 写作后写入: python novel_workflow_engine.py write-sub <path> L01 S02
+⏳ 加载上下文: python novel_context_loader.py <state_path> L01 S02
+⏳ 写作后写入: python novel_workflow_engine.py write-sub <state_path> L01 S02
 ───
 门禁状态:
   ⏳ outline_causality: PASS

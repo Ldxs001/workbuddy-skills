@@ -1,3 +1,12 @@
+## [1.12.1] - 2026-06-25
+
+### 修复
+- **路径系统统一** — 移除 `workflow_engine.py` 内部的 `DATA_STATE`/`DATA_CHAPTERS`/`DATA_REPORTS` 默认路径（指向 `.standardization/` 内部目录），改为从 `state_path` 入参自动推导：`<project>/data/novel_state.json` → chapters=父目录的父目录/chapters、reports=父目录/reports
+- **CLI 强制 state_path** — 不再提供默认值，缺失则报错退出。避免 LLM 无意识走错目录
+- **所有命令统一使用 `<project>/data/novel_state.json` 作为 state_path**，examples.md 同步更新
+
+---
+
 ## [1.12.0] - 2026-06-25
 
 ### 新增

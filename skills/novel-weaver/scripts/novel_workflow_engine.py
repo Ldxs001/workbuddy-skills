@@ -11,15 +11,23 @@ import json, sys, subprocess, os, re
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
-# R-12 审计锚点：数据目录变量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/data/"
-SKILLS_ROOT = SCRIPTS_DIR.parent.parent
-DATA_DIR = SKILLS_ROOT / ".standardization" / "novel-weaver" / "data"
-DATA_STATE = DATA_DIR / "novel_state.json"
-DATA_CHAPTERS = DATA_DIR / "chapters"
-DATA_REPORTS = DATA_DIR / "reports"
+
+def _chapters_dir(state_path):
+    """从 state_path 推导 chapters 目录：<project>/chapters"""
+    return Path(state_path).parent.parent / "chapters"
+
+def _report_dir(state_path):
+    """从 state_path 推导 reports 目录：<project>/data/reports"""
+    return Path(state_path).parent / "reports"
 
 def _parse_ending_tag(summary: str) -> str | None:
+    """从概述中解析【收尾类型: xxx】标签"""
+    m = re.search(r'【收尾类型:\s*(\S+?)】', summary)
+    if m:
+        t = m.group(1)
+        if t in ("封闭式", "开放式", "悬停式"):
+            return t
+    return None
     """从概述中解析【收尾类型: xxx】标签"""
     m = re.search(r'【收尾类型:\s*(\S+?)】', summary)
     if m:
@@ -352,7 +360,7 @@ def fidelity_check(state_path, chapters_dir):
     print(report_text)
 
     # 写入报告
-    report_dir = DATA_REPORTS
+    report_dir = Path(state_path).parent / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "fidelity_report.md"
     report_path.write_text(report_text, encoding="utf-8")
@@ -406,26 +414,25 @@ def finalize_novel(state_path, chapters_dir):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("用法: python novel_workflow_engine.py <命令> [state_path] [args...]")
-        print("  state_path 默认: " + str(DATA_STATE))
+    if len(sys.argv) < 3:
+        print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
+        print("  state_path = <project>/data/novel_state.json")
         print("  命令:")
         print("    plan-chapter     <chapter> <subs_json>       注册子结构")
         print("    verify-chapter   <chapter>                   验证注册完整性")
         print("    preview          <chapter>                   预览章节规划")
-        print("    write-sub        <chapter> <sub_key> [dir]   写入子结构（stdin）")
-        print("    finalize-chapter <chapter> [dir] [report]    完结一章（含 HARD 阻断）")
-        print("    fidelity         [chapters_dir]              大纲忠实度报告")
-        print("    finalize-novel   [chapters_dir]              全文完结")
+        print("    write-sub        <chapter> <sub_key>         写入子结构（stdin）")
+        print("    finalize-chapter <chapter>                  完结一章（含 HARD 阻断）")
+        print("    fidelity                                     大纲忠实度报告")
+        print("    finalize-novel                               全文完结")
         print("    next-step                                    分析当前状态，输出下一步命令")
         print("")
-        print("  快速开始:")
-        print("    python novel_workflow_engine.py next-step <path>")
-        print("    查看当前进度和下一步操作")
+        print("  示例:")
+        print("    python novel_workflow_engine.py next-step ./my-novel/data/novel_state.json")
         sys.exit(1)
 
     cmd = sys.argv[1]
-    sp = sys.argv[2] if len(sys.argv) > 2 else str(DATA_STATE)
+    sp = sys.argv[2]
 
     if cmd == "plan-chapter":
         plan_chapter(sp, sys.argv[3], sys.argv[4])
@@ -434,18 +441,15 @@ if __name__ == "__main__":
     elif cmd == "preview":
         preview_context(sp, sys.argv[3])
     elif cmd == "write-sub":
-        write_sub(sp, sys.argv[3], sys.argv[4],
-                  sys.argv[5] if len(sys.argv) > 5 else str(DATA_CHAPTERS))
+        write_sub(sp, sys.argv[3], sys.argv[4], str(_chapters_dir(sp)))
     elif cmd == "finalize-chapter":
         finalize_chapter(sp, sys.argv[3],
-                         sys.argv[4] if len(sys.argv) > 4 else str(DATA_CHAPTERS / sys.argv[3]),
-                         sys.argv[5] if len(sys.argv) > 5 else str(DATA_REPORTS))
+                         str(_chapters_dir(sp) / sys.argv[3]),
+                         str(_report_dir(sp)))
     elif cmd == "fidelity":
-        fidelity_check(sp,
-                       sys.argv[3] if len(sys.argv) > 3 else str(DATA_CHAPTERS))
+        fidelity_check(sp, str(_chapters_dir(sp)))
     elif cmd == "finalize-novel":
-        finalize_novel(sp,
-                       sys.argv[3] if len(sys.argv) > 3 else str(DATA_CHAPTERS))
+        finalize_novel(sp, str(_chapters_dir(sp)))
     elif cmd == "next-step":
         next_step(sp)
     else:
@@ -573,7 +577,7 @@ def next_step(state_path):
     # HARD 残留检查
     for ch in chapters:
         ch_id = ch.get("id", "")
-        ch_dir = DATA_CHAPTERS / ch_id
+        ch_dir = _chapters_dir(state_path) / ch_id
         if ch_dir.exists():
             fixes_file = ch_dir / f"_{ch_id}_fixes.json"
             if fixes_file.exists():
