@@ -162,40 +162,80 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     print(f"  字数: {word_count}")
 
 def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
-    """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → phase→chapter_done"""
+    """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 阻断循环 → 门禁"""
     import importlib
     sys.path.insert(0, str(SCRIPTS_DIR))
     from novel_continuity import check_continuity, cross_chapter
     from novel_style_check import check_chapter as style_check
+    from novel_pipeline_gate import pass_gate
 
     chapters_dir = str(Path(chapter_dir).parent)
 
+    all_issues = []
+
     print(f"\n{'='*50}")
     print(f"[完结] {chapter}: 章内连续性检查...")
-    check_continuity(chapter_dir, chapter, state_path)
+    all_issues += check_continuity(chapter_dir, chapter, state_path)
 
     print(f"\n---")
     print(f"[完结] {chapter}: 跨章承诺链检查...")
-    cross_chapter(state_path, chapters_dir)
+    all_issues += cross_chapter(state_path, chapters_dir)
 
     print(f"\n---")
     print(f"[完结] {chapter}: 风格校验...")
-    style_check(chapter_dir, chapter, state_path)
+    all_issues += style_check(chapter_dir, chapter, state_path)
 
     print(f"\n---")
     print(f"[完结] {chapter}: 逻辑检查...")
     sys.path.insert(0, str(SCRIPTS_DIR))
     try:
-        from novel_logic_check import check_logic as logic_check
-        logic_check(chapter_dir, chapter, state_path)
+        from novel_logic_check import generate_report as logic_check
+        report_path = Path(report_dir) / f"logic_{chapter}.md"
+        logic_issues = logic_check(chapter_dir, state_path, str(report_path))
+        all_issues += logic_issues
     except Exception as e:
         print(f"[完结] 逻辑检查异常: {e}（跳过）")
 
-    print(f"\n---")
-    print(f"[完结] {chapter}: 通过完结门禁")
-    from novel_pipeline_gate import pass_gate
-    pass_gate(state_path, f"chapter_finalized:{chapter}")
-    print(f"[完结] {chapter}: [OK] 全部完成")
+    # ── 聚合决策 ──
+    hard_issues = [i for i in all_issues if i.get("severity") == "HARD"]
+    soft_issues = [i for i in all_issues if i.get("severity") == "SOFT" or i.get("severity") == ""]
+
+    if hard_issues:
+        print(f"\n{'='*50}")
+        print(f"❌ [完结] {chapter}: 阻断 — {len(hard_issues)} 个必须修复的问题")
+        print(f"{'='*50}")
+        for i in hard_issues:
+            print(f"  [HARD] [{i.get('file','?')}] {i.get('problem','?')}")
+            print(f"    → 位置: {i.get('position','?')}")
+            sug = i.get('suggestion', '')
+            if sug:
+                print(f"    → 建议: {sug}")
+        if soft_issues:
+            print(f"\n  ⚠️ 另有 {len(soft_issues)} 个软性建议（不阻断）:")
+            for i in soft_issues:
+                print(f"    [SOFT] [{i.get('file','?')}] {i.get('problem','?')}")
+        # 写 fixes JSON
+        fixes_path = Path(chapter_dir) / f"_{chapter}_fixes.json"
+        fixes_data = [{
+            "file": i.get("file", ""),
+            "problem": i.get("problem", ""),
+            "suggestion": i.get("suggestion", ""),
+            "action": "rewrite",
+            "severity": "HARD"
+        } for i in hard_issues]
+        fixes_path.write_text(json.dumps(fixes_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"\n  [修复指引] 已写入 {fixes_path}")
+        print(f"  [提示] 请根据以上指引修复问题后重新运行 finalize-chapter")
+        return  # 不标记门禁
+    else:
+        print(f"\n{'='*50}")
+        print(f"[完结] {chapter}: 全部检查通过")
+        if soft_issues:
+            print(f"  ⚠️ {len(soft_issues)} 个软性建议:")
+            for i in soft_issues:
+                print(f"    [SOFT] [{i.get('file','?')}] {i.get('problem','?')}")
+        pass_gate(state_path, f"chapter_finalized:{chapter}")
+        print(f"[完结] {chapter}: [OK] 全部完成")
 
 
 def fidelity_check(state_path, chapters_dir):

@@ -327,7 +327,45 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
         os.fsync(f.fileno())
 
     print(f"OK report={report_path} info={info_count} warn={warn_count}")
-    return all_issues
+
+    # 转为阻断用结构化结果
+    structured = []
+    try:
+        for i in all_issues:
+            if not isinstance(i, dict):
+                continue
+            level = i.get("level", "INFO")
+            dim = i.get("dimension", "")
+            detail = i.get("detail", "")
+
+            # 判断 HARD 条件
+            if level == "WARN" and dim == "内容与概述匹配度":
+                severity = "HARD"
+            elif level == "WARN":
+                severity = "SOFT"
+            else:
+                severity = "SOFT"
+
+            # 生成建议方向
+            suggestion = ""
+            if "关键词命中率" in detail:
+                suggestion = f"在正文中补充概述提到的关键内容"
+            elif "角色" in dim and ("消失" in detail or "未出现" in detail):
+                suggestion = f"检查角色离场是否有明确交代，或补充出场衔接"
+            elif "时间" in dim:
+                suggestion = f"在章节中补充时间过渡交代"
+
+            structured.append({
+                "file": os.path.basename(chapter_dir),
+                "problem": detail[:120],
+                "position": dim,
+                "severity": severity,
+                "suggestion": suggestion or f"按{dim}要求修正"
+            })
+    except Exception:
+        pass  # 结构化转换不影响主流程
+
+    return structured
 
 
 def write_fixes_json(chapter_dir: str, state_path: str, report_path: str, issues: list) -> str:

@@ -10,13 +10,16 @@ from pathlib import Path
 
 
 def check_continuity(chapter_dir, chapter, state_path):
-    """章内子结构首尾3行连续性（时间词重叠）"""
+    """章内子结构首尾3行连续性（时间词重叠）
+    返回结构化问题列表: [{"file", "problem", "position", "severity", "suggestion"}, ...]
+    """
     cd = Path(chapter_dir)
     files = sorted(cd.glob("S*.txt"))
     if not files:
         print(f"[连通性] {chapter}: 无子结构文件")
-        return
+        return []
 
+    result = []
     issues = []
     for i in range(1, len(files)):
         prev_content = files[i-1].read_text(encoding="utf-8").strip()
@@ -30,20 +33,46 @@ def check_continuity(chapter_dir, chapter, state_path):
         prev_times = time_pattern.findall(prev_tail)
         curr_times = time_pattern.findall(curr_head)
 
-        issues.append({
+        time_ok = len(set(prev_times) & set(curr_times)) > 0
+
+        # 角色连续性：在尾和头中检查角色名重叠
+        char_pattern = re.compile(r'[\u4e00-\u9fff]{2,4}')
+        prev_chars = set(char_pattern.findall(prev_tail))
+        curr_chars = set(char_pattern.findall(curr_head))
+        char_ok = len(prev_chars & curr_chars) > 0
+
+        has_issue = not time_ok or not char_ok
+        entry = {
             "from": files[i-1].stem,
             "to": files[i].stem,
             "prev_tail": prev_tail[:100],
             "curr_head": curr_head[:100],
-            "time_overlap": len(set(prev_times) & set(curr_times)) > 0
-        })
+            "time_overlap": time_ok,
+            "char_overlap": char_ok
+        }
+        issues.append(entry)
+
+        if has_issue:
+            problems = []
+            if not time_ok:
+                problems.append("时间词无重叠")
+            if not char_ok:
+                problems.append("角色名无重叠")
+            result.append({
+                "file": f"{files[i-1].stem} → {files[i].stem}",
+                "problem": "；".join(problems),
+                "position": f"{files[i].stem} 开头3行",
+                "severity": "HARD" if (not time_ok and not char_ok) else "SOFT",
+                "suggestion": f"在{files[i].stem}开头补充时间定位或角色承接（当前文风不变）"
+            })
 
     print(f"[连通性报告] {chapter}")
-    for issue in issues:
-        status = "[OK]" if issue["time_overlap"] else "[WARN]"
-        print(f"  {status} {issue['from']} -> {issue['to']}")
-        print(f"    前段尾: {issue['prev_tail'][:60]}...")
-        print(f"    后段头: {issue['curr_head'][:60]}...")
+    for entry in issues:
+        status = "[OK]" if entry["time_overlap"] else "[WARN]"
+        status += "[角色OK]" if entry["char_overlap"] else "[角色WARN]"
+        print(f"  {status} {entry['from']} -> {entry['to']}")
+        print(f"    前段尾: {entry['prev_tail'][:60]}...")
+        print(f"    后段头: {entry['curr_head'][:60]}...")
 
     sp = Path(state_path)
     if sp.exists():
@@ -54,7 +83,8 @@ def check_continuity(chapter_dir, chapter, state_path):
                 break
         sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"[连通性] {chapter} 检查完成 ({len(issues)} 处)")
+    print(f"[连通性] {chapter} 检查完成 ({len(issues)} 处, {len(result)} 个问题)")
+    return result
 
 
 def auto_fix(chapter_dir, chapter):
@@ -197,7 +227,19 @@ def cross_chapter(state_path, chapters_dir):
         for iss in issues:
             print(f"  [WARN] {iss['from_chapter']} -> {iss['to_chapter']}: {iss['unresolved_promises']}")
 
-    return issues
+    # 转为结构化结果（带 severity + suggestion）
+    structured = []
+    for iss in issues:
+        missing_str = ", ".join(iss["unresolved_promises"][:5])
+        structured.append({
+            "file": f"{iss['from_chapter']} → {iss['to_chapter']}",
+            "problem": f"上章承诺关键词 [{missing_str}] 未在 {iss['to_chapter']} 开头续接",
+            "position": f"{iss['to_chapter']} 开头3行",
+            "severity": "SOFT",
+            "suggestion": f"在{iss['to_chapter']}开头通过叙事自然提及 [{missing_str}]"
+        })
+
+    return structured
 
 
 if __name__ == "__main__":
