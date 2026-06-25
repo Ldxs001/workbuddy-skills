@@ -1,3 +1,12 @@
+## [1.13.2] - 2026-06-25
+
+### 文档同步
+- SKILL.md: "16 个流程钩子"→"全量流程钩子"（避免计数过时）；state_manager.py 描述补全 init/set-length/list-projects
+- execution_standards.md: style_guide→writing_style（2处）；current_phase→meta.current_phase；"自动推进 phase"→"需手动推进"；finalize-chapter 签名修正
+- examples.md: 场景1加 init 步骤；next-step 输出加篇幅行；补 list-projects 场景5
+
+---
+
 ## [1.13.1] - 2026-06-25
 
 ### 新增

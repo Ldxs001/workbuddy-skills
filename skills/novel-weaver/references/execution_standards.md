@@ -80,7 +80,7 @@
    ```
    python novel_workflow_engine.py verify-chapter <state_path> <L##>
    ```
-   全部注册后 phase 自动推进到 writing
+   全部注册后需手动推进 phase：
 
 5. 预览：
    ```
@@ -101,10 +101,10 @@
 - 子结构编号：`S01`、`S02` …
 - 完整引用：`L10S04` = 第 10 章第 4 个子结构
 
-novel_state.json 包含字段：project, current_phase, style_guide, characters, timeline, chapters（含章摘要、子结构标题/概述/情绪提示/字数和状态、章节衔接/校验备注）。
+novel_state.json 包含字段：project, meta.current_phase, meta.length, writing_style, signature, characters, timeline, chapters（含章摘要、子结构标题/概述/情绪提示/字数和状态、章节衔接/校验备注）。
 
 更新时机：
-1. 项目初始化 → 填充 style_guide / chapters / characters
+1. 项目初始化 → 填充 writing_style / chapters / characters
 2. 子结构先行规划 → plan-chapter 批量注册 title/summary/tone
 3. 子结构写入完成 → 更新 word_count + status
 4. 角色更新 → 更新 characters
@@ -129,7 +129,7 @@ L10S04
 
 每章完成后输出简表（从 novel_state.json 直接读取），并调用：
 ```
-python novel_workflow_engine.py finalize-chapter <state_path> <ch_key> <chapter_dir> <report_dir>
+python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 ```
 
 此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。

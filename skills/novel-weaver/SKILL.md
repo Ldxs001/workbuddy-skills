@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.13.1
+version: 1.13.2
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -57,7 +57,7 @@ external_data_dir: true
 | 文件 | 内容 |
 | ------ |------|
 | references/execution_standards.md | 字数管理 / 文体规范 / novel_state.json 结构 / 子结构文件格式 / 章节输出 / 时间线 / 角色表 / 结尾收束 |
-| references/hooks.md | 16 个流程钩子 + 门禁系统一览（类型/行为/脚本） |
+| references/hooks.md | 参考文档 | 全量流程钩子 + 门禁系统一览（类型/行为/脚本） |
 | references/antipatterns.md | 常见反模式与正确做法 |
 | references/faq.md | 常见问题与排除 |
 | references/changelog.md | 版本更新日志 |
@@ -75,10 +75,10 @@ external_data_dir: true
 | `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
 | `references/execution_standards.md` | 参考文档 | 执行规范全集：字数管理/文体规范/子结构规划/情绪系统/人格系统/文风系统/收束规范/时间线/角色表。 | 无 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
-| `references/hooks.md` | 参考文档 | 16 个流程钩子 + 门禁系统一览（类型/行为/脚本），含门禁状态查看命令。 | 无 |
+| `references/hooks.md` | 参考文档 | 全量流程钩子 + 门禁系统一览（类型/行为/脚本） | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
-| `scripts/novel_workflow_engine.py` | 主入口 | `plan-chapter`/`write-sub`/`finalize-chapter`/`finalize-novel` 等命令的入口调度器，含 DATA_DIR 声明 | 无 |
-| `scripts/novel_state_manager.py` | 状态管理 | `add-char`/`update-sub`/`finalize`/`add-timeline` 状态文件管理 | 无 |
+| `scripts/novel_workflow_engine.py` | 主入口 | `plan-chapter`/`write-sub`/`finalize-chapter`/`finalize-novel`/`next-step` 等命令的入口调度器 | 无 |
+| `scripts/novel_state_manager.py` | 状态管理 | `init`/`add-char`/`update-sub`/`finalize`/`add-timeline`/`set-signature`/`set-length`/`list-projects` 状态文件管理 | 无 |
 | `scripts/novel_atomic_writer.py` | 写入校验 | `validate_and_write()` 原子写入 + 格式阻断 | 无 |
 | `scripts/novel_context_loader.py` | 上下文加载 | 命题指令输出 + 中断恢复检测 + 人格/情绪/文风三段硬约束 | 无 |
 | `scripts/novel_continuity.py` | 连通性检查 | `check`(章内)/`cross-chapter`(跨章) | 无 |

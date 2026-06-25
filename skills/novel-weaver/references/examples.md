@@ -37,18 +37,27 @@ echo $SKILL_DIR/.standardization/novel-weaver/data/novel_state.json
 
 ## 场景1：从零开始写一本小说
 
-### 0. 查看下一步
+### 0. 初始化项目
+
+```bash
+# 创建中篇小说（默认）
+python novel_state_manager.py init <state_path> 我的小说
+# 或指定篇幅: python novel_state_manager.py init <state_path> 短篇 short
+# 或指定篇幅+章数: python novel_state_manager.py init <state_path> 长篇 long 15
+```
+
+### 1. 查看下一步
 
 在任意时刻，都可以查看当前进度和下一步命令：
 
 ```bash
-python novel_workflow_engine.py next-step <project>/data/novel_state.json
+python novel_workflow_engine.py next-step <state_path>
 ```
 
 输出示例：
 ```
 📋 项目: AI觉醒
-📍 当前阶段: writing
+📍 writing | 篇幅: 中篇
 📝 当前章节: L01 觉醒
 📄 下一个子结构: S02 异常信号
 ───
@@ -189,10 +198,34 @@ python novel_context_loader.py <state_path> L01 S02
 ```bash
 # 默认关闭，禁止任何署名/代名内容出现在正文中
 # 如需打开并指定署名：
-python novel_state_manager.py set-signature <project>/data/novel_state.json true "本文由WorkBuddy创作"
+python novel_state_manager.py set-signature <state_path> true "本文由WorkBuddy创作"
 
 # 关闭署名：
-python novel_state_manager.py set-signature <project>/data/novel_state.json false
+python novel_state_manager.py set-signature <state_path> false
 
 # atomic_writer 代码级阻断：signature=false 时正文含"由...撰写"等模式会被阻止写入
+```
+
+---
+
+## 场景5：列出所有项目
+
+```bash
+python novel_state_manager.py list-projects
+```
+
+输出示例：
+```
+=======================================================
+  已创建的项目 (2):
+=======================================================
+  📖 AI觉醒
+    路径: .../.standardization/novel-weaver/ai-wake/data/novel_state.json
+    篇幅: medium | 阶段: writing
+    章节: 1/10
+
+  📖 暗潮
+    路径: .../.standardization/novel-weaver/dark-tide/data/novel_state.json
+    篇幅: long | 阶段: stage1_init
+    章节: 0/15
 ```
