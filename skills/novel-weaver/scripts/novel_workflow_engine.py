@@ -410,13 +410,18 @@ if __name__ == "__main__":
         print("用法: python novel_workflow_engine.py <命令> [state_path] [args...]")
         print("  state_path 默认: " + str(DATA_STATE))
         print("  命令:")
-        print("    plan-chapter     <chapter> <subs_json>")
-        print("    verify-chapter   <chapter>")
-        print("    preview          <chapter>")
-        print("    write-sub        <chapter> <sub_key> [chapters_dir]")
-        print("    finalize-chapter <chapter> <chapter_dir> <report_dir>")
-        print("    fidelity         [chapters_dir]")
-        print("    finalize-novel   [chapters_dir]")
+        print("    plan-chapter     <chapter> <subs_json>       注册子结构")
+        print("    verify-chapter   <chapter>                   验证注册完整性")
+        print("    preview          <chapter>                   预览章节规划")
+        print("    write-sub        <chapter> <sub_key> [dir]   写入子结构（stdin）")
+        print("    finalize-chapter <chapter> [dir] [report]    完结一章（含 HARD 阻断）")
+        print("    fidelity         [chapters_dir]              大纲忠实度报告")
+        print("    finalize-novel   [chapters_dir]              全文完结")
+        print("    next-step                                    分析当前状态，输出下一步命令")
+        print("")
+        print("  快速开始:")
+        print("    python novel_workflow_engine.py next-step <path>")
+        print("    查看当前进度和下一步操作")
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -441,5 +446,144 @@ if __name__ == "__main__":
     elif cmd == "finalize-novel":
         finalize_novel(sp,
                        sys.argv[3] if len(sys.argv) > 3 else str(DATA_CHAPTERS))
+    elif cmd == "next-step":
+        next_step(sp)
     else:
         print(f"[错误] 未知命令: {cmd}")
+
+
+def next_step(state_path):
+    """
+    分析当前状态，输出下一步应执行的命令。
+    替代用户手动推理流程。
+    """
+    sp = Path(state_path)
+    if not sp.exists():
+        print(f"[错误] state 文件不存在: {state_path}")
+        print(f"  请先初始化 novel_state.json（场景配置 + 大纲 + 用户确认）")
+        return
+
+    data = json.loads(sp.read_text(encoding="utf-8"))
+    phase = data.get("meta", {}).get("current_phase", "")
+    chapters = data.get("chapters", [])
+    project = data.get("project", "未知项目")
+
+    gate_path = Path(state_path).parent / ".workbuddy" / "gate_state.json"
+    gates = {}
+    if gate_path.exists():
+        gates = json.loads(gate_path.read_text(encoding="utf-8"))
+
+    print(f"\n{'='*55}")
+    print(f"  📋 项目: {project}")
+    print(f"  📍 当前阶段: {phase or '未初始化'}")
+    print(f"{'─'*55}")
+
+    if not phase or phase in ("setup", "stage1_init"):
+        print(f"  → 场景配置未完成")
+        oc = gates.get("outline_causality", "PENDING")
+        if oc != "PASS":
+            print(f"    ⏳ 步骤1: 生成场景配置和大纲（L01-L15 标题 + 概述）")
+            print(f"    ⏳ 步骤2: 运行因果链验证:")
+            print(f"      python novel_causality_check.py outline <state_path>")
+            print(f"    ⏳ 步骤3: 用户确认大纲")
+        else:
+            print(f"    ⏳ 初始化 novel_state.json")
+            print(f"    ⏳ 然后: python novel_pipeline_gate.py set-phase <path> stage1_done")
+        return
+
+    if phase == "stage1_done":
+        first_ch = chapters[0]["id"] if chapters else "L01"
+        print(f"  → 阶段1完成，可以开始写作")
+        print(f"    ⏳ 规划第 {first_ch} 章的子结构并注册:")
+        print(f"      python novel_workflow_engine.py plan-chapter <path> {first_ch} '<json>'")
+        print(f"    ⏳ 验证子结构因果链:")
+        print(f"      python novel_causality_check.py sub-structure <path> {first_ch}")
+        print(f"    ⏳ 设置写作阶段:")
+        print(f"      python novel_pipeline_gate.py set-phase <path> writing")
+        return
+
+    current_ch = None
+    pending_sub = None
+    done_subs = 0
+    for ch in chapters:
+        subs = ch.get("sub_structures", {})
+        if not subs:
+            if current_ch is None:
+                current_ch = ch
+            continue
+        for sk in sorted(subs.keys()):
+            if subs[sk].get("status") == "pending":
+                current_ch = ch
+                pending_sub = sk
+                break
+        if pending_sub:
+            break
+        all_done = all(sv.get("status") == "completed" for sv in subs.values())
+        if all_done:
+            done_subs += 1
+            if current_ch is None or str(current_ch.get("id", "")) < str(ch.get("id", "")):
+                current_ch = None
+
+    if pending_sub is None and done_subs == len(chapters):
+        current_ch = None
+
+    if phase in ("writing", "chapter_done"):
+        if pending_sub and current_ch:
+            print(f"  📝 当前章节: {current_ch['id']} {current_ch.get('title', '')}")
+            print(f"  📄 下一个子结构: {pending_sub} {current_ch['sub_structures'][pending_sub].get('title', '')}")
+            print(f"  {'─'*55}")
+            print(f"  ⏳ 加载上下文: python novel_context_loader.py <path> {current_ch['id']} {pending_sub}")
+            print(f"  ⏳ 写作后写入: python novel_workflow_engine.py write-sub <path> {current_ch['id']} {pending_sub}")
+        elif current_ch is not None and not pending_sub:
+            ch_gate = gates.get(f"chapter_finalized:{current_ch['id']}", "PENDING")
+            if ch_gate != "PASS":
+                print(f"  📝 {current_ch['id']} 子结构全部完成，需要完结")
+                print(f"  ⏳ python novel_workflow_engine.py finalize-chapter <path> {current_ch['id']}")
+            else:
+                next_idx = next((i for i, c in enumerate(chapters) if c.get("id") == current_ch["id"]), -1) + 1
+                if next_idx < len(chapters):
+                    print(f"  📝 下一章: {chapters[next_idx]['id']} {chapters[next_idx].get('title', '')}")
+                    print(f"  ⏳ python novel_workflow_engine.py plan-chapter <path> {chapters[next_idx]['id']} '<json>'")
+                else:
+                    print(f"  ✅ 所有章节已完成。准备全文整合。")
+
+    print(f"\n{'─'*55}")
+    print(f"  门禁状态:")
+    for g_name in ["outline_causality", "sub_causality", "fidelity", "ending_verify"]:
+        g_state = gates.get(g_name, "PENDING")
+        icon = "✅" if g_state == "PASS" else "⏳"
+        print(f"    {icon} {g_name}: {g_state}")
+    print(f"{'='*55}\n")
+
+    if phase == "stage3_ready":
+        f_gate = gates.get("fidelity", "PENDING")
+        e_gate = gates.get("ending_verify", "PENDING")
+        if f_gate != "PASS":
+            print(f"  ⏳ python novel_workflow_engine.py fidelity <path>")
+        if e_gate != "PASS":
+            print(f"  ⏳ python novel_fidelity.py verify-ending <project_dir>")
+        if f_gate == "PASS" and e_gate == "PASS":
+            print(f"  ⏳ python novel_pipeline_gate.py set-phase <path> complete")
+        return
+
+    if phase == "complete":
+        print(f"  ✅ 所有阶段已完成。小说完结。")
+        return
+
+    # HARD 残留检查
+    for ch in chapters:
+        ch_id = ch.get("id", "")
+        ch_dir = DATA_CHAPTERS / ch_id
+        if ch_dir.exists():
+            fixes_file = ch_dir / f"_{ch_id}_fixes.json"
+            if fixes_file.exists():
+                try:
+                    fixes = json.loads(fixes_file.read_text(encoding="utf-8"))
+                    if fixes:
+                        ch_gate = gates.get(f"chapter_finalized:{ch_id}", "PENDING")
+                        if ch_gate != "PASS":
+                            print(f"  ⚠️ {ch_id} 有 {len(fixes)} 个 HARD 问题未修复")
+                            print(f"    修复后: python novel_workflow_engine.py finalize-chapter <path> {ch_id}")
+                            break
+                except Exception:
+                    pass

@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.11.0
+version: 1.12.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -91,6 +91,8 @@ external_data_dir: true
 | `scripts/novel_timeline.py` | 时间线 | `add`/`list` 时间事件登记 | 无 |
 ## 工作流程
 
+> 完整 CLI 示例见 `references/examples.md`。任何时候不知道下一步该做什么，运行 `next-step`。
+
 ### 阶段1：场景配置与大纲
 
 输入：用户模糊的想法
@@ -104,45 +106,80 @@ external_data_dir: true
    逐链节检查 L01→L02→…L15 的章概述因果递进（关键词重叠分析）。全部 PASS 后才可进入下一步。
 4. 输出给用户确认
 5. 钩子：用户确认/修正（阻断式）→ 未确认不得进入阶段2
-6. 输出：初始化 novel_state.json（style_guide / chapters / characters / timeline）
+6. 输出：初始化 novel_state.json（chapters / characters / timeline）
+7. ```
+   python novel_pipeline_gate.py set-phase <state_path> stage1_done
+   ```
 
 ### 阶段2：逐章写作
 
 输入：当前一级标题 + 模糊概述
 
-0. **写作前加载上下文（命题指令）** — novel_context_loader.py 输出硬性命题指令（标题/概述/情绪基调），LLM 必须作为命题作文严格遵守，不可偏离
+0. **不确定下一步？**
+   ```
+   python novel_workflow_engine.py next-step <state_path>
+   ```
+   自动检测当前阶段和进度，输出下一步应执行的命令。
 
-1. **子结构先行规划（v1.2 新增硬约束）**
-   a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + **情绪提示 tone** + **可选 emotions 数组**）
-   b. 展示给用户（可选确认）
-   c. **调用 novel_workflow_engine.py plan-chapter 批量注册所有子结构到 novel_state.json**
-      — 自动校验每条概述 ≥12 有效字符，不达标则阻断
-      — 若通过 outline_causality 门禁，自动推进 phase 到 writing
-      — 注册成功后自动写入 pipeline 门禁
-   d. **因果链验证**
+1. **子结构先行规划**
+   a. LLM生成子结构细化（S01-S05 编号 + 标题 + 模糊概述 + tone + 可选 emotions）
+   b. **注册到 state**
       ```
-      ```python novel_causality_check.py sub-structure <state_path> <L##>```
+      python novel_workflow_engine.py plan-chapter <state_path> <chapter> '<subs_json>'
       ```
-      逐链节检查 S01→S02→… 的因果递进，全部 PASS 后才可开始写作。
-      — PASS 时自动写入 pipeline 门禁
-   e. 验证：novel_workflow_engine.py verify-chapter 检查全部注册
+      自动校验每条概述 ≥12 有效字符，不达标则阻断。自动标记末章末子结构 `is_ending`、非末章末子结构 `is_hook_possible`。
+   c. **子结构因果链验证**
+      ```
+      python novel_causality_check.py sub-structure <state_path> <chapter>
+      ```
+   d. ```
+      python novel_pipeline_gate.py set-phase <state_path> writing
+      ```
 
-2. **逐子结构写作循环（硬约束：context_loader 双重阻断）**
-   a. 调用 novel_context_loader.py 加载上下文
-      — 子结构未注册 → 报错阻断
-      — 子结构已完成（status=done）→ 报错阻断，提示用 resume 找下一步
-      — 新写模式：输出命题指令框（标题+概述+情绪基调）+ 背景参考
-      — **续写模式（中断恢复）**：检测到 .progress 文件，输出已写行数 + 末5行锚点
-   b. 用 novel_atomic_writer.py tail 读上一个子结构的末3行（跳过编号标记）作为连接锚点
-   c. 写作 ≤200 行，自然段落结束（命题指令框约束，无硬强制）
-   d. 用 novel_atomic_writer.py 写入（正文含标记行 L##S## → 报错阻断）
-   e. 用 novel_state_manager.py update-sub 更新字数 / 状态（status=done）
-      — **自动触发**：该章全部子结构 done → 自动调用 finalize-chapter
-        （章内连通性 + 跨章承诺链 + 风格校验 + 逻辑检查）
-      — **阻断循环**：上述检查发现 HARD 问题时阻断，不标记门禁、不推进 phase，
-        并写入 `_{chapter}_fixes.json`（含问题位置+修复方向建议）。
-        LLM 修复后重新运行 finalize-chapter，直到全部 HARD 问题清零才放行通过。
-   > **中断恢复**：下次进入时先运行 resume <state_path> 找到续写点，再调 context_loader 获取命题指令 + 已写内容锚点
+2. **逐子结构写作循环**
+   a. **加载命题指令**
+      ```
+      python novel_context_loader.py <state_path> <chapter> <sub_key>
+      ```
+      输出：子结构规划 + 情绪混合 + 人格约束 + 文风约束 + 结尾/钩子建议 + 署名状态。
+
+   b. **LLM写作**，然后通过 stdin 管道写入：
+      ```
+      cat <<'EOF' | python novel_workflow_engine.py write-sub <state_path> <chapter> <sub_key>
+      L## · S##《标题》
+      ...正文内容...
+      EOF
+      ```
+      atomic_writer 代码级校验：标题格式、正文非空、无标记行、无元注释、**署名检测**（signature=off 时阻断）。
+
+   c. 重复 a-b 直到该章所有子结构完成。
+
+3. **完结一章**
+   ```
+   python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
+   ```
+   聚合运行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查。
+   ✅ 全部通过 → 标记 `chapter_finalized:L##` 门禁。
+   ❌ 有 HARD 问题 → 阻断，写入 `_{chapter}_fixes.json`，修复后重跑。
+
+**阶段3：全文整合**
+
+输入：全部章节完成
+
+1. ```
+   python novel_pipeline_gate.py set-phase <state_path> stage3_ready
+   ```
+2. **大纲忠实度报告**
+   ```
+   python novel_workflow_engine.py fidelity <state_path>
+   ```
+3. **结尾收束验证**
+   ```
+   python novel_fidelity.py verify-ending <project_dir>
+   ```
+4. ```
+   python novel_pipeline_gate.py set-phase <state_path> complete
+   ```
 
 **阶段3：全文整合**
 

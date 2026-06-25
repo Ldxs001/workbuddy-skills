@@ -1,3 +1,15 @@
+## [1.12.0] - 2026-06-25
+
+### 新增
+- **next-step 导航命令** — `novel_workflow_engine.py next-step <path>` 分析 state + 门禁状态，输出当前进度和下一步应执行的精确命令
+- **CLI help 中文说明** — workflow_engine.py 帮助信息全部中文 + 命令功能简述 + 快速开始提示
+
+### 文档
+- **references/examples.md 完全重写** — 覆盖从零开始、续写、中断恢复、署名设置 4 个场景；所有 CLI 命令更新为当前真实接口；补充 `next-step` 入口说明
+- **SKILL.md 工作流程章节重写** — 每步附带精确 CLI 命令；引入 `next-step` 作为流程核心入口；去掉过时描述（`resume`/`atomic_writer tail` 等）
+
+---
+
 ## [1.11.0] - 2026-06-25
 
 ### 新增
