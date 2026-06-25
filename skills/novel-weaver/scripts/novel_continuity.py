@@ -8,6 +8,10 @@ Continuity Check — 连通性补充与校验
 import json, sys, re
 from pathlib import Path
 
+# Windows 终端编码修复：强制 stdout 使用 UTF-8，避免 Git Bash 输出中文乱码
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 def check_continuity(chapter_dir, chapter, state_path):
     """章内子结构首尾3行连续性（时间词重叠）

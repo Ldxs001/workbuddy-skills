@@ -6,6 +6,10 @@ Style Check — 风格一致性校验
 import json, sys, re
 from pathlib import Path
 
+# Windows 终端编码修复
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # 禁止的模式
 FORBIDDEN_PATTERNS = [
     (r'从第\s+\w+章开始', "元文本引用（读者视角，非叙事者视角）"),

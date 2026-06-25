@@ -10,6 +10,10 @@ Workflow Engine — 流程引擎
 import json, sys, subprocess, os, re
 from pathlib import Path
 
+# Windows 终端编码修复
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 SCRIPTS_DIR = Path(__file__).parent
 # R-12 审计锚点：数据目录变量声明 — 与 _meta.json data_dir 一致
 DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/"

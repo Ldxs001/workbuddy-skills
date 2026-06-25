@@ -18,6 +18,10 @@ import sys
 import json
 import re
 
+# Windows 终端编码修复
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 def _sorted_substructure_files(chapter_dir: str) -> list:
     if not os.path.isdir(chapter_dir):
