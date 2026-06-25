@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.12.2
+version: 1.12.3
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -127,7 +127,7 @@ external_data_dir: true
       ```
       python novel_workflow_engine.py plan-chapter <state_path> <chapter> '<subs_json>'
       ```
-      自动校验每条概述 ≥12 有效字符，不达标则阻断。自动标记末章末子结构 `is_ending`、非末章末子结构 `is_hook_possible`。
+      自动校验每条概述 ≥12 有效字符（由 novel_causality_check.py 完成，不达标则阻断）。自动标记末章末子结构 `is_ending`、非末章末子结构 `is_hook_possible`。
    c. **子结构因果链验证**
       ```
       python novel_causality_check.py sub-structure <state_path> <chapter>
@@ -181,10 +181,3 @@ external_data_dir: true
    python novel_pipeline_gate.py set-phase <state_path> complete
    ```
 
-**阶段3：全文整合**
-
-输入：全部章节完成
-
-1. 跨章节连通性补充（每章末3行 + 下章首3行）
-2. 大纲忠实度报告（novel_fidelity.py — 逐章对比概述 vs 实际内容）
-3. 可选精修（用户触发）：备份 → 定位 → 更新 → 局部重新连通

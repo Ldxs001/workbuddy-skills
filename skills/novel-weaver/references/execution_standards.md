@@ -10,7 +10,7 @@
 
 ## 文体规范
 
-文体风格由项目 `novel_state.json` 中的 `style_guide` 字段决定。以下规则适用于所有风格：
+文体风格由项目 `novel_state.json` 中的 `writing_style` 字段决定（6 字段：叙事视角、时态、句式偏好、词汇、描写深度、自定义规则）。以下规则适用于所有风格：
 
 允许使用的通用修辞工具：
 - 代码/协议块
@@ -84,7 +84,7 @@
 
 5. 预览：
    ```
-   python novel_workflow_engine.py preview-writing-context <state_path> <L##>
+   python novel_workflow_engine.py preview <state_path> <L##>
    ```
 
 ### 阻断规则

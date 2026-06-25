@@ -1,3 +1,15 @@
+## [1.12.3] - 2026-06-25
+
+### 文档同步
+- **hooks.md 重写** — 修正 4 处 WRONG：因果链模式名 `chapter-outline`→`outline`；删除不存在的 `init` 命令引用；连通性命令 `generate --auto-fix`→`check`/`cross-chapter` 两个子命令；门禁表 `chapter_finalized` 不被 set-phase require 的实际情况
+- **faq.md 重写** — 修正 3 处 WRONG：`resume`→`next-step`；`init`→无此命令；`progress`→无此命令
+- **execution_standards.md** — `preview-writing-context`→`preview`；`style_guide`→`writing_style`
+- **SKILL.md** — 删除末尾残留的旧版阶段3重复节；plan-chapter 概述校验归属修正
+- **antipatterns.md** — "末尾加上 L##S##"→"自动追加"
+- **examples.md** — context_loader 断点续写描述修正；path 占位符统一
+
+---
+
 ## [1.12.2] - 2026-06-25
 
 ### 修复

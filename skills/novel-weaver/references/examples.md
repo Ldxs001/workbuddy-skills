@@ -116,7 +116,7 @@ EOF
 #### 2c 完结一章
 
 ```bash
-python novel_workflow_engine.py finalize-chapter <project>/data/novel_state.json L01
+python novel_workflow_engine.py finalize-chapter <state_path> L01
 ```
 
 通过时输出：
@@ -175,11 +175,11 @@ python novel_workflow_engine.py next-step <project>/data/novel_state.json
 
 ```bash
 # 任何时候不知道写到哪了
-python novel_workflow_engine.py next-step <project>/data/novel_state.json
+python novel_workflow_engine.py next-step <state_path>
 
 # 找到当前待写的子结构后
-python novel_context_loader.py <project>/data/novel_state.json L01 S02
-# context_loader 会自动检测已写内容，输出续写锚点
+python novel_context_loader.py <state_path> L01 S02
+# context_loader 会输出当前子结构的命题指令框
 ```
 
 ---
