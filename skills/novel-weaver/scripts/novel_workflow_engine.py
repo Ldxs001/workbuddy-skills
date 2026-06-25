@@ -11,6 +11,14 @@ import json, sys, subprocess, os, re
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
+# R-12 审计锚点：数据目录变量声明 — 与 _meta.json data_dir 一致
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/data/"
+SKILLS_ROOT = SCRIPTS_DIR.parent.parent  # skills/novel-weaver/
+# _meta.json data_dir 相对于 skills/ 目录，所以用 SKILLS_ROOT.parent
+DATA_DIR = SKILLS_ROOT.parent / ".standardization" / "novel-weaver" / "data"
+DATA_STATE = DATA_DIR / "novel_state.json"
+DATA_CHAPTERS = DATA_DIR / "chapters"
+DATA_REPORTS = DATA_DIR / "reports"
 
 def _chapters_dir(state_path):
     """从 state_path 推导 chapters 目录：<project>/chapters"""
@@ -416,7 +424,7 @@ def finalize_novel(state_path, chapters_dir):
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("用法: python novel_workflow_engine.py <命令> <state_path> [args...]")
-        print("  state_path = <project>/data/novel_state.json")
+        print("  state_path = <项目>/data/novel_state.json")
         print("  命令:")
         print("    plan-chapter     <chapter> <subs_json>       注册子结构")
         print("    verify-chapter   <chapter>                   验证注册完整性")
@@ -427,8 +435,10 @@ if __name__ == "__main__":
         print("    finalize-novel                               全文完结")
         print("    next-step                                    分析当前状态，输出下一步命令")
         print("")
-        print("  示例:")
-        print("    python novel_workflow_engine.py next-step ./my-novel/data/novel_state.json")
+        print("  缺省路径指向统一数据目录:")
+        print("    state:  " + str(DATA_STATE))
+        print("    章节:   " + str(DATA_CHAPTERS))
+        print("    报告:   " + str(DATA_REPORTS))
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -441,15 +451,15 @@ if __name__ == "__main__":
     elif cmd == "preview":
         preview_context(sp, sys.argv[3])
     elif cmd == "write-sub":
-        write_sub(sp, sys.argv[3], sys.argv[4], str(_chapters_dir(sp)))
+        write_sub(sp, sys.argv[3], sys.argv[4], str(DATA_CHAPTERS))
     elif cmd == "finalize-chapter":
         finalize_chapter(sp, sys.argv[3],
-                         str(_chapters_dir(sp) / sys.argv[3]),
-                         str(_report_dir(sp)))
+                         str(DATA_CHAPTERS / sys.argv[3]),
+                         str(DATA_REPORTS))
     elif cmd == "fidelity":
-        fidelity_check(sp, str(_chapters_dir(sp)))
+        fidelity_check(sp, str(DATA_CHAPTERS))
     elif cmd == "finalize-novel":
-        finalize_novel(sp, str(_chapters_dir(sp)))
+        finalize_novel(sp, str(DATA_CHAPTERS))
     elif cmd == "next-step":
         next_step(sp)
     else:
@@ -577,7 +587,7 @@ def next_step(state_path):
     # HARD 残留检查
     for ch in chapters:
         ch_id = ch.get("id", "")
-        ch_dir = _chapters_dir(state_path) / ch_id
+        ch_dir = DATA_CHAPTERS / ch_id
         if ch_dir.exists():
             fixes_file = ch_dir / f"_{ch_id}_fixes.json"
             if fixes_file.exists():

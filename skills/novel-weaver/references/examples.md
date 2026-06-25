@@ -1,16 +1,27 @@
 # 使用示例
 
-## CLI 路径约定
+## 路径约定
 
-所有命令中的 `<project>` 替换为项目目录，例如 `./my-novel`。以下路径以此目录结构为准：
+所有数据存储在技能的标准化数据目录（由 `_meta.json` 的 `data_dir` 声明）：
+`<skill_install_dir>/.standardization/novel-weaver/data/`
+
+实际路径可通过以下命令获取：
+```bash
+# skill 安装位置
+SKILL_DIR=~/.workbuddy/skills/novel-weaver
+echo $SKILL_DIR/.standardization/novel-weaver/data/novel_state.json
+```
+
+在文档中 `<state_path>` 即上述完整路径的简写。
+
+目录结构：
 
 ```
-my-novel/
-├── data/
-│   └── novel_state.json        # 全局状态（单源真理）
-│   └── reports/                # 检查报告输出
-│   └── .workbuddy/
-│       └── gate_state.json     # 门禁状态（自动管理）
+<skill_install_dir>/.standardization/novel-weaver/data/
+├── novel_state.json        # 全局状态（单源真理）
+├── reports/                # 检查报告输出
+├── .workbuddy/
+│   └── gate_state.json     # 门禁状态（自动管理）
 ├── chapters/
 │   ├── L01/
 │   │   ├── S01.txt

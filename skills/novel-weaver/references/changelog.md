@@ -1,3 +1,11 @@
+## [1.12.2] - 2026-06-25
+
+### 修复
+- **DATA_DIR 路径计算错误** — `SKILLS_ROOT / ".standardization" / "novel-weaver" / "data"` 多了一层（`skills/novel-weaver/.standardization/...`），`_meta.json` data_dir 声明是 `skills/.standardization/novel-weaver/data/`（相对于 `skills/` 根）。改为 `SKILLS_ROOT.parent / ...`，与声明完全一致。
+- **数据迁移** — 将现有的 `novel_state.json` 从错误路径 `skills/novel-weaver/data/` 迁移到正确路径 `skills/.standardization/novel-weaver/data/`
+
+---
+
 ## [1.12.1] - 2026-06-25
 
 ### 修复
