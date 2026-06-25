@@ -2299,9 +2299,10 @@ def _struct_dir(skill_dir):
     _SKILL_DIR = os.path.normpath(os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".."
     ))
+    _self_name = os.path.basename(_SKILL_DIR)
     _SKILLS_ROOT = os.path.normpath(os.path.join(_SKILL_DIR, ".."))
     d = os.path.normpath(os.path.join(
-        _SKILLS_ROOT, ".standardization", "skill-standardization",
+        _SKILLS_ROOT, ".standardization", _self_name,
         "data", skill_name, "outputs"
     ))
     os.makedirs(d, exist_ok=True)

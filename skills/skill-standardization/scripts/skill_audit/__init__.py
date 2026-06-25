@@ -734,9 +734,11 @@ def _save_html_report(skill_dir, audit_result, before_summary=None, before_resul
     """统一保存 HTML 报告到 data/<skill>/outputs/。"""
     import os
     _dname = os.path.basename(os.path.abspath(skill_dir))
+    _self_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _self_name = os.path.basename(_self_dir)
     _dd = os.path.normpath(os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "..", ".standardization", "skill-standardization", "data", _dname, "outputs"
+        _self_dir,
+        "..", ".standardization", _self_name, "data", _dname, "outputs"
     ))
     _html_path = os.path.join(_dd, filename)
     try:
@@ -2571,9 +2573,11 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                         "capability_boundary": ".structure_capabilities.json",
                     }
                     _dname = os.path.basename(os.path.abspath(skill_dir))
+                    _self_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    _self_name = os.path.basename(_self_dir)
                     _dd = os.path.normpath(os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                        os.pardir, ".standardization", _dname, "data", _dname, "outputs"
+                        _self_dir,
+                        os.pardir, ".standardization", _self_name, "data", _dname, "outputs"
                     ))
                     struct_file = os.path.join(_dd, _sf_map.get(fk, f".structure_{fk}.json"))
                     sev = "[WARN]"
@@ -3097,6 +3101,26 @@ def main():
     p_update.add_argument("--mode", help="LLM 自检闸门输出的模式（必传，如 --mode update）")
 
     args = parser.parse_args()
+
+    # ── ★ 入口门禁：检查是否有未完成的修复会话 ──
+    if hasattr(args, 'skill_dir') and args.skill_dir:
+        _sd = os.path.abspath(args.skill_dir)
+        _remaining_path = os.path.join(
+            os.path.dirname(_sd), '.standardization',
+            os.path.basename(_sd), '.remaining_llm.json')
+        # 仅阻断非 --continue 和非 --classify 的操作
+        _is_continue = getattr(args, 'refactor_continue', False) or getattr(args, 'continue_', False)
+        _is_classify = bool(getattr(args, 'classify', None))
+        _is_no_fp = bool(getattr(args, 'no_fp', None))
+        if os.path.isfile(_remaining_path) and not (_is_continue or _is_classify or _is_no_fp):
+            print(f"\n  ⛔ ⛔ ⛔ 存在未完成的修复会话 ⛔ ⛔ ⛔")
+            print(f"  .remaining_llm.json 存在，说明修复循环未闭环")
+            print(f"  必须完成修复后才能执行其他操作：")
+            print(f"    1) 手动修复剩余问题")
+            print(f"    2) python -m scripts.skill_audit refactor {_sd} --continue --confirmed --mode refactor")
+            print(f"    3) 重复直到 0 ERROR 0 WARN")
+            print(f"\n  被阻断的操作: {args.command}")
+            sys.exit(3)
 
     if args.command == "audit":
         cmd_audit(args)

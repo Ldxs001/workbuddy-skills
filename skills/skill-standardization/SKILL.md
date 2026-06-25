@@ -1,6 +1,6 @@
 ---
 name: skill-standardization
-version: 2.95.10
+version: 2.95.11
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit / create / update / refactor / bump / readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、LLM 二次筛分类。
@@ -24,8 +24,8 @@ create_permissions_md: true
 - **`.md` 文件禁止使用 Write/Edit 工具更新** — 必须用 `scripts/` 下的 Python 脚本原子写入
 - **版本号三端一致** — 更新时同步 `SKILL.md` / `_meta.json` / `CHANGELOG.md`
 - **0 ERROR 0 WARN 铁律强制** — 更新后用 `audit --verify` 验证，非误报项必须全部修复，exit(0) 方可提交
-- **LLM 二次筛强制** — audit 输出全部原始问题后，LLM **必须**逐条审查每条 ERROR/WARN 并分类为真问题或误报。标记误报时 `--classify ID --category engine_mistake/engine_cant_judge --reason "..."`（如 `--classify 42 --category engine_mistake --reason "BOM字符导致frontmatter未识别"`），不得跳过或笼统说"无需处理"。**WARN 就是真问题，不是"样式建议"——没有"可跳过"类别。**
-- **LLM 手动修不许退出循环** — 遇到 `.remaining_llm.json` 时，LLM **必须立即读取并手动修复**，然后重新审计直到 0 ERROR 0 WARN。**禁止询问用户**、禁止停止、禁止跳过
+- **LLM 二次筛强制** — audit 输出全部原始问题后，LLM **必须**逐条审查每条 ERROR/WARN 并分类为真问题或误报。标记误报时 `--classify ID --category engine_mistake/engine_cant_judge --reason "..."`（如 `--classify 42 --category engine_mistake --reason "BOM字符导致frontmatter未识别"`），不得跳过或笼统说"无需处理"。**WARN 就是真问题，不是"样式建议"——没有"可跳过"类别。** 只有两个合法类别：`engine_mistake`（引擎技术错误）或 `engine_cant_judge`（引擎语义不足）。LLM 不得伪造任何其他类别。
+- **LLM 手动修不许退出循环** — 遇到 `.remaining_llm.json` 时，LLM **必须立即读取并手动修复**，然后重新审计直到 0 ERROR 0 WARN。**禁止询问用户**、禁止停止、禁止跳过。`sys.exit(2)` 不是循环结束，是"等 LLM 动手"信号。达到 0/0 前循环不结束，不存在"主观建议/可跳过/无法修复"这些类别。
 - **HTML 审计报告强制输出** — 每次 `audit` 执行完毕，**必须**确认 `.audit_report.html` 已生成，**且必须**调用 `present_files` 工具打开报告让用户查看
 - **`--fix` 自动修正后** — 将 fix_details 转化为可读 changelog 并用 safe_io 写入
 - **★ 模式自检闸门强制（不可跳过）** — 执行任何 CLI 命令前，LLM **必须**完成以下自检流程：
