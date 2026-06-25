@@ -1,3 +1,10 @@
+## [1.16.3] - 2026-06-25
+
+### 修复
+- novel_continuity.py check自动推导chapter_dir从state_path, 修复LLM路径错误
+
+---
+
 ## [1.16.2] - 2026-06-25
 
 ### 修复

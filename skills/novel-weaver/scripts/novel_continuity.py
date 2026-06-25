@@ -12,8 +12,20 @@ from pathlib import Path
 def check_continuity(chapter_dir, chapter, state_path):
     """章内子结构首尾3行连续性（时间词重叠）
     返回结构化问题列表: [{"file", "problem", "position", "severity", "suggestion"}, ...]
+
+    智能路径：如果 chapter_dir 不是有效目录，自动从 state_path 推导：
+      {state_path.parent.parent}/chapters/{chapter}
     """
     cd = Path(chapter_dir)
+    if not cd.exists():
+        # 从 state_path 自动推导
+        fallback = Path(state_path).parent.parent / "chapters" / chapter
+        if fallback.exists():
+            print(f"[路径] chapter_dir \"{chapter_dir}\" 无效，自动推导为 {fallback}")
+            cd = fallback
+        else:
+            print(f"[连通性] {chapter}: 目录不存在 (tried \"{chapter_dir}\" and \"{fallback}\")")
+            return []
     files = sorted(cd.glob("S*.txt"))
     if not files:
         print(f"[连通性] {chapter}: 无子结构文件")
@@ -249,6 +261,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 4:
         print("用法:")
         print("  章内: python novel_continuity.py check <chapter_dir> <chapter> <state_path>")
+        print("    → chapter_dir 可省略（用 . 占位），自动从 state_path 推导: {state_path}/../chapters/<chapter>")
+        print("    → 示例: python novel_continuity.py check L02 <state_path>")
         print("  跨章: python novel_continuity.py cross-chapter <state_path> <chapters_dir>")
         print("  fix:  python novel_continuity.py auto-fix <chapter_dir> <chapter> <state_path>")
         sys.exit(1)
