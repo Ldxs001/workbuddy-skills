@@ -1,3 +1,22 @@
+## [1.13.5] - 2026-06-25
+
+### 修复
+- **Bug 1: overview keyword 匹配对中文失效** — `novel_logic_check.py:213` 使用 `.split()` 对中文文本分词，无空格时整个概述变成一个 keyword 导致永久假阴性。改用 `re.split()` 按标点和空白分词
+- **Bug 2: 角色重叠检测被贪婪匹配吃掉短词** — `novel_continuity.py:39` 使用 `{2,4}` 贪婪匹配，"铁心说得对"吐出`铁心说得`，"铁心说我有"吐出`铁心说我`，交集为空。改用双字滑动窗口 `char_bigrams()`
+- **Bug 3: tone 硬编码判定改为纯数据参考** — `novel_logic_check.py` tone 检查不再 append issues（不参与阻断），仅 print 命中数 + 语速分析；`novel_context_loader.py` 新增"情绪写作参考"模块，写前给出场景词引导
+
+---
+
+## [1.13.4] - 2026-06-25
+
+### 新增
+- **执行规范字数参考表** — `execution_standards.md` 新增按篇幅（短篇/中篇/长篇）的每章/每子结构字数参考标准，确保规划时字数可控
+
+### 修复
+- **字数规划缺失** — 之前仅有行数上限（200行/子结构）无字数指导，导致规划阶段字数偏差不可控
+
+---
+
 ## [1.13.3] - 2026-06-25
 
 ### 修复
@@ -167,7 +186,7 @@
 - **finalize_chapter 绕过 pass_gate API** — 直接操作 gates dict，改为调用 `pass_gate()`。
 - **finalize_chapter 缺少逻辑检查** — 三检只跑了连通性和风格，未调用 logic_check。已补上。
 - **set_phase 不做门禁检查** — →writing 不检查 outline_causality，→stage3_ready 不检查 fidelity/ending_verify。已补上门禁检查。
-- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 [username-redacted]。
+- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 wUwproject。
 
 ### 文档
 - SKILL.md 渐进式文件索引表修正：execution_standards/hooks/license/causality_check/fidelity/character_registry 描述与实际对齐

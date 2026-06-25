@@ -36,9 +36,12 @@ def check_continuity(chapter_dir, chapter, state_path):
         time_ok = len(set(prev_times) & set(curr_times)) > 0
 
         # 角色连续性：在尾和头中检查角色名重叠
-        char_pattern = re.compile(r'[\u4e00-\u9fff]{2,4}')
-        prev_chars = set(char_pattern.findall(prev_tail))
-        curr_chars = set(char_pattern.findall(curr_head))
+        # 用双字滑动窗口替代 {2,4} 贪婪匹配，避免"铁心说得对"吞掉"铁心"
+        def char_bigrams(text):
+            chars = re.findall(r'[\u4e00-\u9fff]', text)
+            return set(chars[i] + chars[i+1] for i in range(len(chars)-1))
+        prev_chars = char_bigrams(prev_tail)
+        curr_chars = char_bigrams(curr_head)
         char_ok = len(prev_chars & curr_chars) > 0
 
         has_issue = not time_ok or not char_ok
