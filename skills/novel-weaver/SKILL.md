@@ -1,6 +1,6 @@
 ---
 name: novel-weaver
-version: 1.16.0
+version: 1.16.1
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -36,18 +36,39 @@ external_data_dir: true
 
 ## 数据目录
 
-项目文件存放在标准化路径下，**LLM 不得猜测路径，必须从这读**：
+⚠️ **LLM 禁止手工拼写路径！** 以下代码可自动获取正确路径：
 
+**列出所有项目：**
+```python
+import sys; sys.path.insert(0, r'~/.workbuddy/skills/novel-weaver/scripts')
+from _path_utils import list_projects, resolve_state_path, DATA_DIR
+projects = list_projects()
+# DATA_DIR = ~/.workbuddy/skills/.standardization/novel-weaver/projects/
 ```
-~/.workbuddy/skills/.standardization/novel-weaver/projects/<项目名>/
-├── data/novel_state.json          ← 状态文件（章节/角色/时间线）
+
+**读取项目状态：**
+```python
+# 通过 _path_utils 自动解析（优先）
+state_path = resolve_state_path()
+if state_path:
+    import json; state = json.loads(open(state_path, encoding='utf-8').read())
+
+# 或直接用完整路径（如已知项目名）
+from _path_utils import DATA_DIR
+proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
+```
+
+**目录结构（代码推导，仅供理解）：**
+```
+{DATA_DIR}/<项目名>/
+├── data/novel_state.json          ← 状态文件
 ├── data/.workbuddy/gate_state.json ← 门禁状态
 ├── data/reports/                   ← 检查报告
 ├── chapters/L##/S##.txt          ← 章节正文（每子结构一个文件）
 └── .project                       ← 路径缓存
 ```
 
-代码路径计算在 `scripts/_path_utils.py`，`SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"`。
+**绝对路径示例：** `~/.workbuddy/skills/.standardization/novel-weaver/projects/赛博搏杀记/data/novel_state.json`
 
 ## 触发条件
 
