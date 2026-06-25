@@ -1,3 +1,18 @@
+## [1.11.0] - 2026-06-25
+
+### 新增
+- **署名管控系统（代码级硬阻断）** — `novel_state.json` 新增 `signature` 配置（`enabled: bool`, `text: str`），默认关闭
+- **atomic_writer 钩子4: 署名/代名检测** — signature.enabled=false 时，检测正文中"由...撰写/创作"等 8 种署名模式，命中即阻断并提示开启签名命令
+- **签名开启后文本校验** — 只允许与 `signature.text` 完全一致的署名行，自行编造同样阻断
+- **context_loader 输出署名约束** — 每个子结构写作前输出当前签名状态（开/关+文本）
+- **state_manager set-signature 命令** — 支持 `python novel_state_manager.py set-signature <path> true/false [text]`
+
+### 架构
+- 旧项目（无 signature 字段）→ atomic_writer 收到 `signature=None` → 跳过检测，完全向后兼容
+- LLM 无法通过自觉绕过：阻断在 fsync 之前的代码层，未命中签名模式的普通内容不影响
+
+---
+
 ## [1.10.0] - 2026-06-25
 
 ### 修复

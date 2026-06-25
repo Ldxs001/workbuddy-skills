@@ -81,6 +81,21 @@ def add_timeline(path, time_point, event):
     save_state(path, data)
     print(f"[时间线] {time_point}: {event}")
 
+def set_signature(path, enabled, text=""):
+    """设置署名开关和文本。代码级强制，LLM 不可自行添加。"""
+    data = load_state(path)
+    enabled_bool = enabled.lower() in ("true", "1", "yes")
+    data["signature"] = {"enabled": enabled_bool, "text": text}
+    save_state(path, data)
+    status = "开" if enabled_bool else "关"
+    print(f"[署名] signature.enabled={enabled_bool} ({status})")
+    if enabled_bool and text:
+        print(f"[署名] signature.text=\"{text}\"")
+    elif enabled_bool:
+        print(f"[署名] signature.text 为空（默认不显示署名行）")
+    if not enabled_bool:
+        print(f"[署名] 已关闭，LLM 不得在正文中写入任何署名/代名内容（atomic_writer 代码级阻断）")
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("用法: python novel_state_manager.py <add-char|update-sub|finalize|add-timeline> <state_path> [args...]")
@@ -98,5 +113,8 @@ if __name__ == "__main__":
         finalize_chapter(sp, sys.argv[3])
     elif cmd == "add-timeline":
         add_timeline(sp, sys.argv[3], sys.argv[4])
+    elif cmd == "set-signature":
+        text = sys.argv[4] if len(sys.argv) > 4 else ""
+        set_signature(sp, sys.argv[3], text)
     else:
         print(f"[错误] 未知命令: {cmd}")

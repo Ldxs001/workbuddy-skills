@@ -19,7 +19,22 @@ from pathlib import Path
 TITLE_PATTERN = re.compile(r'^L\d+ · S\d+《.+》$')
 MARKER_PATTERN = re.compile(r'^L\d+S\d+$')
 
-def validate_and_write(content, filepath, chapter, sub_key):
+# 署名/代名检测模式（禁止 LLM 擅自添加）
+SIGNATURE_PATTERNS = [
+    r'由\s*\w*\s*(撰写|创作|生成|编写|完成)',
+    r'本文\s*(由|为)\s*\w*\s*(撰写|创作|生成|编写)',
+    r'WorkBuddy\s*(创作|生成|编写|撰写)',
+    r'(撰写|创作|生成)于\s*\w*\s*(助手|AI|WorkBuddy)',
+    r'在\s*\w*\s*(指导|帮助|协助)下\s*(撰写|创作|生成)',
+    r'本文由\s*\w+\s*创作',
+]
+
+
+def validate_and_write(content, filepath, chapter, sub_key, signature=None):
+    """
+    原子写入 + 多钩子校验。
+    signature: {"enabled": bool, "text": str} 或 None（跳过检测）
+    """
     fp = Path(filepath)
     fp.parent.mkdir(parents=True, exist_ok=True)
 
@@ -51,11 +66,43 @@ def validate_and_write(content, filepath, chapter, sub_key):
     # ── 写入前确认: 最终内容不含元注释污染 ──
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
-        # 禁止助手元注释（**S01 完成（字数： 之类的模式）
         if re.match(r'^\*\*(S\d+|L\d+)\s*(完成|全章完成)', stripped):
             print(f"[HOOK-BLOCK] 正文第{i}行含元注释污染: {line.strip()}")
             print(f"  禁止将助手工作记录写入作品文件")
             return False
+
+    # ── 钩子4: 署名/代名检测（代码级硬阻断） ──
+    if signature is None:
+        # 未传入配置，跳过检测
+        pass
+    elif not signature.get("enabled", False):
+        # 签名关闭：禁止任何署名/代名
+        for i, line in enumerate(lines, 1):
+            for pat in SIGNATURE_PATTERNS:
+                if re.search(pat, line):
+                    print(f"[HOOK-BLOCK] 正文第{i}行含禁止的署名/代名: {line.strip()}")
+                    print(f"  匹配模式: {pat}")
+                    print(f"  当前设置: signature.enabled=false")
+                    print(f"  如需添加署名，请执行: python novel_state_manager.py set-signature <state_path> true \"署名文本\"")
+                    return False
+    else:
+        # 签名开启：只允许指定的署名文本，禁止自行编造
+        sig_text = signature.get("text", "")
+        for i, line in enumerate(lines, 1):
+            for pat in SIGNATURE_PATTERNS:
+                m = re.search(pat, line)
+                if m:
+                    if not sig_text:
+                        # 开启了签名但未指定文本 → 不允许任何署名
+                        print(f"[HOOK-BLOCK] 正文第{i}行含署名内容，但 signature.text 为空: {line.strip()}")
+                        print(f"  请先设置签名文本: python novel_state_manager.py set-signature <state_path> true \"署名文本\"")
+                        return False
+                    if sig_text not in line:
+                        # 署名文本与配置值不匹配
+                        print(f"[HOOK-BLOCK] 正文第{i}行署名与配置值不匹配: {line.strip()}")
+                        print(f"  当前设置: signature.text=\"{sig_text}\"")
+                        print(f"  如需修改署名: python novel_state_manager.py set-signature <state_path> true \"新署名\"")
+                        return False
 
     # ── 原子写入 ──
     # 写入正文（不含末行标记）

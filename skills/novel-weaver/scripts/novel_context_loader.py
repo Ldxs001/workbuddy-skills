@@ -210,6 +210,27 @@ def load_context(state_path, chapter, sub_key):
         print(f"  提示: 全文文风一致，不可偏离")
         print(f"{'='*50}\n")
 
+    # ── 🔴 署名约束（代码级硬阻断） ──
+    sig = data.get("signature", {"enabled": False, "text": ""})
+    sig_enabled = sig.get("enabled", False)
+    sig_text = sig.get("text", "")
+    print(f"\n{'='*50}")
+    if sig_enabled:
+        print(f"🔴 署名约束（硬性）")
+        print(f"{'='*50}")
+        print(f"  状态: 已开启")
+        if sig_text:
+            print(f"  署名: {sig_text}")
+        print(f"  允许在作品末尾添加署名")
+        print(f"  禁止使用自行编造的署名文本（必须 = 配置值）")
+    else:
+        print(f"🔴 署名约束（代码级硬阻断）")
+        print(f"{'='*50}")
+        print(f"  状态: 已关闭")
+        print(f"  禁止在正文中出现任何署名/代名内容")
+        print(f"  atomic_writer 代码级阻断，写入即报错")
+    print(f"{'='*50}\n")
+
     # ── 🔴 收尾命题框（is_ending=true 时追加） ──
     if subs[sub_key].get("is_ending"):
         ending_type = subs[sub_key].get("ending_type", "未指定")

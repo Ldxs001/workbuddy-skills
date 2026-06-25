@@ -130,6 +130,10 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     chapter_dir.mkdir(parents=True, exist_ok=True)
     filepath = chapter_dir / f"{sub_key}.txt"
 
+    # ── 读取签名配置 ──
+    ws_data = json.loads(Path(state_path).read_text(encoding="utf-8"))
+    sig_cfg = ws_data.get("signature", {"enabled": False, "text": ""})
+
     # ── 步骤1: 从 stdin 读取内容 ──
     content = sys.stdin.read()
     if not content.strip():
@@ -140,7 +144,8 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     # 直接调用 validate_and_write 函数
     sys.path.insert(0, str(SCRIPTS_DIR))
     import novel_atomic_writer
-    success = novel_atomic_writer.validate_and_write(content, str(filepath), chapter, sub_key)
+    success = novel_atomic_writer.validate_and_write(content, str(filepath), chapter, sub_key,
+                                                      signature=sig_cfg)
     if not success:
         print(f"[HOOK-BLOCK] {chapter}{sub_key}: 写入失败")
         sys.exit(1)
