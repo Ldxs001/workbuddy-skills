@@ -2144,6 +2144,20 @@ def cmd_refactor(args):
         _unlock_refactor(skill_dir)  # ★ 双 0 通过后清除重构锁
 
     # ── 步骤 7：全量一致性审查 + 修复循环 ──
+    # ★ v2.98.4: 同步 .manual_wait 信号机制
+    _c_manual_wait = os.path.join(_manual_dir, ".consistency_manual_wait")
+    _c_manual_done = os.path.join(_manual_dir, ".consistency_manual_done")
+    if os.path.exists(_c_manual_wait):
+        if os.path.exists(_c_manual_done):
+            os.remove(_c_manual_done)
+            os.remove(_c_manual_wait)
+            print(f"\n  ✅ 一致性手动修复信号已确认")
+        else:
+            print(f"\n  🔒 一致性手动修复等待中")
+            print(f"    修完问题后执行：")
+            print(f"    python -c \"import pathlib; pathlib.Path(r'{_c_manual_done}').touch()\"")
+            print(f"    然后重新运行 --continue")
+            sys.exit(0)
     print(f"\n{'─'*55}")
     print(f"  [7/9] 全量一致性审查 + 修复循环")
     print(f"{'─'*55}")
@@ -2176,6 +2190,11 @@ def cmd_refactor(args):
                 print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
                 print(f"{'='*55}")
                 _signal_manual_wait(skill_dir, c_raw)
+                # ★ v2.98.4: 一致性审查使用独立信号文件，不与细碎循环冲突
+                import shutil
+                _cw = os.path.join(_manual_dir, ".consistency_manual_wait")
+                _cd = os.path.join(_manual_dir, ".consistency_manual_done")
+                shutil.copy(os.path.join(_manual_dir, ".manual_wait"), _cw)
                 sys.exit(0)
         
         c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
@@ -2233,6 +2252,9 @@ def cmd_refactor(args):
                 print(f"  --- 余下 {len(c_real)} 项不可自动修复（missing_doc_ref 等），需 LLM 手动编辑 ---")
                 print(f"")
                 _signal_manual_wait(skill_dir, c_real)
+                import shutil
+                shutil.copy(os.path.join(_manual_dir, ".manual_wait"),
+                            os.path.join(_manual_dir, ".consistency_manual_wait"))
                 sys.exit(0)
             
             if c_real:
