@@ -92,6 +92,14 @@ def save_state(path, data, caller="auto"):
 
     state_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    # plan-chapter 成功后更新指纹，使后续 chapter 规划不被误阻断
+    if caller == "plan-chapter":
+        fp_path.parent.mkdir(parents=True, exist_ok=True)
+        new_fp = _fingerprint(data)
+        fp_path.write_text(new_fp, encoding="utf-8")
+        sub_count = sum(len(ch.get("sub_structures", {})) for ch in data.get("chapters", []))
+        print(f"  [指纹] 已更新（{sub_count} 个子结构）")
+
 
 def _merge_runtime_fields(new_data: dict, old_data: dict):
     """将旧数据的运行时字段合并到新数据，修复指纹"""
