@@ -2568,10 +2568,43 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                 sys.exit(1)
             os.remove(_manual_done_path)
             os.remove(_manual_wait_path)
-            print(f"\n  ✅ LLM 手动修复信号已确认，继续流程")
-            # ★ v2.98.3: 跳过审计/修复循环，直接返回空 remaining
-            #   外层 cmd_refactor/cmd_update 会走双0验证和一致性审查
-            return {"results": [], "summary": {"errors": 0, "warns": 0}}, [], 0
+            print(f"\n  ✅ LLM 手动修复信号已确认")
+            # 读剩余项列表，做增量审计验证哪些修好了
+            _remaining_path = os.path.join(_manual_dir, ".remaining_llm.json")
+            _llm_items = []
+            try:
+                _llm_items = json.load(open(_remaining_path, 'r'))
+            except Exception:
+                pass
+            if _llm_items:
+                # 增量审计：只查 LLM 可能改过的文件（SKILL.md）
+                _verify_result = audit_skill(skill_dir, filter_files=["SKILL.md"])
+                _still_failing_ids = set()
+                for _r in _verify_result.get("results", []):
+                    if not _r.get("passed") and not _r.get("skipped"):
+                        _rid = _r.get("rule_id", "")
+                        if _rid:
+                            _still_failing_ids.add(_rid)
+                # 逐项核对：修好的打 √，没好的保留
+                _remaining = []
+                _fixed_count = 0
+                for _item in _llm_items:
+                    _rid = _item.get("rule_id", "")
+                    if _rid in _still_failing_ids:
+                        _remaining.append(_item)
+                    else:
+                        _fixed_count += 1
+                        print(f"  ✅ {_rid}: 已修复")
+                if _remaining:
+                    print(f"\n  ⚠️ 仍有 {len(_remaining)} 项未修复")
+                    _signal_manual_wait(skill_dir, _remaining)
+                    sys.exit(0)
+                else:
+                    print(f"\n  ✅ 所有 {_fixed_count} 项手动修复项已确认通过")
+                    return {"results": [], "summary": {"errors": 0, "warns": 0}}, [], 0
+            else:
+                # 没有剩余项列表，直接返回
+                return {"results": [], "summary": {"errors": 0, "warns": 0}}, [], 0
         else:
             print(f"\n  🔒 LLM 手动修复等待中：修完上述问题后执行以下 Python 代码")
             print(f"     import os, json, pathlib")
