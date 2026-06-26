@@ -131,9 +131,22 @@ def load_context(state_path, chapter, sub_key):
         print(f"[提示] 先运行 plan-chapter 注册子结构")
         sys.exit(1)
 
-    # 查找上一个已完成的子结构
+    # ── 串行阻断：上一子结构未标记完成时强制走 write-sub ──
     sub_keys = sorted(subs.keys())
     current_idx = sub_keys.index(sub_key) if sub_key in sub_keys else -1
+    if current_idx > 0:
+        prev_key = sub_keys[current_idx - 1]
+        prev_status = subs[prev_key].get("status", "pending")
+        if prev_status != "completed":
+            prev_title = subs[prev_key].get("title", prev_key)
+            print(f"[HOOK-BLOCK] 上一子结构 {chapter}{prev_key}《{prev_title}》未标记完成（status={prev_status}）")
+            print(f"[要求] 子结构写作必须串行，请先完成上一子结构的 state 标记：")
+            print(f"  cat chapters/{chapter}/{prev_key}.txt | python novel_workflow_engine.py write-sub \\")
+            print(f"    \"{state_path}\" {chapter} {prev_key}")
+            print(f"[完成后] 重新运行 context_loader 即可继续")
+            sys.exit(1)
+
+    # 查找上一个已完成的子结构（取末3行作为上文）
     prev_lines = []
     if current_idx > 0:
         prev_key = sub_keys[current_idx - 1]
