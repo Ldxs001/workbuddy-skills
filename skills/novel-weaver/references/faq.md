@@ -101,3 +101,22 @@ python novel_pipeline_gate.py status <state_path>
 ```bash
 python novel_workflow_engine.py next-step <state_path>
 ```
+
+### Q: context_loader 报 "上一子结构未标记完成"
+
+**原因：** 子结构写作必须串行。上一子结构的文件虽已存在，但未通过 `write-sub` 管道写入 `novel_state.json`，state 显示为 pending。
+
+**修复：** 运行 write-sub 完成上一子结构的 state 标记，再重新加载下一子结构：
+```bash
+cat chapters/<L##>/<S##>.txt | python novel_workflow_engine.py write-sub <state_path> <L##> <S##>
+```
+
+### Q: write-sub 提示 "字数 < 篇幅下限" 或 "字数 > 上限+15%"
+
+**原因：** write-sub 写入后自动校验字数是否在篇幅目标范围内。中篇目标 1,500-2,000，校验上浮至 2,300。低于下限出 WARN，超上限+15% 出 INFO，范围内出 OK。
+
+**修复：**
+- WARN（低于下限）：内容过少，建议补充
+- INFO（超上限+15%）：篇幅过长，注意控制
+- OK：字数达标，无需操作
+- WARN/INFO 均为提示性，**不阻断写入**，不影响写作进度

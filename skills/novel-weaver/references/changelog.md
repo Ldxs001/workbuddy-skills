@@ -2,6 +2,7 @@
 
 ### 修复
 - **[SKILL.md] 文档脱钩全量修复** — 约束新增串行阻断条目；工作流程步骤10/11更新为字数约束+串行阻断+write-sub三级校验；核心能力表格更新为 write-sub 管道描述；hooks.md 新增串行阻断/字数约束注入钩子条目
+- **[references/*.md] 全量扫描修复** — execution_standards.md 阻断规则新增串行阻断+字数校验；faq.md 新增"上一子结构未完成"和"字数校验解读"FAQ；examples.md 更新 context_loader/write-sub 输出示例；antipatterns.md 引用三级字数校验
 
 ---
 

@@ -114,7 +114,9 @@
 ### 阻断规则
 
 - **context_loader.py** 在子结构未注册时报错退出，不会降级输出"未知"
+- **context_loader.py 串行阻断**：加载子结构时检测上一子结构 state 是否为 completed。若为 pending 则 HOOK-BLOCK 并输出 write-sub 修复命令，强制走管道完成标记后才能继续
 - **必须先 plan-chapter，再开始写作**
+- **write-sub 字数校验**：写入后对比字数是否达到篇幅目标。低于下限 WARN、超上限+15% INFO、范围内 OK
 
 ## 统一项目状态文件
 
