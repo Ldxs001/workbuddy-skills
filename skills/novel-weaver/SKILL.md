@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.19.2
+version: 1.19.3
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -34,8 +34,9 @@ external_data_dir: true
   如果无项目则创建新项目，有项目则记录 state_path 供后续命令使用。
 - **[强制] 流程门禁系统** —  在阶段转换时自动 require 前置门禁：→writing 检查 outline_causality + sub_causality；→stage3_ready 检查 fidelity + ending_verify。门禁状态存于 ， 查看
 - 🔴 **[强制] 核心规划字段保护** — `novel_state_manager.py` 对 `chapters[].title/overview`、`sub_structures[].title/summary/tone`、`characters[].name/role/traits/mbti/archetype`、`novel_info/writing_style/setting` 做 MD5 指纹校验，**LLM 不可更新**。仅 `word_count/status/timeline/notes` 等运行时字段可更新
+- **[强制] 串行阻断** — context_loader 加载子结构上下文时检测上一子结构 state 是否为 completed。若为 pending 则输出 HOOK-BLOCK 并给出 write-sub 修复命令，强制走管道完成标记后才能继续。子结构写作必须串行
 - **[必须] 先确认再写作** — 场景配置和大纲必须经用户确认后才能进入写作阶段
-- **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `novel_causality_check.py sub-structure`（因果链验证）→ `context_loader` 通过子结构存在性检查，才可开始写作
+- **[必须] 先规划再写作** — 每章必须先 `plan-chapter`（含情绪 tone + 可选 emotions）→ `novel_causality_check.py sub-structure`（因果链验证）→ `context_loader` 通过子结构存在性检查 + 串行阻断检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
 - **[必须] 每章四检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
@@ -135,7 +136,7 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 | ------ |------| ------ |
 | **初始化小说项目** | 创建novel_state.json骨架，支持短篇/中篇/长篇 | 仅生成JSON骨架，不自动填充剧情内容 |
 | **章节子结构规划** | 为每章注册3-5个子结构，配置标题/概述/情绪基调 | 概述需≥12有效字符；规划字段写入后MD5锁定不可更改 |
-| **子结构原子写入** | 逐子结构写入正文，自动校验格式/字数/署名/行号 | 每子结构≤200行；正文禁止L##S##标记行 |
+| **子结构原子写入** | 逐子结构写入正文，自动校验格式/字数/署名/行号 | write-sub 管道（atomic_writer + state_manager），字数按篇幅目标校验，上限+15% 浮动窗口 |
 | **因果链验证** | 章级和子结构级双模式因果递进验证 | 仅检查关键词重叠和因果递进，无法验证剧情合理性 |
 | **四合一章节完结检查** | 章内连通性+跨章承诺链+风格校验+逻辑检查 | HARD问题阻断并生成_fixes.json，需人工修复 |
 | **全文收束验证** | 大纲忠实度报告+结尾封闭式/开放式/悬停式验证 | 仅验证末章末子结构，之前的章节需独立检查 |
@@ -158,7 +159,7 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 |------|------|------|
 | **初始化小说项目** | 创建novel_state.json骨架，支持短篇/中篇/长篇 | 仅生成JSON骨架，不自动填充剧情内容 |
 | **章节子结构规划** | 为每章注册3-5个子结构，配置标题/概述/情绪基调 | 概述需≥12有效字符；规划字段写入后MD5锁定不可更改 |
-| **子结构原子写入** | 逐子结构写入正文，自动校验格式/字数/署名/行号 | 每子结构≤200行；正文禁止L##S##标记行 |
+| **子结构原子写入** | 逐子结构写入正文，自动校验格式/字数/署名/行号 | write-sub 管道（atomic_writer + state_manager），字数按篇幅目标校验，上限+15% 浮动窗口 |
 | **因果链验证** | 章级和子结构级双模式因果递进验证 | 仅检查关键词重叠和因果递进，无法验证剧情合理性 |
 | **四合一章节完结检查** | 章内连通性+跨章承诺链+风格校验+逻辑检查 | HARD问题阻断并生成_fixes.json，需人工修复 |
 | **全文收束验证** | 大纲忠实度报告+结尾封闭式/开放式/悬停式验证 | 仅验证末章末子结构，之前的章节需独立检查 |
@@ -180,8 +181,8 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 7. **注册子结构到state** → 输入 subs_json → 输出 novel_state更新 — MD5指纹锁定+标记is_ending/is_hook
 8. **子结构因果链验证** → 输入 sub_structures → 输出 sub_causality门禁 — 逐子结构因果递进检查
 9. **set-phase writing** → 输入 outline+sub门禁 → 输出 phase=writing — require双门禁，不通过则阻断
-10. **加载命题指令** → 输入 chapter+sub_key → 输出 context_loader输出 — 子结构规划+情绪混合+人格+文风约束
-11. **LLM写作+管道写入** → 输入 命题指令 → 输出 S##.txt — atomic_writer代码级校验格式/字数/署名
+10. **加载命题指令** → 输入 chapter+sub_key → 输出 context_loader输出 — 子结构规划+字数约束（篇幅字数范围+15%上浮）+情绪混合+人格+文风约束+串行阻断检查（上一子结构pending则HOOK-BLOCK）
+11. **LLM写作+管道写入(write-sub)** → 输入 命题指令 → 输出 S##.txt — atomic_writer代码级校验格式/字数/署名 + state_manager更新进度（字数对标篇幅目标，OK/WARN/INFO 三级输出）
 12. **重复10-11** → 输入 下一子结构 → 输出 全部子结构完成 — 直到该章全部子结构写完
 13. **完结一章(finalize-chapter)** → 输入 章内容 → 输出 四合一检查报告 — 章内连通性→跨章→风格→逻辑
 14. **全文整合(fidelity)** → 输入 全部章节 → 输出 大纲忠实度报告 — 检查是否偏离大纲
