@@ -156,15 +156,19 @@ def _extract_keywords(data):
         if len(k) >= 2:
             kws.add(k)
         if len(v) >= 2:
-            # 从 value 中提取 ≥2字的片段
-            for seg in re.findall(r'[\u4e00-\u9fff]{2,10}', v):
-                kws.add(seg)
+            # 滑动窗口提取2-4字片段，避免整段中文被当单个关键词
+            text = re.sub(r'[^\u4e00-\u9fff]', '', v)
+            for wlen in range(4, 1, -1):
+                for i in range(len(text) - wlen + 1):
+                    kws.add(text[i:i+wlen])
 
     # 章概述
     for ch in data.get("chapters", []):
         ov = ch.get("overview", "")
-        for seg in re.findall(r'[\u4e00-\u9fff]{2,10}', ov):
-            kws.add(seg)
+        text = re.sub(r'[^\u4e00-\u9fff]', '', ov)
+        for wlen in range(4, 1, -1):
+            for i in range(len(text) - wlen + 1):
+                kws.add(text[i:i+wlen])
 
     return kws
 

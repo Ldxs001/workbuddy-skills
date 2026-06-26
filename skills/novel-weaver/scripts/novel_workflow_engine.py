@@ -324,10 +324,12 @@ def fidelity_check(state_path, chapters_dir):
     kw_list = sorted(kw_set, key=len, reverse=True)
     if not kw_list:
         print("[fidelity] 无可用关键词，使用概述词")
-        # 回退：从各章概述中提取≥2字词
+        # 回退：从各章概述中提取2-4字滑动窗口关键词
         for ch in chapters:
-            for seg in re.findall(r'[\u4e00-\u9fff]{2,10}', ch.get("overview", "")):
-                kw_list.append(seg)
+            text = re.sub(r'[^\u4e00-\u9fff]', '', ch.get("overview", ""))
+            for wlen in range(4, 1, -1):
+                for i in range(len(text) - wlen + 1):
+                    kw_list.append(text[i:i+wlen])
         kw_list = list(set(kw_list))
 
     keyword_re = re.compile('|'.join(re.escape(p) for p in kw_list))
