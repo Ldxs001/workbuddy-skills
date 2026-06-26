@@ -66,11 +66,26 @@ def plan_chapter(state_path, chapter, subs_json):
     chapters = data.get("chapters", [])
     is_last_chapter = bool(chapters and chapters[-1]["id"] == chapter)
 
+    # ── 字数目标表（单一定义源，复用给 context_loader 和 context_loader.py）──
+    SUB_WORD_TARGETS = {
+        "short": (1000, 1500),
+        "medium": (1500, 2000),
+        "long": (2000, 4000),
+    }
+
     for ch in data.get("chapters", []):
         if ch["id"] != chapter:
             continue
         if "sub_structures" not in ch:
             ch["sub_structures"] = {}
+        # 从 meta.length 取字数目标
+        length = data.get("meta", {}).get("length", "")
+        target_range = SUB_WORD_TARGETS.get(length)
+        if target_range:
+            lo, hi = target_range
+            check_max = int(hi * 1.15)
+        else:
+            lo, hi, check_max = 0, 0, 0
         for i, s in enumerate(subs):
             s_key = s["s_key"]
             existing = ch["sub_structures"].get(s_key, {})
@@ -78,6 +93,7 @@ def plan_chapter(state_path, chapter, subs_json):
                 "title": s.get("title", ""),
                 "summary": s.get("summary", ""),
                 "tone": s.get("tone", ""),
+                "word_count_target": {"min": lo, "max": hi, "check_max": check_max},
                 "word_count": existing.get("word_count", 0),
                 "status": existing.get("status", "pending")
             }
@@ -198,23 +214,20 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
     print(f"  字数: {word_count}")
 
-    # ── 字数代码级校验（统一标准：15% 上浮窗口，与 context_loader 同源）──
-    LINE_TOLERANCE_RATIO = 1.15  # 15% 上浮
-    SUB_WORD_TARGETS = {
-        "short": (1000, 1500),
-        "medium": (1500, 2000),
-        "long": (2000, 4000),
-    }
-    length = ws_data.get("meta", {}).get("length", "")
-    target = SUB_WORD_TARGETS.get(length)
-    # 字数检查
-    if target:
-        lo, hi = target
-        check_hi = int(hi * LINE_TOLERANCE_RATIO)  # 15% 上浮
+    # ── 字数代码级校验（从子结构 word_count_target 读取，与 plan-chapter 同源）──
+    sub_info = None
+    for ch in ws_data.get("chapters", []):
+        if ch["id"] == chapter:
+            sub_info = ch.get("sub_structures", {}).get(sub_key, {})
+            break
+    sub_target = sub_info.get("word_count_target", {}) if sub_info else {}
+    if sub_target and sub_target.get("min") and sub_target.get("max"):
+        lo, hi = sub_target["min"], sub_target["max"]
+        check_hi = sub_target.get("check_max", int(hi * 1.15))
         if word_count < lo:
-            print(f"  [WARN] 字数 {word_count} < {length}下限 {lo}，建议补充至 {lo}-{hi} 字")
+            print(f"  [WARN] 字数 {word_count} < 下限 {lo}，建议补充至 {lo}-{hi} 字")
         elif word_count > check_hi:
-            print(f"  [INFO] 字数 {word_count} > {length}上限+15%({check_hi})，注意篇幅控制")
+            print(f"  [INFO] 字数 {word_count} > 上限+15%({check_hi})，注意篇幅控制")
         else:
             print(f"  [OK] 字数 {word_count} 在 {lo}-{check_hi} 范围内")
 

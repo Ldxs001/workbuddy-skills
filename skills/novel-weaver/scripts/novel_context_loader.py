@@ -156,23 +156,17 @@ def load_context(state_path, chapter, sub_key):
             prev_text = [l for l in lines if not l.strip().startswith(f"{chapter}")]
             prev_lines = prev_text[-3:] if len(prev_text) >= 3 else prev_text
 
-    # ── [硬性] 字数约束（硬性）──
-    SUB_WORD_TARGETS = {
-        "short": (1000, 1500),
-        "medium": (1500, 2000),
-        "long": (2000, 4000),
-    }
+    # ── [硬性] 字数约束（从子结构 word_count_target 读取，无需硬编码）──
     LENGTH_LABELS = {"short": "短篇", "medium": "中篇", "long": "长篇"}
     length = data.get("meta", {}).get("length", "")
-    target = SUB_WORD_TARGETS.get(length)
     length_label = LENGTH_LABELS.get(length, length)
+    sub_target = subs[sub_key].get("word_count_target", {})
     word_count_note = ""
-    if target:
-        lo, hi = target
-        check_hi = int(hi * 1.15)
+    if sub_target and sub_target.get("min") and sub_target.get("max"):
+        lo, hi, check_hi = sub_target["min"], sub_target["max"], sub_target.get("check_max", int(sub_target["max"] * 1.15))
         word_count_note = f"  篇幅: {length_label}\n  每子结构字数范围: {lo}-{hi}（校验上浮至 {check_hi}）"
     else:
-        word_count_note = f"  篇幅: {length_label}（未设定的字数目标）"
+        word_count_note = f"  篇幅: {length_label}（未设定字数目标，请运行 plan-chapter 更新）"
 
     # ── 输出标准上下文 ──
     print(f"{'='*50}")

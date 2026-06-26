@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.19.4
+version: 1.19.5
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。

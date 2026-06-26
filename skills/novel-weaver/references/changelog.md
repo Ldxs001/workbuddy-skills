@@ -1,3 +1,15 @@
+## [1.19.5] - 2026-06-26
+
+### 新增
+- **[plan_chapter] 字数目标写入子结构规划** — `word_count_target: {min, max, check_max}` 自动根据 `meta.length` 注入每个子结构。LLM 读 `novel_state.json` 即可看到字数要求，无需翻技能文档
+- **[context_loader] 字数约束从子结构读取** — 不再硬编码 SUB_WORD_TARGETS，改为读 `sub_structures[].word_count_target`
+- **[write-sub] 字数校验从子结构读取** — 同上，三处同源
+
+### 修复
+- **[赛博搏杀记] L01/L02/L03 注入 word_count_target** — 通过 plan-chapter 重注册，所有子结构持有字数目标
+
+---
+
 ## [1.19.3] - 2026-06-26
 
 ### 修复
