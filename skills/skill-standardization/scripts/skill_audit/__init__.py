@@ -2512,11 +2512,50 @@ def _validate_changed_files(skill_dir, changed_files):
 
 
 
+def _manual_dir_path(skill_dir):
+    """.manual_wait / .manual_done 存放目录"""
+    _sn = os.path.basename(os.path.abspath(skill_dir))
+    _sd = os.path.normpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        os.pardir, ".standardization",
+        os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", _sn
+    ))
+    return _sd
+
+
 def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None):
     """
     修复循环通用实现。
     返回 (result, remaining, loop_count)
     """
+    # ★ v2.98.1: 检查 .manual_done 信号（LLM 手动修完后写此文件）
+    _manual_dir = _manual_dir_path(skill_dir)
+    _manual_done_path = os.path.join(_manual_dir, ".manual_done")
+    _manual_wait_path = os.path.join(_manual_dir, ".manual_wait")
+    if os.path.exists(_manual_wait_path):
+        if os.path.exists(_manual_done_path):
+            # LLM 声称修完了，验证是否真的改了文件
+            wait_data = json.load(open(_manual_wait_path, 'r'))
+            wait_files = wait_data.get("files", [])
+            actually_modified = [f for f in wait_files if os.path.exists(f)]
+            if not actually_modified and wait_files:
+                print(f"\n  ❌ LLM 声称已手动修复但未修改任何文件！")
+                print(f"     必须实际修改文件后写 .manual_done，不得空过")
+                sys.exit(1)
+            os.remove(_manual_done_path)
+            os.remove(_manual_wait_path)
+            print(f"\n  ✅ LLM 手动修复信号已确认，继续流程")
+        else:
+            print(f"\n  🔒 LLM 手动修复等待中：修完上述问题后执行以下 Python 代码")
+            print(f"     import os, json, pathlib")
+            print(f"     d = r'{_manual_dir}'")
+            print(f"     os.makedirs(d, exist_ok=True)")
+            print(f"     pathlib.Path(os.path.join(d, '.manual_done')).touch()")
+            print(f"     然后重新运行 --continue")
+            print(f"  ⚠️  如果未修改任何文件就写 .manual_done，流程将拒绝继续")
+            sys.exit(0)
+
     # 首次审计
     if filter_files:
         result = audit_skill(skill_dir, filter_files=filter_files)
@@ -2554,6 +2593,8 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
     
     loop_count = 0
     _prev_sig = None
+    # ★ v2.98.1: 修复循环中的审计只查修改过的文件（增量审计）
+    _fix_mtime_snapshot = {}
     while remaining and loop_count < max_loops:
         loop_count += 1
 
@@ -2660,6 +2701,11 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                         print(f"    → 手动编辑 SKILL.md 或 references/ 中的对应章节后重新 audit")
 
         if has_fixable:
+            # ★ v2.98.1: 修复前快照文件修改时间（增量审计用）
+            _fix_mtime_snapshot.clear()
+            for _fp in [os.path.join(skill_dir, f) for f in ["SKILL.md", "_meta.json"]]:
+                if os.path.exists(_fp):
+                    _fix_mtime_snapshot[_fp] = os.path.getmtime(_fp)
             print(f"\n  --- 自动修复 ---")
             _fixes_applied = 0
             # ★ 只处理 auto-fixable 项（按 fix key 粒度筛选）
@@ -2750,21 +2796,53 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                 # 保存 .remaining_llm.json 并创建重构锁，阻止后续步骤
                 _save_remaining_llm(skill_dir, remaining)
                 _lock_refactor(skill_dir)
+                # ★ v2.98.1: .manual_wait 信号代替 sys.exit(2)
+                # LLM 必须手动修文件 + 写 .manual_done，否则流程拒绝继续
+                try:
+                    os.makedirs(_manual_dir, exist_ok=True)
+                    # 收集需要修改的文件列表
+                    _wait_files = []
+                    for r in remaining:
+                        src = r.get("fix", {}).get("location", "") if isinstance(r.get("fix"), dict) else ""
+                        if src and os.path.exists(src):
+                            _wait_files.append(src)
+                    _wait_files = list(set(_wait_files))
+                    if not _wait_files:
+                        _wait_files = [os.path.join(skill_dir, "SKILL.md")]
+                    with open(_manual_wait_path, 'w', encoding='utf-8') as _wf:
+                        json.dump({"items": len(remaining), "files": _wait_files}, _wf, ensure_ascii=False)
+                except Exception:
+                    pass
                 print(f"\n{'='*55}")
                 print(f"  🔒 重构锁已激活——剩余 {len(remaining)} 项未修复")
-                print(f"  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复")
-                print(f"     不得询问用户、不得停止循环、不得跳过")
-                print(f"     重复此循环直到 0 ERROR 0 WARN")
+                print(f"{'─'*55}")
+                print(f"  修完以上所有问题后执行以下操作：")
+                print(f"    1. 手动编辑 SKILL.md 或 references/ 中的对应章节")
+                print(f"    2. 写入 .manual_done 信号文件：")
+                print(f"       python -c \"import pathlib; pathlib.Path(r'{_manual_done_path}').touch()\"")
+                print(f"    3. 重新运行 --continue")
+                print(f"  ⚠️  未修改任何文件就写 .manual_done 将被拒绝")
                 print(f"{'='*55}")
-                sys.exit(2)  # ★ 强制退出——LLM 无法继续，必须手动修复后再 --continue
+                sys.exit(0)
             else:
                 print(f"\n  ✅ 所有项已修复，双 0 达成")
             break
         print(f"  ⚠️  剩余 {len(remaining)} 项（{len(auto_fixable)} 项可自动修复，{len(remaining)-len(auto_fixable)} 项需手动）")
         print()
 
-        if filter_files:
-            result = audit_skill(skill_dir, filter_files=filter_files)
+        # ★ v2.98.1: 修复循环内只审计修改过的文件（增量审计）
+        if _fix_mtime_snapshot:
+            _changed_files = []
+            for _fp, _old_mt in list(_fix_mtime_snapshot.items()):
+                if os.path.exists(_fp) and os.path.getmtime(_fp) != _old_mt:
+                    _rel = os.path.relpath(_fp, skill_dir)
+                    _changed_files.append(_rel)
+            _audit_filter = _changed_files if _changed_files else None
+        else:
+            _audit_filter = filter_files
+
+        if _audit_filter:
+            result = audit_skill(skill_dir, filter_files=_audit_filter)
         else:
             result = audit_skill(skill_dir)
         print(format_report(result, show_fix_hint=False))

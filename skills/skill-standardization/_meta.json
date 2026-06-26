@@ -1,7 +1,7 @@
 {
   "name": "skill-standardization",
-  "version": "2.98.0",
-  "description": "Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit / create / update / refactor / bump / readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、LLM 二次筛分类。",
+  "version": "2.98.1",
+  "description": "Skill \u6807\u51c6\u5316\u89c4\u8303\u5f15\u64ce\u3002\u652f\u6301 R-01~R-26 \u89c4\u8303\u5ba1\u67e5\uff08audit / create / update / refactor / bump / readonly \u516d\u6a21\u5f0f\uff09\uff0c\u542b\u6743\u9650\u626b\u63cf\u3001\u6570\u636e\u76ee\u5f55\u5408\u89c4\u68c0\u67e5\u3001\u6e10\u8fdb\u5f0f\u52a0\u8f7d\u3001LLM \u4e8c\u6b21\u7b5b\u5206\u7c7b\u3002",
   "author": "wUwproject",
   "tags": [
     "standardization",
@@ -16,13 +16,13 @@
   ],
   "data_dir": "skills/.standardization/skill-standardization/data/",
   "triggers": [
-    "帮我看看这个技能写得怎么样",
-    "检查这个技能是否规范",
-    "审计 skill",
-    "创建新技能",
-    "更新 skill",
-    "重构技能",
-    "skill 规范",
-    "R-规则"
+    "\u5e2e\u6211\u770b\u770b\u8fd9\u4e2a\u6280\u80fd\u5199\u5f97\u600e\u4e48\u6837",
+    "\u68c0\u67e5\u8fd9\u4e2a\u6280\u80fd\u662f\u5426\u89c4\u8303",
+    "\u5ba1\u8ba1 skill",
+    "\u521b\u5efa\u65b0\u6280\u80fd",
+    "\u66f4\u65b0 skill",
+    "\u91cd\u6784\u6280\u80fd",
+    "skill \u89c4\u8303",
+    "R-\u89c4\u5219"
   ]
 }
