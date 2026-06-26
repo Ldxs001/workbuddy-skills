@@ -1,3 +1,10 @@
+## [2.96.2] - 2026-06-26
+
+### 修复
+- 创建模式修复: 移除技能根目录data/改用.standardization/; 补antipatterns.md+faq.md; 迁changelog到references/; 索引表更新
+
+---
+
 ## [2.96.1] - 2026-06-26
 
 ### 修复

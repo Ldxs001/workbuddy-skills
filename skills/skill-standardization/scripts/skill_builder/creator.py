@@ -23,7 +23,7 @@ description: >
   {description}
 tags: []
 data_dir: ../.standardization/{name}/
-external_data_dir:
+external_data_dir: true
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
@@ -58,6 +58,9 @@ trigger_negative:
 | `references/guide.md` | 使用指南 | 参数说明和完整工作流 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描报告、风险说明和 skill-function-test 测试结论 | R-15, R-16 |
 | `references/examples.md` | 使用示例 | 使用示例和输出样例 | 无 |
+| `references/changelog.md` | 版本管理 | 版本变更记录 | R-24 |
+| `references/antipatterns.md` | 规范指南 | 常见反模式与正确做法 | R-18 |
+| `references/faq.md` | 常见问题 | 常见疑问与解答 | R-19 |
 
 ## 约束
 
@@ -125,14 +128,18 @@ skill-sub {name} --input <input-file> --output <output-dir>
             print(f"[X] 目录已存在: {skill_dir}")
             return False
 
-        # 创建目录结构
+        # 创建目录结构（技能自身目录：仅有 SKILL.md + references/ + scripts/）
         skill_dir.mkdir(parents=True)
         (skill_dir / "references").mkdir(exist_ok=True)
         (skill_dir / "scripts").mkdir(exist_ok=True)
-        (skill_dir / "data").mkdir(exist_ok=True)
-        (skill_dir / "data" / "output").mkdir(exist_ok=True)
-        (skill_dir / "data" / "logs").mkdir(exist_ok=True)
-        (skill_dir / "data" / "cache").mkdir(exist_ok=True)
+
+        # 创建标准化产出物目录（skills/.standardization/<name>/，R-11 合规）
+        std_dir = base_dir / ".standardization" / name
+        (std_dir / "data").mkdir(parents=True, exist_ok=True)
+        (std_dir / "outputs").mkdir(exist_ok=True)
+        (std_dir / "cache").mkdir(exist_ok=True)
+        (std_dir / "temp").mkdir(exist_ok=True)
+        (std_dir / "backup").mkdir(exist_ok=True)
 
         # 写入 SKILL.md
         tags_str = ", ".join(f'"{t}"' for t in tags) if tags else '"todo"'
@@ -176,24 +183,36 @@ skill-sub {name} --input <input-file> --output <output-dir>
         progress_content = self._generate_progress_template(name)
         (skill_dir / ".progress.md").write_text(progress_content, encoding="utf-8")
 
-        # 创建 CHANGELOG.md
+        # 创建 references/changelog.md（R-24）
         changelog_content = self._generate_changelog_template(name)
-        (skill_dir / "CHANGELOG.md").write_text(changelog_content, encoding="utf-8")
+        (skill_dir / "references" / "changelog.md").write_text(changelog_content, encoding="utf-8")
+
+        # 创建 references/antipatterns.md（R-18）
+        antipatterns_content = self._generate_antipatterns_template(name)
+        (skill_dir / "references" / "antipatterns.md").write_text(antipatterns_content, encoding="utf-8")
+
+        # 创建 references/faq.md（R-19）
+        faq_content = self._generate_faq_template(name)
+        (skill_dir / "references" / "faq.md").write_text(faq_content, encoding="utf-8")
 
         print(f"[OK] Skill 已创建: {skill_dir}")
         print(f"   ├── SKILL.md           (主文件, ≤230行)")
         print(f"   ├── _meta.json         (元数据 + 数据目录声明)")
-        print(f"   ├── CHANGELOG.md       (版本变更记录)")
         print(f"   ├── .progress.md       (审计进度跟踪)")
         print(f"   ├── references/")
         print(f"   │   ├── guide.md       (完整使用教程)")
         print(f"   │   ├── permissions.md  (权限说明)")
-        print(f"   │   └── examples.md    (使用示例)")
+        print(f"   │   ├── examples.md    (使用示例)")
+        print(f"   │   ├── changelog.md   (版本变更记录)")
+        print(f"   │   ├── antipatterns.md(常见反模式)")
+        print(f"   │   └── faq.md         (常见问题)")
         print(f"   ├── scripts/           (可执行脚本)")
-        print(f"   └── data/              (数据目录)")
-        print(f"       ├── output/        (输出文件)")
-        print(f"       ├── logs/          (执行日志)")
-        print(f"       └── cache/         (缓存文件)")
+        print(f"   └── .standardization/{name}/  (产出物目录, R-11合规)")
+        print(f"       ├── data/          (业务数据)")
+        print(f"       ├── outputs/       (导出产物)")
+        print(f"       ├── cache/         (缓存)")
+        print(f"       ├── temp/          (临时文件)")
+        print(f"       └── backup/        (备份)")
         print(f"\n下一步:")
         print(f"   1. 编辑 SKILL.md 填写触发词和核心能力")
         print(f"   2. 编辑 references/guide.md 填写详细教程")
@@ -558,6 +577,54 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 > 更多示例欢迎通过 PR 贡献到本文件的后续章节。
 """
 
+    def _generate_antipatterns_template(self, name):
+        """生成 references/antipatterns.md 模板（R-18）"""
+        return f"""# {name} — 反模式与常见错误
+
+## 1. 跳过输入验证
+
+- **错误做法**：直接假设输入数据格式正确，不做检查就开始处理。
+- **正确做法**：在入口处校验输入格式和必填字段，不符合时提示。
+
+## 2. 硬编码路径
+
+- **错误做法**：在代码中直接写入绝对路径或写死相对路径。
+- **正确做法**：所有路径从统一路径模块导入。
+
+## 3. 不记录错误信息
+
+- **错误做法**：抛出异常后不记录任何上下文，用户无法排查。
+- **正确做法**：捕获异常后打印关键变量值和操作上下文。
+
+> 更多反模式欢迎通过 PR 贡献。
+"""
+
+    def _generate_faq_template(self, name):
+        """生成 references/faq.md 模板（R-19）"""
+        return f"""# {name} — 常见问题（FAQ）
+
+## 一、参数错误
+
+### Q: 运行报"参数错误"
+
+**原因：** 传入的参数数量或顺序不对。
+**修复：** 查阅 SKILL.md 中的用法说明或运行 --help。
+
+## 二、依赖错误
+
+### Q: 提示 XX 模块未安装
+
+**原因：** 缺少 Python 依赖包。
+**修复：** 确认满足环境要求后重新运行。
+
+## 三、环境错误
+
+### Q: 技能无法启动
+
+**原因：** 可能是不支持的操作系统或 Python 版本。
+**修复：** 确认环境满足 SKILL.md 中的环境要求。
+"""
+
     def _generate_license_template(self, name):
         """生成 references/LICENSE.md 模板（空白 MIT，R-26 规范）"""
         return f"""MIT License
@@ -668,7 +735,8 @@ SOFTWARE.
 
 ### 新增
 - 初始版本，由 `skill-standardization v2.29.2` 创建
-- 基础目录结构：`SKILL.md`、`references/`、`scripts/`、`data/`
+- 基础目录结构：`SKILL.md`、`references/`、`scripts/`
+- 产出物目录：`.standardization/{name}/`（R-11/R-12 标准结构）
 - 支持基本输入处理和结果输出
 - 包含权限声明（R-07 合规）
 - 包含渐进式加载文档体系（R-06 合规）
