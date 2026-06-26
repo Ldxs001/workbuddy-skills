@@ -504,7 +504,7 @@ def _check_path_centralization(skill_dir):
         except Exception:
             continue
 
-        rel = os.path.join("scripts", fname)
+        rel = os.path.join("scripts", fname).replace("\\", "/")
 
         # 检查脚本是否已从 _paths.py 导入
         uses_paths_module = "from _paths import" in text or "from scripts._paths import" in text
