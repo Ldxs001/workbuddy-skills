@@ -1,3 +1,17 @@
+## [2.97.2] - 2026-06-26
+
+### 修复
+- Fix1: format_report()改show_fix_hint参数,refactor/update/--fix不再误导LLM; Fix2: cmd_audit --fix加_llm_only_fix_keys过滤; Fix3: sys.exit前强制生成HTML报告
+
+---
+
+## [2.97.1] - 2026-06-26
+
+### 修复
+- 文档修复: CHANGELOG.md→references/changelog.md; 创建能力描述更新; 流程步骤对齐9步; 模式映射表归入约束; guide.md措辞修正
+
+---
+
 ## [2.97.0] - 2026-06-26
 
 ### 修复

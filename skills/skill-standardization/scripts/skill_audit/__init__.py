@@ -604,7 +604,7 @@ def _filter_false_positives(audit_result, skill_dir):
     return remaining
 
 
-def format_report(audit_result, verbose=True, before_summary=None):
+def format_report(audit_result, verbose=True, before_summary=None, show_fix_hint=True):
     """格式化人类可读的审查报告"""
     lines = []
     r = audit_result
@@ -719,13 +719,14 @@ def format_report(audit_result, verbose=True, before_summary=None):
                 if fix.get("reason"):
                     lines.append(f"    💬 原因：{fix['reason']}")
 
-    # 固定输出：提示可用 --fix 自动修复
-    lines.append("")
-    lines.append(f'{"─"*55}')
-    lines.append("  🛠️ 提示：发现可修复问题时，优先运行以下命令自动修复：")
-    lines.append("    python -m skill_audit audit <skill_dir> --fix")
-    lines.append("  （模型请勿手动修改，优先使用 --fix 自动修复）")
-    lines.append(f'{"─"*55}')
+    # 固定输出：提示可用 --fix 自动修复（仅在纯 audit 命令显示，refactor/update 有自己的修复流程）
+    if show_fix_hint:
+        lines.append("")
+        lines.append(f'{"─"*55}')
+        lines.append("  🛠️ 提示：发现可修复问题时，优先运行以下命令自动修复：")
+        lines.append("    python -m skill_audit audit <skill_dir> --fix")
+        lines.append("  （模型请勿手动修改，优先使用 --fix 自动修复）")
+        lines.append(f'{"─"*55}')
 
     return "\n".join(lines)
 
@@ -990,13 +991,34 @@ def generate_html_report(audit_result, output_path, before_summary=None, skill_d
     else:
         before_table_html = ""
     
+    # 条形图 SVG：纯内联，零外部依赖
+    _max_c = max(err_c, warn_c, pass_c, skip_c, 1)
+    _bar_h = 80
+    _bar_w = 30
+    _gap = 10
+    _total_w = (_bar_w + _gap) * 4
+    _bars = [
+        ("ERROR", err_c, "#ff7675"),
+        ("WARN", warn_c, "#fdcb6e"),
+        ("PASS", pass_c, "#55efc4"),
+        ("SKIP", skip_c, "#74b9ff"),
+    ]
+    _bar_rects = ""
+    _bar_labels = ""
+    for i, (label, val, color) in enumerate(_bars):
+        h = val / _max_c * _bar_h if val > 0 else 2
+        x = i * (_bar_w + _gap)
+        y = _bar_h - h
+        _bar_rects += f'<rect x="{x}" y="{y}" width="{_bar_w}" height="{h}" fill="{color}" rx="3" />'
+        _bar_labels += f'<text x="{x + _bar_w/2}" y="{_bar_h + 14}" text-anchor="middle" font-size="10" fill="#636e72">{label}</text>'
+    bar_svg = f'<svg viewBox="0 0 {_total_w} {_bar_h + 28}" style="width:100%;height:100%;max-height:140px;"><g>{_bar_rects}</g><g>{_bar_labels}</g></svg>'
+    
     html = f'''<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>审计报告 — {skill}</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f5f6fa; color:#2d3436; }}
@@ -1042,7 +1064,33 @@ td {{ padding:8px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; cursor:
 <div class="scc" style="background:#dfe6e9;color:#636e72;"><h3>{excluded_c}</h3><p>ⓘ 误报(排除)</p></div>
 </div>
 {compare_html}
-<div class="ch"><div class="cbx"><canvas id="pie"></canvas></div><div class="cbx"><canvas id="bar"></canvas></div></div>
+<div class="ch">
+  <div class="cbx" style="padding:12px;text-align:center;">
+    <svg viewBox="0 0 160 120" style="max-width:200px;height:100%;">
+      <circle cx="80" cy="60" r="50" fill="#55efc4" />
+      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#ff7675" stroke-width="25"
+        stroke-dasharray="{err_c} {err_c + warn_c + pass_c + skip_c or 1}"
+        stroke-dashoffset="0" transform="rotate(-90,80,60)" />
+      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#fdcb6e" stroke-width="25"
+        stroke-dasharray="{warn_c} {err_c + warn_c + pass_c + skip_c or 1}"
+        stroke-dashoffset="{-err_c * 360 / (err_c + warn_c + pass_c + skip_c + 0.01)}"
+        transform="rotate(-90,80,60)" />
+      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#55efc4" stroke-width="25"
+        stroke-dasharray="{pass_c} {err_c + warn_c + pass_c + skip_c or 1}"
+        transform="rotate(-90,80,60)" />
+      <text x="80" y="65" text-anchor="middle" font-size="16" font-weight="bold">{total}</text>
+    </svg>
+    <div style="display:flex;justify-content:center;gap:12px;font-size:11px;margin-top:4px;">
+      <span><span style="color:#ff7675;">●</span> E{err_c}</span>
+      <span><span style="color:#fdcb6e;">●</span> W{warn_c}</span>
+      <span><span style="color:#55efc4;">●</span> P{pass_c}</span>
+      <span><span style="color:#74b9ff;">●</span> S{skip_c}</span>
+    </div>
+  </div>
+  <div class="cbx" style="padding:12px;">
+    {bar_svg}
+  </div>
+</div>
 {before_table_html}
 <div class="bh">📋 修复后</div>
 <div class="fl">
@@ -1057,8 +1105,6 @@ td {{ padding:8px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; cursor:
 function toggleDetail(i){{var d=document.getElementById('d'+i);d.style.display=d.style.display==='none'?'table-row':'none';}}
 function toggleDetailB(i){{var d=document.getElementById('bd'+i);d.style.display=d.style.display==='none'?'table-row':'none';}}
 function af(){{var s=document.getElementById('sf').value,t=document.getElementById('tf').value,q=document.getElementById('sq').value.toLowerCase();document.querySelectorAll('#rb tr:not(.dr)').forEach(function(r){{var sm=s==='all'||r.dataset.severity===s,tm=t==='all'||(t==='fail'&&r.classList.contains('fail-row'))||(t==='pass'&&r.classList.contains('pass-row'));var tx=r.textContent.toLowerCase();r.style.display=(sm&&tm&&(!q||tx.includes(q)))?'':'none';}});}}
-new Chart(document.getElementById('pie'),{{type:'pie',data:{{labels:['ERROR','WARN','PASS','SKIP'],datasets:[{{data:[{err_c},{warn_c},{pass_c},{skip_c}],backgroundColor:['#ff7675','#fdcb6e','#55efc4','#74b9ff']}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{position:'bottom'}}}}}}}});
-new Chart(document.getElementById('bar'),{{type:'bar',data:{{labels:['ERROR','WARN','PASS','SKIP'],datasets:[{{data:[{err_c},{warn_c},{pass_c},{skip_c}],backgroundColor:['#ff7675','#fdcb6e','#55efc4','#74b9ff']}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{y:{{beginAtZero:true,ticks:{{stepSize:1}}}}}}}}}});
 </script>
 </body>
 </html>'''
@@ -1383,7 +1429,6 @@ def cmd_audit(args):
         print(f"  → 运行 --fix 自动修复，或 --verify 逐项审查")
         print(f"{'='*55}")
         # 强制 HTML 报告输出（代码强制，非 LLM 自觉）
-        _save_html_report(skill_dir, result)
 
     if has_fixable and not args.fix:
         print(f"\n  ⛔ 存在可自动修复的 FAIL — 必须执行 audit --fix 修复后重新验证")
@@ -1482,14 +1527,13 @@ def cmd_audit(args):
             print(f"  修复项：{', '.join(fix_details)} ({fixes_applied} 处)")
             print(f"  修复前：{before_err} ERROR, {before_warn} WARN")
             if not args.json:
-                print(format_report(result, before_summary={"errors": before_err, "warns": before_warn}))
+                print(format_report(result, before_summary={"errors": before_err, "warns": before_warn}, show_fix_hint=False))
             after_err = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'ERROR')
             after_warn = sum(1 for r in result.get("results",[]) if not r.get("passed") and r.get("severity") == 'WARN')
             print(f"  修复后：{after_err} ERROR, {after_warn} WARN")
             if after_err == 0 and after_warn == 0:
                 print(f"  ✅ 全部修复")
             print(f"{'─'*55}")
-            _save_html_report(skill_dir, result, before_summary={"errors": before_err, "warns": before_warn})
 
     # ── 问题分类与真问题强制修复：--fix 后仍有可修复 FAIL 则阻止通过
     # ★ 关键区分：只有 fix 函数能真正自动修复的才算"可自动修复"
@@ -1499,7 +1543,9 @@ def cmd_audit(args):
                  if not res.get("passed") and not res.get("skipped")
                  and not _reclassify_false_positive(res, skill_dir)]
     # 按是否有 fix key 分割为"auto可以"和"LLM 手动"
-    remaining_auto = [r for r in remaining if r.get("fix")]
+    # v2.97.2: 加上 _llm_only_fix_keys 过滤，与 _run_audit_loop 行为一致
+    _llm_only_fix_keys = {"workflow_completeness", "example_quality", "capability_boundary", "section_names"}
+    remaining_auto = [r for r in remaining if r.get("fix") and r["fix"].get("key") not in _llm_only_fix_keys]
     has_fixable_after = bool(remaining_auto)
     if has_fixable_after:
         # 循环检测：用 .fix_loop_check 文件记录上次 remaining IDs
@@ -1525,12 +1571,22 @@ def cmd_audit(args):
             print(f"  → 编辑完成后重新运行 audit 验证。误判标记仅在前置 LLM 二次筛查阶段进行。")
             # 清理 loop 标记文件，避免二次运行时误阻断
             os.remove(_loop_path)
+            # ★ v2.97.2: 任何 exit 前必须生成 HTML 报告
+            try:
+                _save_html_report(skill_dir, result)
+            except Exception:
+                pass
             sys.exit(1)
         # 保存当前 IDs 供下次循环检测
         os.makedirs(os.path.dirname(_loop_path), exist_ok=True)
         with open(_loop_path, "w") as _f:
             json.dump(current_ids, _f)
         print(f"\n  ⛔ --fix 后仍有 {len(remaining_auto)} 项 FAIL — 必须再执行 --fix")
+        # ★ v2.97.2: 任何 exit 前必须生成 HTML 报告
+        try:
+            _save_html_report(skill_dir, result)
+        except Exception:
+            pass
         sys.exit(1)
     # 无 fix key 的规则需要 LLM 手动处理，输出提示
     remaining_llm = [r for r in remaining if not r.get("fix")]
@@ -1544,7 +1600,6 @@ def cmd_audit(args):
         print(f"  → 运行 --verify 查看 FAIL 详情，手动编辑修复")
         print(f"  → 编辑完成后重新运行 audit。误判标记仅在前置 LLM 二次筛查阶段进行。")
         # 强制 HTML 报告输出
-        _save_html_report(skill_dir, result)
 
     # --verify 模式：展示所有 FAIL 项（不做白名单预筛），LLM 自行判断误报
     # 铁律 8 分两阶段：(1) 筛选看到的问题 → (2) 凭ID获取对应修复指引
@@ -1757,7 +1812,8 @@ def cmd_fix(args):
         # 重新审计
         print(f"\n=== 重新审计 ===")
         result = audit_skill(skill_dir)
-        print(format_report(result))
+        print(format_report(result, show_fix_hint=False))
+
 
 
 def cmd_bump(args):
@@ -2017,7 +2073,7 @@ def cmd_refactor(args):
     result = audit_skill(skill_dir, manifest_version=args.manifest_version)
     s_before = result.get("summary", {})  # 记录初始审计摘要，供最终对比
     result_before = result  # 保存初始结果，供最终 HTML 显示 before 表
-    print(format_report(result))
+    print(format_report(result, show_fix_hint=False))
     remaining = [r for r in result.get("results", [])
                  if not r.get("passed") and not r.get("skipped")]
 
@@ -2064,7 +2120,7 @@ def cmd_refactor(args):
     print(f"{'─'*55}")
     result = audit_skill(skill_dir)
     _before = {"errors": s_before.get("errors", 0), "warns": s_before.get("warns", 0)}
-    print(format_report(result, before_summary=_before))
+    print(format_report(result, before_summary=_before, show_fix_hint=False))
     remaining = _filter_false_positives(result, skill_dir)
     if remaining:
         print(f"\n  ⛔ 全量审计确认失败：仍有 {len(remaining)} 项 FAIL")
@@ -2072,7 +2128,6 @@ def cmd_refactor(args):
             sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
             rid = r.get('rule_id', r.get('rule', '?'))
             print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
-        _save_html_report(skill_dir, result)
         sys.exit(1)
     else:
         print(f"  ✅ 双 0 确认通过")
@@ -2111,7 +2166,6 @@ def cmd_refactor(args):
                 print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
                 print(f"{'='*55}")
                 _save_remaining_llm(skill_dir, c_raw)
-                _save_html_report(skill_dir, result)
                 sys.exit(0)
         
         c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
@@ -2169,14 +2223,12 @@ def cmd_refactor(args):
                 print(f"  --- 余下 {len(c_real)} 项不可自动修复（missing_doc_ref 等），需 LLM 用 --classify 处理 ---")
                 print(f"")
                 _save_remaining_llm(skill_dir, c_real)
-                _save_html_report(skill_dir, result)
                 print(f"  ⏸ 一致性审查剩余项已保存至 .remaining_llm.json，请用 --classify 处理误报后重新 --continue")
                 sys.exit(0)
             
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")
                 print(f"  请检查后重新运行 refactor --continue")
-                _save_html_report(skill_dir, result)
                 sys.exit(1)
         else:
             print(f"  ✅ 一致性审查通过，无问题")
@@ -2210,11 +2262,6 @@ def cmd_refactor(args):
     print(f"  ✅ bump: {bump_type} upgrade")
     print(f"  📋 技能: {os.path.basename(skill_dir)}")
     print(f"  📋 状态: 已完成全流程改造")
-    # 输出 HTML 报告（含 before/after 双表）
-    try:
-        _save_html_report(skill_dir, result, before_result=result_before)
-    except Exception:
-        pass
 
     # ── 步骤 9：清理（cleanup session 驱动） ──
     print(f"\n{'─'*55}")
@@ -2239,7 +2286,7 @@ def cmd_refactor(args):
     print(f"\n{'='*55}")
     print(f"  ✅ refactor 全流程完成：{os.path.basename(skill_dir)}")
     print(f"{'='*55}")
-    _save_html_report(skill_dir, result)
+    _save_html_report(skill_dir, result, before_result=result_before)
 
 
 def _check_large_dirs(skill_dir):
@@ -2464,7 +2511,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
         result = audit_skill(skill_dir, filter_files=filter_files)
     else:
         result = audit_skill(skill_dir, manifest_version=manifest_version)
-    print(format_report(result))
+    print(format_report(result, show_fix_hint=False))
 
     # ── ★ 前置 LLM 二次筛除（阻断点） ──
     # 流程: ①审计输出 → ②报告展示 → ③★LLM二次筛 → ④_filter_false_positives → ⑤细碎循环
@@ -2691,7 +2738,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                 # ⛔ 铁律：剩余项不为空则不能退出循环
                 # 保存 .remaining_llm.json 并创建重构锁，阻止后续步骤
                 _save_remaining_llm(skill_dir, remaining)
-                _save_html_report(skill_dir, result)
                 _lock_refactor(skill_dir)
                 print(f"\n{'='*55}")
                 print(f"  🔒 重构锁已激活——剩余 {len(remaining)} 项未修复")
@@ -2702,7 +2748,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                 sys.exit(2)  # ★ 强制退出——LLM 无法继续，必须手动修复后再 --continue
             else:
                 print(f"\n  ✅ 所有项已修复，双 0 达成")
-                _save_html_report(skill_dir, result)
             break
         print(f"  ⚠️  剩余 {len(remaining)} 项（{len(auto_fixable)} 项可自动修复，{len(remaining)-len(auto_fixable)} 项需手动）")
         print()
@@ -2711,7 +2756,7 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             result = audit_skill(skill_dir, filter_files=filter_files)
         else:
             result = audit_skill(skill_dir)
-        print(format_report(result))
+        print(format_report(result, show_fix_hint=False))
         remaining = _filter_false_positives(result, skill_dir)
 
         if remaining:
@@ -2719,7 +2764,6 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
 
     if loop_count >= max_loops:
         print(f"\n  ⛔ 修复循环已达上限 {max_loops} 次，强制退出")
-        _save_html_report(skill_dir, result)
         sys.exit(1)
 
     return result, remaining, loop_count
@@ -2854,7 +2898,7 @@ def cmd_update(args):
     print(f"{'─'*55}")
     result = audit_skill(skill_dir)
     _before = {"errors": s_before_update.get("errors", 0), "warns": s_before_update.get("warns", 0)}
-    print(format_report(result, before_summary=_before))
+    print(format_report(result, before_summary=_before, show_fix_hint=False))
     remaining = _filter_false_positives(result, skill_dir)
     if remaining:
         print(f"\n  ⛔ 全量审计确认失败：仍有 {len(remaining)} 项 FAIL")
@@ -2862,7 +2906,6 @@ def cmd_update(args):
             sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
             rid = r.get('rule_id', r.get('rule', '?'))
             print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
-        _save_html_report(skill_dir, result)
         sys.exit(1)
     else:
         print(f"  ✅ 双 0 确认通过")
@@ -2942,7 +2985,6 @@ def cmd_update(args):
             if c_real:
                 print(f"  ⛔ 一致性修复已达重试上限，仍有 {len(c_real)} 项待处理")
                 print(f"  请检查后重新运行 update --continue")
-                _save_html_report(skill_dir, result)
                 sys.exit(1)
         else:
             print(f"  ✅ 一致性审查通过，无问题")

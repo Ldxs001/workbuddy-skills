@@ -19,7 +19,7 @@
 
 ---
 
-> **⚠️ 文件更新约束**：更新 `SKILL.md` 或 `references/*.md` 时，**严禁使用 Write/Edit 工具**（会损坏 UTF-8 编码）。必须使用 `scripts/` 下的 Python 脚本原子写入（`open(tmp)+os.replace()`）。更新后必须自审 0 ERROR 0 WARN。
+> **⚠️ 文件更新约束**：更新 `SKILL.md` 或 `references/*.md` 时，建议使用 Python 脚本原子写入（`open(tmp)+os.replace()`），避免编码损坏。更新后必须运行审计确认 0 ERROR 0 WARN。
 
 ---
 
