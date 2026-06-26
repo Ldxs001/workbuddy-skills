@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.19.1
+version: 1.19.2
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -27,6 +27,11 @@ external_data_dir: true
 
 ## 约束
 
+- **[强制] 新会话第一步：查看项目** — 不要猜路径，先运行以下命令查看已有的项目：
+  ```
+  python ~/.workbuddy/skills/novel-weaver/scripts/novel_workflow_engine.py list-projects
+  ```
+  如果无项目则创建新项目，有项目则记录 state_path 供后续命令使用。
 - **[强制] 流程门禁系统** —  在阶段转换时自动 require 前置门禁：→writing 检查 outline_causality + sub_causality；→stage3_ready 检查 fidelity + ending_verify。门禁状态存于 ， 查看
 - 🔴 **[强制] 核心规划字段保护** — `novel_state_manager.py` 对 `chapters[].title/overview`、`sub_structures[].title/summary/tone`、`characters[].name/role/traits/mbti/archetype`、`novel_info/writing_style/setting` 做 MD5 指纹校验，**LLM 不可更新**。仅 `word_count/status/timeline/notes` 等运行时字段可更新
 - **[必须] 先确认再写作** — 场景配置和大纲必须经用户确认后才能进入写作阶段
@@ -38,14 +43,26 @@ external_data_dir: true
 
 ## 数据目录
 
-⚠️ **LLM 禁止手工拼写路径！** 以下代码可自动获取正确路径：
+⚠️ **LLM 禁止手工拼写路径！禁止去 Read memory/ 目录下的文件！** 
+所有项目数据只能通过以下途径获取：
 
-**列出所有项目：**
+**列出所有项目（新会话第一件事）：**
+```
+python novel_workflow_engine.py list-projects
+```
+或
 ```python
 import sys; sys.path.insert(0, r'~/.workbuddy/skills/novel-weaver/scripts')
 from _path_utils import list_projects, resolve_state_path, DATA_DIR
 projects = list_projects()
 # DATA_DIR = ~/.workbuddy/skills/.standardization/novel-weaver/projects/
+```
+
+**获取单个项目 state 路径（后续所有命令都需要）：**
+```python
+from _path_utils import resolve_state_path
+state_path = resolve_state_path()       # 自动从 .project 缓存读取
+# 或传入项目名: resolve_state_path("赛博搏杀记")
 ```
 
 **读取项目状态：**
