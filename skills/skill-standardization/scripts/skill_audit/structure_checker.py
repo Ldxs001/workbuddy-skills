@@ -1713,6 +1713,8 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     elif clue == "一行一条":
                         items_c = len(re.findall(r'^[-*]\s+', sec_body, re.MULTILINE))
                         found = items_c > 0
+                    elif clue == "列表":
+                        found = bool(re.search(r'^[-*]\s+', sec_body, re.MULTILINE))
                     else:
                         found = clue in sec_body
                     if not found:
