@@ -14,7 +14,8 @@
 | **串行阻断** | **每段写作前（context_loader）** | **阻断式** | 检测上一子结构 state 是否为 completed，pending 则 HOOK-BLOCK 并输出 write-sub 修复命令 | `scripts/novel_context_loader.py` |
 | 字数约束注入 | 每段写作前（context_loader） | 信息式（硬性提示） | 根据 meta.length 输出篇幅对应的字数范围 + 校验上浮值，禁止 LLM 自行设定 | `scripts/novel_context_loader.py` |
 | 写作前加载上下文 | 写作前 | 阻断式+阶段约束 | novel_context_loader.py 输出命题指令框（含字数约束/情绪/人格/文风） | `scripts/novel_context_loader.py` |
-| 写后即存 | 每段写作完成后 | 阻断式+原子写入 | novel_atomic_writer.py 格式校验 + fsync + 编号标记 + 字数校验（篇幅目标+15%上浮） | `scripts/novel_atomic_writer.py` |
+| 写后即存 | 每段写作完成后 | 阻断式+原子写入 | novel_atomic_writer.py 格式校验 + fsync + 编号标记 + 字数校验（子结构目标） | `scripts/novel_atomic_writer.py` |
+| **修改/扩写提醒** | **已 completed 的子结构再次写入** | **软性（不阻断）** | write-sub 检测子结构状态为 completed，输出提醒要求修改后运行 finalize-chapter | `scripts/novel_workflow_engine.py` |
 | 署名检测 | 每段写入时 | **代码级硬阻断** | atomic_writer 检测"由...撰写"等8种署名模式；signature=off 时阻断 | `scripts/novel_atomic_writer.py` |
 | 更新进度 | 每个子结构完成后 | 阻断式 | novel_state_manager.py update-sub | `scripts/novel_state_manager.py` |
 | 角色登记 | 新角色出场时 | 阻断式 | novel_state_manager.py add-char | `scripts/novel_state_manager.py` |

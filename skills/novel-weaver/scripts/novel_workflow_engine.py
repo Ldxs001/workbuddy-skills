@@ -172,6 +172,9 @@ def write_sub(state_path, chapter, sub_key, target_dir):
       2. state_manager.update-sub → 即时状态更新
 
     内容从 stdin 读取。
+
+    注意：如果子结构已为 completed，本次写入视为修改/扩写，
+    完成后必须运行 finalize-chapter 通过全量检查才能推进。
     """
     atomic_writer = SCRIPTS_DIR / "novel_atomic_writer.py"
     chapter_dir = Path(target_dir) / chapter
@@ -180,6 +183,15 @@ def write_sub(state_path, chapter, sub_key, target_dir):
 
     # ── 读取签名配置 ──
     ws_data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
+
+    # ── 判断是否修改模式（子结构已 completed）──
+    is_rewrite = False
+    for ch in ws_data.get("chapters", []):
+        if ch["id"] == chapter:
+            sub_info = ch.get("sub_structures", {}).get(sub_key, {})
+            if sub_info.get("status") == "completed":
+                is_rewrite = True
+            break
     sig_cfg = ws_data.get("signature", {"enabled": False, "text": ""})
 
     # ── 步骤1: 从 stdin 读取内容 ──
@@ -230,6 +242,14 @@ def write_sub(state_path, chapter, sub_key, target_dir):
             print(f"  [INFO] 字数 {word_count} > 上限+15%({check_hi})，注意篇幅控制")
         else:
             print(f"  [OK] 字数 {word_count} 在 {lo}-{check_hi} 范围内")
+
+    # ── 修改模式提醒：已完成的子结构被修改后必须重新检查 ──
+    if is_rewrite:
+        print(f"\n{'='*50}")
+        print(f"[强制] 检测到修改/扩写已完成子结构 {chapter}{sub_key}")
+        print(f"[要求] 修改后必须运行 finalize-chapter 通过全量检查：")
+        print(f"  python novel_workflow_engine.py finalize-chapter \"{state_path}\" {chapter}")
+        print(f"{'='*50}\n")
 
 def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 阻断循环 → 门禁"""
