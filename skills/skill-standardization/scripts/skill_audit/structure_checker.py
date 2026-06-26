@@ -1690,8 +1690,9 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                         found = bool(re.search(r'^\|.+\|$', sec_body_no_code, re.MULTILINE))
                     elif clue == "加粗":
                         found = bool(re.search(r'\*\*[^*]+\*\*', sec_body))
-                    elif clue in ("编号列表", "序号"):
-                        found = bool(re.search(r'^\d+\.\s+', sec_body_no_code, re.MULTILINE))
+                    elif clue in ("编号列表", "序号", "编号"):
+                        items_c = len(re.findall(r'^\d+\.\s+|^[-*\s]+[①②③④⑤⑥⑦⑧⑨⑩ⅠⅡⅢⅣⅤ]', sec_body, re.MULTILINE))
+                        found = items_c > 0
                     elif clue == "简短列表":
                         found = bool(re.search(r'^[-*]\s+', sec_body, re.MULTILINE))
                     elif clue == "流程图":
@@ -1755,7 +1756,8 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     if not s:
                         continue
                     if re.search(r'[应必][该须]?|[不得][能]?', s):
-                        skip = all(clue in s for clue in clues if clue)
+                        # 检查章��正文是否已包含此指导的内容（用 clues 判断）
+                        skip = any(clue in sec_body for clue in clues if clue)
                         if not skip and len(s) > 6:
                             semantic_rules.append(s)
                 if semantic_rules:

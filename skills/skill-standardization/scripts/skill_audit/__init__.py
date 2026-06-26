@@ -1077,18 +1077,17 @@ td {{ padding:8px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; cursor:
 {compare_html}
 <div class="ch">
   <div class="cbx" style="padding:12px;text-align:center;">
-    <svg viewBox="0 0 160 120" style="max-width:200px;height:100%;">
+    <svg viewBox="0 0 160 120" style="max-width:200px;height:120px;">
       <circle cx="80" cy="60" r="50" fill="#55efc4" />
-      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#ff7675" stroke-width="25"
-        stroke-dasharray="{err_c} {err_c + warn_c + pass_c + skip_c or 1}"
-        stroke-dashoffset="0" transform="rotate(-90,80,60)" />
-      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#fdcb6e" stroke-width="25"
-        stroke-dasharray="{warn_c} {err_c + warn_c + pass_c + skip_c or 1}"
-        stroke-dashoffset="{-err_c * 360 / (err_c + warn_c + pass_c + skip_c + 0.01)}"
-        transform="rotate(-90,80,60)" />
-      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#55efc4" stroke-width="25"
-        stroke-dasharray="{pass_c} {err_c + warn_c + pass_c + skip_c or 1}"
-        transform="rotate(-90,80,60)" />
+      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#ff7675" stroke-width="28"
+        stroke-dasharray="{err_c * 314 / total:.1f} {314:.1f}"
+        stroke-dashoffset="{0 if err_c == 0 else -0.1}" />
+      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#fdcb6e" stroke-width="28"
+        stroke-dasharray="{warn_c * 314 / total:.1f} {314:.1f}"
+        stroke-dashoffset="{-err_c * 314 / total:.1f}" />
+      <circle cx="80" cy="60" r="50" fill="transparent" stroke="#55efc4" stroke-width="28"
+        stroke-dasharray="{pass_c * 314 / total:.1f} {314:.1f}"
+        stroke-dashoffset="{-(err_c + warn_c) * 314 / total:.1f}" />
       <text x="80" y="65" text-anchor="middle" font-size="16" font-weight="bold">{total}</text>
     </svg>
     <div style="display:flex;justify-content:center;gap:12px;font-size:11px;margin-top:4px;">
