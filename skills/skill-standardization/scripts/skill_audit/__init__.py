@@ -2111,19 +2111,18 @@ def cmd_refactor(args):
                      if r.get('rule_id', r.get('rule', '')) in ('R-07', 'R-11', 'R-20', 'R-23', 'R-25')]
         if llm_items:
             _save_remaining_llm(skill_dir, llm_items)
-            _lock_refactor(skill_dir)  # ★ 创建重构锁，阻止跳过循环直接出报告
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
             for r in llm_items:
                 sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
                 rid = r.get('rule_id', r.get('rule', '?'))
                 print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
-            print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
-            print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
-            print(f"  🔒 重构锁已激活——未达双 0 前任何报告生成操作都将被拒绝")
+            _signal_manual_wait(skill_dir, llm_items)
+            sys.exit(0)
         else:
-            print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复修复")
+            print(f"\n  ⛔ 有 {len(remaining)} 项非 LLM 类 FAIL 未被自动修复")
             print(f"  请检查修复循环是否达到上限（20 轮），或手动排查")
-        sys.exit(2)
+            _signal_manual_wait(skill_dir, remaining)
+            sys.exit(0)
 
     # ── 步骤 6：全量审计确认（双 0 验证） ──
     print(f"\n{'─'*55}")
@@ -2176,7 +2175,7 @@ def cmd_refactor(args):
                 print(f"  步骤 3: 重新执行 refactor --continue")
                 print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
                 print(f"{'='*55}")
-                _save_remaining_llm(skill_dir, c_raw)
+                _signal_manual_wait(skill_dir, c_raw)
                 sys.exit(0)
         
         c_real = [i for i in c_issues if not reclassify_consistency_false_positive(i, skill_dir=skill_dir)]
@@ -2231,10 +2230,9 @@ def cmd_refactor(args):
                 print(f"     - 如果发现不一致，LLM 手动修正 SKILL.md 的描述")
                 print(f"     注意：这是语义检查，代码无法自动判断，完全依赖 LLM")
                 print(f"")
-                print(f"  --- 余下 {len(c_real)} 项不可自动修复（missing_doc_ref 等），需 LLM 用 --classify 处理 ---")
+                print(f"  --- 余下 {len(c_real)} 项不可自动修复（missing_doc_ref 等），需 LLM 手动编辑 ---")
                 print(f"")
-                _save_remaining_llm(skill_dir, c_real)
-                print(f"  ⏸ 一致性审查剩余项已保存至 .remaining_llm.json，请用 --classify 处理误报后重新 --continue")
+                _signal_manual_wait(skill_dir, c_real)
                 sys.exit(0)
             
             if c_real:
@@ -2524,6 +2522,33 @@ def _manual_dir_path(skill_dir):
     return _sd
 
 
+def _signal_manual_wait(skill_dir, items, files=None):
+    """写入 .manual_wait 信号，要求 LLM 手动修复后写 .manual_done"""
+    _d = _manual_dir_path(skill_dir)
+    os.makedirs(_d, exist_ok=True)
+    _w = os.path.join(_d, ".manual_wait")
+    _wait_files = files or []
+    if not _wait_files:
+        for r in items:
+            src = r.get("fix", {}).get("location", "") if isinstance(r.get("fix"), dict) else ""
+            if src and os.path.exists(src):
+                _wait_files.append(src)
+        _wait_files = list(set(_wait_files))
+    if not _wait_files:
+        _wait_files = [os.path.join(skill_dir, "SKILL.md")]
+    with open(_w, 'w', encoding='utf-8') as f:
+        json.dump({"items": len(items), "count": len(items), "files": _wait_files}, f, ensure_ascii=False)
+    _d = os.path.join(_d, ".manual_done")
+    print(f"\n{'='*55}")
+    print(f"  🔒 重构锁已激活——剩余 {len(items)} 项未修复")
+    print(f"{'─'*55}")
+    print(f"  修完以上所有问题后执行：")
+    print(f"    python -c \"import pathlib; pathlib.Path(r'{_d}').touch()\"")
+    print(f"  然后重新运行 --continue")
+    print(f"  ⚠️  未修改任何文件就写 .manual_done 将被拒绝")
+    print(f"{'='*55}")
+
+
 def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, filter_files=None):
     """
     修复循环通用实现。
@@ -2793,36 +2818,8 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                     detail = r.get("detail", "")[:150]
                     print(f"    {rid} {sev} {detail}")
                 # ⛔ 铁律：剩余项不为空则不能退出循环
-                # 保存 .remaining_llm.json 并创建重构锁，阻止后续步骤
                 _save_remaining_llm(skill_dir, remaining)
-                _lock_refactor(skill_dir)
-                # ★ v2.98.1: .manual_wait 信号代替 sys.exit(2)
-                # LLM 必须手动修文件 + 写 .manual_done，否则流程拒绝继续
-                try:
-                    os.makedirs(_manual_dir, exist_ok=True)
-                    # 收集需要修改的文件列表
-                    _wait_files = []
-                    for r in remaining:
-                        src = r.get("fix", {}).get("location", "") if isinstance(r.get("fix"), dict) else ""
-                        if src and os.path.exists(src):
-                            _wait_files.append(src)
-                    _wait_files = list(set(_wait_files))
-                    if not _wait_files:
-                        _wait_files = [os.path.join(skill_dir, "SKILL.md")]
-                    with open(_manual_wait_path, 'w', encoding='utf-8') as _wf:
-                        json.dump({"items": len(remaining), "files": _wait_files}, _wf, ensure_ascii=False)
-                except Exception:
-                    pass
-                print(f"\n{'='*55}")
-                print(f"  🔒 重构锁已激活——剩余 {len(remaining)} 项未修复")
-                print(f"{'─'*55}")
-                print(f"  修完以上所有问题后执行以下操作：")
-                print(f"    1. 手动编辑 SKILL.md 或 references/ 中的对应章节")
-                print(f"    2. 写入 .manual_done 信号文件：")
-                print(f"       python -c \"import pathlib; pathlib.Path(r'{_manual_done_path}').touch()\"")
-                print(f"    3. 重新运行 --continue")
-                print(f"  ⚠️  未修改任何文件就写 .manual_done 将被拒绝")
-                print(f"{'='*55}")
+                _signal_manual_wait(skill_dir, remaining)
                 sys.exit(0)
             else:
                 print(f"\n  ✅ 所有项已修复，双 0 达成")
@@ -2966,20 +2963,18 @@ def cmd_update(args):
                      if not r.get("fix") or r["fix"].get("key") in _llm_only_fix_keys_cmd]
         non_llm_items = [r for r in remaining if r not in llm_items]
         if llm_items:
-            _save_remaining_llm(skill_dir, llm_items)
-            _lock_refactor(skill_dir)  # ★ 创建重构锁，阻止跳过循环直接出报告
             print(f"\n  🤖 剩余 {len(llm_items)} 项需 LLM 修复（已保存结构化数据）")
             for r in llm_items:
                 sev = "[ERROR]" if r.get('severity') == 'ERROR' else "[WARN]"
                 rid = r.get('rule_id', r.get('rule', '?'))
                 print(f"    {rid} {sev} {r.get('detail', '')[:120]}")
-            print(f"\n  🔄 LLM 必须立即读取 .remaining_llm.json 并手动修复，不得询问用户，不得停止循环")
-            print(f"  重复此循环直到 0 ERROR 0 WARN，LLM 不允许在未达到双 0 前停止")
-            print(f"  🔒 重构锁已激活——未达双 0 前任何报告生成操作都将被拒绝")
+            _signal_manual_wait(skill_dir, llm_items)
+            sys.exit(0)
         else:
             print(f"\n  ⛔ 有 {len(non_llm_items)} 项非 LLM 类 FAIL 未被自动修复")
             print(f"  请检查修复循环是否达到上限（10 轮），或手动排查")
-        sys.exit(2)
+            _signal_manual_wait(skill_dir, non_llm_items)
+            sys.exit(0)
 
     # ── 步骤 6：全量审计确认（双 0 验证） ──
     print(f"\n{'─'*55}")

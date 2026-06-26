@@ -1,3 +1,11 @@
+## [2.98.2] - 2026-06-26
+
+### 修复
+- 一致性审查同步: cmd_refactor/cmd_update 中所有 sys.exit(2) 改为 _signal_manual_wait
+- 剩余 4 处退出点统一走 .manual_wait/.manual_done 信号，脚本不退出
+
+---
+
 ## [2.98.1] - 2026-06-26
 
 ### 修复
