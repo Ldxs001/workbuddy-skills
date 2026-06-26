@@ -2397,13 +2397,17 @@ def _render_examples_section(data: dict) -> str:
         desc = sc.get("description", "")
         if n:
             lines.append(f"**场景：{n}**")
-        if desc:
+        if inp:
+            lines.append(f"用户需求：{inp}")
+        else:
             lines.append(f"> {desc}")
         if cmd:
+            lines.append(f"系统执行：")
             lines.append(f"```bash\n{cmd}\n```")
-        if inp or exp:
-            lines.append(f"  - **输入**: {inp or '无'}")
-            lines.append(f"  - **输出**: {exp or '无'}")
+        if exp:
+            lines.append(f"系统输出：{exp}")
+        elif desc:
+            lines.append(f"  - **描述**: {desc}")
         lines.append("")
     return "\n".join(lines)
 

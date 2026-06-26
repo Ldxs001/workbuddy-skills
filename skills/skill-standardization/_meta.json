@@ -1,6 +1,6 @@
 {
   "name": "skill-standardization",
-  "version": "2.98.7",
+  "version": "2.98.8",
   "description": "Skill \u6807\u51c6\u5316\u89c4\u8303\u5f15\u64ce\u3002\u652f\u6301 R-01~R-26 \u89c4\u8303\u5ba1\u67e5\uff08audit / create / update / refactor / bump / readonly \u516d\u6a21\u5f0f\uff09\uff0c\u542b\u6743\u9650\u626b\u63cf\u3001\u6570\u636e\u76ee\u5f55\u5408\u89c4\u68c0\u67e5\u3001\u6e10\u8fdb\u5f0f\u52a0\u8f7d\u3001LLM \u4e8c\u6b21\u7b5b\u5206\u7c7b\u3002",
   "author": "wUwproject",
   "tags": [

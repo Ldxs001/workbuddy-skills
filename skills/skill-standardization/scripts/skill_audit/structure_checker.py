@@ -2032,7 +2032,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if re.search(r'示例|快速|使用', _h.group(1)):
                 _c17_section = _h.group(1)
                 break
-        if not re.search(r'用户[：:].*?(推荐|结果|报告|输出)', body):
+        if not re.search(r'用户[^：:]*?[：:].*?(推荐|结果|报告|输出)', body):
             _c17_quality_issues.append(
                 f'【{_c17_section}】示例缺少完整交互流程：当前示例未展示系统响应 → '
                 f'LLM执行：在用户输入之后补充系统推荐/计算结果/输出内容的描述')
@@ -2040,7 +2040,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             _c17_quality_issues.append(
                 f'【{_c17_section}】示例缺乏具体数值参数 → '
                 f'LLM执行：将示例中的输入参数替换为具体数值（如时间、高度、数量等真实场景值）')
-        if not re.search(r'用户[：:].*?\n.*?用户[：:]', body, re.DOTALL):
+        if not re.search(r'用户[^：:]*?[：:].*?\n.*?用户[^：:]*?[：:]', body, re.DOTALL):
             _c17_quality_issues.append(
                 f'【{_c17_section}】仅提供1种场景 → '
                 f'LLM执行：在现有示例之后新增至少1个不同场景的示例'

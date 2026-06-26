@@ -1,3 +1,12 @@
+## [2.98.8] - 2026-06-26
+
+### 修复
+- C-17 regex 用户[：:]→用户[^：:]*?[：:], 修复hug-html示例误报
+- _render_examples_section 补回缺失的return
+- 修复_name_dir→_name_dir_path(skill_dir) 变量作用域bug
+
+---
+
 ## [2.98.7] - 2026-06-26
 
 ### 修复

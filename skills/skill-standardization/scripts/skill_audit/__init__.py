@@ -2144,8 +2144,8 @@ def cmd_refactor(args):
 
     # ── 步骤 7：全量一致性审查 + 修复循环 ──
     # ★ v2.98.4: 同步 .manual_wait 信号机制
-    _c_manual_wait = os.path.join(_manual_dir, ".consistency_manual_wait")
-    _c_manual_done = os.path.join(_manual_dir, ".consistency_manual_done")
+    _c_manual_wait = os.path.join(_manual_dir_path(skill_dir), ".consistency_manual_wait")
+    _c_manual_done = os.path.join(_manual_dir_path(skill_dir), ".consistency_manual_done")
     if os.path.exists(_c_manual_wait):
         if os.path.exists(_c_manual_done):
             os.remove(_c_manual_done)
