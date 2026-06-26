@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.17.2
+version: 1.18.1
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查+大纲忠实度+结尾收束验证。全流程硬约束+门禁跟踪，含MBTI+荣格原型人格、数值化混合情绪、文风槽位。
@@ -61,7 +61,7 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 ```
 
 **目录结构（代码推导，仅供理解）：**
-```
+```text
 {DATA_DIR}/<项目名>/
 ├── data/novel_state.json          ← 状态文件
 ├── data/.workbuddy/gate_state.json ← 门禁状态
@@ -69,8 +69,6 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 ├── chapters/L##/S##.txt          ← 章节正文（每子结构一个文件）
 └── .project                       ← 路径缓存
 ```
-
-**绝对路径示例：** `~/.workbuddy/skills/.standardization/novel-weaver/projects/赛博搏杀记/data/novel_state.json`
 
 ## 触发条件
 
@@ -130,6 +128,13 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 - 跨会话自动续写：不主动保存会话状态，需用户手动通过novel_state.json恢复
 - 多语言翻译：仅支持中文写作，不提供翻译功能
 - 自动纠错：不检查拼写/语法错误，仅校验结构和逻辑
+
+**环境要求：**
+- **Python** 3.8+，依赖标准库（json/pathlib/hashlib/sys）
+- **网络**：完全离线运行，不依赖任何外部API
+- **输入**：novel_state.json 文件和 stdin 文本输入
+- **输出**：TXT 章节文件和 JSON 状态文件
+- **编码**：所有文件使用 UTF-8 编码
 
 
 | 能力 | 说明 | 限制 |

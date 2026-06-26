@@ -12,6 +12,9 @@ import json, sys, hashlib
 from pathlib import Path
 from datetime import datetime
 
+# 路径集中管理
+from _path_utils import DATA_DIR
+
 # ── 核心规划字段保护 ──
 # 这些字段一旦写入即不可修改（仅 status/word_count 等运行字段可变更）
 IMMUTABLE_SCOPE = {
@@ -230,8 +233,7 @@ def init_project(name, project_name, length="medium", num_chapters=None):
     p = Path(name)
     # 如果名字不含路径分隔符，视为项目名，自动创建标准化子目录
     if "/" not in name and "\\" not in name:
-        SCRIPTS_DIR = Path(__file__).parent
-        base = SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"
+        base = DATA_DIR
         p = base / name / "data" / "novel_state.json"
         print(f"[初始化] 项目目录: {p.parent}")
     if p.exists():
@@ -319,33 +321,19 @@ if __name__ == "__main__":
         sys.exit(1)
     cmd = sys.argv[1]
     if cmd == "list-projects":
-        SCRIPTS_DIR = Path(__file__).parent
-        scan_base = SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"
-        found = []
-        if scan_base.exists():
-            for proj_dir in scan_base.iterdir():
-                state_file = proj_dir / "data" / "novel_state.json"
-                try:
-                    d = json.loads(state_file.read_text(encoding="utf-8-sig"))
-                    name = d.get("project", "?")
-                    length = d.get("meta", {}).get("length", "?")
-                    phase = d.get("meta", {}).get("current_phase", "?")
-                    ch_count = len(d.get("chapters", []))
-                    done = sum(1 for c in d.get("chapters", []) if c.get("status") == "completed")
-                    found.append((str(state_file), name, length, phase, ch_count, done))
-                except Exception:
-                    continue
-        if not found:
+        from _path_utils import list_projects
+        projects = list_projects()
+        if not projects:
             print("没有找到已创建的项目。")
         else:
             print(f"\n{'='*55}")
-            print(f"  已创建的项目 ({len(found)}):")
+            print(f"  已创建的项目 ({len(projects)}):")
             print(f"{'='*55}")
-            for path, name, length, phase, total, done in found:
-                print(f"  📖 {name}")
-                print(f"    路径: {path}")
-                print(f"    篇幅: {length} | 阶段: {phase}")
-                print(f"    章节: {done}/{total}")
+            for p in projects:
+                print(f"  📖 {p['name']}")
+                print(f"    路径: {p['path']}")
+                print(f"    篇幅: {p['length']} | 阶段: {p['phase']}")
+                print(f"    章节: {p['done']}/{p['chapters']}")
                 print()
         sys.exit(0)
     sp = sys.argv[2]
