@@ -628,7 +628,7 @@ if __name__ == "__main__":
         print("用法: python novel_workflow_engine.py <命令> [state_path] [args...]")
         print("  state_path 可选（首次指定后缓存到 .project，后续可省略）")
         print("  命令:")
-        print("    plan-chapter     <chapter> <subs_json>       注册子结构")
+        print("    plan-chapter     <chapter> <subs_json>       注册子结构（或 @file.json/*.json 从文件读取）")
         print("    plan-chapter     <chapter> --generate        生成子结构JSON模板")
         print("    verify-chapter   <chapter>                   验证注册完整性")
         print("    preview          <chapter>                   预览章节规划")
@@ -694,6 +694,15 @@ if __name__ == "__main__":
             print(f"]")
             sys.exit(0)
         subs_json = sys.argv[next_arg_idx + 1]
+        # 智能加载：@file.json 或 *.json 从文件读取，避免Shell转义破坏JSON
+        if subs_json.startswith('@') or subs_json.endswith('.json'):
+            fp = Path(subs_json[1:] if subs_json.startswith('@') else subs_json)
+            if fp.exists():
+                subs_json = fp.read_text(encoding='utf-8-sig')
+                print(f"[plan-chapter] 从文件加载子结构JSON: {fp}")
+            else:
+                print(f"[HOOK-BLOCK] 文件不存在: {fp}")
+                sys.exit(1)
         plan_chapter(sp, chapter, subs_json)
     elif cmd == "verify-chapter":
         verify_chapter(sp, sys.argv[next_arg_idx])
