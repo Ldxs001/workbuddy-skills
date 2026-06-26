@@ -1,5 +1,7 @@
 ---
 name: skill-standardization
+slug: skill-standardization
+displayName: Skill Standardization
 version: 2.96.0
 author: wUwproject
 license: MIT
