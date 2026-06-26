@@ -2511,13 +2511,11 @@ def _validate_changed_files(skill_dir, changed_files):
 
 
 def _manual_dir_path(skill_dir):
-    """.manual_wait / .manual_done 存放目录"""
+    """.manual_wait / .manual_done 存放目录（与被审计技能数据同目录）"""
     _sn = os.path.basename(os.path.abspath(skill_dir))
     _sd = os.path.normpath(os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        os.pardir, ".standardization",
-        os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "data", _sn
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        os.pardir, ".standardization", "skill-standardization", "data", _sn
     ))
     return _sd
 
@@ -2571,6 +2569,9 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             os.remove(_manual_done_path)
             os.remove(_manual_wait_path)
             print(f"\n  ✅ LLM 手动修复信号已确认，继续流程")
+            # ★ v2.98.3: 跳过审计/修复循环，直接返回空 remaining
+            #   外层 cmd_refactor/cmd_update 会走双0验证和一致性审查
+            return {"results": [], "summary": {"errors": 0, "warns": 0}}, [], 0
         else:
             print(f"\n  🔒 LLM 手动修复等待中：修完上述问题后执行以下 Python 代码")
             print(f"     import os, json, pathlib")
