@@ -15,13 +15,12 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 SCRIPTS_DIR = Path(__file__).parent
-# R-12 审计锚点：数据目录变量声明 — 与 _meta.json data_dir 一致
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/"
-SKILLS_ROOT = SCRIPTS_DIR.parent.parent  # = C:/Users/sm001/.workbuddy/skills
-# _meta.json data_dir 相对于 skills/ 目录，所以用 SKILLS_ROOT（skills/ 根）
-DATA_DIR = SKILLS_ROOT / ".standardization" / "novel-weaver" / "projects"
-DATA_STATE = DATA_DIR / "novel_state.json"  # 占位（实际用 _chapters_dir 推导）
-DATA_CHAPTERS = DATA_DIR / "chapters"       # 占位
+sys.path.insert(0, str(SCRIPTS_DIR))
+# R-12 审计锚点：所有路径统一从 _path_utils 导入，不重复计算
+from _path_utils import DATA_DIR, PROJECT_LOCK, resolve_state_path, list_projects
+DEFAULT_DATA_DIR_RAW = "skills/.standardization/novel-weaver/"  # 审计锚点注释
+DATA_STATE = DATA_DIR / "novel_state.json"   # 占位（实际用 _chapters_dir 推导）
+DATA_CHAPTERS = DATA_DIR / "chapters"        # 占位
 DATA_REPORTS = DATA_DIR / "reports"          # 占位
 
 LENGTH_RANGES = {"short": (3, 6), "medium": (8, 10), "long": (11, 99)}
@@ -620,9 +619,8 @@ def next_step(state_path):
 
 
 if __name__ == "__main__":
-    # 中文路径编码修复
+    # 中文路径编码修复（已在模块级导入 _path_utils）
     sys.path.insert(0, str(SCRIPTS_DIR))
-    from _path_utils import resolve_state_path, list_projects, PROJECT_LOCK
 
     if len(sys.argv) < 2:
         print("用法: python novel_workflow_engine.py <命令> [state_path] [args...]")
