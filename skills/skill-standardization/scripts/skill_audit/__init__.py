@@ -539,6 +539,9 @@ def _remove_fp_classify(skill_dir, ids):
 def _reclassify_false_positive(res, skill_dir=None):
     """仅通过 --classify ID 标记的误判进行排除
 
+    v2.97.3: _llm_only_fix_keys 项（C-11/C-14/C-17/C-18）禁止被 --classify 绕过。
+    LLM 必须手动修复这些项，不得标记为误判。
+
     v2.86.2: 所有误判由 LLM 通过 `--classify` 手动标记。
     代码层不做任何自动误报排除，确保审计报告输出全部原始问题。
     
@@ -548,6 +551,14 @@ def _reclassify_false_positive(res, skill_dir=None):
     - C-{type}        → 匹配一致性审查 ID
     """
     if skill_dir:
+        # ★ v2.97.3: _llm_only_fix_keys 项不得被分类绕过
+        _blocked_fix_keys = {"workflow_completeness", "example_quality", "capability_boundary", "section_names"}
+        fk = None
+        if isinstance(res.get("fix"), dict):
+            fk = res["fix"].get("key")
+        if fk and fk in _blocked_fix_keys:
+            return False  # 这些是 LLM 手动修复项，必须修，不能分类跳过
+        
         fp_ids = _load_fp_ids(skill_dir)
         if fp_ids:
             try:

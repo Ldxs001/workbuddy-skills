@@ -642,18 +642,9 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
     all_issues = {"must": [], "suggest": [], "optional": []}
 
     # ── R-23: 文档-代码一致性检查 (v2.34.8) ──────────────────────
-    r23_result = check_doc_code_consistency(filepath, content, fm, body, **kw)
-    if not r23_result.get("passed", True):
-        for k in ["must", "suggest", "optional"]:
-            if f"R-23" in r23_result.get("detail", ""):
-                all_issues["suggest"].append(r23_result["detail"])
-        if r23_result.get("ctx_lines"):
-            if "ctx_lines" not in all_issues:
-                all_issues["ctx_lines"] = []
-            all_issues["ctx_lines"].extend(r23_result["ctx_lines"])
-    elif "ⓘ" in r23_result.get("detail", ""):
-        # R-23 通过但有 optional 提示，放在 optional 供参考
-        all_issues["optional"].append(r23_result["detail"])
+    # v2.97.3: 移除 R-23 结果从 R-20 中的重复输出。
+    # R-23 已作为独立规则报告，R-20 不应再包含相同内容。
+    # 去掉以下块，避免 LLM 处理两次同一问题
 
     # ── 检查 SKILL.md 正文 ────────────────────────
     # 注意：body_check_writing_standards 检查的是 SKILL.md 和 references/*.md，
@@ -995,6 +986,9 @@ def check_doc_code_consistency(
                 continue
             # 排除 __pycache__ 等缓存路径
             if '__pycache__' in fpath:
+                continue
+            # 排除 .standardization/ 路径（运行时产出物，非源代码文件）
+            if '.standardization' in fpath:
                 continue
             if fpath.endswith('.py'):
                 script_paths.add(fpath)

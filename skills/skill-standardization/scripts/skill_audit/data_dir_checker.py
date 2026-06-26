@@ -18,6 +18,7 @@ import shutil
 import json
 import datetime
 from pathlib import Path
+from ._path_detector import has_path_feature
 
 from .utils import _is_asset_dir
 

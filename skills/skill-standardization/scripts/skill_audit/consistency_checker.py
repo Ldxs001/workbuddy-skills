@@ -17,13 +17,12 @@ consistency_checker.py — 文档-代码一致性审查（双 0 后执行）
 import os
 import re
 import json
+from ._path_detector import has_path_feature
 
 
 def check_consistency(skill_dir, filter_files=None):
     """
     执行一致性审查。
-    
-    filter_files: 指定只审查某些文件（更新模式用），None = 全量（改造模式用）
     
     返回: [{"type": "missing_file|stale_doc_ref|missing_doc_ref|outdated_rule_ref|argparse_mismatch|path_mismatch|...",
             "detail": "...", "severity": "WARN"}, ...]
@@ -524,13 +523,8 @@ def _check_path_centralization(skill_dir):
             stripped = lines[line_num - 1].strip() if line_num <= len(lines) else ""
             if stripped.startswith("#"):
                 continue
-            # 提取路径特征：os.path.join / ".standardization" / Path / /
-            has_path_feature = (
-                '.standardization' in val or 'os.path.join' in val or 
-                'Path(' in val or '/"' in val or "'/" in val or
-                'SKILLS_ROOT' in val or 'SKILL_DIR' in val
-            )
-            if not has_path_feature:
+            # 提取路径特征：使用统一检测层 _path_detector
+            if not has_path_feature(val):
                 continue
 
             # 记录定义
