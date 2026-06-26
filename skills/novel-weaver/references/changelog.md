@@ -1,3 +1,16 @@
+## [1.19.0] - 2026-06-26
+
+### 新增
+- **[novel_context_loader.py] 字数约束注入上下文** — 根据 `meta.length` 在写作前输出篇幅对应的字数范围 + 校验上浮值，LLM 不再盲写，禁止自行设定
+- **[novel_workflow_engine.py] 字数校验统一标准** — write-sub 检查使用与 context_loader 相同的字数目标 + 15% 上浮窗口（中篇 1,500-2,300 范围内通过），低于下限 WARN、超上浮 INFO、范围内 OK
+- **[execution_standards.md] 三阶段统一标准文档** — 明确字数目标在规划/写作/检查三阶段使用同一套标准，禁止 AI 自行设定
+
+### 修复
+- **[novel_context_loader.py] 情绪格式向后兼容** — 兼容遗留的字符串数组情绪格式（如 `["疑惑","不安"]`），避免 AttributeError
+- **[novel_context_loader.py] GBK 终端 emoji 编码崩溃** — 所有 emoji 替换为 `[硬性]`/`[参考]`/`[下一步]` 文本标记
+
+---
+
 ## [1.18.2] - 2026-06-26
 
 ### 修复

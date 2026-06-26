@@ -61,13 +61,19 @@ def _format_emotions(sub: dict) -> str:
         if tone:
             return f"[情绪基调] {tone}"
         return ""
+    # 兼容两种格式：遗留的字符串数组 ["疑惑","不安"] 和新格式 [{"type":"疑惑","intensity":0.5}]
     parts = []
     for e in emos:
-        t = e.get("type", "")
-        v = e.get("intensity", 0)
-        label = _intensity_label(v)
-        parts.append(f"{t} {label}[{v:.1f}/1]")
+        if isinstance(e, str):
+            parts.append(f"{e}")
+        else:
+            t = e.get("type", "")
+            v = e.get("intensity", 0)
+            label = _intensity_label(v)
+            parts.append(f"{t} {label}[{v:.1f}/1]")
     line = " + ".join(parts)
+    if all(isinstance(e, str) for e in emos):
+        return f"[情绪提示] {line}"
     mix = _emotion_mix_description(emos)
     if mix:
         line += f"\n           → {mix}"
@@ -137,6 +143,24 @@ def load_context(state_path, chapter, sub_key):
             prev_text = [l for l in lines if not l.strip().startswith(f"{chapter}")]
             prev_lines = prev_text[-3:] if len(prev_text) >= 3 else prev_text
 
+    # ── [硬性] 字数约束（硬性）──
+    SUB_WORD_TARGETS = {
+        "short": (1000, 1500),
+        "medium": (1500, 2000),
+        "long": (2000, 4000),
+    }
+    LENGTH_LABELS = {"short": "短篇", "medium": "中篇", "long": "长篇"}
+    length = data.get("meta", {}).get("length", "")
+    target = SUB_WORD_TARGETS.get(length)
+    length_label = LENGTH_LABELS.get(length, length)
+    word_count_note = ""
+    if target:
+        lo, hi = target
+        check_hi = int(hi * 1.15)
+        word_count_note = f"  篇幅: {length_label}\n  每子结构字数范围: {lo}-{hi}（校验上浮至 {check_hi}）"
+    else:
+        word_count_note = f"  篇幅: {length_label}（未设定的字数目标）"
+
     # ── 输出标准上下文 ──
     print(f"{'='*50}")
     print(f"[上下文] {chapter}{sub_key}")
@@ -149,8 +173,15 @@ def load_context(state_path, chapter, sub_key):
         for l in prev_lines:
             print(f"  | {l}")
     print(f"{'='*50}")
+    # 字数约束单独分段输出，确保 LLM 看到
+    print(f"\n{'='*50}")
+    print(f"[硬性] 字数约束")
+    print(f"{'='*50}")
+    print(word_count_note)
+    print(f"  提示: 以叙事单位自然结束为准，不强行撑到目标")
+    print(f"{'='*50}\n")
 
-    # ── 💡 情绪写作参考（tone 场景词，引导而非判定） ──
+    # ── [参考] 情绪写作参考（tone 场景词，引导而非判定） ──
     tone = subs[sub_key].get("tone", "")
     if tone:
         tone_kw_map = {
@@ -174,14 +205,14 @@ def load_context(state_path, chapter, sub_key):
         tone_words = tone_kw_map.get(tone, [])
         if tone_words:
             print(f"\n{'='*50}")
-            print(f"📐 情绪写作参考（数据仅供参考）")
+            print(f"[参考] 情绪写作参考（数据仅供参考）")
             print(f"{'='*50}")
             print(f"  规划情绪: {tone}")
             print(f"  可参考的场景词: {'、'.join(tone_words[:8])}")
             print(f"  提示: 情绪通过场景/动作/对话传达，不依赖直接使用上述词汇")
             print(f"{'='*50}\n")
 
-    # ── 💡 钩子位建议（is_hook_possible=true 时输出，不阻断） ──
+    # ── [参考] 钩子位建议（is_hook_possible=true 时输出，不阻断） ──
     if subs[sub_key].get("is_hook_possible"):
         # 找下一章标题
         chapters_list = data.get("chapters", [])
@@ -192,7 +223,7 @@ def load_context(state_path, chapter, sub_key):
                 next_ch_title = f"{next_ch.get('id', '')}: {next_ch.get('title', '')}"
                 break
         print(f"\n{'='*50}")
-        print(f"💡 钩子位建议（不强制）")
+        print(f"[参考] 钩子位建议（不强制）")
         print(f"{'='*50}")
         print(f"  本子结构是本章末子结构，可考虑设为伏笔/悬念/承诺")
         if next_ch_title:
@@ -204,13 +235,13 @@ def load_context(state_path, chapter, sub_key):
         print(f"  如不设伏笔，请确保本子结构自然收束（非悬停式结尾）")
         print(f"{'='*50}\n")
 
-    # ── 🔴 人格约束（硬性） ──
+    # ── [硬性] 人格约束（硬性） ──
     involved = _find_characters_in_chapter(data, chapter, sub_key)
     if involved:
         has_personality = any(c.get("mbti") or c.get("archetype") for c in involved)
         if has_personality:
             print(f"\n{'='*50}")
-            print(f"🔴 人格约束（硬性）")
+            print(f"[硬性] 人格约束（硬性）")
             print(f"{'='*50}")
             for c in involved:
                 mbti = c.get("mbti", "")
@@ -223,11 +254,11 @@ def load_context(state_path, chapter, sub_key):
             print(f"  提示: 角色言行必须符合其人格设定")
             print(f"{'='*50}\n")
 
-    # ── 🔴 文风约束（硬性） ──
+    # ── [硬性] 文风约束（硬性） ──
     ws = data.get("writing_style", {})
     if ws:
         print(f"\n{'='*50}")
-        print(f"🔴 文风约束（硬性）")
+        print(f"[硬性] 文风约束（硬性）")
         print(f"{'='*50}")
         for key, label in [("narrative_voice", "叙事视角"),
                            ("tense", "时态"),
@@ -241,13 +272,13 @@ def load_context(state_path, chapter, sub_key):
         print(f"  提示: 全文文风一致，不可偏离")
         print(f"{'='*50}\n")
 
-    # ── 🔴 署名约束（代码级硬阻断） ──
+    # ── [硬性] 署名约束（代码级硬阻断） ──
     sig = data.get("signature", {"enabled": False, "text": ""})
     sig_enabled = sig.get("enabled", False)
     sig_text = sig.get("text", "")
     print(f"\n{'='*50}")
     if sig_enabled:
-        print(f"🔴 署名约束（硬性）")
+        print(f"[硬性] 署名约束（硬性）")
         print(f"{'='*50}")
         print(f"  状态: 已开启")
         if sig_text:
@@ -255,14 +286,14 @@ def load_context(state_path, chapter, sub_key):
         print(f"  允许在作品末尾添加署名")
         print(f"  禁止使用自行编造的署名文本（必须 = 配置值）")
     else:
-        print(f"🔴 署名约束（代码级硬阻断）")
+        print(f"[硬性] 署名约束（代码级硬阻断）")
         print(f"{'='*50}")
         print(f"  状态: 已关闭")
         print(f"  禁止在正文中出现任何署名/代名内容")
         print(f"  atomic_writer 代码级阻断，写入即报错")
     print(f"{'='*50}\n")
 
-    # ── 🔴 收尾命题框（is_ending=true 时追加） ──
+    # ── [硬性] 收尾命题框（is_ending=true 时追加） ──
     if subs[sub_key].get("is_ending"):
         ending_type = subs[sub_key].get("ending_type", "未指定")
         project = data.get("project", "未知项目")
@@ -271,7 +302,7 @@ def load_context(state_path, chapter, sub_key):
         theme = data.get("theme", "未知主题")
 
         print(f"\n{'='*50}")
-        print(f"🔴 收尾约束（硬性）")
+        print(f"[硬性] 收尾约束（硬性）")
         print(f"{'='*50}")
         print(f"  收尾类型: {ending_type}")
         print(f"  {'─'*40}")
@@ -298,9 +329,9 @@ def load_context(state_path, chapter, sub_key):
         print(f"  提示: 以上为命题约束，不可偏离")
         print(f"{'='*50}\n")
 
-    # ── 🚀 下一步命令提示 ──
+    # ── [下一步] 下一步命令提示 ──
     print(f"\n{'='*50}")
-    print(f"🚀 下一步 - 写入命令")
+    print(f"[下一步] 下一步 - 写入命令")
     print(f"{'='*50}")
     print(f"  # 将以下内容通过 stdin 管道写入:")
     print(f"  cat <<'EOF' | python novel_workflow_engine.py write-sub \\")

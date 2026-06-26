@@ -198,7 +198,8 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
     print(f"  字数: {word_count}")
 
-    # ── 字数代码级校验 ──
+    # ── 字数代码级校验（统一标准：15% 上浮窗口，与 context_loader 同源）──
+    LINE_TOLERANCE_RATIO = 1.15  # 15% 上浮
     SUB_WORD_TARGETS = {
         "short": (1000, 1500),
         "medium": (1500, 2000),
@@ -206,12 +207,16 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     }
     length = ws_data.get("meta", {}).get("length", "")
     target = SUB_WORD_TARGETS.get(length)
+    # 字数检查
     if target:
         lo, hi = target
+        check_hi = int(hi * LINE_TOLERANCE_RATIO)  # 15% 上浮
         if word_count < lo:
-            print(f"  [WARN] 字数 {word_count} < 篇幅{length}下限 {lo}，建议补充至 {lo}-{hi} 字")
-        elif word_count > hi:
-            print(f"  [INFO] 字数 {word_count} > 篇幅{length}上限 {hi}，注意篇幅控制")
+            print(f"  [WARN] 字数 {word_count} < {length}下限 {lo}，建议补充至 {lo}-{hi} 字")
+        elif word_count > check_hi:
+            print(f"  [INFO] 字数 {word_count} > {length}上限+15%({check_hi})，注意篇幅控制")
+        else:
+            print(f"  [OK] 字数 {word_count} 在 {lo}-{check_hi} 范围内")
 
 def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 阻断循环 → 门禁"""
