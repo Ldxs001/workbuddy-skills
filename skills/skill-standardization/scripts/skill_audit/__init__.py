@@ -1427,6 +1427,7 @@ def cmd_audit(args):
                         "C-15": "inline_refs",
                         "C-17": "example_quality",
                         "C-18": "capability_boundary",
+                        "C-20": "path_centralization",
                     }
                     for c_tag, fk in _r25_fix_map.items():
                         if c_tag in detail:
