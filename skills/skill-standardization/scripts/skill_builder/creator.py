@@ -27,17 +27,31 @@ external_data_dir: true
 sensitive_access: false
 critical_write: false
 permission_weight: LOW
-trigger:
-trigger_negative:
+trigger: 生成报告/分析数据/转换格式
+trigger_negative: 闲聊/翻译/简单问答
+h1_position: true
+meta_field_sync: true
+create_permissions_md: true
+trigger_quality: add_triggers
+faq_unparsable: reformat
+antipattern_count: add_examples
+
+# {name} — {description}
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-## 触发场景
+## 约束
+
+- **[必须] 输入验证** — 输入文件必须存在且格式正确，否则阻断
+- **[必须] 输出规范** — 输出写入 `DATA_DIR/outputs/`，不得写入技能目录
+- **[必须] 路径集中管理** — 所有路径从 `scripts/_paths.py` 导入，禁止硬编码
+
+## 触发条件
 
 当用户提到以下意图时触发本技能：
 - `"/{name}"` 直接调用
-- 用户描述任务包含：<!-- 填写核心触发动词，如"生成XX"、"分析XX" -->
-- 用户要求输出格式为：<!-- 填写预期输出类型 -->
+- 用户描述任务包含：生成XX、分析XX、转换XX
+- 用户要求输出格式为：Markdown / JSON / HTML
 
 **不触发**：
 - 用户仅询问概念、定义，不要求执行操作
@@ -47,9 +61,8 @@ trigger_negative:
 
 | # | 功能 | 说明 |
 |---|------|------|
-| 1 | 主功能名称 | <!-- 一句话描述核心功能 --> |
-| 2 | 辅助功能 | <!-- 可选 --> |
-| 3 | 输出格式 | <!-- Markdown / HTML / JSON 等 --> |
+| 1 | 主功能 | 读取输入 → 处理 → 输出结果 |
+| 2 | 辅助功能 | 校验输入格式，生成摘要报告 |
 
 ### 渐进式文件索引
 
@@ -62,11 +75,17 @@ trigger_negative:
 | `references/antipatterns.md` | 规范指南 | 常见反模式与正确做法 | R-18 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答 | R-19 |
 
-## 约束
+## 数据目录
 
-<!-- 本技能特有的操作约束，每条一句话，最多 5 条 -->
-- <!-- 例：`.md` 文件禁止使用 Write/Edit 工具更新 -->
-- <!-- 例：更新后必须自审 0 ERROR 0 WARN -->
+所有路径从 `scripts/_paths.py` 统一管理，不要在代码中手写路径：
+
+```python
+from scripts._paths import DATA_DIR, OUTPUTS_DIR
+# DATA_DIR  = skills/.standardization/{name}/data/
+# OUTPUTS_DIR = skills/.standardization/{name}/outputs/
+```
+
+> 详细路径常量见 `scripts/_paths.py`
 
 ## 快速开始
 
@@ -77,11 +96,9 @@ skill-sub {name} --input <input-file> --output <output-dir>
 
 ## 工作流程
 
-1. **解析输入** — 读取用户输入文件或参数，验证格式
-2. **执行核心逻辑** — 调用 `scripts/` 目录下的脚本进行处理
-3. **输出结果** — 将结果写入输出目录，并生成摘要报告
-
-> [R-06 渐进式加载] 详细工作流程见 `references/guide.md`
+1. **解析输入** — 输入 用户文件/参数 → 输出 结构化数据
+2. **执行核心逻辑** — 输入 结构化数据 → 输出 处理结果
+3. **输出结果** — 输入 处理结果 → 输出 `OUTPUTS_DIR/result`
 
 ## 权限说明
 
@@ -163,6 +180,10 @@ skill-sub {name} --input <input-file> --output <output-dir>
         (skill_dir / "references" / ".gitkeep").write_text("", encoding="utf-8")
         (skill_dir / "scripts" / ".gitkeep").write_text("", encoding="utf-8")
 
+        # 创建 scripts/_paths.py（路径集中管理模板，R-11/R-12 合规）
+        paths_content = self._generate_paths_template(name)
+        (skill_dir / "scripts" / "_paths.py").write_text(paths_content, encoding="utf-8")
+
         # 创建 references/guide.md 详细文档模板
         guide_content = self._generate_guide_template(name, description)
         (skill_dir / "references" / "guide.md").write_text(guide_content, encoding="utf-8")
@@ -206,7 +227,8 @@ skill-sub {name} --input <input-file> --output <output-dir>
         print(f"   │   ├── changelog.md   (版本变更记录)")
         print(f"   │   ├── antipatterns.md(常见反模式)")
         print(f"   │   └── faq.md         (常见问题)")
-        print(f"   ├── scripts/           (可执行脚本)")
+        print(f"   ├── scripts/")
+        print(f"   │   └── _paths.py      (路径集中管理, R-11合规)")
         print(f"   └── .standardization/{name}/  (产出物目录, R-11合规)")
         print(f"       ├── data/          (业务数据)")
         print(f"       ├── outputs/       (导出产物)")
@@ -589,7 +611,7 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 ## 2. 硬编码路径
 
 - **错误做法**：在代码中直接写入绝对路径或写死相对路径。
-- **正确做法**：所有路径从统一路径模块导入。
+- **正确做法**：所有路径从 `scripts/_paths.py` 导入。
 
 ## 3. 不记录错误信息
 
@@ -598,6 +620,30 @@ python scripts/{name}_main.py --input fixed_input.txt --output output/ --retry
 
 > 更多反模式欢迎通过 PR 贡献。
 """
+
+    def _generate_paths_template(self, name):
+        """生成 scripts/_paths.py 路径集中管理模板（R-11/R-12 合规）"""
+        return f'''"""
+_paths.py — {name} 路径集中管理
+只包含路径常量和路径推导函数，不包含任何业务逻辑。
+所有脚本从本模块导入路径，禁止硬编码。
+"""
+import os
+from pathlib import Path
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+SKILL_DIR    = _SCRIPT_DIR.parent
+SKILLS_ROOT  = SKILL_DIR.parent
+SKILL_NAME   = SKILL_DIR.name
+
+STD_ROOT     = SKILLS_ROOT / ".standardization"
+STD_DIR      = STD_ROOT / SKILL_NAME
+DATA_DIR     = STD_DIR / "data"
+OUTPUTS_DIR  = STD_DIR / "outputs"
+BACKUP_DIR   = STD_DIR / "backup"
+CACHE_DIR    = STD_DIR / "cache"
+TEMP_DIR     = STD_DIR / "temp"
+'''
 
     def _generate_faq_template(self, name):
         """生成 references/faq.md 模板（R-19）"""
