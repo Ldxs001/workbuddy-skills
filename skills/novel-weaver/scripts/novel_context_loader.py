@@ -188,26 +188,19 @@ def load_context(state_path, chapter, sub_key):
     print(f"  提示: 以叙事单位自然结束为准，不强行撑到目标")
     print(f"{'='*50}\n")
 
-    # ── [硬性] 已出场关键人物（根据 first_appearance 章节过滤）──
-    ch_num = 0
-    if chapter.startswith("L"):
-        try: ch_num = int(chapter[1:])
-        except: pass
+    # ── [硬性] 已出场关键人物（登场即累加，不按章节过滤）──
     char_entries = []
     for c in data.get("characters", []):
         fa = c.get("first_appearance", "")
-        fa_num = 0
-        if fa.startswith("L"):
-            try: fa_num = int(fa[1:])
-            except: pass
-        if fa_num > 0 and fa_num <= ch_num:
-            role = c.get("role", "")
-            func = c.get("function", "")
-            label = f"{c['name']}({role})" if role else c['name']
-            if func:
-                char_entries.append(f"  {label}: {func}")
-            else:
-                char_entries.append(f"  {label}: [提示] 未填写 function")
+        if not fa:
+            continue
+        role = c.get("role", "")
+        func = c.get("function", "")
+        label = f"{c['name']}({role})" if role else c['name']
+        if func:
+            char_entries.append(f"  {label}: {func}")
+        else:
+            char_entries.append(f"  {label}: [提示] 未填写 function")
     if char_entries:
         print(f"{'='*50}")
         print(f"[硬性] 已出场关键人物")

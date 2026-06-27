@@ -1,5 +1,9 @@
 ## [1.19.8] - 2026-06-27
 
+### 新增
+- **[context_loader] 已出场关键人物注入** — 所有有 `first_appearance` 的角色登场即累加，每子结构全量输出已出场角色及其 `function`（职责/定位）。不限章节，杜绝遗漏
+- **[state_manager] add-char 支持 function 字段** — 角色注册时可通过第9参数填写功能定位，写入 IMMUTABLE_SCOPE 保护
+
 ### 修复
 - 版本跳号：1.19.7 代码已改但 git-sync 跳过推送，强制 bump 至 1.19.8 重新推送
 
