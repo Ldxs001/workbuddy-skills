@@ -1,3 +1,14 @@
+## [1.19.7] - 2026-06-27
+
+### 新增
+- **[context_loader] 已出场关键人物注入** — 根据 `characters[].first_appearance` 过滤，每子结构输出当前章节前已登场的角色及其 `function`（职责/定位）。LLM 看到"老贾卖格斗术给主角"就不会编成"父亲遗物"
+- **[state_manager] add-char 支持 function 字段** — 角色注册时可通过第9参数填写功能定位，写入 IMMUTABLE_SCOPE 保护
+
+### 修复
+- **[赛博搏杀记] 角色 function 字段补齐** — 林铁生、林铁心、归元会散人等已补充 function 描述
+
+---
+
 ## [1.19.6] - 2026-06-27
 
 ### 新增
@@ -365,7 +376,7 @@
 - **finalize_chapter 绕过 pass_gate API** — 直接操作 gates dict，改为调用 `pass_gate()`。
 - **finalize_chapter 缺少逻辑检查** — 三检只跑了连通性和风格，未调用 logic_check。已补上。
 - **set_phase 不做门禁检查** — →writing 不检查 outline_causality，→stage3_ready 不检查 fidelity/ending_verify。已补上门禁检查。
-- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 [username-redacted]。
+- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 wUwproject。
 
 ### 文档
 - SKILL.md 渐进式文件索引表修正：execution_standards/hooks/license/causality_check/fidelity/character_registry 描述与实际对齐

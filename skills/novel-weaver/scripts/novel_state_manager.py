@@ -20,7 +20,7 @@ from _path_utils import DATA_DIR
 IMMUTABLE_SCOPE = {
     "chapters": {"id", "title", "overview"},
     "sub_structures": {"title", "summary", "tone"},
-    "characters": {"name", "role", "traits", "mbti", "archetype"},
+    "characters": {"name", "role", "traits", "mbti", "archetype", "function"},
     "top_level": {"project", "novel_info", "writing_style", "setting", "technical_notes"},
 }
 
@@ -141,7 +141,7 @@ def _merge_runtime_fields(new_data: dict, old_data: dict):
     if "signature" in old_data:
         new_data["signature"] = old_data["signature"]
 
-def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype=""):
+def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype="", function=""):
     data = load_state(path)
     chars = data.get("characters", [])
     for c in chars:
@@ -151,6 +151,7 @@ def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archet
             if traits: c["traits"] = [t.strip() for t in traits.split(",")]
             if mbti: c["mbti"] = mbti
             if archetype: c["archetype"] = archetype
+            if function: c["function"] = function
             save_state(path, data, caller="add-char")
             print(f"[角色更新] {name} (MBTI={mbti or '无'}, 原型={archetype or '无'})")
             return
@@ -161,6 +162,8 @@ def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archet
         entry["mbti"] = mbti
     if archetype:
         entry["archetype"] = archetype
+    if function:
+        entry["function"] = function
     chars.append(entry)
     data["characters"] = chars
     save_state(path, data, caller="add-char")
@@ -341,7 +344,8 @@ if __name__ == "__main__":
         add_char(sp, sys.argv[3], sys.argv[4], sys.argv[5],
                  sys.argv[6] if len(sys.argv) > 6 else "",
                  sys.argv[7] if len(sys.argv) > 7 else "",
-                 sys.argv[8] if len(sys.argv) > 8 else "")
+                 sys.argv[8] if len(sys.argv) > 8 else "",
+                 sys.argv[9] if len(sys.argv) > 9 else "")
     elif cmd == "update-sub":
         update_sub(sp, sys.argv[3], sys.argv[4], sys.argv[5])
     elif cmd == "finalize":
