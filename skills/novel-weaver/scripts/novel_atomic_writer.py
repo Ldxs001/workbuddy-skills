@@ -11,7 +11,8 @@ Atomic Writer — 原子写入器（v2，格式硬约束版）
   1. title_line 正则校验（阻断）
   2. body 标记行检测（阻断）
   3. 正文非空检测（阻断）
-  4. 原子写入 → fsync → 追加编号标记 → 再次 fsync
+  4. 标点缺失校验（软性，不阻断）
+  5. 原子写入 → fsync → 追加编号标记 → 再次 fsync
 """
 import sys, os, re
 from pathlib import Path
@@ -62,6 +63,29 @@ def validate_and_write(content, filepath, chapter, sub_key, signature=None):
         if MARKER_PATTERN.match(stripped):
             print(f"[HOOK-BLOCK] 正文第{i}行含非法子结构标记: {line.strip()}")
             return False
+
+    # ── 钩子4: 标点缺失校验（软性，不阻断） ──
+    PUNCTUATION = set("，。；：？！、,.;:?!")
+    MAX_SEGMENT = 80
+    for i, line in enumerate(body_lines, 2):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # 按标点分割后检查最长片段
+        segments = []
+        current = ""
+        for ch in stripped:
+            if ch in PUNCTUATION:
+                if current.strip():
+                    segments.append(current.strip())
+                current = ""
+            else:
+                current += ch
+        if current.strip():
+            segments.append(current.strip())
+        longest = max((len(s) for s in segments), default=0)
+        if longest > MAX_SEGMENT:
+            print(f"  [PUNCT] 正文第{i}行含超长无标点片段（{longest}字），建议补充断句标点")
 
     # ── 写入前确认: 最终内容不含元注释污染 ──
     for i, line in enumerate(lines, 1):
