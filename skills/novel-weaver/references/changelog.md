@@ -1,3 +1,12 @@
+## [1.19.11] - 2026-06-27
+
+### 修复
+- **[context_loader] 跨章串行阻断** — 首次加载某章第一个子结构时，检查上一章是否所有子结构已完成。未完成则 HOOK-BLOCK
+- **[context_loader] 关键人物 function 缺失阻断** — 从软提示改为 HOOK-BLOCK，角色有 first_appearance 但无 function 时阻断写作
+- **[state_manager] add-char function 阻断** — 注册角色时若有 first_appearance 但无 function，直接阻断，规划阶段即强制填写
+
+---
+
 ## [1.19.10] - 2026-06-27
 
 ### 新增

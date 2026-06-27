@@ -143,6 +143,13 @@ def _merge_runtime_fields(new_data: dict, old_data: dict):
 
 def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype="", function=""):
     data = load_state(path)
+    # ── 规划阻断：有 first_appearance 则必须同时填写 function ──
+    if first_appearance and not function:
+        print(f"[HOOK-BLOCK] 角色 \"{name}\" 设置了 first_appearance 但未填写 function")
+        print(f"[要求] 请补充 function 参数描述该角色的功能定位，例如：")
+        print(f"  \"推荐主角购买《实用擒拿格斗术》，关键信息提供者\"")
+        print(f"  用法: python novel_state_manager.py add-char <state_path> \"{name}\" \"{role_attr}\" \"{first_appearance}\" \"{traits}\" \"{mbti}\" \"{archetype}\" \"<功能描述>\"")
+        sys.exit(1)
     chars = data.get("characters", [])
     for c in chars:
         if c.get("name") == name:

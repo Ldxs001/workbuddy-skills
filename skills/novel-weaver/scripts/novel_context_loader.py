@@ -134,6 +134,27 @@ def load_context(state_path, chapter, sub_key):
     # ── 串行阻断：上一子结构未标记完成时强制走 write-sub ──
     sub_keys = sorted(subs.keys())
     current_idx = sub_keys.index(sub_key) if sub_key in sub_keys else -1
+
+    # ── 跨章串行阻断：首次加载某章时检查上一章是否全部完成 ──
+    if current_idx == 0:
+        chapters = data.get("chapters", [])
+        ch_idx = -1
+        for i, ch in enumerate(chapters):
+            if ch["id"] == chapter:
+                ch_idx = i
+                break
+        if ch_idx > 0:
+            prev_ch = chapters[ch_idx - 1]
+            prev_subs = prev_ch.get("sub_structures", {})
+            if prev_subs:
+                incomplete = [sk for sk, sv in prev_subs.items() if sv.get("status") != "completed"]
+                if incomplete:
+                    print(f"[HOOK-BLOCK] 上一章 {prev_ch['id']} 有 {len(incomplete)} 个子结构未完成")
+                    for sk in incomplete:
+                        print(f"  {prev_ch['id']}{sk}: {prev_subs[sk].get('title', '')} (status={prev_subs[sk].get('status','?')})")
+                    print(f"[要求] 请先完成上一章所有子结构，再开始新章")
+                    sys.exit(1)
+
     if current_idx > 0:
         prev_key = sub_keys[current_idx - 1]
         prev_status = subs[prev_key].get("status", "pending")
@@ -200,7 +221,10 @@ def load_context(state_path, chapter, sub_key):
         if func:
             char_entries.append(f"  {label}: {func}")
         else:
-            char_entries.append(f"  {label}: [提示] 未填写 function")
+            print(f"[HOOK-BLOCK] 角色 \"{c['name']}\" 已注册但未填写 function")
+            print(f"[要求] 角色规划必须填写 function 字段，请运行 add-char 补充：")
+            print(f"  python novel_state_manager.py add-char <state_path> \"{c['name']}\" \"{c.get('role','')}\" \"{fa}\" \"{','.join(c.get('traits',[]))}\" \"{c.get('mbti','')}\" \"{c.get('archetype','')}\" \"<功能描述>\"")
+            sys.exit(1)
     if char_entries:
         print(f"{'='*50}")
         print(f"[硬性] 已出场关键人物")
