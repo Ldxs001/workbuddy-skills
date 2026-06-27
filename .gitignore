@@ -49,3 +49,5 @@ workday-calendar/**
 skills/.dist/
 .dist/
 .venv*/
+
+# WorkBuddy workspace cache.workbuddy/
