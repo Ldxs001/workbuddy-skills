@@ -218,6 +218,10 @@ def load_context(state_path, chapter, sub_key):
         role = c.get("role", "")
         func = c.get("function", "")
         label = f"{c['name']}({role})" if role else c['name']
+        # 若有别名，追加显示
+        aliases = c.get("aliases", [])
+        if aliases and isinstance(aliases, list):
+            label += f" [别名: {'/'.join(aliases)}]"
         if func:
             char_entries.append(f"  {label}: {func}")
         else:
@@ -232,6 +236,72 @@ def load_context(state_path, chapter, sub_key):
         for line in char_entries:
             print(line)
         print(f"{'='*50}\n")
+
+    # ── [硬性] 实体关系网（累计，登场即累加）──
+    tracker = data.get("entity_tracker", {"entities": [], "relations": []})
+    all_entities = tracker.get("entities", [])
+    all_relations = tracker.get("relations", [])
+    if all_entities:
+        # 实体列表分类输出
+        ent_lines = []
+        type_order = {"character": "角色", "object": "物品", "location": "地点", "organization": "组织", "data": "数据"}
+        for ent_type in ["character", "object", "location", "organization", "data"]:
+            group = [e for e in all_entities if e.get("type") == ent_type]
+            if not group:
+                continue
+            label = type_order.get(ent_type, ent_type)
+            for e in group:
+                attr = e.get("attributes", {})
+                parts = [f"{e['name']}"]
+                if attr:
+                    attr_str = " | ".join(f"{k}={v}" for k, v in attr.items() if v)
+                    if attr_str:
+                        parts.append(f"[{attr_str}]")
+                parts.append(f"[{e.get('first_chapter','?')}{e.get('first_sub','?')}]")
+                ent_lines.append(f"    {'  '.join(parts)}")
+        if ent_lines:
+            print(f"{'='*50}")
+            print(f"[硬性] 实体关系网（累计 {len(all_entities)} 实体, {len(all_relations)} 关系）")
+            print(f"{'='*50}")
+            for line in ent_lines:
+                print(line)
+            # 关系列表（全量输出，与实体同策略）
+            rel_lines = []
+            for r in all_relations:
+                from_e = next((e for e in all_entities if e["id"] == r.get("from_entity")), None)
+                to_e = next((e for e in all_entities if e["id"] == r.get("to_entity")), None)
+                if from_e and to_e:
+                    _ch = r.get("chapter", "?")
+                    _sub = r.get("sub", "?")
+                    rel_lines.append(f"    {from_e['name']} → {r.get('predicate','?')} → {to_e['name']} [{_ch}{_sub}]")
+            if rel_lines:
+                print(f"  ── 关联关系 ──")
+                for line in rel_lines:
+                    print(line)
+            print(f"{'='*50}\n")
+
+    # ── [硬性] 上一章行为轨迹 ──
+    prev_behavior = None
+    chapters_list = data.get("chapters", [])
+    for ci, ch in enumerate(chapters_list):
+        if ch["id"] == chapter and ci > 0:
+            prev_ch = chapters_list[ci - 1]
+            prev_behavior = prev_ch.get("behavior_summary", {})
+            break
+    if prev_behavior:
+        behavior_lines = []
+        for char_name, actions in prev_behavior.items():
+            if actions:
+                actions_str = " → ".join(actions[:4])
+                behavior_lines.append(f"  {char_name}: {actions_str}")
+        if behavior_lines:
+            print(f"{'='*50}")
+            print(f"[硬性] 上一章行为轨迹（{chapters_list[ci-1]['id']}）")
+            print(f"{'='*50}")
+            for line in behavior_lines:
+                print(line)
+            print(f"  提示: 当前章应自然延续以上轨迹，无重大断裂")
+            print(f"{'='*50}\n")
 
     # ── [参考] 情绪写作参考（tone 场景词，引导而非判定） ──
     tone = subs[sub_key].get("tone", "")
@@ -380,6 +450,17 @@ def load_context(state_path, chapter, sub_key):
         print(f"  {'─'*40}")
         print(f"  提示: 以上为命题约束，不可偏离")
         print(f"{'='*50}\n")
+
+    # ── [硬性] 别名声明（代码级阻断） ──
+    print(f"\n{'='*50}")
+    print(f"[硬性] 别名声明（必须，缺失则阻断写入）")
+    print(f"{'='*50}")
+    print(f"  若本次写作引入了角色的别名，请在正文末尾单独一行输出：")
+    print(f"    【别名】老陈 = 陈叔")
+    print(f"  若未引入任何别名，请输出：")
+    print(f"    【别名】无")
+    print(f"  atomic_writer 将拦截此标记行，不写入正文。返回的命令会自动处理。")
+    print(f"{'='*50}\n")
 
     # ── [下一步] 下一步命令提示 ──
     print(f"\n{'='*50}")

@@ -287,6 +287,129 @@ def _check_summary_fidelity(chapter_dir: str, state_path: str) -> list:
     return issues
 
 
+def _check_entity_status(chapter_dir: str, state_path: str) -> list:
+    """
+    检查实体状态一致性：
+    - 读取 entity_tracker 中标记为降级状态（destroyed/damaged/lost/dead 等）的实体
+    - 如果本章正文中正常使用了这些实体（无恢复说明），标记 HARD
+    """
+    issues = []
+    state = {}
+    if os.path.exists(state_path):
+        with open(state_path, "r", encoding="utf-8") as f:
+            state = json.load(f)
+
+    tracker = state.get("entity_tracker", {})
+    entities = tracker.get("entities", []) if isinstance(tracker, dict) else []
+    if not entities:
+        return issues
+
+    STATUS_DEGRADING = {"destroyed", "damaged", "closed", "lost", "dead", "injured", "unconscious", "sold", "stolen", "given"}
+    RECOVERY_WORDS = {"修复", "重建", "修好", "重新", "恢复", "复活", "治愈", "找回", "买回", "赎回"}
+
+    # 读取本章所有子结构的内容
+    files = _sorted_substructure_files(chapter_dir)
+    if not files:
+        return issues
+
+    chapter_text = ""
+    for fpath in files:
+        lines = _read_all_lines(fpath)
+        chapter_text += "\n".join(lines) + "\n"
+
+    for e in entities:
+        attr = e.get("attributes", {})
+        status = attr.get("status", "")
+        if status not in STATUS_DEGRADING:
+            continue
+        name = e.get("name", "")
+        if not name or name not in chapter_text:
+            continue
+        # 实体在降级状态下被本章使用——检查是否有恢复说明
+        has_recovery = any(w in chapter_text for w in RECOVERY_WORDS)
+        if not has_recovery:
+            issues.append({
+                "level": "WARN",
+                "dimension": "实体状态一致性",
+                "detail": f"实体「{name}」状态为「{status}」（详见{e.get('last_chapter','?')}{e.get('last_sub','?')}），"
+                          f"但本章仍在使用且未提及修复/恢复"
+            })
+
+    return issues
+
+
+def _check_entity_relations(chapter_dir: str, state_path: str) -> list:
+    """
+    检查实体关系链断裂：
+    - 读取 entity_tracker 中建立的关系
+    - 如果某实体在前一章建立了重要关系，但本章该实体出现时关系未被提及，标记 SOFT
+    """
+    issues = []
+    state = {}
+    if os.path.exists(state_path):
+        with open(state_path, "r", encoding="utf-8") as f:
+            state = json.load(f)
+
+    tracker = state.get("entity_tracker", {})
+    relations = tracker.get("relations", []) if isinstance(tracker, dict) else []
+    entities = tracker.get("entities", []) if isinstance(tracker, dict) else []
+    if not relations:
+        return issues
+
+    # 从目录名推断本章 ID
+    dir_name = os.path.basename(chapter_dir)
+    ch_match = re.search(r'(\d+)', dir_name)
+    ch_key = f"L{int(ch_match.group(1)):02d}" if ch_match else ""
+
+    # 读取本章内容
+    files = _sorted_substructure_files(chapter_dir)
+    if not files:
+        return issues
+    chapter_text = ""
+    for fpath in files:
+        lines = _read_all_lines(fpath)
+        chapter_text += "\n".join(lines) + "\n"
+
+    # 建立实体名→实体映射
+    entity_by_id = {e["id"]: e for e in entities}
+
+    for r in relations:
+        re_ch = r.get("chapter", "")
+        if re_ch >= ch_key:  # 在本章或之后建立的关系跳过
+            continue
+        from_e = entity_by_id.get(r.get("from_entity"))
+        to_e = entity_by_id.get(r.get("to_entity"))
+        if not from_e or not to_e:
+            continue
+        # 如果两个实体都在本章出现，但关系核心词未出现，标记
+        if from_e["name"] in chapter_text and to_e["name"] in chapter_text:
+            pred = r.get("predicate", "")
+            # 检查核心关系词是否出现在正文
+            relation_words = set()
+            if pred == "贩卖":
+                relation_words = {"买", "卖", "交易", "价格", "信用点"}
+            elif pred == "领导":
+                relation_words = {"领导", "头目", "手下", "成员"}
+            elif pred == "拥有":
+                relation_words = {"拥有", "持有", "带着", "装着"}
+            elif pred == "位于":
+                relation_words = {"在", "位于", "来到", "回到", "离开"}
+            elif pred == "归属":
+                relation_words = {"属于", "加入", "是...成员", "隶属"}
+            elif pred == "转移":
+                relation_words = {"给", "递", "交", "送", "转交"}
+            # 检查是否在正文中有足够的关系暗示
+            if relation_words and not any(w in chapter_text for w in relation_words):
+                issues.append({
+                    "level": "INFO",
+                    "dimension": "实体关系链",
+                    "detail": f"{from_e['name']}与{to_e['name']}曾有『{pred}』关系（{re_ch}{r.get('sub','?')}），"
+                              f"本章两者同时出现但未提及这层关系"
+                })
+
+    return issues
+
+
 def generate_report(chapter_dir: str, state_path: str, report_path: str):
     if not os.path.exists(state_path):
         print(f"ERROR: novel_state.json 未找到: {state_path}")
@@ -335,8 +458,34 @@ def generate_report(chapter_dir: str, state_path: str, report_path: str):
         report_lines.append("- [OK] 所有子结构内容与概述一致")
     report_lines.append(f"")
 
+    # ── 实体状态一致性（新增） ──
+    report_lines.append(f"")
+    report_lines.append(f"## 4️⃣ 实体状态一致性")
+    report_lines.append(f"")
+    entity_status_issues = _check_entity_status(chapter_dir, state_path)
+    if entity_status_issues:
+        for i in entity_status_issues:
+            icon = {"INFO": "\u2139\ufe0f", "WARN": "[WARN]"}.get(i["level"], "\u2139\ufe0f")
+            report_lines.append(f"- {icon} [{i['dimension']}] {i['detail']}")
+    else:
+        report_lines.append("- [OK] 未发现实体状态矛盾")
+    report_lines.append(f"")
+
+    # ── 实体关系链（新增） ──
+    report_lines.append(f"")
+    report_lines.append(f"## 5️⃣ 实体关系链")
+    report_lines.append(f"")
+    relation_issues = _check_entity_relations(chapter_dir, state_path)
+    if relation_issues:
+        for i in relation_issues:
+            icon = {"INFO": "\u2139\ufe0f", "WARN": "[WARN]"}.get(i["level"], "\u2139\ufe0f")
+            report_lines.append(f"- {icon} [{i['dimension']}] {i['detail']}")
+    else:
+        report_lines.append("- [OK] 实体关系链正常")
+    report_lines.append(f"")
+
     # 统计
-    all_issues = char_issues + tl_issues + fidelity_issues
+    all_issues = char_issues + tl_issues + fidelity_issues + entity_status_issues + relation_issues
     pass_count = sum(1 for i in all_issues if i["level"] in ("PASS",))
     info_count = sum(1 for i in all_issues if i["level"] == "INFO")
     warn_count = sum(1 for i in all_issues if i["level"] == "WARN")

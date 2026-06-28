@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Atomic Writer — 原子写入器（v2，格式硬约束版）
+Atomic Writer — 原子写入器（v3，格式硬约束+别名钩子版）
 
 格式规范（钩子强制执行，阻断式）：
   第1行: L## · S##《标题》
-  第2..N-1行: 正文（纯叙事，不得含子结构标记行）
+  第2..N-2行: 正文（纯叙事，不得含子结构标记行，不得含【别名】标记行）
+  第N-1行: 【别名】声明（由本钩子拦截，不写进正文）
   末行: L##S##（由本脚本自动追加）
 
 流程门禁：
@@ -12,13 +13,19 @@ Atomic Writer — 原子写入器（v2，格式硬约束版）
   2. body 标记行检测（阻断）
   3. 正文非空检测（阻断）
   4. 标点缺失校验（软性，不阻断）
-  5. 原子写入 → fsync → 追加编号标记 → 再次 fsync
+  5. 别名声明拦截（阻断：缺失则阻断，存在则剥离并注册）
+  6. 元注释污染检测（阻断）
+  7. 署名/代名检测（阻断）
+  8. 原子写入 → fsync → 追加编号标记 → 再次 fsync
 """
-import sys, os, re
+import sys, os, re, subprocess
 from pathlib import Path
 
 TITLE_PATTERN = re.compile(r'^L\d+ · S\d+《.+》$')
 MARKER_PATTERN = re.compile(r'^L\d+S\d+$')
+ALIAS_PATTERN = re.compile(r'^【别名】\s*(.+?)\s*=\s*(.+)$')
+ALIAS_NONE_PATTERN = re.compile(r'^【别名】\s*无\s*$')
+SCRIPTS_DIR = Path(__file__).parent
 
 # 署名/代名检测模式（禁止 LLM 擅自添加）
 SIGNATURE_PATTERNS = [
@@ -31,7 +38,7 @@ SIGNATURE_PATTERNS = [
 ]
 
 
-def validate_and_write(content, filepath, chapter, sub_key, signature=None):
+def validate_and_write(content, filepath, chapter, sub_key, signature=None, state_path=None):
     """
     原子写入 + 多钩子校验。
     signature: {"enabled": bool, "text": str} 或 None（跳过检测）
@@ -50,21 +57,68 @@ def validate_and_write(content, filepath, chapter, sub_key, signature=None):
         print(f"  实际: {first_line}")
         return False
 
-    # ── 钩子2: 正文非空检测（阻断） ──
+    # ── 钩子5: 别名声明拦截（阻断：缺失则阻断，存在则剥离+注册）──
+    alias_line = None
+    alias_idx = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if ALIAS_PATTERN.match(stripped):
+            alias_line = stripped
+            alias_idx = i
+            break
+        if ALIAS_NONE_PATTERN.match(stripped):
+            alias_line = stripped
+            alias_idx = i
+            break
+
+    if alias_line is None:
+        # 第一子结构可豁免（尚无角色可产生别名）
+        if sub_key != "S01":
+            print(f"[HOOK-BLOCK] 缺少【别名】声明")
+            print(f"  若无别名请输出: 【别名】无")
+            print(f"  若有别名请输出: 【别名】老陈 = 陈叔")
+            return False
+    elif alias_line.startswith("【别名】无"):
+        # 声明无别名，剥离即可
+        lines.pop(alias_idx)
+        print(f"  [别名] 声明: 无别名")
+    else:
+        # 解析别名声明并注册
+        m = ALIAS_PATTERN.match(alias_line)
+        if m:
+            char_name = m.group(1).strip()
+            alias = m.group(2).strip()
+            lines.pop(alias_idx)  # 从正文剥离
+            print(f"  [别名] 声明: {char_name} ← 「{alias}」")
+            if state_path:
+                sm_path = SCRIPTS_DIR / "novel_state_manager.py"
+                r = subprocess.run(
+                    [sys.executable, str(sm_path), "register-alias", state_path, char_name, alias],
+                    capture_output=True, text=True, encoding="utf-8"
+                )
+                if r.returncode == 0:
+                    for out_line in r.stdout.strip().split("\n"):
+                        if out_line.strip():
+                            print(f"    {out_line.strip()}")
+                else:
+                    print(f"    [WARN] 别名注册失败: {r.stderr.strip()}")
+
+    # ── 钩子6: 正文非空检测（阻断）──
+    # 重新构建 body（别名行已被剥离）
     body_lines = lines[1:]
     body_text = "\n".join(body_lines).strip()
     if not body_text:
         print(f"[HOOK-BLOCK] 正文为空，拒绝写入")
         return False
 
-    # ── 钩子3: 正文标记行检测（阻断） ──
-    for i, line in enumerate(body_lines, 2):  # 行号从2开始计数（第1行是标题）
+    # ── 钩子7: 正文标记行检测（阻断）──
+    for i, line in enumerate(body_lines, 2):
         stripped = line.strip()
         if MARKER_PATTERN.match(stripped):
             print(f"[HOOK-BLOCK] 正文第{i}行含非法子结构标记: {line.strip()}")
             return False
 
-    # ── 钩子4: 标点缺失校验（软性，不阻断） ──
+    # ── 钩子8: 标点缺失校验（软性，不阻断）──
     PUNCTUATION = set("，。；：？！、,.;:?!")
     MAX_SEGMENT = 80
     for i, line in enumerate(body_lines, 2):

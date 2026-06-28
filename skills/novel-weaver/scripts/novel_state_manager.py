@@ -20,7 +20,7 @@ from _path_utils import DATA_DIR
 IMMUTABLE_SCOPE = {
     "chapters": {"id", "title", "overview"},
     "sub_structures": {"title", "summary", "tone"},
-    "characters": {"name", "role", "traits", "mbti", "archetype", "function"},
+    "characters": {"name", "role", "traits", "mbti", "archetype", "function", "aliases"},
     "top_level": {"project", "novel_info", "writing_style", "setting", "technical_notes"},
 }
 
@@ -70,7 +70,7 @@ def save_state(path, data, caller="auto"):
         current_fp = _fingerprint(data)
         if current_fp != expected_fp:
             print(f"[HOOK-BLOCK] 核心规划字段被非法修改！指纹不匹配")
-            print(f"  允许修改的字段: word_count, status, continuity_notes, style_check_notes, timeline")
+            print(f"  允许修改的字段: word_count, status, continuity_notes, style_check_notes, timeline, entity_tracker, behavior_summary")
             print(f"  禁止修改: title, overview, summary, tone, 角色核心信息, novel_info, writing_style, setting")
             print(f"  来源: {caller}")
             # 恢复旧数据中的运行时字段到新数据
@@ -119,6 +119,7 @@ def _merge_runtime_fields(new_data: dict, old_data: dict):
             new_ch["status"] = old_ch.get("status", "pending")
             new_ch["continuity_notes"] = old_ch.get("continuity_notes", [])
             new_ch["style_check_notes"] = old_ch.get("style_check_notes", [])
+            new_ch["behavior_summary"] = old_ch.get("behavior_summary", {})
             # 子结构: 还原规划字段 + 保留运行时字段
             old_subs = old_ch.get("sub_structures", {})
             if old_subs:
@@ -137,11 +138,16 @@ def _merge_runtime_fields(new_data: dict, old_data: dict):
     # 4) 时间线
     if "timeline" in old_data:
         new_data["timeline"] = old_data["timeline"]
-    # 5) 签名
+    # 5) 实体追踪器（纯运行时数据，全量保留）
+    if "entity_tracker" in old_data:
+        new_data.setdefault("entity_tracker", {})
+        for key in old_data["entity_tracker"]:
+            new_data["entity_tracker"][key] = old_data["entity_tracker"][key]
+    # 6) 签名
     if "signature" in old_data:
         new_data["signature"] = old_data["signature"]
 
-def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype="", function=""):
+def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archetype="", function="", aliases=""):
     data = load_state(path)
     # ── 规划阻断：有 first_appearance 则必须同时填写 function ──
     if first_appearance and not function:
@@ -159,8 +165,11 @@ def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archet
             if mbti: c["mbti"] = mbti
             if archetype: c["archetype"] = archetype
             if function: c["function"] = function
+            if aliases: c["aliases"] = [a.strip() for a in aliases.split(",")]
             save_state(path, data, caller="add-char")
             print(f"[角色更新] {name} (MBTI={mbti or '无'}, 原型={archetype or '无'})")
+            if aliases:
+                print(f"[别名] {name} 别名: {aliases}")
             return
     entry = {"name": name, "role": role_attr, "first_appearance": first_appearance}
     if traits:
@@ -171,10 +180,33 @@ def add_char(path, name, role_attr, first_appearance, traits="", mbti="", archet
         entry["archetype"] = archetype
     if function:
         entry["function"] = function
+    if aliases:
+        entry["aliases"] = [a.strip() for a in aliases.split(",")]
     chars.append(entry)
     data["characters"] = chars
     save_state(path, data, caller="add-char")
     print(f"[角色新增] {name} (出场: {first_appearance}, MBTI={mbti or '无'}, 原型={archetype or '无'})")
+    if aliases:
+        print(f"[别名] {name} 别名: {aliases}")
+
+def register_alias(path, char_name, alias):
+    """为角色注册单个别名。由 atomic_writer 在检测到【别名】声明时调用。"""
+    data = load_state(path)
+    for c in data.get("characters", []):
+        if c.get("name") != char_name:
+            continue
+        existing = c.get("aliases", [])
+        if not isinstance(existing, list):
+            existing = []
+        if alias in existing:
+            print(f"[别名] {char_name} 已存在别名「{alias}」，无需重复注册")
+            return
+        existing.append(alias)
+        c["aliases"] = existing
+        save_state(path, data, caller="register-alias")
+        print(f"[别名] {char_name} ← 「{alias}」")
+        return
+    print(f"[WARN] 角色「{char_name}」不存在，无法注册别名")
 
 def update_sub(path, chapter, sub_key, word_count):
     """
@@ -292,6 +324,7 @@ def init_project(name, project_name, length="medium", num_chapters=None):
             "custom_rules": ""
         },
         "characters": [],
+        "entity_tracker": {"entities": [], "relations": []},
         "chapters": chapters,
         "timeline": [],
         "signature": {"enabled": False, "text": ""}
@@ -315,8 +348,20 @@ if __name__ == "__main__":
         print("    init       <项目名> [length] [num_chapters]  初始化新小说")
         print("                   length: short(3-6章), medium(8-10章,默认), long(11章+)")
         print("                   也可传入完整路径: init ./my/path/data/novel_state.json 小说名")
-        print("    add-char   <name> <role> <first_appearance> [traits] [mbti] [archetype]")
-        print("    add-char   <name> <role> <first_appearance> [traits] [mbti] [archetype]")
+        print("    add-char   <name> <role> <first_appearance> [traits] [mbti] [archetype] [function] [aliases]")
+        print("    register-alias <char_name> <alias>                    为角色注册别名")
+        print("    update-sub <chapter> <sub_key> <word_count>")
+        print("    finalize   <chapter>")
+        print("    add-timeline <time_point> <event>")
+        print("    set-signature <true|false> [text]")
+        print("    set-length    <short|medium|long>")
+        print("    list-projects                     列出所有已创建的项目")
+        print("")
+        print("  示例:")
+        print("    python novel_state_manager.py init my-novel 我的小说   # 自动创建")
+        print("    python novel_state_manager.py init ./path/state.json 小说名  # 指定路径")
+        print("    python novel_state_manager.py register-alias ./path/state.json 老陈 陈叔")
+        sys.exit(1)
         print("    update-sub <chapter> <sub_key> <word_count>")
         print("    finalize   <chapter>")
         print("    add-timeline <time_point> <event>")
@@ -352,7 +397,8 @@ if __name__ == "__main__":
                  sys.argv[6] if len(sys.argv) > 6 else "",
                  sys.argv[7] if len(sys.argv) > 7 else "",
                  sys.argv[8] if len(sys.argv) > 8 else "",
-                 sys.argv[9] if len(sys.argv) > 9 else "")
+                 sys.argv[9] if len(sys.argv) > 9 else "",
+                 sys.argv[10] if len(sys.argv) > 10 else "")
     elif cmd == "update-sub":
         update_sub(sp, sys.argv[3], sys.argv[4], sys.argv[5])
     elif cmd == "finalize":
@@ -377,5 +423,7 @@ if __name__ == "__main__":
         length = sys.argv[4] if len(sys.argv) > 4 else "medium"
         num = sys.argv[5] if len(sys.argv) > 5 else None
         init_project(sys.argv[2], display_name, length, num)
+    elif cmd == "register-alias":
+        register_alias(sp, sys.argv[3], sys.argv[4])
     else:
         print(f"[错误] 未知命令: {cmd}")

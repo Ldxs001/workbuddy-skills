@@ -9,6 +9,7 @@ from pathlib import Path
 # 推断 data 目录
 _SCRIPTS_DIR = Path(__file__).parent
 DATA_DIR = _SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "projects"
+MODELS_DIR = _SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / "models"
 PROJECT_LOCK = _SCRIPTS_DIR.parent.parent / ".standardization" / "novel-weaver" / ".project"
 
 

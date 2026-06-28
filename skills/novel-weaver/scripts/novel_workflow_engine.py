@@ -205,7 +205,7 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     sys.path.insert(0, str(SCRIPTS_DIR))
     import novel_atomic_writer
     success = novel_atomic_writer.validate_and_write(content, str(filepath), chapter, sub_key,
-                                                      signature=sig_cfg)
+                                                      signature=sig_cfg, state_path=state_path)
     if not success:
         print(f"[HOOK-BLOCK] {chapter}{sub_key}: 写入失败")
         sys.exit(1)
@@ -222,6 +222,21 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     if result.returncode != 0:
         print(f"[HOOK-BLOCK] state 更新失败: {result.stderr}")
         sys.exit(1)
+
+    # ── 步骤4: entity_extractor.extract — 实体关系提取（非阻断）──
+    entity_extractor = SCRIPTS_DIR / "novel_entity_extractor.py"
+    content_file = str(filepath)
+    ext_result = subprocess.run(
+        [sys.executable, str(entity_extractor),
+         state_path, chapter, sub_key, content_file],
+        capture_output=True, text=True, encoding="utf-8"
+    )
+    if ext_result.returncode != 0:
+        print(f"  [INFO] entity-extract 跳过: {ext_result.stderr.strip()}")
+    else:
+        for line in ext_result.stdout.strip().split("\n"):
+            if line.strip():
+                print(f"  {line.strip()}")
 
     print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
     print(f"  字数: {word_count}")
@@ -292,6 +307,28 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
             "suggestion": "检查 novel_state.json 和 chapter 文件完整性后重试"
         })
 
+    # ── 第5步: 语义检查（有模型则执行，无模型跳过） ──
+    print(f"\n---")
+    print(f"[完结] {chapter}: 语义检查...")
+    try:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        from novel_semantic_check import check_semantic
+        semantic_issues = check_semantic(state_path, chapter, chapter_dir)
+        all_issues += semantic_issues
+    except Exception as e:
+        print(f"  [INFO] 语义检查跳过（非阻断）: {e}")
+
+    # ── 第6步: 推理审核（可选，需 GPU + Qwythos-9B） ──
+    print(f"\n---")
+    print(f"[完结] {chapter}: 推理审核...")
+    try:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        from novel_reasoning_check import check_reasoning
+        reasoning_issues = check_reasoning(state_path, chapter, chapter_dir)
+        all_issues += reasoning_issues
+    except Exception as e:
+        print(f"  [INFO] 推理审核跳过（非阻断）: {e}")
+
     # ── 聚合决策 ──
     hard_issues = [i for i in all_issues if i.get("severity") == "HARD"]
     soft_issues = [i for i in all_issues if i.get("severity") == "SOFT" or i.get("severity") == ""]
@@ -339,7 +376,93 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
                 ch["status"] = "completed"
                 break
         sp.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # ── 跨章行为摘要提取 ──
+        _generate_behavior_summary(state_path, chapter, str(chapter_dir))
+
         print(f"[完结] {chapter}: [OK] 全部完成")
+
+
+def _generate_behavior_summary(state_path: str, chapter: str, chapters_dir: str):
+    """
+    从已完成的章节目录中提取角色行为摘要。
+    逐子结构扫描，提取包含角色名的句子中的核心动作。
+    写入 novel_state.json 的 chapters[].behavior_summary。
+    """
+    sp = Path(state_path)
+    if not sp.exists():
+        return
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
+    ch_data = None
+    for ch in data.get("chapters", []):
+        if ch["id"] == chapter:
+            ch_data = ch
+            break
+    if not ch_data:
+        return
+
+    # 获取角色名列表
+    char_names = [c.get("name", "") for c in data.get("characters", []) if c.get("name")]
+    if not char_names:
+        return
+
+    # 扫描所有子结构文件，提取角色行为
+    ch_dir = Path(chapters_dir)
+    char_actions = {}
+    for fpath in sorted(ch_dir.glob("S*.txt")):
+        try:
+            text = fpath.read_text(encoding="utf-8-sig")
+        except Exception:
+            continue
+        # 跳过标题行和编号标记行
+        lines = [l.strip() for l in text.split("\n") if l.strip()
+                 and not l.strip().startswith(f"{chapter}S")
+                 and not re.match(r'L\d+ · S\d+《', l.strip())]
+        content = "".join(lines)
+
+        for name in char_names:
+            if name not in content:
+                continue
+            # 找到包含角色名的中文句子（以 。！？结尾的片段）
+            sentences = re.split(r'[。！？\n]', content)
+            for sent in sentences:
+                if name not in sent:
+                    continue
+                sent = sent.strip()
+                if len(sent) < 4:
+                    continue
+                # 提取动作：从角色名到句尾，去除角色名本身
+                # 只保留有明确动作的句子（包含动词）
+                action_kws = ["把", "将", "用", "对", "给", "从", "在", "说", "问", "答",
+                              "打", "踢", "走", "跑", "跳", "拿", "放", "看", "听", "吃",
+                              "买", "卖", "修", "装", "拆", "调查", "决定", "发现", "开始"]
+                if not any(kw in sent for kw in action_kws):
+                    continue
+                # 截取：保留包含角色名的一段核心动作（不超过 25 字）
+                idx = sent.index(name)
+                action = sent[idx:idx + 25]
+                action = action.replace(name, "【" + name + "】", 1)[:25]
+                if name not in char_actions:
+                    char_actions[name] = []
+                if action not in char_actions[name]:
+                    char_actions[name].append(action)
+
+    if not char_actions:
+        return
+
+    # 去重截断（每个角色最多保留 5 条行为）
+    for name in char_actions:
+        seen = []
+        for a in char_actions[name]:
+            if a not in seen:
+                seen.append(a)
+        char_actions[name] = seen[:5]
+
+    # 写入 state
+    ch_data["behavior_summary"] = char_actions
+    sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    total = sum(len(v) for v in char_actions.values())
+    print(f"[行为摘要] {chapter}: {len(char_actions)} 个角色, {total} 条行为记录")
 
 
 def fidelity_check(state_path, chapters_dir):

@@ -1,3 +1,32 @@
+## [1.21.5] - 2026-06-28
+
+### 文档
+
+- **Qwythos 安装说明重写** — SKILL.md 和 novel_reasoning_check.py 同步更新为独立检查流程：
+  1. 检查 g++（无则下载 winlibs 压缩包，解压到 MODELS_DIR/winlibs/，配 PATH）
+  2. 检查 cmake（无则 pip install cmake）
+  3. pip install llama-cpp-python（编译安装）
+  4. 下载 Qwythos GGUF 模型
+- winlibs 下载直链 + SourceForge 镜像均写入文档
+
+---
+
+## [1.21.4] - 2026-06-28
+
+### 更正
+
+- **v1.21.2 归因更正** — 之前 changelog 中将 ClawHub/SkillHub 发布旧内容归因为"git-sync Bug"，**此为错误归因**。真实原因是：操作者在 bump 时手动 sed 改了 workbuddy-skills 的版本号行但未同步内容，然后并发启动 git-sync + ClawHub + SkillHub，导致 ClawHub/SkillHub 读到旧版 SKILL.md 发布。**非 git-sync 问题，是操作者时序错误。**
+
+---
+
+## [1.21.3] - 2026-06-28
+
+### 文档
+
+- **SKILL.md 模型安装说明前置** — 触发条件新增"安装模型/装BERT/装Qwythos"正向触发词；检查系统章节下方直接嵌入 pip install + 模型下载命令，LLM 不再需要跳转 faq.md 查找
+
+---
+
 ## [1.21.2] - 2026-06-28
 
 ### 修复
@@ -521,7 +550,7 @@
 - **finalize_chapter 绕过 pass_gate API** — 直接操作 gates dict，改为调用 `pass_gate()`。
 - **finalize_chapter 缺少逻辑检查** — 三检只跑了连通性和风格，未调用 logic_check。已补上。
 - **set_phase 不做门禁检查** — →writing 不检查 outline_causality，→stage3_ready 不检查 fidelity/ending_verify。已补上门禁检查。
-- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 wUwproject。
+- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 [username-redacted]。
 
 ### 文档
 - SKILL.md 渐进式文件索引表修正：execution_standards/hooks/license/causality_check/fidelity/character_registry 描述与实际对齐
