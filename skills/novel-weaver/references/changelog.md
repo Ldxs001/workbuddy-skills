@@ -1,3 +1,106 @@
+## [1.21.1] - 2026-06-28
+
+### 修复
+
+- **SKILL.md 碎片/乱码修复** — 约束行"门禁状态存于 ， 查看"改为完整命令；渐进式文件索引表 execution_standards 描述从"/ 层级 / 上限 / 说明 /"改为正常内容
+- **SKILL.md 新增「检查系统」章节** — 6步检查器表格（脚本/作用/阻断等级），LLM 不需跳转 references 即可理解最终检查流程，196行满足 ≤230行审计要求
+
+---
+
+## [1.21.0] - 2026-06-28
+
+### ✨ 新增功能
+
+- **BERT 语义检查引擎** — `novel_semantic_check.py`，基于 bge-small-zh-v1.5（33MB），实现 overview-vs-content 语义对齐检测和子结构间语义跳跃检测，集成到 finalize-chapter 第5步
+- **Qwythos 推理审核引擎** — `novel_reasoning_check.py`，基于 Qwythos-9B GGUF Q4_K_M（~5.5GB，需GPU），实现因果合理性/人物行为一致性/情绪弧/对话匹配度/论证可靠性五项推理审核，集成到 finalize-chapter 第6步
+- **路径统一管理** — `_path_utils.py` 新增 `MODELS_DIR`，所有模型缓存集中到 `models/` 目录，与 huggingface 全局缓存隔离
+- **文档全面同步** — SKILL.md、execution_standards.md、hooks.md、faq.md 同步更新：检查链从4步扩展为6步、新增别名系统/实体关系追踪/行为摘要章节
+
+### 修复
+
+- **SKILL.md 消除重复段** — 删除第160-174行与第136-157行完全重复的能力表和不支持列表
+
+---
+
+## [1.20.5] - 2026-06-27
+
+### ✨ 新增功能
+
+- **项目初始化优化**：完整角色表支持（含 MBTI/原型/功能定位）、文风系统字段、实体关系追踪器数据层
+- **子结构 emotion 增强**：多维度情绪混合配置，强度分级输出 + 混合解读公式
+
+---
+
+## [1.20.4] - 2026-06-27
+
+### 新增
+- **[atomic_writer] 别名声明阻断钩子** — 每个子结构正文末尾必须声明别名：`【别名】老陈 = 陈叔` 或 `【别名】无`。缺失则 HOOK-BLOCK 阻断写入（S01 豁免）。
+- **[context_loader] 别名声明指令** — 输出末尾追加硬性别名声明框，LLM 每次写作前看到强制要求
+- **[state_manager] register-alias 命令** — 新增 `register-alias` CLI，atomic_writer 拦截别名行后自动调此命令注册
+- **[entity_extractor] 移除别名启发式** — 回退到纯机械操作，别名识别完全由 LLM 语义 + atomic_writer 钩子完成
+
+### 流程
+- write-sub 管道: atomic_writer(含别名钩子) → state_manager → 字数校验 → entity_extractor
+- 别名声明行被 atomic_writer 拦截，不写入 .txt 文件，直接走 state_manager 注册
+- S01 豁免（尚无角色可产生别名），S02+ 强制声明
+
+---
+
+## [1.20.3] - 2026-06-27
+
+### 新增
+- **[entity_extractor] 自动别名识别** — 同一个子结构（~2000字）内，未知候选名与已知角色名共现且共享至少一个汉字时，自动识别为别名并写入 character.aliases。无需提前注册，零假阳性风险（同子结构+共享字符=同一人）
+
+### 原理
+"陈叔！你怎么来了？"老陈此时正在街角看着我。
+→ "陈叔"与"老陈"共享"陈"字，同子结构内共现 → 自动识别为别名
+
+---
+
+## [1.20.2] - 2026-06-27
+
+### 新增
+- **[角色别名系统]** — `add-char` 新增第10参数 `aliases`（逗号分隔），角色注册时可指定别名（如"陈叔"）
+- **[entity_extractor] 别名识别** — 已知角色的别名不再被创建为新实体，别名在正文中出现时正确更新该实体的 last_chapter
+- **[context_loader] 别名显示** — 已出场关键人物区块中别名以 `[别名: 陈叔]` 形式显示
+- **[IMMUTABLE_SCOPE] 别名保护** — `aliases` 字段列入指纹保护范围
+
+### 解决场景
+- 叙事用"老陈"、对话用"陈叔"——alias 注册后视为同一实体，LLM 看到别名提示即知为同一个人
+
+---
+
+## [1.20.1] - 2026-06-27
+
+### 新增
+- **[behavior_summary] 跨章行为摘要系统** — novel_state.json 每章新增 `behavior_summary` 字段，记录各角色的关键行为轨迹
+- **[finalize-chapter] 行为摘要自动提取** — 完结检查通过后自动从子结构正文提取角色行为，去重后写入 state（每角色最多 5 条）
+- **[context_loader] 上一章行为轨迹注入** — 在实体关系网之后追加「上一章行为轨迹」区块，LLM 看到角色刚做了什么，续写自然一致
+
+### 架构
+- finalize-chapter 成功路径末尾追加行为摘要提取
+- context_loader 输出顺序: 关键人物 → 实体关系网 → 行为轨迹(新增) → 情绪参考
+- 行为摘要是纯运行时数据，不受指纹保护
+
+---
+
+## [1.20.0] - 2026-06-27
+
+### 新增
+- **[entity_tracker] 实体关系追踪系统** — novel_state.json 新增 `entity_tracker` 数据层，追踪角色/物品/地点/组织/数据五类实体的属性和相互关系
+- **[entity_extractor] 自动实体提取** — 新脚本 `novel_entity_extractor.py`，write-sub 第4步非阻断执行，从每子结构内容中自动提取实体-关系三元组、检测状态变更
+- **[context_loader] 实体关系网注入** — 「已出场关键人物」区块后追加「实体关系网」区块，全量累加输出实体列表和关系，LLM 写作时看到累计事实
+- **[logic_check] 实体状态一致性检查** — 检查已标记降级状态的实体（destroyed/damaged/dead 等）是否在后续章节无恢复地被使用，HARD 级警告
+- **[logic_check] 实体关系链检查** — 检查同时出现的两个实体间已建立的关系是否被忽略，SOFT 级提示
+- **[state_manager] 兼容 entity_tracker** — _merge_runtime_fields 保留 entity_tracker，init_project 初始化为空列表
+
+### 架构
+- write-sub 管道: atomic_writer → state_manager → 字数校验 → entity_extractor(新增)
+- context_loader 输出: 关键人物 → 实体关系网(新增) → 情绪参考
+- finalize-chapter 逻辑检查: 5项(新增2项: 实体状态+关系链)
+
+---
+
 ## [1.19.11] - 2026-06-27
 
 ### 修复

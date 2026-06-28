@@ -37,7 +37,17 @@ python novel_workflow_engine.py plan-chapter <state_path> <L##> '<subs_json>'
 
 **原因：** 缺少 Python 依赖模块。
 
-**修复：** 本技能所有脚本仅依赖 Python 标准库（json/os/sys/re/subprocess），不需要 pip install。
+**修复：** 核心功能仅依赖 Python 标准库（json/os/sys/re/subprocess），不需要 pip install。
+可选增强功能需额外安装：
+- **BERT 语义检查**（finalize-chapter 第5步）：
+  ```
+  pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
+  ```
+- **Qwythos 推理审核**（finalize-chapter 第6步，需 GPU 4GB+）：
+  ```
+  pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
+  ```
+两者均未安装时自动跳过，不影响现有流程。
 
 ### Q: context_loader 报 "子结构已完成，禁止重复写作"
 
@@ -54,7 +64,11 @@ python novel_workflow_engine.py next-step <state_path>
 
 **修复：** 确保 `<state_path>` 指向正确的路径：
 ```
-<skill_install_dir>/.standardization/novel-weaver/data/novel_state.json
+~/.workbuddy/skills/.standardization/novel-weaver/projects/<项目名>/data/novel_state.json
+```
+可用 list-projects 查看所有已创建的项目：
+```bash
+python novel_workflow_engine.py list-projects
 ```
 
 ## 三、环境错误
@@ -120,3 +134,33 @@ cat chapters/<L##>/<S##>.txt | python novel_workflow_engine.py write-sub <state_
 - INFO（超上限+15%）：篇幅过长，注意控制
 - OK：字数达标，无需操作
 - WARN/INFO 均为提示性，**不阻断写入**，不影响写作进度
+
+### Q: finalize-chapter 中的「语义检查」和「推理审核」是什么？
+
+**语义检查（第5步）：** 基于 BAAI/bge-small-zh-v1.5（33MB），检测：
+- overview-vs-content 语义对齐（正文是否真的在讲概述规划的内容）
+- 子结构间语义跳跃（两段之间话题是否断裂）
+- 情绪偏离+同义冗余+跨章主题延续辅助提示
+
+**推理审核（第6步）：** 基于 Qwythos-9B GGUF Q4_K_M（~5.5GB），检测：
+- 因果合理性（事件是否有前文铺垫）
+- 人物行为一致性（行为是否符合人格设定）
+- 情绪弧自然度（情绪转变是否合理）
+- 对话匹配度（对话是否符合角色身份）
+- 论证可靠性（推理是否成立）
+
+两者均有模型时执行，无模型时自动跳过，不影响现有流程。
+
+### Q: 安装 BERT 语义检查
+
+```bash
+pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
+HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
+```
+
+### Q: 安装 Qwythos 推理审核
+
+```bash
+pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
+HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF', filename='Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf')"
+```

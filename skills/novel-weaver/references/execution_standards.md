@@ -122,21 +122,36 @@
 
 所有元数据写入一个文件 `novel_state.json`。
 
-编号规则：
+### 模型存储
+
+BERT 语义检查和 Qwythos 推理审核的模型文件集中存储在 `_path_utils.py` 的 `MODELS_DIR` 管理的目录下：
+```
+~/.workbuddy/skills/.standardization/novel-weaver/models/
+├── bge-small-zh/             ← BERT 33MB（sentence-transformers 缓存）
+└── qwythos-9b-q4/            ← Qwythos GGUF ~5.5GB（llama-cpp-python 缓存）
+```
+首次下载模型时自动存入对应子目录。如有镜像需求设置 `HF_ENDPOINT` 环境变量。
+
+### 编号规则
 - 章节编号：`L01`、`L02` … `L15`
 - 子结构编号：`S01`、`S02` …
 - 完整引用：`L10S04` = 第 10 章第 4 个子结构
 
-novel_state.json 包含字段：project, meta.current_phase, meta.length, writing_style, signature, characters, timeline, chapters（含章摘要、子结构标题/概述/情绪提示/字数和状态、章节衔接/校验备注）。
+novel_state.json 包含字段：project, meta.current_phase, meta.length, writing_style, signature, characters（含aliases别名数组）, timeline, chapters（含章摘要、子结构标题/概述/情绪提示/字数和状态、章节衔接/校验备注），以及运行时字段：entity_tracker（实体关系网，含entities+relations）、behavior_summary（行为轨迹摘要）、cross_chapter_check（跨章承诺链记录）、continuity_notes（连通性记录）。
 
 更新时机：
 1. 项目初始化 → 填充 writing_style / chapters / characters
 2. 子结构先行规划 → plan-chapter 批量注册 title/summary/tone
 3. 子结构写入完成 → 更新 word_count + status
-4. 角色更新 → 更新 characters
-5. 时间推进 → 更新 timeline
-6. 连通性补充后 → 更新 continuity_notes
-7. 风格校验后 → 更新 style_check_notes
+4. 角色更新 → 更新 characters（含 aliases）
+5. 角色别名注册 → atomic_writer 写入时拦截【别名】行，自动调用 register-alias
+6. 时间推进 → 更新 timeline
+7. 连通性补充后 → 更新 continuity_notes
+8. 风格校验后 → 更新 style_check_notes
+9. 实体关系提取 → write-sub 后 entity_extractor 自动提取 entity_tracker.entities + entity_tracker.relations
+10. 行为摘要提取 → finalize-chapter 通过后自动提取 behavior_summary
+11. 语义检查 → finalize-chapter 中 BERT 检测 overview-vs-content 对齐和子结构间语义跳跃（有模型时）
+12. 推理审核 → finalize-chapter 中 Qwythos 检测因果/人格/情绪/对话/论证一致性（有模型时）
 
 ## 子结构文件格式
 
@@ -158,17 +173,19 @@ L10S04
 python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 ```
 
-此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
+此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 语义检查(BERT，可选) → 推理审核(Qwythos，可选，需GPU) → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
 
 ## 一键完结篇章（v1.9.0 质量闭环）
 
-代替手动依次调用各检查器的繁琐流程。内部执行 4 步检查 + 1 步阻断决策：
+代替手动依次调用各检查器的繁琐流程。内部执行 6 步检查 + 1 步阻断决策：
 
 ```
-章内连通性    → 检查子结构间时间/角色断链     → HARD: 双断裂阻断
-跨章承诺链    → 检查上章尾 vs 下章头关键词续接 → SOFT: 仅建议
-风格校验      → 检查禁用词/末行编号/行数       → HARD: 发现问题阻断
-逻辑检查      → 检查角色+时间线+概述忠实度     → HARD: 关键词命中<30%阻断
+章内连通性    → 检查子结构间时间/角色断链         → HARD: 双断裂阻断
+跨章承诺链    → 检查上章尾 vs 下章头关键词续接       → SOFT: 仅建议
+风格校验      → 检查禁用词/末行编号/行数             → HARD: 发现问题阻断
+逻辑检查      → 检查角色+时间线+概述忠实度           → HARD: 关键词命中<30%阻断
+语义检查(BERT)→ overview-vs-content 对齐+子结构间跳跃 → HARD: <0.4阻断（有模型时）
+推理审核(Qwythos) → 因果/人格/情绪/对话/论证 5项    → 按结果 HARD/SOFT（有模型时）
     ↓
 聚合决策：有 HARD 问题 → 写入 _fixes.json → 阻断
          全部通过      → 标记门禁 → phase → chapter_done
@@ -311,6 +328,112 @@ python novel_state_manager.py add-char <state_path> <name> <role> <first_appeara
   词汇: 文学化
   描写深度: 中等
   提示: 全文文风一致，不可偏离
+```
+
+## 别名系统（v1.13.x 新增）
+
+角色在正文中可能出现多种称呼（老贾→"姓贾的"）。LLM 写作后必须在正文末尾声明 `【别名】` 行。
+
+### 声明格式
+
+```
+【别名】老贾 = 贾老头,姓贾的
+【别名】无   ← 未引入新别名时
+```
+
+### 代码级阻断
+
+`novel_atomic_writer.py` 在写入时扫描最后几行：
+- 检测到 `【别名】行` → 剥离后调用 `register-alias` 注册到 characters[].aliases
+- 未检测到 → **HOOK-BLOCK 阻断写入**（第一子结构可豁免，尚无角色）
+- 非末章末子结构豁免，末子结构强制要求
+
+### context_loader 输出
+
+```
+[硬性] 别名声明（必须，缺失则阻断写入）
+  若本次写作引入了角色的别名，请在正文末尾单独一行输出：
+    【别名】老陈 = 陈叔
+  若未引入任何别名，请输出：
+    【别名】无
+  atomic_writer 将拦截此标记行，不写入正文。
+```
+
+### 别名在检查器中的使用
+
+- **连通性检查**：关键词匹配使用 `name + aliases`，别名被视为有效关键词
+- **实体提取**：`novel_entity_extractor.py` 在扫描正文时自动识别别名及其映射
+
+## 实体关系追踪（v1.13.x 新增）
+
+写作完成后自动提取并追踪五类实体及其关系。
+
+### 触发
+
+write-sub 管道中 `novel_entity_extractor.py` 非阻断执行。
+
+### 五类实体
+
+| 类型 | 说明 | 示例 |
+|------|------|------|
+| character | 角色 | 林铁生、老贾 |
+| object | 物品 | 《实用擒拿格斗术》、义肢 |
+| location | 地点 | 下层区、老贾的摊子 |
+| organization | 组织 | 恒达机电、归元会 |
+| data | 数据/信息 | 索赔链记录、格斗术理论 |
+
+### 存储
+
+存入 novel_state.json 的 `entity_tracker` 字段：
+```json
+{
+  "entities": [
+    {"id": "e001", "name": "林铁生", "type": "character",
+     "attributes": {"status": "受伤", "location": "下层区"},
+     "first_chapter": "L01", "first_sub": "S01"}
+  ],
+  "relations": [
+    {"from_entity": "e001", "predicate": "购买", "to_entity": "e002",
+     "chapter": "L01", "sub": "S01"}
+  ]
+}
+```
+
+### context_loader 输出
+
+每个子结构写作前输出全量实体关系网：
+```
+[硬性] 实体关系网（累计 12 实体, 8 关系）
+    角色: 林铁生[status=受伤 | location=下层区] [L01S01]
+    物品: 实用擒拿格斗术[owner=林铁生] [L01S01]
+  ── 关联关系 ──
+    林铁生 → 购买 → 实用擒拿格斗术 [L01S01]
+```
+
+## 行为摘要（v1.13.x 新增）
+
+finalize-chapter 通过后自动提取本章各角色的行为轨迹。
+
+### 存储
+
+存入 novel_state.json 章节字段的 `behavior_summary`：
+```json
+{
+  "behavior_summary": {
+    "林铁生": ["购买格斗术书籍", "尝试关节锁控原理", "反制混混挑衅"],
+    "铁心": ["抱怨哥哥乱花钱", "关心哥哥受伤"]
+  }
+}
+```
+
+### context_loader 输出
+
+下一章写作前输出上一章行为轨迹：
+```
+[硬性] 上一章行为轨迹（L01）
+  林铁生: 购买格斗术书籍 → 尝试关节锁控原理 → 反制混混挑衅
+  铁心: 抱怨哥哥乱花钱 → 关心哥哥受伤
+  提示: 当前章应自然延续以上轨迹，无重大断裂
 ```
 
 ## 结尾收束规范 v2

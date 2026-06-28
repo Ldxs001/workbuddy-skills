@@ -24,6 +24,9 @@
 | 跨章承诺链检查 | finalize-chapter 时 | **软性（不阻断）** | novel_continuity.py cross-chapter — 关键词续接检测 | `scripts/novel_continuity.py` |
 | 风格校验 | finalize-chapter 时 | **HARD（阻断）** | novel_style_check.py — 禁用词/末行编号/超200行阻断 | `scripts/novel_style_check.py` |
 | 逻辑检查 | finalize-chapter 时 | **HARD（阻断）** | novel_logic_check.py — 人物/时间线/概述匹配度，命中<30%阻断 | `scripts/novel_logic_check.py` |
+| **语义检查(BERT)** | **finalize-chapter 时（第5步）** | **HARD（可选，有模型时）** | novel_semantic_check.py — overview-vs-content 语义对齐<0.4 阻断；子结构间语义跳跃<0.4 阻断；情绪偏离/同义冗余/跨章主题延续 SOFT 提示 | `scripts/novel_semantic_check.py` |
+| **推理审核(Qwythos)** | **finalize-chapter 时（第6步）** | **HARD+SOFT（可选，需GPU+模型）** | novel_reasoning_check.py — 5 项推理审核（因果合理性/人物行为一致/情绪弧自然度/对话匹配度/论证可靠性），按结果输出 HARD 或 SOFT | `scripts/novel_reasoning_check.py` |
+| **别名声明拦截** | **write-sub 写入时** | **代码级硬阻断** | novel_atomic_writer.py — 检测到缺少【别名】声明行则阻断写入；存在则剥离并调用 register-alias 注册到 characters[].aliases | `scripts/novel_atomic_writer.py` + `scripts/novel_state_manager.py` |
 | **一键完结章节（阻断循环）** | 子结构全部完成后 | **编排式+HARD阻断** | finalize-chapter：聚合上述检查→有HARD问题写入`_fixes.json`并阻断，不标记门禁；全部通过才pass `chapter_finalized:L##` | `scripts/novel_workflow_engine.py` |
 | 大纲忠实度报告 | 全文完成后 | 自动式+阶段门禁 | novel_fidelity.py generate-report（需≥stage3_ready）→ pass fidelity 门禁 | `scripts/novel_fidelity.py` |
 | 结尾收束验证 | 全文完成后 | **阻断式+门禁** | novel_fidelity.py verify-ending — 封闭/开放/悬停类型专项检查 | `scripts/novel_fidelity.py` |
