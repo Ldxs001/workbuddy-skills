@@ -41,6 +41,55 @@ external_data_dir: true
 - **[必须] 每章六检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → **语义检查** → **推理审核** → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
 - **[必须] 全文三检** — 全文完成后必须：`novel_fidelity.py`（大纲忠实度）+ `verify-ending`（结尾收束验证）+ `set-phase stage3_ready`
 
+### 数据目录
+
+⚠️ **LLM 禁止手工拼写路径！禁止去 Read memory/ 目录下的文件！** 
+所有项目数据只能通过以下途径获取：
+
+**列出所有项目（新会话第一件事）：**
+```bash
+python scripts/novel_workflow_engine.py list-projects
+```
+或
+```python
+import sys; sys.path.insert(0, 'scripts')
+from _path_utils import list_projects, resolve_state_path, DATA_DIR
+projects = list_projects()
+# DATA_DIR = ~/.workbuddy/skills/.standardization/novel-weaver/projects/
+```
+
+**获取单个项目 state 路径：**
+```python
+from _path_utils import resolve_state_path
+state_path = resolve_state_path()       # 自动从 .project 缓存读取
+# 或传入项目名: resolve_state_path("赛博搏杀记")
+```
+
+**读取项目状态：**
+```python
+state_path = resolve_state_path()
+if state_path:
+    import json; state = json.loads(open(state_path, encoding='utf-8').read())
+from _path_utils import DATA_DIR
+proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
+```
+
+**目录结构（代码推导，仅供理解）：**
+```text
+{DATA_DIR}/<项目名>/
+├── data/novel_state.json          ← 状态文件
+├── data/.workbuddy/gate_state.json ← 门禁状态
+├── data/reports/                   ← 检查报告
+├── chapters/L##/S##.txt          ← 章节正文
+└── .project                       ← 路径缓存
+
+模型文件存储在：
+  ~/.workbuddy/skills/.standardization/novel-weaver/models/
+  ├── bge-small-zh/                 ← BERT 33MB（可选）
+  └── ds-r1-distill-qwen-1.5b/     ← DeepSeek-R1-Distill-Qwen-1.5B ~1GB（CPU 可跑）
+```
+数据目录由 `_path_utils.py` 统一管理。
+
 ## 触发条件
 
 **正向触发：**
@@ -87,6 +136,8 @@ external_data_dir: true
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 ## 工作流程
 
+### 写作流程
+
 1. **LLM 生成场景配置** → 输入 用户模糊想法 → 输出 novel_info/setting — 生成人物/时代/地点/风土人情/核心冲突
 2. **LLM 生成一级大纲** → 输入 场景配置 → 输出 chapters[] title/overview — L01-L15编号+标题+每章概述
 3. **因果链验证(outline)** → 输入 chapters[] overview → 输出 outline_causality 门禁 — 逐链节检查L01→L02→...因果递进
@@ -102,59 +153,8 @@ external_data_dir: true
 13. **完结一章(finalize-chapter)** → 输入 章内容 → 输出 四合一检查报告 — 章内连通性→跨章→风格→逻辑
 14. **全文整合(fidelity)** → 输入 全部章节 → 输出 大纲忠实度报告 — 检查是否偏离大纲
 15. **结尾收束验证** → 输入 末章末子结构 → 输出 ending_report.md — 封闭式/开放式/悬停式三选一验证
-## 数据目录
 
-⚠️ **LLM 禁止手工拼写路径！禁止去 Read memory/ 目录下的文件！** 
-所有项目数据只能通过以下途径获取：
-
-**列出所有项目（新会话第一件事）：**
-```bash
-python scripts/novel_workflow_engine.py list-projects
-```
-或
-```python
-import sys; sys.path.insert(0, 'scripts')
-from _path_utils import list_projects, resolve_state_path, DATA_DIR
-projects = list_projects()
-# DATA_DIR = ~/.workbuddy/skills/.standardization/novel-weaver/projects/
-```
-
-**获取单个项目 state 路径（后续所有命令都需要）：**
-```python
-from _path_utils import resolve_state_path
-state_path = resolve_state_path()       # 自动从 .project 缓存读取
-# 或传入项目名: resolve_state_path("赛博搏杀记")
-```
-
-**读取项目状态：**
-```python
-# 通过 _path_utils 自动解析（优先）
-state_path = resolve_state_path()
-if state_path:
-    import json; state = json.loads(open(state_path, encoding='utf-8').read())
-
-# 或直接用完整路径（如已知项目名）
-from _path_utils import DATA_DIR
-proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
-```
-
-**目录结构（代码推导，仅供理解）：**
-```text
-{DATA_DIR}/<项目名>/
-├── data/novel_state.json          ← 状态文件
-├── data/.workbuddy/gate_state.json ← 门禁状态
-├── data/reports/                   ← 检查报告
-├── chapters/L##/S##.txt          ← 章节正文（每子结构一个文件）
-└── .project                       ← 路径缓存
-
-模型文件存储在：
-  ~/.workbuddy/skills/.standardization/novel-weaver/models/
-  ├── bge-small-zh/                 ← BERT 33MB（可选）
-  └── ds-r1-distill-qwen-1.5b/     ← DeepSeek-R1-Distill-Qwen-1.5B ~1GB（transformers 缓存，CPU 可跑）
-数据目录由 _path_utils.py 统一管理。
-```
-
-## 检查系统
+### 检查系统
 
 finalize-chapter 是章节质量的核心关卡，聚合执行 6 步检查链：
 
