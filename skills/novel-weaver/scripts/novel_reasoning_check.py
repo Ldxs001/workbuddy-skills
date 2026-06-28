@@ -18,22 +18,28 @@ Reasoning Check — 推理审核引擎（v1.0）
   - llama-cpp-python（pip install，Windows 需先装 g++ 编译器 + cmake）
   - Qwythos-9B GGUF Q4_K_M（首次 `from_pretrained` 自动下载 ~5.5GB）
 
-Windows 编译器安装：
-  # 1. 检查 g++
+Windows 编译器安装（严格按顺序，缺一不可）：
+  # 1. 检查 C++ 编译器
   g++ --version
-  #    无输出 → 下载 winlibs 压缩包:
-  #    下载: https://github.com/brechtsanders/winlibs_mingw/releases/download/
-  #          16.1.0posix-14.0.0-ucrt-r3/
-  #          winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r3.zip
-  #    镜像: https://sourceforge.net/projects/winlibs-mingw/
-  #    解压到: ~/.workbuddy/skills/.standardization/novel-weaver/models/winlibs/
-  #    将 mingw64/bin 加入 PATH
+  #    无 → 下载 winlibs: https://winlibs.com/ → x86_64-posix-seh 基础版 UCRT
+  #         解压到 ~/.workbuddy/skills/.standardization/novel-weaver/models/winlibs/
+  #         将 mingw64/bin 加入 PATH
+  #         重新打开 CMD 验证 g++ --version
   
   # 2. 检查 cmake
   cmake --version
-  #    无输出 → pip install cmake
+  #    无 → pip install cmake -i https://mirrors.aliyun.com/pypi/simple/
   
-  # 3. 安装 llama-cpp-python
+  # 3. ⚠️ 关键：指定 cmake 用 MinGW（默认找 MSVC，找不到就炸）
+  set CMAKE_GENERATOR=MinGW Makefiles
+  
+  # 4. 编译安装
+  pip install llama-cpp-python --no-cache-dir --no-build-isolation -i https://mirrors.aliyun.com/pypi/simple/
+  
+  常见错误：
+  - "CMAKE_C_COMPILER not found" → 漏了第3步 set CMAKE_GENERATOR
+  - "g++.exe: fatal error" → mingw64/bin 没在 PATH
+  - "Could not find a version" → 加 --no-build-isolation
   pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
     HF_ENDPOINT=https://hf-mirror.com python -c "
 from llama_cpp import Llama

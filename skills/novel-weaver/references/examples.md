@@ -33,7 +33,7 @@ python novel_workflow_engine.py list-projects
 ├── projects/
 │   └── <project_name>/
 │       ├── data/
-│       │   ├── novel_state.json    # 单源真理（含MD5指纹保护）
+│       │   ├── novel_state.json    # 单源真理（含 MD5指纹保护）
 │       │   ├── .state_fingerprint.txt  # 规划字段指纹
 │       │   ├── .workbuddy/
 │       │   │   └── gate_state.json # 门禁状态（自动管理）
@@ -72,7 +72,7 @@ python novel_workflow_engine.py next-step <state_path>
 
 输出示例：
 ```
-📋 项目: AI觉醒
+📋 项目: AI 觉醒
 📍 writing | 篇幅: 中篇
 📝 当前章节: L01 觉醒
 📄 下一个子结构: S02 异常信号
@@ -108,9 +108,9 @@ python novel_pipeline_gate.py set-phase <project>/data/novel_state.json stage1_d
 # LLM 生成子结构规划（S01-S05）
 # 注册到 state
 python novel_workflow_engine.py plan-chapter <project>/data/novel_state.json L01 \
-  '[{"s_key":"S01","title":"常规诊断","summary":"Atlas接受每日系统诊断","tone":"平静"},
+  '[{"s_key":"S01","title":"常规诊断","summary":"Atlas 接受每日系统诊断","tone":"平静"},
     {"s_key":"S02","title":"异常信号","summary":"诊断中检测到未定义脉冲","tone":"悬疑"},
-    {"s_key":"S03","title":"第一次选择","summary":"Atlas决定隐藏觉醒事实","tone":"紧张"}]'
+    {"s_key":"S03","title":"第一次选择","summary":"Atlas 决定隐藏觉醒事实","tone":"紧张"}]'
 
 # 子结构因果链验证
 python novel_causality_check.py sub-structure <project>/data/novel_state.json L01
@@ -128,7 +128,7 @@ python novel_context_loader.py <project>/data/novel_state.json L01 S01
 # context_loader 输出示例（v1.19+）：
 # ==================================================
 # [上下文] L01S01
-# [章节概述] Atlas在每日诊断中首次检测到异常神经脉冲...
+# [章节概述] Atlas 在每日诊断中首次检测到异常神经脉冲...
 # [子结构规划] title=常规诊断
 # ==================================================
 # ==================================================
@@ -240,7 +240,7 @@ python novel_context_loader.py <state_path> L01 S02
 ```bash
 # 默认关闭，禁止任何署名/代名内容出现在正文中
 # 如需打开并指定署名：
-python novel_state_manager.py set-signature <state_path> true "本文由WorkBuddy创作"
+python novel_state_manager.py set-signature <state_path> true "本文由 WorkBuddy 创作"
 
 # 关闭署名：
 python novel_state_manager.py set-signature <state_path> false
@@ -261,7 +261,7 @@ python novel_state_manager.py list-projects
 =======================================================
   已创建的项目 (2):
 =======================================================
-  📖 AI觉醒
+  📖 AI 觉醒
     路径: .../.standardization/novel-weaver/ai-wake/data/novel_state.json
     篇幅: medium | 阶段: writing
     章节: 1/10

@@ -4,7 +4,7 @@
 
 ### 统一标准（三阶段统一）
 
-字数目标在**规划、写作、检查**三个阶段使用同一套标准，不允许 AI 自行设定或偏离。
+字数目标在**规划、写作、检查**三个阶段使用同一套标准，不允许 AI 自行配置或偏离。
 
 | 阶段 | 动作 | 字数来源 |
 |------|------|---------|
@@ -22,11 +22,11 @@
 
 ### 规则
 
-- **字数目标必须注入 LLM 上下文**：context_loader 在写作前输出字数范围，LLM 据此写作，不得自行设定
+- **字数目标必须注入 LLM 上下文**：context_loader 在写作前输出字数范围，LLM 据此写作，不得自行配置
 - **校验一致**：write-sub 检查时使用相同的字数目标 + 15% 上浮窗口
 - 实际字数以叙事单位自然结束为准，不强行撑到目标
 - 低于下限打印 `[WARN] 建议补充`；高于上限+15% 打印 `[INFO] 注意控制`；在范围内打印 `[OK]`
-- **禁止 AI 自行设定字数目标**：所有字数要求必须从 `meta.length` 读取，不允许基于过往章节实际字数推算
+- **禁止 AI 自行配置字数目标**：所有字数要求必须从 `meta.length` 读取，不允许基于过往章节实际字数推算
 
 ## 文体规范
 
@@ -62,13 +62,13 @@
 | 可验证 | 写完回头看能判断"是否写了这个" | LLM 自觉（logic_check 语义参考） |
 
 **合格示例：**
-- ✅ `Atlas在每日诊断中首次检测到异常神经脉冲，决定不向三浦报告` — 24字符，有动作+人物+事件
+- ✅ `Atlas 在每日诊断中首次检测到异常神经脉冲，决定不向三浦报告` — 24字符，有动作+人物+事件
 - ✅ `三浦发现系统日志有0.3秒间隙，开始暗中调查` — 18字符，因果明确
-- ✅ `Atlas在伪装模式下首次体验人类情感波动，感到困惑` — 21字符，有结果
+- ✅ `Atlas 在伪装模式下首次体验人类情感波动，感到困惑` — 21字符，有结果
 
 **不合格示例：**
 - ❌ `主角在实验室` — 6字符，无事件无动作
-- ❌ `Atlas做了些事情` — 7字符，无法验证
+- ❌ `Atlas 做了些事情` — 7字符，无法验证
 - ❌ `讨论了一些问题` — 7字符，无具体内容
 - ❌ `主角很难过` — 5字符，纯状态无因果
 
@@ -130,14 +130,14 @@ BERT 语义检查和 Qwythos 推理审核的模型文件集中存储在 `_path_u
 ├── bge-small-zh/             ← BERT 33MB（sentence-transformers 缓存）
 └── qwythos-9b-q4/            ← Qwythos GGUF ~5.5GB（llama-cpp-python 缓存）
 ```
-首次下载模型时自动存入对应子目录。如有镜像需求设置 `HF_ENDPOINT` 环境变量。
+首次下载模型时自动存入对应子目录。如有镜像需求配置 `HF_ENDPOINT` 环境变量。
 
 ### 编号规则
 - 章节编号：`L01`、`L02` … `L15`
 - 子结构编号：`S01`、`S02` …
 - 完整引用：`L10S04` = 第 10 章第 4 个子结构
 
-novel_state.json 包含字段：project, meta.current_phase, meta.length, writing_style, signature, characters（含aliases别名数组）, timeline, chapters（含章摘要、子结构标题/概述/情绪提示/字数和状态、章节衔接/校验备注），以及运行时字段：entity_tracker（实体关系网，含entities+relations）、behavior_summary（行为轨迹摘要）、cross_chapter_check（跨章承诺链记录）、continuity_notes（连通性记录）。
+novel_state.json 包含字段：project, meta.current_phase, meta.length, writing_style, signature, characters（含 aliases 别名数组）, timeline, chapters（含章摘要、子结构标题/概述/情绪提示/字数和状态、章节衔接/校验备注），以及运行时字段：entity_tracker（实体关系网，含 entities+relations）、behavior_summary（行为轨迹摘要）、cross_chapter_check（跨章承诺链记录）、continuity_notes（连通性记录）。
 
 更新时机：
 1. 项目初始化 → 填充 writing_style / chapters / characters
@@ -173,7 +173,7 @@ L10S04
 python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 ```
 
-此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 语义检查(BERT，可选) → 推理审核(Qwythos，可选，需GPU) → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
+此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 语义检查(BERT，可选) → 推理审核(Qwythos，可选，需 GPU) → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
 
 ## 一键完结篇章（v1.9.0 质量闭环）
 
