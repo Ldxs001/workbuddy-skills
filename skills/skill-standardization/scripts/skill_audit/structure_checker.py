@@ -624,12 +624,21 @@ def _check_writing_standards_text(text, filename="", self_audit=False):
             prefix = f"{filename}：" if filename else ""
             issues["suggest"].append(f"{prefix}含模糊表述「{word}」：{suggestion}")
 
-    # ── 检查3：中英文混排空格 ───────────────────
+    # ── 检查3：中英文混排空格（每条独立输出） ───────────
     mingled = re.findall(r'[一-鿿][A-Za-z]{2,}|[A-Za-z]{2,}[一-鿿]', cleaned)
     mingled = [m for m in mingled if not re.match(r'v\d|SKILL|MD|JSON|YAML', m)]
     if mingled:
-        prefix = f"{filename}：" if filename else ""
-        issues["suggest"].append(f"{prefix}中英文混排缺少空格：{', '.join(mingled[:5])}")
+        # 在原始文本中查找每处匹配的行号
+        orig_lines = text.split("\n")
+        for m in mingled:
+            line_no = None
+            for ln, orig_line in enumerate(orig_lines, 1):
+                if m in orig_line:
+                    line_no = ln
+                    break
+            pos = f"{filename}:{line_no}" if filename and line_no else (filename or "")
+            prefix = f"{pos}：" if pos else ""
+            issues["suggest"].append(f"{prefix}中英文混排缺少空格：{m}")
 
     return issues
 
@@ -728,47 +737,46 @@ def body_check_writing_standards(filepath, content, fm, body, **kw):
         for k in ["must", "suggest", "optional"]:
             all_issues[k] += issues[k]
 
-    # ── 分级格式化输出 ──────────────────────────────
+    # ── 粒度输出：每个子问题为独立 WARN ─────────────
     must_count = len(all_issues["must"])
     suggest_count = len(all_issues["suggest"])
     optional_count = len(all_issues["optional"])
 
     if must_count == 0 and suggest_count == 0 and optional_count == 0:
-        return {"passed": True,
-                "detail": "写作规范检查通过（SKILL.md + references/*.md 术语一致、无禁止表述、中英文混排规范）"}
+        return [{"passed": True,
+                 "detail": "写作规范检查通过（SKILL.md + references/*.md 术语一致、无禁止表述、中英文混排规范）"}]
 
-    # 仅 optional — 通过
-    if must_count == 0 and suggest_count == 0 and optional_count > 0:
-        return {"passed": True,
-                "detail": f"写作规范检查通过 ⓘ 风格偏好（{optional_count} 条）：{all_issues['optional'][0]}" +
-                          (f" 等（共 {optional_count} 条）" if optional_count > 1 else "")}
+    results = []
 
-    # 格式化输出（仅描述问题类型与数量，不做程度判断）
-    parts = []
-    parts = []
-    if must_count > 0:
-        parts.append(f"术语不一致（{must_count} 条）：{all_issues['must'][0]}")
-        if must_count > 1:
-            parts[0] += f" 等（共 {must_count} 条）"
-    if suggest_count > 0:
-        parts.append(f"表述规范（{suggest_count} 条）：{all_issues['suggest'][0]}")
-        if suggest_count > 1:
-            parts[-1] += f" 等（共 {suggest_count} 条）"
+    # 每个 must 问题独立输出（术语不一致）
+    for i, issue in enumerate(all_issues["must"]):
+        results.append({
+            "passed": False,
+            "detail": issue,
+            "fix": {"key": "writing_standards", "value": "fix_terms",
+                    "location": f"{filepath} 正文 + references/*.md",
+                    "operation": f"修复术语不一致：{issue}",
+                    "verification": "重新运行 audit_skill()，确认 R-20 passed"}
+        })
+
+    # 每个 suggest 问题独立输出（中英文混排、表述规范）
+    for i, issue in enumerate(all_issues["suggest"]):
+        results.append({
+            "passed": False,
+            "detail": issue,
+            "fix": {"key": "writing_standards", "value": "fix_terms",
+                    "location": f"{filepath} 正文 + references/*.md",
+                    "operation": f"修复表述规范：{issue}",
+                    "verification": "重新运行 audit_skill()，确认 R-20 passed"}
+        })
+
+    # optional 打包一条
     if optional_count > 0:
-        parts.append(f"风格偏好（{optional_count} 条）：{all_issues['optional'][0]}")
-        if optional_count > 1:
-            parts[-1] += f" 等（共 {optional_count} 条）"
+        results.append({"passed": True,
+                        "detail": f"写作规范检查通过 ⓘ 风格偏好（{optional_count} 条）：{all_issues['optional'][0]}" +
+                                  (f" 等（共 {optional_count} 条）" if optional_count > 1 else "")})
 
-    detail = "；".join(parts)
-    result = {"passed": False,
-              "detail": f"写作规范问题：{detail}",
-              "fix": {"key": "writing_standards", "value": "fix_terms",
-                       "location": f"{filepath} 正文 + references/*.md",
-                       "operation": "修复术语不一致与表述规范问题，确保中英文混排有空格",
-                       "verification": "重新运行 audit_skill()，确认 R-20 passed"}}
-    if all_issues.get("ctx_lines"):
-        result["ctx_lines"] = all_issues["ctx_lines"][:8]
-    return result
+    return results
 
 
 def body_has_progressive_loading_explicit(filepath, content, fm, body, **kw):
@@ -1004,8 +1012,14 @@ def check_doc_code_consistency(
             alt_path = os.path.join(skill_dir, 'scripts', os.path.basename(script_path))
             if os.path.isfile(alt_path):
                 continue
+            # 在原始内容中查找脚本引用位置的行号
+            _script_ln = 1
+            for _ln, _line in enumerate(content.split("\n"), 1):
+                if script_path in _line or os.path.basename(script_path) in _line:
+                    _script_ln = _ln
+                    break
             issues["suggest"].append(
-                f"R-23: {filepath}:1 - 文档 `{filepath}` 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
+                f"R-23: {filepath}:{_script_ln} - 文档 `{filepath}` 提到脚本 `{script_path}` 但文件不存在（期望相对路径如 `scripts/foo.py`）"
             )
         else:
             # 静态语法检查
@@ -1050,8 +1064,13 @@ def check_doc_code_consistency(
                         actual_flags = set(re.findall(r"add_argument\(\s*['\"]--([a-z][-a-z]*)['\"]", src))
                         for flag in doc_flags:
                             if flag not in actual_flags and flag not in ('help', 'version'):
+                                _flag_ln = 1
+                                for _ln, _line in enumerate(content.split("\n"), 1):
+                                    if f"--{flag}" in _line:
+                                        _flag_ln = _ln
+                                        break
                                 issues["optional"].append(
-                                    f"R-23: {filepath}:1 - SKILL.md 示例中含 `--{flag}` 但 `{script_path}` 未定义此参数（实际定义：{', '.join(sorted(actual_flags)[:5])}）"
+                                    f"R-23: {filepath}:{_flag_ln} - SKILL.md 示例中含 `--{flag}` 但 `{script_path}` 未定义此参数（实际定义：{', '.join(sorted(actual_flags)[:5])}）"
                                 )
                     except Exception:
                         pass
@@ -1108,8 +1127,10 @@ def check_doc_code_consistency(
                             ctx_parts.append(f"  {_src_name}:{_ln} 附近:\n{_ctx}")
                             break
                 ctx = ctx_parts[0] if ctx_parts else f"  文件: {ref_path} 不存在"
+                # 使用实际行号替代硬编码 :1
+                actual_ln = _ln if ctx_parts else 1
                 issues["suggest"].append(
-                    f"R-23: {filepath}:1 - 文档引用 `{ref_path}` 但文件不存在"
+                    f"R-23: {filepath}:{actual_ln} - 文档引用 `{ref_path}` 但文件不存在"
                 )
                 if "ctx_lines" not in issues:
                     issues["ctx_lines"] = []
@@ -1140,8 +1161,13 @@ def check_doc_code_consistency(
                 # 模糊匹配（前缀匹配）
                 matched = [d for d in all_defs if d.startswith(ref) or ref.startswith(d)]
                 if not matched:
+                    _ref_ln = 1
+                    for _ln, _line in enumerate(content.split("\n"), 1):
+                        if ref in _line:
+                            _ref_ln = _ln
+                            break
                     issues["suggest"].append(
-                        f"R-23: {filepath}:1 - SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
+                        f"R-23: {filepath}:{_ref_ln} - SKILL.md 提到函数/类名 `{ref}` 但在技能代码中未找到（已有定义：{', '.join(sorted(all_defs)[:5])}）"
                     )
 
     # 6. (新增 v2.38.8) 检查 SKILL.md 正文中的路径描述是否与 frontmatter data_dir 一致
@@ -1223,24 +1249,24 @@ def check_doc_code_consistency(
     total = must_n + suggest_n + optional_n
 
     if total == 0:
-        return {"passed": True, "detail": f"{filepath}:1 - R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}
+        return [{"passed": True, "detail": f"{filepath}:1 - R-23: 文档-代码一致性检查通过（引用文件/函数均存在，调用方式一致）"}]
 
     # 仅 optional（如粗筛产物）→ 通过，detail 带 NOTE
     if must_n == 0 and suggest_n == 0 and optional_n > 0:
         opt_msgs = "\n".join(issues["optional"])
-        return {"passed": True,
+        return [{"passed": True,
                 "detail": f"{filepath}:1 - R-23: ⓘ 粗筛 {optional_n} 条待 LLM 精筛确认（不阻断通过）：\n{opt_msgs}",
-                "fix": None}
+                "fix": None}]
 
-    msgs = []
-    for k in ["must", "suggest", "optional"]:
-        msgs.extend(issues[k])
-    result = {"passed": False,
-              "detail": f"{filepath}:1 - R-23: 文档-代码一致性问题（{total} 条）：{msgs[0]}",
-              "fix": None}
-    if issues.get("ctx_lines"):
-        result["ctx_lines"] = issues["ctx_lines"][:8]
-    return result
+    results = []
+    for k in ["must", "suggest"]:
+        for msg in issues[k]:
+            results.append({
+                "passed": False,
+                "detail": msg,
+                "fix": None
+            })
+    return results
 
 def check_changelog_progressive(filepath, content, fm, body, **kw):
     """
@@ -1731,7 +1757,7 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                     )
             if "约束" in sec_title:
                 items_c = len(re.findall(r'^[-*]\s+', sec_body, re.MULTILINE))
-                if items_c > 5:
+                if items_c > 9:
                     _c12_sec_pos = body.find(f'## {sec_title}')
                     _c12_ln = body[:_c12_sec_pos].count('\n') + 2 if _c12_sec_pos >= 0 else 1
                     issues["warn"].append(f"{filepath}:{_c12_ln} - C-12: 章节「约束」共 {items_c} 条，超过上限 9 条，需精简或部分移到 references/")
@@ -2032,7 +2058,8 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             if re.search(r'示例|快速|使用', _h.group(1)):
                 _c17_section = _h.group(1)
                 break
-        if not re.search(r'用户[^：:]*?[：:].*?(推荐|结果|报告|输出)', body):
+        # ★ v2.99.1: 支持多行匹配（示例输出可能在下一行），同时兼容单行格式
+        if not re.search(r'用户[^：:]*?[：:].*?(推荐|结果|报告|输出)', body, re.DOTALL):
             _c17_quality_issues.append(
                 f'【{_c17_section}】示例缺少完整交互流程：当前示例未展示系统响应 → '
                 f'LLM执行：在用户输入之后补充系统推荐/计算结果/输出内容的描述')
@@ -2140,31 +2167,25 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         if warn_count > 20:
             detail_parts[-1] += f" 等（共 {warn_count} 条待修复项）"
 
-    # C-17/C-18/C-19 质量问题：产生规则级 FAIL，进入铁律 9 验证管道
-    if _c171819_quality_flag:
-        result = {"passed": False,
-                  "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
-        # C-17/C-18/C-19 也接入 fix key（即使只能部分修复）
-        warn_text = "\n".join(issues["warn"])
-        if "C-17" in warn_text:
-            result["fix"] = {"key": "example_quality"}
-        elif "C-18" in warn_text:
-            result["fix"] = {"key": "capability_boundary"}
-        return result
-
-    result = {"passed": error_count == 0,
-              "detail": f"{filepath}:1 - R-25: {'; '.join(detail_parts)}"}
-
-    # 注意：单个 R-25 结果只能带一个 fix key。如果有多个 C-* 子项，
-    # cmd_audit --fix 和 _run_audit_loop 会自动扫描 detail 字符串调所有匹配的 fix 函数。
-    # 这里只需设一个非空 fix key 让 has_fixable 判断为 True 即可。
-    warn_text = "\n".join(issues["warn"])
-    if "C-10" in warn_text or "C-11" in warn_text or "C-12" in warn_text or \
-       "C-14" in warn_text or "C-15" in warn_text or "C-17" in warn_text or \
-       "C-18" in warn_text:
-        result["fix"] = {"key": "section_names"}
-
-    return result
+    # ── 粒度输出：每个 C-* 子问题为独立 WARN ──
+    results = []
+    for warn_msg in issues["warn"]:
+        entry = {"passed": False, "detail": warn_msg}
+        # 根据 C-ID 分配 fix key
+        if "C-17" in warn_msg:
+            entry["fix"] = {"key": "example_quality"}
+        elif "C-18" in warn_msg:
+            entry["fix"] = {"key": "capability_boundary"}
+        elif "C-10" in warn_msg or "C-11" in warn_msg or "C-12" in warn_msg or \
+             "C-14" in warn_msg or "C-15" in warn_msg:
+            entry["fix"] = {"key": "section_names"}
+        results.append(entry)
+    if error_count > 0:
+        for err_msg in issues["error"]:
+            results.append({"passed": False, "detail": err_msg})
+    if not results:
+        results.append({"passed": True, "detail": f"{filepath}:1 - R-25: 文档格式规范检查通过"})
+    return results
 
 
 # ═══════════════════════════════════════════════════════

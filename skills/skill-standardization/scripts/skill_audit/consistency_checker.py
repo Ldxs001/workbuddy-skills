@@ -17,7 +17,7 @@ consistency_checker.py — 文档-代码一致性审查（双 0 后执行）
 import os
 import re
 import json
-from ._path_detector import has_path_feature
+from ._path_detector import has_path_feature, _find_shared_path_file
 
 
 def check_consistency(skill_dir, filter_files=None):
@@ -458,9 +458,16 @@ def apply_consistency_fix(skill_dir, issue):
     return False
 
 
+
+
+
 def _check_path_centralization(skill_dir):
     """
     检测 scripts/*.py 中的路径定义是否集中管理（R-25 C-20）。
+    
+    v2.99.0: 
+      - 自动识别共享文件（不限于 _paths.py）
+      - 检测所有非从共享文件导入的路径构造，全部输出（不再只输出重复定义）
     
     P1 — 模块级路径常量定义（_DIR/_PATH/_ROOT）
     P2 — sys.argv[N] 用于文件 I/O
@@ -476,24 +483,17 @@ def _check_path_centralization(skill_dir):
     if not os.path.isdir(scripts_dir):
         return issues
 
-    # 检查 _paths.py 是否存在
-    has_paths_module = os.path.isfile(os.path.join(scripts_dir, "_paths.py"))
-    # 收集所有已从 _paths 导入的符号
-    imported_from_paths = set()
-    if has_paths_module:
-        try:
-            with open(os.path.join(scripts_dir, "_paths.py"), "r", encoding="utf-8") as f:
-                _paths_content = f.read()
-            imported_from_paths = set(re.findall(r'^([A-Z_]+)\s*=', _paths_content, re.MULTILINE))
-        except Exception:
-            pass
+    # ── 自动检测共享文件 ──
+    shared_file, shared_vars, _shared_cnt = _find_shared_path_file(scripts_dir)
+    shared_basename = shared_file[:-3] if shared_file else "_paths"  # 含默认 fallback
+    has_shared_module = shared_file is not None
 
-    # 收集所有脚本中的路径定义（按解析值分组）
+    # 收集所有脚本中的路径定义（按解析值分组，同时标记是否已在共享文件中）
     from collections import defaultdict
     path_defs = defaultdict(list)  # key: 解析后的路径值, value: [(file, line, var_name, code_line)]
 
     for fname in sorted(os.listdir(scripts_dir)):
-        if not fname.endswith(".py") or fname == "_paths.py" or fname.startswith("__"):
+        if not fname.endswith(".py") or fname == shared_file or fname.startswith("__"):
             continue
         fpath = os.path.join(scripts_dir, fname)
         try:
@@ -505,11 +505,13 @@ def _check_path_centralization(skill_dir):
 
         rel = os.path.join("scripts", fname).replace("\\", "/")
 
-        # 检查脚本是否已从 _paths.py 导入
-        uses_paths_module = "from _paths import" in text or "from scripts._paths import" in text
+        # 检查脚本是否已从共享文件导入
+        uses_shared = (
+            f"from {shared_basename} import" in text or 
+            f"from scripts.{shared_basename} import" in text
+        )
 
         # ── P1: 模块级路径常量定义 ──
-        # 匹配: VAR = ... 其中 VAR 含 _DIR/_PATH/_ROOT 且值含路径特征
         p1_pat = re.compile(
             r'^([A-Za-z_]+(?:_DIR|_PATH|_ROOT))\s*=\s*(.+?)$',
             re.MULTILINE
@@ -517,89 +519,149 @@ def _check_path_centralization(skill_dir):
         for m in p1_pat.finditer(text):
             var_name = m.group(1)
             val = m.group(2).strip()
-            # 过滤：跳过注释行、变量引用自身、路径搜索调用
-            line_start = max(0, text[:m.start()].rfind('\n'))
             line_num = text[:m.start()].count('\n') + 1
             stripped = lines[line_num - 1].strip() if line_num <= len(lines) else ""
             if stripped.startswith("#"):
                 continue
-            # 提取路径特征：使用统一检测层 _path_detector
             if not has_path_feature(val):
                 continue
 
-            # 记录定义
+            # ★ v2.99.0: 检查是否已从共享文件导入，不在则输出
+            if has_shared_module and uses_shared and var_name in shared_vars:
+                continue  # 已在共享文件中声明且已导入 → OK
+
             path_defs[val.strip()].append((
                 rel, line_num, var_name, stripped
             ))
 
-        # ── P2: sys.argv[N] 用于文件 I/O ──
-        if uses_paths_module:
-            continue  # 已使用共享模块，跳过
+        # ── P3/P4: 所有含路径特征的构造（非模块级常量） ──
+        # 检测所有硬编码路径字面量和路径推导，如果不在共享文件中则输出
+        if uses_shared:
+            continue  # 已使用共享模块，假设该文件路径都从共享文件来
         for i, line in enumerate(lines, 1):
             stripped = line.strip()
             if stripped.startswith("#") or stripped.startswith("import") or stripped.startswith("from"):
                 continue
-            # 检测 sys.argv[N] + 文件操作
-            if re.search(r'sys\.argv\[\d+\]', stripped):
-                has_file_op = any(fn in stripped for fn in [
-                    '.read_text(', '.write_text(', 'open(', '.read(', '.write(',
-                    'Path(', 'json.load', 'json.dump',
-                ])
-                if has_file_op:
-                    issues.append({
-                        "type": "path_centralization",
-                        "severity": "WARN",
-                        "detail": (
-                            f"{rel}:{i}  sys.argv 裸用于文件 I/O\n"
-                            f"  行内容: {stripped[:120]}\n"
-                            f"  修复: 改为 from _paths import resolve_state_path，包裹 sys.argv 读取"
-                        ),
-                        "fix": {
-                            "key": "path_centralization",
-                            "location": f"{rel}:{i}",
-                            "operation": (
-                                "1) 添加 from _paths import resolve_state_path\n"
-                                "2) 将 sys.argv[N] 读取路径改为 resolve_state_path(sys.argv[N])"
+            # 检测路径特征（字面量、Path、os.path.join、parent 链等）
+            if has_path_feature(stripped):
+                # 排除注释和非常量赋值中的路径引用
+                if re.match(r'^\s*#', stripped):
+                    continue
+                # 检查是否是变量赋值或路径构造函数调用
+                is_path_construct = (
+                    re.search(r'["\'](?:skills/|\.standardization/|\.workbuddy)["\']', stripped) or
+                    re.search(r'Path\s*\(', stripped) or
+                    re.search(r'os\.path\.join', stripped) or
+                    re.search(r'\.parent', stripped) or
+                    re.search(r'[A-Za-z]:[\\/]', stripped)
+                )
+                if not is_path_construct:
+                    continue
+
+                # P2: sys.argv[N] + 文件 I/O
+                if re.search(r'sys\.argv\[\d+\]', stripped):
+                    has_file_op = any(fn in stripped for fn in [
+                        '.read_text(', '.write_text(', 'open(', '.read(', '.write(',
+                        'Path(', 'json.load', 'json.dump',
+                    ])
+                    if has_file_op:
+                        issues.append({
+                            "type": "path_centralization",
+                            "severity": "WARN",
+                            "detail": (
+                                f"{rel}:{i}  sys.argv 裸用于文件 I/O\n"
+                                f"  行内容: {stripped[:120]}\n"
+                                f"  修复: 改为 from {shared_basename} import resolve_state_path，包裹 sys.argv 读取"
                             ),
-                        }
-                    })
+                            "fix": {
+                                "key": "path_centralization",
+                                "location": f"{rel}:{i}",
+                                "operation": (
+                                    f"1) 添加 from {shared_basename} import resolve_state_path\n"
+                                    "2) 将 sys.argv[N] 读取路径改为 resolve_state_path(sys.argv[N])"
+                                ),
+                            }
+                        })
+                    continue  # 已作为 P2 输出
 
-    # ── P1 分组输出：同路径值出现在多个文件 → 重复定义 ──
+                # P3/P4: 硬编码/推导路径 → 输出
+                issues.append({
+                    "type": "path_centralization",
+                    "severity": "WARN",
+                    "detail": (
+                        f"{rel}:{i}  路径构造未从共享文件导入\n"
+                        f"  行内容: {stripped[:120]}\n"
+                        f"  修复: 将路径定义移入 scripts/{shared_file or '_paths.py'}，"
+                        f"原处改为 from {shared_basename} import <变量>"
+                    ),
+                    "fix": {
+                        "key": "path_centralization",
+                        "location": f"{rel}:{i}",
+                        "operation": (
+                            f"1) 将路径定义移入 scripts/{shared_file or '_paths.py'}\n"
+                            f"2) 原处改为 from {shared_basename} import <变量>"
+                        ),
+                    }
+                })
+
+    # ── P1 分组输出：每条路径定义都输出（不论是否重复） ──
     for val, defs in path_defs.items():
-        if len(defs) < 2:
-            continue  # 只在同一文件定义 → 不需要集中管理
-        # 检查是否所有定义都已导入 _paths
-        all_in_paths = all(d[2] in imported_from_paths for d in defs)
-        if all_in_paths:
-            continue  # 都已集中，跳过
-
+        # ★ v2.99.0: 每条不在共享文件中的路径定义都输出，不再只输出重复定义
         sources = [f"{d[0]}:{d[1]}" for d in defs]
         vars_list = [d[2] for d in defs]
         example_code = defs[0][3]
 
-        issues.append({
-            "type": "path_centralization",
-            "severity": "WARN",
-            "detail": (
-                f"{sources[0]}  {defs[0][2]} 路径重复定义\n"
-                f"  表达式: {example_code[:120]}\n"
-                f"  同值文件: {', '.join(sources[1:])}\n"
-                f"  修复: 移入 scripts/_paths.py，原处改为 from _paths import {vars_list[0]}"
-            ),
-            "fix": {
-                "key": "path_centralization",
-                "location": sources[0],
-                "operation": (
-                    f"1) 在 scripts/_paths.py 中添加 {vars_list[0]} = {example_code}\n"
-                    f"2) 删除 {sources[0]} 的该行定义\n"
-                    f"3) 在 {defs[0][0]} 顶部添加 from _paths import {vars_list[0]}\n"
-                    f"4) 对 {', '.join(sources[1:])} 同样替换为 import"
-                ),
-            }
-        })
+        # 检查此值是否已在共享文件中声明
+        if has_shared_module and any(v in shared_vars for v in vars_list):
+            continue  # 已在共享文件中声明 → OK
 
-        # P3/P4 暂不实现独立扫描 — 它们会作为 P1 的副产品被覆盖
-        #（局域推导和硬编码字面量通常都会关联到某个模块级常量）
+        if len(defs) == 1:
+            # 单文件定义，但不在共享文件中 → 输出
+            issues.append({
+                "type": "path_centralization",
+                "severity": "WARN",
+                "detail": (
+                    f"{sources[0]}  {defs[0][2]} 路径定义未集中\n"
+                    f"  表达式: {example_code[:120]}\n"
+                    f"  修复: 移入 scripts/{shared_file or '_paths.py'}，"
+                    f"原处改为 from {shared_basename} import {vars_list[0]}"
+                ),
+                "fix": {
+                    "key": "path_centralization",
+                    "location": sources[0],
+                    "operation": (
+                        f"1) 在 scripts/{shared_file or '_paths.py'} 中添加 {vars_list[0]} = {example_code}\n"
+                        f"2) 删除 {sources[0]} 的该行定义\n"
+                        f"3) 在 {defs[0][0]} 顶部添加 from {shared_basename} import {vars_list[0]}"
+                    ),
+                }
+            })
+        else:
+            # 多文件重复定义
+            all_shared = all(v in shared_vars for v in vars_list) if has_shared_module else False
+            if all_shared:
+                continue
+            issues.append({
+                "type": "path_centralization",
+                "severity": "WARN",
+                "detail": (
+                    f"{sources[0]}  {defs[0][2]} 路径重复定义\n"
+                    f"  表达式: {example_code[:120]}\n"
+                    f"  同值文件: {', '.join(sources[1:])}\n"
+                    f"  修复: 移入 scripts/{shared_file or '_paths.py'}，"
+                    f"原处改为 from {shared_basename} import {vars_list[0]}"
+                ),
+                "fix": {
+                    "key": "path_centralization",
+                    "location": sources[0],
+                    "operation": (
+                        f"1) 在 scripts/{shared_file or '_paths.py'} 中添加 {vars_list[0]} = {example_code}\n"
+                        f"2) 删除 {sources[0]} 的该行定义\n"
+                        f"3) 在 {defs[0][0]} 顶部添加 from {shared_basename} import {vars_list[0]}\n"
+                        f"4) 对 {', '.join(sources[1:])} 同样替换为 import"
+                    ),
+                }
+            })
 
     return issues
 
@@ -607,22 +669,34 @@ def _check_path_centralization(skill_dir):
 def _fix_path_centralization(skill_dir, issue):
     """
     自动修复路径集中管理问题。
-    创建/更新 _paths.py，将重复的路径定义替换为 import。
+    创建/更新共享文件（自动识别文件名），将分散的路径定义替换为 import。
     返回 True 表示修复成功，False 表示失败。
     """
     import re, os, tempfile
     detail = str(issue.get("detail", ""))
     
+    # 从 detail 提取共享文件名（路径构造 / 路径未集中 / 重复定义）
+    # 新格式: ...移入 scripts/<filename>，...
+    _m_shared = re.search(r'scripts/(\S+?)(?:\'|"|\s|，|,|$)', detail)
+    if _m_shared:
+        shared_fname = _m_shared.group(1)
+    else:
+        shared_fname = "_paths.py"
+    
     # 从 detail 提取首个源文件路径和变量名
-    m = re.match(r'(scripts/[^:]+):(\d+)\s+(\w+)\s+路径重复定义', detail)
+    m = re.match(r'(scripts/[^:]+):(\d+)\s+(\w+)\s+(?:路径重复定义|路径定义未集中)', detail)
     if not m:
-        return False
+        # 尝试匹配 sys.argv / 路径构造格式
+        m2 = re.match(r'(scripts/[^:]+):(\d+)\s+(?:sys\.argv|路径构造)', detail)
+        if not m2:
+            return False
+        return False  # sys.argv/路径构造需要 LLM 手动修复
 
     src_file = m.group(1)
     src_line = int(m.group(2))
     var_name = m.group(3)
     src_abs = os.path.join(skill_dir, src_file)
-    paths_abs = os.path.join(skill_dir, "scripts", "_paths.py")
+    paths_abs = os.path.join(skill_dir, "scripts", shared_fname)
 
     if not os.path.isfile(src_abs):
         return False
@@ -639,9 +713,11 @@ def _fix_path_centralization(skill_dir, issue):
 
     def_line = src_lines[src_line - 1]
 
-    # 2. 创建/更新 _paths.py
+    # 2. 创建/更新共享文件
     paths_dir = os.path.dirname(paths_abs)
     os.makedirs(paths_dir, exist_ok=True)
+
+    shared_basename = shared_fname[:-3]  # 去掉 .py
 
     if os.path.isfile(paths_abs):
         with open(paths_abs, "r", encoding="utf-8") as f:
@@ -651,7 +727,7 @@ def _fix_path_centralization(skill_dir, issue):
         skill_name = os.path.basename(os.path.abspath(skill_dir))
         paths_content = (
             '"""\n'
-            '_paths.py — 路径集中管理\n'
+            f'{shared_fname} — 路径集中管理\n'
             '只包含路径常量和路径推导函数，不包含任何业务逻辑。\n'
             '"""\n'
             'import os\n'
@@ -669,14 +745,14 @@ def _fix_path_centralization(skill_dir, issue):
             'TEMP_DIR     = STD_DIR / "temp"\n\n'
         )
 
-    # 检查变量是否已存在于 _paths.py
+    # 检查变量是否已存在于共享文件
     if f"{var_name} " in paths_content or f"{var_name}=" in paths_content:
         pass  # 已存在，跳过
     else:
         # 追加定义行
         paths_content += f"{def_line.strip()}\n"
 
-    # 原子写入 _paths.py
+    # 原子写入共享文件
     tmp = paths_abs + ".tmp." + os.urandom(4).hex()
     try:
         with open(tmp, "w", encoding="utf-8") as f:
@@ -689,11 +765,9 @@ def _fix_path_centralization(skill_dir, issue):
 
     # 3. 替换源文件：删除定义行 + 添加 import
     new_src_lines = []
-    import_added = False
     for i, line in enumerate(src_lines):
         if i == src_line - 1:
-            # 跳过定义行（等待 import 替换它）
-            continue
+            continue  # 跳过定义行
         new_src_lines.append(line)
 
     # 在文件顶部添加 import（在第一行非注释/非空行前）
@@ -704,24 +778,21 @@ def _fix_path_centralization(skill_dir, issue):
             insert_pos = i
             break
         if stripped.startswith('"""') or stripped.startswith("'''"):
-            # 跳过文档字符串
             continue
 
-    # 检查是否已有 from _paths import，有则追加变量名
+    # 检查是否已有 from X import，有则追加变量名
     import_line_idx = -1
     for i, line in enumerate(new_src_lines):
-        if line.strip().startswith("from _paths import") or line.strip().startswith("from scripts._paths import"):
+        if re.match(rf'from\s+(?:scripts\.)?{re.escape(shared_basename)}\s+import', line.strip()):
             import_line_idx = i
             break
 
     if import_line_idx >= 0:
-        # 追加到已有 import 行
         existing = new_src_lines[import_line_idx].strip()
         if var_name not in existing:
             new_src_lines[import_line_idx] = existing + ", " + var_name + "\n"
     else:
-        # 在 insert_pos 处插入新 import 行
-        new_src_lines.insert(insert_pos, f"from _paths import {var_name}\n")
+        new_src_lines.insert(insert_pos, f"from {shared_basename} import {var_name}\n")
 
     # 原子写入源文件
     tmp2 = src_abs + ".tmp." + os.urandom(4).hex()
@@ -732,13 +803,9 @@ def _fix_path_centralization(skill_dir, issue):
     except Exception:
         if os.path.exists(tmp2):
             os.unlink(tmp2)
-        # 回滚 _paths.py 的修改
-        if os.path.exists(paths_abs) and not os.path.isfile(paths_abs + ".bak"):
-            # 暂不做完整回滚 — 让 LLM 手动处理
-            pass
         return False
 
-    # 4. 验证：编译 _paths.py 和源文件
+    # 4. 验证：编译共享文件和源文件
     try:
         import py_compile
         py_compile.compile(paths_abs, doraise=True)

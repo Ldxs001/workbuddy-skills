@@ -1161,6 +1161,8 @@ def fix_writing_standards(skill_dir, **kw):
         ("基于skill-standardization", "基于 skill-standardization"),
         ("skill-standardization渐进", "skill-standardization 渐进"),
     ]
+    # 中英文混排空格修复（正则：中→E 或 E→中之间加空格）
+    import re
     for wrong, right in replacements:
         if wrong in content:
             content = content.replace(wrong, right)
@@ -1169,6 +1171,12 @@ def fix_writing_standards(skill_dir, **kw):
         if wrong in content:
             content = content.replace(wrong, right)
             fixed += 1
+    # 中文字符后紧跟英文词 → 加空格
+    content, cn_en_count = re.subn(r'([\u4e00-\u9fff])([A-Za-z]{2,})', r'\1 \2', content)
+    fixed += cn_en_count
+    # 英文词后紧跟中文字符 → 加空格
+    content, en_cn_count = re.subn(r'([A-Za-z]{2,})([\u4e00-\u9fff])', r'\1 \2', content)
+    fixed += en_cn_count
     if content != original:
         _write_file(skill_md, content)
     # 也检查 references/*.md
@@ -1188,6 +1196,11 @@ def fix_writing_standards(skill_dir, **kw):
                 if wrong in ref_content:
                     ref_content = ref_content.replace(wrong, right)
                     fixed += 1
+            # 中英文混排空格（正则）
+            ref_content, r_cn_en = re.subn(r'([\u4e00-\u9fff])([A-Za-z]{2,})', r'\1 \2', ref_content)
+            fixed += r_cn_en
+            ref_content, r_en_cn = re.subn(r'([A-Za-z]{2,})([\u4e00-\u9fff])', r'\1 \2', ref_content)
+            fixed += r_en_cn
             if ref_content != ref_original:
                 _write_file(fpath, ref_content)
     return fixed

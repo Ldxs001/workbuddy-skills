@@ -16,10 +16,14 @@ from .utils import (
     _is_hardcoded_path, _classify_artifact, _classify_artifact_by_ext,
     _extract_path_literal, _find_skills_dir, _is_asset_dir,
 )
+from ._path_detector import _find_shared_path_file
 
 
 def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
-    """R-11: 全面产出物路径检测（铁律4）。"""
+    """R-11: 全面产出物路径检测（铁律4）。
+    
+    v2.99.0: scripts/ 扫描范围收缩到共享路径文件（如果存在）。
+    """
     if not skill_dir or not os.path.isdir(skill_dir):
         return {"passed": True, "detail": "跳过：无法确定技能目录", "skip": True}
 
@@ -29,7 +33,13 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
     # ── 1. scripts/ 扫描 ──
     scripts_dir = os.path.join(skill_dir, "scripts")
     if os.path.isdir(scripts_dir):
-        for fname in sorted(os.listdir(scripts_dir)):
+        # ★ v2.99.0: 检测共享路径文件，若存在则只扫描该文件
+        shared_file, _shared_vars, _ = _find_shared_path_file(scripts_dir)
+        scan_targets = [shared_file] if shared_file else sorted(os.listdir(scripts_dir))
+
+        for fname in scan_targets:
+            if not fname:
+                continue
             fpath = os.path.join(scripts_dir, fname)
             ext = os.path.splitext(fname)[1].lower()
             if ext not in script_exts or not os.path.isfile(fpath):
@@ -67,25 +77,21 @@ def check_artifact_paths(filepath, content, fm, body, skill_dir=None, **kw):
     _check_body_paths(body, violations)
 
     if violations:
-        detail_lines = [f"发现 {len(violations)} 处产出物路径违规："]
+        results = []
         for v in violations:
-            line = f"  {v['source']}  产出 \"{v['path_literal']}\" — 应迁至 {v['suggestion']}"
+            detail = f"{v['source']}  产出 \"{v['path_literal']}\" — 应迁至 {v['suggestion']}"
             if v.get("cross_refs"):
-                line += f"\n    [!] 关联引用 ({len(v['cross_refs'])}处): {', '.join(v['cross_refs'])}"
-            detail_lines.append(line)
-        return {
-            "passed": False,
-            "detail": "\n".join(detail_lines),
-            "violations": [{"source": v["source"], "path_literal": v["path_literal"],
-                           "suggestion": v["suggestion"], "cross_refs": v.get("cross_refs", [])}
-                          for v in violations],
-            "fix": {"key": "artifact_paths", "value": True,
-                     "location": f"{skill_dir} (scripts/ 及根目录)",
-                     "violations": [{"source": v["source"], "path_literal": v["path_literal"],
-                                    "suggestion": v["suggestion"]} for v in violations],
-                     "operation": "将所有违规产出物路径迁移至 skills/.standardization/<skill>/{outputs,data,cache,temp}/ 目录，并更新所有交叉引用",
-                     "verification": "重新运行 audit_skill()，确认 R-11 passed"},
-        }
+                detail += f"\n    [!] 关联引用 ({len(v['cross_refs'])}处): {', '.join(v['cross_refs'])}"
+            results.append({
+                "passed": False,
+                "detail": detail,
+                "fix": {"key": "artifact_paths", "value": True,
+                        "location": f"{skill_dir} (scripts/ 及根目录)",
+                        "violations": [v],
+                        "operation": "将所有违规产出物路径迁移至 skills/.standardization/<skill>/{outputs,data,cache,temp}/ 目录",
+                        "verification": "重新运行 audit_skill()，确认 R-11 passed"}
+            })
+        return results
     else:
         return {"passed": True, "detail": "未发现产出物路径违规（scripts/ + 根目录 + 子目录均通过）"}
 
@@ -536,7 +542,8 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
     violations = []
     expected_pattern = ".standardization/" + dirname + "/"
 
-    # 1. scan scripts/ for data dir definitions
+    # 1. scan shared file (or scripts/) for data dir definitions
+    # ★ v2.99.0: 只检查共享路径文件中的声明，不扫所有脚本
     scripts_dir = os.path.join(skill_dir, "scripts")
     data_dir_vars = []
     _DATA_VAR_RE = re.compile(
@@ -544,7 +551,12 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
     )
 
     if os.path.isdir(scripts_dir):
-        for fname in sorted(os.listdir(scripts_dir)):
+        shared_file, _shared_vars, _ = _find_shared_path_file(scripts_dir)
+        scan_targets = [shared_file] if shared_file else sorted(os.listdir(scripts_dir))
+
+        for fname in scan_targets:
+            if not fname:
+                continue
             fpath = os.path.join(scripts_dir, fname)
             if not os.path.isfile(fpath):
                 continue
@@ -558,7 +570,6 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                         m = _DATA_VAR_RE.match(stripped)
                         if m:
                             val = m.group(2).strip()
-                            # 直接用原始值（无 _extract_path_value 函数可用）
                             path_val = val.strip().strip('"').strip("'")
                             data_dir_vars.append((
                                 os.path.join("scripts", fname),
@@ -570,48 +581,46 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
                 continue
 
     # 1.5 [v2.38.9] check scripts that reference .standardization/ but lack proper DATA_DIR
-    #     修复前：template_generator.py/visual_editor.py 用 OUTPUT_DIR 指向 .standardization/
-    #     但无 DATA_DIR 变量名 → R-12 完全跳过检测
-    scripts_seen = {rel_file for rel_file, _, _, _ in data_dir_vars}
-    for fname in sorted(os.listdir(scripts_dir)):
-        fpath = os.path.join(scripts_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
-        ext = os.path.splitext(fname)[1].lower()
-        if ext not in (".py", ".sh", ".bat", ".ps1"):
-            continue
-        rel = os.path.join("scripts", fname)
-        if rel in scripts_seen:
-            continue  # 已有 DATA 变量，无需二次检查
-        # 白名单：这些脚本引用 .standardization/ 是因为它们是审计/检查逻辑的一部分，
-        # 并非自身使用数据目录。使用 os.path.join 确保 Windows 反斜杠兼容。
-        R12_WHITELIST = {
-            os.path.join("scripts", "artifact_checker.py"),
-            os.path.join("scripts", "creator.py"),
-            os.path.join("scripts", "fix.py"),
-            os.path.join("scripts", "migrator.py"),
-            os.path.join("scripts", "progress_manager.py"),
-            os.path.join("scripts", "refactor.py"),
-            os.path.join("scripts", "updater.py"),
-            os.path.join("scripts", "utils.py"),
-        }
-        if rel in R12_WHITELIST:
-            continue
-        try:
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                sc = f.read()
-        except Exception:
-            continue
-        if ".standardization" in sc:
-            violations.append({
-                "source": rel,
-                "var_name": "(missing DATA_DIR)",
-                "path_value": f"references .standardization/ via {fname}",
-                "expected": "should declare DEFAULT_DATA_DIR_RAW + DATA_DIR",
-                "detail": f"{fname} references .standardization/ paths but lacks a variable named with DATA|STORAGE|DB|CACHE|CONFIG + _DIR/_PATH. "
-                       "【推荐写法】添加 DEFAULT_DATA_DIR_RAW = \"skills/.standardization/<skill>/data/\" 和 "
-                       "DATA_DIR = SKILL_DIR.parent / \".standardization\" / \"<skill>\" / \"data\"",
-            })
+    # ★ v2.99.0: 有共享文件时跳过此检查（共享文件已处理），无共享文件时全量扫
+    if not data_dir_vars:
+        scripts_seen = {rel_file for rel_file, _, _, _ in data_dir_vars}
+        for fname in sorted(os.listdir(scripts_dir)):
+            fpath = os.path.join(scripts_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in (".py", ".sh", ".bat", ".ps1"):
+                continue
+            rel = os.path.join("scripts", fname)
+            if rel in scripts_seen:
+                continue
+            R12_WHITELIST = {
+                os.path.join("scripts", "artifact_checker.py"),
+                os.path.join("scripts", "creator.py"),
+                os.path.join("scripts", "fix.py"),
+                os.path.join("scripts", "migrator.py"),
+                os.path.join("scripts", "progress_manager.py"),
+                os.path.join("scripts", "refactor.py"),
+                os.path.join("scripts", "updater.py"),
+                os.path.join("scripts", "utils.py"),
+            }
+            if rel in R12_WHITELIST:
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                    sc = f.read()
+            except Exception:
+                continue
+            if ".standardization" in sc:
+                violations.append({
+                    "source": rel,
+                    "var_name": "(missing DATA_DIR)",
+                    "path_value": f"references .standardization/ via {fname}",
+                    "expected": "should declare DEFAULT_DATA_DIR_RAW + DATA_DIR",
+                    "detail": f"{fname} references .standardization/ paths but lacks a variable named with DATA|STORAGE|DB|CACHE|CONFIG + _DIR/_PATH. "
+                           "【推荐写法】添加 DEFAULT_DATA_DIR_RAW = \"skills/.standardization/<skill>/data/\" 和 "
+                           "DATA_DIR = SKILL_DIR.parent / \".standardization\" / \"<skill>\" / \"data\"",
+                })
 
     # 2. check paths conform to standardization/<skill-name>/ convention
     #     path_val 可能是 Python 表达式（如 SKILL_DIR.parent / ".standardization" / "skill" / "data"）

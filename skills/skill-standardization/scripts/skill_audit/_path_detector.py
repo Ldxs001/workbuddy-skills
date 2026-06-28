@@ -8,6 +8,8 @@ _path_detector.py — 统一路径定义检测层
   - 字面量路径：含 "skills/" 或 ".standardization/" 或平台绝对路径
   - 变量推导路径：赋值含 Path(__file__) / os.path.join / parent 链
   - *_DIR / *_PATH / *_ROOT 赋值
+
+v2.99.0: 新增 _find_shared_path_file() — 自动检测共享路径文件（不限于 _paths.py）
 """
 
 import ast, os, re
@@ -93,3 +95,61 @@ def get_standardized_dirs(skill_name: str):
         "CACHE_DIR": f"skills/.standardization/{skill_name}/cache/",
         "TEMP_DIR": f"skills/.standardization/{skill_name}/temp/",
     }
+
+
+def _find_shared_path_file(scripts_dir):
+    """
+    自动检测共享路径文件（不限于 _paths.py）。
+    
+    检测逻辑：
+    1. 扫描所有 .py 文件（排除 __init__.py）
+    2. 记录每个文件被其他脚本 import 的次数（from <basename> import）
+    3. 被最多脚本引用的文件 → 共享文件候选
+    4. 回溯兼容：如果没找到，检查 _paths.py 是否存在
+    
+    返回 (filename_or_None, set_of_declared_vars, imported_by_count)
+    """
+    if not os.path.isdir(scripts_dir):
+        return None, set(), 0
+
+    py_files = [f for f in os.listdir(scripts_dir)
+                if f.endswith('.py') and f != '__init__.py']
+    if not py_files:
+        return None, set(), 0
+
+    import_graph = {}
+    for f in py_files:
+        import_graph[f] = set()
+
+    for candidate in py_files:
+        base = candidate[:-3]
+        for f in py_files:
+            if f == candidate:
+                continue
+            try:
+                with open(os.path.join(scripts_dir, f), 'r', encoding='utf-8', errors='replace') as fh:
+                    content = fh.read()
+                if re.search(rf'from\s+(?:scripts\.)?{re.escape(base)}\s+import', content):
+                    import_graph[candidate].add(f)
+            except Exception:
+                continue
+
+    sorted_files = sorted(py_files, key=lambda f: len(import_graph[f]), reverse=True)
+    best = sorted_files[0]
+    best_count = len(import_graph[best])
+
+    if best_count == 0:
+        if os.path.isfile(os.path.join(scripts_dir, "_paths.py")):
+            best = "_paths.py"
+            best_count = 1
+
+    declared_vars = set()
+    if best:
+        try:
+            with open(os.path.join(scripts_dir, best), 'r', encoding='utf-8') as f:
+                content = f.read()
+            declared_vars = set(re.findall(r'^([A-Z_]+)\s*=', content, re.MULTILINE))
+        except Exception:
+            pass
+
+    return best, declared_vars, best_count

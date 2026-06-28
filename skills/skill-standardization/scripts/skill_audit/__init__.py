@@ -241,57 +241,55 @@ def audit_skill(skill_dir, manifest_version=None, _fix_applied=False, progress_f
             import traceback
             traceback.print_exc()
             result = {"passed": False, "detail": f"规则 {rule['id']} 执行异常: {_e}"}
-        # 兼容 dict 和 tuple 两种返回格式
-        if isinstance(result, dict):
-            passed = result.get("passed", False)
-            skipped = result.get("skip", False)
-        elif isinstance(result, (tuple, list)) and len(result) >= 1:
-            # 旧格式: (passed, details, fixable)
-            passed = bool(result[0]) if len(result) > 0 else False
-            skipped = result[2].get("skip", False) if len(result) > 2 and isinstance(result[2], dict) else False
-            # 将 tuple 转为 dict 以便后续处理
-            detail = result[1] if len(result) > 1 else ""
-            fix = result[2] if len(result) > 2 and isinstance(result[2], dict) else None
-            # data_dir_checker 返回 (passed, details, fixable_list)，fixable 为 list
-            if fix is None and len(result) > 2 and isinstance(result[2], list) and len(result[2]) > 0:
-                fix = {"key": "data_dir_compliance", "fixable_list": result[2], "value": True}
-            result = {"passed": passed, "detail": detail, "fix": fix}
-        else:
-            passed = False
-            skipped = False
+        # 兼容 dict、tuple list 和列表三种返回格式
+        # 结构检查器（如 R-20/R-25）可返回列表，每条独立输出
+        result_list = result if isinstance(result, list) else [result]
+        for raw_result in result_list:
+            if isinstance(raw_result, dict):
+                passed = raw_result.get("passed", False)
+                skipped = raw_result.get("skip", False)
+            elif isinstance(raw_result, (tuple, list)) and len(raw_result) >= 1:
+                # 旧格式: (passed, details, fixable)
+                passed = bool(raw_result[0]) if len(raw_result) > 0 else False
+                skipped = raw_result[2].get("skip", False) if len(raw_result) > 2 and isinstance(raw_result[2], dict) else False
+                detail = raw_result[1] if len(raw_result) > 1 else ""
+                fix = raw_result[2] if len(raw_result) > 2 and isinstance(raw_result[2], dict) else None
+                if fix is None and len(raw_result) > 2 and isinstance(raw_result[2], list) and len(raw_result[2]) > 0:
+                    fix = {"key": "data_dir_compliance", "fixable_list": raw_result[2], "value": True}
+                raw_result = {"passed": passed, "detail": detail, "fix": fix}
+            else:
+                passed = False
+                skipped = False
 
-        entry = {
-            "rule_id": rule["id"],
-            "rule_name": rule["name"],
-            "severity": rule["severity"],
-            "passed": passed,
-            "skipped": skipped,
-            "detail": result.get("detail", ""),
-        }
-        if result.get("ctx_lines"):
-            entry["ctx_lines"] = result["ctx_lines"][:8]  # 最多8行上下文
-        # 新增：附带修正建议（供 LLM 参考）
-        if not passed and not skipped:
-            if result.get("fix"):
-                entry["fix"] = result["fix"]
-            if result.get("suggestion"):
-                entry["suggestion"] = result["suggestion"]
-        results.append(entry)
+            entry = {
+                "rule_id": rule["id"],
+                "rule_name": rule["name"],
+                "severity": rule["severity"],
+                "passed": passed,
+                "skipped": skipped,
+                "detail": raw_result.get("detail", ""),
+            }
+            if raw_result.get("ctx_lines"):
+                entry["ctx_lines"] = raw_result["ctx_lines"][:8]
+            if not passed and not skipped:
+                if raw_result.get("fix"):
+                    entry["fix"] = raw_result["fix"]
+                if raw_result.get("suggestion"):
+                    entry["suggestion"] = raw_result["suggestion"]
+            results.append(entry)
 
-        # 收集 fix 建议
-        if not passed and not skipped and result.get("fix"):
-            fixes.append(result["fix"])
+            if not passed and not skipped and raw_result.get("fix"):
+                fixes.append(raw_result["fix"])
 
-        # 误报不计入 WARN/ERROR 统计
-        is_false_positive = not passed and not skipped and _reclassify_false_positive(entry)
-        if is_false_positive:
-            pass_count += 1
-        elif skipped:
-            skip_count += 1
-        elif passed:
-            pass_count += 1
-        elif rule["severity"] == "ERROR":
-            error_count += 1
+            is_false_positive = not passed and not skipped and _reclassify_false_positive(entry)
+            if is_false_positive:
+                pass_count += 1
+            elif skipped:
+                skip_count += 1
+            elif passed:
+                pass_count += 1
+            elif rule["severity"] == "ERROR":
+                error_count += 1
         else:
             warn_count += 1
 
@@ -447,6 +445,48 @@ _CLASSIFY_CATEGORY_HELP = (
     "engine_cant_judge — 引擎语义不足，LLM 确认后放行（如 __init__.py 无需列文档树、反模式格式引擎没认出但内容确实合规）"
 )
 
+# ── --classify 误报子类型枚举 ──
+# 每个子类型写明：适用规则 + 适用场景 + 不适用场景
+# LLM 按照 WARN/ERROR 的 detail 描述匹配以下场景，不匹配则不能选此子类型。
+# 不在枚举表中的子类型 → 代码级拒绝。
+_CLASSIFY_LEGAL_SUBTYPES = {
+    # engine_mistake 类：引擎技术性错误
+    "regex_misidentify":
+        "【引擎正则误匹配】适用 R-23：引擎正则把文档中的命令/env/路径字符串误匹配为文件名或引用。"
+        "仅当 WARN 的 detail 明确提到「文档引用……但文件不存在」这类路径误匹配时使用。"
+        "不适用：非 R-23 的 WARN。",
+    "false_classification":
+        "【引擎分类错误】适用 R-01/R-20：引擎把合法项错分为违规。"
+        "R-01 非标字段：标准 frontmatter 字段被标为非标。"
+        "R-20 术语不一致：代码标识符/文件名（如 novel_state.json、is_ending）被误认为自然语言文本问题。"
+        "不适用：纯「中英文混排缺少空格」的内容质量问题或真·术语混用（如同一文档里混用「更新」「修改」「变更」）。",
+    "bom_encoding":
+        "【BOM/编码误识别】适用 R-01：UTF-8 BOM 导致 frontmatter 解析错位，字段被误识别。"
+        "仅当 detail 提到 BOM、编码相关时使用。",
+    "comment_misread":
+        "【注释误读为代码】保留枚举，当前无规则会产生此场景。",
+    "template_convention":
+        "【模板/框架约定】适用 R-11/R-25 C-11。"
+        "R-11：正文中的标准化路径说明（如 models/、data/、backup/）是该技能的标准目录结构描述，不是违规硬编码路径。"
+        "R-25 C-11：非标章节标题（如「检查系统」「数据目录」）是该技能的固定架构模板，不属于临时写的非标内容。"
+        "不适用：非模板内容被引擎报出的情况——那是真问题。",
+    # engine_cant_judge 类：引擎语义不足
+    "domain_convention":
+        "【领域特定约定】适用 R-17/R-25 C-11：技能文档中的章节结构是该领域（如小说写作）的标准惯例，"
+        "引擎无法理解领域语义。仅当 detail 明确说「非标章节」且属于该技能的固有架构时使用。",
+    "architecture_pattern":
+        "【架构模式约定】适用 R-25 C-12/C-14：约束条数/简练度/长段说明/工作流标注/流程步骤数"
+        "是该技能的固定架构模式，引擎无法验证完整性和简练度。"
+        "仅当 detail 提到 C-12、C-14 或「工作流程」「约束」时使用。"
+        "不适用：C-07 代码块缺语言标识——那是真问题，必须补。",
+    "context_sensitive":
+        "【上下文敏感】适用 R-23/R-07：函数/触发词是否合理取决于外部调用方或运行上下文，"
+        "引擎静态分析无法覆盖。仅当 detail 提到「函数名」「未找到」「触发」时使用。",
+    "data_dependency":
+        "【数据依赖无法验证】适用 R-11/R-23：路径引用依赖于运行时数据（如模型缓存路径、示例目录树），"
+        "引擎无法静态验证。仅当 detail 提到「路径」「models/」「数据」「缓存」「目录树」时使用。",
+}
+
 def _load_fp_ids(skill_dir):
     """读取 LLM 分类的误判 #ID 列表（返回 set[str]）
     
@@ -488,7 +528,7 @@ def _load_fp_details(skill_dir):
     return {}
 
 
-def _write_fp_classify(skill_dir, ids, category, reason=""):
+def _write_fp_classify(skill_dir, ids, category, reason="", subtype=""):
     """向 .verify_fp.json 写入误判标记（dict 格式，旧 list 格式忽略）"""
     import json
     skill_dir = os.path.abspath(skill_dir)
@@ -507,7 +547,7 @@ def _write_fp_classify(skill_dir, ids, category, reason=""):
         except Exception:
             pass
     for id_str in ids:
-        existing[id_str] = {"category": category, "reason": reason}
+        existing[id_str] = {"category": category, "reason": reason, "subtype": subtype}
     with open(fp_path, 'w', encoding='utf-8') as f:
         json.dump(existing, f, ensure_ascii=False, indent=2, sort_keys=True)
 
@@ -551,8 +591,8 @@ def _reclassify_false_positive(res, skill_dir=None):
     - C-{type}        → 匹配一致性审查 ID
     """
     if skill_dir:
-        # ★ v2.97.3: _llm_only_fix_keys 项不得被分类绕过
-        _blocked_fix_keys = {"workflow_completeness", "example_quality", "capability_boundary", "section_names"}
+        # ★ section_names 移出黑名单 → '约束9条超过上限9条'是引擎bug(9=9)，非标章节/流程步数是架构约定可用subtype分类
+        _blocked_fix_keys = {"workflow_completeness", "example_quality", "capability_boundary"}
         fk = None
         if isinstance(res.get("fix"), dict):
             fk = res["fix"].get("key")
@@ -1312,6 +1352,16 @@ def cmd_audit(args):
             print(f"❌ 非法类别 '{category}' — 仅支持：{', '.join(sorted(_CLASSIFY_LEGAL_CATEGORIES))}")
             return 1
 
+        # 校验 --subtype（必填）
+        subtype = getattr(args, 'subtype', None)
+        if not subtype:
+            print(f"❌ --classify 必须附带 --subtype 参数，说明误报子类型")
+            print(f"   合法子类型：{', '.join(sorted(_CLASSIFY_LEGAL_SUBTYPES.keys()))}")
+            return 1
+        if subtype not in _CLASSIFY_LEGAL_SUBTYPES:
+            print(f"❌ 非法子类型 '{subtype}' — 仅支持：{', '.join(sorted(_CLASSIFY_LEGAL_SUBTYPES.keys()))}")
+            return 1
+
         # 读取 --reason
         reason = getattr(args, 'reason', '') or ''
 
@@ -1337,11 +1387,12 @@ def cmd_audit(args):
                 print(f"❌ 无效 ID: '{id_str}' — ID 必须是数字（如 42,55,67）、C-{{type}}（如 C-missing_doc_ref）或 R-XX（如 R-23）")
                 return 1
 
-        _write_fp_classify(skill_dir, ids, category, reason)
+        _write_fp_classify(skill_dir, ids, category, reason, subtype)
 
         print(f"\n{'='*55}")
         print(f"  [CLASSIFY] 已标记 {len(ids)} 个 #ID 为误判")
         print(f"    类别：{category}")
+        print(f"    子类型：{subtype} — {_CLASSIFY_LEGAL_SUBTYPES.get(subtype, '')[:60]}")
         if reason:
             print(f"    理由：{reason}")
         print(f"    ID：{', '.join(ids)}")
@@ -2020,6 +2071,10 @@ def cmd_refactor(args):
     print(f"  ⚙️  [refactor] 全流程改造：{os.path.basename(skill_dir)}")
     print(f"{'='*55}")
 
+    # ── 步骤 0：清理旧会话状态文件（仅首次 refactor，--continue 不清） ──
+    if not getattr(args, 'refactor_continue', False):
+        _clean_stale_state(skill_dir)
+
     # ── 步骤 1：蓝皮书扫描（强制） ──
     print(f"\n{'─'*55}")
     print(f"  [1/8] 蓝皮书前置扫描")
@@ -2293,10 +2348,11 @@ def cmd_refactor(args):
     print(f"  📋 技能: {os.path.basename(skill_dir)}")
     print(f"  📋 状态: 已完成全流程改造")
 
-    # ── 步骤 9：清理（cleanup session 驱动） ──
+    # ── 步骤 9：清理（cleanup session 驱动 + 状态文件清理） ──
     print(f"\n{'─'*55}")
     print(f"  [9/9] cleanup 清理")
     print(f"{'─'*55}")
+    _clean_stale_state(skill_dir, verbose=False)
     if manifest_id:
         try:
             from scripts.cleanup_manager import end_session
@@ -2317,6 +2373,49 @@ def cmd_refactor(args):
     print(f"  ✅ refactor 全流程完成：{os.path.basename(skill_dir)}")
     print(f"{'='*55}")
     _save_html_report(skill_dir, result, before_result=result_before)
+
+
+def _clean_stale_state(skill_dir, verbose=True):
+    """清理 refactor 遗留的状态文件，确保每次任务都是全新独立的。
+
+    清理两个目录：
+    1. 技能自己的标准化 data 目录 → .verify_fp.json
+    2. skill-standardization 的数据跟踪目录 → .remaining_llm.json, .manual_wait, .manual_done
+    """
+    import glob as _glob
+
+    skill_name = os.path.basename(os.path.abspath(skill_dir))
+    removed = 0
+
+    # 目录1：技能 data 目录（.verify_fp.json）
+    skill_data_dir = os.path.join(
+        os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+        skill_name, 'data')
+    for fname in ['.verify_fp.json', '.manual_wait', '.manual_done']:
+        fp = os.path.join(skill_data_dir, fname)
+        if os.path.isfile(fp):
+            os.remove(fp)
+            removed += 1
+            if verbose:
+                print(f"  🧹 清理: {fname}")
+
+    # 目录2：skill-standardization 的跟踪目录（skill-standardization/data/{skill_name}/）
+    self_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    track_dir = os.path.join(self_dir, 'data', skill_name)
+    for pattern in ['.remaining_llm.json', '.manual_wait', '.manual_done']:
+        fp = os.path.join(track_dir, pattern)
+        if os.path.isfile(fp):
+            os.remove(fp)
+            removed += 1
+            if verbose:
+                print(f"  🧹 清理: {pattern}")
+
+    if verbose:
+        if removed:
+            print(f"  ✅ 已清理 {removed} 个旧会话状态文件")
+        else:
+            print(f"  ✅ 无残留状态文件（干净的开始）")
+    return removed
 
 
 def _check_large_dirs(skill_dir):
@@ -2651,23 +2750,49 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
     if raw_remaining:
         fp_ids = _load_fp_ids(skill_dir)
         if not fp_ids:
+            # ★ 无任何分类数据 → 阻断，要求 LLM 一次性全部 classify
             skill_name = os.path.basename(os.path.abspath(skill_dir))
             print(f"\n{'='*55}")
             print(f"  ⏸  ★ 前置 LLM 二次筛除（阻断点）")
             print(f"{'─'*55}")
             print(f"  原始审计发现 {len(raw_remaining)} 项 FAIL，需要 LLM 确认真问题 vs 误报")
+            print(f"  ⚠️  必须一次性 classify 所有可分类项，再进入细碎循环。边修边分类是不允许的。")
             print(f"")
             print(f"  步骤 1: 查看 FAIL 详情")
             print(f"    python -m scripts.skill_audit audit {skill_dir} --verify --mode refactor")
             print(f"")
-            print(f"  步骤 2: 对确认为误报的项执行 --classify，须附带 --category（如 --category engine_mistake --reason '...'）")
-            print(f"    python -m scripts.skill_audit audit {skill_dir} --classify ID1,ID2 --category engine_mistake --reason '...' --mode refactor")
+            print(f"  步骤 2: 对确认为误报的项执行 --classify，须附带 --category + --subtype")
+            print(f"    例: python -m scripts.skill_audit audit {skill_dir} --classify R-23 --category engine_mistake --subtype regex_misidentify --reason '...' --mode refactor")
             print(f"")
             print(f"  步骤 3: 重新执行 refactor --continue")
             print(f"    python -m scripts.skill_audit refactor {skill_dir} --continue --confirmed --mode refactor")
             print(f"{'='*55}")
             _save_remaining_llm(skill_dir, raw_remaining)
             return result, raw_remaining, 0
+        else:
+            # fp_ids 已有部分分类 → 检查是否所有项都已分类
+            _partial = [r for r in raw_remaining if not _reclassify_false_positive(r, skill_dir)]
+            if _partial:
+                # 仍有未分类项 → 检查是否为 LLM 手动修复项（不可分类）
+                _llm_only_set = {"workflow_completeness", "example_quality", "capability_boundary"}
+                _unclassifiable = all(
+                    r.get("fix", {}).get("key") in _llm_only_set
+                    if isinstance(r.get("fix"), dict) else False
+                    for r in _partial
+                )
+                if not _unclassifiable:
+                    print(f"\n{'='*55}")
+                    print(f"  ⏸  ★ 二次筛除未完成——仍有 {len(_partial)} 项可分类但未分类")
+                    print(f"{'─'*55}")
+                    print(f"  ⚠️  细碎修复循环不可修改修复清单！所有分类必须在步骤 4 一次性完成。")
+                    print(f"  请 classify 以下未分类项后重新 --continue：")
+                    for _pr in _partial:
+                        _prid = _pr.get('rule_id', '?')
+                        _pdet = _pr.get('detail', '')[:80]
+                        print(f"    [{_prid}] {_pdet}")
+                    print(f"{'='*55}")
+                    _save_remaining_llm(skill_dir, _partial)
+                    return result, _partial, 0
 
     remaining = _filter_false_positives(result, skill_dir)
     
@@ -3203,9 +3328,10 @@ def main():
     p_audit.add_argument("--mode", help="LLM 自检闸门输出的模式，用于模式-命令校验（必传，如 --mode refactor）")
     p_audit.add_argument("--verify", action="store_true", help="强制验证：有非误报未通过项则 exit(1)，确保铁律 0 ERROR 0 WARN 强制执行")
     p_audit.add_argument("--show-fix", metavar="IDS", help="仅展示指定 #ID 的修复指引（先运行 --verify 获取 ID 列表）")
-    p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（如 --classify 42,55,67），须附带 --category engine_mistake|engine_cant_judge，可选 --reason")
+    p_audit.add_argument("--classify", metavar="IDS", help="将指定 #ID 标记为误判（如 --classify 42,55,67），须附带 --category 和 --subtype，可选 --reason")
     p_audit.add_argument("--category", metavar="CAT", help=f"误报类别：{', '.join(sorted(_CLASSIFY_LEGAL_CATEGORIES))}（仅与 --classify 配合使用）")
-    p_audit.add_argument("--reason", metavar="TEXT", help="误报理由（engine_cant_judge 必填，须含具体路径证据；engine_mistake 可选）")
+    p_audit.add_argument("--subtype", metavar="TYPE", help=f"误报子类型（必填，与 --classify 配合使用）：{', '.join(sorted(_CLASSIFY_LEGAL_SUBTYPES.keys()))}")
+    p_audit.add_argument("--reason", metavar="TEXT", help="误报理由（可选）")
     p_audit.add_argument("--no-fp", metavar="IDS", help="将指定 #ID 从误判列表中移除（取消分类）")
 
     # audit-all 子命令
