@@ -1,3 +1,62 @@
+## [1.29.0] - 2026-06-28
+
+### 修复
+- 中英文混排修复：timeline骨架→timeline 骨架、可选emotions→可选 emotions、sub门禁→sub 门禁、require双门禁→require 双门禁
+- SKILL.md 代码块补充语言标识（```bash）
+
+## [1.28.0] - 2026-06-28
+
+### 变更
+- R-20 输出粒度拆分：每条中英文混排、术语不一致独立 WARN，输出格式为「文件名:行号：描述」
+- R-23 文档引用输出携带真实行号（修复多处硬编码 :1）
+- R-25 C-* 子项独立输出
+- R-11 每条路径违规独立输出
+- 模型安装说明中增加 g++/cmake 独立检查流程 + winlibs 下载直链+镜像
+
+---
+
+## [1.27.0] - 2026-06-28
+
+### 修复
+- refactor: novel-weaver
+
+---
+
+## [1.26.0] - 2026-06-28
+
+### 修复
+- refactor: novel-weaver
+
+---
+
+## [1.25.0] - 2026-06-28
+
+### 修复
+- refactor: novel-weaver
+
+---
+
+## [1.24.0] - 2026-06-28
+
+### 修复
+- refactor: novel-weaver
+
+---
+
+## [1.23.0] - 2026-06-28
+
+### 修复
+- refactor: novel-weaver
+
+---
+
+## [1.22.0] - 2026-06-28
+
+### 修复
+- refactor: novel-weaver
+
+---
+
 ## [1.21.6] - 2026-06-28
 
 ### 修复
@@ -31,7 +90,7 @@
 
 ### 文档
 
-- **SKILL.md 模型安装说明前置** — 触发条件新增"安装模型/装BERT/装Qwythos"正向触发词；检查系统章节下方直接嵌入 pip install + 模型下载命令，LLM 不再需要跳转 faq.md 查找
+- **SKILL.md 模型安装说明前置** — 触发条件新增"安装模型/装 BERT/装 Qwythos"正向触发词；检查系统章节下方直接嵌入 pip install + 模型下载命令，LLM 不再需要跳转 faq.md 查找
 
 ---
 
@@ -57,7 +116,7 @@
 ### ✨ 新增功能
 
 - **BERT 语义检查引擎** — `novel_semantic_check.py`，基于 bge-small-zh-v1.5（33MB），实现 overview-vs-content 语义对齐检测和子结构间语义跳跃检测，集成到 finalize-chapter 第5步
-- **Qwythos 推理审核引擎** — `novel_reasoning_check.py`，基于 Qwythos-9B GGUF Q4_K_M（~5.5GB，需GPU），实现因果合理性/人物行为一致性/情绪弧/对话匹配度/论证可靠性五项推理审核，集成到 finalize-chapter 第6步
+- **Qwythos 推理审核引擎** — `novel_reasoning_check.py`，基于 Qwythos-9B GGUF Q4_K_M（~5.5GB，需 GPU），实现因果合理性/人物行为一致性/情绪弧/对话匹配度/论证可靠性五项推理审核，集成到 finalize-chapter 第6步
 - **路径统一管理** — `_path_utils.py` 新增 `MODELS_DIR`，所有模型缓存集中到 `models/` 目录，与 huggingface 全局缓存隔离
 - **文档全面同步** — SKILL.md、execution_standards.md、hooks.md、faq.md 同步更新：检查链从4步扩展为6步、新增别名系统/实体关系追踪/行为摘要章节
 
@@ -82,7 +141,7 @@
 - **[atomic_writer] 别名声明阻断钩子** — 每个子结构正文末尾必须声明别名：`【别名】老陈 = 陈叔` 或 `【别名】无`。缺失则 HOOK-BLOCK 阻断写入（S01 豁免）。
 - **[context_loader] 别名声明指令** — 输出末尾追加硬性别名声明框，LLM 每次写作前看到强制要求
 - **[state_manager] register-alias 命令** — 新增 `register-alias` CLI，atomic_writer 拦截别名行后自动调此命令注册
-- **[entity_extractor] 移除别名启发式** — 回退到纯机械操作，别名识别完全由 LLM 语义 + atomic_writer 钩子完成
+- **[entity_extractor] 删除别名启发式** — 回退到纯机械操作，别名识别完全由 LLM 语义 + atomic_writer 钩子完成
 
 ### 流程
 - write-sub 管道: atomic_writer(含别名钩子) → state_manager → 字数校验 → entity_extractor
@@ -133,10 +192,10 @@
 
 ### 新增
 - **[entity_tracker] 实体关系追踪系统** — novel_state.json 新增 `entity_tracker` 数据层，追踪角色/物品/地点/组织/数据五类实体的属性和相互关系
-- **[entity_extractor] 自动实体提取** — 新脚本 `novel_entity_extractor.py`，write-sub 第4步非阻断执行，从每子结构内容中自动提取实体-关系三元组、检测状态变更
+- **[entity_extractor] 自动实体提取** — 新脚本 `novel_entity_extractor.py`，write-sub 第4步非阻断执行，从每子结构内容中自动提取实体-关系三元组、检测状态更新
 - **[context_loader] 实体关系网注入** — 「已出场关键人物」区块后追加「实体关系网」区块，全量累加输出实体列表和关系，LLM 写作时看到累计事实
 - **[logic_check] 实体状态一致性检查** — 检查已标记降级状态的实体（destroyed/damaged/dead 等）是否在后续章节无恢复地被使用，HARD 级警告
-- **[logic_check] 实体关系链检查** — 检查同时出现的两个实体间已建立的关系是否被忽略，SOFT 级提示
+- **[logic_check] 实体关系链检查** — 检查同时出现的两个实体间已创建的关系是否被忽略，SOFT 级提示
 - **[state_manager] 兼容 entity_tracker** — _merge_runtime_fields 保留 entity_tracker，init_project 初始化为空列表
 
 ### 架构
@@ -194,9 +253,9 @@
 ## [1.19.6] - 2026-06-27
 
 ### 新增
-- **[novel_workflow_engine.py] 修改/扩写提醒** — write-sub 检测到子结构已为 completed 时，标记为修改模式，输出提醒要求修改后运行 finalize-chapter
-- **[SKILL.md] 修改/扩写流程约束** — 新增"[强制] 修改/扩写逐子结构串行"，禁止批量修改
-- **[hooks.md] 修改/扩写提醒钩子** — 新增钩子条目
+- **[novel_workflow_engine.py] 更新/扩写提醒** — write-sub 检测到子结构已为 completed 时，标记为更新模式，输出提醒要求更新后运行 finalize-chapter
+- **[SKILL.md] 更新/扩写流程约束** — 新增"[强制] 更新/扩写逐子结构串行"，禁止批量更新
+- **[hooks.md] 更新/扩写提醒钩子** — 新增钩子条目
 
 ---
 
@@ -215,7 +274,7 @@
 ## [1.19.3] - 2026-06-26
 
 ### 修复
-- **[SKILL.md] 文档脱钩全量修复** — 约束新增串行阻断条目；工作流程步骤10/11更新为字数约束+串行阻断+write-sub三级校验；核心能力表格更新为 write-sub 管道描述；hooks.md 新增串行阻断/字数约束注入钩子条目
+- **[SKILL.md] 文档脱钩全量修复** — 约束新增串行阻断条目；工作流程步骤10/11更新为字数约束+串行阻断+write-sub 三级校验；核心能力表格更新为 write-sub 管道描述；hooks.md 新增串行阻断/字数约束注入钩子条目
 - **[references/*.md] 全量扫描修复** — execution_standards.md 阻断规则新增串行阻断+字数校验；faq.md 新增"上一子结构未完成"和"字数校验解读"FAQ；examples.md 更新 context_loader/write-sub 输出示例；antipatterns.md 引用三级字数校验
 
 ---
@@ -237,9 +296,9 @@
 ## [1.19.0] - 2026-06-26
 
 ### 新增
-- **[novel_context_loader.py] 字数约束注入上下文** — 根据 `meta.length` 在写作前输出篇幅对应的字数范围 + 校验上浮值，LLM 不再盲写，禁止自行设定
+- **[novel_context_loader.py] 字数约束注入上下文** — 根据 `meta.length` 在写作前输出篇幅对应的字数范围 + 校验上浮值，LLM 不再盲写，禁止自行配置
 - **[novel_workflow_engine.py] 字数校验统一标准** — write-sub 检查使用与 context_loader 相同的字数目标 + 15% 上浮窗口（中篇 1,500-2,300 范围内通过），低于下限 WARN、超上浮 INFO、范围内 OK
-- **[execution_standards.md] 三阶段统一标准文档** — 明确字数目标在规划/写作/检查三阶段使用同一套标准，禁止 AI 自行设定
+- **[execution_standards.md] 三阶段统一标准文档** — 明确字数目标在规划/写作/检查三阶段使用同一套标准，禁止 AI 自行配置
 
 ### 修复
 - **[novel_context_loader.py] 情绪格式向后兼容** — 兼容遗留的字符串数组情绪格式（如 `["疑惑","不安"]`），避免 AttributeError
@@ -250,25 +309,25 @@
 ## [1.18.2] - 2026-06-26
 
 ### 修复
-- 修复_extract_keywords和fidelity_check的CJK关键词提取: {2,10}整段匹配→2-4字滑动窗口,避免过长短语匹配失败
+- 修复_extract_keywords 和 fidelity_check 的 CJK 关键词提取: {2,10}整段匹配→2-4字滑动窗口,避免过长短语匹配失败
 
 ---
 
 ## [1.18.1] - 2026-06-26
 
 ### 修复
-- 补写1.18.0 changelog条目,R-11/R-12/C-07/C-16/C-18手动修复,changelog条目补全
+- 补写1.18.0 changelog 条目,R-11/R-12/C-07/C-16/C-18手动修复,changelog 条目补全
 
 ---
 
 ## [1.18.0] - 2026-06-26
 
 ### Fixed
-- R-11: 移除SKILL.md中硬编码的绝对路径示例
-- R-12: novel_state_manager.py添加DATA_DIR导入,替换局域路径计算
+- R-11: 删除 SKILL.md 中硬编码的绝对路径示例
+- R-12: novel_state_manager.py 添加 DATA_DIR 导入,替换局域路径计算
 - C-07: 补充代码块语言标识(```→```text)
-- C-16: execution_standards.md过期行数阈值200→230
-- C-18: SKILL.md补充环境依赖说明(Python3.8+/离线/UTF-8)
+- C-16: execution_standards.md 过期行数阈值200→230
+- C-18: SKILL.md 补充环境依赖说明(Python3.8+/离线/UTF-8)
 
 ### Changed
 - 全流程 refactor 改造: 路径集中管理审计整合
@@ -278,63 +337,63 @@
 ## [1.17.2] - 2026-06-26
 
 ### 修复
-- 指纹保护修复: plan-chapter成功后更新.state_fingerprint.txt, 使后续章节规划不被误阻断
+- 指纹保护修复: plan-chapter 成功后更新.state_fingerprint.txt, 使后续章节规划不被误阻断
 
 ---
 
 ## [1.17.1] - 2026-06-26
 
 ### 修复
-- 路径统一管理: novel_workflow_engine.py改从_path_utils.py导入DATA_DIR,消除路径重复计算
+- 路径统一管理: novel_workflow_engine.py 改从_path_utils.py 导入 DATA_DIR,消除路径重复计算
 
 ---
 
 ## [1.17.0] - 2026-06-26
 
 ### 修复
-- plan-chapter新增文件加载(@/路径), 避免Shell转义破坏JSON
+- plan-chapter 新增文件加载(@/路径), 避免 Shell 转义破坏 JSON
 
 ---
 
 ## [1.16.4] - 2026-06-25
 
 ### 修复
-- 4核心脚本加stdout编码修复(sys.stdout.reconfigure utf-8), 解决Git Bash中文乱码
+- 4核心脚本加 stdout 编码修复(sys.stdout.reconfigure utf-8), 解决 Git Bash 中文乱码
 
 ---
 
 ## [1.16.3] - 2026-06-25
 
 ### 修复
-- novel_continuity.py check自动推导chapter_dir从state_path, 修复LLM路径错误
+- novel_continuity.py check 自动推导 chapter_dir 从 state_path, 修复 LLM 路径错误
 
 ---
 
 ## [1.16.2] - 2026-06-25
 
 ### 修复
-- 原始SKILL.md补充slug/displayName前导字段(修复git-sync冲掉问题)
+- 原始 SKILL.md 补充 slug/displayName 前导字段(修复 git-sync 冲掉问题)
 
 ---
 
 ## [1.16.1] - 2026-06-25
 
 ### 修复
-- 数据目录章节改为代码示例驱动, LLM禁止手写路径, 提供_path_utils.py调用代码
+- 数据目录章节改为代码示例驱动, LLM 禁止手写路径, 提供_path_utils.py 调用代码
 
 ---
 
 ## [1.16.0] - 2026-06-25
 
 ### 修复
-- SKILL.md data_dir修正(data->projects), 新增数据目录章节指引LLM路径
+- SKILL.md data_dir 修正(data->projects), 新增数据目录章节指引 LLM 路径
 
 ---
 
 ## [1.15.1] - 2026-06-25
 
 ### 修复
-- 标准化改造:_meta.json路径修正/examples.md路径修正/术语统一/约束9to8/路径bug修复
+- 标准化改造:_meta.json 路径修正/examples.md 路径修正/术语统一/约束9to8/路径 bug 修复
 
 ---
 
@@ -348,16 +407,16 @@
 - **[_path_utils.py] 中文路径编码修复** — 新增路径解析模块，通过.resolve() + .project 缓存机制，后续命令无需反复传路径
 
 ### 修复
-- **[novel_logic_check.py] 概述匹配度不再HARD阻断** — 概述为写作前规划的基准文件，一旦确认不可更改。内容与概述的偏离仅做信息性标记(SOFT)，不阻塞finalize-chapter
+- **[novel_logic_check.py] 概述匹配度不再 HARD 阻断** — 概述为写作前规划的基准文件，一旦确认不可更改。内容与概述的偏离仅做信息性标记(SOFT)，不阻塞 finalize-chapter
 
 ## [1.14.0] - 2026-06-25
 
 ### 修复
-- **[novel_logic_check.py] 关键词匹配算法改用bigram重叠率** — 旧算法将概述按标点切段后要求整段逐字出现在正文，导致语义概述永远无法通过HARD检查。改用`2字滑动窗口(bigram)重叠率`匹配，语义自然概述即可正常通行。阈值：WARN=<20%, INFO=<40%
-- **[novel_logic_check.py] 概述匹配度不再HARD阻断** — 概述为写作前规划的基准文件，一旦确认不可更改。内容与概述的偏离仅做信息性标记(SOFT)，不阻塞finalize-chapter。偏差信息写入reports供参考
-- **[novel_causality_check.py] 检查通过后自动pass门禁** — outline/sub-structure检查全部通过后自动调用`pass_gate()`，消除手动pass_outline_causality/sub_causality门禁的步骤
-- **[novel_pipeline_gate.py] set-phase writing增加sub_causality检查** — 转换到writing阶段时除了require outline_causality，现在也require sub_causality
-- **[novel_context_loader.py] 末尾输出write-sub命令** — 每个子结构上下文加载后，自动输出下步应执行的完整`write-sub`管道命令
+- **[novel_logic_check.py] 关键词匹配算法改用 bigram 重叠率** — 旧算法将概述按标点切段后要求整段逐字出现在正文，导致语义概述永远无法通过 HARD 检查。改用`2字滑动窗口(bigram)重叠率`匹配，语义自然概述即可正常通行。阈值：WARN=<20%, INFO=<40%
+- **[novel_logic_check.py] 概述匹配度不再 HARD 阻断** — 概述为写作前规划的基准文件，一旦确认不可更改。内容与概述的偏离仅做信息性标记(SOFT)，不阻塞 finalize-chapter。偏差信息写入 reports 供参考
+- **[novel_causality_check.py] 检查通过后自动 pass 门禁** — outline/sub-structure 检查全部通过后自动调用`pass_gate()`，消除手动 pass_outline_causality/sub_causality 门禁的步骤
+- **[novel_pipeline_gate.py] set-phase writing 增加 sub_causality 检查** — 转换到 writing 阶段时除了 require outline_causality，现在也 require sub_causality
+- **[novel_context_loader.py] 末尾输出 write-sub 命令** — 每个子结构上下文加载后，自动输出下步应执行的完整`write-sub`管道命令
 
 ## [1.13.6] - 2026-06-25
 
@@ -764,8 +823,8 @@
 
 ### 更新
 - **SKILL.md 工作流程重构**：
-  - 阶段2步骤1 从"生成→追加"改为"生成→**plan-chapter批量注册**→验证"
-  - 阶段2步骤5 从"连通性+风格"改为"**三道检查+finalize-chapter一键完结**"
+  - 阶段2步骤1 从"生成→追加"改为"生成→**plan-chapter 批量注册**→验证"
+  - 阶段2步骤5 从"连通性+风格"改为"**三道检查+finalize-chapter 一键完结**"
   - 新增 7 条硬约束（子结构先行、正文禁标记、报告前检等）
 - **hooks.md 翻新**：从 11 个钩子扩展到 15 个，新增代码级硬约束条目
 - **`_meta.json` 版本**：1.1.1 → 1.2.0
