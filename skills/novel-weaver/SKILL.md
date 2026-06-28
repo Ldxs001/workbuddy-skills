@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.21.2
+version: 1.21.3
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。
@@ -104,6 +104,7 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 - 「帮我检查文章前后是否一致」→ 触发风格校验
 - 「把这几段串起来」→ 触发连通性补充
 - 「检查文章是否偏离了大纲」→ 触发大纲忠实度报告
+- 「安装模型/下载模型/装BERT/装Qwythos」→ 触发模型安装流程：安装 sentence-transformers + 下载 bge-small-zh 或安装 llama-cpp-python + 下载 Qwythos GGUF
 
 **否定条件：**
 - 用户只是说「改写/润色」——不是本技能范畴
@@ -176,6 +177,21 @@ finalize-chapter 是章节质量的核心关卡，聚合执行 6 步检查链：
 | 6 | 推理审核(Qwythos) | `novel_reasoning_check.py` | 因果合理/人格一致/情绪弧/对话/论证（有模型+GPU时） | HARD/SOFT |
 
 步骤 1-4 由 Python 刚性规则驱动，**无外部依赖**。步骤 5-6 需额外安装模型，无模型时自动跳过。有 HARD 问题则阻断（不标记门禁），写入 `_fixes.json`；全部通过则标记 `chapter_finalized` 门禁。
+
+### 模型安装（可选，仅步骤5-6需要）
+
+BERT 语义检查（33MB，纯 CPU 可跑，第5步）：
+```
+pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
+HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
+```
+
+Qwythos 推理审核（~5.5GB，需 GPU 4GB+，第6步）：
+```
+pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
+HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF', filename='Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf')"
+```
+模型自动缓存到 `~/.workbuddy/skills/.standardization/novel-weaver/models/`。
 
 ## 工作流程
 
