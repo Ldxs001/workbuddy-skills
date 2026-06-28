@@ -1,3 +1,11 @@
+## [1.21.4] - 2026-06-28
+
+### 更正
+
+- **v1.21.2 归因更正** — 之前 changelog 中将 ClawHub/SkillHub 发布旧内容归因为"git-sync Bug"，**此为错误归因**。真实原因是：操作者在 bump 时手动 sed 改了 workbuddy-skills 的版本号行但未同步内容，然后并发启动 git-sync + ClawHub + SkillHub，导致 ClawHub/SkillHub 读到旧版 SKILL.md 发布。**非 git-sync 问题，是操作者时序错误。**
+
+---
+
 ## [1.21.3] - 2026-06-28
 
 ### 文档
