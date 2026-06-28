@@ -1,3 +1,13 @@
+## [1.30.0] - 2026-06-28
+
+### 变更
+- **推理审核引擎重构 v3.0** — 从 llama-cpp-python (GGUF) 切换为 transformers + torch，彻底解决编译依赖
+- **安装流程简化** — 移除所有 C++ 编译需求（winlibs/GCC/cmake），改为 pip install transformers torch（aliyun 镜像有 prebuilt wheel）
+- **模型下载改用逐文件** — 照搬 RAG 技能的 hf_hub_download 逐文件下载，避免 snapshot_download 卡死，支持 hf-mirror 自动降级
+- **新增 GPU 自动检测** — `_load_model()` 自动检测 CUDA，有 GPU 用 GPU，无 GPU 回落 CPU
+- **模型切换** — 从 Qwythos-9B（GGUF，需 GPU）→ DeepSeek-R1-Distill-Qwen-1.5B（transformers，~1GB，CPU 可跑）
+- **技能文档全量更新** — SKILL.md、novel_reasoning_check.py、execution_standards.md、faq.md、hooks.md 中所有 Qwythos/GGUF/winlibs 引用替换为 transformers 方案
+
 ## [1.29.0] - 2026-06-28
 
 ### 修复

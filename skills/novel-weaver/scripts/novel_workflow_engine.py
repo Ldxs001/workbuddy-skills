@@ -318,7 +318,7 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     except Exception as e:
         print(f"  [INFO] 语义检查跳过（非阻断）: {e}")
 
-    # ── 第6步: 推理审核（可选，需 GPU + Qwythos-9B） ──
+    # ── 第6步: 推理审核（可选，CPU 可跑，DeepSeek-R1-Distill-Qwen-1.5B） ──
     print(f"\n---")
     print(f"[完结] {chapter}: 推理审核...")
     try:

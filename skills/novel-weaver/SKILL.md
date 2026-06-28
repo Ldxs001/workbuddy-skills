@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.29.0
+version: 1.30.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline 流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。
@@ -50,7 +50,7 @@ external_data_dir: true
 - 「帮我检查文章前后是否一致」→ 触发风格校验
 - 「把这几段串起来」→ 触发连通性补充
 - 「检查文章是否偏离了大纲」→ 触发大纲忠实度报告
-- 「安装模型/下载模型/装 BERT/装 Qwythos」→ 触发模型安装流程：安装 sentence-transformers + 下载 bge-small-zh 或安装 llama-cpp-python + 下载 Qwythos GGUF
+- 「安装模型/下载模型/装 BERT/装推理模型」→ 触发模型安装流程：安装 sentence-transformers + 下载 bge-small-zh 或安装 llama-cpp-python + 下载推理审核 GGUF
 
 **否定条件：**
 - 用户只是说「改写/润色」——不是本技能范畴
@@ -150,7 +150,7 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 模型文件存储在：
   ~/.workbuddy/skills/.standardization/novel-weaver/models/
   ├── bge-small-zh/                 ← BERT 33MB（可选）
-  └── qwythos-9b-q4/               ← Qwythos GGUF ~5.5GB（可选，需 GPU）
+  └── ds-r1-distill-qwen-1.5b-q4/     ← DeepSeek-R1-Distill-Qwen-1.5B GGUF ~1GB（可选，CPU 可跑）
 数据目录由 _path_utils.py 统一管理。
 ```
 
@@ -165,7 +165,7 @@ finalize-chapter 是章节质量的核心关卡，聚合执行 6 步检查链：
 | 3 | 风格校验 | `novel_style_check.py` | 禁用词/末行标记/超200行检测 | HARD |
 | 4 | 逻辑检查 | `novel_logic_check.py` | 角色一致性+时间线+概述关键词命中率 | HARD |
 | 5 | 语义检查(BERT) | `novel_semantic_check.py` | overview-vs-content 对齐+子结构间语义跳跃（有模型时） | HARD |
-| 6 | 推理审核(Qwythos) | `novel_reasoning_check.py` | 因果合理/人格一致/情绪弧/对话/论证（有模型+GPU 时） | HARD/SOFT |
+| 6 | 推理审核(DeepSeek-R1) | `novel_reasoning_check.py` | 因果合理/人格一致/情绪弧/对话/论证（有模型时） | HARD/SOFT |
 
 步骤 1-4 由 Python 刚性规则驱动，**无外部依赖**。步骤 5-6 需额外安装模型，无模型时自动跳过。有 HARD 问题则阻断（不标记门禁），写入 `_fixes.json`；全部通过则标记 `chapter_finalized` 门禁。
 
@@ -177,27 +177,17 @@ pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
 HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
 ```
 
-Qwythos 推理审核（~5.5GB，需 GPU 4GB+，第6步）：
+DeepSeek-R1-Distill-Qwen-1.5B 推理审核（~1GB，CPU 可跑，第6步）：
 
-Windows 上需本地编译 C++ 代码。按顺序执行：
+安装 transformers + 下载模型，无需编译 C++ 代码，有 prebuilt wheel：
 
 ```bash
-g++ --version               # 无→winlibs 下载解压配 PATH(https://winlibs.com/ → x86_64-posix-seh 基础版 UCRT)
-cmake --version             # 无→pip install cmake -i https://mirrors.aliyun.com/pypi/simple/
-set CMAKE_GENERATOR=MinGW Makefiles   # ⚠️关键！不设会去找 MSVC，找不到就炸
-pip install llama-cpp-python --no-cache-dir --no-build-isolation -i https://mirrors.aliyun.com/pypi/simple/
-HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF', filename='Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf')"
+# 1. 装 transformers + torch（有 prebuilt wheel，秒装）
+pip install transformers torch -i https://mirrors.aliyun.com/pypi/simple/
+
+# 2. 下载 DeepSeek-R1-Distill-Qwen-1.5B 模型（~1GB，hf-mirror）
+HF_ENDPOINT=https://hf-mirror.com python -c "from transformers import AutoModel; AutoModel.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', trust_remote_code=True)"
 ```
-
-| 错误 | 原因 | 解决 |
-| ------ |------| ------ |
-| `CMAKE_C_COMPILER not found` | cmake 默认找 MSVC | `set CMAKE_GENERATOR=MinGW Makefiles` |
-| `g++.exe: fatal error` | mingw64/bin 不在 PATH | 重新配 PATH 并重开 CMD |
-| `Could not find a version` | pip 没 wheel 也没编译 | 加 `--no-build-isolation` |
-
-模型自动缓存到 `~/.workbuddy/skills/.standardization/novel-weaver/models/`。
-
-winlibs 下载：https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r3/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r3.zip
-镜像：https://sourceforge.net/projects/winlibs-mingw/
-解压到：`~/.workbuddy/skills/.standardization/novel-weaver/models/winlibs/`，将 `mingw64/bin` 加入 PATH。
+HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='lmstudio-community/DeepSeek-R1-Distill-Qwen-1.5B-GGUF', filename='DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')"
+```
 

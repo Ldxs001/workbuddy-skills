@@ -43,7 +43,7 @@ python novel_workflow_engine.py plan-chapter <state_path> <L##> '<subs_json>'
   ```
   pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
   ```
-- **Qwythos 推理审核**（finalize-chapter 第6步，需 GPU 4GB+）：
+- **DeepSeek-R1-Distill-Qwen-1.5B 推理审核**（finalize-chapter 第6步，CPU 可跑）：
   ```
   pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
   ```
@@ -142,7 +142,7 @@ cat chapters/<L##>/<S##>.txt | python novel_workflow_engine.py write-sub <state_
 - 子结构间语义跳跃（两段之间话题是否断裂）
 - 情绪偏离+同义冗余+跨章主题延续辅助提示
 
-**推理审核（第6步）：** 基于 Qwythos-9B GGUF Q4_K_M（~5.5GB），检测：
+**推理审核（第6步）：** 基于 DeepSeek-R1-Distill-Qwen-1.5B GGUF Q4_K_M（~1GB，CPU 可跑），检测：
 - 因果合理性（事件是否有前文铺垫）
 - 人物行为一致性（行为是否符合人格配置）
 - 情绪弧自然度（情绪转变是否合理）
@@ -158,9 +158,9 @@ pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
 HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
 ```
 
-### Q: 安装 Qwythos 推理审核
+### Q: 安装推理审核模型
 
 ```bash
 pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
-HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF', filename='Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf')"
+HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='lmstudio-community/DeepSeek-R1-Distill-Qwen-1.5B-GGUF', filename='DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')"
 ```

@@ -124,11 +124,11 @@
 
 ### 模型存储
 
-BERT 语义检查和 Qwythos 推理审核的模型文件集中存储在 `_path_utils.py` 的 `MODELS_DIR` 管理的目录下：
+BERT 语义检查和 DeepSeek-R1-Distill-Qwen-1.5B 推理审核的模型文件集中存储在 `_path_utils.py` 的 `MODELS_DIR` 管理的目录下：
 ```
 ~/.workbuddy/skills/.standardization/novel-weaver/models/
 ├── bge-small-zh/             ← BERT 33MB（sentence-transformers 缓存）
-└── qwythos-9b-q4/            ← Qwythos GGUF ~5.5GB（llama-cpp-python 缓存）
+└── ds-r1-distill-qwen-1.5b/            ← DeepSeek-R1-Distill-Qwen-1.5B（transformers 缓存）
 ```
 首次下载模型时自动存入对应子目录。如有镜像需求配置 `HF_ENDPOINT` 环境变量。
 
@@ -151,7 +151,7 @@ novel_state.json 包含字段：project, meta.current_phase, meta.length, writin
 9. 实体关系提取 → write-sub 后 entity_extractor 自动提取 entity_tracker.entities + entity_tracker.relations
 10. 行为摘要提取 → finalize-chapter 通过后自动提取 behavior_summary
 11. 语义检查 → finalize-chapter 中 BERT 检测 overview-vs-content 对齐和子结构间语义跳跃（有模型时）
-12. 推理审核 → finalize-chapter 中 Qwythos 检测因果/人格/情绪/对话/论证一致性（有模型时）
+12. 推理审核 → finalize-chapter 中 DeepSeek-R1-Distill-Qwen-1.5B 检测因果/人格/情绪/对话/论证一致性（有模型时）
 
 ## 子结构文件格式
 
@@ -173,7 +173,7 @@ L10S04
 python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 ```
 
-此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 语义检查(BERT，可选) → 推理审核(Qwythos，可选，需 GPU) → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
+此命令自动执行：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 语义检查(BERT，可选) → 推理审核(DeepSeek-R1-Distill-Qwen-1.5B，可选，CPU 可跑) → HARD 阻断决策。存在 HARD 问题时阻断（不标记门禁，不推进 phase），写入 `_{chapter}_fixes.json` 后等待 LLM 修复；全部通过才推进 phase。
 
 ## 一键完结篇章（v1.9.0 质量闭环）
 
@@ -185,7 +185,7 @@ python novel_workflow_engine.py finalize-chapter <state_path> <chapter>
 风格校验      → 检查禁用词/末行编号/行数             → HARD: 发现问题阻断
 逻辑检查      → 检查角色+时间线+概述忠实度           → HARD: 关键词命中<30%阻断
 语义检查(BERT)→ overview-vs-content 对齐+子结构间跳跃 → HARD: <0.4阻断（有模型时）
-推理审核(Qwythos) → 因果/人格/情绪/对话/论证 5项    → 按结果 HARD/SOFT（有模型时）
+推理审核(DeepSeek-R1) → 因果/人格/情绪/对话/论证 5项    → 按结果 HARD/SOFT（有模型时）
     ↓
 聚合决策：有 HARD 问题 → 写入 _fixes.json → 阻断
          全部通过      → 标记门禁 → phase → chapter_done
