@@ -45,7 +45,7 @@ python novel_workflow_engine.py plan-chapter <state_path> <L##> '<subs_json>'
   ```
 - **DeepSeek-R1-Distill-Qwen-1.5B 推理审核**（finalize-chapter 第6步，CPU 可跑）：
   ```
-  pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
+  pip install transformers torch -i https://mirrors.aliyun.com/pypi/simple/
   ```
 两者均未安装时自动跳过，不影响现有流程。
 
@@ -142,7 +142,7 @@ cat chapters/<L##>/<S##>.txt | python novel_workflow_engine.py write-sub <state_
 - 子结构间语义跳跃（两段之间话题是否断裂）
 - 情绪偏离+同义冗余+跨章主题延续辅助提示
 
-**推理审核（第6步）：** 基于 DeepSeek-R1-Distill-Qwen-1.5B GGUF Q4_K_M（~1GB，CPU 可跑），检测：
+**推理审核（第6步）：** 基于 DeepSeek-R1-Distill-Qwen-1.5B（transformers，~1GB，CPU 可跑），检测：
 - 因果合理性（事件是否有前文铺垫）
 - 人物行为一致性（行为是否符合人格配置）
 - 情绪弧自然度（情绪转变是否合理）
@@ -161,6 +161,26 @@ HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import S
 ### Q: 安装推理审核模型
 
 ```bash
-pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
-HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='lmstudio-community/DeepSeek-R1-Distill-Qwen-1.5B-GGUF', filename='DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')"
+pip install transformers torch -i https://mirrors.aliyun.com/pypi/simple/
+HF_ENDPOINT=https://hf-mirror.com python -c "from transformers import AutoModel; AutoModel.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', trust_remote_code=True)"
 ```
+
+### Q: 出错了怎么办？
+
+按错误类型分类处理：
+
+**参数错误（命令行参数写错了）**
+- 检查章节目录是否存在：`ls chapters/`
+- 检查章节 ID 格式：`L01`、`L02`（两位数字）
+- 检查项目路径是否正确：`python novel_workflow_engine.py list-projects`
+
+**依赖错误（Python 包缺失）**
+- BERT 语义检查：`pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/`
+- 推理审核：`pip install transformers torch -i https://mirrors.aliyun.com/pypi/simple/`
+- 模型下载：设置 `HF_ENDPOINT=https://hf-mirror.com` 后重试
+
+**环境错误（文件/路径问题）**
+- novel_state.json 损坏 → 检查 data/novel_state.json 是否为合法 JSON
+- 子结构文件缺失 → 运行 `verify-chapter` 检查
+- 缓存不完整 → 删除 `~/.cache/huggingface/hub/` 对应条目重新下载
+- GitHub 网络不通 → 使用国内镜像：`HF_ENDPOINT=https://hf-mirror.com`

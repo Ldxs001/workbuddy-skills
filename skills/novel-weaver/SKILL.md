@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.30.0
+version: 1.31.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline 流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。
@@ -29,7 +29,7 @@ external_data_dir: true
 
 - **[强制] 新会话第一步：查看项目** — 不要猜路径，先运行以下命令查看已有的项目：
   ```bash
-  python ~/.workbuddy/skills/novel-weaver/scripts/novel_workflow_engine.py list-projects
+  python scripts/novel_workflow_engine.py list-projects
   ```
   如果无项目则创建新项目，有项目则记录 state_path 供后续命令使用。
 - **[强制] 流程门禁系统** — 在阶段转换时自动 require 前置门禁：→writing 检查 outline_causality + sub_causality；→stage3_ready 检查 fidelity + ending_verify。门禁状态查看：`python novel_pipeline_gate.py status <state_path>`
@@ -50,7 +50,7 @@ external_data_dir: true
 - 「帮我检查文章前后是否一致」→ 触发风格校验
 - 「把这几段串起来」→ 触发连通性补充
 - 「检查文章是否偏离了大纲」→ 触发大纲忠实度报告
-- 「安装模型/下载模型/装 BERT/装推理模型」→ 触发模型安装流程：安装 sentence-transformers + 下载 bge-small-zh 或安装 llama-cpp-python + 下载推理审核 GGUF
+- 「安装模型/下载模型/装 BERT/装推理模型」→ 触发模型安装流程：安装 sentence-transformers + 下载 bge-small-zh 或安装 transformers + 下载推理审核模型
 
 **否定条件：**
 - 用户只是说「改写/润色」——不是本技能范畴
@@ -109,11 +109,11 @@ external_data_dir: true
 
 **列出所有项目（新会话第一件事）：**
 ```bash
-python novel_workflow_engine.py list-projects
+python scripts/novel_workflow_engine.py list-projects
 ```
 或
 ```python
-import sys; sys.path.insert(0, r'~/.workbuddy/skills/novel-weaver/scripts')
+import sys; sys.path.insert(0, 'scripts')
 from _path_utils import list_projects, resolve_state_path, DATA_DIR
 projects = list_projects()
 # DATA_DIR = ~/.workbuddy/skills/.standardization/novel-weaver/projects/
@@ -150,7 +150,7 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 模型文件存储在：
   ~/.workbuddy/skills/.standardization/novel-weaver/models/
   ├── bge-small-zh/                 ← BERT 33MB（可选）
-  └── ds-r1-distill-qwen-1.5b-q4/     ← DeepSeek-R1-Distill-Qwen-1.5B GGUF ~1GB（可选，CPU 可跑）
+  └── ds-r1-distill-qwen-1.5b/     ← DeepSeek-R1-Distill-Qwen-1.5B ~1GB（transformers 缓存，CPU 可跑）
 数据目录由 _path_utils.py 统一管理。
 ```
 
@@ -187,7 +187,5 @@ pip install transformers torch -i https://mirrors.aliyun.com/pypi/simple/
 
 # 2. 下载 DeepSeek-R1-Distill-Qwen-1.5B 模型（~1GB，hf-mirror）
 HF_ENDPOINT=https://hf-mirror.com python -c "from transformers import AutoModel; AutoModel.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', trust_remote_code=True)"
-```
-HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='lmstudio-community/DeepSeek-R1-Distill-Qwen-1.5B-GGUF', filename='DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')"
 ```
 
