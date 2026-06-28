@@ -1,3 +1,11 @@
+## [1.21.2] - 2026-06-28
+
+### 修复
+
+- **git-sync SKILL.md 内容未同步 Bug** — git-sync 更新了版本号但 SKILL.md 和 references/ 文件内容停在旧版。本地文件已手动同步至 workbuddy-skills 仓库并重新发布 ClawHub + SkillHub
+
+---
+
 ## [1.21.1] - 2026-06-28
 
 ### 修复
