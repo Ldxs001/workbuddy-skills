@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.21.4
+version: 1.21.6
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。
@@ -187,8 +187,29 @@ HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import S
 ```
 
 Qwythos 推理审核（~5.5GB，需 GPU 4GB+，第6步）：
+
+Windows 上 `llama-cpp-python` 需要 C++ 编译器编译源码。安装流程：
+
 ```
+# 1. 检查 C++ 编译器（g++ 或 MSVC 均可）
+g++ --version
+# 无输出 → 下载 winlibs 压缩包（解压即用，免安装器）:
+#    下载：https://github.com/brechtsanders/winlibs_mingw/releases/download/
+#          16.1.0posix-14.0.0-ucrt-r3/
+#          winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r3.zip
+#    镜像：https://sourceforge.net/projects/winlibs-mingw/
+#    解压到：~/.workbuddy/skills/.standardization/novel-weaver/models/winlibs/
+#    将 mingw64/bin 加入 PATH
+#    验证：g++ --version（应有版本输出）
+
+# 2. 检查 cmake
+cmake --version
+# 无输出 → pip install cmake
+
+# 3. 编译安装 llama-cpp-python（自动调用 g++，约 5-10 分钟）
 pip install llama-cpp-python -i https://mirrors.aliyun.com/pypi/simple/
+
+# 4. 下载 Qwythos GGUF 模型
 HF_ENDPOINT=https://hf-mirror.com python -c "from llama_cpp import Llama; Llama.from_pretrained(repo_id='empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF', filename='Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf')"
 ```
 模型自动缓存到 `~/.workbuddy/skills/.standardization/novel-weaver/models/`。

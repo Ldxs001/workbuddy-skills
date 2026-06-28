@@ -1,3 +1,24 @@
+## [1.21.6] - 2026-06-28
+
+### 修复
+
+- **版本号同步** — 重新发布修正后的 SKILL.md 和 novel_reasoning_check.py（含 g++/cmake 独立检查流程）到 ClawHub + SkillHub
+
+---
+
+## [1.21.5] - 2026-06-28
+
+### 文档
+
+- **Qwythos 安装说明重写** — SKILL.md 和 novel_reasoning_check.py 同步更新为独立检查流程：
+  1. 检查 g++（无则下载 winlibs 压缩包，解压到 MODELS_DIR/winlibs/，配 PATH）
+  2. 检查 cmake（无则 pip install cmake）
+  3. pip install llama-cpp-python（编译安装）
+  4. 下载 Qwythos GGUF 模型
+- winlibs 下载直链 + SourceForge 镜像均写入文档
+
+---
+
 ## [1.21.4] - 2026-06-28
 
 ### 更正
