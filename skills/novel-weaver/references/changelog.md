@@ -2,7 +2,7 @@
 
 ### 修复
 
-- **git-sync SKILL.md 内容未同步 Bug** — git-sync 更新了版本号但 SKILL.md 和 references/ 文件内容停在旧版。本地文件已手动同步至 workbuddy-skills 仓库并重新发布 ClawHub + SkillHub
+- **操作时序错误导致 ClawHub/SkillHub 内容错位** — bump 1.21.1 时先手动 sed 改了 workbuddy-skills 的版本号行，然后同时启动 git-sync + ClawHub + SkillHub，导致 ClawHub/SkillHub 读到的是半路改过 version 但内容未同步的旧 SKILL.md。已修正并重新发布 1.21.2
 
 ---
 
