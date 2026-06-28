@@ -1,4 +1,36 @@
-## [2.100.0] - 2026-06-28
+## [2.101.3] - 2026-06-28
+
+### 修复
+- 补全剩余 6 处 `_reclassify_false_positive` 传 `skill_dir`：
+  - `audit_skill` 内 false-positive 计数（影响 summary）
+  - `format_report` 内逐行 ⓘ 标记
+  - `generate_html_report` 内 before-table 行标记 + 误报计数 + after-table 误报计数
+  - `cmd_audit_all` 内 fp_status 显示
+- 至此全部 18 处 `_reclassify_false_positive` 调用均已正确传 `skill_dir`
+
+## [2.101.2] - 2026-06-28
+
+### 修复
+- `format_report()` 缺少 `skill_dir` 参数导致文本报告从不展示 LLM 二筛结果，看起来"双0验证没有 LLM 二次筛除"
+- `generate_html_report()` 内 3 处 `_reclassify_false_positive` 未传 `skill_dir`，导致 HTML 报告的修复前计数/误报排除计数失准
+- 修改：`format_report` 加 `skill_dir` 参数，9 个调用点全部传值；`generate_html_report` 内 3 处补传 `skill_dir`
+- 注明：写/读 `.verify_fp.json` 的路径一致，不存在路径穿透问题
+
+## [2.101.1] - 2026-06-28
+
+### 修复
+- `_clean_stale_state`: 正确的根因——不是清理列表的问题，是之前的修复错误地保留了 `.verify_fp.json`。
+  实际根因：`_clean_stale_state` 曾在 LLM 二次筛除循环内部被调用，导致刚分类写入的 `.verify_fp.json` 被立即清除。
+  本次修正：
+  - `.verify_fp.json` 加回清理列表（它是 session 级状态文件，新 refactor 应清理）
+  - docstring 写明时序规则：只在 Step 0（蓝皮书前，仅首次 refactor）和 Step 9（一致性审查后）调用
+  - 确认 `_run_audit_loop` 内部无 `_clean_stale_state` 调用
+  - Step 0 有 `--continue` 守卫，`refactor --continue` 不触发清理
+
+## [2.101.0] - 2026-06-28
+
+### 变更
+- `_clean_stale_state` 移除 `.verify_fp.json` 清理（临时方案，v2.101.1 已修正为正确方案）
 
 ### 变更
 - fix_writing_standards: 新增中英文混排正则空格修复（`[\u4e00-\u9fff][A-Za-z]{2,}`），`--fix` 可自动修混排空格
