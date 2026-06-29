@@ -1,5 +1,7 @@
 ---
 name: git-sync
+slug: git-sync
+displayName: Git Sync
 version: 2.24.0
 author: wUwproject
 license: MIT
