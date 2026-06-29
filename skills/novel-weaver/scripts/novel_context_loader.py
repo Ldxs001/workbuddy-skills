@@ -175,11 +175,21 @@ def load_context(state_path, chapter, sub_key):
         prev_status = subs[prev_key].get("status", "pending")
         if prev_status != "completed":
             prev_title = subs[prev_key].get("title", prev_key)
-            print(f"[HOOK-BLOCK] 上一子结构 {chapter}{prev_key}《{prev_title}》未标记完成（status={prev_status}）")
-            print(f"[要求] 子结构写作必须串行，请先完成上一子结构的 state 标记：")
-            print(f"  cat chapters/{chapter}/{prev_key}.txt | python novel_workflow_engine.py write-sub \\")
-            print(f"    \"{state_path}\" {chapter} {prev_key}")
-            print(f"[完成后] 重新运行 context_loader 即可继续")
+            # 检查文件系统：文件存在但 state 未更新 → 绕过 write-sub 了
+            prev_file = Path(sp.parent) / "chapters" / chapter / f"{prev_key}.txt"
+            if prev_file.exists():
+                print(f"[HOOK-BLOCK] 上一子结构 {chapter}{prev_key}《{prev_title}》已写入文件但未经过 write-sub 管道")
+                print(f"  state 中的状态: {prev_status}（应为 completed）")
+                print(f"  ⚠️ 检测到直接写入文件，绕过了 write-sub 管道。必须重新管道写入：")
+                print(f"  python -c \"import sys; open(sys.argv[1]).read()\" {prev_file} | python novel_workflow_engine.py write-sub \\")
+                print(f"    \"{state_path}\" {chapter} {prev_key}")
+                print(f"[完成后] 重新运行 context_loader 即可继续")
+            else:
+                print(f"[HOOK-BLOCK] 上一子结构 {chapter}{prev_key}《{prev_title}》未标记完成（status={prev_status}）")
+                print(f"[要求] 子结构写作必须串行，请先完成上一子结构的 state 标记：")
+                print(f"  cat chapters/{chapter}/{prev_key}.txt | python novel_workflow_engine.py write-sub \\")
+                print(f"    \"{state_path}\" {chapter} {prev_key}")
+                print(f"[完成后] 重新运行 context_loader 即可继续")
             sys.exit(1)
 
     # 查找上一个已完成的子结构（取末3行作为上文）
@@ -327,6 +337,9 @@ def load_context(state_path, chapter, sub_key):
     print(f"  □ 正文末尾可带【别名】行（缺失则系统自动补，S01可省略）")
     print(f"{'='*50}")
     print(f"[下一步] 写入命令 — 将正文管道写入（不需标题行/标记行）:")
+    print(f"  ⚠️ 强制: 必须通过管道写入！禁止使用 Write 工具直接写 S##.txt 文件")
+    print(f"  ⚠️ 直接写文件会导致 state 不更新，后续 serial block 阻断")
+    print(f"{'─'*50}")
     print(f"  cat <<'EOF' | python novel_workflow_engine.py write-sub \\")
     print(f"    \"{state_path}\" {chapter} {sub_key}")
     print("  <填入正文叙事内容>")
