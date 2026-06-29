@@ -12,6 +12,13 @@ import subprocess
 import argparse
 import builtins
 
+# ── 路径集中管理 ─────────────────────────────────────────
+from _paths import (
+    _data_dir_abs, DEFAULT_DATA_DIR_RAW, SKILL_DIR, SKILLS_ROOT as SKILLS_DIR,
+    WORK_REPO, DIST_DIR, MANIFEST_FILE, README_FILE, GIT_CREDENTIALS,
+    SCAN_OUT_PREFIX,
+)
+
 # ── 编码安全 ─────────────────────────────────────────────
 # Windows Git Bash (GBK) 下 print(emoji) 直接崩，
 # 模块级替换 print 为安全版本，避免挨个改 30+ 处调用。
@@ -27,13 +34,6 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径（变量名不含 DATA，避免被审计二次匹配）
-_data_dir_abs = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
-
 
 # ── 强制 UTF-8 输出（Windows 终端兼容）────────────────────────────
 if hasattr(sys.stdout, "reconfigure"):
@@ -44,9 +44,6 @@ if hasattr(sys.stdout, "reconfigure"):
 
 # ── 路径配置 ───────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent.resolve()
-SKILLS_DIR = SCRIPT_DIR.parents[1]  # skills/<skill-name>/scripts/ → skills/
-WORK_REPO  = Path.home() / ".workbuddy" / "workbuddy-skills"
-DIST_DIR   = SKILLS_DIR / ".dist"
 
 # ZIP 打包排除模式（支持 *.ext, dir/, 精确名）
 EXCLUDE_PATTERNS = [
@@ -54,10 +51,6 @@ EXCLUDE_PATTERNS = [
     "node_modules/", ".DS_Store", "Thumbs.db",
     "nul", "NUL",  # Windows 保留设备名，在目录中无法删除且 copytree 崩溃
 ]
-MANIFEST_FILE = (
-    SKILLS_DIR / ".standardization" / "git-sync" / "data" / "manifest.json"
-)
-README_FILE = WORK_REPO / "README.md"
 
 # ── 颜色输出 ──────────────────────────────────────────────────────────────────
 class C:
@@ -393,6 +386,10 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
     # ── 打印扫描结果详情 ──────────────────────────────────────────────────
     d = json.load(scan_out.open(encoding="utf-8"))
     total_findings = sum(len(e.get("findings", [])) for e in d)
+    if total_findings == 0:
+        log("4.5", 8, "未发现敏感信息", "ok")
+        scan_out.unlink(missing_ok=True)
+        return desensitized_files
     print(f"  ⚠️  发现敏感信息：共 {len(d)} 个文件，{total_findings} 处")
     for e in d:
         file_rel = e["file"]       # 已是相对路径，如 "references/faq.md"
@@ -409,36 +406,21 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
         if len(finds) > 5:
             print(f"      ... 还有 {len(finds) - 5} 处未显示")
 
-    # ── 默认全部脱敏 ──────────────────────────────────────────────────────
+    # ── HOOK-BLOCK：等待 LLM 判断 ─────────────────────────────────────────
+    # 扫描结果已保存到 scan_out，LLM 需审阅后手动创建决策文件
     decisions = SCRIPT_DIR / f".sensitive_scan_{skill_name}.json.decisions.json"
-    make_py = SCRIPT_DIR / "make_all_sanitize.py"
-    if make_py.exists():
-        r = run_python(make_py, str(scan_out), capture=True)
-        if r and r.stdout:
-            Path(decisions).write_text(r.stdout, encoding="utf-8")
-
-    if decisions.exists():
-        log("4.5", 8, "正在执行脱敏...", "info")
-        # 先备份脱敏前的文件哈希（用于对比）
-        desensitized_files = set()
-        for e in d:
-            desensitized_files.add(repo_skill_dir / e["file"])
-
-        run_python(scan_py, "apply", str(repo_skill_dir),
-                   "--decisions", str(decisions),
-                   "--scan-result", str(scan_out))
-
-        # 脱敏后：显示脱敏结果
-        print(f"  ✅ 脱敏完成，涉及 {len(desensitized_files)} 个文件：")
-        for fp in sorted(desensitized_files):
-            rel = fp.relative_to(repo_skill_dir)
-            print(f"      - {rel}")
-    else:
-        log("4.5", 8, "无脱敏决策文件，跳过脱敏", "warn")
-
-    scan_out.unlink(missing_ok=True)
-    decisions.unlink(missing_ok=True)
-    return desensitized_files
+    print(f"\n{'='*60}")
+    print(f"[HOOK-BLOCK] 发现 {total_findings} 处潜在敏感信息，需 LLM 判断")
+    print(f"{'='*60}")
+    print(f"  扫描结果: {scan_out}")
+    print(f"  请审阅上方 findings，逐个判断是否需要脱敏。")
+    print(f"  判断原则：邮箱/token/内网IP → 脱敏；公开署名/代名/示例路径 → 跳过")
+    print(f"")
+    print(f"  确认后，创建决策文件: {decisions}")
+    print(f"  决策文件格式: [{{\"file\":\"<相对路径>\",\"field\":\"<匹配文本>\",\"action\":\"sanitize|skip\"}},...]")
+    print(f"  创建后重新运行 git-sync 继续。")
+    print(f"{'='*60}\n")
+    sys.exit(1)  # HOOK-BLOCK：阻断管道
 
 # ── 步骤 5：更新 README.md ─────────────────────────────────────────────────
 def step_update_readme(repo_name="workbuddy-skills"):
@@ -542,6 +524,16 @@ def _resolve_push_url(remote_name: str) -> tuple:
 
     from urllib.parse import urlparse
     parsed = urlparse(raw_url)
+
+    # ★ v2.23.2: 检测 SSH URL — SSH 用 key 认证，不需要 credential 注入
+    # SSH 格式: git@host:path (urlparse 无 scheme/hostname) 或 ssh://git@host/path (scheme=ssh)
+    _is_ssh = (
+        parsed.scheme == 'ssh' or
+        (not parsed.scheme and '@' in raw_url and ':' in raw_url)
+    )
+    if _is_ssh:
+        return raw_url, raw_url, ""
+
     host = parsed.hostname or ""
 
     # 情况1：URL 已内嵌凭证（如 https://user:[email-redacted]/path）

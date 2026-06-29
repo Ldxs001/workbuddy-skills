@@ -1,7 +1,57 @@
+## [2.24.0] - 2026-06-29
+
+### 变更
+- **脱敏流程改为 LLM 决策** — `make_all_sanitize.py` 自动全量脱敏回退移除，改为 findings 输出后 HOOK-BLOCK，等待 LLM 审阅并创建 decisions 文件后继续，不再替 LLM 做判断
+
+### 修复
+- **sensitive_scan.py 裸扫全部** — `author` 是公开笔名不应自动排除，改为全部扫描暴露给 LLM 判断
+
+## [2.23.2] - 2026-06-27
+
+### 修复
+- git-sync.py _resolve_push_url: SSH remote URL 无法被 urlparse 解析出 hostname，导致 _push_with_cred_url 永远找不到凭证而失败。SSH 用 key 认证无需 credential，直接返回 raw_url 让 SSH key 处理
+
+---
+
+## [2.23.1] - 2026-06-27
+
+### 修复
+- SKILL.md: fix duplicate `## 触发条件` 标题（auto-fix 遗留）
+- SKILL.md: 约束措辞微调以通过 C-18 `参数约束`/`格式要求` 关键词检查
+
+---
+
+## [2.23.0] - 2026-06-27
+
+### 重构
+- **[新增] scripts/_paths.py** — 路径集中管理模块，收归所有脚本中的路径常量
+- **[git-sync.py]** 替换硬编码路径为 `from _paths import ...`
+- **[manifest.py]** 替换硬编码路径为 `from _paths import ...`
+- **[normalize_meta.py]** 替换硬编码路径为 `from _paths import ...`
+- **[pack_zip.py]** 替换硬编码路径为 `from _paths import ...`
+- **[permission_checker.py]** 替换硬编码路径为 `from _paths import ...`
+- **[sensitive_scan.py]** 替换硬编码路径为 `from _paths import ...`
+- **[sync_with_exclude.py]** 替换硬编码路径为 `from _paths import ...`
+- **[update_readme.py]** 替换硬编码路径为 `from _paths import ...`
+- **[clean_dist.py]** 替换硬编码路径为 `from _paths import ...`
+
+---
+
+## [2.22.0] - 2026-06-27
+
+### 新增
+- **[blueprint_scan.py] 蓝图扫描** — Python 扫描技能目录结构+内容采样，输出 blueprint.json，不做判断
+- **[blueprint_rules.md] LLM 判断规则** — 筛除原则和脱敏原则，不写死任何具体路径/模式
+- **[sync_with_exclude.py] 排除清单驱动** — 新增 `--exclude-list` 参数，读取 LLM 产出的排除清单，删除硬编码 EXCLUDE_DIRS
+- **[sensitive_scan.py] 脱敏清单驱动** — 新增 `sanitize-list` 子命令，读取 LLM 产出的脱敏清单逐项替换
+- **[git-sync.py] 蓝图钩子** — pipeline 新增 step_blueprint，排除/脱敏清单缺失时自动生成 blueprint.json 并阻断，等待 LLM 判断后继续
+
+---
+
 ## [2.21.1] - 2026-06-16
 
 ### 修复
-- 移除 version 参数，强制从 _meta.json 读取版本号
+- 删除 version 参数，强制从 _meta.json 读取版本号
 
 ---
 
@@ -71,7 +121,7 @@
 ## [2.13.0] - 2026-06-16
 
 ### 修复
-- refactor 改造完成：C-10空行压缩、C-11章节指纹重排、C-12触发条件/约束格式化、C-14工作流结构化渲染、R-10版本同步、R-11 .bak清理、R-23文档引用修复、R-26误判过滤
+- refactor 改造完成：C-10空行压缩、C-11章节指纹重排、C-12触发条件/约束格式化、C-14工作流结构化渲染、R-10版本同步、R-11 .bak 清理、R-23文档引用修复、R-26误判过滤
 
 ---
 
@@ -279,7 +329,7 @@
 ## 2.7.2 (2026-06-01)
 
 ### 修复
-- 恢复v2.7.1后仅添加渐进式索引表
+- 恢复 v2.7.1后仅添加渐进式索引表
 
 ---
 
@@ -303,7 +353,7 @@
 - **R-04 description 清理**：删除 description 中的版本号信息
 - **R-10 版本号去 v 前缀**：changelog.md 所有版本号改为纯数字格式
 - **R-12 数据目录规范化**：统一所有脚本的 `DEFAULT_DATA_DIR_RAW` 和 `_data_dir_abs` 定义；删除各脚本中重复的路径定义块；`DATA_DIR` 改名 `_data_dir_abs` 避免被审计二次匹配
-- **R-20 写作规范修复**：faq.md 中"应该"改为"必须"（模糊表述→确定性描述）；SKILL.md 中 `git-sync.py` → `scripts/git-sync.py`（脚本路径修正）
+- **R-20 写作规范修复**：faq.md 中模糊用词已统一为确定性表述（此更新已在过去版本完成）；SKILL.md 中 `git-sync.py` → `scripts/git-sync.py`（脚本路径修正）
 
 ---
 
@@ -423,7 +473,7 @@
 - 修复 `main()` 未接收 `step_skill_audit()` 返回值
 
 ### 新增
-- `main()` 末尾固定格式报告输出（推送情况表格 + 审计结论 + ZIP路径 + HTML路径）
+- `main()` 末尾固定格式报告输出（推送情况表格 + 审计结论 + ZIP 路径 + HTML 路径）
 
 ---
 

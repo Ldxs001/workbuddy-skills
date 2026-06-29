@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.21.1",
-  "description": "将skill代码规范化推送到码云、GitHub，并生成ZIP安装包。修复_push_with_cred_url/pull_with_cred_url未检查URL内嵌token的缺陷（remote URL已含token时不需查git-credentials）。",
+  "version": "2.24.0",
+  "description": "将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复_push_with_cred_url/pull_with_cred_url 未检查 URL 内嵌 token 的缺陷（remote URL 已含 token 时不需查 git-credentials）。",
   "author": "wUwproject",
   "tags": [
     "sync",
@@ -12,6 +12,6 @@
   ],
   "data_dir": "skills/.standardization/git-sync/data/",
   "triggers": [
-    "同步/推送/发布/上传/打包/更新READ ME"
+    "同步/推送/发布/上传/打包/更新 READ ME"
   ]
 }

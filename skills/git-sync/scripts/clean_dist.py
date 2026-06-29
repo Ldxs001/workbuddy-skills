@@ -3,9 +3,8 @@
 import json, os, re, glob
 from pathlib import Path
 
-# 从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/
-SKILLS_DIR = str(Path(__file__).resolve().parent.parent.parent)
-DIST_DIR = os.path.join(SKILLS_DIR, ".dist")
+# ── 路径集中管理 ─────────────────────────────────────────
+from _paths import SKILLS_ROOT as SKILLS_DIR, DIST_DIR
 
 # 读取所有技能最新版本
 latest = {}

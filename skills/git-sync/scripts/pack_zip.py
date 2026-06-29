@@ -9,15 +9,10 @@ import zipfile
 import fnmatch
 from pathlib import Path
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-_data_dir_abs = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
-
-
-
+# ── 路径集中管理 ─────────────────────────────────────────
+from _paths import (
+    _data_dir_abs, DEFAULT_DATA_DIR_RAW, SKILL_DIR,
+)
 
 # UTF-8 输出（Windows 终端兼容）
 if hasattr(sys.stdout, "reconfigure"):
@@ -41,27 +36,23 @@ def pack_zip(source_dir, output_zip):
         ".eggs-info", ".pytest_cache", ".mypy_cache", "node_modules",
         ".dist", ".standardization",
     }
-    # 文件名通配符模式（支持 fnmatch 通配符）
     exclude_file_patterns = [
         ".gitignore", ".ds_store", "thumbs.db",
-        "*.bat",  # Windows 批处理文件
-        "test_sensitive.py",  # 测试脚本
-        ".gitkeep",  # 占位空文件
-        "*.bak*",  # 备份文件（含 .bak_opt / .bak_ai 等后缀）
+        "*.bat",
+        "test_sensitive.py",
+        ".gitkeep",
+        "*.bak*",
         "fix_*.py", "force_*.py", "patch_*.py", "insert_*.py",
         "implement_*.py", "apply_*.py", "*_fixed.py",
-        # 非官方自定义脚本（不应打入发行包）
         "settings.py", "skill_extractor.py",
     ]
     exclude_extensions = {".pyc", ".pyo", ".pyd", ".bak", ".tmp", ".bak*"}
 
-    # 空文件排除白名单（这些空文件需要保留）
-    # LICENSE.txt 已弃用，统一使用 references/LICENSE.md
     empty_file_whitelist = {".gitkeep", ".keep", ".gitignore", "readme"}
 
     parent_dir = os.path.dirname(source)
     skill_name = os.path.basename(source)
-    arc_root = skill_name  # ZIP 内根目录名
+    arc_root = skill_name
 
     print(f"📦 打包: {source}")
     print(f"   输出: {output}")
@@ -70,7 +61,6 @@ def pack_zip(source_dir, output_zip):
         file_count = 0
         skipped_empty = 0
         for root, dirs, files in os.walk(source):
-            # 过滤排除目录（原地修改 dirs 以阻止 os.walk 进入）
             dirs[:] = [
                 d for d in dirs
                 if d not in exclude_dirs
@@ -78,23 +68,18 @@ def pack_zip(source_dir, output_zip):
             ]
 
             for fname in files:
-                # 排除特定文件名（支持 fnmatch 通配符）
                 if any(fnmatch.fnmatch(fname, pat) for pat in exclude_file_patterns):
                     continue
-                # 排除特定扩展名
                 if os.path.splitext(fname)[1].lower() in exclude_extensions:
                     continue
 
                 file_path = os.path.join(root, fname)
 
-                # 排除空文件（0 KB）- .gitkeep 等占位文件
                 if os.path.getsize(file_path) == 0:
-                    # 白名单检查：少数空文件需要保留
                     if fname.lower() not in {w.lower() for w in empty_file_whitelist}:
                         skipped_empty += 1
                         continue
 
-                # 计算 ZIP 内相对路径
                 rel_path = os.path.relpath(file_path, parent_dir)
                 arc_name = rel_path.replace(os.sep, "/")
 

@@ -1,4 +1,4 @@
-# 基于skill-standardization渐进式披露规范的权限说明
+# 基于 skill-standardization 渐进式披露规范的权限说明
 
 本文档由 `skill-standardization` 权限扫描器自动维护。
 
@@ -94,7 +94,7 @@
 
 ### 敏感信息访问（9 项）
 
-> **功能说明**：技能代码中检测到敏感关键词（token/password等）。
+> **功能说明**：技能代码中检测到敏感关键词（token/password 等）。
 > **授权方式**：unified
 
 | 文件 | 行号 | 匹配内容 | 功能说明 |
@@ -123,7 +123,7 @@
 
 <!-- fp:risk=CRITICAL|sensitive=9|critical_write=0|network=2|delete=19|subprocess=15|issues=45 -->
 
-## 基于skill-function-test的测试报告
+## 基于 skill-function-test 的测试报告
 
 | 运行时间 | S1 场景链路 | D1-D6 功能测试 | S4 执行忠实度 | 耗时(s) |
 |---------|-------------|----------------|--------------|---------|

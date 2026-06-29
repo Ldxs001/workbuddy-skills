@@ -18,12 +18,11 @@ import sys
 import argparse
 from pathlib import Path
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-_data_dir_abs = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+# ── 路径集中管理 ─────────────────────────────────────────
+from _paths import (
+    _data_dir_abs, DEFAULT_DATA_DIR_RAW, SKILL_DIR, SKILLS_ROOT as SKILLS_DIR,
+    CONFIG_FILE,
+)
 
 
 
@@ -108,15 +107,12 @@ SENSITIVE_PATTERNS = [
 
 # ── 工具函数 ─────────────────────────────────────────────────────────────
 
-def _find_skills_dir():
-    """从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/"""
-    return str(Path(__file__).resolve().parent.parent.parent)
+
 
 def load_config(config_path=None):
     """读取 skills/.standardization/git-sync/data/config.json，返回配置字典"""
     if config_path is None:
-        skills_dir = _find_skills_dir()
-        config_path = os.path.join(skills_dir, ".standardization", "git-sync", "data", "config.json")
+        config_path = str(CONFIG_FILE)
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -157,7 +153,7 @@ def scan_file(file_path, config=None):
                 "span": (m.start(), m.end()),
             })
 
-    # 2. 用户名扫描（来自 config.json 的 user/author 值）
+    # 2. 用户名扫描（来自 config.json 的 user/author 值 — 裸扫描，全部暴露给 LLM 判断）
     if config:
         usernames = set()
         for key in ("author",):

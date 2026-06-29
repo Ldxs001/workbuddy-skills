@@ -27,6 +27,12 @@ import re
 from datetime import date
 from pathlib import Path
 
+# ── 路径集中管理 ─────────────────────────────────────────
+from _paths import (
+    _data_dir_abs, DEFAULT_DATA_DIR_RAW, SKILL_DIR,
+    SKILLS_ROOT as SKILLS_DIR, MANIFEST_FILE as MANIFEST_PATH, CONFIG_FILE,
+)
+
 # ── 编码安全 ─────────────────────────────────────────────
 # Windows Git Bash (GBK) 下 print(emoji) 直接崩，
 # 模块级替换 print 为安全版本，避免挨个改 25+ 处调用。
@@ -40,24 +46,11 @@ def _safe_print(*args, **kwargs):
         _original_print(*safe_args, **kwargs)
 builtins.print = _safe_print
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-_data_dir_abs = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
-
-
-
-
 # ── 路径解析 ───────────────────────────────────────────
 def _find_skills_dir():
     """从 scripts/ 往上 2 级确定 skills 目录: skills/<name>/scripts/ → skills/"""
     return str(Path(__file__).resolve().parent.parent.parent)
 
-SKILLS_DIR = _find_skills_dir()
-GIT_SYNC_DATA = os.path.join(SKILLS_DIR, ".standardization", "git-sync", "data")
-MANIFEST_PATH = os.path.join(GIT_SYNC_DATA, "manifest.json")
 
 def load_manifest():
     if not os.path.exists(MANIFEST_PATH):
@@ -421,7 +414,7 @@ def _extract_desc(skill_dir):
 
 def _load_config():
     """读取 skills/.standardization/git-sync/data/config.json，返回配置字典"""
-    config_path = os.path.join(GIT_SYNC_DATA, "config.json")
+    config_path = str(CONFIG_FILE)
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)

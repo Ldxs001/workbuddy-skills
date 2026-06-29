@@ -8,12 +8,10 @@ import sys
 import shutil
 from pathlib import Path
 
-# R-12 审计锚点：数据目录字面量声明
-DEFAULT_DATA_DIR_RAW = "skills/.standardization/git-sync/data/"
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-# 运行时绝对路径
-_data_dir_abs = SKILL_DIR.parent / ".standardization" / "git-sync" / "data"
+# ── 路径集中管理 ─────────────────────────────────────────
+from _paths import (
+    _data_dir_abs, DEFAULT_DATA_DIR_RAW, SKILL_DIR,
+)
 
 
 
