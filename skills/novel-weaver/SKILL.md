@@ -37,8 +37,8 @@ external_data_dir: true
 - **[强制] 串行阻断** — context_loader 加载子结构上下文时检测上一子结构 state 是否为 completed。若为 pending 则输出 HOOK-BLOCK 并给出 write-sub 修复命令，强制走管道完成标记后才能继续。子结构写作必须串行
 - **[必须] 先确认+规划再写作** — 场景配置和大纲必须经用户确认，每章先 `plan-chapter`（含必填 writing_prompt + 情绪 tone + 可选 emotions）→ 因果链验证 → 通过串行阻断检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
-- **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
-- **[必须] 每章六检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → **语义检查** → **推理审核** → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
+- **[强制] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`。**plan-chapter 已加硬阻断**：sub_structures 中出现未登记角色名时 HOOK-BLOCK，必须先 add-char 才能写入。
+- **[强制] 每章六检 + 自动完结** — 写完所有子结构后 **write-sub 自动触发 finalize-chapter**（不再需手动执行）：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → **语义检查** → **推理审核** → 聚合硬性问题并阻断。通过后自动推进 phase。
 - **[必须] 全文三检** — 全文完成后必须：`novel_fidelity.py`（大纲忠实度）+ `verify-ending`（结尾收束验证）+ `set-phase stage3_ready`
 
 ### 数据目录
@@ -144,13 +144,13 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 4. **用户确认** → 输入 大纲 → 输出 确认/修正 — 钩子阻断式，未确认不得进入阶段2
 5. **初始化 novel_state.json** → 输入 大纲 → 输出 novel_state.json — chapters/characters/timeline 骨架
 6. **规划章子结构** → 输入 章节标题+概述 → 输出 sub_structures[] JSON — S01-S05+标题+概述+tone+**必填 writing_prompt(≥50字符)**+可选 emotions。缺失 writing_prompt 则 plan-chapter HOOK-BLOCK
-7. **注册子结构到 state** → 输入 subs_json → 输出 novel_state 更新 — MD5指纹锁定+自动字数目标+标记 is_ending/is_hook
+7. **注册子结构到 state** → 输入 subs_json → 输出 novel_state 更新 — MD5指纹锁定+自动字数目标+标记 is_ending/is_hook。**新角色检测+HARD-BLOCK**：sub_structures 中出现未登记角色名时阻断并提示 add-char 命令
 8. **子结构因果链验证** → 输入 sub_structures → 输出 sub_causality 门禁 — 逐子结构因果递进检查
 9. **set-phase writing** → 输入 outline+sub 门禁 → 输出 phase=writing — require 双门禁，不通过则阻断
 10. **加载上下文（context_loader）** → 输出 4区块优先级排列：A(标识+硬性字数/文风/署名约束+写作命题框) → B(末3行+人物+人格+实体+轨迹+节奏) → C(收尾+钩子+输出模板)。无预编命题时自动从概述合成 fallback
 11. **LLM 写作 → 系统组装写入** → LLM 只输出纯正文（末尾可带可选【别名】行）→ write-sub 自动组装标题行+别名行+标记行 → atomic_writer.v4 校验正文合法性。无别名行时系统自动补【别名】无
 12. **重复10-11** → 输入 下一子结构 → 输出 全部子结构完成 — 直到该章全部子结构写完
-13. **完结一章(finalize-chapter)** → 输入 章内容 → 输出 四合一检查报告 — 章内连通性→跨章→风格→逻辑
+13. **完结一章(finalize-chapter)** → 输入 章内容 → 输出 六合⼀检查报告 — **自动触发**（最后一个子结构写入后自动运行），无需手动执行
 14. **全文整合(fidelity)** → 输入 全部章节 → 输出 大纲忠实度报告 — 检查是否偏离大纲
 15. **结尾收束验证** → 输入 末章末子结构 → 输出 ending_report.md — 封闭式/开放式/悬停式三选一验证
 
@@ -167,25 +167,29 @@ finalize-chapter 是章节质量的核心关卡，聚合执行 6 步检查链：
 | 5 | 语义检查(BERT) | `novel_semantic_check.py` | overview-vs-content 对齐+子结构间语义跳跃（有模型时） | HARD |
 | 6 | 推理审核(DeepSeek-R1) | `novel_reasoning_check.py` | 因果合理/人格一致/情绪弧/对话/论证（有模型时） | HARD/SOFT |
 
-步骤 1-4 由 Python 刚性规则驱动，**无外部依赖**。步骤 5-6 需额外安装模型，无模型时自动跳过。有 HARD 问题则阻断（不标记门禁），写入 `_fixes.json`；全部通过则标记 `chapter_finalized` 门禁。
+步骤 1-4 由 Python 刚性规则驱动，**无外部依赖**。步骤 5-6 需本地已缓存的模型，**无模型时自动跳过（绝不联网）**。有 HARD 问题则阻断（不标记门禁），写入 `_fixes.json`；全部通过则标记 `chapter_finalized` 门禁。
+
+> ⚠️ **GPU 安全**：步骤 5-6 强制 CPU 运行（`CUDA_VISIBLE_DEVICES=-1`），避免与 LM Studio 等 GPU 应用冲突。模型推理全程使用系统内存。
 
 ### 模型安装（可选，仅步骤5-6需要）
 
-BERT 语义检查（33MB，纯 CPU 可跑，第5步）：
+步骤 5-6 只在本地已有模型缓存时运行。无模型时静默跳过，按需安装：
+
+BERT 语义检查（92MB，纯 CPU 可跑，第5步）：
 ```bash
 pip install sentence-transformers -i https://mirrors.aliyun.com/pypi/simple/
 HF_ENDPOINT=https://hf-mirror.com python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
 ```
 
-DeepSeek-R1-Distill-Qwen-1.5B 推理审核（~1GB，CPU 可跑，第6步）：
+DeepSeek-R1-Distill-Qwen-1.5B 推理审核（~3.7GB，CPU 可跑，第6步）：
 
-安装 transformers + 下载模型，无需编译 C++ 代码，有 prebuilt wheel：
+安装 transformers + torch + accelerate，有 prebuilt wheel：
 
 ```bash
-# 1. 装 transformers + torch（有 prebuilt wheel，秒装）
-pip install transformers torch -i https://mirrors.aliyun.com/pypi/simple/
+# 1. 装 transformers + torch + accelerate
+pip install transformers torch accelerate -i https://mirrors.aliyun.com/pypi/simple/
 
-# 2. 下载 DeepSeek-R1-Distill-Qwen-1.5B 模型（~1GB，hf-mirror）
+# 2. 下载 DeepSeek-R1-Distill-Qwen-1.5B 模型（~3.7GB，hf-mirror）
 HF_ENDPOINT=https://hf-mirror.com python -c "from transformers import AutoModel; AutoModel.from_pretrained('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', trust_remote_code=True)"
 ```
 

@@ -39,7 +39,7 @@
 ## [1.34.0] - 2026-06-29
 
 ### 修复
-- **plan-chapter JSON 保存 + CLI 错误信息增强** — 成功注册后自动保存 JSON 副本到 data/subs_L##.json；JSON 解析失败时输出完整用法[email-redacted] 和 --generate 两条替代路径；缺参数时不再 IndexError，改为清晰错误
+- **plan-chapter JSON 保存 + CLI 错误信息增强** — 成功注册后自动保存 JSON 副本到 data/subs_L##.json；JSON 解析失败时输出完整用法+@file.json 和 --generate 两条替代路径；缺参数时不再 IndexError，改为清晰错误
 - **--generate 模板同时写入文件** — 生成 stdout 模板的同时写入 data/subs_L##_template.json，支持 @file.json 直接加载
 - **next-step 推荐 @file.json** — 规划下一章时优先推荐文件加载方案，避免 CLI JSON 转义问题
 
@@ -701,7 +701,7 @@
 - **finalize_chapter 绕过 pass_gate API** — 直接操作 gates dict，改为调用 `pass_gate()`。
 - **finalize_chapter 缺少逻辑检查** — 三检只跑了连通性和风格，未调用 logic_check。已补上。
 - **set_phase 不做门禁检查** — →writing 不检查 outline_causality，→stage3_ready 不检查 fidelity/ending_verify。已补上门禁检查。
-- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 [username-redacted]。
+- **LICENSE.md 内容不完整** — 只写了一行 `MIT License`，已补全完整许可证文本。copyright 更新为 wUwproject。
 
 ### 文档
 - SKILL.md 渐进式文件索引表修正：execution_standards/hooks/license/causality_check/fidelity/character_registry 描述与实际对齐
