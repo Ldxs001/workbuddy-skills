@@ -90,16 +90,18 @@
    ```
    python novel_workflow_engine.py plan-chapter <state_path> <L##> '<json_array>'
    ```
-   JSON 示例（含 emotions + writing_prompt）：
+   JSON 示例（必填 writing_prompt + 可选 emotions）：
    ```json
    [
      {"s_key":"S01","title":"实验室初试","summary":"主角第一次接触实验设备，紧张","tone":"紧张",
       "emotions":[{"type":"紧张","intensity":0.7},{"type":"好奇","intensity":0.5}],
       "writing_prompt":"实验室的灯光惨白。主角第一次站在操作台前，手指悬在控制面板上方微微发抖。面前的义肢测试臂正在做循环动作，液压泵的嗡鸣声在安静的空间里格外刺耳。导师站在三米外，不时瞥一眼显示屏。\n\n主角深吸一口气按下启动键——测试臂突然加速，远超预设参数。警报声炸响，液压管压力表指针猛地甩到红色区域。导师冲过来拍下急停键，但主角注意到他在查看日志时眼神闪过一丝异样。"},
-     {"s_key":"S02","title":"意外发现","summary":"意外发现异常数据，兴奋","tone":"兴奋",
-      "emotions":[{"type":"兴奋","intensity":0.8},{"type":"不安","intensity":0.3}]},
-     {"s_key":"S03","title":"导师的警告","summary":"导师对发现表示怀疑，压抑","tone":"压抑",
-      "emotions":[{"type":"压抑","intensity":0.7},{"type":"愤怒","intensity":0.4}]}
+     {"s_key":"S02","title":"意外发现","summary":"主角意外发现异常数据，紧张又好奇","tone":"兴奋",
+      "emotions":[{"type":"兴奋","intensity":0.8},{"type":"不安","intensity":0.3}],
+      "writing_prompt":"显示器上的数据曲线突然偏离了基线。主角反复重启三次测试，每次都出现同样的异常脉冲。他调出日志比对，发现这个脉冲模式在历史记录中从未出现过。这不是设备故障——是某种未知信号的干扰。他犹豫是否要报告给导师。"},
+     {"s_key":"S03","title":"导师的警告","summary":"导师对发现表示严重怀疑，要求主角停止调查","tone":"压抑",
+      "emotions":[{"type":"压抑","intensity":0.7},{"type":"愤怒","intensity":0.4}],
+      "writing_prompt":"导师把主角叫到办公室，语气严肃地警告他不要多管闲事。那个信号可能是系统误差，不需要深究。但主角注意到导师的眼神在回避，手指在桌面上轻轻敲击——那是紧张的表现。他决定暗中调查。"}
    ]
    ```
 4. 验证：

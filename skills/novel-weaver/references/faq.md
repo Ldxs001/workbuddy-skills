@@ -14,12 +14,22 @@ python novel_state_manager.py --help
 
 ### Q: `plan-chapter` 报 "subs_json 格式错误"
 
-**原因：** 传入的 JSON 字符串格式不正确（少引号、多逗号等）。
+**原因：** 传入的 JSON 字符串格式不正确（少引号、多逗号等），或直接在命令行中嵌入 JSON
 
 **修复：**
-- 确保 JSON 是合法的数组格式：`[{"s_key":"S01",...}]`
-- Windows 下注意转义双引号或使用单引号包裹整个 JSON
-- 先验证 JSON 格式：`echo '<json>' | python -m json.tool`
+- **推荐方案**：写 JSON 到文件后用 `@` 加载，避免 shell 转义问题
+  ```bash
+  python novel_workflow_engine.py plan-chapter <state_path> <L##> @data/subs_<L##>.json
+  ```
+- 或用 `--generate` 生成模板文件再修改：
+  ```bash
+  python novel_workflow_engine.py plan-chapter <state_path> <L##> --generate
+  # 输出同时自动写入 data/subs_<L##>_template.json
+  ```
+- 确保 JSON 是合法的数组格式，每项含必填 `writing_prompt`（≥50字符）：
+  ```json
+  [{"s_key":"S01","title":"...","summary":"...","tone":"...","writing_prompt":"..."}]
+  ```
 
 ### Q: `context_loader` 报 "子结构未注册"
 

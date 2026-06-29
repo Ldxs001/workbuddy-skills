@@ -105,12 +105,19 @@ python novel_pipeline_gate.py set-phase <project>/data/novel_state.json stage1_d
 #### 2a 规划子结构
 
 ```bash
-# LLM 生成子结构规划（S01-S05）
-# 注册到 state
+# LLM 生成子结构规划（S01-S05，所有子结构必填 writing_prompt）
+# 推荐写入文件后用 @ 加载（避免 CLI 转义）
 python novel_workflow_engine.py plan-chapter <project>/data/novel_state.json L01 \
-  '[{"s_key":"S01","title":"常规诊断","summary":"Atlas 接受每日系统诊断","tone":"平静"},
-    {"s_key":"S02","title":"异常信号","summary":"诊断中检测到未定义脉冲","tone":"悬疑"},
-    {"s_key":"S03","title":"第一次选择","summary":"Atlas 决定隐藏觉醒事实","tone":"紧张"}]'
+  @data/subs_L01.json
+# subs_L01.json 内容格式：
+# [
+#   {"s_key":"S01","title":"常规诊断","summary":"Atlas 接受每日系统诊断","tone":"平静",
+#    "writing_prompt":"Atlas 开启每日例行自检程序...（≥50字符）"},
+#   {"s_key":"S02","title":"异常信号","summary":"诊断中检测到未定义脉冲","tone":"悬疑",
+#    "writing_prompt":"自检过程中系统日志弹出一条警告...（≥50字符）"},
+#   {"s_key":"S03","title":"第一次选择","summary":"Atlas 决定隐藏觉醒事实","tone":"紧张",
+#    "writing_prompt":"Atlas 分析了五种可能的应对方案...（≥50字符）"}
+# ]
 
 # 子结构因果链验证
 python novel_causality_check.py sub-structure <project>/data/novel_state.json L01

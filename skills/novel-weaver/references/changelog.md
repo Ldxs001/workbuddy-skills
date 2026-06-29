@@ -1,3 +1,9 @@
+## [1.34.4] - 2026-06-29
+
+### 修复
+- **faq.md JSON 格式错误答案过时** — 改为推荐 @file.json 主方案 + --generate 辅助方案，不再教用户转义内联 JSON
+- **SKILL.md + execution_standards.md + examples.md 全量文档扫描对齐** — 确认所有示例与 v1.34 行为一致（writing_prompt 必填、body-only 管道、系统组装）
+
 ## [1.34.3] - 2026-06-29
 
 ### 修复

@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.34.3
+version: 1.34.4
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline 流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。
@@ -35,7 +35,7 @@ external_data_dir: true
 - **[强制] 流程门禁系统** — 在阶段转换时自动 require 前置门禁：→writing 检查 outline_causality + sub_causality；→stage3_ready 检查 fidelity + ending_verify。门禁状态查看：`python novel_pipeline_gate.py status <state_path>`
 - **[强制] 核心规划字段保护 + 串行阻断** — `novel_state_manager.py` 对核心字段做 MD5 指纹校验，LLM 不可更新。context_loader 检测上一子结构是否为 completed，否则 HOOK-BLOCK 阻断。串行写入，一次只改一个子结构
 - **[强制] 串行阻断** — context_loader 加载子结构上下文时检测上一子结构 state 是否为 completed。若为 pending 则输出 HOOK-BLOCK 并给出 write-sub 修复命令，强制走管道完成标记后才能继续。子结构写作必须串行
-- **[必须] 先确认+规划再写作** — 场景配置和大纲必须经用户确认，每章先 `plan-chapter`（含情绪 tone + 可选 emotions）→ 因果链验证 → 通过串行阻断检查，才可开始写作
+- **[必须] 先确认+规划再写作** — 场景配置和大纲必须经用户确认，每章先 `plan-chapter`（含必填 writing_prompt + 情绪 tone + 可选 emotions）→ 因果链验证 → 通过串行阻断检查，才可开始写作
 - **[必须] 写作规范** — 每段 ≤200行（自然段落结束），atomic write 逐行 fsync，正文禁止 `L##S##` 标记行（会被阻断）
 - **[必须] 写作中登记** — 新角色出场时 `novel_state_manager.py add-char`，每章结束时 `novel_timeline.py add`
 - **[必须] 每章六检 + 阻断循环** — 完成后运行 `finalize-chapter`：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → **语义检查** → **推理审核** → 聚合硬性问题并阻断（不通过则不标记门禁，不推进 phase），通过后自动推进 phase
