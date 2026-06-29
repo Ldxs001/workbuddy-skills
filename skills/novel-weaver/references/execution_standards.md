@@ -85,15 +85,17 @@
    - `summary`: 模糊概述（20-40字，描述该段核心内容）
    - `tone`: **情绪提示**（如"紧张"、"宁静"、"悬疑"、"温馨"等）— 保证跨子结构情绪连贯性
    - `emotions`: **可选** 混合情绪数组 — 每项 `{"type":"愤怒","intensity":0.8}`，强度 0.0-1.0，多维度表达复杂情绪
+   - `writing_prompt`: **必填** 预编写作命题（≥50字符）— 规划阶段必须为该子结构编写详细剧情指令。包含场景建立、核心事件、情绪弧等完整 beat。context_loader 将其作为 `[硬性] 写作命题框` 输出，是 LLM 写作的核心依据。缺失则 plan-chapter HOOK-BLOCK 拒绝注册。存量旧子结构无此字段时，context_loader 自动从 summary+tone+emotions 合成 fallback 命题。
 3. 用 workflow_engine.py 批量注册：
    ```
    python novel_workflow_engine.py plan-chapter <state_path> <L##> '<json_array>'
    ```
-   JSON 示例（含 emotions）：
+   JSON 示例（含 emotions + writing_prompt）：
    ```json
    [
      {"s_key":"S01","title":"实验室初试","summary":"主角第一次接触实验设备，紧张","tone":"紧张",
-      "emotions":[{"type":"紧张","intensity":0.7},{"type":"好奇","intensity":0.5}]},
+      "emotions":[{"type":"紧张","intensity":0.7},{"type":"好奇","intensity":0.5}],
+      "writing_prompt":"实验室的灯光惨白。主角第一次站在操作台前，手指悬在控制面板上方微微发抖。面前的义肢测试臂正在做循环动作，液压泵的嗡鸣声在安静的空间里格外刺耳。导师站在三米外，不时瞥一眼显示屏。\n\n主角深吸一口气按下启动键——测试臂突然加速，远超预设参数。警报声炸响，液压管压力表指针猛地甩到红色区域。导师冲过来拍下急停键，但主角注意到他在查看日志时眼神闪过一丝异样。"},
      {"s_key":"S02","title":"意外发现","summary":"意外发现异常数据，兴奋","tone":"兴奋",
       "emotions":[{"type":"兴奋","intensity":0.8},{"type":"不安","intensity":0.3}]},
      {"s_key":"S03","title":"导师的警告","summary":"导师对发现表示怀疑，压抑","tone":"压抑",
@@ -117,6 +119,68 @@
 - **context_loader.py 串行阻断**：加载子结构时检测上一子结构 state 是否为 completed。若为 pending 则 HOOK-BLOCK 并输出 write-sub 修复命令，强制走管道完成标记后才能继续
 - **必须先 plan-chapter，再开始写作**
 - **write-sub 字数校验**：写入后对比字数是否达到篇幅目标。低于下限 WARN、超上限+15% INFO、范围内 OK
+
+### write-sub（v2 — 系统组装模式）
+
+v1.33.0 重构：LLM 只输出纯正文，系统自动组装全部元数据。
+
+```
+输入（stdin）: 纯正文叙事内容
+  [可选尾部] 【别名】原名 = 别名
+
+内部流程:
+  1. 读取 stdin → body
+  2. 从 state 读取 sub_structures[].title
+  3. 调用 atomic_writer.v4.validate_and_write_body():
+     a. 检测 body 末尾 【别名】行 → 剥离 + 注册（register-alias）
+     b. body 无别名行 → 系统自动补 【别名】无（不再 HOOK-BLOCK）
+     c. 正文非空检验
+     d. 正文禁止 L#S# 校验
+     e. 正文禁止署名/代名校验
+     f. 系统组装：title_line + body + alias_line
+     g. 原子写入 + fsync
+     h. 追加标记行 L##S## + fsync
+  4. state_manager update-sub → word_count + status
+  5. entity_extractor 非阻断提取
+  6. 字数校验（与规划阶段同源）
+
+输出文件：
+  L## · S##《title》              ← 系统生成
+  （正文）                         ← LLM 写的
+  【别名】无                      ← LLM 或系统补
+  L##S##                          ← 系统追加
+```
+
+### context_loader 输出优先级
+
+v1.33.0 重构：按注意力优先级排列输出块：
+
+```
+区块A（黄金位 — LLM 最先看到）：
+  [上下文] L##S## | 章标题 · 子结构标题 | 概述摘要
+  [情绪基调] 格式化 emotions[] 或 tone
+  [硬性] 字数约束     ← 埋在中段 → 移至头部
+  [硬性] 文风约束     ← 同上
+  [硬性] 署名约束     ← 同上
+  [硬性] 写作命题框  ← 有预编则输出，无则自动合成 fallback
+  [参考] 叙事节奏参考
+
+区块B（参考数据）：
+  [上一子结构末3行]
+  [硬性] 已出场关键人物 + 人格约束
+  [硬性] 实体关系网
+  [硬性] 上一章行为轨迹
+
+区块C（尾部条件）：
+  [硬性] 收尾约束（仅 is_ending）
+  [参考] 钩子位建议（仅 is_hook_possible）
+
+区块D（尾部固定）：
+  [硬性] 输出模板（填空框 + 校验规则）
+  [下一步] 管道命令
+
+已删除：情绪写作参考词块（低价值，情绪信息已在标识行和命题框中）
+```
 
 ## 统一项目状态文件
 
@@ -153,18 +217,27 @@ novel_state.json 包含字段：project, meta.current_phase, meta.length, writin
 11. 语义检查 → finalize-chapter 中 BERT 检测 overview-vs-content 对齐和子结构间语义跳跃（有模型时）
 12. 推理审核 → finalize-chapter 中 DeepSeek-R1-Distill-Qwen-1.5B 检测因果/人格/情绪/对话/论证一致性（有模型时）
 
-## 子结构文件格式
+## 子结构文件格式（系统组装，LLM 不负责格式）
+
+v1.33.0 变更：LLM 只输出纯正文，系统自动组装标题行+别名行+标记行。
+
+### 写入磁盘的最终文件格式
 
 ```
-（剧情正文，纯叙事文本）
-
-L10S04
+L## · S##《子结构标题》         ← 系统从 state 读取 title 生成
+（正文叙事内容）                 ← LLM 输出的纯正文
+【别名】无                     ← LLM 输出或系统自动补
+L##S##                         ← 系统追加
 ```
 
-- 正文：纯叙事文本，不含元数据
-- **禁止在正文中出现子结构标记行（L##S##）— atomic_writer.py 会检测并阻断写入**
-- 末行：子结构编号（如 L10S04），由 atomic_writer finalize 写入
-- 连通性检查读取前3行/后3行时，跳过末行编号行
+### 规则
+
+- **LLM 写入的内容**：纯正文叙事文本 + 可选尾部 `【别名】` 行
+- **标题行**：由 write-sub 自动生成（格式 `L## · S##《title》`），原子性无需 LLM 关心
+- **别名行**：LLM 在正文末尾输出 `【别名】原名 = 别名` 或 `【别名】无`。未输出时系统自动补 `【别名】无`
+- **末行标记**：由 atomic_writer 在文件写入后自动追加（格式 `L##S##`）
+- **正文禁止**：出现 `L##S##` 子结构标记、署名/代名内容、元注释污染
+- **验证机制**：atomic_writer.v4 `validate_and_write_body()` 校验正文合法性，不校验标题/标记格式（系统生成，无需校验）
 
 ## 章节完成输出
 

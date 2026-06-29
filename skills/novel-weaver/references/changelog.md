@@ -1,3 +1,24 @@
+## [1.34.0] - 2026-06-29
+
+### 修复
+- **plan-chapter JSON 保存 + CLI 错误信息增强** — 成功注册后自动保存 JSON 副本到 data/subs_L##.json；JSON 解析失败时输出完整用法[email-redacted] 和 --generate 两条替代路径；缺参数时不再 IndexError，改为清晰错误
+- **--generate 模板同时写入文件** — 生成 stdout 模板的同时写入 data/subs_L##_template.json，支持 @file.json 直接加载
+- **next-step 推荐 @file.json** — 规划下一章时优先推荐文件加载方案，避免 CLI JSON 转义问题
+
+## [1.33.0] - 2026-06-29
+
+### 修复
+- **write-sub 重构为系统组装模式（v2）** — LLM 只需输出纯正文，系统自动组装标题行+别名行+末行标记。atomic_writer.v4 改为 `validate_and_write_body()` 只校验正文合法性，不再校验标题/标记格式
+- **atomic_writer 别名检查改为自动补** — 正文无别名行时系统自动补 `【别名】无`，不再 HOOK-BLOCK。LLM 减少一项格式负担
+- **context_loader 输出按优先级重排** — 字数约束/文风约束/署名约束/命题框移至头部黄金位，参考数据（人物/实体/轨迹/节奏）居中，输出模板/钩子位放尾部。删除了低价值"情绪写作参考词"块
+- **恢复 writing_prompt 输出** — 之前模板替换误删了写作命题框和叙事节奏块，已恢复
+- **writing_prompt 改为必填+自动补体系** — plan-chapter 强制 writing_prompt ≥50 字符，缺失即 HOOK-BLOCK；context_loader 对存量缺字段子结构自动合成 fallback 命题
+- **plan_chapter() 丢弃 writing_prompt** — 用户预先编写的详细写作命题（≥50字符）现在正确存储到 novel_state.json 的子结构字段中，不再被丢弃
+- **context_loader 缺失写作命题框** — 新增 [硬性] 写作命题框，有预编命题时直接输出，无预编时自动合成 fallback
+- **JSON Schema 校验加强** — plan-chapter 增加必填字段（s_key/title/summary/tone）和 summary 最低字数（12有效字符）校验，拒绝不可用输入
+- **context_loader 新增写作框架参考** — 结构化三段式模板（开头20%/中段60%/结尾20%）引导 LLM 保持一致的叙事节奏
+- **调用路径统一** — 增加 plan-chapter 的验收性校验，拒绝 dict 格式和缺字段的 JSON 输入
+
 ## [1.32.0] - 2026-06-28
 
 ### 修复

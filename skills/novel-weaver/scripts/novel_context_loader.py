@@ -80,6 +80,21 @@ def _format_emotions(sub: dict) -> str:
     return line
 
 
+def _auto_generate_prompt(sub: dict, chapter_overview: str) -> str:
+    """从摘要+情绪+章概述自动合成写作命题（当 writing_prompt 缺失时的 fallback）"""
+    summary = sub.get("summary", "")
+    tone = sub.get("tone", "")
+    title = sub.get("title", "")
+    emotions = sub.get("emotions", [])
+    parts = [f"本子结构需要撰写：{title}"]
+    parts.append(f"")
+    parts.append(f"核心剧情：{summary}")
+    parts.append(f"章概述参考：{chapter_overview[:60]}...")
+    parts.append(f"")
+    parts.append(f"请围绕以上核心事件展开叙事。场景建立 → 事件发展 → 情绪收束，保持角色言行一致。")
+    return "\n".join(parts)
+
+
 def _find_characters_in_chapter(data: dict, chapter_id: str, sub_key: str) -> list:
     """扫描本章涉及的角色（基于子结构概述匹配角色名）"""
     chars = data.get("characters", [])
@@ -209,6 +224,121 @@ def load_context(state_path, chapter, sub_key):
     print(f"  提示: 以叙事单位自然结束为准，不强行撑到目标")
     print(f"{'='*50}\n")
 
+    # ── [硬性] 文风约束（硬性） ──
+    ws = data.get("writing_style", {})
+    if ws:
+        print(f"\n{'='*50}")
+        print(f"[硬性] 文风约束（硬性）")
+        print(f"{'='*50}")
+        for key, label in [("narrative_voice", "叙事视角"),
+                           ("tense", "时态"),
+                           ("sentence_preference", "句式偏好"),
+                           ("vocabulary_register", "词汇"),
+                           ("description_depth", "描写深度"),
+                           ("custom_rules", "自定义规则")]:
+            val = ws.get(key, "")
+            if val:
+                print(f"  {label}: {val}")
+        print(f"  提示: 全文文风一致，不可偏离")
+        print(f"{'='*50}\n")
+
+    # ── [硬性] 署名约束（代码级硬阻断） ──
+    sig = data.get("signature", {"enabled": False, "text": ""})
+    sig_enabled = sig.get("enabled", False)
+    sig_text = sig.get("text", "")
+    print(f"\n{'='*50}")
+    if sig_enabled:
+        print(f"[硬性] 署名约束（硬性）")
+        print(f"{'='*50}")
+        print(f"  状态: 已开启")
+        if sig_text:
+            print(f"  署名: {sig_text}")
+        print(f"  允许在作品末尾添加署名")
+        print(f"  禁止使用自行编造的署名文本（必须 = 配置值）")
+    else:
+        print(f"[硬性] 署名约束（代码级硬阻断）")
+        print(f"{'='*50}")
+        print(f"  状态: 已关闭")
+        print(f"  禁止在正文中出现任何署名/代名内容")
+        print(f"  atomic_writer 代码级阻断，写入即报错")
+    print(f"{'='*50}\n")
+
+    # ── [硬性] 写作命题框（必填，新规划预编；旧规划自动补）──
+    wp = subs[sub_key].get("writing_prompt", "")
+    if wp and isinstance(wp, str) and len(wp) >= 50:
+        _is_auto_wp = False
+    else:
+        wp = _auto_generate_prompt(subs[sub_key], ch_info.get("overview", ""))
+        _is_auto_wp = True
+    wp_label = "自动补（未预编）" if _is_auto_wp else "规划阶段预先编写"
+    print(f"\n{'='*50}")
+    print(f"[硬性] 写作命题框（{wp_label} — 硬性约束）")
+    print(f"{'='*50}")
+    print(wp)
+    print(f"\n  {'─'*40}")
+    if _is_auto_wp:
+        print(f"  提示: 该子结构未预编写作命题，已从概述+情绪自动合成")
+        print(f"  提示: 建议在规划阶段补全 writing_prompt 以获得更精确的剧情指令")
+    else:
+        print(f"  提示: 命题框为规划阶段编制的核心剧情指令，必须遵循")
+        print(f"  提示: 在遵循命题框的前提下可自由发挥文笔、对话和细节")
+    print(f"{'='*50}\n")
+
+    # ── [参考] 叙事节奏参考 ──
+    sub_keys = sorted(subs.keys())
+    current_idx = sub_keys.index(sub_key) if sub_key in sub_keys else -1
+    _is_first = (current_idx == 0)
+    _is_last_sub = (current_idx == len(sub_keys) - 1)
+    print(f"{'='*50}")
+    print(f"[参考] 叙事节奏参考")
+    print(f"{'='*50}")
+    print(f"  建议按 建立→发展→收束 的弧线自然推进：")
+    print(f"  开头：场景锚定 + 人物入场/状态")
+    print(f"  中段：核心事件展开（{subs[sub_key].get('summary','')[:40]}...）")
+    print(f"  结尾：情绪落点 + 衔接过渡（不强行收住，为下一子结构留流动感）")
+    if _is_first:
+        print(f"  ℹ️ 章首子结构 — 承接上章尾（第3轮及以上），建立本章基调")
+    if _is_last_sub:
+        print(f"  ℹ️ 末子结构 — 建议自然收束或设置钩子（非强制）")
+    print(f"  提示: 百分比不重要，叙事弧的流动感才重要。段落之间靠因果链自然过渡，不机械分段。")
+    print(f"{'='*50}\n")
+
+    # ── [硬性] 输出模板（正文唯一填空，标题+别名+标记由系统生成）──
+    title_lbl = subs[sub_key].get("title", "")
+    ch_tag = chapter[1:]
+    sk_tag = sub_key[1:]
+    print(f"\n{'='*50}")
+    print(f"[硬性] 输出模板（系统组装 — LLM 只需填写下方正文区域）")
+    print(f"{'='*50}")
+    print("┌─ 填写正文 ──────────────────────────────────────────────")
+    print("| <填入正文叙事内容>")
+    print("|")
+    print("| [可选] 末尾可添加【别名】行（无别名可省略，系统自动补）")
+    print("└─────────────────────────────────────────────────────────")
+    print(f"  系统自动组装后的完整文件格式（不劳LLM费心）：")
+    print(f"  L{ch_tag} · S{sk_tag}《{title_lbl}》  ← 系统生成")
+    print(f"  <正文叙事内容>              ← 你填写的内容")
+    print(f"  【别名】xxx                   ← 你填写或系统自动补")
+    print(f"  L{ch_tag}{sk_tag}                    ← 系统自动追加")
+    print(f"  校验规则（atomic_writer 代码级阻断）:")
+    print(f"  □ 正文不能为空")
+    print(f"  □ 正文禁止出现 L#S# 子结构标记")
+    print(f"  □ 正文禁止署名/代名内容")
+    print(f"  □ 正文末尾可带【别名】行（缺失则系统自动补，S01可省略）")
+    print(f"{'='*50}")
+    print(f"[下一步] 写入命令 — 将正文管道写入（不需标题行/标记行）:")
+    print(f"  cat <<'EOF' | python novel_workflow_engine.py write-sub \\")
+    print(f"    \"{state_path}\" {chapter} {sub_key}")
+    print("  <填入正文叙事内容>")
+    print("")
+    print("  [可选] 【别名】无")
+    print("  EOF")
+    print(f"{'='*50}\n")
+if __name__ == "__main__":
+    if len(sys.argv) < 4:
+        print("用法: python novel_context_loader.py <state_path> <chapter> <sub_key>")
+        sys.exit(1)
+    load_context(sys.argv[1], sys.argv[2], sys.argv[3])
     # ── [硬性] 已出场关键人物（登场即累加，不按章节过滤）──
     char_entries = []
     for c in data.get("characters", []):
@@ -236,6 +366,25 @@ def load_context(state_path, chapter, sub_key):
         for line in char_entries:
             print(line)
         print(f"{'='*50}\n")
+
+    # ── [硬性] 人格约束（硬性） ──
+    involved = _find_characters_in_chapter(data, chapter, sub_key)
+    if involved:
+        has_personality = any(c.get("mbti") or c.get("archetype") for c in involved)
+        if has_personality:
+            print(f"\n{'='*50}")
+            print(f"[硬性] 人格约束（硬性）")
+            print(f"{'='*50}")
+            for c in involved:
+                mbti = c.get("mbti", "")
+                archetype = c.get("archetype", "")
+                if mbti or archetype:
+                    parts = []
+                    if mbti: parts.append(f"MBTI={mbti}")
+                    if archetype: parts.append(f"原型={archetype}")
+                    print(f"  {c['name']}: {', '.join(parts)}")
+            print(f"  提示: 角色言行必须符合其人格设定")
+            print(f"{'='*50}\n")
 
     # ── [硬性] 实体关系网（累计，登场即累加）──
     tracker = data.get("entity_tracker", {"entities": [], "relations": []})
@@ -303,118 +452,6 @@ def load_context(state_path, chapter, sub_key):
             print(f"  提示: 当前章应自然延续以上轨迹，无重大断裂")
             print(f"{'='*50}\n")
 
-    # ── [参考] 情绪写作参考（tone 场景词，引导而非判定） ──
-    tone = subs[sub_key].get("tone", "")
-    if tone:
-        tone_kw_map = {
-            "紧张": ["脚步声", "围堵", "攥紧", "屏息", "逼近", "昏暗", "颤抖", "冷汗", "心跳", "身后", "不敢动", "停步", "围上来", "三个人", "黑暗", "夜路", "短句", "压迫"],
-            "悲伤": ["沉默", "怀念", "叹息", "沉重", "别离", "往事", "难过", "哽咽", "遗物", "远方", "说不出口", "一个人"],
-            "愤怒": ["握拳", "砸桌", "低吼", "瞪", "质问", "凭什么", "混蛋", "找死", "忍不住"],
-            "温馨": ["微笑", "轻声", "牵", "晚饭", "灯光", "肩膀", "晚安", "相依", "家"],
-            "悬疑": ["为什么", "怎么回事", "痕迹", "不对劲", "暗自", "暗中", "视线", "余光"],
-            "平静": ["躺着", "闭眼", "呼吸", "均匀", "微风", "寂静", "枕头", "梦"],
-            "恐惧": ["后退", "尖叫", "跑", "逃", "拼命", "僵硬", "屏住", "冷汗"],
-            "欢乐": ["笑出声", "哈哈", "得意", "轻松", "嬉笑", "嘴", "乐"],
-            "疑惑探索": ["好奇", "翻", "查看", "研究", "琢磨", "试验", "对比", "验证", "想不通", "定睛", "端详"],
-            "专注": ["专注", "凝视", "目不转睛", "仔细", "认真", "盯着", "埋头", "研读", "一字不漏"],
-            "启发": ["原来如此", "明白了", "懂了", "灵感", "窍", "悟", "发现", "意识到", "突然明白"],
-            "顿悟": ["豁然", "一下子", "灵光", "开窍", "通透", "醍醐", "秒懂"],
-            "沉思": ["沉思", "琢磨", "反复", "深入", "反省", "扪心", "自问", "陷入"],
-            "闲适略带好奇": ["闲", "逛", "溜达", "看看", "瞧瞧", "不急", "晃", "好奇", "打量"],
-            "理性分析": ["分析", "计算", "判断", "推理", "逻辑", "数据", "参数", "概率", "规律"],
-            "希望与使命感": ["希望", "使命", "意义", "值得", "担当", "信念", "信仰", "愿意"],
-        }
-        tone_words = tone_kw_map.get(tone, [])
-        if tone_words:
-            print(f"\n{'='*50}")
-            print(f"[参考] 情绪写作参考（数据仅供参考）")
-            print(f"{'='*50}")
-            print(f"  规划情绪: {tone}")
-            print(f"  可参考的场景词: {'、'.join(tone_words[:8])}")
-            print(f"  提示: 情绪通过场景/动作/对话传达，不依赖直接使用上述词汇")
-            print(f"{'='*50}\n")
-
-    # ── [参考] 钩子位建议（is_hook_possible=true 时输出，不阻断） ──
-    if subs[sub_key].get("is_hook_possible"):
-        # 找下一章标题
-        chapters_list = data.get("chapters", [])
-        next_ch_title = ""
-        for ci, ch in enumerate(chapters_list):
-            if ch["id"] == chapter and ci + 1 < len(chapters_list):
-                next_ch = chapters_list[ci + 1]
-                next_ch_title = f"{next_ch.get('id', '')}: {next_ch.get('title', '')}"
-                break
-        print(f"\n{'='*50}")
-        print(f"[参考] 钩子位建议（不强制）")
-        print(f"{'='*50}")
-        print(f"  本子结构是本章末子结构，可考虑设为伏笔/悬念/承诺")
-        if next_ch_title:
-            print(f"  下章: {next_ch_title}")
-        print(f"  可选类型:")
-        print(f"    - 悬念：留下一个未解答的问题")
-        print(f"    - 伏笔：埋设一个日后才揭示的线索")
-        print(f"    - 承诺：暗示下一章将有重要发展")
-        print(f"  如不设伏笔，请确保本子结构自然收束（非悬停式结尾）")
-        print(f"{'='*50}\n")
-
-    # ── [硬性] 人格约束（硬性） ──
-    involved = _find_characters_in_chapter(data, chapter, sub_key)
-    if involved:
-        has_personality = any(c.get("mbti") or c.get("archetype") for c in involved)
-        if has_personality:
-            print(f"\n{'='*50}")
-            print(f"[硬性] 人格约束（硬性）")
-            print(f"{'='*50}")
-            for c in involved:
-                mbti = c.get("mbti", "")
-                archetype = c.get("archetype", "")
-                if mbti or archetype:
-                    parts = []
-                    if mbti: parts.append(f"MBTI={mbti}")
-                    if archetype: parts.append(f"原型={archetype}")
-                    print(f"  {c['name']}: {', '.join(parts)}")
-            print(f"  提示: 角色言行必须符合其人格设定")
-            print(f"{'='*50}\n")
-
-    # ── [硬性] 文风约束（硬性） ──
-    ws = data.get("writing_style", {})
-    if ws:
-        print(f"\n{'='*50}")
-        print(f"[硬性] 文风约束（硬性）")
-        print(f"{'='*50}")
-        for key, label in [("narrative_voice", "叙事视角"),
-                           ("tense", "时态"),
-                           ("sentence_preference", "句式偏好"),
-                           ("vocabulary_register", "词汇"),
-                           ("description_depth", "描写深度"),
-                           ("custom_rules", "自定义规则")]:
-            val = ws.get(key, "")
-            if val:
-                print(f"  {label}: {val}")
-        print(f"  提示: 全文文风一致，不可偏离")
-        print(f"{'='*50}\n")
-
-    # ── [硬性] 署名约束（代码级硬阻断） ──
-    sig = data.get("signature", {"enabled": False, "text": ""})
-    sig_enabled = sig.get("enabled", False)
-    sig_text = sig.get("text", "")
-    print(f"\n{'='*50}")
-    if sig_enabled:
-        print(f"[硬性] 署名约束（硬性）")
-        print(f"{'='*50}")
-        print(f"  状态: 已开启")
-        if sig_text:
-            print(f"  署名: {sig_text}")
-        print(f"  允许在作品末尾添加署名")
-        print(f"  禁止使用自行编造的署名文本（必须 = 配置值）")
-    else:
-        print(f"[硬性] 署名约束（代码级硬阻断）")
-        print(f"{'='*50}")
-        print(f"  状态: 已关闭")
-        print(f"  禁止在正文中出现任何署名/代名内容")
-        print(f"  atomic_writer 代码级阻断，写入即报错")
-    print(f"{'='*50}\n")
-
     # ── [硬性] 收尾命题框（is_ending=true 时追加） ──
     if subs[sub_key].get("is_ending"):
         ending_type = subs[sub_key].get("ending_type", "未指定")
@@ -451,31 +488,26 @@ def load_context(state_path, chapter, sub_key):
         print(f"  提示: 以上为命题约束，不可偏离")
         print(f"{'='*50}\n")
 
-    # ── [硬性] 别名声明（代码级阻断） ──
-    print(f"\n{'='*50}")
-    print(f"[硬性] 别名声明（必须，缺失则阻断写入）")
-    print(f"{'='*50}")
-    print(f"  若本次写作引入了角色的别名，请在正文末尾单独一行输出：")
-    print(f"    【别名】老陈 = 陈叔")
-    print(f"  若未引入任何别名，请输出：")
-    print(f"    【别名】无")
-    print(f"  atomic_writer 将拦截此标记行，不写入正文。返回的命令会自动处理。")
-    print(f"{'='*50}\n")
+    # ── [参考] 钩子位建议（is_hook_possible=true 时输出，不阻断） ──
+    if subs[sub_key].get("is_hook_possible"):
+        # 找下一章标题
+        chapters_list = data.get("chapters", [])
+        next_ch_title = ""
+        for ci, ch in enumerate(chapters_list):
+            if ch["id"] == chapter and ci + 1 < len(chapters_list):
+                next_ch = chapters_list[ci + 1]
+                next_ch_title = f"{next_ch.get('id', '')}: {next_ch.get('title', '')}"
+                break
+        print(f"\n{'='*50}")
+        print(f"[参考] 钩子位建议（不强制）")
+        print(f"{'='*50}")
+        print(f"  本子结构是本章末子结构，可考虑设为伏笔/悬念/承诺")
+        if next_ch_title:
+            print(f"  下章: {next_ch_title}")
+        print(f"  可选类型:")
+        print(f"    - 悬念：留下一个未解答的问题")
+        print(f"    - 伏笔：埋设一个日后才揭示的线索")
+        print(f"    - 承诺：暗示下一章将有重要发展")
+        print(f"  如不设伏笔，请确保本子结构自然收束（非悬停式结尾）")
+        print(f"{'='*50}\n")
 
-    # ── [下一步] 下一步命令提示 ──
-    print(f"\n{'='*50}")
-    print(f"[下一步] 下一步 - 写入命令")
-    print(f"{'='*50}")
-    print(f"  # 将以下内容通过 stdin 管道写入:")
-    print(f"  cat <<'EOF' | python novel_workflow_engine.py write-sub \\")
-    print(f"    \"{state_path}\" {chapter} {sub_key}")
-    print(f"  L{chapter[1:]} · S{sub_key[1:]}\u300a{subs[sub_key].get('title','')}\u300b")
-    print(f"  ...正文内容...")
-    print(f"  EOF")
-    print(f"{'='*50}\n")
-
-if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("用法: python novel_context_loader.py <state_path> <chapter> <sub_key>")
-        sys.exit(1)
-    load_context(sys.argv[1], sys.argv[2], sys.argv[3])

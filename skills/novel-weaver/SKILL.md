@@ -2,7 +2,7 @@
 name: novel-weaver
 slug: novel-weaver
 displayName: Novel Weaver
-version: 1.32.0
+version: 1.34.0
 author: wUwproject
 license: MIT
 description: 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline 流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。
@@ -143,12 +143,12 @@ proj = DATA_DIR / '项目名' / 'data' / 'novel_state.json'
 3. **因果链验证(outline)** → 输入 chapters[] overview → 输出 outline_causality 门禁 — 逐链节检查L01→L02→...因果递进
 4. **用户确认** → 输入 大纲 → 输出 确认/修正 — 钩子阻断式，未确认不得进入阶段2
 5. **初始化 novel_state.json** → 输入 大纲 → 输出 novel_state.json — chapters/characters/timeline 骨架
-6. **规划章子结构** → 输入 章节标题+概述 → 输出 sub_structures[] — S01-S05+标题+概述+tone+可选 emotions
-7. **注册子结构到 state** → 输入 subs_json → 输出 novel_state 更新 — MD5指纹锁定+标记 is_ending/is_hook
+6. **规划章子结构** → 输入 章节标题+概述 → 输出 sub_structures[] JSON — S01-S05+标题+概述+tone+**必填 writing_prompt(≥50字符)**+可选 emotions。缺失 writing_prompt 则 plan-chapter HOOK-BLOCK
+7. **注册子结构到 state** → 输入 subs_json → 输出 novel_state 更新 — MD5指纹锁定+自动字数目标+标记 is_ending/is_hook
 8. **子结构因果链验证** → 输入 sub_structures → 输出 sub_causality 门禁 — 逐子结构因果递进检查
 9. **set-phase writing** → 输入 outline+sub 门禁 → 输出 phase=writing — require 双门禁，不通过则阻断
-10. **加载命题指令** → 输入 chapter+sub_key → 输出 context_loader 输出 — 子结构规划+情绪混合+人格+文风约束
-11. **LLM 写作+管道写入** → 输入 命题指令 → 输出 S##.txt — atomic_writer 代码级校验格式/字数/署名
+10. **加载上下文（context_loader）** → 输出 4区块优先级排列：A(标识+硬性字数/文风/署名约束+写作命题框) → B(末3行+人物+人格+实体+轨迹+节奏) → C(收尾+钩子+输出模板)。无预编命题时自动从概述合成 fallback
+11. **LLM 写作 → 系统组装写入** → LLM 只输出纯正文（末尾可带可选【别名】行）→ write-sub 自动组装标题行+别名行+标记行 → atomic_writer.v4 校验正文合法性。无别名行时系统自动补【别名】无
 12. **重复10-11** → 输入 下一子结构 → 输出 全部子结构完成 — 直到该章全部子结构写完
 13. **完结一章(finalize-chapter)** → 输入 章内容 → 输出 四合一检查报告 — 章内连通性→跨章→风格→逻辑
 14. **全文整合(fidelity)** → 输入 全部章节 → 输出 大纲忠实度报告 — 检查是否偏离大纲

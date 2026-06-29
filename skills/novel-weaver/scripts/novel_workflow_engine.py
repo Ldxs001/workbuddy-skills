@@ -50,16 +50,52 @@ def plan_chapter(state_path, chapter, subs_json):
     try:
         subs = json.loads(subs_json)
     except json.JSONDecodeError as e:
-        print(f"[HOOK-BLOCK] subs_json 不是合法 JSON: {e}")
-        print(f"  接收到的内容: {subs_json[:200]}")
-        print(f"  期望格式: [{{\"s_key\":\"S01\",\"title\":\"...\",\"summary\":\"...\",\"tone\":\"...\"}}]")
+        print(f"[HOOK-BLOCK] plan-chapter JSON 解析失败: {e}")
+        print(f"  接收到的内容: {subs_json[:120]}")
+        print(f"")
+        print(f"  用法: python novel_workflow_engine.py plan-chapter <state_path> <L##> '<json_array>'")
+        print(f"")
+        print(f"  json_array 格式（必填字段 + writing_prompt）：")
+        print(f"  [")
+        print(f'    {{"s_key":"S01","title":"子结构标题","summary":"概述（≥12字符）","tone":"情绪","writing_prompt":"预编命题（≥50字符）"}},')
+        print(f'    {{"s_key":"S02","title":"子结构标题2","summary":"概述","tone":"情绪","emotions":[{{"type":"愤怒","intensity":0.7}}],"writing_prompt":"..."}}')
+        print(f"  ]")
+        print(f"")
+        print(f"  💡 首次使用请先输出模板：")
+        print(f"     python novel_workflow_engine.py plan-chapter <path> <L##> --generate")
+        print(f"")
+        print(f"  💡 复杂 JSON 推荐写入文件后用 @ 加载（避免 shell 转义问题）：")
+        print(f"     python novel_workflow_engine.py plan-chapter <path> <L##> @subs.json")
         sys.exit(1)
     if not isinstance(subs, list):
-        print(f"[HOOK-BLOCK] subs_json 应为数组，收到 {type(subs).__name__}")
-        sys.exit(1)
+        # 友好兼容：dict 格式 {"S01": {...}} → 自动转换为数组
+        if isinstance(subs, dict):
+            converted = []
+            for sk in sorted(subs.keys()):
+                sv = subs[sk]
+                if isinstance(sv, dict):
+                    sv["s_key"] = sk
+                    converted.append(sv)
+            subs = converted
+            print(f"[plan-chapter] 自动转换 dict→list：{len(subs)} 个子结构")
+        else:
+            print(f"[HOOK-BLOCK] subs_json 应为数组，收到 {type(subs).__name__}")
+            sys.exit(1)
+    # ── JSON Schema 校验 ──
     for i, s in enumerate(subs):
-        if not isinstance(s, dict) or "s_key" not in s:
-            print(f"[HOOK-BLOCK] subs[{i}] 缺少 s_key 字段: {s}")
+        if not isinstance(s, dict):
+            print(f"[HOOK-BLOCK] subs[{i}] 不是对象: {s}")
+            sys.exit(1)
+        required = ["s_key", "title", "summary", "tone"]
+        missing = [f for f in required if f not in s or not isinstance(s[f], str) or not s[f].strip()]
+        if missing:
+            print(f"[HOOK-BLOCK] subs[{i}] 缺少必填字段: {', '.join(missing)}")
+            sys.exit(1)
+        # summary 最低字数检查（去标点后 ≥12 有效字符）
+        clean_summary = re.sub(r'[\s,，。！？、；：""''【】《》（）\n\t]', '', s.get("summary", ""))
+        if len(clean_summary) < 12:
+            print(f"[HOOK-BLOCK] subs[{i}] summary 字数不足（{len(clean_summary)} < 12 有效字符）")
+            print(f"  当前 summary: {s.get('summary', '')[:60]}")
             sys.exit(1)
 
     # 判断是否为末章
@@ -100,6 +136,14 @@ def plan_chapter(state_path, chapter, subs_json):
             # 情绪混合系统：emotions 数组（可选）
             if "emotions" in s and isinstance(s["emotions"], list) and len(s["emotions"]) > 0:
                 entry["emotions"] = s["emotions"]
+            # writing_prompt 必填（≥50字符，规划阶段必须提供详细剧情指令）
+            if "writing_prompt" in s and isinstance(s["writing_prompt"], str) and len(s["writing_prompt"]) >= 50:
+                entry["writing_prompt"] = s["writing_prompt"]
+            else:
+                print(f"[HOOK-BLOCK] subs[{i}] {s_key} 缺少 writing_prompt 或长度不足（需 ≥50 字符）")
+                print(f"  writing_prompt 必须包含本子结构的详细剧情指令")
+                print(f"  接收到的值: {repr(s.get('writing_prompt', ''))[:80]}")
+                sys.exit(1)
             # 末章 + 最后一个子结构 → 标记 is_ending
             if is_last_chapter and i == len(subs) - 1:
                 entry["is_ending"] = True
@@ -117,6 +161,11 @@ def plan_chapter(state_path, chapter, subs_json):
     import novel_state_manager as nsm
     nsm.save_state(state_path, data, caller="plan-chapter")
 
+    # ── 将本次注册的 JSON 保存到项目 data 目录（供后续 @file.json 重用）──
+    subs_file_path = Path(state_path).parent / f"subs_{chapter}.json"
+    subs_file_path.write_text(subs_json, encoding="utf-8")
+    print(f"[plan-chapter] JSON 副本已保存: {subs_file_path}")
+
     if is_last_chapter:
         last_sub = subs[-1]["s_key"] if subs else "?"
         print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
@@ -125,6 +174,8 @@ def plan_chapter(state_path, chapter, subs_json):
         last_sub = subs[-1]["s_key"] if subs else "?"
         print(f"[plan-chapter] {chapter}: {len(subs)} 个子结构已注册")
         print(f"[伏笔] 非末章 → 末子结构 {last_sub} 标记 is_hook_possible（可选伏笔位）")
+    print(f"💡 下次可用 @ 加载已保存的文件:")
+    print(f"   python novel_workflow_engine.py plan-chapter <path> {chapter} @{subs_file_path}")
 
 def verify_chapter(state_path, chapter):
     """验证章节子结构注册完整性"""
@@ -166,23 +217,29 @@ def preview_context(state_path, chapter):
 
 def write_sub(state_path, chapter, sub_key, target_dir):
     """
-    单子结构写入钩子（阻断式，即时状态标记）
+    单子结构写入钩子（v2 — LLM 只写正文，系统组装全文）
     流程链:
-      1. atomic_writer.validate_and_write → 格式校验 + 原子写入
-      2. state_manager.update-sub → 即时状态更新
-
-    内容从 stdin 读取。
+      1. 从 stdin 读取纯正文（可能末尾含 【别名】行）
+      2. atomic_writer.validate_and_write_body → 正文校验 + 系统组装标题+别名+标记 + 原子写入
+      3. state_manager.update-sub → 即时状态更新
 
     注意：如果子结构已为 completed，本次写入视为修改/扩写，
     完成后必须运行 finalize-chapter 通过全量检查才能推进。
     """
-    atomic_writer = SCRIPTS_DIR / "novel_atomic_writer.py"
     chapter_dir = Path(target_dir) / chapter
     chapter_dir.mkdir(parents=True, exist_ok=True)
     filepath = chapter_dir / f"{sub_key}.txt"
 
-    # ── 读取签名配置 ──
+    # ── 读取 state 数据 ──
     ws_data = json.loads(Path(state_path).read_text(encoding="utf-8-sig"))
+
+    # ── 获取子结构标题 ──
+    sub_title = sub_key
+    for ch in ws_data.get("chapters", []):
+        if ch["id"] == chapter:
+            sub_info = ch.get("sub_structures", {}).get(sub_key, {})
+            sub_title = sub_info.get("title", sub_key)
+            break
 
     # ── 判断是否修改模式（子结构已 completed）──
     is_rewrite = False
@@ -194,24 +251,25 @@ def write_sub(state_path, chapter, sub_key, target_dir):
             break
     sig_cfg = ws_data.get("signature", {"enabled": False, "text": ""})
 
-    # ── 步骤1: 从 stdin 读取内容 ──
-    content = sys.stdin.read()
-    if not content.strip():
+    # ── 步骤1: 从 stdin 读取正文（纯叙事，不包含标题行/标记行）──
+    body = sys.stdin.read()
+    if not body.strip():
         print(f"[HOOK-BLOCK] {chapter}{sub_key}: stdin 内容为空，拒绝写入")
         sys.exit(1)
 
-    # ── 步骤2: 通过 atomic_writer 进行格式校验 + 原子写入 ──
-    # 直接调用 validate_and_write 函数
+    # ── 步骤2: 通过 atomic_writer 校验正文 + 系统组装全文 + 原子写入 ──
     sys.path.insert(0, str(SCRIPTS_DIR))
     import novel_atomic_writer
-    success = novel_atomic_writer.validate_and_write(content, str(filepath), chapter, sub_key,
-                                                      signature=sig_cfg, state_path=state_path)
+    success = novel_atomic_writer.validate_and_write_body(
+        body, str(filepath), chapter, sub_key, sub_title,
+        signature=sig_cfg, state_path=state_path
+    )
     if not success:
         print(f"[HOOK-BLOCK] {chapter}{sub_key}: 写入失败")
         sys.exit(1)
 
     # ── 步骤3: state_manager.update-sub — 即时状态标记 ──
-    word_count = len(content.replace("\n", ""))
+    word_count = len(body.strip().replace("\n", ""))
     state_manager = SCRIPTS_DIR / "novel_state_manager.py"
     result = subprocess.run(
         [sys.executable, str(state_manager), "update-sub",
@@ -241,7 +299,7 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
     print(f"  字数: {word_count}")
 
-    # ── 字数代码级校验（从子结构 word_count_target 读取，与 plan-chapter 同源）──
+    # ── 字数代码级校验 ──
     sub_info = None
     for ch in ws_data.get("chapters", []):
         if ch["id"] == chapter:
@@ -258,7 +316,7 @@ def write_sub(state_path, chapter, sub_key, target_dir):
         else:
             print(f"  [OK] 字数 {word_count} 在 {lo}-{check_hi} 范围内")
 
-    # ── 修改模式提醒：已完成的子结构被修改后必须重新检查 ──
+    # ── 修改模式提醒 ──
     if is_rewrite:
         print(f"\n{'='*50}")
         print(f"[强制] 检测到修改/扩写已完成子结构 {chapter}{sub_key}")
@@ -723,6 +781,18 @@ def next_step(state_path):
         if pending_sub and current_ch:
             print(f"  📝 当前章节: {current_ch['id']} {current_ch.get('title', '')}")
             print(f"  📄 下一个子结构: {pending_sub} {current_ch['sub_structures'][pending_sub].get('title', '')}")
+            # 检测当前子结构是否缺少 writing_prompt
+            sub_entry = current_ch['sub_structures'][pending_sub]
+            missing_wp = not sub_entry.get("writing_prompt") or not isinstance(sub_entry.get("writing_prompt"), str) or len(sub_entry.get("writing_prompt", "")) < 50
+            if missing_wp:
+                print(f"  ⚠️ 该子结构缺少 writing_prompt（存量旧注册）")
+                print(f"     context_loader 会自动合成 fallback 命题，但不如预编精准")
+                print(f"     如需补全，请重新注册：")
+                sub_title = sub_entry.get('title', '')
+                sub_summary = sub_entry.get('summary', '')
+                sub_tone = sub_entry.get('tone', '')
+                print(f"     python novel_workflow_engine.py plan-chapter <path> {current_ch['id']} \\")
+                print(f'       \'[{{"s_key":"{pending_sub}","title":"{sub_title}","summary":"{sub_summary}","tone":"{sub_tone}","writing_prompt":"<编写具体剧情指令（≥50字符）>"}}]\'')
             print(f"  {'─'*55}")
             print(f"  ⏳ 加载上下文: python novel_context_loader.py <path> {current_ch['id']} {pending_sub}")
             print(f"  ⏳ 写作后写入: python novel_workflow_engine.py write-sub <path> {current_ch['id']} {pending_sub}")
@@ -735,7 +805,9 @@ def next_step(state_path):
                 next_idx = next((i for i, c in enumerate(chapters) if c.get("id") == current_ch["id"]), -1) + 1
                 if next_idx < len(chapters):
                     print(f"  📝 下一章: {chapters[next_idx]['id']} {chapters[next_idx].get('title', '')}")
-                    print(f"  ⏳ python novel_workflow_engine.py plan-chapter <path> {chapters[next_idx]['id']} '<json>'")
+                    print(f"  ⏳ 规划子结构（推荐方案A：文件加载，避免CLI转义问题）:")
+                    print(f"      方案A: python novel_workflow_engine.py plan-chapter <path> {chapters[next_idx]['id']} @data/subs_{chapters[next_idx]['id']}.json")
+                    print(f"      方案B: python novel_workflow_engine.py plan-chapter <path> {chapters[next_idx]['id']} --generate（先生成模板）")
                 else:
                     print(f"  ✅ 所有章节已完成。准备全文整合。")
 
@@ -845,15 +917,33 @@ if __name__ == "__main__":
             if not ch_info:
                 print(f"[错误] 章节 {chapter} 未找到")
                 sys.exit(1)
-            print(f"# {chapter} {ch_info.get('title','')} — 子结构JSON模板")
-            print(f"# 概述: {ch_info.get('overview','')[:60]}")
-            print(f"[")
+            # 生成模板并写入文件
+            template_lines = [
+                f"# {chapter} {ch_info.get('title','')} — 子结构JSON模板",
+                f"# 概述: {ch_info.get('overview','')[:60]}",
+                "[",
+            ]
             for i in range(1, 5):
                 sk = f"S{i:02d}"
-                print(f'  {{"s_key":"{sk}","title":"子结构标题{i}","summary":"概述内容（≥12字符）","tone":"情绪提示"}},')
-            print(f'  {{"s_key":"S{5:02d}","title":"子结构标题5","summary":"末子结构概述","tone":"情绪提示"}}')
-            print(f"]")
+                template_lines.append(f'  {{"s_key":"{sk}","title":"子结构标题{i}","summary":"概述内容（≥12字符，含动作+人物）","tone":"情绪提示","writing_prompt":"预编写作命题（≥50字符，含场景/事件/情绪弧）"}},')
+            template_lines.append(f'  {{"s_key":"S{5:02d}","title":"子结构标题5","summary":"末子结构概述","tone":"情绪提示","writing_prompt":"末子结构命题（≥50字符）"}}')
+            template_lines.append("]")
+            template_text = "\n".join(template_lines)
+            print(template_text)
+            # 同时写入文件
+            template_file = Path(sp).parent / f"subs_{chapter}_template.json"
+            template_file.write_text(template_text, encoding="utf-8")
+            print(f"\n💡 模板已同时保存到文件（可用 @ 加载）:")
+            print(f"   python novel_workflow_engine.py plan-chapter <path> {chapter} @{template_file}")
             sys.exit(0)
+        if len(sys.argv) <= next_arg_idx + 1:
+            print(f"[HOOK-BLOCK] plan-chapter 缺少子结构 JSON 参数")
+            print(f"")
+            print(f"  用法: python novel_workflow_engine.py plan-chapter <state_path> <L##> '<json_array>'")
+            print(f"")
+            print(f"  💡 查看模板: python novel_workflow_engine.py plan-chapter <path> <L##> --generate")
+            print(f"  💡 从文件加载: python novel_workflow_engine.py plan-chapter <path> <L##> @subs.json")
+            sys.exit(1)
         subs_json = sys.argv[next_arg_idx + 1]
         # 智能加载：@file.json 或 *.json 从文件读取，避免Shell转义破坏JSON
         if subs_json.startswith('@') or subs_json.endswith('.json'):
