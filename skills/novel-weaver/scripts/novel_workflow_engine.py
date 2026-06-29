@@ -440,6 +440,28 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
 
         print(f"[完结] {chapter}: [OK] 全部完成")
 
+        # ── 查找下一章（如有） ──
+        next_ch_info = None
+        for ci, ch in enumerate(state_data.get("chapters", [])):
+            if ch["id"] == chapter and ci + 1 < len(state_data["chapters"]):
+                next_ch_info = state_data["chapters"][ci + 1]
+                break
+        if next_ch_info:
+            print(f"\n{'='*50}")
+            print(f"  📖 {chapter} 已完结 → 续写下一章 {next_ch_info['id']} {next_ch_info.get('title','')}")
+            print(f"{'='*50}")
+            print(f"  [流程刷新] 本章已结束，进入新章节前请重新阅读流程：")
+            print(f"  ┌─ 下一章写作步骤 ─────────────────────────────────────┐")
+            print(f"  │ 1. 查看项目状态: python novel_workflow_engine.py next-step <path>    │")
+            print(f"  │ 2. 规划子结构:   @file.json → plan-chapter <path> <L##> @subs.json  │")
+            print(f"  │ 3. 验证因果链:   novel_causality_check.py sub-structure           │")
+            print(f"  │ 4. 逐个写子结构: context_loader → 正文 → write-sub 管道          │")
+            print(f"  │ 5. 完结本章:     novel_workflow_engine.py finalize-chapter         │")
+            print(f"  └────────────────────────────────────────────────────────────────┘")
+            print(f"  ⚠️ 禁止：跳过管道直接 Write 工具写文件")
+            print(f"  ⚠️ 禁止：跳过 context_loader 直接写正文")
+            print(f"{'='*50}")
+
 
 def _generate_behavior_summary(state_path: str, chapter: str, chapters_dir: str):
     """
