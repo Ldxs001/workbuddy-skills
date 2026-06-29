@@ -299,22 +299,38 @@ def write_sub(state_path, chapter, sub_key, target_dir):
     print(f"[write-sub] {chapter}{sub_key} [OK] 已完成")
     print(f"  字数: {word_count}")
 
-    # ── 字数代码级校验 ──
+    # ── 字数代码级校验（fallback: 从 meta.length 读默认值） ──
     sub_info = None
     for ch in ws_data.get("chapters", []):
         if ch["id"] == chapter:
             sub_info = ch.get("sub_structures", {}).get(sub_key, {})
             break
     sub_target = sub_info.get("word_count_target", {}) if sub_info else {}
+    lo, hi, check_hi = 0, 0, 0
     if sub_target and sub_target.get("min") and sub_target.get("max"):
         lo, hi = sub_target["min"], sub_target["max"]
         check_hi = sub_target.get("check_max", int(hi * 1.15))
+    else:
+        # fallback: 从 meta.length 读取默认字数目标
+        length = ws_data.get("meta", {}).get("length", "")
+        _FALLBACK_TARGETS = {"short": (1000, 1500), "medium": (1500, 2000), "long": (2000, 4000)}
+        fb = _FALLBACK_TARGETS.get(length)
+        if fb:
+            lo, hi = fb
+            check_hi = int(hi * 1.15)
+            print(f"  [INFO] 字数校验使用默认目标（子结构无 word_count_target）: {lo}-{hi}")
+    if lo and hi:
         if word_count < lo:
             print(f"  [WARN] 字数 {word_count} < 下限 {lo}，建议补充至 {lo}-{hi} 字")
         elif word_count > check_hi:
             print(f"  [INFO] 字数 {word_count} > 上限+15%({check_hi})，注意篇幅控制")
         else:
             print(f"  [OK] 字数 {word_count} 在 {lo}-{check_hi} 范围内")
+    else:
+        # 正常情况下不会走到这里。meta.length 在场景配置阶段必填。
+        # 如果真的缺失，说明项目初始化有问题，不应静默跳过
+        print(f"[HOOK-BLOCK] 无法执行字数校验：meta.length 未设置。请先运行：")
+        print(f"  python novel_state_manager.py set-length <path> <short|medium|long>")
 
     # ── 修改模式提醒 ──
     if is_rewrite:
