@@ -93,7 +93,17 @@ def save_state(path, data, caller="auto"):
         fp_path.write_text(_fingerprint(old_data), encoding="utf-8")
         print(f"  [指纹] 已记录核心规划字段指纹（{sub_count} 个子结构）")
 
-    state_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # ── 原子写入：写 .tmp → fsync → rename ──
+    tmp_path = state_file.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 验证写入的 JSON 可重新解析
+    try:
+        json.loads(tmp_path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError:
+        tmp_path.unlink(missing_ok=True)
+        print(f"[HOOK-BLOCK] save_state: 生成的 JSON 非法，拒绝写入")
+        sys.exit(1)
+    tmp_path.rename(state_file)
 
     # plan-chapter 成功后更新指纹，使后续 chapter 规划不被误阻断
     if caller == "plan-chapter":

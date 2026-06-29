@@ -1,3 +1,14 @@
+## [1.35.0] - 2026-06-29
+
+### 新增
+- **plan-chapter 新角色检测 + HARD-BLOCK** — 注册子结构后自动扫描所有 title/summary/writing_prompt 中的 2-3 字中文名，与 characters[] 比对，发现未登记角色则阻断并提示 add-char 命令，防止角色写入时缺人物卡
+- **write-sub 自动触发 finalize-chapter** — 写完本章最后一个子结构后自动检测所有子结构 status=completed，自动调用完结验证（四合一必跑，五/六步有模型跑无模型跳过），不再依赖手动执行
+
+### 修复
+- **原子写入 + 写入后 JSON 验证** — `save_state()` 和 `_generate_behavior_summary()` 改用写 .tmp 文件 → 验证 JSON 可解析 → rename 的原子写入模式，防止 Python 崩溃遗留半截文件
+- **语义检查/推理审核永不联网** — 模型只在本地已缓存时才加载，用 snapshot 路径直读，零网络请求。无本地模型时直接跳过步骤 5/6 并提示安装命令。下载逻辑只发生在用户主动要求时（SKILL.md 模型安装章节）
+- **强制 CPU 避免与 LM Studio 冲突** — `CUDA_VISIBLE_DEVICES=-1` 在 torch/sentence_transformers 导入前设置，确保 GPU 显存完全留给 LM Studio，零冲突
+
 ## [1.34.5] - 2026-06-29
 
 ### 修复

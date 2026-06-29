@@ -84,23 +84,25 @@ def _download_model():
 
 
 def _load_model():
-    """懒加载 transformers 模型, 下载+加载, 失败则设为 None"""
+    """懒加载 transformers 模型，只在本地已缓存时加载，永不联网尝试。"""
     global _LLM, _TOKENIZER, _DEVICE
     if _LLM is not None:
         return _LLM, _TOKENIZER
     try:
         import os as _os
+        # 强制 CPU，避免与 LM Studio 抢夺 GPU 显存
+        _os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
         import torch
+        # transformers 导入时需要 HF_ENDPOINT 指向镜像以避免挂死
         _os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-        _os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        # 自动检测 GPU
-        _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+        # 强制 CPU（CUDA_VISIBLE_DEVICES=-1 后 torch.cuda.is_available() 返回 False）
+        _DEVICE = "cpu"
         device_map = _DEVICE
         print(f"[推理审核] 设备: {_DEVICE.upper()}" + (f" ({torch.cuda.get_device_name(0)})" if _DEVICE == "cuda" else ""))
 
-        # 使用默认 hub 缓存或 MODELS_DIR
+        # 查找本地模型缓存
         default_cache = str(Path.home() / ".cache" / "huggingface" / "hub")
         default_snap = _os.path.join(default_cache, f"models--{MODEL_NAME.replace('/', '--')}", "snapshots")
         try:
@@ -110,27 +112,28 @@ def _load_model():
         except Exception:
             model_cache = default_cache
 
-        # 如果默认缓存已有模型, 直接用默认缓存
-        if _os.path.isdir(default_snap) and _os.listdir(default_snap):
-            cache_dir = default_cache
-        else:
-            cache_dir = model_cache
+        # 先检查 MODELS_DIR，再检查默认 HF 缓存
+        model_local_path = ""
+        for cache_dir in [model_cache, default_cache]:
+            snap_dir = _os.path.join(cache_dir, f"models--{MODEL_NAME.replace('/', '--')}", "snapshots")
+            if _os.path.isdir(snap_dir):
+                snap_items = [d for d in _os.listdir(snap_dir) if _os.path.isdir(_os.path.join(snap_dir, d))]
+                if snap_items:
+                    model_local_path = _os.path.join(snap_dir, snap_items[-1])
+                    print(f"[推理审核] 本地缓存: {model_local_path}")
+                    break
 
-        _os.environ["HUGGINGFACE_HUB_CACHE"] = cache_dir
-        print(f"[推理审核] 模型: {MODEL_NAME}")
-        print(f"[推理审核] 缓存: {cache_dir}")
-
-        cached_snap = _os.path.join(cache_dir, f"models--{MODEL_NAME.replace('/', '--')}", "snapshots")
-        if not _os.path.isdir(cached_snap) or not _os.listdir(cached_snap):
-            print(f"[推理审核] 未缓存, 逐文件下载...")
-            if not _download_model():
-                raise RuntimeError("模型下载失败")
-            print(f"[推理审核] 下载完成")
+        if not model_local_path:
+            # 没本地模型 → 跳过，绝不联网下载
+            print("[推理审核] 跳过：本地无模型缓存，用户需主动安装")
+            print(f"[推理审核] 安装命令: HF_ENDPOINT=https://hf-mirror.com python -c \"from transformers import AutoModel; AutoModel.from_pretrained('{MODEL_NAME}', trust_remote_code=True)\"")
+            _LLM, _TOKENIZER = None, None
+            return None, None
 
         print(f"[推理审核] 加载模型...")
-        _TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+        _TOKENIZER = AutoTokenizer.from_pretrained(model_local_path, trust_remote_code=True)
         _LLM = AutoModelForCausalLM.from_pretrained(
-            MODEL_NAME,
+            model_local_path,
             trust_remote_code=True,
             torch_dtype="auto",
             device_map=device_map,

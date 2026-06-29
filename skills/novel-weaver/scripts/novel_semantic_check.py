@@ -64,32 +64,50 @@ EMOTION_KEYWORDS = {
 
 
 def _load_model():
-    """懒加载模型，失败则设为 None，缓存到 MODELS_DIR"""
+    """懒加载模型，失败则设为 None。只在本地已缓存时加载，永不联网尝试。"""
     global _MODEL
     if _MODEL is not None:
         return _MODEL
     try:
         import os as _os
-        # 从 _path_utils 读取 MODELS_DIR，失败则用默认 HF 缓存
+        # 强制 CPU，避免与 LM Studio 抢夺 GPU 显存（在 sentence_transformers 导入前设置）
+        _os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+        # sentence_transformers 导入时需要 HF_ENDPOINT 指向镜像以避免挂死
+        _os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
+        # 查找本地模型缓存
         try:
             sys.path.insert(0, str(Path(__file__).parent))
             from _path_utils import MODELS_DIR
             model_cache = str(MODELS_DIR / "bge-small-zh")
         except Exception:
             model_cache = str(Path.home() / ".cache" / "huggingface" / "hub")
-        # 检查 model_cache 是否包含有效模型（HF hub 格式）
+
         model_id_safe = _MODEL_NAME.replace("/", "--")
         model_id_safe = "models--" + model_id_safe
         hub_path = Path(model_cache) / model_id_safe
+
+        # 先检查 MODELS_DIR
         if hub_path.exists() and (hub_path / "snapshots").exists():
-            # 模型在 MODELS_DIR 中以 HF hub 格式存在，直接使用
-            _os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(hub_path.parent.parent)
+            snapshot_dir = sorted((hub_path / "snapshots").iterdir())[-1]
+            model_path = str(snapshot_dir)
         else:
-            # fallback: 使用默认 HF 缓存（模型通常在这里）
-            _os.environ.pop("SENTENCE_TRANSFORMERS_HOME", None)
+            # 再检查标准 HF 缓存
+            default_hub = str(Path.home() / ".cache" / "huggingface" / "hub")
+            default_path = Path(default_hub) / model_id_safe
+            if default_path.exists() and (default_path / "snapshots").exists():
+                snapshot_dir = sorted((default_path / "snapshots").iterdir())[-1]
+                model_path = str(snapshot_dir)
+            else:
+                # 没本地模型 → 跳过，绝不联网
+                print("[语义检查] 跳过：本地无模型缓存，用户需主动安装")
+                print("[语义检查] 安装命令: pip install sentence-transformers && HF_ENDPOINT=https://hf-mirror.com python -c \"from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')\"")
+                _MODEL = None
+                return _MODEL
+
         from sentence_transformers import SentenceTransformer
-        _MODEL = SentenceTransformer(_MODEL_NAME)
-        print(f"[语义检查] 模型已加载: {_MODEL_NAME}")
+        _MODEL = SentenceTransformer(model_path)
+        print(f"[语义检查] 模型已加载 (本地): {model_path[:80]}")
         print(f"[语义检查] 缓存路径: {model_cache}")
     except ImportError:
         print("[语义检查] 模型不可用: 未安装 sentence-transformers")

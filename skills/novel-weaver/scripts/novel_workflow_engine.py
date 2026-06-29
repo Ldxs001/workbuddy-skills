@@ -7,8 +7,21 @@ Workflow Engine — 流程引擎
   链式调用: atomic_writer.validate_and_write → state_manager.update-sub
   每完成一个子结构立即记录状态（非批量，非延迟）
 """
-import json, sys, subprocess, os, re
+import json, sys, subprocess, os, re, shutil
 from pathlib import Path
+
+# ── 原子 JSON 写入（写 .tmp → 验证 → rename）──
+def _atomic_write_json(path: Path, data: dict):
+    """原子写入 JSON 文件，写入后验证 JSON 合法性，防止崩溃遗留半截文件"""
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        json.loads(tmp.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError:
+        tmp.unlink(missing_ok=True)
+        print(f"[HOOK-BLOCK] _atomic_write_json: 生成的 JSON 非法，拒绝写入")
+        sys.exit(1)
+    shutil.move(str(tmp), str(path))
 
 # Windows 终端编码修复
 if hasattr(sys.stdout, 'reconfigure'):
@@ -43,6 +56,49 @@ def _parse_ending_tag(summary: str) -> str | None:
         if t in ("封闭式", "开放式", "悬停式"):
             return t
     return None
+
+def _detect_new_chars_in_plan(data: dict, chapter: str, subs: list):
+    """
+    扫描子结构的 title/summary/writing_prompt 中的 2-3 字中文名，
+    检查是否已在 characters[] 中注册。
+    发现未登记角色 → HOOK-BLOCK 阻断，提示 add-char 命令。
+    """
+    existing_names = set()
+    for c in data.get("characters", []):
+        existing_names.add(c.get("name", ""))
+        for a in c.get("aliases", []):
+            if a and len(a) >= 2:
+                existing_names.add(a)
+
+    # 从所有子结构的 title/summary/writing_prompt 中提取 2-3 字中文名
+    # 排除: 组织名词（以特定后缀结尾）、纯数字、句首"她/他/它/这/那/你/我/你们/我们"、虚词
+    EXCLUDE_SET = {"他们","她们","它们","你们","我们","自己","什么","那里","这里","这个","那个","这些","那些","没有","不是","因为","所以","但是","然而","虽然","如果","那么","可以","应该","必须","已经","现在","时候","之后","之前","如何","怎么","怎样","一个","一种","一些","方面","问题","可能","需要","成为","决定","面对","开始","出现","发现","知道","看到","听到","感到","想起","进入","到达","离开","回到","来到","通过","形成","引起"}
+    suspected = set()
+    for s in subs:
+        texts = [s.get("title",""), s.get("summary",""), s.get("writing_prompt","")]
+        for t in texts:
+            matches = re.findall(r'[\u4e00-\u9fff]{2,3}', t)
+            for m in matches:
+                if m not in EXCLUDE_SET and m not in existing_names:
+                    suspected.add(m)
+
+    if not suspected:
+        return
+
+    print(f"\n{'='*50}")
+    print(f"[HOOK-BLOCK] {chapter}: 规划中发现 {len(suspected)} 个未登记角色名")
+    print(f"{'='*50}")
+    for name in sorted(suspected):
+        print(f"  ❌ 未登记: 「{name}」→ 请先注册后再重新 plan-chapter")
+        print(f"     python novel_state_manager.py add-char <state_path> \"{name}\" \"<角色身份>\" \"{chapter}\" \"<性格特征(逗号分隔)>\" \"<MBTI>\" \"<原型>\" \"<功能描述>\"")
+    print(f"\n  [示例] 若「{list(suspected)[0]}」是维权组织的法律顾问：")
+    ex_name = list(suspected)[0]
+    print(f"    python novel_state_manager.py add-char <state_path> \\")
+    print(f"      \"{ex_name}\" \"归元会法律组负责人\" \"{chapter}\" \"冷静专业,有正义感\" \"\" \"\" \"处理法律事务和媒体曝光\"")
+    print(f"\n  [完成后] 重新运行相同的 plan-chapter 命令即可（子结构内容不变）")
+    print(f"{'='*50}\n")
+    sys.exit(1)
+
 
 def plan_chapter(state_path, chapter, subs_json):
     """批量注册子结构。末章末子结构自动标记 is_ending。"""
@@ -155,6 +211,9 @@ def plan_chapter(state_path, chapter, subs_json):
                 entry["is_hook_possible"] = True
             ch["sub_structures"][s_key] = entry
         break
+
+    # ── 新角色检测：扫所有子结构的 title/summary/writing_prompt → 比对 characters[] → 阻断 ──
+    _detect_new_chars_in_plan(data, chapter, subs)
 
     # 通过 state_manager.save_state 写入（包含核心字段指纹校验）
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -340,6 +399,42 @@ def write_sub(state_path, chapter, sub_key, target_dir):
         print(f"  python novel_workflow_engine.py finalize-chapter \"{state_path}\" {chapter}")
         print(f"{'='*50}\n")
 
+    # ── 自动完结检测：本章所有子结构全部 completed → 自动 finalize-chapter ──
+    report_dir = str(Path(state_path).parent / "reports")
+    _auto_finalize_if_done(state_path, chapter, str(chapter_dir), report_dir)
+
+
+def _auto_finalize_if_done(state_path, chapter, chapter_dir, report_dir):
+    """检测本章所有子结构是否全部 completed，是则自动触发 finalize-chapter"""
+    sp = Path(state_path)
+    if not sp.exists():
+        return
+    data = json.loads(sp.read_text(encoding="utf-8-sig"))
+    ch_info = None
+    for ch in data.get("chapters", []):
+        if ch["id"] == chapter:
+            ch_info = ch
+            break
+    if not ch_info:
+        return
+    subs = ch_info.get("sub_structures", {})
+    if not subs:
+        return
+    all_done = all(sv.get("status") == "completed" for sv in subs.values())
+    if not all_done:
+        remaining = [sk for sk, sv in subs.items() if sv.get("status") != "completed"]
+        print(f"[完结] {chapter}: 还有 {len(remaining)} 个子结构未完成 → 继续等待")
+        print(f"  待完成: {', '.join(remaining)}")
+        return
+    
+    print(f"\n{'='*50}")
+    print(f"[自动完结] {chapter}: 所有 {len(subs)} 个子结构已完成，自动触发完结验证...")
+    print(f"{'='*50}")
+    
+    # finalize_chapter 在同一模块的后面定义，调用时已加载
+    finalize_chapter(state_path, chapter, chapter_dir, report_dir)
+
+
 def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
     """一键完结：章内连通性 → 跨章承诺链 → 风格校验 → 逻辑检查 → 阻断循环 → 门禁"""
     import importlib
@@ -449,7 +544,7 @@ def finalize_chapter(state_path, chapter, chapter_dir, report_dir):
             if ch["id"] == chapter:
                 ch["status"] = "completed"
                 break
-        sp.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(sp, state_data)
 
         # ── 跨章行为摘要提取 ──
         _generate_behavior_summary(state_path, chapter, str(chapter_dir))
@@ -556,7 +651,7 @@ def _generate_behavior_summary(state_path: str, chapter: str, chapters_dir: str)
 
     # 写入 state
     ch_data["behavior_summary"] = char_actions
-    sp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(sp, data)
     total = sum(len(v) for v in char_actions.values())
     print(f"[行为摘要] {chapter}: {len(char_actions)} 个角色, {total} 条行为记录")
 
