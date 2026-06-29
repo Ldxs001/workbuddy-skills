@@ -1,3 +1,8 @@
+## [1.34.1] - 2026-06-29
+
+### 修复
+- **novel_semantic_check.py BERT 模型路径不兼容** — SENTENCE_TRANSFORMERS_HOME 指向 MODELS_DIR 但模型以 HF hub 格式存储（models--BAAI--bge-small-zh），库不认该目录结构。改为先检测 MODELS_DIR 是否含有效 HF hub 模型，有则正确指向，无则清 env var 回落默认 HF 缓存
+
 ## [1.34.0] - 2026-06-29
 
 ### 修复

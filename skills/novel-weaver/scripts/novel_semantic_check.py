@@ -70,14 +70,23 @@ def _load_model():
         return _MODEL
     try:
         import os as _os
-        # 从 _path_utils 读取 MODELS_DIR，失败则用默认
+        # 从 _path_utils 读取 MODELS_DIR，失败则用默认 HF 缓存
         try:
             sys.path.insert(0, str(Path(__file__).parent))
             from _path_utils import MODELS_DIR
             model_cache = str(MODELS_DIR / "bge-small-zh")
         except Exception:
             model_cache = str(Path.home() / ".cache" / "huggingface" / "hub")
-        _os.environ["SENTENCE_TRANSFORMERS_HOME"] = model_cache
+        # 检查 model_cache 是否包含有效模型（HF hub 格式）
+        model_id_safe = _MODEL_NAME.replace("/", "--")
+        model_id_safe = "models--" + model_id_safe
+        hub_path = Path(model_cache) / model_id_safe
+        if hub_path.exists() and (hub_path / "snapshots").exists():
+            # 模型在 MODELS_DIR 中以 HF hub 格式存在，直接使用
+            _os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(hub_path.parent.parent)
+        else:
+            # fallback: 使用默认 HF 缓存（模型通常在这里）
+            _os.environ.pop("SENTENCE_TRANSFORMERS_HOME", None)
         from sentence_transformers import SentenceTransformer
         _MODEL = SentenceTransformer(_MODEL_NAME)
         print(f"[语义检查] 模型已加载: {_MODEL_NAME}")
