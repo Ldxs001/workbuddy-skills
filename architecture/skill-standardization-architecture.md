@@ -1,7 +1,7 @@
 # skill-standardization 架构与规范体系文档
 
-> 完整解读 v2.95.0 版的架构设计、审查规则体系、标准化执行流程与修复体系  
-> 更新：2026-06-20（v2.82.0 → v2.95.0，含 13 个版本迭代的变更同步）
+> 完整解读 v2.101.8 版的架构设计、审查规则体系、标准化执行流程与修复体系  
+> 更新：2026-06-30（v2.95.0 → v2.101.8，含 7 个版本迭代的变更同步）
 
 ---
 
@@ -13,8 +13,8 @@ skill-standardization 是一个 **Skill 全生命周期标准化管理工具集*
 规范定义（spec/*.json）
   → 构建器（skill_builder: create / update / refactor）
     → 审查器（skill_audit: R-01 ~ R-26）
-      → 修复器（fix.py: 30+ 自动修复函数）
-        → 验证（--verify 铁律阻断 + --classify --category 误判分类）
+      → 修复器（fix.py: 35+ 自动修复函数（含 code_block_markers/list_mixing/code_block_lang/section_completeness/error_handling_faq））
+        → 验证（--verify 铁律阻断 + --classify --category --subtype 误判分类）
 ```
 
 ### 1.1 三层架构
@@ -45,39 +45,25 @@ skill-standardization/
 │   ├── permissions.md          # 权限声明
 │   └── LICENSE.md              # MIT 许可证（R-26 要求）
 └── scripts/                    # 核心脚本
-    ├── skill_builder/          # 构建器包（OO 重构）
-    │   ├── __init__.py         # 主入口 + argparse
+    ├── skill_audit/            # 审计引擎包（重构后统一入口）
+    │   ├── __init__.py         # 主入口 + cmd_xxx() + audit_skill() + _run_audit_loop
     │   ├── __main__.py         # python -m 支持
-    │   ├── creator.py          # SkillCreator（create 模式）
-    │   ├── updater.py          # SkillUpdater（update 模式）
-    │   ├── refactor.py         # SkillRefactor（refactor 模式）
-    │   ├── migrator.py         # SkillMigrator（migrate-data 命令）
-    │   ├── version_manager.py  # VersionManager（版本号管理）
-    │   └── utils.py            # 工具函数（备份、模板等）
-    ├── skill_audit/            # 审查器包
-    │   ├── __init__.py         # 主入口 + cmd_audit/create/update/refactor/bump + _run_audit_loop
-    │   ├── __main__.py         # python -m 支持
-    │   ├── frontmatter_checker.py  # R-01~R-05（frontmatter + _meta.json）
+    │   ├── fix.py              # 自动修复函数（35+ fix key，含新增 code_block_markers 等5个）
     │   ├── structure_checker.py    # R-06~R-09, R-18~R-25 正文结构 + 质量 + R-26
-    │   ├── artifact_checker.py     # R-11~R-12 产出物 + 数据目录
-    │   ├── permission_checks.py    # R-13~R-17 安全权限
+    │   ├── artifact_checker.py     # R-11~R-12 产出物 + 数据目录（v2.101.8: 支持 pathlib 推导式放行）
     │   ├── data_dir_checker.py     # R-22 数据目录合规
-    │   ├── consistency_checker.py  # 一致性审查（含嵌套目录树路径重建，v2.95.0）
+    │   ├── consistency_checker.py  # 一致性审查（含嵌套目录树路径重建）
+    │   ├── _path_detector.py       # 共享路径文件检测（v2.101.8: 优先改选 _paths.py）
     │   ├── _tree_scanner.py        # 目录树扫描器（R-23 辅助）
     │   ├── progress_manager.py     # 进度管理器
-    │   ├── fix.py              # 自动修复函数（30+ 规则）
     │   └── utils.py            # 常量定义（RULES 列表、关键词映射等）
     ├── safe_io.py              # 安全文件写入（原子写入 + 备份 + Windows 重试）
     ├── cleanup_manager.py      # Manifest 驱动清理（备份注册 + 收尾清理）
     ├── permission_checker.py   # 权限检查器（AST 扫描风险操作）
     ├── skill_inspector.py      # 结构扫描器（输出技能蓝皮书）
     └── spec/                   # 规范定义（JSON Schema）
-        ├── _index.json         # 模块注册索引
-        ├── frontmatter.json    # Frontmatter 字段规范 v2.6.0（11 required + 2 conditional + 4 optional）
-        ├── body.json           # 正文章节结构规范 v2.6.0（三层章节体系 + section_synonyms + classification_hints）
-        ├── rules.json          # 审查规则完整定义（R-01~R-26，12 ERROR + 9 WARN）
-        ├── structure.json      # 目录结构规范
-        └── progressive_md.json # 渐进式 MD 体系规范
+        ├── body.json           # 正文章节结构规范 v2.6.0
+        └── ...
 ```
 
 **变化说明（v2.82.0 → v2.95.0）**：
@@ -314,13 +300,17 @@ python -m scripts.skill_audit audit <dir> --classify C-stale_doc_ref --category 
 
 **_llm_only_fix_keys**（v2.95.0，新增 `section_names`）：
 ```python
-_llm_only_fix_keys = {
-    "workflow_completeness",  # C-14: 需要 LLM 读代码写工作流
-    "example_quality",        # C-17: 需要 LLM 读代码创建示例
-    "capability_boundary",    # C-18: 需要 LLM 理解能力边界
+_BLOCKED_FIX_KEYS = {
+    "workflow_completeness",  # C-14: 需要 LLM 读代码写工作流 → 输出3步指引
+    "example_quality",        # C-17: 需要 LLM 读代码创建示例 → 输出3步指引
+    "capability_boundary",    # C-18: 需要 LLM 理解能力边界 → 输出3步指引
     "section_names",          # C-11: 非标章节归类需 LLM 判断内容语义
 }
 ```
+BLOCKED 的 3 个 key（C-14/17/18）被阻断时输出结构化指引：
+1. 读取 `scripts/` 下的 Python 代码理解功能
+2. 按 JSON 模板写入结构化数据文件
+3. 重新 `--fix` 自动渲染为 SKILL.md 章节
 
 ### 5.2 修复循环退出机制（v2.94.0 重写）
 
@@ -344,7 +334,7 @@ else:
     break  # 只有 0 remaining 才放行
 ```
 
-### 5.3 修复函数清单（30+）
+### 5.3 修复函数清单（35+）
 
 | 函数 | 对应规则 | 修复内容 |
 |------|---------|---------|
@@ -366,12 +356,17 @@ else:
 | `fix_frontmatter_fields` | R-01 | 补全 frontmatter |
 | `fix_license_compliance` | R-26 | LICENSE 规范 |
 | `apply_consistency_fix` | 一致性审查 | outdated_rule_ref 修复 |
+| **`fix_code_block_markers`** | **R-22(写作标准)** | **缩进代码块→围栏 ``` 块（v2.101.7 新增）** |
+| **`fix_list_mixing`** | **C-05** | **同章节混排列表统一为多数方样式（v2.101.7 新增）** |
+| **`fix_code_block_lang`** | **C-07** | **裸 ``` 补语言标识（v2.101.7 新增）** |
+| **`fix_section_completeness`** | **C-12** | **空章节补充格式线索（v2.101.7 新增）** |
+| **`fix_faq_error_handling`** | **C-19** | **创建/补充 FAQ 错误处理章节（v2.101.7 新增）** |
 
 ---
 
 ## 六、关键流程
 
-### 6.1 refactor 模式完整步骤（v2.95.0）
+### 6.1 refactor 模式完整步骤（v2.101.8）
 
 ```
 [1/8] 蓝皮书扫描 → inspect_skill(skill_dir)
@@ -416,4 +411,4 @@ else:
 
 ---
 
-> 本文档基于 skill-standardization v2.95.0 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
+> 本文档基于 skill-standardization v2.101.8 的 SKILL.md + references/*.md + 核心脚本综合分析整理。
