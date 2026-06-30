@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import json
+import hashlib
 import datetime
 import importlib.util
 import argparse
@@ -487,7 +488,82 @@ _CLASSIFY_LEGAL_SUBTYPES = {
         "引擎无法静态验证。仅当 detail 提到「路径」「models/」「数据」「缓存」「目录树」时使用。",
 }
 
+
+_SNAPSHOT_BASENAME = ".fp_snapshot.json"
+
+def _snapshot_dir(skill_dir):
+    """指纹快照目录：.standardization/skill-standardization/data/<skill>/"""
+    return os.path.join(
+        os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+        'skill-standardization', 'data',
+        os.path.basename(os.path.abspath(skill_dir))
+    )
+
+def _hash_file(path):
+    """SHA256 文件指纹，文件不存在返回 None"""
+    if not os.path.isfile(str(path)):
+        return None
+    return hashlib.sha256(open(str(path), 'rb').read()).hexdigest()
+
+def _update_snapshot(skill_dir, basename):
+    """系统写入信号文件后更新指纹。传文件名（如 .verify_fp.json）"""
+    sdir = _snapshot_dir(skill_dir)
+    os.makedirs(sdir, exist_ok=True)
+    snap_path = os.path.join(sdir, _SNAPSHOT_BASENAME)
+    snap = {}
+    if os.path.isfile(snap_path):
+        try:
+            snap = json.load(open(snap_path, 'r', encoding='utf-8'))
+        except Exception:
+            snap = {}
+    target = os.path.join(
+        os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+        os.path.basename(os.path.abspath(skill_dir)), 'data', basename
+    )
+    snap[basename] = _hash_file(target)
+    with open(snap_path, 'w', encoding='utf-8') as f:
+        json.dump(snap, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+def _verify_snapshot(skill_dir, basename):
+    """读取信号文件前校验指纹。指纹不匹配或文件被删则 HARD-BLOCK"""
+    sdir = _snapshot_dir(skill_dir)
+    snap_path = os.path.join(sdir, _SNAPSHOT_BASENAME)
+    if not os.path.isfile(snap_path):
+        return  # 首次使用无快照，放行
+    try:
+        snap = json.load(open(snap_path, 'r', encoding='utf-8'))
+    except Exception:
+        return
+    expected = snap.get(basename)
+    if expected is None:
+        return  # 该文件尚未注册快照
+    target = os.path.join(
+        os.path.dirname(os.path.abspath(skill_dir)), '.standardization',
+        os.path.basename(os.path.abspath(skill_dir)), 'data', basename
+    )
+    actual = _hash_file(target)
+    if actual is None:
+        print(f"\n{'='*55}")
+        print(f"  [HARD-BLOCK] 信号文件被删除: {basename}")
+        print(f"  指纹快照 %s 记录该文件曾有指纹，现已不存在。" % _SNAPSHOT_BASENAME)
+        print(f"  可能原因：LLM 手动 `rm` 后未通过系统管道重建。")
+        print(f"  修复：删除 {snap_path} 后重新运行 refactor（会丢失分类数据）。")
+        print(f"{'='*55}\n")
+        sys.exit(1)
+    if actual != expected:
+        print(f"\n{'='*55}")
+        print(f"  [HARD-BLOCK] 信号文件指纹不匹配: {basename}")
+        print(f"  期望指纹: {expected}")
+        print(f"  实际指纹: {actual}")
+        print(f"  可能原因：LLM 手动写入该文件，绕过了系统管道（--classify / 修复循环）。")
+        print(f"  必须通过系统管道操作，直接写文件将被拒绝。")
+        print(f"{'='*55}\n")
+        sys.exit(1)
+
+
+
 def _load_fp_ids(skill_dir):
+    _verify_snapshot(skill_dir, ".verify_fp.json")
     """读取 LLM 分类的误判 #ID 列表（返回 set[str]）
     
     仅识别 dict 格式（{id: {category, reason}}），
@@ -550,6 +626,7 @@ def _write_fp_classify(skill_dir, ids, category, reason="", subtype=""):
         existing[id_str] = {"category": category, "reason": reason, "subtype": subtype}
     with open(fp_path, 'w', encoding='utf-8') as f:
         json.dump(existing, f, ensure_ascii=False, indent=2, sort_keys=True)
+    _update_snapshot(skill_dir, ".verify_fp.json")
 
 
 def _remove_fp_classify(skill_dir, ids):
@@ -847,6 +924,7 @@ def _save_remaining_llm(skill_dir, remaining):
     try:
         with open(_path, 'w', encoding='utf-8') as f:
             json.dump(remaining, f, ensure_ascii=False, indent=2)
+        _update_snapshot(skill_dir, ".remaining_llm.json")
         print(f"  📋 LLM 剩余修复项已保存: {_path}")
     except Exception as e:
         print(f"  ⚠️  保存 .remaining_llm.json 失败: {e}")
@@ -2687,6 +2765,17 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             wait_data = json.load(open(_manual_wait_path, 'r'))
             wait_files = wait_data.get("files", [])
             actually_modified = [f for f in wait_files if os.path.exists(f)]
+            # mtime 校验：文件必须比 .manual_done 新，证明 LLM 实际修改过
+            if actually_modified:
+                done_mtime = os.path.getmtime(_manual_done_path)
+                verified = []
+                for f in wait_files:
+                    if os.path.exists(f):
+                        if os.path.getmtime(f) >= done_mtime:
+                            verified.append(f)
+                        else:
+                            print(f"  ⚠️  文件末次修改早于 .manual_done 写入: {f}")
+                actually_modified = verified
             if not actually_modified and wait_files:
                 print(f"\n  ❌ LLM 声称已手动修复但未修改任何文件！")
                 print(f"     必须实际修改文件后写 .manual_done，不得空过")
@@ -2816,6 +2905,10 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
             # 首次循环 (loop_count == 1) 时注入 fix key；后续循环中不再重新注入已被清除的 key
             if rid_inner == "R-25" and loop_count == 1:
                 detail_inner = r_inner.get("detail", "")
+                if "C-05" in detail_inner:
+                    r_inner["fix"] = {"key": "writing_standards"}
+                if "C-07" in detail_inner:
+                    r_inner["fix"] = {"key": "trigger_format"}
                 if "C-10" in detail_inner and not r_inner.get("fix"):
                     r_inner["fix"] = {"key": "excessive_blank_lines"}
                 if "C-11" in detail_inner:
@@ -2911,24 +3004,35 @@ def _run_audit_loop(skill_dir, max_loops, label_prefix, manifest_version=None, f
                         print(f"    → 手动编辑 SKILL.md 或 references/ 中的对应章节后重新 audit")
 
         if has_fixable:
-            # ★ v2.98.1: 修复前快照文件修改时间（增量审计用）
-            _fix_mtime_snapshot.clear()
-            for _fp in [os.path.join(skill_dir, f) for f in ["SKILL.md", "_meta.json"]]:
-                if os.path.exists(_fp):
-                    _fix_mtime_snapshot[_fp] = os.path.getmtime(_fp)
-            print(f"\n  --- 自动修复 ---")
-            _fixes_applied = 0
-            # ★ 只处理 auto-fixable 项（按 fix key 粒度筛选）
-            _auto_targets = remaining_auto if remaining_auto else [r for r in remaining
-                if r.get("fix") and r["fix"].get("key") not in _llm_only_fix_keys]
+            # ★ --continue 手动修复周期中跳过 auto-fix，避免覆盖手动修
+            _manual_dir = _manual_dir_path(skill_dir)
+            _manual_wait_path = os.path.join(_manual_dir, ".manual_wait")
+            if os.path.isfile(_manual_wait_path):
+                has_fixable = False
+                _fixes_applied = 0
+                _auto_targets = []
+            else:
+                # ★ v2.98.1: 修复前快照文件修改时间（增量审计用）
+                _fix_mtime_snapshot.clear()
+                for _fp in [os.path.join(skill_dir, f) for f in ["SKILL.md", "_meta.json"]]:
+                    if os.path.exists(_fp):
+                        _fix_mtime_snapshot[_fp] = os.path.getmtime(_fp)
+                print(f"\n  --- 自动修复 ---")
+                _fixes_applied = 0
+                # ★ 只处理 auto-fixable 项（按 fix key 粒度筛选）
+                _auto_targets = remaining_auto if remaining_auto else [r for r in remaining
+                    if r.get("fix") and r["fix"].get("key") not in _llm_only_fix_keys]
             for res in _auto_targets:
                 # R-25 可能有多个子项 -> 调所有匹配的 fix 函数
                 if res.get("rule_id", "") == "R-25":
                     detail = res.get("detail", "")
                     _fix_key_map = {
+                        "C-05": "writing_standards",
+                        "C-07": "trigger_format",
                         "C-10": "excessive_blank_lines",
                         "C-11": "section_reorder",
                         "C-12": "trigger_format",
+                        "C-13": "section_reorder",
                         "C-14": "workflow_completeness",
                         "C-15": "inline_refs",
                         "C-17": "example_quality",
@@ -3425,6 +3529,9 @@ def main():
         _is_continue = getattr(args, 'refactor_continue', False) or getattr(args, 'continue_', False)
         _is_classify = bool(getattr(args, 'classify', None))
         _is_no_fp = bool(getattr(args, 'no_fp', None))
+        if getattr(args, 'refactor_continue', False):
+            _verify_snapshot(args.skill_dir, ".remaining_llm.json")
+            _verify_snapshot(args.skill_dir, ".manual_wait")
         if os.path.isfile(_remaining_path) and not (_is_continue or _is_classify or _is_no_fp):
             print(f"\n  ⛔ ⛔ ⛔ 存在未完成的修复会话 ⛔ ⛔ ⛔")
             print(f"  .remaining_llm.json 存在，说明修复循环未闭环")

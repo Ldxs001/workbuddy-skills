@@ -251,13 +251,13 @@ python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed
 
 ```bash
 # 方式一：在 skill-standardization 目录下调用
-cd "C:/Users/sm001/.workbuddy/skills/skill-standardization"
+cd ~/workbuddy/skills/skill-standardization
 python -c "
 from scripts.skill_audit.fix import apply_fix
 # 修复单条规则
-apply_fix('C:/Users/sm001/.workbuddy/skills/<skill-dir>', 'R-07')
+apply_fix('~/workbuddy/skills/<skill-dir>', 'R-07')
 # 修复多条规则
-apply_fix('C:/Users/sm001/.workbuddy/skills/<skill-dir>', 'R-07', 'R-18', 'R-19')
+apply_fix('~/workbuddy/skills/<skill-dir>', 'R-07', 'R-18', 'R-19')
 "
 ```
 

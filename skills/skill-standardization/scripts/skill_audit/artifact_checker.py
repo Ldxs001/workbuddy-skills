@@ -626,6 +626,8 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
     #     path_val 可能是 Python 表达式（如 SKILL_DIR.parent / ".standardization" / "skill" / "data"）
     #     不直接用 os.path.normpath 比较（会因引用/拼接操作符而失败），改为检查
     #     .standardization + skill 名称是否同时出现
+    # ★ v2.101.7: 如果 path_val 是变量推导（如 STD_DIR / "data"），
+    #   检查同一文件中是否有关联变量包含 .standardization，有则放行
     for rel_file, var_name, path_val, lineno in data_dir_vars:
         if not path_val:
             continue
@@ -633,15 +635,31 @@ def check_external_data_dir(filepath, content, fm, body, skill_dir=None, **kw):
         has_std = ".standardization" in pv_lower
         has_skill = dirname.lower() in pv_lower
         if not (has_std and has_skill):
-            violations.append({
-                "source": rel_file + ":" + str(lineno),
-                "var_name": var_name,
-                "path_value": path_val,
-                "expected": ".standardization/" + dirname + "/data/",
-                "detail": var_name + "=" + path_val + " violates skills/.standardization/<skill>/ convention (same as R-11). "
-                       "【推荐写法】变量名含 DATA 的那行直接赋值合规字面量，"
-                       "再用另一个不含关键词的变量（如 _data_dir_abs）计算绝对路径。",
-            })
+            # 检查是否为 pathlib 推导路径：同一文件有其他变量包含 .standardization
+            is_derived = False
+            source_file = os.path.join(skill_dir, rel_file)
+            if os.path.isfile(source_file):
+                try:
+                    with open(source_file, "r", encoding="utf-8") as _f:
+                        _src = _f.read()
+                    # 查找包含 .standardization 字面量的其他变量声明
+                    if re.search(r'=\s*(?:SKILLS_ROOT|SKILL_DIR).*?\.standardization', _src, re.MULTILINE):
+                        is_derived = True
+                    elif re.search(r'"[^"]*\.standardization[^"]*"', _src) or \
+                         re.search(r"'[^']*\.standardization[^']*'", _src):
+                        is_derived = True
+                except Exception:
+                    pass
+            if not is_derived:
+                violations.append({
+                    "source": rel_file + ":" + str(lineno),
+                    "var_name": var_name,
+                    "path_value": path_val,
+                    "expected": ".standardization/" + dirname + "/data/",
+                    "detail": var_name + "=" + path_val + " violates skills/.standardization/<skill>/ convention (same as R-11). "
+                           "【推荐写法】变量名含 DATA 的那行直接赋值合规字面量，"
+                           "再用另一个不含关键词的变量（如 _data_dir_abs）计算绝对路径。",
+                })
 
     # 3. check _meta.json has data_dir field
     meta_file = os.path.join(skill_dir, "_meta.json")

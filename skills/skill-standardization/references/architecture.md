@@ -52,10 +52,12 @@ skill-standardization/                 # Skill 根目录
     └── skill_audit/                   # 审计引擎包
         ├── __init__.py                # 主入口 + cmd_xxx() + audit_skill()
         ├── consistency_checker.py     # 一致性审查
-        ├── structure_checker.py       # R-26~R-26 检查函数
-        ├── fix.py                     # 自动修复函数
+        ├── structure_checker.py       # R-06~R-26 检查函数
+        ├── fix.py                     # 自动修复函数（35+ fix key，含新增的 code_block_markers/list_mixing/code_block_lang/section_completeness/error_handling_faq）
+        ├── artifact_checker.py        # R-12 数据目录合规 + 产物物路径检查（v2.101.8: 支持 pathlib 推导式放行）
+        ├── _path_detector.py          # 共享路径文件检测（v2.101.8: 优先改选 _paths.py）
         └── spec/
-            └── rules.json             # 规则定义
+            └── body.json              # 正文章节结构规范（三层体系 + content_format）
 ```
 
 ---
@@ -77,6 +79,7 @@ skill-standardization/                 # Skill 根目录
       │                  audit_skill()                       │
       │    R-01~R-26 全量/针对性审计                          │
       │    → _filter_false_positives() (读取 --classify)     │
+      │    → _path_detector (共享路径文件检测)                 │
       └──────────────────────────────────────────────────────┘
                                │
           ┌────────────────────┼────────────────────┐
@@ -86,7 +89,10 @@ skill-standardization/                 # Skill 根目录
     │① audit       │    → reclassify_consistency
     │② 二次筛阻断点 │      _false_positive()
     │③ auto-fix    │    → apply_consistency_fix()
+    │  (35+ fix key)│
     │④ LLM manual  │
+    │  (含BLOCKED   │
+    │   指引输出)   │
     │⑤ re-audit    │
     └──────────────┘
 ```
@@ -95,20 +101,21 @@ skill-standardization/                 # Skill 根目录
 
 ## 核心流程
 
-### refactor（9 步）
+### refactor（10 步）
 ```
-[1] 蓝皮书扫描
-[2] cleanup session + 备份
-[3] 全量审计 → audit_skill()
-[4] _run_audit_loop()
-      ├─ ★ 前置 LLM 二次筛阻断点
-      ├─ auto-fix（按 fix key 粒度过滤 _llm_only_fix_keys 后修复）
-      └─ LLM manual 指引
-[5] LLM 剩余项检查
-[6] 全量审计确认（双0）
-[7] 全量一致性审查（含自有二次筛）
-[8] bump（feature → MINOR）
-[9] cleanup 清理
+[1]  蓝皮书扫描
+[2]  cleanup session + 备份
+[3]  全量审计 → audit_skill()
+[4]  _run_audit_loop()
+       ├─ ★ 前置 LLM 二次筛阻断点（检查 --classify）
+       ├─ auto-fix（按 fix key 粒度过滤 _llm_only_fix_keys 后修复）
+       └─ LLM manual 指引（含 BLOCKED fix 的 3 步操作指引输出）
+[5]  LLM 剩余项检查（读取 .remaining_llm.json）
+[6]  全量审计确认（双0）
+[7]  全量一致性审查（含自有二次筛）
+[8]  --subtype 二次精筛（必须从枚举表匹配）
+[9]  bump（feature → MINOR）
+[10] cleanup 清理 + 展示报告
 ```
 
 ### update（9 步）
@@ -161,15 +168,20 @@ R-01~R-26 规则定义在 `scripts/skill_audit/spec/rules.json`，由 `structure
 
 | 规则范围 | 规则ID | 说明 |
 |----------|--------|------|
-| Frontmatter | R-01~R-26 | 字段完整性、命名、版本、描述、H1 |
-| 正文结构 | R-07~R-26 | 触发条件、章节、版本一致性 |
-| 路径安全 | R-11~R-26 | 产出物路径、数据目录 |
-| 权限安全 | R-13~R-26 | 敏感访问、写入、风险说明 |
-| 渐进加载 | R-17 | 文件行数 ≤ 230 |
-| 内容质量 | R-18~R-26 | 反模式、FAQ |
-| 写作规范 | R-20 | 术语、模糊表述、中英文空格 |
+| Frontmatter | R-01~R-04 | 字段完整性、命名、版本、描述 |
+| 正文结构 | R-06~R-09 | H1、触发条件、章节、工作流 |
+| 版本 | R-10 | 版本三端一致性 |
+| 路径安全 | R-11~R-12 | 产出物路径、数据目录规范 |
+| 权限安全 | R-13~R-16 | 敏感访问、写入、permissions.md |
+| 渐进加载 | R-17 | 文件行数 ≤ 230 + 非标章节迁移 |
+| 内容质量 | R-18~R-19 | 反模式、FAQ |
+| 写作规范 | R-20 | 术语一致/无模糊表述/中英文空格 |
 | 渐进引用 | R-21 | 固定模板句 |
-| 规范性 | R-22~R-26 | data_dir、一致性、changelog、格式、LICENSE |
+| 数据目录 | R-22 | 安装目录无越位数据文件 |
+| 一致性 | R-23 | 文档-代码一致性 |
+| 更新日志 | R-24 | 渐进式 changelog |
+| 文档格式 | R-25 | C-01~C-19 写作格式规范（含 C-05/C-07/C-12/C-14/C-17/C-18/C-19） |
+| 许可声明 | R-26 | LICENSE + README 规范 |
 
 ---
 

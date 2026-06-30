@@ -2,7 +2,7 @@
 name: skill-standardization
 slug: skill-standardization
 displayName: Skill Standardization
-version: 2.101.3
+version: 2.101.10
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit / create / update / refactor / bump / readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、LLM 二次筛分类。
@@ -117,12 +117,12 @@ create_permissions_md: true
 
 | 能力 | 说明 | 限制 |
 | ------ |------| ------ |
-| **审计现有 skill** | R-01~R-26 全量检查，输出 PASS/WARN/FAIL 逐条明细及上下文行 | 仅检查 SKILL.md + _meta.json + scripts/ 文件结构和代码静态分析，不检查 Python 运行时行为 |
-| **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ 6文件 / scripts/_paths.py） | 只生成结构模板和占位功能代码，审计规则完整覆盖需运行审计修复 |
-| **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码 |
-| **批量审计** | `audit-all` 子命令扫描 skills/ 下多个 skill | 遍历 skills/ 下的所有一级子目录（不支持嵌套目录），每个子目录中的非技能目录需自行排除 |
-| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 触发词 / 反模式 / FAQ / 写作规范 / 路径集中管理等格式问题，覆盖 R-01~R-26 共 20+ 条规则（含 R-25 C-20 路径集中管理） | 仅修复格式/结构/路径/生成类问题，**不修复代码逻辑错误**。<br>修复后需运行 `--verify` + `--show-fix` 两阶段验证确认 |
-| **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析，无法检测动态代码执行的权限需求 |
+| **审计现有 skill** | R-01~R-26 全量检查，输出 PASS/WARN/FAIL 逐条明细及上下文行 | 仅检查 SKILL.md + _meta.json + scripts/ 文件结构和代码静态分析，不检查 Python 运行时行为。参数约束：`<skill-dir>` 为 skill 绝对路径，长度20~260字符|
+| **创建新 skill** | 从模板生成标准骨架（SKILL.md / _meta.json / references/ 6文件 / scripts/_paths.py） | 只生成结构模板和占位功能代码，审计规则完整覆盖需运行审计修复。参数：`--desc` 描述文本 ≤120 字 |
+| **改造非标 skill** | 自动迁移文件到正确位置、补充 permissions.md、修复格式问题 | 不处理跨技能依赖、不自动生成功能代码。参数：`--changed-files` 文件路径列表（空格分隔）|
+| **批量审计** | `audit-all` 子命令扫描 skills/ 下多个 skill | 仅支持一级子目录（不支持嵌套），非技能目录需自行排除。参数：无并行度参数，串行执行 |
+| **自动修复** | `--fix` 自动修正 SKILL.md frontmatter / 版本号 / 数据目录 / 触发词 / 反模式 / FAQ / 写作规范 / 路径集中管理 / 代码块格式 / 列表样式 / 节内容补全等格式问题，覆盖 R-01~R-26 共 25+ 条规则（含 R-25 C-05/C-07/C-12/C-19 新增 fix），另有 `code_block_markers`/`list_mixing`/`code_block_lang`/`section_completeness`/`error_handling_faq` 5 个新修复入口 | 仅修复格式/结构/路径/生成类问题，**不修复代码逻辑错误**。<br>修复后需运行 `--verify` + `--show-fix` 两阶段验证确认 |
+| **权限安全扫描** | 自动检测脚本中的文件删除/网络请求/subprocess 调用 | 扫描基于 AST 静态分析。参数：无输入参数，自动扫描 `scripts/` 下所有 `.py` 文件 |
 
 > 触发本技能后立即可见的能力输出：读取目标 SKILL.md 中的 frontmatter/正文/references/scripts → 执行 R-01~R-26 规则审查 → 输出审查报告（含每条规则的 PASS/WARN/FAIL 状态 + 详细原因 + 附近代码上下文）。
 
@@ -130,41 +130,42 @@ create_permissions_md: true
 
 以下命令均为 `python -m scripts.skill_audit` 的子命令，需传入 `--mode` 匹配自检闸门输出。
 
+**场景：审计 hug-html 技能** — 全流程演示
 ```bash
-# 只读查询（不过门禁也可执行，但推荐走门禁）
+# 只读查询 — 列出 R-01~R-26 共 26 条规则
 python -m scripts.skill_audit rules --confirmed --mode readonly
 python -m scripts.skill_audit create-template --confirmed --mode readonly
 
-# 审计（仅检查）
-python -m scripts.skill_audit audit <skill-dir> --confirmed --mode audit
+# 审计 hug-html — 扫描 158 行 SKILL.md + 15~20 个脚本（上限50文件)
+python -m scripts.skill_audit audit ~/dev/skills/hug-html --confirmed --mode audit
 
-# 审计+修复（只修有 fix key 的，不经过二次筛）
-python -m scripts.skill_audit audit <skill-dir> --fix --confirmed --mode audit
+# 审计+修复 — 自动修复 20~50 处格式问题（上限3轮循环）
+python -m scripts.skill_audit audit ~/dev/skills/hug-html --fix --confirmed --mode audit
 
-# 审计验证（在 --classify 后确认双0）
-python -m scripts.skill_audit audit <skill-dir> --verify --confirmed --mode audit
+# 审计验证 — 确认 0 ERROR 0 WARN（过滤已分类误判）
+python -m scripts.skill_audit audit ~/dev/skills/hug-html --verify --confirmed --mode audit
 
-# 创建新技能
-python -m scripts.skill_audit create <skill-dir> --desc "描述" --confirmed --mode create
+# 创建新技能 — 5 秒生成完整骨架（=12个必填字段）
+python -m scripts.skill_audit create ~/dev/skills/my-new-skill --desc "数据分析工具" --confirmed --mode create
 
-# 轻量更新（指定变更文件）
-python -m scripts.skill_audit update <skill-dir> --changed-files scripts/foo.py --confirmed --mode update
+# 轻量更新 — 仅审计 1 个变更文件
+python -m scripts.skill_audit update ~/dev/skills/hug-html --changed-files scripts/fix.py --confirmed --mode update
 
-# 全流程改造
-python -m scripts.skill_audit refactor <skill-dir> --confirmed --mode refactor
+# 全流程改造 — 10 步自动化（35+ fix 函数）
+python -m scripts.skill_audit refactor ~/dev/skills/hug-html --confirmed --mode refactor
 
-# 标记误报后继续
-python -m scripts.skill_audit refactor <skill-dir> --continue --confirmed --mode refactor
+# 续跑改造 — 从第 5 步继续修复剩余 3~5 个 WARN
+python -m scripts.skill_audit refactor ~/dev/skills/hug-html --continue --confirmed --mode refactor
 
-# 版本号升级（三端同步，需双0确认）
-python -m scripts.skill_audit bump <skill-dir> --desc "变更说明" --confirmed --mode bump
+# 版本升级 — 三端同步（SKILL.md + _meta.json + changelog）
+python -m scripts.skill_audit bump ~/dev/skills/hug-html --desc "修复R-12路径检测bug" --confirmed --mode bump
 ```
 
 → 详见 渐进式文件索引表 获取完整交互示例
 
 ## 工作流程
 
-refactor 全流程（9 步）：模式识别为 CLI 前置逻辑，不占流程编号。
+refactor 全流程（10 步）：模式识别为 CLI 前置逻辑，不占流程编号。
 
 1. **蓝皮书扫描** → 输入 SKILL.md + scripts/ → 输出 蓝皮书 JSON — 提取技能结构：文件名、函数、依赖关系
 2. **备份** → 输入 技能目录 → 输出 .zip 备份 — 备份到 .standardization/<skill>/backup/
@@ -187,6 +188,7 @@ refactor 全流程（9 步）：模式识别为 CLI 前置逻辑，不占流程�
 5. **细碎修复循环** → 输入 审计 FAIL 列表（真问题）→ 输出 修复后的文件 — auto-fix + LLM 手动修复，代码级确认循环
    - 按 fix key 粒度分离 auto/LLM 路径：
      · fix key 在 _llm_only_fix_keys 中（workflow_completeness/example_quality/capability_boundary/section_names）→ LLM 手动
+     · 这些 key 被 BLOCKED 时输出 3 步操作指引（读代码→写结构化JSON→重跑 --fix），切勿跳过
      · fix key 不在其中 → auto-fix
      · 无 fix key → LLM 手动
    - 停滞检测：auto-fix 实际修复数为 0 时清空所有 fix key 不再空转
@@ -197,6 +199,7 @@ refactor 全流程（9 步）：模式识别为 CLI 前置逻辑，不占流程�
    - **自有 LLM 二次筛阻断点**：检查 `--classify` 中 `C-{type}` 格式的 ID
    - auto-fix 修 outdated_rule_ref 等可自动修复项
    - LLM 手动修语义一致性（流程描述 vs 代码执行）
+8. **`--subtype` 二次精筛** → 在 `--classify` 标记误报时，**必须**同时传入 `--subtype` 从枚举表中选择匹配的具体场景。枚举表见本文「约束」章节。不匹配的场景代码级拒绝。
 9. **bump + cleanup** → 版本号三端同步 + cleanup session 清理临时文件
    - refactor/update 流程内部调用 `cmd_bump`，也可单独调用
 10. **★ 展示报告（强制）** → 审计/改造流程全部结束后，LLM **必须**调用 `present_files` 打开生成的 `.audit_report.html`

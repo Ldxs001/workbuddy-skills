@@ -410,9 +410,9 @@ def fix_section_trigger(skill_dir, **kw):
     neg_section = '\n'.join(f"- {t}" for t in neg_triggers)
 
     section_body = (
-        f"**正向触发（满足以下任意一条）：**\n"
+        f"**正向触发**：\n"
         f"{pos_items}\n\n"
-        f"**否定条件（满足以下任意一条，不触发）：**\n"
+        f"**否定条件**：\n"
         f"{neg_section}\n"
     )
 
@@ -1460,7 +1460,7 @@ def fix_frontmatter_fields(skill_dir, **kw):
         'license': 'license: MIT',
         'tags': 'tags: []',
         'data_dir': f'data_dir: ../.standardization/{skill_name}/',
-        'external_data_dir': 'external_data_dir:',    # 空值（对应 YAML null）
+        'external_data_dir': 'external_data_dir: true',
         'sensitive_access': 'sensitive_access: false',
         'critical_write': 'critical_write: false',
         'permission_weight': 'permission_weight: LOW',
@@ -2501,12 +2501,41 @@ def fix_workflow_completeness(skill_dir, **kw):
     data = _read_struct(skill_dir, "workflow_completeness")
     if data is None:
         struct_path = _struct_file_path(skill_dir, "workflow_completeness")
-        print(f"\n  ⛔ C-14 需结构化数据：请读取技能代码，生成 {struct_path}")
-        print(f"    格式：{{\"skill\": \"技能名\", \"steps\": [")
-        print(f"      {{\"order\": 1, \"name\": \"步骤名\", \"input\": \"...\", \"output\": \"...\", \"detail\": \"...\"}}")
-        print(f"    ]}}")
-        print(f"    生成后重新运行 --fix，脚本会自动渲染为工作流章节")
+        skill_name = os.path.basename(os.path.normpath(skill_dir))
+        print(f"""
+  ╔══ C-14 修复指引 ═══════════════════════════════════════
+  ║  ┌─ 问题 ──────────────────────────────────────────
+  ║  │ SKILL.md 的「工作流程」章节内容不完整，缺少有序的步骤描述。
+  ║  ├─ 修复流程（3 步）─────────────────────────────────
+  ║  │ 1. 读取 {skill_dir}/scripts/ 下的 Python 代码，
+  ║  │    理解该技能的完整执行流程（入口函数→各步骤→输出）。
+  ║  │ 2. 按以下 JSON 格式，写入 {struct_path}：
+  ║  │    {{
+  ║  │      "skill": "{skill_name}",
+  ║  │      "steps": [
+  ║  │        {{"order": 1, "name": "步骤一名称", "input": "输入说明", "output": "输出说明", "detail": "详细描述"}},
+  ║  │        {{"order": 2, "name": "步骤二名称", "input": "...", "output": "...", "detail": "..."}}
+  ║  │      ]
+  ║  │    }}
+  ║  │ 3. 重新运行 --fix，脚本自动读取该 JSON 并渲染为工作流章节
+  ║  └──────────────────────────────────────────────────
+  ║  注意：steps 必须按顺序排列，order 从 1 开始递增
+  ╚══════════════════════════════════════════════════════════""")
         return 0
+    
+    rendered = _render_workflow_section(data)
+    if not rendered:
+        return 0
+    
+    # 确定替换范围：## 工作流程 到下一个 H2
+    section_content = "## 工作流程\n\n" + rendered
+    if _replace_section_in_skill(skill_dir, "工作流程", section_content):
+        return 1
+    # 尝试别名
+    for alias in ["工作流", "Workflow", "完整执行流程", "执行流程"]:
+        if _replace_section_in_skill(skill_dir, alias, section_content):
+            return 1
+    return 0
     
     rendered = _render_workflow_section(data)
     if not rendered:
@@ -2530,11 +2559,25 @@ def fix_example_quality(skill_dir, **kw):
     data = _read_struct(skill_dir, "example_quality")
     if data is None:
         struct_path = _struct_file_path(skill_dir, "example_quality")
-        print(f"\n  ⛔ C-17 需结构化数据：请读取技能代码，生成 {struct_path}")
-        print(f"    格式：{{\"scenarios\": [")
-        print(f"      {{\"name\": \"场景名\", \"command\": \"命令\", \"input\": \"输入\", \"expected_output\": \"预期输出\", \"description\": \"描述\"}}")
-        print(f"    ]}}")
-        print(f"    生成后重新运行 --fix，脚本会自动渲染为示例段落")
+        print(f"""
+  ╔══ C-17 修复指引 ═══════════════════════════════════════
+  ║  ┌─ 问题 ──────────────────────────────────────────
+  ║  │ SKILL.md 的使用示例/快速开始章节质量不足（缺少 CLI 命令/
+  ║  │ 输入输出说明/执行过程）。
+  ║  ├─ 修复流程（3 步）─────────────────────────────────
+  ║  │ 1. 读取 {skill_dir}/ 下的 Python 代码，
+  ║  │    理解该技能的使用方式、参数和预期输出。
+  ║  │ 2. 按以下 JSON 格式，写入 {struct_path}：
+  ║  │    {{
+  ║  │      "scenarios": [
+  ║  │        {{"name": "场景一", "command": "示例命令", "input": "输入描述", "expected_output": "预期输出", "description": "场景说明"}},
+  ║  │        {{"name": "场景二", "command": "...", "input": "...", "expected_output": "...", "description": "..."}}
+  ║  │      ]
+  ║  │    }}
+  ║  │ 3. 重新运行 --fix，脚本自动读取该 JSON 并渲染为示例章节
+  ║  └──────────────────────────────────────────────────
+  ║  注意：每个场景应展示一种典型用法，包含完整命令和预期输出
+  ╚══════════════════════════════════════════════════════════""")
         return 0
     
     rendered = _render_examples_section(data)
@@ -2558,11 +2601,27 @@ def fix_capability_boundary(skill_dir, **kw):
     data = _read_struct(skill_dir, "capability_boundary")
     if data is None:
         struct_path = _struct_file_path(skill_dir, "capability_boundary")
-        print(f"\n  ⛔ C-18 需结构化数据：请读取技能代码，生成 {struct_path}")
-        print(f"    格式：{{\"capabilities\": [")
-        print(f"      {{\"name\": \"能力名\", \"description\": \"...\", \"limit\": \"...\"}}")
-        print(f"    ], \"non_capabilities\": [{{\"name\": \"...\", \"reason\": \"...\"}}]}}")
-        print(f"    生成后重新运行 --fix，脚本会自动渲染为能力边界表格")
+        print(f"""
+  ╔══ C-18 修复指引 ═══════════════════════════════════════
+  ║  ┌─ 问题 ──────────────────────────────────────────
+  ║  │ SKILL.md 缺少「能力与限制」章节或内容不完整
+  ║  │（未声明能力边界、参数限制、不支持的功能）。
+  ║  ├─ 修复流程（3 步）─────────────────────────────────
+  ║  │ 1. 读取 {skill_dir}/ 下的 Python 代码，
+  ║  │    分析技能的输入参数、能力范围和不支持的功能。
+  ║  │ 2. 按以下 JSON 格式，写入 {struct_path}：
+  ║  │    {{
+  ║  │      "capabilities": [
+  ║  │        {{"name": "能力名称", "description": "能力说明", "limit": "限制条件"}}
+  ║  │      ],
+  ║  │      "non_capabilities": [
+  ║  │        {{"name": "不支持功能", "reason": "原因说明"}}
+  ║  │      ]
+  ║  │    }}
+  ║  │ 3. 重新运行 --fix，脚本自动读取该 JSON 并渲染为能力限制表格
+  ║  └──────────────────────────────────────────────────
+  ║  注意：capabilities 列出能做到什么及限制，non_capabilities 列出不支持什么
+  ╚══════════════════════════════════════════════════════════""")
         return 0
     
     rendered = _render_capabilities_section(data)
@@ -2752,6 +2811,452 @@ def fix_doc_references(skill_dir, **kw):
             fixed += 1
     return fixed
 
+
+# ═══════════════════════════════════════════════════
+# R-22（写作标准）：代码块标识修复 — 缩进代码块→围栏代码块
+# ═══════════════════════════════════════════════════
+
+def fix_code_block_markers(skill_dir, **kw):
+    """
+    R-22 代码块标识修复：将 SKILL.md 中缩进 4+ 空格的代码块
+    转换为合法的 ``` 围栏代码块。
+    返回：修复的代码块数量
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    lines = content.split('\n')
+    new_lines = []
+    i = 0
+    fixed = 0
+    in_fence = False
+    in_indented_block = False
+    indent_buffer = []
+    indent_start = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.rstrip()
+        # 跟踪围栏代码块状态
+        if stripped.startswith('```'):
+            # 如果之前有缩进缓冲区，先清空
+            if in_indented_block and indent_buffer:
+                for bl in indent_buffer:
+                    new_lines.append(bl)
+                indent_buffer = []
+                in_indented_block = False
+            new_lines.append(line)
+            in_fence = not in_fence
+            i += 1
+            continue
+        if in_fence:
+            new_lines.append(line)
+            i += 1
+            continue
+        # 不在围栏内：检测缩进代码块
+        # 跳过空行（保留，可能分隔缩进块）
+        if not stripped:
+            if in_indented_block and indent_buffer:
+                # 空行属于当前缩进块的一部分
+                indent_buffer.append(line)
+            else:
+                new_lines.append(line)
+            i += 1
+            continue
+        # 检查是否缩进 4+ 空格且不是列表/引用/标题
+        indent_match = re.match(r'^( {4,})(\S.*)', line)
+        if (indent_match
+                and not stripped.startswith('-')
+                and not stripped.startswith('*')
+                and not stripped.startswith('>')
+                and not stripped.startswith('#')):
+            if not in_indented_block:
+                in_indented_block = True
+                indent_buffer = []
+                indent_start = i
+            indent_buffer.append(line)
+            i += 1
+            continue
+        # 非缩进行 — 如果之前在缩进块中，转义为围栏块
+        if in_indented_block and indent_buffer:
+            # 检查内容长度：至少 2 行才值得转义
+            code_text = '\n'.join(
+                re.sub(r'^ {4}', '', bl)  # 去除前 4 格缩进
+                if re.match(r'^ {4}', bl)
+                else bl
+                for bl in indent_buffer
+            )
+            # 检测语言
+            lang = 'text'
+            for kw_lang, kw_pattern in [
+                ('python', r'\b(import |def |class |print\()'),
+                ('bash', r'^\$ '),
+                ('json', r'^[{[]'),
+                ('yaml', r'^[\w-]+:'),
+                ('html', r'</?[a-z]+'),
+                ('xml', r'</?'),
+                ('javascript', r'\b(const |let |var |function |=>)'),
+            ]:
+                if re.search(kw_pattern, code_text, re.MULTILINE):
+                    lang = kw_lang
+                    break
+            new_lines.append(f'```{lang}')
+            new_lines.append(code_text)
+            new_lines.append('```')
+            fixed += 1
+            indent_buffer = []
+            in_indented_block = False
+        new_lines.append(line)
+        i += 1
+    # 文件尾仍有积压的缩进块
+    if in_indented_block and indent_buffer:
+        code_text = '\n'.join(
+            re.sub(r'^ {4}', '', bl)
+            if re.match(r'^ {4}', bl)
+            else bl
+            for bl in indent_buffer
+        )
+        lang = 'text'
+        for kw_lang, kw_pattern in [
+            ('python', r'\b(import |def |class |print\()'),
+            ('bash', r'^\$ '),
+            ('json', r'^[{[]'),
+            ('yaml', r'^[\w-]+:'),
+            ('html', r'</?[a-z]+'),
+            ('xml', r'</?'),
+            ('javascript', r'\b(const |let |var |function |=>)'),
+        ]:
+            if re.search(kw_pattern, code_text, re.MULTILINE):
+                lang = kw_lang
+                break
+        new_lines.append(f'```{lang}')
+        new_lines.append(code_text)
+        new_lines.append('```')
+        fixed += 1
+    if fixed > 0:
+        _write_file(skill_md, '\n'.join(new_lines))
+    return fixed
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-05：列表混排修复 — 统一同一章节内的列表样式
+# ═══════════════════════════════════════════════════
+
+def fix_list_mixing(skill_dir, **kw):
+    """
+    C-05 修复：同一章节内若同时混用有序/无序列表且各有 3+ 项，
+    将少数方转为多数方样式。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+
+    # 按 H2 分段
+    sections = list(re.finditer(
+        r'^##\s+(.+?)$\n(.*?)(?=^##\s|\Z)',
+        body, re.MULTILINE | re.DOTALL
+    ))
+    fixed = 0
+    new_body = body
+    # 从后往前替换，保持位置不漂移
+    for m in reversed(sections):
+        sec_content = m.group(2)
+        # 提取有序和无序列表行
+        ordered_lines = list(re.finditer(
+            r'^\d+\.\s+(.*)$', sec_content, re.MULTILINE
+        ))
+        unordered_lines = list(re.finditer(
+            r'^[-*]\s+(.*)$', sec_content, re.MULTILINE
+        ))
+        if len(ordered_lines) >= 3 and len(unordered_lines) >= 3:
+            # 少数方转为多数方样式
+            convert_unordered = len(unordered_lines) <= len(ordered_lines)
+            new_sec = sec_content
+            if convert_unordered:
+                # 无序→有序：为每行重新编号
+                ul_matches = list(re.finditer(
+                    r'^[-*]\s+(.*)$', new_sec, re.MULTILINE
+                ))
+                base_num = 1
+                for ul_m in reversed(ul_matches):
+                    text = ul_m.group(1)
+                    new_sec = (
+                        new_sec[:ul_m.start()]
+                        + f"{base_num}. {text}"
+                        + new_sec[ul_m.end():]
+                    )
+                    base_num += 1
+                fixed += 1
+            else:
+                # 有序→无序：去掉编号前缀
+                sec_lines = new_sec.split('\n')
+                changed = False
+                for j, sl in enumerate(sec_lines):
+                    ol_match = re.match(r'^(\s*)\d+\.\s+(.*)', sl)
+                    if ol_match:
+                        sec_lines[j] = ol_match.group(1) + '- ' + ol_match.group(2)
+                        changed = True
+                if changed:
+                    new_sec = '\n'.join(sec_lines)
+                    fixed += 1
+            # 替换 body 中的章节内容
+            new_body = (
+                new_body[:m.start(2)]
+                + new_sec
+                + new_body[m.end(2):]
+            )
+
+    if fixed > 0:
+        buf = io.StringIO()
+        buf.write('---\n')
+        for k, v in fm.items():
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
+        buf.write('---\n')
+        buf.write(new_body)
+        _write_file(skill_md, buf.getvalue())
+    return fixed
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-07：代码块语言标识修复
+# ═══════════════════════════════════════════════════
+
+def fix_code_block_lang(skill_dir, **kw):
+    """
+    C-07 修复：为缺少语言标识的 ``` 代码块补上启发式语言标识。
+    检测规则：import/def/class→python, $ →bash, [/{ →json, </ →html/xml
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    lines = content.split('\n')
+    new_lines = list(lines)
+    fixed = 0
+    # 找出所有 ```
+    fence_indices = [i for i, ln in enumerate(lines) if ln.strip().startswith('```')]
+    for idx, i in enumerate(fence_indices):
+        if idx % 2 == 1:
+            continue  # 跳过结束 ```
+        fence_text = lines[i].rstrip()
+        # 只有裸 ``` 才需要补（没有语言标识）
+        if fence_text.strip() != '```' and not re.match(r'^```\s*$', fence_text):
+            continue  # 已经有内容，跳过
+        # 读取围栏内的内容（到下一个 ``` 为止）
+        end_idx = None
+        for j in range(i + 1, len(lines)):
+            if lines[j].strip().startswith('```'):
+                end_idx = j
+                break
+        if end_idx is None:
+            continue
+        inner = '\n'.join(lines[i+1:end_idx])
+        # 启发式语言检测
+        lang = 'text'
+        for kw_lang, kw_pattern in [
+            ('python', r'\b(import |def |class |print\s*\()'),
+            ('bash', r'^\$ '),
+            ('json', r'^\s*[{[]'),
+            ('yaml', r'^\s*[\w-]+:\s'),
+            ('html', r'</?[a-z]+'),
+            ('javascript', r'\b(const |let |var |function |=>)'),
+            ('sql', r'\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\b'),
+            ('dockerfile', r'^\s*(FROM|RUN|CMD|COPY|WORKDIR)\s'),
+        ]:
+            if re.search(kw_pattern, inner, re.MULTILINE):
+                lang = kw_lang
+                break
+        new_lines[i] = f'```{lang}'
+        fixed += 1
+    if fixed > 0:
+        _write_file(skill_md, '\n'.join(new_lines))
+    return fixed
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-12：节内容完整性修复 — 补充格式线索
+# ═══════════════════════════════════════════════════
+
+def fix_section_completeness(skill_dir, **kw):
+    """
+    C-12 修复：为 SKILL.md 中内容过短的章节补充必要格式元素。
+    基于 body.json 的 content_format 定义推断需补充的内容类型。
+    """
+    skill_md = os.path.join(skill_dir, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        return 0
+    content = _read_file(skill_md)
+    fm, body = parse_simple_yaml_frontmatter(content)
+    if fm is None:
+        return 0
+
+    # 加载 content_format 规范
+    spec_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        'scripts', 'spec', 'body.json'
+    )
+    content_format = {}
+    if os.path.isfile(spec_path):
+        with open(spec_path, 'r', encoding='utf-8') as f:
+            raw = f.read()
+        brace_count = 0
+        first_end = None
+        for ci, ch in enumerate(raw):
+            if ch == '{': brace_count += 1
+            elif ch == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    first_end = ci + 1
+                    break
+        spec = json.loads(raw[:first_end]) if first_end else json.loads(raw)
+        content_format = spec.get("content_format", {}) if isinstance(spec, dict) else {}
+
+    # 按 H2 分段检查
+    sections = list(re.finditer(
+        r'^##\s+(.+?)$\n(.*?)(?=^##\s|\Z)',
+        body, re.MULTILINE | re.DOTALL
+    ))
+    fixed = 0
+    new_body = body
+    
+    def _ensure_format(section_text, clues):
+        """确保章节包含指定的格式线索。"""
+        result = section_text
+        for clue in clues:
+            if clue == '加粗' and '**' not in section_text:
+                # 在章节开头加一个加粗提示
+                result = result.rstrip() + '\n\n> **关键术语**：请在此补充\n'
+                fixed_local = True
+            elif clue == '表格' and '|' not in section_text:
+                result = result.rstrip() + '\n\n| 项目 | 说明 |\n|------|------|\n| | |\n'
+        return result
+
+    for m in reversed(sections):
+        title = m.group(1).strip()
+        sec_content = m.group(2)
+        title_lower = title.lower().replace(' ', '')
+        
+        # 根据章节名推断需要的格式
+        needed_hints = []
+        cf = content_format.get(title, {})
+        if isinstance(cf, dict):
+            hints = cf.get('classification_hints', {})
+            if isinstance(hints, dict):
+                needed_hints = hints.get('format_clues', [])
+        
+        # 如果没有 hints 定义，用标题关键词推断
+        if not needed_hints:
+            keyword_map = {
+                '约束': ['加粗'],
+                '触发': ['加粗'],
+                '核心': ['加粗'],
+                '工作流程': ['加粗'],
+            }
+            for kw, hints in keyword_map.items():
+                if kw in title_lower:
+                    needed_hints = hints
+                    break
+
+        if needed_hints:
+            new_sec = _ensure_format(sec_content, needed_hints)
+            if new_sec != sec_content:
+                new_body = (
+                    new_body[:m.start(2)]
+                    + new_sec
+                    + new_body[m.end(2):]
+                )
+                fixed += 1
+
+    if fixed > 0:
+        buf = io.StringIO()
+        buf.write('---\n')
+        for k, v in fm.items():
+            buf.write(f"{k}: {_fmt_frontmatter_value(v)}\n")
+        buf.write('---\n')
+        buf.write(new_body)
+        _write_file(skill_md, buf.getvalue())
+    return fixed
+
+
+# ═══════════════════════════════════════════════════
+# R-25 C-19：错误处理分类修复 — 补充/增强 FAQ
+# ═══════════════════════════════════════════════════
+
+def fix_faq_error_handling(skill_dir, **kw):
+    """
+    C-19 修复：在 references/faq.md 中补充错误处理问答。
+    如果不存在 FAQ，创建一个包含三类错误场景的模板；
+    如果存在但缺少分类/步骤，补充缺失部分。
+    """
+    skill_dir = os.path.abspath(skill_dir)
+    refs_dir = os.path.join(skill_dir, 'references')
+    faq_path = os.path.join(refs_dir, 'faq.md')
+    skill_name = os.path.basename(skill_dir)
+    
+    # 标准三类错误修复模板
+    ERROR_TEMPLATE = f"""## 出错了怎么办？
+
+### 1. 参数错误
+**场景：** 命令参数格式不正确或缺失必需参数。
+**修复：** 检查命令参数是否拼写正确，使用 `--help` 查看完整参数列表。
+
+### 2. 环境/依赖错误
+**场景：** 缺少依赖包、Python 版本不匹配或路径配置错误。
+**修复：** 确认 Python 版本 >= 3.8，安装 requirements.txt 中的依赖包，检查 `SKILL.md` 中 `data_dir:` 声明路径是否存在。
+
+### 3. 运行时异常
+**场景：** 技能执行过程中抛出未预期的异常。
+**修复：** 检查输入数据格式、文件权限和磁盘空间。仍无法解决 → 查看 `--debug` 输出或提交 Issue。"""
+    
+    if not os.path.isdir(refs_dir):
+        os.makedirs(refs_dir, exist_ok=True)
+    
+    if not os.path.isfile(faq_path):
+        # FAQ 不存在：创建含错误处理的完整 FAQ
+        faq_parts = [ERROR_TEMPLATE]
+        _write_file(faq_path, '\n\n'.join(faq_parts))
+        return 1
+
+    existing = _read_file(faq_path)
+    modified = False
+    
+    # 检查是否有错误处理章节
+    has_err_section = bool(re.search(
+        r'出错|报错|异常|怎么办|修正|修复', existing
+    ))
+    
+    if not has_err_section:
+        # 追加错误处理章节
+        existing = existing.rstrip() + '\n\n' + ERROR_TEMPLATE
+        modified = True
+    else:
+        # 已有错误内容：检查是否需要补充分类
+        if not re.search(r'(场景|情况|类型|分类|示例).*(出错|错误|异常|问题)', existing, re.DOTALL):
+            existing = existing.rstrip() + '\n\n### 补充：错误分类\n\n' + (
+                '建议按以下三类排查：\n\n'
+                '1. **参数错误** — 检查参数拼写和格式\n'
+                '2. **环境错误** — 检查依赖和版本\n'
+                '3. **运行时错误** — 检查输入和权限\n'
+            )
+            modified = True
+        if not re.search(r'(检查|确认|修改|调整|建议)[^。]*。', existing):
+            existing = existing.rstrip() + '\n\n### 补充：通用修复步骤\n\n' + (
+                '1. 确认输入参数格式正确\n'
+                '2. 检查运行环境依赖是否齐全\n'
+                '3. 查看 `--debug` 日志定位具体异常位置\n'
+            )
+            modified = True
+    
+    if modified:
+        _write_file(faq_path, existing)
+        return 1
+    return 0
+
+
 # ═══════════════════════════════════════════════════
 # 统一入口：apply_fix()
 # ═══════════════════════════════════════════════════
@@ -2836,6 +3341,16 @@ def apply_fix(skill_dir, fix_key, **kw):
         "trigger_format": fix_trigger_format,
         "constraint_format": fix_constraint_format,
         "doc_references": fix_doc_references,
+        # ── R-22（写作标准）代码块标识 ──
+        "code_block_markers": fix_code_block_markers,
+        # ── C-05 列表混排 ──
+        "list_mixing": fix_list_mixing,
+        # ── C-07 代码块语言标识 ──
+        "code_block_lang": fix_code_block_lang,
+        # ── C-12 节内容完整性 ──
+        "section_completeness": fix_section_completeness,
+        # ── C-19 错误处理分类 ──
+        "error_handling_faq": fix_faq_error_handling,
     }
 
     func = dispatch.get(fix_key)

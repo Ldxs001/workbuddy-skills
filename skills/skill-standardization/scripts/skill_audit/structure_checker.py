@@ -2176,6 +2176,12 @@ def body_check_document_format(filepath, content, fm, body, **kw):
             entry["fix"] = {"key": "example_quality"}
         elif "C-18" in warn_msg:
             entry["fix"] = {"key": "capability_boundary"}
+        elif "C-19" in warn_msg:
+            entry["fix"] = {"key": "error_handling_faq"}
+        elif "C-07" in warn_msg:
+            entry["fix"] = {"key": "code_block_lang"}
+        elif "C-05" in warn_msg:
+            entry["fix"] = {"key": "list_mixing"}
         elif "C-10" in warn_msg or "C-11" in warn_msg or "C-12" in warn_msg or \
              "C-14" in warn_msg or "C-15" in warn_msg:
             entry["fix"] = {"key": "section_names"}

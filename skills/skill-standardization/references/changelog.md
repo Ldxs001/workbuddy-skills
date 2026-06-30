@@ -1,3 +1,47 @@
+## [2.101.10] - 2026-06-30
+
+### 修复
+- 脱敏：SKILL.md + guide.md 中的真实用户路径替换为占位符 ~/dev/skills/
+
+---
+
+## [2.101.9] - 2026-06-30
+
+### 修复
+- 文档同步 + C-17/C-18 内容补全
+
+---
+
+## [2.101.8] - 2026-06-30
+
+### 修复
+- **[R-12] _find_shared_path_file 选错共享路径文件** — 当业务文件（如 grid_builder.py）import 数量超过 _paths.py 时被误选为路径定义来源，导致 DATA_DIR 变量未扫描到。新增后备逻辑：当选中的文件不含路径变量声明且 _paths.py 存在时优先改选。
+- **[R-12] pathlib 路径推导式误报** — `DATA_DIR = STD_DIR / "data"` 等 pathlib 链式赋值因值中不含 ".standardization" 字面量被误判为路径违规。新增推导式放行：同一文件有变量包含 `.standardization` 字面量时，派生变量不再触发 R-12。
+
+## [2.101.7] - 2026-06-30
+
+### 修复
+- **[P0] auto-fix 在手动修复周期中不应执行** — `_run_audit_loop()` 检测到 `.manual_wait` 存在时跳过 auto-fix 阶段，避免覆盖 LLM 手动修改的内容。此前每次 `--continue` 都重新全量审计 + auto-fix，手动修的内容被覆盖，导致 9 条 WARN 循环不收敛。
+
+## [2.101.6] - 2026-06-30
+
+### 修复
+- **[P0] mtime 校验阻断 LLM 跳过修复循环** — `_run_audit_loop()` 检测 `.manual_done` 时，比对 `wait_files` 中每个文件的 mtime 与 `.manual_done` 的 mtime。文件 mtime 早于 `.manual_done` 说明 LLM 未实际修改即标记完成 → HARD-BLOCK（`sys.exit(1)`）。此前只检查文件是否存在，LLM 可写 `.manual_done` 后不改任何文件直接通过。
+- **[P0] _fix_key_map 缺 C-05/C-07/C-13 映射** — 这三个本应是 auto-fixable 的机械格式化问题，因无 fix key 被归入 LLM 手动范畴。已补 mapping 到 `writing_standards`/`trigger_format`/`section_reorder`。
+
+## [2.101.5] - 2026-06-30
+
+### 修复
+- **[P0] 指纹快照加固** — 新增 `_update_snapshot()` + `_verify_snapshot()` 机制，对三份信号文件（.verify_fp.json / .remaining_llm.json / .manual_wait）做 SHA256 指纹快照。
+  - 写入点：`_write_fp_classify()`、`_save_remaining_llm()`、`_signal_manual_wait()` 完成后自动更新指纹
+  - 校验点：`_load_fp_ids()`、`--continue` 入口、`_run_audit_loop()` 入口自动校验
+  - 指纹不匹配或文件被删 → HARD-BLOCK（`sys.exit(1)`），阻止 LLM 绕过管道直接写信号文件
+
+## [2.101.4] - 2026-06-30
+
+### 修复
+- **[P0] fix.py:1463 external_data_dir 空值导致 audit 误报** — `external_data_dir:`（YAML null）改为 `external_data_dir: true`。修复 auto-fix 与 audit R-01 之间的不一致。根因：FM_REQUIRED 含 `external_data_dir`，但 fix_frontmatter 写入的是空值，二次审计时报"缺失必填字段"，形成 fix→audit→fix 死循环。
+
 ## [2.101.3] - 2026-06-28
 
 ### 修复

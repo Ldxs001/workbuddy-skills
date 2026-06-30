@@ -143,6 +143,26 @@ def _find_shared_path_file(scripts_dir):
             best = "_paths.py"
             best_count = 1
 
+    # ★ v2.101.7: 当选中的 shared file 不含路径变量声明时，
+    #   优先改选 _paths.py（grid_builder 等业务文件虽然import多，
+    #   但不适合作为路径定义来源）
+    if best and best != "_paths.py":
+        try:
+            best_path = os.path.join(scripts_dir, best)
+            with open(best_path, 'r', encoding='utf-8') as f:
+                best_content = f.read()
+            # 只检查变量声明行（=左侧），不检查值引用（=右侧）
+            has_path_var = bool(re.search(
+                r'^[A-Z_]+(?:DATA|STORAGE|DB|CACHE|CONFIG)[A-Z_]+_(?:DIR|PATH|RAW)\s*=',
+                best_content, re.MULTILINE
+            ))
+            paths_py_path = os.path.join(scripts_dir, "_paths.py")
+            if not has_path_var and os.path.isfile(paths_py_path):
+                best = "_paths.py"
+                best_count = 1
+        except Exception:
+            pass
+
     declared_vars = set()
     if best:
         try:
