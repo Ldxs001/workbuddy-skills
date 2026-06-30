@@ -1,7 +1,7 @@
 ---
 name: hug-html
 tags: ['html', 'grid', 'template', 'visual-editor', 'module-library', 'style-presets', 'layout', 'chinese-error-handling']
-version: 3.2.0
+version: 3.3.0
 author: Ldxs
 license: MIT
 description: 8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling
@@ -19,23 +19,21 @@ license_compliance: true
 # hug-html
 
 > → 详见核心能力的渐进式文件索引
-> → 详见核心能力的渐进式文件索引
-> → 详见核心能力的渐进式文件索引
 
 ## 限制
 
 - **本技能的能力边界分为支持场景、不支持场景和边界情况三类。**
-- **生成推广卡片** — 应用推广、活动宣传、产品介绍的毛玻璃卡片。触发词："生成一个APP推广HTML卡片"
-- **生成信息面板** — 带表格、参数、二维码的信息展示面板。触发词："做一个带二维码和参数描述的HTML"
-- **生成可视化编辑模板** — 带 Ctrl+E 可编辑的 HTML。触发词："生成一个可视化编辑的HTML模板"
-- **生成日历/周历仪表板** — 假日管理、年份控制、工日统计的交互仪表板。触发词："生成一个周历交互HTML"
+- **生成推广卡片** — 应用推广、活动宣传、产品介绍的毛玻璃卡片。触发词："生成一个 APP 推广 HTML 卡片"
+- **生成信息面板** — 带表格、参数、二维码的信息展示面板。触发词："做一个带二维码和参数描述的 HTML"
+- **生成可视化编辑模板** — 带 Ctrl+E 可编辑的 HTML。触发词："生成一个可视化编辑的 HTML 模板"
+- **生成日历/周历仪表板** — 假日管理、年份控制、工日统计的交互仪表板。触发词："生成一个周历交互 HTML"
 - **生成双端对比卡片** — 左应用右元服务/双实体的对比展示。触发词："生成一个双端推广卡片"
-- **内容填充** — 自动/手动填充 data-field 标记的文字和图片。触发词："给这个HTML模板填充示例内容"
+- **内容填充** — 自动/手动填充 data-field 标记的文字和图片。触发词："给这个 HTML 模板填充示例内容"
 - **方案模板固化** — 将当前设计保存为可复用的用户模板。触发词："把这个模板保存为 my-card"
 - **自由创作 HTML** — AI 参考模块库直接编写自包含 HTML。触发词："帮我写一个毛玻璃风格的首页"
 
 **不支持的场景：**
-- **复杂前端应用** — 不支持路由/状态管理/API调用（替代：手写 React/Vue）
+- **复杂前端应用** — 不支持路由/状态管理/API 调用（替代：手写 React/Vue）
 - **多页面 HTML 站点** — 不处理页面间导航（替代：静态站点生成器）
 - **PDF / 图片输出** — 不直接生成图片或 PDF（替代：浏览器打印或截图）
 - **外部 CSS/JS 框架集成** — 强调零外部依赖（替代：手动引入 CDN）
@@ -46,7 +44,7 @@ license_compliance: true
 - **网格越界** — row/col + rowspan/colspan 不能超过网格总行列数。影响：CSS Grid 异常渲染
 - **毛玻璃裁剪** — backdrop-filter 需要 overflow:hidden 容器
 - **JSON 模板路径** — --spec 支持绝对/相对路径和内置名，不存在有中文错误提示
-- **文件编码** — 必须 UTF-8，其他编码可能乱码
+- **文件编码** — 必须 UTF-8，其他编码会导致乱码
 - **编辑模式兼容性** — Ctrl+E 需要 Chrome/Edge/Firefox，不支持 IE
 
 ## 触发条件
@@ -58,11 +56,11 @@ license_compliance: true
 - "网格布局" / "grid layout" / "N×M 网格"
 - "单元格合并" / "rowspan" / "colspan"
 - 输出格式：自包含 HTML 文件（毛玻璃卡片风格）
-- "我需要一个APP推广卡片，要有个二维码—可以用，支持"
-- "帮我做一个带表格和参数配置的HTML面板—支持，用 data-table + param-panel 模块"
+- "我需要一个 APP 推广卡片，要有个二维码—可以用，支持"
+- "帮我做一个带表格和参数配置的 HTML 面板—支持，用 data-table + param-panel 模块"
 - "生成一个双端对比的推广页面—支持，用 header-dual + qr-dual"
 - "这个模板我想保存下来以后用—支持，用 --save-as 固化"
-- "给我生成的HTML加一个可视化编辑界面—支持，用 visual_editor.py"
+- "给我生成的 HTML 加一个可视化编辑界面—支持，用 visual_editor.py"
 
 **否定条件：**
 - 不触发：用户仅询问 HTML 语法概念，无文件生成需求
@@ -81,7 +79,7 @@ license_compliance: true
 | 5 | **方案模板库** | 内置 7+ 预置{骨架+组件+样式}组合 + **用户可自定义固化** |
 | 6 | **样式预设** | 5 种内置风格：商务/科研/喜庆/丧事/技术，一键切换配色字体 |
 | 7 | **基础编辑** | 每个文字元素独立控制：字体家族(8种)/字重(100-900)/字号(9-48px)/字色/透明度 |
-| 8 | **图片编辑** | 点击输入URL + 拖放文件替换，所有图片组件均支持 |
+| 8 | **图片编辑** | 点击输入 URL + 拖放文件替换，所有图片组件均支持 |
 | 9 | **生成后审计** | 自动检查 HTML 结构完整性、标签平衡、图片属性、网格越界、渲染风险 |
 | 10 | **统一接口** | `--export-interfaces` 导出完整接口定义 JSON，大模型可直接理解 |
 | 11 | **方案模板固化** | `--save-as <名>` 将任意生成固化为用户模板，后续按名引用 |
@@ -98,7 +96,7 @@ license_compliance: true
 | `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式。包含：错误做法示例、正确做法示例、避坑指引。 | R-18 |
 | `references/architecture.md` | 架构设计 | skill-standardization 整体架构。包含：模块关系、数据流、核心设计决策。 | 无 |
 | `references/call-chains.md` | 参考文档 | 本文件定义 `hug-html` 技能的调用链，供 `skill-sub` 读取和执行。 | 无 |
-| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、变更类型、修复项、升级说明。 | R-24 |
+| `references/changelog.md` | 版本管理 | 版本更新日志。包含：版本号、更新类型、修复项、升级说明。 | R-24 |
 | `references/examples.md` | 使用示例 | 各场景完整执行示例。包含：CLI 命令、执行过程、输出结果。 | R-25 C-17 |
 | `references/faq.md` | 常见问题 | 常见疑问与解答。包含：问题分类、原因分析、解决方案。 | R-19, R-25 C-19 |
 | `references/guide.md` | 使用指南 | 三种执行模式操作教程。包含：audit/create/refactor 流程、参数说明、注意事项。 | 无 |
@@ -108,7 +106,7 @@ license_compliance: true
 ## 快速开始
 
 **场景：生成推广卡片**
-用户需求：帮我做一个APP推广卡片，要有二维码，输出HTML文件
+用户需求：帮我做一个 APP 推广卡片，要有二维码，输出 HTML 文件
 系统执行：
 ```bash
 python scripts/template_generator.py --type promo -o "data/output/card.html"
@@ -116,15 +114,15 @@ python scripts/template_generator.py --type promo -o "data/output/card.html"
 系统输出：data/output/card.html — 毛玻璃风格推广卡片，含二维码、产品名、宣传语
 
 **场景：可视化编辑**
-用户需求：给这个卡片加一个在线编辑功能，输出可编辑HTML
+用户需求：给这个卡片加一个在线编辑功能，输出可编辑 HTML
 系统执行：
 ```bash
 python scripts/visual_editor.py --template data/output/card.html -o data/output/editor.html
 ```
-系统输出：data/output/editor.html — 带Ctrl+E编辑界面，双击文字可修改
+系统输出：data/output/editor.html — 带 Ctrl+E编辑界面，双击文字可更新
 
 **场景：生成周历仪表板**
-用户需求：做一个带假日管理的周历交互HTML，输出仪表板
+用户需求：做一个带假日管理的周历交互 HTML，输出仪表板
 系统执行：
 ```bash
 python scripts/template_generator.py --type calendar-dashboard -o "data/output/calendar.html"
@@ -153,6 +151,6 @@ python scripts/template_generator.py --type calendar-dashboard -o "data/output/c
 - **不会**访问系统敏感路径或凭证文件
 - **不会**向外部网络发送数据
 - **不会**执行用户 Shell 配置文件
-- **不会**修改系统注册表或环境变量
+- **不会**更新系统注册表或环境变量
 - **不会**执行用户 Shell 配置文件
 
