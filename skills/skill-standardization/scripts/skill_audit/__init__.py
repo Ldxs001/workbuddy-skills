@@ -662,10 +662,11 @@ def _reclassify_false_positive(res, skill_dir=None):
     v2.86.2: 所有误判由 LLM 通过 `--classify` 手动标记。
     代码层不做任何自动误报排除，确保审计报告输出全部原始问题。
     
-    ID 支持三种格式：
+    ID 支持四种格式：
     - 数字 eid（如 20）→ 匹配 _expand_fail_entries 的序号
     - R-XX（如 R-23） → 匹配 rule_id
     - C-{type}        → 匹配一致性审查 ID
+    - C-XX（如 C-08） → 匹配 R-25 子检查项（如 R-25 (C-08)）
     """
     if skill_dir:
         # ★ section_names 移出黑名单 → '约束9条超过上限9条'是引擎bug(9=9)，非标章节/流程步数是架构约定可用subtype分类
@@ -674,6 +675,14 @@ def _reclassify_false_positive(res, skill_dir=None):
         if isinstance(res.get("fix"), dict):
             fk = res["fix"].get("key")
         if fk and fk in _blocked_fix_keys:
+            # ★ v2.101.12: 如果 LLM 已完成结构化数据准备，允许分类
+            #   workflow_completeness → .structure_workflow.json 存在
+            #   example_quality → .structure_examples.json 存在
+            #   capability_boundary → .structure_capabilities.json 存在
+            if skill_dir:
+                from .fix import _read_struct
+                if _read_struct(skill_dir, fk) is not None:
+                    return True  # LLM 已完成手动修复，允许分类跳过
             return False  # 这些是 LLM 手动修复项，必须修，不能分类跳过
         
         fp_ids = _load_fp_ids(skill_dir)
@@ -683,6 +692,18 @@ def _reclassify_false_positive(res, skill_dir=None):
                 rid = res.get('rule_id', res.get('rule', ''))
                 if rid and any(fpid == rid for fpid in fp_ids):
                     return True
+                # ★ 新增：C-XX 格式匹配 R-25 子检查项
+                # 如 --classify C-08 应匹配 rule_id = "R-25 (C-08)" 的条目
+                c_ids = [fpid for fpid in fp_ids if re.match(r'^C-\d+$', str(fpid))]
+                if c_ids:
+                    entries = _expand_fail_entries([res])
+                    for e in entries:
+                        e_rid = e.get('rule_id', '')
+                        e_problem = e.get('problem', '')
+                        for cid in c_ids:
+                            # rule_id 格式: "R-25 (C-08)" 或 "R-25 (C-08a)"
+                            if e_rid.startswith(f'R-25 ({cid}') or cid in e_problem:
+                                return True
                 # eid 匹配（数字 ID）
                 entries = _expand_fail_entries([res])
                 fp_id_set = {str(i) for i in fp_ids}
@@ -715,6 +736,7 @@ def _filter_false_positives(audit_result, skill_dir):
     if fp_ids:
         entries = _expand_fail_entries(remaining)
         fp_id_set = {str(i) for i in fp_ids}
+        c_ids = {str(fpid) for fpid in fp_ids if re.match(r'^C-\d+$', str(fpid))}
         # 把已标记为误判的条目过滤掉
         filtered = []
         for r in remaining:
@@ -722,10 +744,21 @@ def _filter_false_positives(audit_result, skill_dir):
             rid = r.get('rule_id', '')
             detail = r.get('detail', '')
             # 用 _expand_fail_entries 展开后检查
+            matched = False
             for e in entries:
                 if str(e['id']) in fp_id_set and (e['rule_id'] == rid and e['problem'][:80] in detail):
+                    matched = True
                     break
-            else:
+                # ★ C-XX 格式匹配
+                e_rid = e.get('rule_id', '')
+                e_problem = e.get('problem', '')
+                for cid in c_ids:
+                    if (e_rid.startswith(f'R-25 ({cid}') or cid in e_problem):
+                        matched = True
+                        break
+                if matched:
+                    break
+            if not matched:
                 filtered.append(r)
         remaining = filtered
     

@@ -1880,7 +1880,18 @@ def body_check_document_format(filepath, content, fm, body, **kw):
 
     # ════════════════════════════════════════════════════════════
     # C-14 (WARN): 工作流程步骤完整性 — Phase 1 正则粗筛步骤数， LLM 确认
+    # ★ v2.102.0: 如果 .structure_workflow.json 存在，说明 LLM 已确认，跳过
     # ════════════════════════════════════════════════════════════
+    _skill_dir = kw.get('skill_dir', '')
+    _c14_verified = False
+    if _skill_dir:
+        _c14_json = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(filepath)))),
+            '.standardization', os.path.basename(os.path.dirname(os.path.dirname(_skill_dir))),
+            'data', os.path.basename(_skill_dir), 'outputs', '.structure_workflow.json'
+        )
+        if os.path.isfile(_c14_json):
+            _c14_verified = True
     # 提取 ## 工作流程 章节中的编号步骤
     wf_section = re.search(r'^## 工作流程\n\n.*?(?=^## |\Z)', body, re.MULTILINE | re.DOTALL)
     if wf_section:
@@ -1889,13 +1900,16 @@ def body_check_document_format(filepath, content, fm, body, **kw):
         _c14_ln = body[:_c14_wf_pos].count('\n') + 2 if _c14_wf_pos >= 0 else 1  # +2: +1 for 0-index, +1 for H2 line itself
         steps = re.findall(r'^\d+\.\s+(.+)$', wf_text, re.MULTILINE)
         if steps:
-            # Phase 1: 输出步骤列表供 LLM 精筛
-            step_details = "; ".join(s[:40] for s in steps[:6])
-            if len(steps) > 6:
-                step_details += f" 等（共 {len(steps)} 步）"
-            issues["warn"].append(
-                f"{filepath}:{_c14_ln} - C-14: 工作流程共 {len(steps)} 步，需 LLM 逐条确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
-            )
+            if _c14_verified:
+                pass  # ★ LLM 已完成确认（.structure_workflow.json 存在），不重复警告
+            else:
+                # Phase 1: 输出步骤列表供 LLM 精筛
+                step_details = "; ".join(s[:40] for s in steps[:6])
+                if len(steps) > 6:
+                    step_details += f" 等（共 {len(steps)} 步）"
+                issues["warn"].append(
+                    f"{filepath}:{_c14_ln} - C-14: 工作流程共 {len(steps)} 步，需 LLM 逐条确认步骤是否完整覆盖实际代码功能（当前步骤：{step_details}）"
+                )
 
         # ── C-14b: 检测工作流程中混入 changelog 风格内容（版本号+更新类关键词） ──
         # 检查 blockquote 行中是否含版本号标记

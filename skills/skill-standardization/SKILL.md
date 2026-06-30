@@ -2,7 +2,7 @@
 name: skill-standardization
 slug: skill-standardization
 displayName: Skill Standardization
-version: 2.101.10
+version: 2.102.1
 author: wUwproject
 license: MIT
 description: Skill 标准化规范引擎。支持 R-01~R-26 规范审查（audit / create / update / refactor / bump / readonly 六模式），含权限扫描、数据目录合规检查、渐进式加载、LLM 二次筛分类。

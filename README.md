@@ -45,7 +45,6 @@ workbuddy-skills/
 ├── LICENSE
 ├── README.md
 ├── architecture/
-├── release/
 └── skills/
 ```
 
