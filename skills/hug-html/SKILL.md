@@ -1,5 +1,7 @@
 ---
 name: hug-html
+slug: hug-html
+displayName: Hug HTML
 tags: ['html', 'grid', 'template', 'visual-editor', 'module-library', 'style-presets', 'layout', 'chinese-error-handling']
 version: 3.3.0
 author: Ldxs
