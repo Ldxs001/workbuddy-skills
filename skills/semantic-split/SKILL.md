@@ -1,5 +1,7 @@
 ---
 name: semantic-split
+slug: semantic-split
+displayName: 语义拆分与智能规划
 description: 语义拆分与智能规划。将自然语言拆分为结构化需求块，三管线协同调度（正则结构分析→bge语义匹配→bge-reranker重排序），5W2H提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，自增强闭环自动沉淀能力级JSON模板，7门禁钩子系统管控流程。
 trigger: ['帮我做', '我需要', '交给你了', '帮我分析', '需求拆分']
 license: MIT
