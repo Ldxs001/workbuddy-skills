@@ -1,3 +1,10 @@
+## [2.102.3] - 2026-07-01
+
+### 修复
+- 修复: `fix_progressive_index_table()` 在替换索引表时会丢失 SKILL.md 中已有的人工填写内容。新增 `existing_rows` 保留机制：先读取现有表格行内容，仅对新文件调用 STANDARDIZED 或 auto-generate，已有行保持原有 4 列内容不变。
+
+---
+
 ## [2.102.2] - 2026-07-01
 
 ### 修复

@@ -1881,12 +1881,35 @@ def fix_progressive_index_table(skill_dir, **kw):
     ref_files = sorted(f for f in os.listdir(refs_dir) if f.endswith('.md'))
     if not ref_files:
         return 0
+
+    # ★ 读取 SKILL.md 中已有的表格行，保留人工填写的内容
+    existing_rows = {}
+    existing_table = re.search(
+        r'### 渐进式文件索引\n\n\| 文件名.*?(?=\n## |\n---|\Z)',
+        body, re.DOTALL
+    )
+    if existing_table:
+        for line in existing_table.group(0).split('\n'):
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) >= 5 and '`references/' in line:
+                fn_match = re.search(r'`references/([^`]+)`', line)
+                if fn_match:
+                    fn = fn_match.group(1)
+                    existing_rows[fn] = {
+                        'cat': parts[2] if len(parts) > 2 else '参考文档',
+                        'desc': parts[3] if len(parts) > 3 else '',
+                        'audit': parts[4] if len(parts) > 4 else '无',
+                    }
     
     rows = []
     for fn in ref_files:
         if fn in STANDARDIZED:
             cat, content_desc, audit_rules = STANDARDIZED[fn]
             rows.append((fn, cat, content_desc, audit_rules))
+        elif fn in existing_rows:
+            # ★ 保留 SKILL.md 中已有的内容（人工填写或过往生成）
+            er = existing_rows[fn]
+            rows.append((fn, er['cat'], er['desc'], er['audit']))
         else:
             # 未知文件：从文件自身提取
             fpath = os.path.join(refs_dir, fn)
