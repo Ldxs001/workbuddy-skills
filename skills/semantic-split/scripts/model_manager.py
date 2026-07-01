@@ -52,8 +52,6 @@ EMBEDDING_MODELS = [
         "type": "rerank",
     },
 ]
-    },
-]
 
 DOWNLOAD_SOURCES = [
     {"name": "modelscope",     "env": {},                          "desc": "ModelScope 国内镜像（推荐）"},

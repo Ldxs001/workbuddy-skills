@@ -8,12 +8,12 @@
 ## [3.0.1] - 2026-07-01
 
 ### 修复
-- 移除 Stanza（1.1GB），Pipeline B 改为纯正则实现，零模型依赖
-- 移除 pipeline_b.py 中冗余的独立 BERT 层（reranker 本身已是 BERT）
+- 删除 Stanza（1.1GB），Pipeline B 改为纯正则实现，零模型依赖
+- 删除 pipeline_b.py 中冗余的独立 BERT 层（reranker 本身已是 BERT）
 - 清理所有 Stanza / spaCy 引用（代码 + 文档 + 版权声明）
 
-### 变更
-- Pipeline C 改为智能体原生推理，移除外部 LLM API 调用代码
+### 更新
+- Pipeline C 改为智能体原生推理，删除外部 LLM API 调用代码
 - pipeline_c.py 输出 `agent_context`（含结构分析 + 模板参考）增强智能体思考深度
 - 新增 `_save_template()` 自增强闭环：每次执行后自动保存为能力级 JSON 模板
 - 新增 7 道门禁钩子系统（input_valid → b_pipeline_done → a_scan_done → decision_made → llm_generated → template_saved → wp_done）
@@ -21,10 +21,10 @@
 - 统一数据路径至 `.standardization/semantic-split/data/`
 - model_manager.py 修复 DOWNLOAD_SOURCES 索引错误
 
-### 模型
-- bge-small-zh-v1.5: 92MB → data/models/bge-small-zh-v1.5/
-- bge-reranker-base: 1.1GB → data/models/bge-reranker-base/
-- Pipeline B 纯正则，无模型
+### 删除
+- 删除 Stanza（1.1GB），Pipeline B 改为纯正则实现，零模型依赖
+- 删除 pipeline_b.py 中冗余的独立 BERT 层（reranker 本身已是 BERT）
+- 清理所有 Stanza / spaCy 引用（代码 + 文档 + 版权声明）
 
 ## [3.0.0] - 2026-07-01
 
@@ -38,7 +38,7 @@
 - 新增 `pipeline_c.py`：LLM 推理管线（可插拔 API 设计）
 - 新增 `semantic_pipeline.py`：三管线统一调度入口
 - 新增 `references/attribution.md`：第三方组件版权声明
-- 许可证清理：移除 HanLP（CC BY-NC-SA）/ LTP（商用付费），替代为 Stanza（Apache 2.0）+ BGE（MIT），全部兼容商业使用
+- 许可证清理：删除 HanLP（CC BY-NC-SA）/ LTP（商用付费），替代为 Stanza（Apache 2.0）+ BGE（MIT），全部兼容商业使用
 - 更新 `SKILL.md` 快速开始、核心能力、工作流程章节
 
 ---
@@ -46,7 +46,7 @@
 ## [2.6.0] - 2026-06-30
 
 ### 修复
-- refactor 全流程改造：0 ERROR 0 WARN; 新增触发条件章节/C-08/C-12修复/C-14/C-17结构化数据渲染/8步工作流/CN-EN空格
+- refactor 全流程改造：0 ERROR 0 WARN; 新增触发条件章节/C-08/C-12修复/C-14/C-17结构化数据渲染/8步工作流/CN-EN 空格
 
 ---
 

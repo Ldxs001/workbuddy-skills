@@ -1,8 +1,6 @@
 ---
 name: semantic-split
-slug: semantic-split
-displayName: 语义拆分与智能规划
-description: 语义拆分与智能规划。将自然语言拆分为结构化需求块，三管线协同调度（正则结构分析→bge语义匹配→bge-reranker重排序），5W2H提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，自增强闭环自动沉淀能力级JSON模板，7门禁钩子系统管控流程。
+description: 语义拆分与智能规划。将自然语言拆分为结构化需求块，三管线协同调度（正则结构分析→bge 语义匹配→bge-reranker 重排序），5W2H提取与约束标注增强语义理解，双视角推理整合为单一执行步骤，自增强闭环自动沉淀能力级 JSON 模板，10门禁钩子系统管控流程。
 trigger: ['帮我做', '我需要', '交给你了', '帮我分析', '需求拆分']
 license: MIT
 data_dir: .standardization/semantic-split/data
@@ -13,7 +11,7 @@ trigger_negative: true
 external_data_dir: true
 sensitive_access: false
 critical_write: false
-permission_weight: LOW
+permission_weight: MEDIUM
 meta_field_sync: true
 create_permissions_md: true
 faq_quality: improve_qa
@@ -24,31 +22,26 @@ trigger_quality: refine_triggers
 
 > 语义拆分与智能规划。三管线递进调度 + 自增强闭环沉淀。
 
-## 输入输出
-
-- **输入**：≤2000 字纯文本（任务描述）
-- **输出**：JSON 结构化需求块（含步骤列表、WP 分解、钩子门禁状态）
-- **依赖**：sentence-transformers（embedding + rerank）
-
 ## 触发条件
 
 **正向触发：**
 - [需求拆分] "帮我把这个需求拆开" / "拆分一下这个任务"
 - [语义规划] "帮我规划一下怎么做" / "整理一下思路"
 - [5W2H分析] "帮我分析这个需求" / "5W2H分析一下"
-- [JSON管理] "管理json文件" / "json_manager"
-- [渐进匹配] "加载规则" / "匹配json"
+- [JSON 管理] "管理 json 文件" / "json_manager"
+- [渐进匹配] "加载规则" / "匹配 json"
 
-**不触发：**
+**否定条件（不触发）：**
 - 简单问答、闲聊、问候
 - 单步任务
 
----
 
 ## 核心能力
 
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+
 | # | 功能 | 说明 |
-|---|------|------|
+| --- |------| ------ |
 | 1 | **Pipeline B 结构分析** | 纯正则（5W2H/主语/约束/分块/注意力锚定），零外部依赖 |
 | 2 | **Pipeline A 语义匹配** | 正则→bge-small(embedding)→bge-reranker(CrossEncoder)|
 | 3 | **Pipeline C 智能体推理** | 结构分析 + 模板参考 喂给智能体 → 增强思考 → 生成步骤 |
@@ -62,8 +55,8 @@ trigger_quality: refine_triggers
 
 ### 渐进式文件索引
 
-| 文件 | 内容 |
-|-----|------|
+| 文件名 | 分类 | 包含内容 | 审计关联 |
+| ----- |------| ---------- |----------|
 | `references/LICENSE.md` | MIT 许可协议 |
 | `references/changelog.md` | 版本更新日志 |
 | `references/attribution.md` | 第三方组件版权声明与许可说明 |
@@ -83,41 +76,24 @@ trigger_quality: refine_triggers
 
 ## 快速开始
 
+**场景：扫描**
+用户需求：查找PPT相关的已有模板
+系统执行：
 ```bash
-# 0. 安装依赖
-pip install sentence-transformers huggingface-hub
-
-# 1. 下载 BGE 模型
-python scripts/model_manager.py --download bge-small
-python scripts/model_manager.py --download bge-rerank
-
-# 2. 三管线调度
-python scripts/semantic_pipeline.py --text "帮我做一份PPT" --hooks
-
-# 3. 查看流程门禁
-python scripts/semantic_pipeline.py --text "帮我分析Q2数据" --hooks
-
-# 4. JSON 管理（模板库操作）
-python scripts/json_manager.py scan --keywords PPT
+python scripts/json_manager.py scan --keywords 制作 PPT 产品
 ```
+  - **描述**: 匹配
 
----
-
-## 三管线职责
-
-| 管线 | 方法 | 模型 | 产出 |
-|:----|:----|:----:|:----|
-| **B 结构分析** | 纯正则 | **无** | 5W2H七维 / 主语 / 约束等级 / 分块 / 注意力锚定 |
-| **A 语义匹配** | 正则 → embedding → rerank | bge-small + bge-reranker ✅ | 模板库扫描 / 相似度匹配 / 约束分类 |
-| **C 智能体推理** | 智能体原生推理 | — | 步骤列表 / WP分解 / 模板沉淀 |
-
-> Pipeline B 的 5W2H / 主语 / 约束提取不需要模型，纯正则完成。
-> 正则词表覆盖常见动词/主语/时间/地点/数量词，边界 case 由 Pipeline C（LLM）推理补全。
-> bge-small / bge-reranker 不参与结构分析，只做模板库语义匹配。
-
+**场景：归类**
+用户需求：按频次归类任务模板
+系统执行：
+```bash
+python scripts/json_manager.py categorize --threshold 5
+```
+  - **描述**: 分组
 ## 工作流程
 
-```
+```json
 输入文本
     │
     ▼
@@ -171,13 +147,34 @@ python scripts/json_manager.py scan --keywords PPT
 
 ---
 
+## 输入输出
+
+- **输入**：≤2000 字纯文本（任务描述）
+- **输出**：JSON 结构化需求块（含步骤列表、WP 分解、钩子门禁状态）
+- **依赖**：sentence-transformers（embedding + rerank）
+
+## 三管线职责
+
+| 管线 | 方法 | 模型 | 产出 |
+| :---- |:----| :----: |:----|
+| **B 结构分析** | 纯正则 | **无** | 5W2H七维 / 主语 / 约束等级 / 分块 / 注意力锚定 |
+| **A 语义匹配** | 正则 → embedding → rerank | bge-small + bge-reranker ✅ | 模板库扫描 / 相似度匹配 / 约束分类 |
+| **C 智能体推理** | 智能体原生推理 | — | 步骤列表 / WP 分解 / 模板沉淀 |
+
+> Pipeline B 的 5W2H / 主语 / 约束提取不需要模型，纯正则完成。
+> 正则词表覆盖常见动词/主语/时间/地点/数量词，边界 case 由 Pipeline C（LLM）推理补全。
+> bge-small / bge-reranker 不参与结构分析，只做模板库语义匹配。
+
 ## 模型清单
 
 | 模型 | 管线 | 大小 | 协议 |
-|:----|:----|:---:|:----:|
+| :---- |:----| :---: |:----:|
 | BAAI/bge-small-zh-v1.5 | Pipeline A 嵌入层 | 92MB | MIT |
 | BAAI/bge-reranker-base | Pipeline A 重排序层 | 1.1GB | MIT |
-| **合计** | | **~1.2GB** | **全部商业友好** |
+| **合计** |  | **~1.2GB** | **全部商业友好** |
 
 > Pipeline B 为纯正则实现，零模型依赖。
+>
+> **能力边界**: 单次输入 ≤2000 字，输出 JSON。单任务，建议 ≤10 并发。模型加载约 30 秒。
+> **能力边界**：单次输入 ≤2000 字，输出 JSON 结构步骤。单任务处理，建议不超过 10 个并发。Pipeline A 模型加载完毕约需 30 秒（1.2GB）。
 > 无外部 API 调用，无 LLM 配置需求。Pipeline C 由智能体原生推理。

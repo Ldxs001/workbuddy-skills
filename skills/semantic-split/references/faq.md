@@ -4,6 +4,10 @@ Q: 报 "file not found"？
 
 A: 使用 `list` 子命令查看已有 JSON 文件列表，确认路径后重试。
 
+Q: 这个技能有什么能力边界？
+
+A: 单次输入 ≤2000 字纯文本；单任务处理，建议不超过 10 个并发；Pipeline A 模型首次加载约 30 秒（1.2GB）；纯规划不执行任务；不联网搜索。
+
 Q: 报 ModuleNotFoundError？
 
 A: 本技能零外部依赖，仅使用 Python 标准库。
