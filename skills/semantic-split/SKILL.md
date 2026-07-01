@@ -4,7 +4,7 @@ description: 语义拆分与智能规划。将自然语言拆分为结构化需�
 trigger: ['帮我做', '我需要', '交给你了', '帮我分析', '需求拆分']
 license: MIT
 data_dir: .standardization/semantic-split/data
-version: 3.1.0
+version: 3.1.1
 author: wUwproject
 tags: ['semantic-split', 'task-planning', 'json-accumulation', 'progressive-loading', '5w2h', 'constraint-annotation', 'self-reinforcing-loop']
 trigger_negative: true
