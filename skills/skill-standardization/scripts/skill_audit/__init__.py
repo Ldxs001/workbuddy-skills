@@ -628,6 +628,26 @@ def _write_fp_classify(skill_dir, ids, category, reason="", subtype=""):
         json.dump(existing, f, ensure_ascii=False, indent=2, sort_keys=True)
     _update_snapshot(skill_dir, ".verify_fp.json")
 
+    # ★ 同步从 .remaining_llm.json 移除已分类项，避免 --continue 循环重审计
+    #    .remaining_llm.json 是细碎循环的手动修复清单快照，分类后的项不应再出现在清单中
+    _rr_dir = _manual_dir_path(skill_dir)
+    _rr_path = os.path.join(_rr_dir, '.remaining_llm.json')
+    if os.path.isfile(_rr_path):
+        try:
+            rr_data = json.load(open(_rr_path, 'r', encoding='utf-8'))
+            if isinstance(rr_data, list):
+                before = len(rr_data)
+                rr_data = [r for r in rr_data
+                           if not any(rid in (r.get('rule_id','') or '') + (r.get('rule','') or '')
+                                      for rid in ids)]
+                if len(rr_data) < before:
+                    with open(_rr_path, 'w', encoding='utf-8') as f:
+                        json.dump(rr_data, f, ensure_ascii=False, indent=2)
+                    _update_snapshot(skill_dir, ".remaining_llm.json")
+                    print(f"  [sync] remaining_llm: 移除 {before - len(rr_data)} 项已分类")
+        except Exception:
+            pass
+
 
 def _remove_fp_classify(skill_dir, ids):
     """从 .verify_fp.json 中移除指定 #ID（只认 dict 格式）"""

@@ -4,7 +4,7 @@ description: 语义拆分与智能规划。将自然语言拆分为结构化需�
 trigger: ['帮我做', '我需要', '交给你了', '帮我分析', '需求拆分']
 license: MIT
 data_dir: .standardization/semantic-split/data
-version: 3.0.2
+version: 3.1.0
 author: wUwproject
 tags: ['semantic-split', 'task-planning', 'json-accumulation', 'progressive-loading', '5w2h', 'constraint-annotation', 'self-reinforcing-loop']
 trigger_negative: true
@@ -76,13 +76,21 @@ trigger_quality: refine_triggers
 
 ## 快速开始
 
-**场景：扫描**
-用户需求：查找PPT相关的已有模板
+**场景：语义拆分**
+用户需求：帮我用公司模板做一份PPT，下周五前交给客户
+系统执行：
+```bash
+python scripts/semantic_pipeline.py --text "帮我用公司模板做一份PPT，下周五前交给客户" --hooks
+```
+  - **输出**: 10道门禁全部通过，输出步骤列表+WP分解
+
+**场景：模板扫描**
+用户需求：查找已有PPT相关模板
 系统执行：
 ```bash
 python scripts/json_manager.py scan --keywords 制作 PPT 产品
 ```
-  - **描述**: 匹配
+  - **输出**: 匹配结果列表+相似度分数
 
 **场景：归类**
 用户需求：按频次归类任务模板
@@ -90,7 +98,7 @@ python scripts/json_manager.py scan --keywords 制作 PPT 产品
 ```bash
 python scripts/json_manager.py categorize --threshold 5
 ```
-  - **描述**: 分组
+  - **输出**: 模板被分组为高频/中频/低频三类
 ## 工作流程
 
 ```json

@@ -1,3 +1,21 @@
+## [3.1.0] - 2026-07-01
+
+### 修复
+- 移除 spaCy/Stanza 所有引用，Pipeline B 改为纯正则结构分析（零模型依赖）
+- 清理 pipeline_b.py 冗余 BERT 层（约 80 行死代码）
+- 修复 model_manager.py DOWNLOAD_SOURCES 索引错误
+- 修复 pipeline_c.py `build_reasoning_context()` 缺少结构分析和模板参考输入
+- 自增强闭环 `_save_template()` 接上 hooks 流程
+
+### 变更
+- 10 道门禁钩子系统（7→10）：新增 focus/divergent/integration 双视角推理强制钩子
+- 双视角推理改为强制执行，无法跳过
+- 模型从 3 个减为 2 个：bge-small-zh-v1.5(92MB) + bge-reranker-base(1.1GB)
+- 模型文件移出 git 仓库（~1.3GB），通过 model_manager.py 按需下载
+- SKILL.md/attribution.md/setup_env.py/changelog 全部同步更新
+
+---
+
 ## [3.0.2] - 2026-07-01
 
 ### 修复

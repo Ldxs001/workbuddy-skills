@@ -1,3 +1,10 @@
+## [2.102.2] - 2026-07-01
+
+### 修复
+- 修复: `_write_fp_classify()` 现在同步从 `.remaining_llm.json` 移除已分类项，防止 `refactor --continue` 循环死锁（根因：--classify 只写 verify_fp，不更新 remaining_llm，导致每次 --continue 仍加载全部未分类项）
+
+---
+
 ## [2.102.1] - 2026-06-30
 
 ### 修复
