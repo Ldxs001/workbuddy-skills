@@ -57,20 +57,20 @@ trigger_quality: refine_triggers
 
 | 文件名 | 分类 | 包含内容 | 审计关联 |
 | ----- |------| ---------- |----------|
-| `references/LICENSE.md` | MIT 许可协议 |
-| `references/changelog.md` | 版本更新日志 |
-| `references/attribution.md` | 第三方组件版权声明与许可说明 |
-| `references/json_schema.md` | 能力级/规则级 JSON 格式定义 |
-| `references/loading_decision_tree.md` | 渐进加载决策流程（含自增强闭环） |
-| `references/planning_rules.md` | 双视角推理与规划生成规则 |
-| `references/split_rules.md` | 语义拆分规则 |
-| `references/constraint_annotation.md` | 约束标注规则与注意力锚定 |
-| `references/examples.md` | 各功能输出格式示例 |
-| `references/faq.md` | 常见问题与排错 |
-| `references/permissions.md` | 权限扫描与风险评估 |
-| `references/task_type_defaults.md` | 5W2H 任务类型默认值映射 |
-| `references/antipatterns.md` | 反模式指南 |
-| `references/automation_tasks.md` | 自动任务配置 |
+| `references/LICENSE.md` | 许可协议 | 开源许可证声明（MIT） | R-26 |
+| `references/changelog.md` | 版本管理 | 版本更新日志 | R-24 |
+| `references/attribution.md` | 版权声明 | 第三方组件与模型版权归属说明 | 无 |
+| `references/json_schema.md` | 参考 | 能力级/规则级 JSON 格式定义 | 无 |
+| `references/loading_decision_tree.md` | 参考 | 渐进加载决策流程（含自增强闭环） | 无 |
+| `references/planning_rules.md` | 规则 | 双视角推理与规划生成规则 | 无 |
+| `references/split_rules.md` | 规则 | 语义拆分规则 | 无 |
+| `references/constraint_annotation.md` | 规范 | 约束标注规则与注意力锚定 | 无 |
+| `references/examples.md` | 示例 | 各功能输出格式示例 | R-25 C-17 |
+| `references/faq.md` | FAQ | 常见问题与排错 | R-19 |
+| `references/permissions.md` | 权限 | 权限扫描与风险评估 | R-15 |
+| `references/task_type_defaults.md` | 参考 | 5W2H 任务类型默认值映射 | 无 |
+| `references/antipatterns.md` | 规范指南 | skill 编写中的常见反模式 | R-18 |
+| `references/automation_tasks.md` | 参考 | 自动任务配置列表 | 无 |
 
 ---
 
