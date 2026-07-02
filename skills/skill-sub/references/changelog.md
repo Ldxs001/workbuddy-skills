@@ -1,4 +1,20 @@
-## [1.29.1] - 2026-06-16
+## [1.32.0] - 2026-07-02
+
+### 新增
+- **意图分解器**（chain_planner.py `_decompose_intent`）：自然语言→时序子意图拆解
+  支持标记：A后B、先A再B、A然后B、A→B、1.X 2.Y 等
+  拆解后对每个子意图分别搜索，候选按子意图分组展示
+- **I/O 提取强化**（skill_extractor.py）：_CONSUMES_PATTERNS +7 条（基于/根据/抓取/提取等）
+  _PRODUCES_PATTERNS +6 条（绘制/渲染/训练/合并等）
+  _STEP_NAME_IO_INFERENCE +10 组（PPT/可视化/邮件/训练/提取等）
+- **全链 DAG 连通性验证**（step_link_validator.py `validate_chain`）
+  全局 I/O 流图分析：孤儿 produces 检测、断链 consumes 检测、连通率评分
+  CLI 命令 check-chain + 集成到 chain_planner plan 流程第4b步
+
+### 修复
+- 搜索阶段意图理解从"关键词包"升级为"时序拆解后分别搜索"
+
+---
 
 ### 修复
 - `--fixed-rules` 修复参数解析（逗号分词 bug）
