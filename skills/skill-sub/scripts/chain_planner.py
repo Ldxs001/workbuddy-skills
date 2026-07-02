@@ -20,6 +20,9 @@ import re
 import sys
 from pathlib import Path
 
+# 门禁系统
+import chain_gate as gate
+
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
@@ -106,6 +109,11 @@ def cmd_plan(args):
     step_search, validate_link, validate_chain, PathManager, ChainManager, _, find_skill_dir, extract_step_semantics = _import_extras()
 
     intent = args.intent
+    gs = gate._default_state()
+    gs["chain_name"] = f"plan:{intent[:20]}"
+    gate.save_state(gs)
+    gate.set_gate("blueprint_verified", "open",
+                  "chain_planner 假定蓝皮书已校验（由 search 命令前置检测）", gs)
     print(f"🧩 链规划: {intent}")
     print(f"{'='*55}")
 
@@ -117,8 +125,10 @@ def cmd_plan(args):
             print(f"   步骤{i}: {si}")
     else:
         sub_intents = [intent]
+    gate.set_gate("intent_decomposed", "open", f"拆为{len(sub_intents)}个子意图", gs)
 
     # 1. 对每个子意图分别搜索候选步骤
+    gate.check("intent_decomposed", gs)
     print(f"\n🔍 第1步: 搜索匹配步骤...")
     all_candidates_by_sub = []
     for i, si in enumerate(sub_intents):
@@ -138,8 +148,10 @@ def cmd_plan(args):
     # 汇总展示
     total_candidates = sum(len(c) for c in all_candidates_by_sub)
     if total_candidates == 0:
-        print(f"❌ 未找到任何匹配的步骤，请调整意图或降低 --min-score")
-        return 1
+        gate.block("steps_searched", "所有子意图均无匹配步骤，请调整意图或降低 --min-score", gs)
+    gate.set_gate("steps_searched", "open", f"共{total_candidates}个候选", gs)
+
+    gate.check("steps_searched", gs)
 
     # 2. LLM 选取步骤（输出给 AI，由 AI 返回 step_id 列表）
     print(f"\n🤖 第2步: LLM 选取步骤")
@@ -150,7 +162,10 @@ def cmd_plan(args):
         print(f"   chain_planner.py plan \\")
         print(f"     --intent \"{intent}\" \\")
         print(f"     --steps \"skill-A.步1,skill-B.步3,skill-A.步5\"")
+        gate.set_gate("steps_selected", "blocked", "LLM 未提供步骤ID", gs)
         return 0
+
+    gate.set_gate("steps_selected", "open", f"选了{len(args.steps.split(','))}步", gs)
 
     # 3. 校验步骤可用性
     print(f"\n✅ 第3步: 校验步骤可用性...")
@@ -216,9 +231,13 @@ def cmd_plan(args):
         print(f"\n⚠️  检测到 {gaps_found} 个衔接缺口，建议检查后手动补充粘连点步骤")
         if not args.force:
             print(f"   使用 --force 强制创建（会生成无粘连点的链）")
+            gate.set_gate("io_validated", "blocked", f"{gaps_found}个缺口需要补充粘连点", gs)
             return 1
 
+    gate.set_gate("io_validated", "open", f"校验{gaps_found}个缺口", gs)
+
     # v1.30.0: 全链 DAG 连通性验证
+    gate.check("io_validated", gs)
     print(f"\n🔗 第4b步: 全链 I/O 连通性验证...")
     chain_result = validate_chain(validated)
     if chain_result["warnings"]:
@@ -238,7 +257,12 @@ def cmd_plan(args):
                 if not m.get("is_external_input"):
                     print(f"     断链输入: 步骤{m['step_idx']+1}「{m['step_name']}」→ {m['desc']}")
 
-    # 5. 构建步骤 JSON
+    if not chain_result["connected"] and not args.force:
+        gate.block("chain_connected", f"DAG连通率{chain_result['chain_score']}，存在I/O断链", gs)
+    gate.set_gate("chain_connected", "open", f"连通率{chain_result['chain_score']}", gs)
+
+    # 5. 构建步骤 JSON — 前置门禁：chain_connected
+    gate.check("chain_connected", gs)
     steps_json = []
     for i, v in enumerate(validated, 1):
         step = {
@@ -268,12 +292,14 @@ def cmd_plan(args):
         user_specified=args.user
     )
     if success:
+        gate.set_gate("chain_saved", "open", f"链 {chain_name} 已保存", gs)
         print(f"   ✅ {msg}")
         print(f"   链目录: {cm.path_manager.chains_dir / chain_name}")
         print(f"   ├── chain.json")
         print(f"   └── blueprints.json")
         return 0
     else:
+        gate.set_gate("chain_saved", "blocked", f"保存失败: {msg}", gs)
         print(f"   ❌ {msg}")
         return 1
 

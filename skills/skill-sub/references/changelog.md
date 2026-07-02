@@ -1,4 +1,22 @@
-## [1.32.3] - 2026-07-03
+## [1.33.0] - 2026-07-03
+
+### 新增
+- **门禁系统**（chain_gate.py）：10 个 HARD 门禁，参考 novel-weaver pipeline_gate 架构
+  GATE_REGISTRY 含依赖链：blueprint_verified → intent_decomposed → steps_searched → steps_selected → io_validated → chain_connected → chain_saved → chain_loaded → execution_planned → execution_completed
+  API: check()/set_gate()/block()/reset(), 不通过则 exit(1) + HOOK-BLOCK 输出
+- **chain_planner 门禁集成**：cmd_plan 每步前后注入 gate.check/set/block
+  - 第1步搜索 → set steps_searched
+  - 第2步LLM选 → set steps_selected（无输入则 blocked）
+  - 第4步校验 → set io_validated（gap 数过大则 blocked）
+  - 第4b步 DAG → set chain_connected（不连通则 blocked）
+  - 第5步保存 → set chain_saved（失败则 blocked）
+  阻断格式：HOOK-BLOCK [HARD] + 原因 + 修复命令
+
+### 变更
+- chain_planner.py：无 --steps 返回时 set steps_selected=blocked（标记问题，非静默退出）
+- chain_planner.py：搜索无结果时 gate.block 替代 print+return
+
+---
 
 ### 新增
 - **search 过期硬检测**：搜索前自动比对所有技能的 SKILL.md 指纹与蓝皮书记录
