@@ -1,3 +1,20 @@
+## [1.32.2] - 2026-07-03
+
+### 新增
+- **LLM 步骤蓝皮书提取路径**：prepare-llm-input (输出 SKILL.md 供 LLM 读)
+- **apply-blueprint 命令**：接收+校验+保存 LLM 提取结果，含指纹记录
+- **validate_llm_output() 校验器**：LLM 输出结构化校验 (step_name/consumes/produces 字段)
+- **scan --check-fingerprint**：仅输出指纹变更列表，零修改
+- **文档/help 顺序**：LLM 优先，regex 兜底
+
+### 修复
+- **I/O 文本清洗** (skill_extractor.py)：`_clean_io_text()` 去掉 `|` `**` `` ` `` 代码块碎片，80字截断
+- **description 清洗**：`_clean_io_text` 处理后 120字截断，替换 raw 200字
+- **表格行过滤**：含 `|` 或 `` ` `` 的编号步骤跳过（748→672步）
+- **无 ### 的 SKILL.md**：通过 LLM 提取路径覆盖（regex 无法提取的 ## / 列表格式）
+
+---
+
 ## [1.32.1] - 2026-07-02
 
 ### 修复

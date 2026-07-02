@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.32.1
+version: 1.32.2
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -150,6 +150,47 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "代码发布" --force
 ### 循环与分支编排
 
 > → 详见核心能力的渐进式文件索引
+
+---
+
+## 步骤蓝皮书（步骤索引）
+
+skill-sub 将每个已安装技能（`~/.workbuddy/skills/*/`）的 SKILL.md 解析为结构化步骤蓝图，供搜索和链规划使用。
+
+### 蓝皮书更新流程（LLM 优先）
+
+```
+LLM 提取（主路径）
+  ├── 1. check-fingerprint → 检测哪些 skill 的 SKILL.md 有变更
+  ├── 2. prepare-llm-input → 输出变更 skill 的 SKILL.md 全文
+  ├── 3. AI/Agent 调用 LLM → LLM 读取 SKILL.md，输出步骤蓝图
+  ├── 4. apply-blueprint → 格式校验 + 指纹记录 + 蓝图保存
+  └── 5. 自检（可选）→ LLM 再读一次核实提取完整
+
+Regex 兜底（LLM 不可用时）
+  └── scan → 正则提取（仅支持 ### 标题格式，不保准）
+```
+
+```bash
+# LLM 主路径
+step_indexer.py scan --check-fingerprint                       # 检测变更
+step_indexer.py prepare-llm-input --skill "skill-name"         # 获取 SKILL.md
+step_indexer.py apply-blueprint --skill "skill-name" \         # 保存 LLM 结果
+  --steps-json '[{"step_name": "步骤名", "consumes": "输入", "produces": "输出"}]'
+  [--self-check-json '{"passed":true,"issues":[]}']
+
+# Regex 兜底（LLM 失败时）
+step_indexer.py scan [--skill "skill-name"] [--force]          # 全量/增量重建
+```
+
+### 搜索
+
+```bash
+step_indexer.py search --intent "分析数据 报告 生成"
+# 输出：匹配步骤列表（含 I/O 描述和匹配分数）
+step_indexer.py status
+# 输出：当前蓝皮书覆盖率和构建时间
+```
 
 ---
 
