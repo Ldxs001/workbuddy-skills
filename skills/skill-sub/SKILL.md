@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.32.2
+version: 1.32.3
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -135,7 +135,28 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "代码发布" --force
 
 ## 工作流程
 
-1. **理解意图** → 输入：用户自然语言请求；输出：是否需调用链的判断 + 意图分类
+### 前置硬约束：蓝皮书必须最新
+
+**所有搜索/规划操作前，必须先确认蓝皮书指纹一致。** `search` 命令自带过期检测，指纹不一致会直接拒绝搜索。
+
+```
+# 每次执行链规划前（硬约束）
+step_indexer.py search --intent "..."   ← 自动检查指纹
+            ↓ 指纹一致 → 正常搜索
+            ↓ 指纹不一致 → ❌ 拒绝搜索
+
+# 必须先更新：
+# 1. LLM 路径
+step_indexer.py scan --check-fingerprint          # 检测哪些变更
+step_indexer.py prepare-llm-input --skill "X"     # 输出 SKILL.md 给 LLM
+↓ LLM 读 SKILL.md → 输出步骤 JSON
+step_indexer.py apply-blueprint --skill "X" \     # 校验+保存
+  --steps-json '[...]'
+# 2. 或 Regex 兜底
+step_indexer.py scan --force
+```
+
+### 规划执行流程（串行）
 2. **规划技能顺序** → 输入：意图分类；输出：参与 Skill 及其执行顺序列表
 3. **流程缺口分析** → 输入：Skill 顺序列表；输出：衔接处缺口类型（语义/流程/决策）+ 粘连点候选
 4. **步骤蓝图搜索** → 输入：意图关键词；输出：匹配的步骤候选列表（含 call_address、interface）
@@ -156,6 +177,15 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "代码发布" --force
 ## 步骤蓝皮书（步骤索引）
 
 skill-sub 将每个已安装技能（`~/.workbuddy/skills/*/`）的 SKILL.md 解析为结构化步骤蓝图，供搜索和链规划使用。
+
+**硬约束：`search` 命令自带指纹过期检测，蓝皮书过期直接拒绝搜索。**
+```
+step_indexer.py search --intent "分析数据"
+→ 蓝皮书过期（1个技能）：
+   - skill-X（SKILL.md 已变更）
+   请先更新：scan [--force] 或 LLM 路径
+→ 或跳过检测：--ignore-stale
+```
 
 ### 蓝皮书更新流程（LLM 优先）
 

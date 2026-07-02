@@ -389,6 +389,7 @@ def _search_steps(intent, step_search_fn, min_score):
             self.skill = ""
             self.json = True
             self.limit = 100
+            self.ignore_stale = True  # 内部搜索跳过过期检测，由调用方负责更新
 
     # 捕获 JSON 输出
     old_stdout = sys.stdout

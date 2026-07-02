@@ -368,6 +368,31 @@ def cmd_search(args):
         print("❌ 步骤索引为空，请先运行 scan")
         return 1
 
+    # v1.32.2: 蓝图过期检测 — 指纹不一致则阻止搜索
+    stale_skills = []
+    if not getattr(args, 'ignore_stale', False):
+        skills_dir = get_skills_dir()
+        for name, info in meta.get("skills", {}).items():
+            if not isinstance(info, dict):
+                continue
+            md = skills_dir / name / "SKILL.md"
+            if not md.exists():
+                continue
+            cached_md5 = info.get("md5", "")
+            if cached_md5 != _md5_of_file(md):
+                stale_skills.append(name)
+
+        if stale_skills:
+            print(f"❌ 蓝皮书过期（{len(stale_skills)} 个技能 SKILL.md 已变更）:")
+            for s in stale_skills:
+                print(f"   - {s}")
+            print()
+            print(f"请先更新蓝皮书再搜索：")
+            print(f"  1. LLM 路径：check-fingerprint → prepare-llm-input → LLM → apply-blueprint")
+            print(f"  2. Regex 兜底：scan [--force]")
+            print(f"  或使用 --ignore-stale 跳过检测强制搜索")
+            return 1
+
     # 全量搜索 vs 指定技能搜索
     search_skills = args.skill.split(",") if args.skill else list(meta["skills"].keys())
 
@@ -842,6 +867,8 @@ def main():
     p_search.add_argument("--min-score", type=float, default=0.1, help="最低匹配分数（默认0.1）")
     p_search.add_argument("--json", action="store_true", help="JSON 格式输出")
     p_search.add_argument("--limit", type=int, default=20, help="最大结果数（默认20）")
+    p_search.add_argument("--ignore-stale", action="store_true",
+                          help="跳过蓝皮书过期检测，强制搜索")
 
     # info
     p_info = subparsers.add_parser("info", help="查看步骤详情")
