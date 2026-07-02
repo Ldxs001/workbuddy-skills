@@ -31,9 +31,11 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 _SEQUENCE_MARKERS = [
     # 先后型：先A再B、先A然后B、先A接着B
     (r'先(.+?)(?:再|然后|接着|而[后後])(.+)', 'SEQ2'),
-    # 前后型：A后B、A然后B、A之后B、A接着B
-    (r'(.+?)(?:[后後]|然后|之后|接着|之後)(.+?)', 'SEQ2'),
-    # 目的型：A以便B、A以B、A来B
+    # 前后型（多字标记优先）
+    (r'(.+?)(?:然后|之后|接着|之後)(.+)', 'SEQ2'),
+    # 前后型（单字 后/後，排除"最后"的误切）
+    (r'(.+?)(?:(?<!最)[后後])(.+)', 'SEQ2'),
+    # 目的型：A以便B、A以B、A用来B、A为了B
     (r'(.+?)(?:以便|以|用来|用于|为了)(.+)', 'SEQ2'),
     # 箭头型：A→B、A->B、A>>B
     (r'(.+?)[→\->>](.+)', 'SEQ2'),
@@ -42,31 +44,46 @@ _SEQUENCE_MARKERS = [
 ]
 
 
-def _decompose_intent(intent):
+def _decompose_intent(intent, depth=0):
     """将自然语言意图拆解为时序子意图列表。
 
     输入："分析数据后做PPT"
     输出：["分析数据", "做PPT"]
 
+    "分析数据后做PPT然后发邮件"
+    输出：["分析数据", "做PPT", "发邮件"]（递归拆分右侧）
+
     无法拆解时返回 [intent]（退化行为，保持现状兼容）。
     """
-    if not intent:
-        return [intent]
+    if not intent or depth > 3:
+        return [intent] if intent else []
 
+    # 在所有标记中找最左边的匹配（用分隔符位置，不是匹配整体起点）
+    best_match = None
     for pattern, mode in _SEQUENCE_MARKERS:
         match = re.search(pattern, intent)
         if match:
-            if mode == 'SEQ2':
-                parts = [match.group(1).strip(), match.group(2).strip()]
-                # 过滤过短或无意义的子意图
-                parts = [p for p in parts if len(p) >= 2]
-                if len(parts) >= 2:
-                    return parts
-            elif mode == 'SEQ_MULTI':
-                parts = re.findall(r'\d+[.、]\s*(.+?)(?=\d+[.、]|$)', intent)
-                parts = [p.strip() for p in parts if len(p.strip()) >= 2]
-                if len(parts) >= 2:
-                    return parts
+            # SEQ2 用 group(1) 结束位置（即分隔符位置）判断先后
+            sep_pos = match.end(1) if mode == 'SEQ2' else match.start()
+            if best_match is None or sep_pos < best_match['sep_pos']:
+                best_match = {'pattern': pattern, 'mode': mode, 'match': match, 'sep_pos': sep_pos}
+
+    if best_match:
+        mode = best_match['mode']
+        match = best_match['match']
+        if mode == 'SEQ2':
+            part_a = match.group(1).strip()
+            part_b = match.group(2).strip()
+            parts = [p for p in [part_a] if len(p) >= 2]
+            sub_b = _decompose_intent(part_b, depth + 1)
+            parts.extend(sub_b)
+            if len(parts) >= 2:
+                return parts
+        elif mode == 'SEQ_MULTI':
+            parts = re.findall(r'\d+[.、]\s*(.+?)(?=\d+[.、]|$)', intent)
+            parts = [p.strip() for p in parts if len(p.strip()) >= 2]
+            if len(parts) >= 2:
+                return parts
 
     return [intent]
 
