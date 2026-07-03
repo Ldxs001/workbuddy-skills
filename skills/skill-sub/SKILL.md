@@ -1,6 +1,6 @@
 ---
 name: skill-sub
-version: 1.35.0
+version: 1.35.1
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -33,7 +33,7 @@ create_permissions_md: true
 
 ## 核心能力
 
-> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
+> 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（~380行），详细内容拆分到 `references/*.md` 按需加载。
 
 | # | 功能 | 说明 |
 | --- |------| ------ |
@@ -41,9 +41,11 @@ create_permissions_md: true
 | 2 | **执行计划生成** | 生成结构化执行计划，含并行/串行标记 |
 | 3 | **条件执行** | 支持条件步骤，按条件判断是否执行 |
 | 4 | **循环与分支编排** | 支持 for-each/while 循环和 if-else 分支 |
-| 5 | **Dry-Run 模式** | 模拟执行，不实际调用技能 |
-| 6 | **链备份与版本管理** | 自动备份，支持版本恢复 |
-| 7 | **粘连点（Adhesion Point）** | 标记 skill 无法自动化的缺口，提供三种解决方案保证链不断；支持自愈 —— 每次执行自动扫描是否有新 skill 可填补 |
+| 5 | **门禁系统** | 10 座 HARD 门禁串行阻断管线（chain_gate.py），HOOK-BLOCK 输出 |
+| 6 | **步骤蓝皮书过期检测** | `search` 命令前置自动比对指纹，过期直接拒绝搜索 |
+| 7 | **链私有蓝皮书基线校验** | 链创建时 snapshot 步骤接口，执行前自动校验基线偏移 |
+| 8 | **粘连点（Adhesion Point）** | 标记 skill 无法自动化的缺口，提供三种解决方案保证链不断 |
+| 9 | **自增强闭环（模板搜索）** | `chain_manager search` 匹配历史链，相似意图直接复用 |
 
 ---
 
@@ -61,6 +63,8 @@ create_permissions_md: true
 | `references/loop_branch.md` | 参考文档 | > 本文档是 SKILL.md 的渐进式补充，包含循环与分支编排的完整示例。 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 | `references/reference.md` | 命令参考 | CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。 | 无 |
+| `scripts/chain_gate.py` | 脚本 | 门禁系统 — 10 座 HARD 门禁的 check/set/status/reset | 无 |
+| `scripts/chain_executor.py` | 脚本 | 执行引擎 — 含执行前蓝皮书基线自动校验 | 无 |
 | `references/workflow.md` | 参考文档 | > 本文档是 SKILL.md 的渐进式补充，详细描述执行流程、里程碑判断规则、三层回退策略。 | 无 |
 ## 快速开始
 
@@ -121,11 +125,24 @@ python {SKILL_DIR}/scripts/chain_planner.py suggest \
 # 生成执行计划（详细输出）
 python {SKILL_DIR}/scripts/chain_executor.py plan --name "代码发布" --verbose
 
+# 链执行前基线校验（自动）
+# 如有偏移，加 --force-health 跳过
+python {SKILL_DIR}/scripts/chain_executor.py plan --name "代码发布" --force-health
+
 # 查看调用链详情
 python {SKILL_DIR}/scripts/chain_manager.py show --name "代码发布"
 
 # 列出所有调用链
 python {SKILL_DIR}/scripts/chain_manager.py list
+
+# 按意图搜索已有链（模板匹配）
+python {SKILL_DIR}/scripts/chain_manager.py search --intent "代码审查 部署"
+
+# 检查链健康状态
+python {SKILL_DIR}/scripts/chain_manager.py check-health --name "代码发布"
+
+# 查看门禁状态
+python {SKILL_DIR}/scripts/chain_gate.py status
 
 # 删除（自动备份）
 python {SKILL_DIR}/scripts/chain_manager.py delete --name "代码发布" --force
@@ -135,36 +152,26 @@ python {SKILL_DIR}/scripts/chain_manager.py delete --name "代码发布" --force
 
 ## 工作流程
 
-### 前置硬约束：蓝皮书必须最新
+### 前置硬约束
 
-**所有搜索/规划操作前，必须先确认蓝皮书指纹一致。** `search` 命令自带过期检测，指纹不一致会直接拒绝搜索。
+- **步骤蓝皮书过期检测**：`search` 命令自动比对指纹，过期直接拒绝搜索
+- **链私有蓝皮书基线校验**：`chain_executor plan` 加载链时自动比对 `_skill_md5s` vs 当前 SKILL.md，偏移则 HOOK-BLOCK
+- **门禁系统**：10 座 HARD 门禁串行阻断，任一不通过则 exit(1)
 
-```
-# 每次执行链规划前（硬约束）
-step_indexer.py search --intent "..."   ← 自动检查指纹
-            ↓ 指纹一致 → 正常搜索
-            ↓ 指纹不一致 → ❌ 拒绝搜索
+### 规划执行流程（串行，门禁阻断）
 
-# 必须先更新：
-# 1. LLM 路径
-step_indexer.py scan --check-fingerprint          # 检测哪些变更
-step_indexer.py prepare-llm-input --skill "X"     # 输出 SKILL.md 给 LLM
-↓ LLM 读 SKILL.md → 输出步骤 JSON
-step_indexer.py apply-blueprint --skill "X" \     # 校验+保存
-  --steps-json '[...]'
-# 2. 或 Regex 兜底
-step_indexer.py scan --force
-```
-
-### 规划执行流程（串行）
-2. **规划技能顺序** → 输入：意图分类；输出：参与 Skill 及其执行顺序列表
-3. **流程缺口分析** → 输入：Skill 顺序列表；输出：衔接处缺口类型（语义/流程/决策）+ 粘连点候选
-4. **步骤蓝图搜索** → 输入：意图关键词；输出：匹配的步骤候选列表（含 call_address、interface）
-5. **步骤衔接校验** → 输入：相邻步骤的 interface；输出：I/O 匹配置信度 + 缺口标记
-6. **生成调用链** → 输入：步骤列表 + 缺口标记；输出：JSON 格式调用链（含 skill / adhesion 步骤）。如有定时/自动化意图，**必须** 附带 `--schedule` 参数
-7. **立即注册调度** → 链创建成功且带 `schedule` 时，AI **必须当场**完成注册
-8. **链健康检查** → 输入：链名；输出：md5 比对报告（interface 变化/步骤消失/健康）
-9. **（可选）实际执行** → 按执行计划逐步调用技能
+| 步骤 | 名称 | 门禁 | 说明 |
+|------|------|------|------|
+| 0 | **蓝皮书校验** | `blueprint_verified` | `search` 自动检查指纹，过期直接拒绝 |
+| 1 | **理解意图** | `intent_decomposed` | 拆解用户意图为时序子意图 |
+| 2 | **步骤搜索** | `steps_searched` | 对每个子意图分别搜索候选步骤 |
+| 3 | **LLM 选步骤 + 链验证** | `llm_chain_verified` | 传入 `--llm-chain-check`，passed=false 阻断 |
+| 4 | **里程碑判断** | `milestones_set` | 传入 `--milestones`，缺值阻断 |
+| 5 | **步骤衔接校验** | `io_validated` | I/O 类型匹配 + DAG 连通性验证 |
+| 6 | **黏连点补充** | `adhesion_resolved` | 传入 `--adhesion`，有缺口未解决阻断 |
+| 7 | **生成调用链** | `chain_saved` | JSON 保存 + 自动 snapshot 私有蓝皮书 |
+| 8 | **链健康检查** | — | 执行前自动比对 blueprints.json vs 当前 SKILL.md |
+| 9 | **执行** | `chain_loaded` → `execution_planned` → `execution_completed` | 按计划逐步调用 skill |
 
 ---
 
@@ -220,6 +227,92 @@ step_indexer.py search --intent "分析数据 报告 生成"
 # 输出：匹配步骤列表（含 I/O 描述和匹配分数）
 step_indexer.py status
 # 输出：当前蓝皮书覆盖率和构建时间
+```
+
+---
+
+## 门禁系统
+
+所有规划、执行操作由 **10 座 HARD 门禁** 串行阻断。门禁状态存 `data/gate_state.json`。
+
+```bash
+# 查看全部门禁状态
+python {SKILL_DIR}/scripts/chain_gate.py status
+
+# 检查单个门禁（失败则 exit(1) + HOOK-BLOCK）
+python {SKILL_DIR}/scripts/chain_gate.py check --name chain_connected
+
+# 强制开放（跳过阻断）
+python {SKILL_DIR}/scripts/chain_gate.py set --name chain_connected --status open
+
+# 重置全部门禁
+python {SKILL_DIR}/scripts/chain_gate.py reset
+```
+
+门禁依赖链（不可跳过）：
+```
+blueprint_verified → intent_decomposed → steps_searched → steps_selected
+  → llm_chain_verified → milestones_set → io_validated → adhesion_resolved
+  → chain_connected → chain_saved → chain_loaded → execution_planned → execution_completed
+```
+
+---
+
+## 链私有蓝皮书（基线保护）
+
+每条链创建时自动保存步骤接口快照到 `chains/{name}/blueprints.json`，同时记录所有涉及 skill 的 SKILL.md md5（`_skill_md5s`）。
+
+**执行前自动校验：**
+```
+chain_executor plan --name "链名"
+  → 自动比对 blueprints.json 中的 _skill_md5s vs 当前 SKILL.md
+  → 全部一致 → 放行
+  → 有偏移 → HOOK-BLOCK，不给执行
+  → 跳过：--force-health
+```
+
+**手动检查：**
+```bash
+chain_manager.py check-health --name "链名"
+# 输出：步骤A 健康 ✅ / 步骤B 已变化 ⚠️ / 步骤C 已消失 ❌
+```
+
+---
+
+## LLM 参数（链规划时 Agent 传入）
+
+`chain_planner.py plan` 接收 Agent 传入的 LLM 判断结果：
+
+```bash
+python {SKILL_DIR}/scripts/chain_planner.py plan \
+  --intent "分析数据后做PPT" \
+  --steps "analysis-toolkit.数据分析,ppt-gen.生成PPT" \
+  --llm-chain-check '{"passed":true,"reason":"步骤合理","milestones":"1,2"}' \
+  --milestones "1,2" \
+  --adhesion '{"resolved":true,"solutions":[{"mode":"manual","desc":"手动转换"}]}'
+```
+
+参数说明：
+| 参数 | 格式 | 门禁 | 阻断条件 |
+|------|------|------|---------|
+| `--llm-chain-check` | JSON `{passed, reason, milestones}` | `llm_chain_verified` | passed=false 或格式错误 |
+| `--milestones` | 逗号分隔序号 `1,3,5` | `milestones_set` | 缺值 |
+| `--adhesion` | JSON `{resolved, reason, solutions}` | `adhesion_resolved` | gap>0 但 resolved=false |
+
+---
+
+## 自增强闭环（历史链搜索）
+
+每次保存的链自动成为模板，下次相似意图直接命中：
+
+```bash
+# 搜索已有链（n-gram 匹配 intent 关键词）
+python {SKILL_DIR}/scripts/chain_manager.py search --intent "分析数据 报告"
+
+# 输出：
+# 🔍 链搜索: 分析数据 → 2 个匹配
+#   [0.62] 分析数据后做PPT (3步) 分析数据后生成PPT并发送邮件
+#   [0.45] 审计报告链 (2步) 审计代码并生成报告
 ```
 
 ---
