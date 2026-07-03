@@ -1824,6 +1824,11 @@ def body_check_document_format(filepath, content, fm, body, **kw):
                 for r in table_rows:
                     fn = r.split('/')[-1] if '/' in r else r
                     listed_refs.add(fn)
+                # v2.102.7: 额外检查索引表中是否有非 references/ 条目（如 scripts/）
+                all_table_paths = re.findall(r'^\|.*?`([^`]+)`.*?\|', core_text, re.MULTILINE)
+                extra_entries = [p for p in all_table_paths if not p.startswith('references/')]
+                if extra_entries:
+                    issues["warn"].append(f"C-13: 渐进式索引表包含非 references/ 文件：{', '.join(extra_entries[:5])}（索引表应仅列出 references/*.md 文件）")
                 missing_from_table = [f for f in actual_refs if f not in listed_refs]
                 if missing_from_table:
                     issues["warn"].append(f"C-13: references/ 中存在但渐进式索引表未列出的文件：{', '.join(missing_from_table[:5])}")

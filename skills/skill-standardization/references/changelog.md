@@ -1,3 +1,8 @@
+## [2.102.8] - 2026-07-03
+
+### 修复
+- 修复: `structure_checker.py` C-13 索引表检查仅匹配 `references/` 前缀的表格行，漏检 `scripts/` 等非 references 条目。新增 EXTRA 检查：索引表中所有文件路径必须以 `references/` 开头，否则报 WARN
+
 ## [2.102.7] - 2026-07-03
 
 ### 修复
