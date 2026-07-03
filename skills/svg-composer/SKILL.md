@@ -9,7 +9,6 @@ license: MIT
 data_dir: skills/.standardization/svg-composer/data/
 triggers: ['拼接 SVG', '合成图标', 'SVG 组合', '字符拼接', 'svg-composer']
 slug: svg-composer
-displayName: SVG 拼接工具
 trigger: 拼接 SVG
 trigger_negative: 生成 PNG 图片,非拼接矢量绘图
 h1_position: true
