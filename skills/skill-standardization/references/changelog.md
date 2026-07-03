@@ -1,3 +1,10 @@
+## [2.102.4] - 2026-07-03
+
+### 修复
+- 修复: `structure_checker.py` R-23 路径解析使用源文件目录而非 skill_dir（`references/` 下的路径应相对 source file 目录解析，而不是从 skill_dir 解析）
+
+---
+
 ## [2.102.3] - 2026-07-01
 
 ### 修复

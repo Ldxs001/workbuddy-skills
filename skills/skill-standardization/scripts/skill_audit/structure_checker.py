@@ -1093,8 +1093,17 @@ def check_doc_code_consistency(
                 except Exception:
                     _md_contents[_mf] = []
         for ref_path in sorted(other_file_refs):
-            full_path = os.path.join(skill_dir, ref_path)
+            # v2.99.1: 先从源文件所在目录解析（reference.md 中的路径是相对 reference.md 自身）
+            if filepath:
+                source_dir = os.path.dirname(filepath)
+                full_path = os.path.join(source_dir, ref_path)
+            else:
+                full_path = os.path.join(skill_dir, ref_path)
             if not os.path.isfile(full_path):
+                # 试 skill_dir 路径
+                trial2 = os.path.join(skill_dir, ref_path)
+                if trial2 != full_path and os.path.isfile(trial2):
+                    continue
                 # 在 references/ 和 scripts/ 下也尝试找
                 alt = None
                 for prefix in ['references', 'scripts']:
