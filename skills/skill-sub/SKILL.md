@@ -2,7 +2,7 @@
 name: skill-sub
 slug: skill-sub
 displayName: skill-sub
-version: 1.37.2
+version: 1.37.3
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -121,14 +121,13 @@ trigger_danger: remove_dangerous
 | `references/loop_branch.md` | 参考文档 | > 本文档是 SKILL.md 的渐进式补充，包含循环与分支编排的完整示例。 | 无 |
 | `references/permissions.md` | 权限与测试 | 权限扫描说明与测试结论。包含：风险等级、高权限操作说明、测试概览、计时统计。 | R-15, R-16 |
 | `references/reference.md` | 命令参考 | CLI 完整命令参考。包含：所有参数、子命令、选项、示例用法。 | 无 |
-| `scripts/chain_gate.py` | 脚本 | 门禁系统 — 10 座 HARD 门禁的 check/set/status/reset | 无 |
-| `scripts/chain_executor.py` | 脚本 | 执行引擎 — 含执行前蓝皮书基线自动校验 | 无 |
 | `references/workflow.md` | 参考文档 | > 本文档是 SKILL.md 的渐进式补充，详细描述执行流程、里程碑判断规则、三层回退策略。 | 无 |
 | `references/blueprint.md` | 参考文档 | 步骤蓝皮书结构与更新流程 | 无 |
 | `references/gate.md` | 参考文档 | 门禁系统完整文档与 CLI 示例 | 无 |
 | `references/private_blueprint.md` | 参考文档 | 链私有蓝皮书基线保护机制 | 无 |
 | `references/llm_params.md` | 参考文档 | LLM 参数格式与门禁对应关系 | 无 |
 | `references/chain_search.md` | 参考文档 | 自增强闭环历史链搜索 | 无 |
+## 
 ## 快速开始
 
 
