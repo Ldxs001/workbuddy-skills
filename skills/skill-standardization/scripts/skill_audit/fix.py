@@ -406,7 +406,7 @@ def fix_section_trigger(skill_dir, **kw):
         triggers = [f"使用 {name}", f"询问关于 {name} 的问题", f"需要 {name}"]
 
     # ── 生成正/否定双列表 ──
-    pos_items = '\n'.join(f"- 用户需要{t}" if not t.startswith('- ') else t for t in triggers[:4])
+    pos_items = '\n'.join(f"- {t}" if not t.startswith('- ') else t for t in triggers[:4])
     neg_section = '\n'.join(f"- {t}" for t in neg_triggers)
 
     section_body = (

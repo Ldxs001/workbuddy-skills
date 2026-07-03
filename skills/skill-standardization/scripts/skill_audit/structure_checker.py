@@ -240,10 +240,7 @@ def body_has_trigger_section(filepath, content, fm, body, **kw):
     for item_text in positive_triggers:
         item_clean = item_text.strip().lower()
         # 匹配已知的模板式模式
-        # v2.102.5: "用户需要"本身不是模板标志，只有当后面跟着极短(≤8字)或含占位符/泛词时才拒
-        if re.match(r'^用户需要.{0,8}$', item_clean):
-            boilerplate_triggers.append(item_text)
-        elif re.match(r'^用户需要.*?(?:功能|工具|能力)(?:\s|$)', item_clean):
+        if re.match(r'^用户需要.*', item_clean):
             boilerplate_triggers.append(item_text)
         elif re.match(r'^当用户需要.*', item_clean):
             boilerplate_triggers.append(item_text)
