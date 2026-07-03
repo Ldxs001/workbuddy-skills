@@ -11,6 +11,13 @@
 - 修复: `structure_checker.py` R-23 路径解析使用源文件目录而非 skill_dir（`references/` 下的路径应相对 source file 目录解析，而不是从 skill_dir 解析）
 - 修复: `fix.py` `fix_section_workflow()` 在 ## 工作流程 已有自定义内容时跳过覆盖（避免每次 refactor --continue 销毁已有的工作流表格和门禁表）
 
+## [2.102.6] - 2026-07-03
+
+### 修复
+- 修复: `structure_checker.py` R-07 正则过于激进，所有以"用户需要"开头的触发词均被标记为模板式，包括 auto-fix 自己生成的 `用户需要[具体动作]` 描述。改为仅当"用户需要"后紧跟 ≤8 字或含"功能/工具/能力"泛词时才拒，打破 auto-fix 非收敛循环
+
+---
+
 ## [2.102.5] - 2026-07-03
 
 ### 修复
