@@ -396,6 +396,14 @@ class InstructionGenerator:
                     if sol.get("constraints"):
                         lines.append(f"    约束: {sol['constraints']}")
 
+            # 显示流程钩子（v1.38.0）
+            hook = step.get("hook") if isinstance(step, dict) else None
+            expects = hook.get("expects", []) if isinstance(hook, dict) else []
+            if expects:
+                lines.append(f"🔗 流程钩子 — 前置检查:")
+                for e in expects:
+                    lines.append(f"   - {e}")
+
             lines.append("")
         
         return "\n".join(lines)
@@ -588,6 +596,25 @@ class CLIHandler:
         else:
             print(plan["ai_instructions"])
         
+        # v1.38.0: 流程钩子检查（除非 --force-hooks）
+        force_hooks = getattr(args, 'force_hooks', False)
+        if not force_hooks:
+            from .chain_hook import check_chain
+            hook_results = check_chain(chain_data.get("steps", []))
+            if hook_results:
+                all_pass = True
+                for cr in hook_results:
+                    cr.print_report()
+                    if not cr.passed:
+                        all_pass = False
+                if not all_pass:
+                    print(f"\n{'='*55}")
+                    print(f"  HOOK-BLOCK [HARD] — 流程钩子阻断")
+                    print(f"  请确保前置步骤已产出预期文件后重试")
+                    print(f"  或使用 --force-hooks 跳过")
+                    print(f"{'='*55}")
+                    sys.exit(1)
+        
         if hasattr(args, "output") and args.output:
             with open(args.output, "w", encoding="utf-8") as f:
                 f.write(plan["ai_instructions"])
@@ -621,6 +648,21 @@ class CLIHandler:
         print(f"里程碑步骤: {len(ms)}")
         for m in ms:
             print(f"  - 步骤 {m['index']}: {m['reason']}")
+        
+        # 流程钩子验证（v1.38.0）
+        from .chain_hook import check_chain
+        hook_results = check_chain(steps)
+        if hook_results:
+            print(f"\n流程钩子:")
+            all_pass = True
+            for cr in hook_results:
+                cr.print_report()
+                if not cr.passed:
+                    all_pass = False
+            if not all_pass:
+                print(f"\n⚠️ 流程钩子存在阻断项，请在执行前确保前置产出物存在")
+            else:
+                print(f"\n✅ 流程钩子全部通过")
 
 # ============================================================
 # main - 命令行入口
@@ -643,8 +685,10 @@ def main():
     plan_parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
     plan_parser.add_argument("--json", action="store_true", help="JSON 格式输出")
     plan_parser.add_argument("--output", "-o", help="保存执行计划到文件")
-    plan_parser.add_argument("--force-health", action="store_true",
+    plan_    parser.add_argument("--force-health", action="store_true",
                              help="跳过链蓝皮书基线健康检查")
+    plan_parser.add_argument("--force-hooks", action="store_true",
+                             help="跳过流程钩子验证（不推荐）")
     
     # quick 命令
     quick_parser = subparsers.add_parser("quick", help="快速生成执行计划")

@@ -1,3 +1,12 @@
+## [1.38.0] - 2026-07-03
+
+### 新增
+- **流程钩子系统（chain_hook.py）**：在里程碑步骤和末尾步骤上挂载 `hook.expects` 检查前置产出物
+  - 新增 `chain_hook.py`：钩子检查引擎，支持 check/check_chain/CLI
+  - `chain_executor.py plan` 输出显示钩子信息，`--force-hooks` 跳过
+  - `chain_executor.py validate` 输出钩子验证结果
+  - Step schema 新增 `hook` 字段，文档见 chain_schema.md
+
 ## [1.37.3] - 2026-07-03
 
 ### 修复
