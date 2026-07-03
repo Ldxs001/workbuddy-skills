@@ -1,3 +1,17 @@
+## [1.36.0] - 2026-07-03
+
+### 修复
+- **SKILL.md 标准化审计修复**（skill-standardization refactor）
+  - R-17：SKILL.md 从 377 行裁剪至 160 行
+  - R-20：changelog 术语统一
+  - R-21：渐进式加载模板句恢复
+  - R-23：文档-代码一致性误报分类
+  - C-07：14 个代码块补充语言标识
+  - C-11/C-12/C-13/C-17/C-18：章节格式、索引表、示例、边界量化修复
+- 扩展 step_indexer search 过期检测覆盖 chain_planner 内部搜索（--ignore-stale 兜底）
+
+---
+
 ## [1.35.1] - 2026-07-03
 
 ### 修复
@@ -21,7 +35,7 @@
   发现基线偏移 → HOOK-BLOCK [HARD] 阻断，输出修复命令
   跳过：`--force-health`
 
-### 变更
+### 更新
 - chain_executor.py plan 新增 `--force-health` 参数
 - chain_executor.validate 也受健康检查影响（共用 load_chain）
 
@@ -41,7 +55,7 @@
   - CLI：`python chain_cache.py [list|clear|scan <intent>]`
 - **chain_planner plan** 新增参数：--llm-chain-check, --milestones, --adhesion
 
-### 变更
+### 更新
 - chain_planner cmd_plan 管线新增门禁步：steps_selected → llm_chain_verified → milestones_set → io_validated → ... → adhesion_resolved → chain_connected → chain_saved
 
 ---
@@ -54,13 +68,13 @@
   API: check()/set_gate()/block()/reset(), 不通过则 exit(1) + HOOK-BLOCK 输出
 - **chain_planner 门禁集成**：cmd_plan 每步前后注入 gate.check/set/block
   - 第1步搜索 → set steps_searched
-  - 第2步LLM选 → set steps_selected（无输入则 blocked）
+  - 第2步 LLM 选 → set steps_selected（无输入则 blocked）
   - 第4步校验 → set io_validated（gap 数过大则 blocked）
   - 第4b步 DAG → set chain_connected（不连通则 blocked）
   - 第5步保存 → set chain_saved（失败则 blocked）
   阻断格式：HOOK-BLOCK [HARD] + 原因 + 修复命令
 
-### 变更
+### 更新
 - chain_planner.py：无 --steps 返回时 set steps_selected=blocked（标记问题，非静默退出）
 - chain_planner.py：搜索无结果时 gate.block 替代 print+return
 
@@ -71,7 +85,7 @@
   指纹不一致 → 直接拒绝搜索，提示先更新蓝皮书
   跳过检测：`--ignore-stale`
 
-### 变更
+### 更新
 - **工作流文档**：SKILL.md 明确标注蓝皮书校验为前置硬约束（第0步）
   链规划串行流程：校验→理解→规划→缺口→搜索→校验→生成→调度→健康检查
 
@@ -83,11 +97,11 @@
 - **LLM 步骤蓝皮书提取路径**：prepare-llm-input (输出 SKILL.md 供 LLM 读)
 - **apply-blueprint 命令**：接收+校验+保存 LLM 提取结果，含指纹记录
 - **validate_llm_output() 校验器**：LLM 输出结构化校验 (step_name/consumes/produces 字段)
-- **scan --check-fingerprint**：仅输出指纹变更列表，零修改
+- **scan --check-fingerprint**：仅输出指纹更新列表，零更新
 - **文档/help 顺序**：LLM 优先，regex 兜底
 
 ### 修复
-- **I/O 文本清洗** (skill_extractor.py)：`_clean_io_text()` 去掉 `|` `**` `` ` `` 代码块碎片，80字截断
+- **I/O 文本清洗** (skill_extractor.py)：`_clean_io_text()` 删除 `|` `**` `` ` `` 代码块碎片，80字截断
 - **description 清洗**：`_clean_io_text` 处理后 120字截断，替换 raw 200字
 - **表格行过滤**：含 `|` 或 `` ` `` 的编号步骤跳过（748→672步）
 - **无 ### 的 SKILL.md**：通过 LLM 提取路径覆盖（regex 无法提取的 ## / 列表格式）
@@ -97,8 +111,8 @@
 ## [1.32.1] - 2026-07-02
 
 ### 修复
-- **意图分解器 Bugfix**：SEQ2 正则尾部 `.+?` 改为 `.+`（非贪婪只吞1字符导致"分析数据后做PPT"拆成["分析数据","做"]后被长度过滤掉）
-- **递归拆解**：支持"分析数据后做PPT然后发邮件"→3步拆解（右侧递归）
+- **意图分解器 Bugfix**：SEQ2 正则尾部 `.+?` 改为 `.+`（非贪婪只吞1字符导致"分析数据后做 PPT"拆成["分析数据","做"]后被长度过滤掉）
+- **递归拆解**：支持"分析数据后做 PPT 然后发邮件"→3步拆解（右侧递归）
 - **最左标记优先**：改用 `sep_pos`（分隔符位置）替代 `match.start()` 比较，避免多标记同起点时选错
 - **「最后」避险**：`(?<!最)[后後]` 负向后顾，防止"最后"被误切
 
@@ -167,7 +181,7 @@
 ## 1.27.1 (2026-06-05)
 
 ### 修复
-- 全流程钩子加固: cmd_create缺口分析提示+创建后自动校验(结构+流程)+调度注册exit(1)截断
+- 全流程钩子加固: cmd_create 缺口分析提示+创建后自动校验(结构+流程)+调度注册 exit(1)截断
 
 ---
 
@@ -247,7 +261,7 @@
 ## 1.24.6 (2026-06-01)
 
 ### 修复
-- 标准化改造完成(非标章节处理+description同步)
+- 标准化改造完成(非标章节处理+description 同步)
 
 ---
 
@@ -268,7 +282,7 @@
 ## 1.24.3 (2026-06-01)
 
 ### 修复
-- 版本追平changelog
+- 版本追平 changelog
 
 ---
 

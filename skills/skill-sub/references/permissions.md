@@ -1,4 +1,4 @@
-# 基于skill-standardization渐进式披露规范的权限说明
+# 基于 skill-standardization 渐进式披露规范的权限说明
 
 本文档由 `skill-standardization` 权限扫描器自动维护。
 
