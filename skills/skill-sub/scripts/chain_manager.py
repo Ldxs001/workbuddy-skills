@@ -1047,17 +1047,60 @@ class CLIHandler:
     # ═══════════════════════════════════════════════════
     # v1.29.0: 链健康检查 - 蓝皮书比对（私有蓝皮书 + md5）
     # ═══════════════════════════════════════════════════
-    def cmd_check_health(self, args):
-        """检查调用链健康状态：比对当前 SKILL.md vs 链私有蓝皮书"""
-        name = args.name
-        chain = self.chain_manager.load_chain(name)
-        if not chain:
-            print(f"❌ 调用链 '{name}' 不存在")
+    def cmd_search(self, args):
+        """在已有调用链中搜索匹配意图的链（自增强闭环模板匹配）。"""
+        intent = args.intent.lower().strip()
+        if not intent:
+            print("❌ 请提供搜索意图")
             return 1
 
-        # 读取私有蓝皮书
-        pm = self.chain_manager.path_manager
-        bp_file = pm.chains_dir / name / "blueprints.json"
+        import re
+        intent_words = re.findall(r'[\u4e00-\u9fff]{2,}|[A-Za-z][A-Za-z0-9]{2,}', intent)
+        intent_chars = set("".join(intent_words))
+        if not intent_chars:
+            print("❌ 搜索词太短")
+            return 1
+
+        chains = self.chain_manager.list_chains()
+        results = []
+        for name in chains:
+            chain = self.chain_manager.load_chain(name)
+            if not chain:
+                continue
+            search_text = (
+                chain.get("description", "") + " " +
+                chain.get("purpose", "") + " " +
+                " ".join(s.get("step_name", "") for s in chain.get("steps", []))
+            ).lower()
+            search_chars = set(search_text.replace(" ", ""))
+
+            word_matches = sum(1 for w in intent_words if w in search_text)
+            word_score = word_matches / max(len(intent_words), 1)
+            char_overlap = len(intent_chars & search_chars) / max(
+                len(intent_chars | search_chars), 1)
+            score = max(word_score, char_overlap)
+
+            if score >= (args.min_score or 0.3):
+                results.append({
+                    "name": name,
+                    "description": chain.get("description", "")[:60],
+                    "steps": len(chain.get("steps", [])),
+                    "purpose": chain.get("purpose", "")[:40],
+                    "score": round(score, 2),
+                })
+
+        results.sort(key=lambda r: -r["score"])
+        if args.json:
+            import json as j
+            print(j.dumps(results, ensure_ascii=False, indent=2))
+        else:
+            print(f"🔍 链搜索: {intent} → {len(results)} 个匹配")
+            for r in results[:10]:
+                print(f"  [{r['score']}] {r['name']} ({r['steps']}步) {r['description']}")
+        return 0
+
+    def cmd_check_health(self, args):
+        """检查调用链健康状态：比对当前 SKILL.md vs 链私有蓝皮书"""
         if not bp_file.exists():
             print(f"⚠️  调用链 '{name}' 没有私有蓝皮书（需 v1.29.0 重新创建）")
             return 0
@@ -1354,6 +1397,12 @@ def main():
     # check-health (v1.29.0)
     p_health = subparsers.add_parser("check-health", help="检查调用链健康状态（蓝皮书比对）")
     p_health.add_argument("--name", required=True, help="调用链名称")
+
+    # search (v1.34.0)
+    p_search = subparsers.add_parser("search", help="按意图搜索已有调用链（模板匹配）")
+    p_search.add_argument("--intent", required=True, help="意图描述")
+    p_search.add_argument("--min-score", type=float, default=0.3, help="最低匹配分数")
+    p_search.add_argument("--json", action="store_true", help="JSON 格式输出")
     
     args = parser.parse_args()
     
@@ -1371,6 +1420,7 @@ def main():
         "delete": cli_handler.cmd_delete,
         "check-gaps": cli_handler.cmd_check_gaps,
         "check-health": cli_handler.cmd_check_health,
+        "search": cli_handler.cmd_search,
         "schedule": cli_handler.cmd_schedule,
         "register-schedule": cli_handler.cmd_register_schedule,
     }

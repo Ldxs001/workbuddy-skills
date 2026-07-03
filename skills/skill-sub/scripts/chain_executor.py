@@ -517,19 +517,58 @@ class CLIHandler:
         self.path_manager = path_manager or PathManager()
         self.config = config or Config(Path(""), Path(""))
         self.validator = validator or Validator()
-    
+        self.force_health = False  # v1.34.0: 强制跳过蓝皮书健康检查
+
     def load_chain(self, name):
-        """加载调用链"""
+        """加载调用链，自动执行私有蓝皮书健康检查"""
         chain_dir = self.path_manager.get_chain_dir(name)
         chain_file = chain_dir / f"{name}.json"
         if not chain_file.exists():
             print(f"[错误] 调用链不存在: {name}")
             return None
         with open(chain_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            chain_data = json.load(f)
+
+        # v1.34.0: 自动私有蓝皮书健康检查（链执行前基线校验）
+        bp_file = chain_dir / "blueprints.json"
+        if bp_file.exists():
+            try:
+                with open(bp_file, encoding="utf-8") as f:
+                    bp_data = json.load(f)
+                import hashlib
+                skills_dir = self.path_manager.get_skills_dir()
+                saved_md5s = bp_data.get("_skill_md5s", {})
+                changed = []
+                missing = []
+                for skill_name, old_md5 in saved_md5s.items():
+                    md_path = skills_dir / skill_name / "SKILL.md"
+                    if not md_path.exists():
+                        missing.append(skill_name)
+                        continue
+                    cur_md5 = hashlib.md5(md_path.read_bytes()).hexdigest()
+                    if cur_md5 != old_md5:
+                        changed.append(skill_name)
+
+                if missing or changed:
+                    if self.force_health:
+                        print(f"⚠️  [--force-health] 跳过蓝皮书基线检查")
+                    else:
+                        print(f"HOOK-BLOCK [HARD]: 链 [{name}] 蓝皮书基线偏移")
+                        for s in changed:
+                            print(f"  技能 '{s}' 的 SKILL.md 已变更 — 链可能不健康")
+                        for s in missing:
+                            print(f"  技能 '{s}' 已不存在 — 链可能损坏")
+                        print(f"  修复: chain_manager.py check-health --name {name}")
+                        print(f"  或跳过: chain_executor.py plan --name {name} --force-health")
+                        return None
+            except Exception:
+                pass  # 健康检查失败不影响加载
+
+        return chain_data
     
     def cmd_plan(self, args):
         """生成执行计划"""
+        self.force_health = getattr(args, 'force_health', False)
         name = args.name
         chain_data = self.load_chain(name)
         if not chain_data:
@@ -604,6 +643,8 @@ def main():
     plan_parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
     plan_parser.add_argument("--json", action="store_true", help="JSON 格式输出")
     plan_parser.add_argument("--output", "-o", help="保存执行计划到文件")
+    plan_parser.add_argument("--force-health", action="store_true",
+                             help="跳过链蓝皮书基线健康检查")
     
     # quick 命令
     quick_parser = subparsers.add_parser("quick", help="快速生成执行计划")

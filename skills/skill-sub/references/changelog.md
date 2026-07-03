@@ -1,3 +1,17 @@
+## [1.35.0] - 2026-07-03
+
+### 新增
+- **链执行前蓝皮书健康检查**（chain_executor.py load_chain）
+  每次加载链执行时自动比 blueprints.json 中的 _skill_md5s vs 当前 SKILL.md
+  发现基线偏移 → HOOK-BLOCK [HARD] 阻断，输出修复命令
+  跳过：`--force-health`
+
+### 变更
+- chain_executor.py plan 新增 `--force-health` 参数
+- chain_executor.validate 也受健康检查影响（共用 load_chain）
+
+---
+
 ## [1.34.0] - 2026-07-03
 
 ### 新增

@@ -329,14 +329,6 @@ def cmd_plan(args):
     )
     if success:
         gate.set_gate("chain_saved", "open", f"链 {chain_name} 已保存", gs)
-        # 保存到模板缓存（自增强闭环）
-        milestones_list = [int(x.strip()) for x in args.milestones.split(",")
-                          if x.strip().isdigit()] if args.milestones else []
-        try:
-            from chain_cache import save_template
-            save_template(intent, steps_json, milestones_list)
-        except Exception:
-            pass  # 缓存保存失败不影响主流程
         print(f"   ✅ {msg}")
         print(f"   链目录: {cm.path_manager.chains_dir / chain_name}")
         print(f"   ├── chain.json")
