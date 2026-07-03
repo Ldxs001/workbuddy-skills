@@ -167,6 +167,28 @@ def cmd_plan(args):
 
     gate.set_gate("steps_selected", "open", f"选了{len(args.steps.split(','))}步", gs)
 
+    # === HOOK: LLM 链逻辑验证（Agent 通过 --llm-chain-check 传入） ===
+    if args.llm_chain_check:
+        try:
+            lcc = json.loads(args.llm_chain_check)
+        except json.JSONDecodeError:
+            gate.block("llm_chain_verified", "llm-chain-check JSON 解析失败", gs)
+        if not lcc.get("passed", False):
+            reason = lcc.get("reason", "LLM 判断链逻辑不合理")
+            gate.block("llm_chain_verified", reason, gs)
+        gate.set_gate("llm_chain_verified", "open", lcc.get("reason", "通过"), gs)
+        if lcc.get("milestones"):
+            args.milestones = ",".join(str(m) for m in lcc["milestones"])
+    else:
+        gate.set_gate("llm_chain_verified", "open", "未提供 llm-chain-check（跳过）", gs)
+        # 如果 lcc 同时传了 milestones，也一并处理
+
+    # === HOOK: 里程碑门禁（Agent 通过 --milestones 传入） ===
+    if args.milestones:
+        gate.set_gate("milestones_set", "open", f"里程碑: {args.milestones}", gs)
+    else:
+        gate.set_gate("milestones_set", "blocked", "未指定里程碑步骤", gs)
+
     # 3. 校验步骤可用性
     print(f"\n✅ 第3步: 校验步骤可用性...")
     selected = args.steps.split(",")
@@ -261,8 +283,22 @@ def cmd_plan(args):
         gate.block("chain_connected", f"DAG连通率{chain_result['chain_score']}，存在I/O断链", gs)
     gate.set_gate("chain_connected", "open", f"连通率{chain_result['chain_score']}", gs)
 
+    # === HOOK: 黏连点门禁（Agent 通过 --adhesion 传入） ===
+    if args.adhesion:
+        try:
+            adh = json.loads(args.adhesion)
+        except json.JSONDecodeError:
+            gate.block("adhesion_resolved", "adhesion JSON 解析失败", gs)
+        if not adh.get("resolved", False):
+            gate.block("adhesion_resolved", adh.get("reason", "黏连点未解决"), gs)
+        gate.set_gate("adhesion_resolved", "open",
+                      adh.get("reason", f'{len(adh.get("solutions", []))}个方案'), gs)
+    else:
+        gate.set_gate("adhesion_resolved", "open", "无缺口，无需黏连点", gs)
+
     # 5. 构建步骤 JSON — 前置门禁：chain_connected
     gate.check("chain_connected", gs)
+    gate.check("adhesion_resolved", gs)
     steps_json = []
     for i, v in enumerate(validated, 1):
         step = {
@@ -293,6 +329,14 @@ def cmd_plan(args):
     )
     if success:
         gate.set_gate("chain_saved", "open", f"链 {chain_name} 已保存", gs)
+        # 保存到模板缓存（自增强闭环）
+        milestones_list = [int(x.strip()) for x in args.milestones.split(",")
+                          if x.strip().isdigit()] if args.milestones else []
+        try:
+            from chain_cache import save_template
+            save_template(intent, steps_json, milestones_list)
+        except Exception:
+            pass  # 缓存保存失败不影响主流程
         print(f"   ✅ {msg}")
         print(f"   链目录: {cm.path_manager.chains_dir / chain_name}")
         print(f"   ├── chain.json")
@@ -494,6 +538,9 @@ def main():
     p_plan.add_argument("--topk", type=int, default=10, help="显示候选数")
     p_plan.add_argument("--force", action="store_true", help="强制创建（忽略衔接缺口）")
     p_plan.add_argument("--user", action="store_true", help="标记为用户指定链（自愈时跳过）")
+    p_plan.add_argument("--llm-chain-check", default="", help="LLM 链逻辑验证结果 JSON")
+    p_plan.add_argument("--milestones", default="", help="里程碑步骤序号（逗号分隔，如 1,3,5）")
+    p_plan.add_argument("--adhesion", default="", help="黏连点补充方案 JSON")
 
     # script
     p_script = subparsers.add_parser("script", help="全自动生成链")

@@ -1,3 +1,22 @@
+## [1.34.0] - 2026-07-03
+
+### 新增
+- **LLM 参数门禁**（chain_gate.py/chain_planner.py）：三座新增 HARD 门禁
+  - `llm_chain_verified`：接收 `--llm-chain-check` JSON，passed=false 阻断
+  - `milestones_set`：接收 `--milestones`（逗号分隔序号），缺值阻断
+  - `adhesion_resolved`：接收 `--adhesion` JSON，resolved=false 阻断
+- **自增强模板缓存**（chain_cache.py）：参考 semantic-split 的闭环设计
+  - `save_template()`：链规划成功时自动保存到 templates/
+  - `scan_templates()`：n-gram 匹配（复用 step_indexer 同源算法）
+  - `hit_template()`：相似意图命中后直接复用里程碑/步骤组合
+  - CLI：`python chain_cache.py [list|clear|scan <intent>]`
+- **chain_planner plan** 新增参数：--llm-chain-check, --milestones, --adhesion
+
+### 变更
+- chain_planner cmd_plan 管线新增门禁步：steps_selected → llm_chain_verified → milestones_set → io_validated → ... → adhesion_resolved → chain_connected → chain_saved
+
+---
+
 ## [1.33.0] - 2026-07-03
 
 ### 新增

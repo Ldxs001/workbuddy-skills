@@ -63,6 +63,21 @@ GATE_REGISTRY = {
         "depends_on": ["chain_connected"],
         "severity": "HARD",
     },
+    "llm_chain_verified": {
+        "description": "LLM 链逻辑验证通过（步骤满足用户意图）",
+        "depends_on": ["steps_selected"],
+        "severity": "HARD",
+    },
+    "milestones_set": {
+        "description": "LLM 里程碑判断完成",
+        "depends_on": ["llm_chain_verified"],
+        "severity": "HARD",
+    },
+    "adhesion_resolved": {
+        "description": "所有衔接缺口已补充粘连点方案",
+        "depends_on": ["milestones_set"],
+        "severity": "HARD",
+    },
     # 链执行门禁
     "chain_loaded": {
         "description": "调用链已加载",
