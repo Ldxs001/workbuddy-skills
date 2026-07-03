@@ -476,6 +476,7 @@ def fix_section_core(skill_dir, **kw):
 def fix_section_workflow(skill_dir, **kw):
     """
     R-09 修复：添加 ## 工作流程 章节。
+    v2.102.4: 如果已有工作流章节且内容比模板多（已有自定义内容），跳过覆盖。
     """
     skill_md = os.path.join(skill_dir, "SKILL.md")
     if not os.path.isfile(skill_md):
@@ -483,6 +484,22 @@ def fix_section_workflow(skill_dir, **kw):
     content = _read_file(skill_md)
     fm, body = parse_simple_yaml_frontmatter(content)
     name = fm.get("name", "本技能") if fm else "本技能"
+
+    # v2.102.4: 检查现有工作流章节是否已有超越模板的自定义内容
+    if body:
+        lines = body.split("\n")
+        for i, ln in enumerate(lines):
+            if ln.strip().startswith("## 工作流程"):
+                # 统计后续行数（直到下一个 ## 或结束）
+                end = i + 1
+                while end < len(lines) and not lines[end].strip().startswith("## "):
+                    end += 1
+                existing_lines = end - i - 1  # 减去标题行
+                # 模板内容行数 = 5 (4步 + 渐进式行)
+                if existing_lines > 6:
+                    return 0  # 已有自定义内容，跳过覆盖
+                break
+
     section_body = (
         "1. 理解用户需求\n"
         "2. 规划执行步骤\n"
