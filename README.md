@@ -15,7 +15,7 @@
 |--------|------|
 | `activity-duration-estimation` | 活动历时估算 + WBS工作分解 + 项目文档生成 + 经济效益分析 + 挣值管理（Activity Duration Estimation & WBS & Project Docs & Economic Analysis & EVM）—— 支持三点估算/蒙特卡洛四种方法 + WBS项目规划与分解 + 项目文档双模式生成（手动空模版/逐节自动）+ ROI/NPV/IRR/BCR 经济效益分析 + PV/EV/AC/SPI/CPI 挣值管理。三库隔离架构：shared.db + economic.db + evm.db。输出自包含HTML评估报告、经济效益分析报告和挣值分析报告。 |
 | `analysis-toolkit` | 检验检测行业质量控制和数据分析工具箱。覆盖室内质控、室间比对、批次间比对、方法验证、趋势监控五大场景。方法通用，跨领域适用。 |
-| `color-toolkit` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。 |
+| `color-toolkit-turn` | 专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。 |
 | `drawiodo` | draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。 |
 | `everything-search-breadmemory` | 基于Everything/es.exe的本地文件搜索引擎 + 面包屑知识管理系统 + 艾宾浩斯复习引擎 + 拓扑甜甜圈知识关联 + 容灾备份。Agent通用，CLI驱动。 |
 | `git-sync` | 将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复_push_with_cred_url/pull_with_cred_url 未检查 URL 内嵌 token 的缺陷（remote URL 已含 token 时不需查 git-credentials）。 |

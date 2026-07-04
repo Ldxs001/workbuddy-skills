@@ -1,0 +1,16 @@
+{
+  "name": "color-toolkit-turn",
+  "version": "3.4.1",
+  "description": "专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。",
+  "author": "wUwproject",
+  "tags": [
+    "color",
+    "design",
+    "color-conversion",
+    "contrast",
+    "accessibility",
+    "wcag"
+  ],
+  "triggers": [],
+  "data_dir": "skills/.standardization/color-toolkit/data/"
+}
