@@ -2,7 +2,7 @@
 name: drawiodo
 author: wUwproject
 license: MIT
-version: 2.6.1
+version: 2.6.2
 description: draw.io 自动做图 Skill。当用户要求画图、生成图表、做架构图、流程图、UML、ER 图、时序图、思维导图等时触发。生成 .drawio 文件并用 draw.io 打开。支持思考-确认-迭代-版本回溯的完整工作流，8 个 Hook Point 安全校验。
 tags: ['diagram', 'drawio', 'flowchart', 'architecture', 'uml', 'er', 'visualization']
 allowed-tools: ['Bash', 'Read', 'Write', 'Edit']
