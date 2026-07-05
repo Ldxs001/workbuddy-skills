@@ -46,13 +46,24 @@ def run_query(question, kb="default", k=None, threshold=None, template=None, jso
         return 1
 
 
-def run_import(file_path, kb="default", json_output=False):
+def run_import(file_path, kb="default", json_output=False, auto_classify=False):
     """导入文件到知识库"""
     if not os.path.exists(file_path):
         _print_error(f"文件不存在: {file_path}", json_output)
         return 1
     try:
         embeddings = get_embeddings()
+
+        # 自动分类：路由开启时用 reranker 语义匹配，否则用关键词硬匹配
+        if auto_classify:
+            from knowledge_base_manager import auto_classify as do_classify
+            from config import load_config
+            cfg = load_config()
+            router_enabled = cfg.get("router", {}).get("enabled", False)
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            kb = do_classify(content, filename=file_path, use_semantic=router_enabled)
+
         result = import_documents_to_kb(file_path, kb, embeddings)
         if json_output:
             print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
@@ -141,6 +152,8 @@ if __name__ == "__main__":
     parser.add_argument("--threshold", type=float, help="相似度阈值 (0-1)")
     parser.add_argument("--template", type=str, help="自定义 prompt 模板（含 {context} {question}）")
     parser.add_argument("--import-file", type=str, dest="import_file", help="导入文件到知识库")
+    parser.add_argument("--auto-classify", action="store_true", dest="auto_classify",
+                        help="导入时自动分类到对应知识库（路由开启=语义，关闭=关键词硬匹配）")
     parser.add_argument("--kb-list", action="store_true", help="列出知识库")
     parser.add_argument("--no-router", action="store_true", dest="no_router",
                         help="禁用路由层（直接检索指定 KB）")
@@ -153,7 +166,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.import_file:
-        sys.exit(run_import(args.import_file, args.kb, args.json))
+        sys.exit(run_import(args.import_file, args.kb, args.json, auto_classify=args.auto_classify))
 
     if args.kb_list:
         sys.exit(run_kb_list(args.json))

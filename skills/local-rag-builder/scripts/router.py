@@ -167,21 +167,51 @@ def broadcast_route(question: str, kb_names: list[str]) -> list[str]:
 
 def route_query(question: str) -> dict:
     """
-    完整路由流程：
-    ① hardcoded(query) — 命中则直接路由
-    ② fallback(query × KB签名) — 命中则路由到最佳 KB
-    ③ broadcast — 全量广播所有 KB
+    完整路由流程（路由层开启时）：
+    ① 关键词语义路由(reranker) — 用规则关键词作为锚点，reranker 语义匹配 query
+    ② 硬编码路由(keywords/exact match + extension) — 精确匹配
+    ③ 回退语义路由(query × KB签名) — KB 签名语义匹配
+    ④ 全量广播 — 兜底
+
+    路由层关闭时 → 直接全量广播
     """
     from knowledge_base_manager import list_knowledge_bases
     cfg = load_config()
     router_cfg = cfg.get("router", {})
 
-    # ① 硬编码路由
+    if not router_cfg.get("enabled", True):
+        all_kbs = list(list_knowledge_bases().keys())
+        return {"kb_names": all_kbs, "method": "broadcast", "kb_scores": None}
+
+    # ① 关键词语义路由（用 reranker 对 rule.keywords × query 打分）
+    try:
+        from knowledge_base_manager import _load_rules
+        rules = _load_rules()
+        if rules:
+            fallback = FallbackRouter()
+            classify_threshold = router_cfg.get("classify_threshold", 0.3)
+            best_kb, best_score = None, classify_threshold
+            for kb_name, rule_obj in rules.items():
+                keywords = rule_obj.get("keywords", [])
+                if not keywords:
+                    continue
+                kw_text = " ".join(keywords)
+                scores = fallback.score(question, {kb_name: kw_text})
+                score = scores.get(kb_name, 0.0)
+                if score > best_score:
+                    best_score = score
+                    best_kb = kb_name
+            if best_kb:
+                return {"kb_names": [best_kb], "method": "semantic_keyword", "kb_scores": {best_kb: best_score}}
+    except (ValueError, RuntimeError):
+        pass  # 模型未就绪，降级
+
+    # ② 硬编码路由
     hc_result = hardcoded_route(question)
     if hc_result:
         return {"kb_names": [hc_result], "method": "hardcoded", "kb_scores": None}
 
-    # ② 回退语义路由
+    # ③ 回退语义路由
     fallback_enabled = router_cfg.get("fallback", {}).get("enabled", True)
     if fallback_enabled:
         signatures = _load_signatures()
@@ -192,9 +222,9 @@ def route_query(question: str) -> dict:
                 if best_kb:
                     return {"kb_names": [best_kb], "method": "fallback", "kb_scores": scores}
             except (ValueError, RuntimeError):
-                pass  # 模型未就绪，降级到 broadcast
+                pass
 
-    # ③ 全量广播
+    # ④ 全量广播
     all_kbs = list(list_knowledge_bases().keys())
     broadcast_kbs = broadcast_route(question, all_kbs)
     return {"kb_names": broadcast_kbs, "method": "broadcast", "kb_scores": None}
@@ -204,7 +234,7 @@ def route_query(question: str) -> dict:
 
 def _build_signature_from_texts(texts: list[str], max_chars: int = 500) -> str:
     """
-    从文本列表提取签名：词频统计（排除停用词）+ 代表性片段
+    从文本列表提取签名：词频统计（排除数字+停用词）+ 代表性片段
     """
     combined = " ".join(texts)
     tokens = re.findall(r'[\w\u4e00-\u9fff]+', combined.lower())
@@ -217,24 +247,48 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500) -> str:
         "have", "has", "had", "do", "does", "did", "will", "would", "can",
         "could", "may", "might", "shall", "should", "to", "of", "in", "for",
         "on", "with", "at", "by", "from", "as", "into", "through", "during",
-        "this", "that", "these", "those", "it", "its",
+        "this", "that", "these", "those", "it", "its", "等", "第", "其",
     }
     freq = {}
     for t in tokens:
+        # 过滤：纯数字、太短、停用词
         if len(t) < 2 or t in stop_words:
             continue
-        freq[t] = freq.get(t, 0) + 1
+        if t.isdigit():
+            continue
+        # 中文词权重更高
+        is_cjk = bool(re.match(r'[\u4e00-\u9fff]', t))
+        weight = 3 if is_cjk else 1
+        freq[t] = freq.get(t, 0) + weight
 
     sorted_words = sorted(freq.items(), key=lambda x: -x[1])
-    top_words = [w for w, _ in sorted_words[:30]]
-    signature = " ".join(top_words)
 
+    # 至少取 10 个，最多 20 个，优先中文词
+    top_words = []
+    for w, _ in sorted_words:
+        if len(top_words) >= 20:
+            break
+        if len(w) >= 2:
+            top_words.append(w)
+    if len(top_words) < 10:
+        top_words = [w for w, _ in sorted_words[:10]]
+    signature = " · ".join(top_words)
+
+    # 取中后段的内容页（跳过封面/目录），优先含中文的
     excerpt_parts = []
-    for t in texts[:3]:
-        excerpt_parts.append(t[:100].strip())
-    excerpt = " ".join(excerpt_parts)
+    for t in texts[len(texts)//3:len(texts)//3+5]:
+        t = t.strip()
+        if len(t) < 20:
+            continue
+        excerpt_parts.append(t[:150])
+        if len(" ".join(excerpt_parts)) > 300:
+            break
 
-    full = f"{signature} {excerpt}"
+    excerpt = "｜".join(excerpt_parts) if excerpt_parts else ""
+    if excerpt:
+        full = f"【摘要】{signature} | {excerpt}"
+    else:
+        full = f"【摘要】{signature}"
     return full[:max_chars]
 
 

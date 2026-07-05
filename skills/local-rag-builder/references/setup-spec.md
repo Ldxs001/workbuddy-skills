@@ -14,7 +14,7 @@
 | # | 参数 | 类型 | 默认值 | 钩子行为 |
 |---|------|------|--------|---------|
 | 1 | enable_pdf | bool | false | 用户说"要处理PDF"→true；否则默认false |
-| 2 | enable_ocr | bool | false | 用户说"扫描件"/"图片PDF"→true；否则默认false |
+| 2 | enable_ocr | bool | false | 用户说"扫描件"/"图片PDF"→true；自动安装 paddleocr，失败回退 easyocr |
 | 3 | enable_html2md | bool | false | 用户说"网页"/"HTML"→true；否则默认false |
 | 4 | pdf_backend | enum | pypdf | 选项: pypdf / pdfplumber；用户未指定→默认 |
 
@@ -92,7 +92,7 @@ LLM 必须按顺序执行以下阶段，每阶段完成后才能进入下一阶�
   │
   ▼
 阶段 2: 环境检测 & 修复
-  ├─ python 版本检查（3.8-3.11）
+  ├─ python 版本检查（3.11+）
   ├─ pip 可用性检查
   ├─ 缺失包检测 → 自动安装（可选镜像源）
   └─ GPU 检测（影响 device 参数）

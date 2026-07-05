@@ -296,6 +296,27 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
             from langchain_community.document_loaders import PyPDFLoader
             loader = PyPDFLoader(file_path)
             docs = loader.load()
+            # 扫描版 PDF 自动回退 OCR
+            total_chars = sum(len(d.page_content) for d in docs)
+            if total_chars < 50:
+                try:
+                    from pdf2image import convert_from_path
+                    import numpy as np
+                    import easyocr
+                    reader = easyocr.Reader(["ch_sim", "en"])
+                    images = convert_from_path(file_path, dpi=200)
+                    all_text = []
+                    for img in images:
+                        arr = np.array(img)
+                        result = reader.readtext(arr)
+                        all_text.append("\n".join([r[1] for r in result]))
+                    from langchain_core.documents import Document
+                    docs = [Document(
+                        page_content="\n\n--- 换页 ---\n\n".join(all_text),
+                        metadata={"source": os.path.basename(file_path), "ocr": True}
+                    )]
+                except Exception as ocr_err:
+                    raise RuntimeError(f"PDF 无文本且 OCR 失败: {ocr_err}")
         else:
             from langchain_community.document_loaders import TextLoader
             loader = TextLoader(file_path, encoding="utf-8")

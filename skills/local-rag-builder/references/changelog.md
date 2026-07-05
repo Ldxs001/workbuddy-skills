@@ -1,3 +1,13 @@
+## [1.3.1] - 2026-07-05
+
+### 改进
+- **扫描 PDF 自动 OCR**：`import_documents_to_kb()` 自动检测扫描版 PDF，无文本时回退 EasyOCR（不再需要手动写 OCR 脚本）
+- **KB 签名自动更新**：`add_documents_to_kb()` 入库时自动调用 `update_kb_signature()`，签名不再滞后
+- **签名质量提升**：过滤纯数字 token、中文词加权 3x、取中后段代表性片段（跳过封面/目录）
+- **文档一致性修复**：SKILL.md / guide.md / setup-spec.md / faq.md 中 Python 版本从"3.8-3.11"更新为"3.11+"，补充 OCR 回退和签名功能说明
+
+---
+
 ## [1.3.0] - 2026-07-05
 
 ### 新增

@@ -157,15 +157,22 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     index[kb_name]["doc_count"] = count
     _save_index(index)
 
+    # 更新 KB 签名（入库时自动归纳）
+    try:
+        from router import update_kb_signature
+        update_kb_signature(kb_name, documents)
+    except Exception:
+        pass
+
     return True, f"已向 '{kb_name}' 添加 {len(documents)} 个文档块 (总计: {count})"
 
 
-def auto_classify(content, rules=None, filename=None):
+def auto_classify(content, rules=None, filename=None, use_semantic=False):
     """根据规则自动分类内容到对应知识库
 
     支持：
-    - 关键词匹配（内容）
-    - 文件扩展名匹配（如 .py .md .pdf）
+    - 扩展名匹配（始终精确，不走语义）
+    - 关键词匹配：路由关=硬匹配(in)，路由开=语义匹配(reranker × 关键词锚点)
     """
     if rules is None:
         rules = _load_rules()
@@ -179,15 +186,30 @@ def auto_classify(content, rules=None, filename=None):
     best_score = 0
 
     for kb_name, rule in rules.items():
-        score = 0
-        # 关键词匹配
-        for kw in rule.get("keywords", []):
-            if kw.lower() in content_lower:
-                score += 1
-        # 扩展名匹配
+        # 扩展名匹配（始终精确，任何模式都优先）
         for ex in rule.get("extensions", []):
             if ex.lower() == ext:
-                score += 3  # 扩展名匹配权重更高
+                return kb_name  # 扩展名匹配直接命中，不参与语义/硬匹配的分数排序
+
+        if use_semantic:
+            # 路由开启：reranker 语义匹配关键词锚点
+            keywords = rule.get("keywords", [])
+            if keywords:
+                try:
+                    from router import FallbackRouter
+                    kw_text = " ".join(keywords)
+                    fallback = FallbackRouter()
+                    scores = fallback.score(content, {kb_name: kw_text})
+                    score = scores.get(kb_name, 0.0)
+                except (ValueError, RuntimeError):
+                    score = 0
+        else:
+            # 路由关闭：硬匹配（关键词 in content）
+            score = 0
+            for kw in rule.get("keywords", []):
+                if kw.lower() in content_lower:
+                    score += 1
+
         if score > best_score:
             best_score = score
             best_match = kb_name

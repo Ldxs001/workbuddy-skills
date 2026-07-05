@@ -537,6 +537,11 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
         <label>最低得分阈值</label>
         <input type="number" value="{fb_cfg.get('min_score_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))">
       </div>
+      <div class="form-group">
+        <label>语义分类阈值</label>
+        <input type="number" value="{router_cfg.get('classify_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','classify_threshold',parseFloat(this.value))">
+        <span style="color:#888;font-size:11px;margin-left:4px;">（入库/出库时 reranker 关键词锚点匹配）</span>
+      </div>
     </div>
     <div style="margin-top:12px;">
       <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">回退语义路由模型 <span style="font-weight:400;color:#888;font-size:11px;">（每个模型独立下载，选中即生效）</span></div>
