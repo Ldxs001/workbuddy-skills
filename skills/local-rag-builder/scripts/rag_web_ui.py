@@ -162,6 +162,14 @@ def generate_html():
         guard_card_html += f'<span style="font-size:13px;font-weight:600;color:{fg};">{guard_labels[g]}</span></label>'
     guard_card_html += ""
     input_src = cfg.get("input_sources", {})
+    def _src_dot_class(key):
+        """计算输入源状态点的初始 CSS 类：关→off(黄), 开且依赖就绪→ready(绿), 开且缺依赖→missing(红)"""
+        if not input_src.get(key, False):
+            return "off"
+        return _check_dep(key)
+    _dot_cls_pdf = _src_dot_class("enable_pdf")
+    _dot_cls_ocr = _src_dot_class("enable_ocr")
+    _dot_cls_html = _src_dot_class("enable_html2md")
     split_cfg = cfg.get("splitting", {})
     overrides = split_cfg.get("strategy_overrides", {})
 
@@ -311,7 +319,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <h2>📂 输入源 <span style="font-weight:400;color:#888;font-size:12px;">⬤ 黄=未开/检测中 绿=可用 红=依赖缺失</span></h2>
     <div class="form-row-3">
       <div class="form-group">
-        <label>PDF 解析 <span class="src-dot" id="dot-enable_pdf" style="font-size:12px;">⬤</span></label>
+        <label>PDF 解析 <span class="src-dot {_dot_cls_pdf}" id="dot-enable_pdf" style="font-size:12px;">⬤</span></label>
         <label class="toggle-switch" onclick="toggleInputSource('enable_pdf')">
           <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_pdf", False) else ""}>
           <span class="toggle-slider"></span>
@@ -319,7 +327,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
         <div style="font-size:11px;color:#888;margin-top:4px;">pypdf / pdfplumber</div>
       </div>
       <div class="form-group">
-        <label>OCR 图片提取 <span class="src-dot" id="dot-enable_ocr" style="font-size:12px;">⬤</span></label>
+        <label>OCR 图片提取 <span class="src-dot {_dot_cls_ocr}" id="dot-enable_ocr" style="font-size:12px;">⬤</span></label>
         <label class="toggle-switch" onclick="toggleInputSource('enable_ocr')">
           <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_ocr", False) else ""}>
           <span class="toggle-slider"></span>
@@ -327,7 +335,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
         <div style="font-size:11px;color:#888;margin-top:4px;">paddleocr</div>
       </div>
       <div class="form-group">
-        <label>HTML→MD 转换 <span class="src-dot" id="dot-enable_html2md" style="font-size:12px;">⬤</span></label>
+        <label>HTML→MD 转换 <span class="src-dot {_dot_cls_html}" id="dot-enable_html2md" style="font-size:12px;">⬤</span></label>
         <label class="toggle-switch" onclick="toggleInputSource('enable_html2md')">
           <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_html2md", False) else ""}>
           <span class="toggle-slider"></span>
@@ -1023,7 +1031,7 @@ function refreshSortRules(){{fetch('/api/reranker/rules',{{method:'POST'}}).then
 function deleteSortRule(i){{if(!confirm('\u5220\u9664\u89c4\u5219 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{index:i}})}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u5220\u9664');refreshSortRules()}}else toast(d.error,'error')}});}}
 function setSrcDot(key, cls) {{var el=document.getElementById('dot-'+key);if(el){{el.className='src-dot '+cls;}}}}
 function refreshSrcStatus() {{
-  fetch('/api/dep-check',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(!d.success)return;var map=d.status||{{}};['enable_pdf','enable_ocr','enable_html2md'].forEach(function(k){{var st=map[k]||'missing';var on=document.querySelector('input[type=\"checkbox\"]');setSrcDot(k,st);}});}});
+  fetch('/api/dep-check',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(!d.success)return;var map=d.status||{{}};['enable_pdf','enable_ocr','enable_html2md'].forEach(function(k){{var st=map[k]||'missing';setSrcDot(k,st);}});}});
 }}
 function onToggleInputSource(key) {{
   setSrcDot(key,'checking');
@@ -1492,8 +1500,16 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 try: rebuild_all_signatures(); self._send_json({"success": True})
                 except Exception as e: self._send_json({"success": False, "error": str(e)})
             elif path == "/api/reranker/toggle":
-                cfg = load_config(); rr = cfg.setdefault("reranker", {}); rr["enabled"] = not rr.get("enabled", False)
-                save_config(cfg); self._send_json({"success": True, "enabled": rr["enabled"]})
+                cfg = load_config(); rr = cfg.setdefault("reranker", {})
+                new_enabled = not rr.get("enabled", False)
+                rr["enabled"] = new_enabled
+                # 联动：开启 rerank 时检索更多候选（K=20），关闭时恢复 K=3
+                ret = cfg.setdefault("retrieval", {})
+                if new_enabled:
+                    ret["k"] = 20
+                else:
+                    ret["k"] = 3
+                save_config(cfg); self._send_json({"success": True, "enabled": new_enabled})
             elif path == "/api/reranker/rules":
                 cfg = load_config(); rules = cfg.get("reranker", {}).get("sort_rules", [])
                 self._send_json({"success": True, "rules": rules})

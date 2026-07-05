@@ -1,3 +1,17 @@
+## [1.2.11] - 2026-07-05
+
+### 修复
+
+- **检索 k 值 UI 联动**：开启 Rerank 时 `retrieval.k` 自动设为 20，关闭时恢复 3。
+  之前只在 `retrieve_context()` 层做运行时缩放，但 UI 上 k 值不联动，用户看到的始终是 3。
+  根因：`/api/reranker/toggle` 只改了 `reranker.enabled`，没有同步改 `retrieval.k`。
+- **输入源状态指示器初始状态**：修复页面刚打开时三个状态点显示黑色（无色）的问题。
+  根因：SSR 生成的 `<span class="src-dot">` 缺少初始 CSS 类（ready/missing/off），`refreshSrcStatus()` 异步调用前点显示为默认黑色。
+  修复：`generate_html()` 中根据 toggle 状态和 `_check_dep()` 结果直接 SSR 正确的 CSS 类。
+- **清理冗余代码**：移除 `refreshSrcStatus()` 中的死代码 `var on=document.querySelector(...)`。
+
+---
+
 ## [1.2.10] - 2026-07-05
 
 ### 新增
