@@ -487,12 +487,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <div id="kb-list" style="margin-bottom:8px;">
       {' '.join(f'''<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
         <div style="flex:1;"><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</div>
-        <div style="min-width:200px;">
-          <select class="kb-model-select" data-kb="{name}" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:12px;" onchange="setKbModel('{name}',this.value)">
-            <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
-            {''.join(f'<option value="{m.get("path","")}"{" selected" if info.get("embedding_model","")==m.get("path","") else ""}>{m.get("model_id","")}</option>' for m in models)}
-          </select>
-        </div>
+        <div style="color:#888;font-size:11px;">模型编辑在下方「自动分类规则」中</div>
       </div>''' for name, info in kbs.items())}
     </div>
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
