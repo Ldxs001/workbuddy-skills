@@ -1,3 +1,15 @@
+## [1.3.0] - 2026-07-05
+
+### 新增
+- **路由层关键词语义分类**：路由开启后，入库和出库共享同一套 reranker 语义匹配逻辑
+  - 入库：`auto_classify()` 新增 `use_semantic` 参数，路由开时用 reranker 对 `rule.keywords × doc_content` 打分，而非硬匹配
+  - 出库：`route_query()` 新增 `① 关键词语义路由` 步骤，先于硬编码和签名回退执行
+  - 扩展名匹配始终精确，不受路由开关影响
+  - CLI：`rag_skill.py --import-file --auto-classify` 自动分类入库
+  - Web UI：路由层新增「语义分类阈值」配置项
+
+---
+
 ## [1.2.18] - 2026-07-05
 
 ### 修复
