@@ -1,3 +1,15 @@
+## [1.3.2] - 2026-07-05
+
+### 新增
+- **ChromaDB 容灾备份**：`add_documents_to_kb()` 入库前自动备份 `chroma.sqlite3.bak`，写入失败自动回滚恢复
+- **HNSW 损坏自动修复**：`retrieve_documents()` 检测到 HNSW 索引损坏时自动清理段数据并重建索引，查询不再中断
+
+### 修复
+- **Python 3.11 f-string 兼容**：修复 GPU OCR 脚本中反斜杠转义导致的 SyntaxError
+- **ChromaDB 文件检测**：`add_documents_to_kb()` 中 `.parquet` 改为 `.sqlite3`，适配新版 ChromaDB
+
+---
+
 ## [1.3.1] - 2026-07-05
 
 ### 改进

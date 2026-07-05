@@ -91,27 +91,38 @@ def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, e
     if not os.path.exists(kb_path) or not os.listdir(kb_path):
         return []
 
-    vectorstore = Chroma(
-        persist_directory=kb_path,
-        embedding_function=embeddings,
-    )
+    # 尝试检索，HNSW 损坏时自动修复
+    import time as _t
+    for _attempt in range(2):
+        try:
+            vectorstore = Chroma(
+                persist_directory=kb_path,
+                embedding_function=embeddings,
+            )
+            cfg = load_config()
+            ret_cfg = cfg.get("retrieval", {})
+            if k is None:
+                k = ret_cfg.get("k", 3)
+            if score_threshold is None:
+                score_threshold = ret_cfg.get("score_threshold")
 
-    cfg = load_config()
-    ret_cfg = cfg.get("retrieval", {})
-    if k is None:
-        k = ret_cfg.get("k", 3)
-    if score_threshold is None:
-        score_threshold = ret_cfg.get("score_threshold")
+            if score_threshold:
+                retriever = vectorstore.as_retriever(
+                    search_type="similarity_score_threshold",
+                    search_kwargs={"score_threshold": score_threshold, "k": k},
+                )
+            else:
+                retriever = vectorstore.as_retriever(search_kwargs={"k": k})
 
-    if score_threshold:
-        retriever = vectorstore.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={"score_threshold": score_threshold, "k": k},
-        )
-    else:
-        retriever = vectorstore.as_retriever(search_kwargs={"k": k})
-
-    return retriever.invoke(query)
+            return retriever.invoke(query)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "hnsw" in err_str or "segment reader" in err_str or "compactor" in err_str:
+                from knowledge_base_manager import _try_repair_kb, _backup_kb
+                if _attempt == 0 and _try_repair_kb(kb_path):
+                    _backup_kb(kb_path)
+                    continue
+            raise  # 非 HNSW 错误或修复失败则透传
 
 
 def build_context(docs):
