@@ -115,9 +115,6 @@ def generate_html():
     cfg = load_config()
     kbs = list_knowledge_bases()
     all_models = list_downloaded_models()
-    # 过滤掉重排序模型，只保留真正的嵌入模型（供知识库嵌入模型选择器使用）
-    reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
-    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
     template = load_template()
     router_cfg = cfg.get("router", {})
     fb_cfg = router_cfg.get("fallback", {})
@@ -128,6 +125,9 @@ def generate_html():
     from embedding_model_manager import RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS
     dl = list_downloaded_models()
     dl_ids = {m.get("model_id","").lower() for m in dl}
+    # 过滤掉重排序模型，只保留真正的嵌入模型（供 KB 嵌入模型选择器使用）
+    reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
+    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
     Q = "'"
     def _mlist(role, models_def, current_path=""):
         """生成模型列表：role=embedding|rerank|fb, models_def=模型定义列表"""

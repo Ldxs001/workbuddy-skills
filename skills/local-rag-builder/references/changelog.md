@@ -1,3 +1,12 @@
+## [1.2.18] - 2026-07-05
+
+### 修复
+- **Web UI 启动报错 UnboundLocalError**：`generate_html()` 中 `RECOMMENDED_RERANK_MODELS` 在第 119 行使用但在第 128 行才 import，导致 Python 将其视为未绑定的局部变量
+  - 根因：过滤器代码插入位置在 import 语句之前
+  - 修复：将过滤逻辑移到 `from embedding_model_manager import ...` 之后
+
+---
+
 ## [1.2.17] - 2026-07-05
 
 ### 重构
