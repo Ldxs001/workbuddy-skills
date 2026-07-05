@@ -37,6 +37,32 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
 
     if model_path is None:
         model_path = emb_cfg.get("model_path", "")
+
+    # 如果 model_path 不是有效路径，尝试从 model_index.json 解析 model_id → 路径
+    if model_path and not os.path.exists(model_path):
+        from utils import MODELS_DIR
+        index_path = os.path.join(MODELS_DIR, "model_index.json")
+        if os.path.exists(index_path):
+            try:
+                import json
+                with open(index_path, "r", encoding="utf-8") as f:
+                    idx = json.load(f)
+                # 精确匹配 model_id
+                if model_path in idx:
+                    actual = idx[model_path].get("path", "")
+                    if actual and os.path.exists(actual):
+                        model_path = actual
+                # 模糊匹配子路径（如 model_path 是 HuggingFace ID，索引用反斜杠路径）
+                if not os.path.exists(model_path):
+                    for mid, info in idx.items():
+                        if mid.replace("/", "_") in model_path or mid == model_path:
+                            actual = info.get("path", "")
+                            if actual and os.path.exists(actual):
+                                model_path = actual
+                                break
+            except Exception:
+                pass
+
     # 校验：路径为空或路径失效时回退到扫描 MODELS_DIR
     if not model_path or not os.path.exists(model_path):
         models = find_model_dirs(MODELS_DIR)

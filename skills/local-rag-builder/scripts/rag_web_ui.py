@@ -517,7 +517,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group"><label>知识库嵌入模型</label>
         <select id="rule-model" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
           <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
-          {''.join(f'<option value="{m.get("path","")}">[嵌入] {m.get("model_id","")}</option>' for m in models)}
+          {''.join(f'<option value="{m.get("model_id","")}">[嵌入] {m.get("model_id","")}</option>' for m in models)}
         </select>
         <div style="font-size:11px;color:#888;margin-top:4px;">选空=回退到全局默认模型。已有文档的知识库切换模型后需重新导入。</div>
       </div>

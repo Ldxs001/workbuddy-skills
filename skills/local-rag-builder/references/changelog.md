@@ -1,3 +1,14 @@
+## [1.2.16] - 2026-07-05
+
+### 修复
+- **知识库嵌入模型选择器存的是文件路径而非模型 ID**：下拉菜单的 `value` 用了 `m.get("path")`，导致 `set_kb_model()` 将完整文件路径写入 KB 配置
+  - 根因：`rag_web_ui.py` 规则编辑器 `<option value="{path}">` 存的是文件路径
+  - 修复：改为 `value="{model_id}"`，保存标准模型 ID
+- **`get_embeddings()` 无法解析 model_id 到文件路径**：KB 配置存的是 model_id（如 `maidalun1020/bce-embedding-base_v1`），但 `get_embeddings()` 直接调 `os.path.exists()` 找不到，fallback 到字母序第一个模型（通常是 reranker）
+  - 修复：新增 `model_index.json` 查找逻辑，将 model_id 转为真实文件路径
+
+---
+
 ## [1.2.15] - 2026-07-05
 
 ### 修复
