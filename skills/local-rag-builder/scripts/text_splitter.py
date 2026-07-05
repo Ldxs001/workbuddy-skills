@@ -290,11 +290,15 @@ def split_by_sentence(text, language="中文", delimiters=None):
         else:
             raise ImportError("skip")
     except (ImportError, Exception, LookupError):
-        delim_pattern = "[" + "".join(re.escape(d) for d in delimiters) + "]"
-        sentences = [s.strip() for s in re.split(delim_pattern, text) if s.strip()]
-        if sentences:
-            last_delim = delimiters[0] if delimiters else "。"
-            sentences = [s + last_delim for s in sentences]
+        # 捕获组保留 delimiter，避免 re.split 吃掉真实标点后硬粘第一个
+        delim_re = "([" + "".join(re.escape(d) for d in delimiters) + "])"
+        tokens = re.split(delim_re, text)
+        sentences = []
+        for i in range(0, len(tokens), 2):
+            content = tokens[i].strip()
+            delim_sym = tokens[i + 1] if i + 1 < len(tokens) else ""
+            if content:
+                sentences.append(content + (delim_sym or ""))
 
     docs = []
     for s in sentences:
@@ -324,7 +328,8 @@ def split_semantic(text, embeddings=None, breakpoint_type="percentile"):
 # ==================== 后处理（子切分）====================
 
 def _run_secondary(chunks: list, secondary_strategy: str,
-                  chunk_size: int, chunk_overlap: int) -> list:
+                  chunk_size: int, chunk_overlap: int,
+                  embeddings=None) -> list:
     """
     对 chunks 执行二次切分，metadata 白名单继承。
     只有 chunks 内容长度超过 chunk_size 的才子切。
@@ -350,9 +355,11 @@ def _run_secondary(chunks: list, secondary_strategy: str,
     elif secondary_strategy == "semantic":
         try:
             from langchain_experimental.text_splitter import SemanticChunker
-            from langchain_huggingface import HuggingFaceEmbeddings
+            if embeddings is None:
+                from langchain_huggingface import HuggingFaceEmbeddings
+                embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
             splitter = SemanticChunker(
-                embeddings=HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5"),
+                embeddings=embeddings,
                 breakpoint_threshold_type="percentile",
             )
         except ImportError:
@@ -404,7 +411,7 @@ META_INHERIT_STRATEGIES = {"headers", "semantic"}
 
 
 def split_pipeline(text, guards=None, primary="recursive", secondary=None,
-                   chunk_size=500, chunk_overlap=50, **kwargs):
+                   chunk_size=500, chunk_overlap=50, embeddings=None, **kwargs):
     """
     三层切分流水线：守卫栈 → 主切分 → 后处理(子切)
 
@@ -415,6 +422,7 @@ def split_pipeline(text, guards=None, primary="recursive", secondary=None,
         secondary: 后处理策略，支持 recursive/fixed/semantic/None
         chunk_size: 块大小
         chunk_overlap: 块重叠
+        embeddings: 嵌入模型实例（供语义切分使用，不传则 fallback bge-small-zh-v1.5）
         **kwargs: 传递给主策略的额外参数（headers_to_split_on, strip_headers, separators, etc.）
     """
     from langchain_core.documents import Document
@@ -452,6 +460,10 @@ def split_pipeline(text, guards=None, primary="recursive", secondary=None,
         strategy_kwargs["chunk_size"] = actual_chunk_size
         strategy_kwargs["chunk_overlap"] = actual_chunk_overlap
 
+    # 注入嵌入模型（语义切分专用，外部传入优先）
+    if embeddings is not None and primary == "semantic":
+        strategy_kwargs["embeddings"] = embeddings
+
     chunks = plugin.execute(protected_text, strategy_kwargs)
 
     # 3. 守卫还原
@@ -461,7 +473,7 @@ def split_pipeline(text, guards=None, primary="recursive", secondary=None,
     if secondary and secondary != primary:
         # 只有 headers/semantic 主策略需要 metadata 继承
         if primary in META_INHERIT_STRATEGIES:
-            chunks = _run_secondary(chunks, secondary, chunk_size, chunk_overlap)
+            chunks = _run_secondary(chunks, secondary, chunk_size, chunk_overlap, embeddings=embeddings)
         else:
             # 固定/递归/按句：纯子切，不继承位置 metadata
             chunks = _run_secondary_without_inherit(chunks, secondary, chunk_size, chunk_overlap)

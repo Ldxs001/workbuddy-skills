@@ -1,3 +1,110 @@
+## [1.2.9] - 2026-07-05
+
+### 修复
+- **语义切分硬编码嵌入模型**：`split_semantic` 和 `split_semantic` 后处理子切均硬编码 `BAAI/bge-small-zh-v1.5`，不随用户配置的嵌入模型变化
+  - 根因：`split_pipeline` 没有 `embeddings` 参数，`_run_secondary` 也没有，`rag_core.import_documents_to_kb` 手里有 `embeddings` 却从未传递
+  - 修复：`split_pipeline` 新增 `embeddings=None` 参数，语义主策略时注入 `strategy_kwargs`；`_run_secondary` 新增 `embeddings=None` 参数，语义子切使用传入模型；`rag_core.import_documents_to_kb` 将 `embeddings` 传入 `split_pipeline`
+  - 向后兼容：不传 `embeddings` 时仍 fallback 到 `bge-small-zh-v1.5`
+- **sentence 切分 fallback delimiter 乱附着**：NLTK 不可用时 regex fallback 吃掉真实标点后硬粘 `delimiters[0]`（"。"），导致 `"你吃饭了吗？"` → `"你吃饭了吗。"`
+  - 根因：`re.split` 非捕获组模式会丢弃 delimiter，后续用 `delimiters[0]` 硬补
+  - 修复：改用捕获组 `(…)` 保留 delimiter，按 i,i+1 配对取出内容+真实标点，空 content 跳过，末尾无标点不追加
+
+---
+
+## [1.2.8] - 2026-07-05
+
+### 新增
+- **输入源状态指示灯**：每个输入源开关旁显示 ⬤ 色点
+  - 🟡 黄 = 开关未开启 / 检测中
+  - 🟢 绿 = 依赖已安装可用
+  - 🔴 红 = 依赖缺失
+  - 页面加载时自动检测依赖状态，开关点击后实时更新
+- 新增 `/api/dep-check` 端点返回所有输入源依赖状态
+
+---
+
+## [1.2.7] - 2026-07-05
+
+### 修复
+- **路由层回退模型选择每次重启后重置**：
+  - 根因：保存时写入 `router.fallback.model_path`，但 HTML 生成时读取 `router.model_path_fallback`，路径不一致导致始终读不到已保存的值，回退到列表第一个模型
+  - 修复：`_mlist("fb")` 的 `current_path` 改为 `fb_cfg.get("model_path", "")`
+
+---
+
+## [1.2.6] - 2026-07-05
+
+### 新增
+- **输入源开关自动安装依赖**：打开 PDF/OCR/HTML→MD 开关时自动检测并 `pip install` 所需包
+  - `enable_pdf` → 依次检测 `pypdf` / `pdfplumber`，都无则装 `pypdf`
+  - `enable_ocr` → 检测 `paddleocr`，无则安装
+  - `enable_html2md` → 检测 `html2text`，无则安装
+  - 安装失败时开关保持关闭，返回错误提示
+
+---
+
+## [1.2.5] - 2026-07-05
+
+### 修复
+- **所有 toggle 开关需要多次点击才能生效**：
+  - 根因：`<label>` 包裹 `<input type="checkbox">` 时，点击 label 同时触发两件事：(1) label 的 `onclick` 调用 API toggle，(2) 浏览器原生将 checkbox 的 `click` 事件冒泡回 label，导致 `onclick` **二次触发**，API 被调两次（刚开又关）
+  - 修复：所有 6 个 toggle 的 `<input>` 添加 `onclick="event.stopPropagation()"`，阻止 checkbox 原生 click 冒泡到 label
+  - 影响范围：Rerank 开关 / 路由开关 / 多知识库路由开关 / PDF 解析开关 / OCR 开关 / HTML→MD 开关
+
+---
+
+## [1.2.4] - 2026-07-05
+
+### 修复
+- **自动分类规则编辑后蓝色三角箭头仍显示"默认模型"**：
+  - 根因1：`saveRule()` 调用 `/api/kb-model` 设置 KB 模型，但目标 KB（规则名）不存在于 `kb_index.json`，`set_kb_model` 返回失败
+  - 修复：`/api/kb-model` 处理时若 KB 不存在则自动创建
+  - 根因2：`refreshRules` 显示用 `split('/')` 提取模型名，Windows 路径用 `\` 无法正确拆分
+  - 修复：自动检测路径分隔符（`\` 或 `/`），提取末段目录名，将 `_` 转为 `/` 显示
+
+---
+
+## [1.2.3] - 2026-07-05
+
+### 修复
+- **`list_downloaded_models` 返回无权重文件的空目录模型**：
+  - 根因：只从 `model_index.json` 读取，不验证文件是否实际存在。目录被删除/损坏后仍显示"已下载"并可被选中
+  - 修复：遍历索引时调用 `_check_integrity()` 过滤，仅返回权重文件完整的模型
+
+---
+
+## [1.2.2] - 2026-07-05
+
+### 修复
+- **Web UI 下载进度监控不兼容 ModelScope 缓存目录结构**：
+  - 根因：ModelScope 的 `snapshot_download(cache_dir=xx)` 将文件写入 `BAAI/bge-m3` 格式（`org/name`），但 Web UI 进度扫描硬编码为 HuggingFace 的 `models--BAAI--bge-m3` 格式
+  - 修复：进度监控同时扫描 HF（`models--`）和 ModelScope（`org/name`）两种缓存路径前缀
+- **`_download_with_modelscope` 未安装时跳过而非自动安装**：
+  - 根因：函数入口只 `import` 检测，未安装就直接返回失败
+  - 修复：`modelscope` 未安装 → 自动 `pip install` → 成功则继续下载，失败才跳下一源
+- **HF ↔ ModelScope 模型 ID 映射**：部分模型在两平台 org/name 不一致导致下载挂起
+  - 新增 `_MS_MODEL_ID_MAP` 映射表，当前覆盖：
+    - `maidalun1020/bce-embedding-base_v1` → `maidalun/bce-embedding-base_v1`
+    - `Alibaba-NLP/gte-Qwen2-7B-instruct` → `iic/gte-Qwen2-7B-instruct`
+  - `_download_with_modelscope` 入口自动查表映射
+- timeout 从 600s 提升至 1800s（BGE-M3 约 2.2GB 需要）
+
+---
+
+## [1.2.0] - 2026-07-05
+
+### 新增
+- **嵌入推荐模型大扩充**：从 6 个增至 14 个，补齐常用多语言系列
+  - `BAAI/bge-m3`：BGE 多语言旗舰，支持 100+ 语言，Dense+Sparse+MultiVec 三种检索方式
+  - `intfloat/multilingual-e5-small/base/large-instruc`：E5 多语言系列（小/中/大），覆盖 100 语言
+  - `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`：多语言 paraphrase，50+ 语言
+  - `BAAI/bge-large-en-v1.5`：英文高精度嵌入
+  - `Alibaba-NLP/gte-Qwen2-7B-instruct`：阿里 GTE 大模型嵌入
+  - `sentence-transformers/all-mpnet-base-v2`：英文高精度嵌入
+- 模型列表重新分组：BGE 系列 / 多语言系列 / 中文双语系列 / 英文系列
+
+---
+
 ## [1.1.3] - 2026-06-21
 
 ### 修复

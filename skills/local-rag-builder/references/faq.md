@@ -32,7 +32,7 @@ A: ModelScope 下载的模型名中 `.` 可能变为 `___`（如 `bge-small-zh-v
 ### 参数错误
 - **`--query` 后无内容**：检查是否使用了引号包裹查询内容，如 `--query "问题"`
 - **`--kb` 指定未知库**：先运行 `python scripts/knowledge_base_manager.py --list` 查看已有知识库
-- **切分参数超出范围**：`--chunk-size` 范围 50–2000，`--overlap` 范围 0–500
+- **切分参数超出范围**：`--chunk-size` 范围 50–5000，`--overlap` 范围 0–1000
 
 ### 依赖错误
 - **ModuleNotFoundError**：运行 `python scripts/rag_env_setup.py --auto-install` 自动安装缺失包

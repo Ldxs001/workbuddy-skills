@@ -256,9 +256,15 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
         embeddings = get_embeddings(kb_name=kb_name)
 
     try:
-        from langchain_community.document_loaders import TextLoader
-        loader = TextLoader(file_path, encoding="utf-8")
-        docs = loader.load()
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".pdf":
+            from langchain_community.document_loaders import PyPDFLoader
+            loader = PyPDFLoader(file_path)
+            docs = loader.load()
+        else:
+            from langchain_community.document_loaders import TextLoader
+            loader = TextLoader(file_path, encoding="utf-8")
+            docs = loader.load()
     except Exception as e:
         raise RuntimeError(f"文档加载失败: {e}")
 
@@ -280,6 +286,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
         headers_to_split_on=split_cfg.get("headers_to_split_on"),
         strip_headers=split_cfg.get("strip_headers", False),
         strategy_overrides=strategy_overrides,
+        embeddings=embeddings,
     )
 
     # 从 strategy_overrides 注入当前策略的专属参数
