@@ -70,20 +70,6 @@ Skill Pipeline Orchestrator — 用编排替代 ReAct 循环架构的智能体�
 
 ---
 
-## 目录结构
-
-```
-workbuddy-skills/
-├── Cogito_Scribit/      # 方法论沉淀文档
-├── LICENSE              # MIT License（skills/ 目录）
-├── README.md
-├── Orchestrator/        # Skill Pipeline Orchestrator（Apache 2.0）
-├── architecture/        # 架构文档
-└── skills/              # 技能合集（MIT）
-```
-
----
-
 ## 如何使用
 
 ### 方式一：从码云（Gitee）安装
