@@ -1,0 +1,8 @@
+{
+  "preferences": {},
+  "facts": [
+    "Q: list_directory... A: 当前目录下包含以下主要文件和目录：\n\n**核心代码文件：**\n- `agent_loop.py`: Agent 的主循环逻辑。\n- `run_agent.py`: 启动 Agent 的入口脚本。\n- ..."
+  ],
+  "tasks": [],
+  "tags": []
+}

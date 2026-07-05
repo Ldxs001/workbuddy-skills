@@ -1,9 +1,41 @@
 # Skills Repository
 
-> **用户技能仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-07-03
+> **用户技能仓库 + 编排工具** — 由 git-sync 自动同步维护。
+> 最后更新：2026-07-06
 
-本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
+本仓库托管 wUwproject 技能合集及 Skill Pipeline Orchestrator 编排工具，码云（Gitee）和 GitHub 双平台同步。
+
+---
+
+## 仓库结构
+
+```
+workbuddy-skills/
+├── Cogito_Scribit/         # 方法论沉淀
+├── LICENSE                 # MIT（skills 子目录）
+├── README.md
+├── Orchestrator/           # Skill Pipeline Orchestrator 编排工具
+│   ├── LICENSE             # Apache 2.0
+│   ├── README.md
+│   ├── gui_agent.py        # tkinter GUI
+│   ├── chain_engine.py     # 执行引擎
+│   ├── chain_model.py      # 数据模型
+│   └── ...                 # 其他模块
+├── architecture/           # 架构文档
+└── skills/                 # 技能目录（MIT）
+```
+
+## Orchestrator
+
+Skill Pipeline Orchestrator — 用编排替代 ReAct 循环架构的智能体工具。
+详见 [`Orchestrator/README.md`](Orchestrator/README.md)。
+
+核心能力：
+- 三区 GUI：技能列表 / 编排画布 / 输入+控制
+- 顺序/并行/循环三种编排模式
+- 内置 skill-sub 优化、语义拆分、三步自审
+- 颜色校验、HTML 校验、Python 自动装包
+- LLM 粘合层自动读取技能 SKILL.md
 
 ---
 
@@ -41,11 +73,12 @@
 
 ```
 workbuddy-skills/
-├── Cogito_Scribit/
-├── LICENSE
+├── Cogito_Scribit/      # 方法论沉淀文档
+├── LICENSE              # MIT License（skills/ 目录）
 ├── README.md
-├── architecture/
-└── skills/
+├── Orchestrator/        # Skill Pipeline Orchestrator（Apache 2.0）
+├── architecture/        # 架构文档
+└── skills/              # 技能合集（MIT）
 ```
 
 ---
@@ -84,4 +117,21 @@ rm -rf temp-skills
 
 ## 许可证
 
+本仓库采用双许可证结构：
+
+| 目录 | 许可证 | 说明 |
+|------|--------|------|
+| `skills/` | MIT License | 技能合集，根目录 LICENSE |
+| `Orchestrator/` | Apache 2.0 | 编排工具，见 `Orchestrator/LICENSE` |
+
+### MIT License（skills/）
+```
 MIT License
+Copyright (c) 2026 wUwproject
+```
+
+### Apache 2.0（Orchestrator/）
+```
+Copyright 2026 wUwproject
+Licensed under the Apache License, Version 2.0
+```
