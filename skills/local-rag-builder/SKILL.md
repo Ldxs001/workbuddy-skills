@@ -2,7 +2,7 @@
 name: local-rag-builder
 slug: local-rag-builder
 displayName: local-rag-builder
-version: 1.2.11
+version: 1.2.12
 description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
 license: MIT
@@ -148,7 +148,7 @@ python scripts/rag_standalone.py --llm-help                  # 查看 LLM 接入
 
 ## 限制
 
-- **文件类型支持**：仅支持纯文本格式（txt / md / py / json / yaml），不支持 PDF、图片 OCR 或音视频转录 — 影响：数据来源受限 ✅ 已接受
+- **文件类型支持**：原生支持 txt / md / py / json / yaml 纯文本格式；可选扩展支持 PDF（pypdf/pdfplumber）、图片 OCR（paddleocr/easyocr）、HTML→MD 转换（html2text）— 影响：纯文本以外的格式需手动开启输入源开关 🔄 可扩展（输入源开关）
 - **知识库容量**：单个知识库建议 5 万条以内，超过需考虑分段策略优化 — 影响：大规模部署需规划 🟡 有替代方案（分段入库）
 - **模型范围**：仅支持 sentence-transformers/HuggingFace 格式的嵌入模型，不直接支持 OpenAI/Cohere API 格式 — 影响：API 方式无法直接对接 ✅ 已接受
 - **LLM 依赖**：独立模式需要外部 LLM 服务（LM Studio / Ollama / vLLM），技能模式不需要 — 影响：独立模式有额外部署成本 ✅ 已说明

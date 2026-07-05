@@ -37,7 +37,7 @@ TEMPLATES_DIR = os.path.join(os.path.dirname(cfg_dir), "config_templates")
 
 _DEP_MODULES = {
     "enable_pdf": ["pypdf", "pdfplumber"],
-    "enable_ocr": ["paddleocr"],
+    "enable_ocr": ["paddleocr", "easyocr"],
     "enable_html2md": ["html2text"],
 }
 
@@ -332,7 +332,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
           <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_ocr", False) else ""}>
           <span class="toggle-slider"></span>
         </label>
-        <div style="font-size:11px;color:#888;margin-top:4px;">paddleocr</div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">paddleocr (CPU: paddleocr / GPU: paddleocr-gpu) / easyocr</div>
       </div>
       <div class="form-group">
         <label>HTML→MD 转换 <span class="src-dot {_dot_cls_html}" id="dot-enable_html2md" style="font-size:12px;">⬤</span></label>
@@ -1151,11 +1151,14 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 if new_state:
                     _DEP_MAP = {
                         "enable_pdf": {"modules": ["pypdf", "pdfplumber"], "pip": "pypdf"},
-                        "enable_ocr": {"modules": ["paddleocr"], "pip": "paddleocr"},
+                        "enable_ocr": {"modules": ["paddleocr", "easyocr"], "pip": ["paddleocr", "easyocr"]},
                         "enable_html2md": {"modules": ["html2text"], "pip": "html2text"},
                     }
                     info = _DEP_MAP[key]
                     found = False
+                    pip_targets = info["pip"]
+                    if not isinstance(pip_targets, list):
+                        pip_targets = [pip_targets]
                     for mod in info["modules"]:
                         try:
                             __import__(mod)
@@ -1164,13 +1167,18 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                         except ImportError:
                             continue
                     if not found:
-                        print(f"  依赖未安装，自动安装 {info['pip']}...")
-                        py = sys.executable
-                        r = run_command([py, "-m", "pip", "install", info["pip"], "-q"], timeout=120)
-                        if not r["success"]:
-                            self._send_json({"success": False, "error": f"依赖 {info['pip']} 安装失败", "dep": "missing"})
+                        for pip_pkg in pip_targets:
+                            print(f"  依赖未安装，自动安装 {pip_pkg}...")
+                            py = sys.executable
+                            r = run_command([py, "-m", "pip", "install", pip_pkg, "-q"], timeout=120)
+                            if r["success"]:
+                                print(f"  [OK] {pip_pkg} 安装成功")
+                                found = True
+                                break
+                            print(f"  [!] {pip_pkg} 安装失败，尝试下一候选")
+                        if not found:
+                            self._send_json({"success": False, "error": f"所有候选依赖均安装失败", "dep": "missing"})
                             return
-                        print(f"  [OK] {info['pip']} 安装成功")
 
                 dep_status = _check_dep(key)
                 cfg["input_sources"][key] = new_state

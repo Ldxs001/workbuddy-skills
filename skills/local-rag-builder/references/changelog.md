@@ -1,3 +1,17 @@
+## [1.2.12] - 2026-07-05
+
+### 新增
+- **EasyOCR 回退机制**：OCR 输入源检测增加 EasyOCR 作为 PaddleOCR 的回退选项。
+  当 PaddleOCR 不可用时（如 PaddlePaddle 兼容性问题），自动切换到 EasyOCR。
+  `_check_dep("enable_ocr")` 现在返回 `ready` 如果 paddleocr 或 easyocr 任一可用。
+  自动安装时先尝试 paddleocr，失败后尝试 easyocr。
+
+### 文档修正
+- **Web UI OCR 描述**：`rag_web_ui.py` 和 `rag_settings.html` 的 OCR 提示文本从 `paddleocr` 改为 `paddleocr (CPU: paddleocr / GPU: paddleocr-gpu) / easyocr`
+- **SKILL.md 限制**：文件类型支持描述从"不支持 PDF、图片OCR"改为"可选扩展支持 PDF/OCR/HTML→MD（输入源开关）"
+
+---
+
 ## [1.2.11] - 2026-07-05
 
 ### 修复
