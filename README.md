@@ -12,7 +12,8 @@
 ```
 workbuddy-skills/
 ├── Cogito_Scribit/         # 方法论沉淀
-├── LICENSE                 # MIT（skills 子目录）
+├── LICENSE                 # MIT（skills/ 目录）
+├── LICENSE-APACHE          # Apache 2.0（Orchestrator/ 目录）
 ├── README.md
 ├── Orchestrator/           # Skill Pipeline Orchestrator 编排工具
 │   ├── LICENSE             # Apache 2.0
@@ -119,19 +120,21 @@ rm -rf temp-skills
 
 本仓库采用双许可证结构：
 
-| 目录 | 许可证 | 说明 |
+| 目录 | 许可证 | 文件 |
 |------|--------|------|
-| `skills/` | MIT License | 技能合集，根目录 LICENSE |
-| `Orchestrator/` | Apache 2.0 | 编排工具，见 `Orchestrator/LICENSE` |
+| `skills/` | MIT License | `LICENSE`（根目录） |
+| `Orchestrator/` | Apache 2.0 | `LICENSE-APACHE`（根目录）、`Orchestrator/LICENSE` |
 
-### MIT License（skills/）
+### MIT License — skills/
 ```
 MIT License
 Copyright (c) 2026 wUwproject
 ```
+适用于 `skills/` 目录下的所有技能。详见根目录 `LICENSE` 文件。
 
-### Apache 2.0（Orchestrator/）
+### Apache 2.0 — Orchestrator/
 ```
 Copyright 2026 wUwproject
 Licensed under the Apache License, Version 2.0
 ```
+适用于 `Orchestrator/` 目录下的编排工具。详见根目录 `LICENSE-APACHE` 文件或 `Orchestrator/LICENSE`。
