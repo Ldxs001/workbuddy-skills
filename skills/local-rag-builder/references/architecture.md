@@ -1,4 +1,4 @@
-# 架构设计 — local-rag-builder v1.2.10
+# 架构设计 — local-rag-builder v1.2.13
 
 ## 整体架构
 
