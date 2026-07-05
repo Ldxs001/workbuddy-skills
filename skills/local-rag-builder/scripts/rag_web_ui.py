@@ -568,6 +568,13 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
           <option value="hybrid" {"selected" if rerank_cfg.get("mode")=="hybrid" else ""}>混合（模型+规则）</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>输出数量</label>
+        <input type="number" min="1" max="50" value="{rerank_cfg.get("top_k", 5)}"
+               onchange="updateConfig('reranker','top_k',parseInt(this.value)||5)"
+               style="width:70px;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+        <span style="color:#888;font-size:11px;margin-left:4px;">（精排后取前 N 条）</span>
+      </div>
     </div>
     <div style="margin-top:12px;">
       <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Rerank 模型</div>

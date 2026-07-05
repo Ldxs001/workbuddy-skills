@@ -123,12 +123,21 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
         routing_method = "direct"
 
     # ==================== 检索阶段 ====================
+    # Rerank 开启时自动扩容候选池，保证精排有足够的筛选空间
+    reranker_enabled = use_reranker and cfg.get("reranker", {}).get("enabled", False)
+    if reranker_enabled:
+        reranker_top_k = cfg.get("reranker", {}).get("top_k", 5)
+        default_k = cfg.get("retrieval", {}).get("k", 3)
+        effective_k = k if k is not None else max(default_k, reranker_top_k * 4)
+    else:
+        effective_k = k
+
     all_docs = []
     source_kb_map = {}
     for target_kb in kb_names:
         try:
             docs = retrieve_documents(
-                question, kb_name=target_kb, k=k,
+                question, kb_name=target_kb, k=effective_k,
                 score_threshold=score_threshold, embeddings=embeddings,
             )
             for d in docs:

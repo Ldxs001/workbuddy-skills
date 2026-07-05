@@ -1,3 +1,18 @@
+## [1.2.10] - 2026-07-05
+
+### 新增
+- **检索 k 自动扩容**：rerank 开启时 `retrieve_context()` 自动将 `retrieval.k` 从 3 扩容到 `max(k, reranker.top_k × 4)`（默认 20），保证精排有足够候选池
+  - 根因：rerank 关闭时 k=3 是合理的最终输出数；rerank 开启后 k=3 只能召回 3 个候选，精排无筛选空间
+  - 修复：检索前检测 rerank 开关状态，开启时 `effective_k = max(default_k, reranker_top_k * 4)`
+
+### 文档对齐
+- **architecture.md**：新增 Router/Reranker 模块依赖和查询流程图；添加 k 与 reranker.top_k 参数耦合说明
+- **setup-spec.md**：strategy #7 标注 semantic 使用全局嵌入模型；retrieval.k #14 和 reranker.top_k #29 添加耦合约束说明
+- **SKILL.md**：核心能力表新增路由层（#4）和 Rerank 层（#5），Web 面板描述补充 Router/Rerank 控件
+- **guide.md**：Web 面板功能列表补充 Rerank 层和路由层配置项
+
+---
+
 ## [1.2.9] - 2026-07-05
 
 ### 修复
@@ -8,6 +23,10 @@
 - **sentence 切分 fallback delimiter 乱附着**：NLTK 不可用时 regex fallback 吃掉真实标点后硬粘 `delimiters[0]`（"。"），导致 `"你吃饭了吗？"` → `"你吃饭了吗。"`
   - 根因：`re.split` 非捕获组模式会丢弃 delimiter，后续用 `delimiters[0]` 硬补
   - 修复：改用捕获组 `(…)` 保留 delimiter，按 i,i+1 配对取出内容+真实标点，空 content 跳过，末尾无标点不追加
+
+### 新增
+- **Web UI Rerank 输出数量控件**：Rerank 层卡片新增 `top_k` 数字输入框，范围 1-50
+- **SKILL.md frontmatter**：新增 `slug` 和 `displayName` 字段，满足 SkillHub 发布要求
 
 ---
 

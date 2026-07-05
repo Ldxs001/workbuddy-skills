@@ -2,7 +2,7 @@
 name: local-rag-builder
 slug: local-rag-builder
 displayName: local-rag-builder
-version: 1.2.9
+version: 1.2.10
 description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
 license: MIT
@@ -65,10 +65,11 @@ create_permissions_md: true
 | 1 | **环境自动检测修复** | 检测 Python 版本（需 3.8-3.11）、缺失包，自动创建虚拟环境安装 |
 | 2 | **嵌入模型管理** | 多源下载（ModelScope / HuggingFace 镜像 / 官方 / 直连），自动重试，完整性校验，路径修正 |
 | 3 | **5 种切分策略 + GuardStack + 后处理** | 固定窗口、递归切、层级/标题切、按句切、语义切；守卫栈（mermaid/代码块/公式/表格/HTML 保护）；后处理子切（递归/固定/语义，metadata 白名单继承） |
-| 4 | **多知识库管理** | 支持多个向量知识库并行，LLM 自动分类入库或用户指定 |
-| 5 | **可调 Prompt** | 模板持久化，支持自定义占位符（`{context}` `{question}`），运行时编辑 |
-| 6 | **Web 可视化界面** | 内嵌 HTML 配置面板：输入源开关、GuardStack 守卫配置、5 策略动态表单 + 后处理配置、极客模式 JSON 编辑器 + 配置模板管理、知识库自动分类规则编辑器 |
-| 7 | **双模式接口** | 技能模式纯检索（`rag_skill.py`），智能体自行回答；独立模式（`rag_standalone.py`）检索 + LLM 全链路 |
+| 4 | **多知识库管理 + 路由层** | 支持多个向量知识库并行，LLM 自动分类入库或用户指定；路由层（硬编码关键词 → 语义签名回退 → 全库广播兜底） |
+| 5 | **Rerank 重排序层** | 可选精排（cross-encoder 模型 / 规则 / 混合），默认关闭。开启后对检索结果重排序，提升 top-K 精度 |
+| 6 | **可调 Prompt** | 模板持久化，支持自定义占位符（`{context}` `{question}`），运行时编辑 |
+| 7 | **Web 可视化界面** | 内嵌 HTML 配置面板：输入源开关、GuardStack 守卫配置、5 策略动态表单 + 后处理配置、Router/Rerank 参数、极客模式 JSON 编辑器 + 配置模板管理、知识库自动分类规则编辑器 |
+| 8 | **双模式接口** | 技能模式纯检索（`rag_skill.py`），智能体自行回答；独立模式（`rag_standalone.py`）检索 + LLM 全链路 |
 
 ### 渐进式文件索引
 
