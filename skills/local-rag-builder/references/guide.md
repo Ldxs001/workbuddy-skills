@@ -50,7 +50,7 @@ python scripts/rag_standalone.py
 
 `rag_env_setup.py` 自动检测以下内容：
 
-- Python 版本（建议 3.8-3.11）
+- Python 版本（建议 3.11+）
 - pip 可用性
 - 必需包安装状态（langchain, chromadb, sentence-transformers 等 9 个）
 - 可选包安装状态（unstructured, pdfplumber 等）
@@ -79,8 +79,8 @@ python scripts/rag_env_setup.py --json
 
 | Python 版本 | 状态 | 说明 |
 |------------|------|------|
-| 3.8 - 3.11 | ✅ 推荐 | chromadb 官方支持 |
-| 3.12+ | ⚠️ 实验性 | chromadb 可能有兼容问题 |
+| 3.11 - 3.14 | ✅ 支持 | 已测试 3.11/3.14 |
+| 3.12+ | ✅ 支持 | 已测试至 3.14 |
 | < 3.8 | ❌ 不支持 | 请升级 Python |
 
 ---
@@ -267,6 +267,8 @@ Web 面板支持：
 - 嵌入模型选择与设备切换
 - 切分策略与参数调整
 - 检索参数（K 值、阈值）
+- **Rerank 层**（启用/禁用、模式、top_k 输出数、模型选择）
+- **路由层**（启用/禁用、回退模型）
 - LLM 地址与参数
 - Prompt 模板实时编辑
 - 知识库概览
@@ -472,7 +474,7 @@ python scripts/rag_standalone.py --verify-llm
 
 | 问题 | 原因 | 解决 |
 |------|------|------|
-| chromadb 安装失败 | Python 版本过高 | 使用 Python 3.8-3.11 |
+| chromadb 安装失败 | Python 版本过高 | 使用 Python 3.11+ |
 | 模型下载超时 | 网络问题 | 使用 --interactive 选择其他源 |
 | 模型路径找不到 | 路径名变形 | 运行 verify 自动修正 |
 | LLM 连接失败 | LM Studio 未启动 | 启动 LM Studio Server |

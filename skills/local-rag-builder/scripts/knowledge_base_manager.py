@@ -8,6 +8,8 @@ import os
 import sys
 import json
 import glob
+import shutil
+import time
 
 from utils import KB_DIR, safe_json_load, safe_json_dump
 
@@ -17,10 +19,21 @@ AUTO_CLASSIFY_RULES_FILE = os.path.join(KB_DIR, "auto_classify_rules.json")
 
 def _load_index():
     data = safe_json_load(KB_INDEX_FILE, {})
-    if not data:
+    if data is None or (isinstance(data, dict) and len(data) == 0):
+        # 初次使用：创建默认 KB
         data = {"default": {"path": os.path.join(KB_DIR, "default"), "description": "默认知识库"}}
         os.makedirs(os.path.join(KB_DIR, "default"), exist_ok=True)
         safe_json_dump(data, KB_INDEX_FILE)
+    elif isinstance(data, dict) and data.get("default") and len(data) == 1:
+        # 只有 default，检查磁盘上是否有其他 KB（索引损坏恢复）
+        import glob as _g
+        existing = [d for d in os.listdir(KB_DIR) if os.path.isdir(os.path.join(KB_DIR, d)) and d != "default"]
+        if existing:
+            for _name in existing:
+                _path = os.path.join(KB_DIR, _name)
+                if _name not in data:
+                    data[_name] = {"path": _path, "description": "", "doc_count": 0}
+            safe_json_dump(data, KB_INDEX_FILE)
     return data
 
 
@@ -120,6 +133,60 @@ def get_kb_vectorstore(kb_name, embeddings):
     return None
 
 
+# ==================== 容灾备份 ====================
+
+_BACKUP_LOCK = set()
+
+def _backup_kb(persist_dir: str) -> str | None:
+    """备份 ChromaDB sqlite3 文件，返回备份路径"""
+    db_path = os.path.join(persist_dir, "chroma.sqlite3")
+    if not os.path.isfile(db_path):
+        return None
+    bak_path = db_path + ".bak"
+    try:
+        shutil.copy2(db_path, bak_path)
+        return bak_path
+    except Exception:
+        return None
+
+def _restore_kb(persist_dir: str) -> bool:
+    """从备份恢复 ChromaDB"""
+    db_path = os.path.join(persist_dir, "chroma.sqlite3")
+    bak_path = db_path + ".bak"
+    if not os.path.isfile(bak_path):
+        return False
+    try:
+        shutil.copy2(bak_path, db_path)
+        return True
+    except Exception:
+        return False
+
+def _try_repair_kb(persist_dir: str) -> bool:
+    """检测 ChromaDB 损坏并尝试修复"""
+    db_path = os.path.join(persist_dir, "chroma.sqlite3")
+    bak_path = db_path + ".bak"
+    if not os.path.isfile(db_path):
+        return False
+    # 尝试用 SQLite 完整性检查
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA integrity_check").fetchall()
+        conn.close()
+        return True  # DB 本身没问题
+    except Exception:
+        pass
+    # 尝试从备份恢复
+    if os.path.isfile(bak_path):
+        try:
+            shutil.copy2(bak_path, db_path)
+            print(f"  [recovery] 已从备份恢复: {bak_path}")
+            return True
+        except Exception:
+            pass
+    return False
+
+
 def add_documents_to_kb(kb_name, documents, embeddings=None):
     """向知识库添加文档"""
     from langchain_chroma import Chroma
@@ -134,19 +201,29 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     if embeddings is None:
         return False, "需要提供嵌入模型"
 
-    # 检查是否已有向量库
-    if os.path.exists(persist_dir) and any(f.endswith(".parquet") for f in os.listdir(persist_dir)):
-        vectorstore = Chroma(
-            persist_directory=persist_dir,
-            embedding_function=embeddings,
-        )
-        vectorstore.add_documents(documents)
-    else:
-        vectorstore = Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings,
-            persist_directory=persist_dir,
-        )
+    # 入库前自动备份（已有数据时）
+    _backup_kb(persist_dir)
+
+    try:
+        # 检查是否已有向量库
+        if os.path.exists(persist_dir) and any(f.endswith(".sqlite3") for f in os.listdir(persist_dir)):
+            vectorstore = Chroma(
+                persist_directory=persist_dir,
+                embedding_function=embeddings,
+            )
+            vectorstore.add_documents(documents)
+        else:
+            vectorstore = Chroma.from_documents(
+                documents=documents,
+                embedding=embeddings,
+                persist_directory=persist_dir,
+            )
+    except Exception as e:
+        # 写入失败 -> 自动回滚备份
+        print(f"  [recovery] ChromaDB 写入失败: {e}")
+        if _restore_kb(persist_dir):
+            print(f"  [recovery] 已从备份恢复")
+        return False, f"入库失败，已回滚: {str(e)[:80]}"
 
     # 更新文档计数
     try:
@@ -157,15 +234,22 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     index[kb_name]["doc_count"] = count
     _save_index(index)
 
+    # 更新 KB 签名（入库时自动归纳）
+    try:
+        from router import update_kb_signature
+        update_kb_signature(kb_name, documents)
+    except Exception:
+        pass
+
     return True, f"已向 '{kb_name}' 添加 {len(documents)} 个文档块 (总计: {count})"
 
 
-def auto_classify(content, rules=None, filename=None):
+def auto_classify(content, rules=None, filename=None, use_semantic=False):
     """根据规则自动分类内容到对应知识库
 
     支持：
-    - 关键词匹配（内容）
-    - 文件扩展名匹配（如 .py .md .pdf）
+    - 扩展名匹配（始终精确，不走语义）
+    - 关键词匹配：路由关=硬匹配(in)，路由开=语义匹配(reranker × 关键词锚点)
     """
     if rules is None:
         rules = _load_rules()
@@ -179,15 +263,30 @@ def auto_classify(content, rules=None, filename=None):
     best_score = 0
 
     for kb_name, rule in rules.items():
-        score = 0
-        # 关键词匹配
-        for kw in rule.get("keywords", []):
-            if kw.lower() in content_lower:
-                score += 1
-        # 扩展名匹配
+        # 扩展名匹配（始终精确，任何模式都优先）
         for ex in rule.get("extensions", []):
             if ex.lower() == ext:
-                score += 3  # 扩展名匹配权重更高
+                return kb_name  # 扩展名匹配直接命中，不参与语义/硬匹配的分数排序
+
+        if use_semantic:
+            # 路由开启：reranker 语义匹配关键词锚点
+            keywords = rule.get("keywords", [])
+            if keywords:
+                try:
+                    from router import FallbackRouter
+                    kw_text = " ".join(keywords)
+                    fallback = FallbackRouter()
+                    scores = fallback.score(content, {kb_name: kw_text})
+                    score = scores.get(kb_name, 0.0)
+                except (ValueError, RuntimeError):
+                    score = 0
+        else:
+            # 路由关闭：硬匹配（关键词 in content）
+            score = 0
+            for kw in rule.get("keywords", []):
+                if kw.lower() in content_lower:
+                    score += 1
+
         if score > best_score:
             best_score = score
             best_match = kb_name

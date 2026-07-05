@@ -1,10 +1,10 @@
 ---
-name: color-toolkit
+name: color-toolkit-turn
 data_dir: ../.standardization/color-toolkit/
 license: MIT
 description: 专业颜色工具集，支持颜色编码转换、对比度计算、智能颜色推荐、HTML预览生成。适用于UI设计、无障碍开发、配色方案生成等场景。
 author: wUwproject
-version: 3.4.0
+version: 3.4.1
 tags: ['color', 'color-conversion', 'contrast', 'accessibility', 'design', 'wcag']
 trigger: ['颜色转换', '对比度计算', '颜色推荐', '配色方案', '色彩空间', 'HEX.*RGB', 'HSL', 'HSV', 'CMYK', '色差', 'WCAG']
 trigger_negative: ['不触发', '不需要颜色工具', '与其他无关']

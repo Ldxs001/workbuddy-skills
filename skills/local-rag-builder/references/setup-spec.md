@@ -14,7 +14,7 @@
 | # | 参数 | 类型 | 默认值 | 钩子行为 |
 |---|------|------|--------|---------|
 | 1 | enable_pdf | bool | false | 用户说"要处理PDF"→true；否则默认false |
-| 2 | enable_ocr | bool | false | 用户说"扫描件"/"图片PDF"→true；否则默认false |
+| 2 | enable_ocr | bool | false | 用户说"扫描件"/"图片PDF"→true；自动安装 paddleocr，失败回退 easyocr |
 | 3 | enable_html2md | bool | false | 用户说"网页"/"HTML"→true；否则默认false |
 | 4 | pdf_backend | enum | pypdf | 选项: pypdf / pdfplumber；用户未指定→默认 |
 
@@ -29,7 +29,7 @@
 
 | # | 参数 | 类型 | 默认值 | 钩子行为 |
 |---|------|------|--------|---------|
-| 7 | strategy | enum | recursive | 选项: recursive/fixed/headers/sentence/semantic |
+| 7 | strategy | enum | recursive | 选项: recursive/fixed/headers/sentence/semantic。semantic 策略自动使用全局嵌入模型（参数#5）计算句子相似度断点 |
 | 8 | chunk_size | int | 500 | 用户说"精细切"→200；"粗略切"→1000；否则默认500 |
 | 9 | chunk_overlap | int | 50 | 默认50，语义切→0 |
 | 10 | separators | list[str] | ["\n\n","\n","。","；","，"," ",""] | 递归切专用，默认值 |
@@ -41,7 +41,7 @@
 
 | # | 参数 | 类型 | 默认值 | 钩子行为 |
 |---|------|------|--------|---------|
-| 14 | k | int | 3 | top-K 召回数 |
+| 14 | k | int | 3 | top-K 召回数。rerank 关闭时=最终输出数；rerank 开启时=候选池大小，应与 reranker.top_k 协调（推荐 k ≥ top_k×3） |
 | 15 | score_threshold | float/null | null | 相似度阈值，null=不启用 |
 | 16 | search_type | enum | similarity | 选项: similarity / mmr |
 
@@ -71,7 +71,7 @@
 | 26 | enabled | bool | false | **默认关闭**。用户明确要求精度排序→开启 |
 | 27 | mode | enum | model | model/rule/hybrid；默认model（需模型），用户选rule只用规则 |
 | 28 | model | string | BAAI/bge-reranker-v2-m3 | mode=model/hybrid 时必选；mode=rule 时忽略 |
-| 29 | top_k | int | 5 | 精排后取前N条送 LLM |
+| 29 | top_k | int | 5 | 精排后取前N条送 LLM。应与 retrieval.k 协调（推荐 k ≥ top_k×3），否则候选池不足时精排无筛选空间 |
 | 30 | sort_rules | list[dict] | [] | mode=rule/hybrid 时生效；每项有 type + 参数 |
 
 ### 1.8 LLM 模式 — llm
@@ -92,7 +92,7 @@ LLM 必须按顺序执行以下阶段，每阶段完成后才能进入下一阶�
   │
   ▼
 阶段 2: 环境检测 & 修复
-  ├─ python 版本检查（3.8-3.11）
+  ├─ python 版本检查（3.11+）
   ├─ pip 可用性检查
   ├─ 缺失包检测 → 自动安装（可选镜像源）
   └─ GPU 检测（影响 device 参数）

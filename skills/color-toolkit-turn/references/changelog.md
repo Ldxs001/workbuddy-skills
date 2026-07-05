@@ -1,3 +1,11 @@
+## [3.4.1] - 2026-07-04
+
+### 基础设施
+- 重命名: color-toolkit → color-toolkit-turn（统一ClawHub和本地名称）
+- 合并: ClawHub上的color-toolkit和color-toolkit-turn两个slug归一到color-toolkit-turn
+
+---
+
 ## [3.4.0] - 2026-06-18
 
 ### 修复

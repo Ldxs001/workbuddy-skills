@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG 系统设置面板</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; color: #333; }
+.container { max-width: 1000px; margin: 0 auto; }
+.card { background: rgba(255,255,255,0.95); border-radius: 16px; padding: 28px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); backdrop-filter: blur(10px); }
+.card h2 { font-size: 18px; margin-bottom: 16px; color: #5a3e8a; border-bottom: 2px solid #e0d4f5; padding-bottom: 8px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; transition: border 0.2s; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #667eea; outline: none; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+.form-group textarea { min-height: 80px; font-family: 'Courier New', monospace; font-size: 13px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-secondary { background: #e8e8e8; color: #555; }
+.btn-secondary:hover { background: #ddd; }
+.btn-danger { background: #ff6b6b; color: white; }
+.btn-danger:hover { background: #ee5a5a; }
+.btn-success { background: #51cf66; color: white; }
+.btn-success:hover { background: #40c057; }
+.btn-ai { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+.btn-ai:hover { opacity: 0.9; transform: translateY(-1px); }
+.status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.status-ok { background: #d3f9d8; color: #2b8a3e; }
+.status-warn { background: #fff3bf; color: #e67700; }
+.status-err { background: #ffe3e3; color: #c92a2a; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.stat-card { background: #f8f9fa; border-radius: 12px; padding: 16px; text-align: center; }
+.stat-card .num { font-size: 28px; font-weight: 700; color: #5a3e8a; }
+.stat-card .label { font-size: 12px; color: #888; margin-top: 4px; }
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 24px; border-radius: 10px; color: white; font-weight: 600; z-index: 999; animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.collapsible { background: #f0f4ff; border-radius: 10px; padding: 12px 16px; margin-top: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: #5a3e8a; user-select: none; }
+.collapsible:hover { background: #e0d4f5; }
+.collapsible-content { display: none; padding: 16px 0 0; }
+.override-row { display: grid; grid-template-columns: 1fr 80px 80px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid #eee; }
+.override-row:last-child { border: none; }
+.override-row span { font-size: 13px; font-weight: 600; color: #555; }
+.override-row input { width: 100%; padding: 6px 8px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 13px; text-align: center; }
+.override-row input:focus { border-color: #667eea; outline: none; }
+.combo-warn { background: #fff3bf; border: 1px solid #fcc419; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #e67700; margin-top: 8px; display: none; }
+.toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; transition: 0.3s; border-radius: 22px; }
+.toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: 0.3s; border-radius: 50%; }
+input:checked + .toggle-slider { background: #667eea; }
+input:checked + .toggle-slider:before { transform: translateX(18px); }
+.src-dot { transition: color 0.3s; }
+.src-dot.ready { color: #2b8a3e; }
+.src-dot.missing { color: #c92a2a; }
+.src-dot.checking { color: #e67700; }
+.src-dot.off { color: #e67700; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 style="color:white;margin-bottom:20px;font-weight:300;font-size:28px;">🛠️ RAG 系统设置面板</h1>
+
+  <div class="card">
+    <div class="grid-3">
+      <div class="stat-card">
+        <div class="num">4</div>
+        <div class="label">嵌入模型</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">2</div>
+        <div class="label">知识库</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">0</div>
+        <div class="label">文档块</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📂 输入源 <span style="font-weight:400;color:#888;font-size:12px;">⬤ 黄=未开/检测中 绿=可用 红=依赖缺失</span></h2>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>PDF 解析 <span class="src-dot" id="dot-enable_pdf" style="font-size:12px;">⬤</span></label>
+        <label class="toggle-switch" onclick="toggleInputSource('enable_pdf')">
+          <input type="checkbox" onclick="event.stopPropagation();" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <div style="font-size:11px;color:#888;margin-top:4px;">pypdf / pdfplumber</div>
+      </div>
+      <div class="form-group">
+        <label>OCR 图片提取 <span class="src-dot" id="dot-enable_ocr" style="font-size:12px;">⬤</span></label>
+        <label class="toggle-switch" onclick="toggleInputSource('enable_ocr')">
+          <input type="checkbox" onclick="event.stopPropagation();" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <div style="font-size:11px;color:#888;margin-top:4px;">paddleocr (CPU: paddleocr / GPU: paddleocr-gpu) / easyocr</div>
+      </div>
+      <div class="form-group">
+        <label>HTML→MD 转换 <span class="src-dot" id="dot-enable_html2md" style="font-size:12px;">⬤</span></label>
+        <label class="toggle-switch" onclick="toggleInputSource('enable_html2md')">
+          <input type="checkbox" onclick="event.stopPropagation();" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <div style="font-size:11px;color:#888;margin-top:4px;">html2text</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📝 Prompt 模板</h2>
+    <div class="form-group">
+      <textarea id="prompt-template" rows="8" onchange="savePrompt(this.value)">基于以下资料回答问题。如果资料中没有相关信息，请说"不知道"。
+
+资料：
+{context}
+
+问题：{question}
+
+请用 Markdown 格式输出，并在末尾附上引用片段编号。
+
+回答：</textarea>
+    </div>
+    <button class="btn btn-secondary" onclick="resetPrompt()">↺ 重置为默认</button>
+    <span id="prompt-status" style="margin-left:12px;font-size:13px;color:#888;"></span>
+  </div>
+
+  <div class="card">
+    <h2>📦 嵌入模型</h2>
+    <div style="max-height:300px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="BAAI/bge-small-zh-v1.5" id="emb-BAAI/bge-small-zh-v1.5"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-BAAI/bge-small-zh-v1.5" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-small-zh-v1.5">BAAI/bge-small-zh-v1.5 <span style="color:#888;font-size:11px;">(130MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-small-zh-v1.5')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="BAAI/bge-base-zh-v1.5" id="emb-BAAI/bge-base-zh-v1.5"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-BAAI/bge-base-zh-v1.5" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-base-zh-v1.5">BAAI/bge-base-zh-v1.5 <span style="color:#888;font-size:11px;">(400MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-base-zh-v1.5')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="BAAI/bge-large-zh-v1.5" id="emb-BAAI/bge-large-zh-v1.5"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-BAAI/bge-large-zh-v1.5" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-large-zh-v1.5">BAAI/bge-large-zh-v1.5 <span style="color:#888;font-size:11px;">(1300MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-large-zh-v1.5')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="BAAI/bge-m3" id="emb-BAAI/bge-m3"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-BAAI/bge-m3" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-m3">BAAI/bge-m3 <span style="color:#888;font-size:11px;">(2200MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-m3')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="BAAI/bge-large-en-v1.5" id="emb-BAAI/bge-large-en-v1.5"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-BAAI/bge-large-en-v1.5" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-large-en-v1.5">BAAI/bge-large-en-v1.5 <span style="color:#888;font-size:11px;">(1300MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-large-en-v1.5')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="intfloat/multilingual-e5-small" id="emb-intfloat/multilingual-e5-small"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-intfloat/multilingual-e5-small" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="intfloat/multilingual-e5-small">intfloat/multilingual-e5-small <span style="color:#888;font-size:11px;">(500MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('intfloat/multilingual-e5-small')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="intfloat/multilingual-e5-base" id="emb-intfloat/multilingual-e5-base"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-intfloat/multilingual-e5-base" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="intfloat/multilingual-e5-base">intfloat/multilingual-e5-base <span style="color:#888;font-size:11px;">(1100MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('intfloat/multilingual-e5-base')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="intfloat/multilingual-e5-large-instruc" id="emb-intfloat/multilingual-e5-large-instruc"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-intfloat/multilingual-e5-large-instruc" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="intfloat/multilingual-e5-large-instruc">intfloat/multilingual-e5-large-instruc <span style="color:#888;font-size:11px;">(2200MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('intfloat/multilingual-e5-large-instruc')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" id="emb-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2">sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 <span style="color:#888;font-size:11px;">(470MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="shibing624/text2vec-base-chinese" id="emb-shibing624/text2vec-base-chinese"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-shibing624/text2vec-base-chinese" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="shibing624/text2vec-base-chinese">shibing624/text2vec-base-chinese <span style="color:#888;font-size:11px;">(400MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('shibing624/text2vec-base-chinese')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="maidalun1020/bce-embedding-base_v1" id="emb-maidalun1020/bce-embedding-base_v1" checked onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-maidalun1020/bce-embedding-base_v1" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="maidalun1020/bce-embedding-base_v1">maidalun1020/bce-embedding-base_v1 <span style="color:#888;font-size:11px;">(800MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="Alibaba-NLP/gte-Qwen2-7B-instruct" id="emb-Alibaba-NLP/gte-Qwen2-7B-instruct"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-Alibaba-NLP/gte-Qwen2-7B-instruct" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="Alibaba-NLP/gte-Qwen2-7B-instruct">Alibaba-NLP/gte-Qwen2-7B-instruct <span style="color:#888;font-size:11px;">(14000MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('Alibaba-NLP/gte-Qwen2-7B-instruct')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="sentence-transformers/all-MiniLM-L6-v2" id="emb-sentence-transformers/all-MiniLM-L6-v2"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-sentence-transformers/all-MiniLM-L6-v2" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="sentence-transformers/all-MiniLM-L6-v2">sentence-transformers/all-MiniLM-L6-v2 <span style="color:#888;font-size:11px;">(80MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('sentence-transformers/all-MiniLM-L6-v2')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="embedding-model" value="sentence-transformers/all-mpnet-base-v2" id="emb-sentence-transformers/all-mpnet-base-v2"  onchange=updateConfig("embedding","model_path",this.value) style="flex-shrink:0;"><label for="emb-sentence-transformers/all-mpnet-base-v2" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="sentence-transformers/all-mpnet-base-v2">sentence-transformers/all-mpnet-base-v2 <span style="color:#888;font-size:11px;">(420MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('sentence-transformers/all-mpnet-base-v2')">下载</button></div>
+    </div>
+    <div class="form-row" style="margin-top:14px;">
+      <div class="form-group">
+        <label>设备</label>
+        <select onchange="updateConfig('embedding','device',this.value)">
+          <option value="auto" selected>自动检测</option>
+          <option value="cuda" >GPU (CUDA)</option>
+          <option value="cpu" >CPU</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🛡️ 守卫栈 <span style="font-weight:400;color:#888;font-size:12px;">— 预处理，保护特殊内容不被切碎（多选）</span></h2>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+      <label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:2px solid #ddd;border-radius:10px;cursor:pointer;background:#fafafa;transition:all 0.2s;" onclick="toggleGuard('mermaid')"><input type="checkbox"  style="accent-color:#667eea;"><span style="font-size:13px;font-weight:600;color:#555;">🧜 Mermaid</span></label><label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:2px solid #667eea;border-radius:10px;cursor:pointer;background:#f0f4ff;transition:all 0.2s;" onclick="toggleGuard('code')"><input type="checkbox" checked style="accent-color:#667eea;"><span style="font-size:13px;font-weight:600;color:#667eea;">💻 代码块</span></label><label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:2px solid #ddd;border-radius:10px;cursor:pointer;background:#fafafa;transition:all 0.2s;" onclick="toggleGuard('math')"><input type="checkbox"  style="accent-color:#667eea;"><span style="font-size:13px;font-weight:600;color:#555;">∑ LaTeX公式</span></label><label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:2px solid #667eea;border-radius:10px;cursor:pointer;background:#f0f4ff;transition:all 0.2s;" onclick="toggleGuard('table')"><input type="checkbox" checked style="accent-color:#667eea;"><span style="font-size:13px;font-weight:600;color:#667eea;">📊 表格</span></label><label style="display:flex;align-items:center;gap:6px;padding:8px 14px;border:2px solid #ddd;border-radius:10px;cursor:pointer;background:#fafafa;transition:all 0.2s;" onclick="toggleGuard('html')"><input type="checkbox"  style="accent-color:#667eea;"><span style="font-size:13px;font-weight:600;color:#555;">🌐 HTML结构</span></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✂️ 文档切片</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>主策略</label>
+        <select id="strategy-select" onchange="onStrategyChange(this.value)">
+          <option value="recursive" selected>递归切分（推荐）</option>
+          <option value="fixed" >固定窗口</option>
+          <option value="headers" >层级/标题切分</option>
+          <option value="sentence" >按句切分</option>
+          <option value="semantic" >语义切分</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>后处理子切</label>
+        <select id="secondary-select" onchange="onSecondaryChange(this.value)">
+          <option value="">不处理</option>
+          <option value="recursive" >递归子切</option>
+          <option value="fixed" >固定窗口子切</option>
+          <option value="semantic" selected>语义子切</option>
+        </select>
+      </div>
+    </div>
+    <div class="collapsible" onclick="toggleAdvanced()" id="adv-toggle">
+      <span>⚙️ 切片参数（动态，依主策略+后处理组合）</span>
+      <span id="adv-arrow">▶</span>
+    </div>
+    <div class="collapsible-content" id="adv-content">
+      <div style="font-size:12px;color:#888;margin-bottom:8px;">当前策略配置</div>
+      <div id="form-strategy-fixed" class="strategy-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">块大小:</span><input id="strategy_fixed_chunk_size" type="number" min="50" max="5000" value="500" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('strategy_fixed','chunk_size',this.value||null)"></div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">重叠:</span><input id="strategy_fixed_chunk_overlap" type="number" min="0" max="1000" value="50" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('strategy_fixed','chunk_overlap',this.value||null)"></div></div><div id="form-strategy-recursive" class="strategy-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">块大小:</span><input id="strategy_recursive_chunk_size" type="number" min="50" max="5000" value="500" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('strategy_recursive','chunk_size',this.value||null)"></div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">重叠:</span><input id="strategy_recursive_chunk_overlap" type="number" min="0" max="1000" value="50" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('strategy_recursive','chunk_overlap',this.value||null)"></div><div class="form-group"><label>分隔符（逗号分隔）</label><input id="strategy_recursive_separators" type="text" value="\n\n,\n,。,；，, ," style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;" onchange="updateStrategyParam('strategy_recursive','separators',this.value)"></div></div><div id="form-strategy-headers" class="strategy-form" style="display:none;"><div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;"><div style="flex:1;min-width:200px;"><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;"><span style="font-size:13px;font-weight:600;color:#555;margin-right:4px;">标题级别:</span><label style="display:inline-flex;align-items:center;gap:3px;margin:0 4px 0 0;font-size:13px;cursor:pointer;white-space:nowrap;"><input type="checkbox" value="#" checked style="accent-color:#667eea;width:14px;height:14px;" onchange="updateStrategyMulti('strategy_headers','headers_to_split_on',this)">#</label><label style="display:inline-flex;align-items:center;gap:3px;margin:0 4px 0 0;font-size:13px;cursor:pointer;white-space:nowrap;"><input type="checkbox" value="##" checked style="accent-color:#667eea;width:14px;height:14px;" onchange="updateStrategyMulti('strategy_headers','headers_to_split_on',this)">##</label><label style="display:inline-flex;align-items:center;gap:3px;margin:0 4px 0 0;font-size:13px;cursor:pointer;white-space:nowrap;"><input type="checkbox" value="###" checked style="accent-color:#667eea;width:14px;height:14px;" onchange="updateStrategyMulti('strategy_headers','headers_to_split_on',this)">###</label><label style="display:inline-flex;align-items:center;gap:3px;margin:0 4px 0 0;font-size:13px;cursor:pointer;white-space:nowrap;"><input type="checkbox" value="####" checked style="accent-color:#667eea;width:14px;height:14px;" onchange="updateStrategyMulti('strategy_headers','headers_to_split_on',this)">####</label></div></div><div style="padding-top:2px;"><label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;margin-top:4px;"><input type="checkbox" id="strategy_headers_strip_headers"  style="accent-color:#667eea;" onchange="updateStrategyParam('strategy_headers','strip_headers',this.checked)">去除标题</label></div></div></div><div id="form-strategy-sentence" class="strategy-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">语言:</span><select id="strategy_sentence_language" style="flex:1;max-width:160px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('strategy_sentence','language',this.value)"><option value="中文" selected>中文</option><option value="English">English</option><option value="自定义">自定义</option></select></div><div class="form-group"><label>自定义边界符（直接输入字符）</label><input id="strategy_sentence_delimiters" type="text" value="。！？" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;" onchange="updateStrategyParam('strategy_sentence','delimiters',this.value)"></div></div><div id="form-strategy-semantic" class="strategy-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">断点算法:</span><select id="strategy_semantic_breakpoint_type" style="flex:1;max-width:160px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('strategy_semantic','breakpoint_type',this.value)"><option value="percentile" selected>percentile</option><option value="gradient">gradient</option><option value="stddev">stddev</option></select></div></div>
+      <div id="secondary-forms-container" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd;display:none;">
+        <div style="font-size:12px;color:#888;margin-bottom:8px;">后处理配置</div>
+        <div id="form-secondary-recursive" class="secondary-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">子切块大小:</span><input id="sec_recursive_chunk_size" type="number" min="50" max="2000" value="250" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('sec_recursive','chunk_size',this.value||null)"></div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">子切重叠:</span><input id="sec_recursive_chunk_overlap" type="number" min="0" max="500" value="25" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('sec_recursive','chunk_overlap',this.value||null)"></div></div><div id="form-secondary-fixed" class="secondary-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">子切块大小:</span><input id="sec_fixed_chunk_size" type="number" min="50" max="2000" value="250" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('sec_fixed','chunk_size',this.value||null)"></div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">子切重叠:</span><input id="sec_fixed_chunk_overlap" type="number" min="0" max="500" value="25" style="flex:1;max-width:120px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('sec_fixed','chunk_overlap',this.value||null)"></div></div><div id="form-secondary-semantic" class="secondary-form" style="display:none;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">断点算法:</span><select id="sec_semantic_breakpoint_type" style="flex:1;max-width:160px;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;" onchange="updateStrategyParam('sec_semantic','breakpoint_type',this.value)"><option value="percentile" selected>percentile</option><option value="gradient">gradient</option><option value="stddev">stddev</option></select></div></div>
+      </div>
+      <div style="font-size:11px;color:#aaa;margin-top:8px;">
+        💡 在对话中描述文档类型，系统将自动推荐切片配置。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🔍 检索参数</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>检索文档数 (K)</label>
+        <input type="number" id="k-value" value="3" min="1" max="20" onchange="updateConfig('retrieval','k',parseInt(this.value))">
+      </div>
+      <div class="form-group">
+        <label>相似度阈值</label>
+        <input type="number" id="threshold-value" value="" min="0" max="1" step="0.05" placeholder="不启用" onchange="updateConfig('retrieval','score_threshold',this.value?parseFloat(this.value):null)">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🤖 LLM 模式</h2>
+    <div class="form-group" style="margin-bottom:16px;">
+      <label>运行模式 <span style="font-weight:400;color:#888;font-size:12px;">— 决定系统行为路径</span></label>
+      <div style="display:flex;gap:12px;margin-top:8px;">
+        <label style="flex:1;padding:14px 16px;border:2px solid #667eea;border-radius:12px;cursor:pointer;background:#f0f4ff;transition:all 0.2s;" onclick="setMode('integrated')">
+          <input type="radio" name="mode" value="integrated" checked style="display:none;">
+          <div style="font-size:16px;font-weight:600;color:#667eea;">🔌 集成模式</div>
+          <div style="font-size:12px;color:#888;margin-top:4px;">无 LLM，纯检索。智能体根据检索到的 context 自行回答。</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px;">无需配置 LLM，不产生额外推理成本</div>
+        </label>
+        <label style="flex:1;padding:14px 16px;border:2px solid #ddd;border-radius:12px;cursor:pointer;background:#fafafa;transition:all 0.2s;" onclick="setMode('standalone')">
+          <input type="radio" name="mode" value="standalone"  style="display:none;">
+          <div style="font-size:16px;font-weight:600;color:#555;">🤖 独立模式</div>
+          <div style="font-size:12px;color:#888;margin-top:4px;">检索 + LLM 全链路。系统自行完成检索→生成回答。</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px;">需要配置下方 LLM 连接</div>
+        </label>
+      </div>
+    </div>
+    <div id="llm-settings" style="display:none;">
+      <div class="form-group">
+        <label>API 地址</label>
+        <input type="text" id="llm-url" value="http://localhost:1234/v1" onchange="updateConfig('llm','base_url',this.value)">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Temperature</label>
+          <input type="number" id="llm-temp" value="0.1" min="0" max="2" step="0.05" onchange="updateConfig('llm','temperature',parseFloat(this.value))">
+        </div>
+        <div class="form-group">
+          <label>Max Tokens</label>
+          <input type="number" id="llm-tokens" value="512" min="64" max="4096" step="64" onchange="updateConfig('llm','max_tokens',parseInt(this.value))">
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="verifyLLM()" style="margin-top:8px;">🔗 验证连接</button>
+      <span id="llm-status"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📚 知识库 & 分类规则</h2>
+    <div class="form-row" style="margin-bottom:8px;">
+      <div class="form-group">
+        <label>启用多知识库路由 <span style="font-weight:400;color:#888;font-size:11px;">（关闭则路由层自动禁用）</span></label>
+        <label class="toggle-switch" onclick="toggleKB()">
+          <input type="checkbox" onclick="event.stopPropagation();" checked><span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div id="kb-list" style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
+        <div style="flex:1;"><strong>default</strong> - 默认知识库 [0 文档]</div>
+        <div style="min-width:200px;">
+          <select class="kb-model-select" data-kb="default" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:12px;" onchange="setKbModel('default',this.value)">
+            <option value="">— 默认模型 (mixedbread-ai/mxbai-rerank-base-v1) —</option>
+            <option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\mixedbread-ai_mxbai-rerank-base-v1">mixedbread-ai/mxbai-rerank-base-v1</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\BAAI_bge-reranker-base">BAAI/bge-reranker-base</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\BAAI_bge-reranker-v2-m3">BAAI/bge-reranker-v2-m3</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\maidalun1020_bce-embedding-base_v1">maidalun1020/bce-embedding-base_v1</option>
+          </select>
+        </div>
+      </div> <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
+        <div style="flex:1;"><strong>白酒</strong> -  [0 文档]</div>
+        <div style="min-width:200px;">
+          <select class="kb-model-select" data-kb="白酒" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:12px;" onchange="setKbModel('白酒',this.value)">
+            <option value="">— 默认模型 (mixedbread-ai/mxbai-rerank-base-v1) —</option>
+            <option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\mixedbread-ai_mxbai-rerank-base-v1" selected>mixedbread-ai/mxbai-rerank-base-v1</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\BAAI_bge-reranker-base">BAAI/bge-reranker-base</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\BAAI_bge-reranker-v2-m3">BAAI/bge-reranker-v2-m3</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\maidalun1020_bce-embedding-base_v1">maidalun1020/bce-embedding-base_v1</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">📋 自动分类规则 <span style="font-weight:400;color:#888;font-size:11px;">（关键词 + 扩展名匹配）</span></div>
+      <div id="rules-list" style="font-size:13px;color:#888;">加载中...</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="refreshRules()">🔄 刷新规则</button>
+        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" onclick="showRuleEditor()">➕ 添加规则</button>
+        <button class="btn btn-danger" style="padding:6px 14px;font-size:12px;" onclick="if(confirm('重置所有分类规则为默认？'))resetRules()">↺ 重置默认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 规则编辑弹窗 -->
+  <div id="rule-editor-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)hideRuleEditor()">
+    <div style="background:white;border-radius:16px;padding:28px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <h3 id="rule-editor-title" style="font-size:18px;color:#5a3e8a;margin-bottom:16px;">添加分类规则</h3>
+      <div class="form-group"><label>知识库名</label><input id="rule-name" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;"></div>
+      <div class="form-group"><label>关键词（逗号分隔）</label><input id="rule-keywords" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="例: 代码,API,编程"></div>
+      <div class="form-group"><label>扩展名（逗号分隔）</label><input id="rule-extensions" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="例: .py,.js,.ts"></div>
+      <div class="form-group"><label>描述</label><input id="rule-desc" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="可选"></div>
+      <div class="form-group"><label>知识库嵌入模型</label>
+        <select id="rule-model" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
+          <option value="">— 默认模型 (mixedbread-ai/mxbai-rerank-base-v1) —</option>
+          <option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\mixedbread-ai_mxbai-rerank-base-v1">mixedbread-ai/mxbai-rerank-base-v1</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\BAAI_bge-reranker-base">BAAI/bge-reranker-base</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\BAAI_bge-reranker-v2-m3">BAAI/bge-reranker-v2-m3</option><option value="C:\Users\sm001\.workbuddy\skills\.standardization\local-rag-builder\data\models\maidalun1020_bce-embedding-base_v1">maidalun1020/bce-embedding-base_v1</option>
+        </select>
+        <div style="font-size:11px;color:#888;margin-top:4px;">选空=回退到全局默认模型。已有文档的知识库切换模型后需重新导入。</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="hideRuleEditor()">取消</button>
+        <button class="btn btn-primary" onclick="saveRule()">💾 保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 路由层 -->
+  <div class="card">
+    <h2>🌐 路由层 <span style="font-weight:400;color:#888;font-size:12px;">— 硬编码(来自KB规则)→语义回退→全量广播</span></h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>启用路由 <span style="font-weight:400;color:#888;font-size:11px;">（KB路由关闭时自动禁用）</span></label>
+        <label class="toggle-switch" onclick="toggleRouter()">
+          <input type="checkbox" onclick="event.stopPropagation();" checked><span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label>最低得分阈值</label>
+        <input type="number" value="0.3" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))">
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">回退语义路由模型 <span style="font-weight:400;color:#888;font-size:11px;">（每个模型独立下载，选中即生效）</span></div>
+      <div style="max-height:200px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="fb-model" value="BAAI/bge-reranker-v2-m3" id="fb-BAAI/bge-reranker-v2-m3"  onchange=onFallbackModelChange('BAAI/bge-reranker-v2-m3') style="flex-shrink:0;"><label for="fb-BAAI/bge-reranker-v2-m3" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-v2-m3">BAAI/bge-reranker-v2-m3 <span style="color:#888;font-size:11px;">(1136MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="fb-model" value="BAAI/bge-reranker-large" id="fb-BAAI/bge-reranker-large"  onchange=onFallbackModelChange('BAAI/bge-reranker-large') style="flex-shrink:0;"><label for="fb-BAAI/bge-reranker-large" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-large">BAAI/bge-reranker-large <span style="color:#888;font-size:11px;">(1120MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-reranker-large')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="fb-model" value="BAAI/bge-reranker-base" id="fb-BAAI/bge-reranker-base"  onchange=onFallbackModelChange('BAAI/bge-reranker-base') style="flex-shrink:0;"><label for="fb-BAAI/bge-reranker-base" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-base">BAAI/bge-reranker-base <span style="color:#888;font-size:11px;">(556MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="fb-model" value="BAAI/bge-reranker-v2.5-gemma2-lightweight" id="fb-BAAI/bge-reranker-v2.5-gemma2-lightweight"  onchange=onFallbackModelChange('BAAI/bge-reranker-v2.5-gemma2-lightweight') style="flex-shrink:0;"><label for="fb-BAAI/bge-reranker-v2.5-gemma2-lightweight" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-v2.5-gemma2-lightweight">BAAI/bge-reranker-v2.5-gemma2-lightweight <span style="color:#888;font-size:11px;">(3000MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-reranker-v2.5-gemma2-lightweight')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="fb-model" value="mixedbread-ai/mxbai-rerank-base-v1" id="fb-mixedbread-ai/mxbai-rerank-base-v1" checked onchange=onFallbackModelChange('mixedbread-ai/mxbai-rerank-base-v1') style="flex-shrink:0;"><label for="fb-mixedbread-ai/mxbai-rerank-base-v1" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="mixedbread-ai/mxbai-rerank-base-v1">mixedbread-ai/mxbai-rerank-base-v1 <span style="color:#888;font-size:11px;">(556MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="fb-model" value="Alibaba-NLP/gte-multilingual-reranker-base" id="fb-Alibaba-NLP/gte-multilingual-reranker-base"  onchange=onFallbackModelChange('Alibaba-NLP/gte-multilingual-reranker-base') style="flex-shrink:0;"><label for="fb-Alibaba-NLP/gte-multilingual-reranker-base" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="Alibaba-NLP/gte-multilingual-reranker-base">Alibaba-NLP/gte-multilingual-reranker-base <span style="color:#888;font-size:11px;">(600MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('Alibaba-NLP/gte-multilingual-reranker-base')">下载</button></div>
+      </div>
+    </div>
+    <div class="collapsible" onclick="toggleAdvSig()" style="margin-top:8px;">
+      <span>📋 KB 签名（入库时自动归纳）</span>
+      <span id="adv-sig-arrow">▶</span>
+    </div>
+    <div class="collapsible-content" id="adv-sig-content">
+      <div style="font-size:12px;color:#888;">
+        暂无签名
+      </div>
+      <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;margin-top:8px;" onclick="rebuildSigs()">🔄 重建所有签名</button>
+    </div>
+  </div>
+
+  <!-- Rerank 层 -->
+  <div class="card">
+    <h2>🔀 Rerank 层 <span style="font-weight:400;color:#888;font-size:12px;">— 检索完成后对结果重排序（默认关闭）</span></h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>启用 Rerank</label>
+        <label class="toggle-switch" onclick="toggleReranker()">
+          <input type="checkbox" onclick="event.stopPropagation();" checked><span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label>模式</label>
+        <select onchange="updateConfig('reranker','mode',this.value)">
+          <option value="model" selected>模型排序</option>
+          <option value="rule" >规则排序</option>
+          <option value="hybrid" >混合（模型+规则）</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Rerank 模型</div>
+      <div style="max-height:200px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="rerank-model" value="BAAI/bge-reranker-v2-m3" id="rer-BAAI/bge-reranker-v2-m3"  onchange=updateConfig("reranker","model_path",this.value) style="flex-shrink:0;"><label for="rer-BAAI/bge-reranker-v2-m3" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-v2-m3">BAAI/bge-reranker-v2-m3 <span style="color:#888;font-size:11px;">(1136MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="rerank-model" value="BAAI/bge-reranker-large" id="rer-BAAI/bge-reranker-large"  onchange=updateConfig("reranker","model_path",this.value) style="flex-shrink:0;"><label for="rer-BAAI/bge-reranker-large" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-large">BAAI/bge-reranker-large <span style="color:#888;font-size:11px;">(1120MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-reranker-large')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="rerank-model" value="BAAI/bge-reranker-base" id="rer-BAAI/bge-reranker-base"  onchange=updateConfig("reranker","model_path",this.value) style="flex-shrink:0;"><label for="rer-BAAI/bge-reranker-base" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-base">BAAI/bge-reranker-base <span style="color:#888;font-size:11px;">(556MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="rerank-model" value="BAAI/bge-reranker-v2.5-gemma2-lightweight" id="rer-BAAI/bge-reranker-v2.5-gemma2-lightweight"  onchange=updateConfig("reranker","model_path",this.value) style="flex-shrink:0;"><label for="rer-BAAI/bge-reranker-v2.5-gemma2-lightweight" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="BAAI/bge-reranker-v2.5-gemma2-lightweight">BAAI/bge-reranker-v2.5-gemma2-lightweight <span style="color:#888;font-size:11px;">(3000MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('BAAI/bge-reranker-v2.5-gemma2-lightweight')">下载</button></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="rerank-model" value="mixedbread-ai/mxbai-rerank-base-v1" id="rer-mixedbread-ai/mxbai-rerank-base-v1" checked onchange=updateConfig("reranker","model_path",this.value) style="flex-shrink:0;"><label for="rer-mixedbread-ai/mxbai-rerank-base-v1" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="mixedbread-ai/mxbai-rerank-base-v1">mixedbread-ai/mxbai-rerank-base-v1 <span style="color:#888;font-size:11px;">(556MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#3B6D11;">已下载</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="rerank-model" value="Alibaba-NLP/gte-multilingual-reranker-base" id="rer-Alibaba-NLP/gte-multilingual-reranker-base"  onchange=updateConfig("reranker","model_path",this.value) style="flex-shrink:0;"><label for="rer-Alibaba-NLP/gte-multilingual-reranker-base" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="Alibaba-NLP/gte-multilingual-reranker-base">Alibaba-NLP/gte-multilingual-reranker-base <span style="color:#888;font-size:11px;">(600MB)</span></label><span style="font-size:11px;flex-shrink:0;color:#888;">未下载</span><button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel('Alibaba-NLP/gte-multilingual-reranker-base')">下载</button></div>
+      </div>
+    </div>
+    <div class="collapsible" onclick="toggleSortRules()" style="margin-top:8px;">
+      <span>📏 排序规则 <span style="font-weight:400;color:#888;font-size:11px;">（规则/混合模式下生效）</span></span>
+      <span id="adv-rules-arrow">▶</span>
+    </div>
+    <div class="collapsible-content" id="adv-rules-content">
+      <div id="sort-rules-list" style="font-size:13px;color:#888;">加载中...</div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="refreshSortRules()">🔄 刷新</button>
+        <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="addSortRule()">➕ 添加规则</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 排序规则编辑器弹窗 -->
+  <div id="sort-rule-editor-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)hideSortRuleEditor()">
+    <div style="background:white;border-radius:16px;padding:28px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <h3 id="sort-rule-editor-title" style="font-size:18px;color:#5a3e8a;margin-bottom:16px;">添加排序规则</h3>
+      <div class="form-group"><label>规则类型</label>
+        <select id="sort-rule-type" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" onchange="onSortRuleTypeChange()">
+          <option value="">-- 请选择 --</option>
+          <option value="score_weight">score_weight — 分数加权</option>
+          <option value="recency">recency — 时间衰减</option>
+          <option value="source_weight">source_weight — 来源加权</option>
+          <option value="boost_keywords">boost_keywords — 关键词提升</option>
+        </select>
+      </div>
+      <div id="sort-rule-params" style="display:none;">
+        <div id="sort-rule-params-fields"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="hideSortRuleEditor()">取消</button>
+        <button class="btn btn-primary" onclick="saveSortRule()">💾 保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 极客模式：JSON 配置编辑器 + 模板管理 -->
+  <div class="card" style="margin-bottom: 12px;">
+    <h2>⚡ 极客模式 <span style="font-weight:400;color:#888;font-size:12px;">— 编辑 & 保存复用模板</span></h2>
+    <div class="form-group">
+      <textarea id="geek-editor" rows="10" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'Courier New',monospace;font-size:12px;">{
+  "mode": "integrated",
+  "input_sources": {
+    "enable_pdf": true,
+    "enable_ocr": true,
+    "enable_html2md": true,
+    "pdf_backend": "pypdf"
+  },
+  "splitting": {
+    "strategy": "recursive",
+    "chunk_size": 500,
+    "chunk_overlap": 50,
+    "separators": [
+      "\n\n",
+      "\n",
+      "。",
+      "；",
+      "，",
+      " ",
+      ""
+    ],
+    "headers_to_split_on": [
+      [
+        "#",
+        "h1"
+      ],
+      [
+        "##",
+        "h2"
+      ],
+      [
+        "###",
+        "h3"
+      ]
+    ],
+    "strip_headers": false,
+    "semantic_breakpoint": "percentile",
+    "secondary_strategy": "semantic",
+    "guards": [
+      "code",
+      "table"
+    ],
+    "strategy_overrides": {
+      "headers": {
+        "chunk_size": null,
+        "chunk_overlap": null
+      },
+      "semantic": {
+        "chunk_size": null,
+        "chunk_overlap": null
+      },
+      "sentence": {
+        "chunk_size": null,
+        "chunk_overlap": null
+      }
+    }
+  },
+  "router": {
+    "enabled": true,
+    "fallback": {
+      "enabled": true,
+      "model_path": "mixedbread-ai/mxbai-rerank-base-v1",
+      "min_score_threshold": 0.3,
+      "broadcast_on_fail": true,
+      "auto_update_signatures": true
+    }
+  },
+  "reranker": {
+    "enabled": true,
+    "mode": "model",
+    "model_path": "mixedbread-ai/mxbai-rerank-base-v1",
+    "top_k": 5,
+    "sort_rules": []
+  },
+  "retrieval": {
+    "k": 3,
+    "score_threshold": null,
+    "search_type": "similarity"
+  },
+  "llm": {
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "not-needed",
+    "temperature": 0.1,
+    "max_tokens": 512,
+    "model_name": ""
+  },
+  "kb": {
+    "active_kb": "default",
+    "auto_classify": false
+  },
+  "prompt": {
+    "template_file": "default_template.txt"
+  },
+  "embedding": {
+    "model_path": "maidalun1020/bce-embedding-base_v1"
+  }
+}</textarea>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn btn-danger" onclick="applyGeekConfig()" style="margin-right:4px;">💾 应用</button>
+      <button class="btn btn-secondary" onclick="saveGeekTemplate()" style="margin-right:4px;">📋 另存为模板</button>
+      <button class="btn btn-success" onclick="refreshGeekTemplates()" style="margin-right:4px;">🔄 刷新模板列表</button>
+      <button class="btn btn-danger" onclick="if(confirm('确定重置所有配置为默认？'))resetAll()">↺ 重置默认</button>
+    </div>
+    <span id="geek-status" style="font-size:13px;color:#888;margin-left:8px;"></span>
+
+    <div id="template-list" style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">已保存模板</div>
+      <div id="template-items" style="font-size:13px;color:#888;">加载中...</div>
+    </div>
+  </div>
+
+  <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-danger" onclick="if(confirm('确定重置所有配置？'))resetAll()">&#x1f5d1;&#xfe0f; 重置配置</button>
+    <button class="btn btn-success" onclick="window.location.reload()">&#x1f504; 刷新</button>
+  </div>
+</div>
+
+<script>
+function toast(msg, type) { type = type || 'success'; const t = document.createElement('div'); t.className = 'toast'; t.style.background = type==='success' ? '#51cf66' : type==='error' ? '#ff6b6b' : '#fcc419'; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){t.remove()}, 2500); }
+
+function setMode(mode) {
+  fetch('/api/mode', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({mode})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已切换'); setTimeout(function(){location.reload()}, 300); }
+    else { toast(d.error, 'error'); }
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function updateConfig(section, key, value) {
+  fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({section: section, key: key, value: value})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('已更新');
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function setKbModel(kbName, modelId) {
+  fetch('/api/kb-model', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kbName, model_id: modelId})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('知识库模型已更新: ' + d.message);
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function updateOverride(strategy, key, value) {
+  fetch('/api/override', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({strategy: strategy, key: key, value: value})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('已更新');
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function toggleInputSource(key) { onToggleInputSource(key); }
+
+function onStrategyChange(strategy) {
+  updateConfig('splitting','strategy',strategy);
+  updateAdvView();
+}
+
+function onSecondaryChange(val) {
+  fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({section: 'splitting', key: 'secondary_strategy', value: val || null})
+  });
+  updateAdvView();
+}
+
+function toggleAdvanced() {
+  var content = document.getElementById('adv-content');
+  var arrow = document.getElementById('adv-arrow');
+  var on = content.style.display === 'block';
+  content.style.display = on ? 'none' : 'block';
+  arrow.textContent = on ? '▶' : '▼';
+}
+
+function savePrompt(content) {
+  fetch('/api/prompt', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({content: content})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { document.getElementById('prompt-status').textContent = '✓ 已保存'; toast('模板已保存'); }
+    else toast('保存失败', 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function resetPrompt() {
+  fetch('/api/prompt/reset', {method:'POST'})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.success) { document.getElementById('prompt-template').value = d.template; toast('已重置'); }
+  });
+}
+
+function verifyLLM() {
+  fetch('/api/verify-llm').then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('llm-status');
+    el.innerHTML = d.success ? '<span class="status status-ok">✓ 连接正常</span>' : '<span class="status status-err">✗ '+d.message+'</span>';
+  });
+}
+
+function toggleGuard(name) {
+  fetch('/api/guard/toggle', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已更新'); setTimeout(function(){location.reload()}, 200); }
+    else toast('操作失败', 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function updateStrategyParam(strategy, key, value) {
+  // int 字段转数字
+  if (value === '' || value === null) value = null;
+  else if (!isNaN(value) && value !== true && value !== false) value = parseInt(value);
+  fetch('/api/override', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({strategy: strategy, key: key, value: value})
+  });
+}
+
+function updateStrategyMulti(strategy, key, cb) {
+  // strategy 参数可能是 "strategy_headers"，去掉前缀
+  var clean = strategy.replace(/^strategy_/, '');
+  var checks = document.querySelectorAll('#form-strategy-' + clean + ' input[type=checkbox][value]');
+  var values = [];
+  checks.forEach(function(c) { if(c.checked) values.push(c.value); });
+  fetch('/api/override', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({strategy: clean, key: key, value: values})
+  });
+}
+
+function applyGeekConfig() {
+  var raw = document.getElementById('geek-editor').value;
+  try { JSON.parse(raw); } catch(e) { toast('JSON 格式错误: '+e.message, 'error'); return; }
+  fetch('/api/config/raw', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: raw
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { document.getElementById('geek-status').textContent = '✓ 已应用'; toast('配置已更新'); }
+    else { toast(d.error, 'error'); }
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function saveGeekTemplate() {
+  var name = prompt('输入模板名称（例如：“我的技术文档配置”）:');
+  if(!name) return;
+  var label = prompt('输入模板描述（可空）:') || name;
+  var raw = document.getElementById('geek-editor').value;
+  fetch('/api/template/save', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name, label: label, config: JSON.parse(raw)})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('模板已保存：'+name); refreshGeekTemplates(); }
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function loadGeekTemplate(name) {
+  if(!confirm('确定加载模板 "'+name+'" 并覆盖当前配置？')) return;
+  fetch('/api/template/load', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已加载模板：'+name); setTimeout(function(){location.reload()}, 300); }
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function deleteGeekTemplate(name) {
+  if(!confirm('确定删除模板 "'+name+'"？')) return;
+  fetch('/api/template/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已删除'); refreshGeekTemplates(); }
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function refreshGeekTemplates() {
+  fetch('/api/template/list', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('template-items');
+    if(!d.templates || d.templates.length === 0) {
+      el.innerHTML = '暂无保存的模板。调好参数后点“另存为模板”保存。';
+      return;
+    }
+    el.innerHTML = d.templates.map(function(t) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;">' +
+        '<span><strong>' + t.label + '</strong> <span style="color:#aaa;font-size:11px;">(' + t.name + ')</span></span>' +
+        '<span>' +
+        '<button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="loadGeekTemplate(\'' + t.name + '\')">加载</button>' +
+        '<button class="btn btn-danger" style="padding:4px 12px;font-size:12px;" onclick="deleteGeekTemplate(\'' + t.name + '\')">删除</button>' +
+        '</span></div>';
+    }).join('');
+  });
+}
+
+function refreshRules() {
+  Promise.all([
+    fetch('/api/rules/list', {method:'POST'}).then(function(r){return r.json()}),
+    fetch('/api/kb-models', {method:'POST'}).then(function(r){return r.json()})
+  ]).then(function(results) {
+    var d = results[0], kbData = results[1];
+    var el = document.getElementById('rules-list');
+    var rules = d.rules || {};
+    var kbModels = (kbData && kbData.kb_models) || {};
+    var names = Object.keys(rules);
+    if (names.length === 0) {
+      el.innerHTML = '暂无自定义规则，点“重置默认”创建默认规则。';
+      return;
+    }
+    el.innerHTML = names.map(function(name) {
+      var r = rules[name];
+      var kws = (r.keywords || []).join(', ');
+      var exts = (r.extensions || []).join(', ');
+      var modelLabel = '默认模型';
+      if (kbModels[name]) {
+        var p = kbModels[name];
+        // 从路径提取模型目录名（跨平台兼容 \ 和 /）
+        var sep = p.indexOf('\\') >= 0 ? '\\' : '/';
+        var parts = p.split(sep);
+        var dirName = parts[parts.length-1] || p;
+        // 模型目录名含 _ 连接 org_name → org/name 显示
+        var idx = dirName.indexOf('_');
+        if (idx > 0) {
+          modelLabel = dirName.slice(0, idx) + '/' + dirName.slice(idx + 1);
+        } else {
+          modelLabel = dirName;
+        }
+      }
+      var modelHtml = '<br><span style="font-size:11px;color:#667eea;">▶ 模型: ' + modelLabel + '</span>';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;">' +
+        '<div style="flex:1;"><strong>' + name + '</strong> ' +
+        (r.description ? '<span style="color:#888;font-size:11px;">(' + r.description + ')</span>' : '') +
+        '<br><span style="font-size:11px;color:#aaa;">关键词: ' + (kws || '—') + ' | 扩展名: ' + (exts || '—') + '</span>' +
+        modelHtml + '</div>' +
+        '<span>' +
+        '<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;margin-right:4px;" onclick="editRule(\'' + name + '\')">编辑</button>' +
+        '<button class="btn btn-danger" style="padding:3px 10px;font-size:11px;" onclick="deleteRule(\'' + name + '\')">删除</button>' +
+        '</span></div>';
+    }).join('');
+  });
+}
+
+function showRuleEditor(editName) {
+  document.getElementById('rule-editor-overlay').style.display = 'flex';
+  document.getElementById('rule-editor-title').textContent = editName ? '编辑规则' : '添加规则';
+}
+
+function hideRuleEditor() {
+  document.getElementById('rule-editor-overlay').style.display = 'none';
+  document.getElementById('rule-name').value = '';
+  document.getElementById('rule-name').readOnly = false;
+  document.getElementById('rule-keywords').value = '';
+  document.getElementById('rule-extensions').value = '';
+  document.getElementById('rule-desc').value = '';
+  document.getElementById('rule-model').value = '';
+}
+
+function editRule(name) {
+  Promise.all([
+    fetch('/api/rules/list', {method:'POST'}).then(function(r){return r.json()}),
+    fetch('/api/kb-models', {method:'POST'}).then(function(r){return r.json()})
+  ]).then(function(results) {
+    var d = results[0], kbData = results[1];
+    var r = (d.rules || {})[name];
+    if (!r) { toast('规则不存在', 'error'); return; }
+    document.getElementById('rule-name').value = name;
+    document.getElementById('rule-name').readOnly = true;
+    document.getElementById('rule-keywords').value = (r.keywords || []).join(', ');
+    document.getElementById('rule-extensions').value = (r.extensions || []).join(', ');
+    document.getElementById('rule-desc').value = r.description || '';
+    document.getElementById('rule-editor-title').textContent = '编辑规则: ' + name;
+    // 设置模型下拉
+    var kbModels = (kbData && kbData.kb_models) || {};
+    var sel = document.getElementById('rule-model');
+    if (kbModels[name]) {
+      sel.value = kbModels[name];
+    } else {
+      sel.value = '';
+    }
+    document.getElementById('rule-editor-overlay').style.display = 'flex';
+  });
+}
+
+function saveRule() {
+  var name = document.getElementById('rule-name').value.trim();
+  if (!name) { toast('请输入知识库名', 'error'); return; }
+  var kws = document.getElementById('rule-keywords').value.split(',').map(function(s){return s.trim()}).filter(function(s){return s});
+  var exts = document.getElementById('rule-extensions').value.split(',').map(function(s){return s.trim()}).filter(function(s){return s});
+  var desc = document.getElementById('rule-desc').value.trim();
+  var modelId = document.getElementById('rule-model').value;
+  // 先保存规则，再设置 KB 模型
+  fetch('/api/rules/save', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name, keywords: kws, extensions: exts, description: desc})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (!d.success) { toast(d.error, 'error'); return; }
+    // 设置 KB 模型
+    fetch('/api/kb-model', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({kb_name: name, model_id: modelId})
+    }).then(function(r){return r.json()}).then(function(d2) {
+      toast(d2.success ? '规则已保存，模型已更新' : '规则已保存，模型设置失败');
+      hideRuleEditor();
+      refreshRules();
+    });
+  });
+}
+
+function deleteRule(name) {
+  if (!confirm('确定删除规则 "' + name + '"？')) return;
+  fetch('/api/rules/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { toast('已删除'); refreshRules(); }
+    else toast(d.error, 'error');
+  });
+}
+
+function resetRules() {
+  fetch('/api/rules/reset', {method:'POST'})
+  .then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { toast('规则已重置'); refreshRules(); }
+    else toast(d.error, 'error');
+  });
+}
+
+function updateAdvView() {
+  var s = document.getElementById('strategy-select').value;
+  var d2 = document.getElementById('secondary-select').value;
+  // 隐藏所有策略和后处理表单
+  document.querySelectorAll('.strategy-form').forEach(function(f) { f.style.display = 'none'; });
+  document.querySelectorAll('.secondary-form').forEach(function(f) { f.style.display = 'none'; });
+  // 显示当前策略表单
+  var cur = document.getElementById('form-strategy-' + s);
+  if (cur) cur.style.display = 'block';
+  // 显示后处理表单
+  var secContainer = document.getElementById('secondary-forms-container');
+  if (d2) {
+    secContainer.style.display = 'block';
+    var secForm = document.getElementById('form-secondary-' + d2);
+    if (secForm) secForm.style.display = 'block';
+  } else {
+    secContainer.style.display = 'none';
+  }
+}
+
+function resetAll() {
+  fetch('/api/reset', {method:'POST'})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已重置'); setTimeout(function(){location.reload()}, 500); }
+  });
+}
+
+function downloadModel(id){
+  var el = document.createElement('div');
+  el.id = 'dl-status';
+  el.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;max-width:500px;z-index:9999;background:white;border-radius:12px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;border-left:4px solid #667eea;';
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><div style="width:20px;height:20px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;"></div><div style="flex:1;"><strong>下载 ' + id.split('/').pop() + '</strong><br><span id="dl-msg" style="color:#888;font-size:12px;">准备中...</span></div><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#aaa;">x</button></div>';
+  document.body.appendChild(el);
+  // 启动下载
+  fetch('/api/download-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})});
+  // 轮询状态
+  var poll = setInterval(function(){
+    fetch('/api/download-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})})
+    .then(function(r){return r.json()}).then(function(d){
+      var msg = document.getElementById('dl-msg');
+      if(!msg){clearInterval(poll);return}
+      if(d.status==='starting') msg.textContent = '准备中...';
+      else if(d.status==='downloading'){msg.innerHTML = (d.message||'下载中...') + '<br><span style="color:#aaa;font-size:11px;">' + (d.size_mb||0) + ' MB | ' + (d.speed||'') + '</span>';}
+      else if(d.status==='done'){msg.textContent = '完成';el.style.borderLeftColor='#3B6D11';clearInterval(poll);setTimeout(function(){el.remove();location.reload()},1000);}
+      else if(d.status==='failed'){msg.textContent = '失败: ' + d.message;el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
+    });
+  },2000);
+}
+function toggleKB(){fetch('/api/kb/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('多知识库路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function onFallbackModelChange(v){updateConfig('router','model_path_fallback',v)}
+function toggleRouter(){fetch('/api/router/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleReranker(){fetch('/api/reranker/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('Rerank:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleAdvSig(){var e=document.getElementById('adv-sig-content'),a=document.getElementById('adv-sig-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';}
+function rebuildSigs(){fetch('/api/router/rebuild-signatures',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已重建');setTimeout(function(){location.reload()},500)}else toast(d.error,'error')});}
+function toggleSortRules(){var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';if(!o)refreshSortRules();}
+function refreshSortRules(){fetch('/api/reranker/rules',{method:'POST'}).then(function(r){return r.json()}).then(function(d){var e=document.getElementById('sort-rules-list'),rules=d.rules||[];if(!rules.length){e.innerHTML='<span style="color:#aaa;">暂无</span>';return}e.innerHTML=rules.map(function(r,i){return'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;"><div style="flex:1;font-size:12px;">#'+(i+1)+' '+JSON.stringify(r)+'</div><button class="btn btn-danger" style="padding:2px 8px;font-size:11px;" onclick="deleteSortRule('+i+')">x</button></div>'}).join('')});}
+function deleteSortRule(i){if(!confirm('删除规则 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已删除');refreshSortRules()}else toast(d.error,'error')});}
+function setSrcDot(key, cls) {var el=document.getElementById('dot-'+key);if(el){el.className='src-dot '+cls;}}
+function refreshSrcStatus() {
+  fetch('/api/dep-check',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(!d.success)return;var map=d.status||{};['enable_pdf','enable_ocr','enable_html2md'].forEach(function(k){var st=map[k]||'missing';var on=document.querySelector('input[type="checkbox"]');setSrcDot(k,st);});});
+}
+function onToggleInputSource(key) {
+  setSrcDot(key,'checking');
+  fetch('/api/input-source',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key:key})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success){setSrcDot(key,d.dep||'missing');toast('已更新');setTimeout(function(){location.reload()},500);}
+    else{setSrcDot(key,d.dep||'missing');toast(d.error||'操作失败','error');}
+  }).catch(function(e){setSrcDot(key,'missing');toast('请求失败','error');});
+}
+function addSortRule(){showSortRuleEditor()}
+function showSortRuleEditor(){document.getElementById('sort-rule-editor-overlay').style.display='flex';onSortRuleTypeChange();}
+function hideSortRuleEditor(){document.getElementById('sort-rule-editor-overlay').style.display='none';document.getElementById('sort-rule-params').style.display='none';}
+function onSortRuleTypeChange(){var t=document.getElementById("sort-rule-type").value;var e=document.getElementById("sort-rule-params-fields");var p=document.getElementById("sort-rule-params");if(!t){p.style.display="none";return}var html="";if(t==="score_weight")html='<div class="form-group"><label>嵌入分权重 (embedding_score)</label><input id="sr-emb" type="number" value="0.6" min="0" max="1" step="0.05" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;"></div><div class="form-group"><label>Rerank分权重 (rerank_score)</label><input id="sr-rer" type="number" value="0.4" min="0" max="1" step="0.05" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;"></div>';else if(t==="recency")html='<div class="form-group"><label>半衰期天数 (days_halflife)</label><input id="sr-days" type="number" value="30" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;"></div>';else if(t==="source_weight")html='<div class="form-group"><label>来源加权 JSON</label><textarea id="sr-sources" rows="3" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="例: {legal_gov:1.5, baike:1.0}"></textarea></div>';else if(t==="boost_keywords")html='<div class="form-group"><label>关键词（逗号分隔）</label><input id="sr-keys" type="text" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;" placeholder="例: python,api,definitive"></div><div class="form-group"><label>提升倍数 (boost)</label><input id="sr-boost" type="number" value="1.2" min="0" step="0.1" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;"></div>';e.innerHTML=html;p.style.display="block";}
+function saveSortRule(){var t=document.getElementById('sort-rule-type').value;if(!t){toast('请选择规则类型','error');return}var p={type:t};if(t==='score_weight'){p.embedding_score=parseFloat(document.getElementById('sr-emb').value||0.6);p.rerank_score=parseFloat(document.getElementById('sr-rer').value||0.4)}else if(t==='recency'){p.days_halflife=parseInt(document.getElementById('sr-days').value||30)}else if(t==='source_weight'){try{var v=JSON.parse(document.getElementById('sr-sources').value||'{}');Object.assign(p,v)}catch(e){toast('解析失败','error');return}}else if(t==='boost_keywords'){var k=document.getElementById('sr-keys').value.split(',').map(function(s){return s.trim()}).filter(function(s){return s});if(!k.length){toast('请输入关键词','error');return}p.keywords=k;p.boost=parseFloat(document.getElementById('sr-boost').value||1.2)}fetch('/api/reranker/rules/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rule:p})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已添加');hideSortRuleEditor();refreshSortRules()}else toast(d.error,'error')});}
+window.onload = function() { updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); };
+</script>
+</body>
+</html>

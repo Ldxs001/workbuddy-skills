@@ -23,7 +23,7 @@ from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_mo
 from router import list_kb_signatures, rebuild_all_signatures
 from rag_standalone import verify_llm_connection
 from text_splitter import STRATEGY_REGISTRY, GUARD_REGISTRY, get_all_strategies_info, SECONDARY_STRATEGIES
-from utils import cfg_dir
+from utils import cfg_dir, run_command
 
 # 下载状态跟踪 {model_id: {"status":"downloading"|"done"|"failed"|"retrying", "source":"...", "attempt":1, "message":"..."}}
 _download_tasks = {}
@@ -31,6 +31,26 @@ _download_tasks = {}
 PORT = 8765
 HTML_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rag_settings.html")
 TEMPLATES_DIR = os.path.join(os.path.dirname(cfg_dir), "config_templates")
+
+
+# ==================== 输入源依赖检测 ====================
+
+_DEP_MODULES = {
+    "enable_pdf": ["pypdf", "pdfplumber"],
+    "enable_ocr": ["paddleocr", "easyocr"],
+    "enable_html2md": ["html2text"],
+}
+
+def _check_dep(key):
+    """检查输入源依赖是否已安装，返回 'ready' 或 'missing'"""
+    modules = _DEP_MODULES.get(key, [])
+    for mod in modules:
+        try:
+            __import__(mod)
+            return "ready"
+        except ImportError:
+            continue
+    return "missing"
 
 
 # ==================== 配置模板管理 ====================
@@ -94,7 +114,7 @@ def generate_html():
     """生成自包含 HTML 设置界面"""
     cfg = load_config()
     kbs = list_knowledge_bases()
-    models = list_downloaded_models()
+    all_models = list_downloaded_models()
     template = load_template()
     router_cfg = cfg.get("router", {})
     fb_cfg = router_cfg.get("fallback", {})
@@ -105,6 +125,9 @@ def generate_html():
     from embedding_model_manager import RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS
     dl = list_downloaded_models()
     dl_ids = {m.get("model_id","").lower() for m in dl}
+    # 过滤掉重排序模型，只保留真正的嵌入模型（供 KB 嵌入模型选择器使用）
+    reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
+    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
     Q = "'"
     def _mlist(role, models_def, current_path=""):
         """生成模型列表：role=embedding|rerank|fb, models_def=模型定义列表"""
@@ -123,11 +146,11 @@ def generate_html():
                 hdl = f'onchange=updateConfig("reranker","model_path",this.value)'
             else:
                 hdl = f'onchange=updateConfig("embedding","model_path",this.value)'
-            rows.append(f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="{role}-model" value="{mid}" id="{role[:3]}-{mid}" {checked} {hdl} style="flex-shrink:0;"><label for="{role[:3]}-{mid}" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{mid}">{mid} <span style="color:#888;font-size:11px;">({m["size_mb"]}MB)</span></label><span style="font-size:11px;flex-shrink:0;color:{"#3B6D11" if ok else "#888"};">{st}</span>{bt}</div>')
+            rows.append(f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="{role}-model" value="{mid}" id="{role[:3]}-{mid}" {checked} {hdl} style="flex-shrink:0;"><label for="{role[:3]}-{mid}" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{mid}">{"[嵌入] " if role=="embedding" else "[重排序] " if role=="rerank" else "[路由] "}{mid} <span style="color:#888;font-size:11px;">({m["size_mb"]}MB)</span></label><span style="font-size:11px;flex-shrink:0;color:{"#3B6D11" if ok else "#888"};">{st}</span>{bt}</div>')
         return "\n".join(rows)
     emb_model_html = _mlist("embedding", RECOMMENDED_MODELS, cfg.get("embedding",{}).get("model_path",""))
     rr_model_html = _mlist("rerank", RECOMMENDED_RERANK_MODELS, rerank_cfg.get("model_path",""))
-    fb_model_html = _mlist("fb", RECOMMENDED_RERANK_MODELS, router_cfg.get("model_path_fallback",""))
+    fb_model_html = _mlist("fb", RECOMMENDED_RERANK_MODELS, fb_cfg.get("model_path",""))
     guard_labels = {"mermaid": "🧜 Mermaid", "code": "💻 代码块", "math": "∑ LaTeX公式", "table": "📊 表格", "html": "🌐 HTML结构"}
     active_guards = cfg.get("splitting", {}).get("guards", ["code"])
     guard_card_html = ""
@@ -142,6 +165,14 @@ def generate_html():
         guard_card_html += f'<span style="font-size:13px;font-weight:600;color:{fg};">{guard_labels[g]}</span></label>'
     guard_card_html += ""
     input_src = cfg.get("input_sources", {})
+    def _src_dot_class(key):
+        """计算输入源状态点的初始 CSS 类：关→off(黄), 开且依赖就绪→ready(绿), 开且缺依赖→missing(红)"""
+        if not input_src.get(key, False):
+            return "off"
+        return _check_dep(key)
+    _dot_cls_pdf = _src_dot_class("enable_pdf")
+    _dot_cls_ocr = _src_dot_class("enable_ocr")
+    _dot_cls_html = _src_dot_class("enable_html2md")
     split_cfg = cfg.get("splitting", {})
     overrides = split_cfg.get("strategy_overrides", {})
 
@@ -259,6 +290,11 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans
 .toggle-slider:before {{ position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: 0.3s; border-radius: 50%; }}
 input:checked + .toggle-slider {{ background: #667eea; }}
 input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
+.src-dot {{ transition: color 0.3s; }}
+.src-dot.ready {{ color: #2b8a3e; }}
+.src-dot.missing {{ color: #c92a2a; }}
+.src-dot.checking {{ color: #e67700; }}
+.src-dot.off {{ color: #e67700; }}
 </style>
 </head>
 <body>
@@ -283,31 +319,31 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
   </div>
 
   <div class="card">
-    <h2>📂 输入源</h2>
+    <h2>📂 输入源 <span style="font-weight:400;color:#888;font-size:12px;">⬤ 黄=未开/检测中 绿=可用 红=依赖缺失</span></h2>
     <div class="form-row-3">
       <div class="form-group">
-        <label>PDF 解析</label>
+        <label>PDF 解析 <span class="src-dot {_dot_cls_pdf}" id="dot-enable_pdf" style="font-size:12px;">⬤</span></label>
         <label class="toggle-switch" onclick="toggleInputSource('enable_pdf')">
-          <input type="checkbox" {"checked" if input_src.get("enable_pdf", False) else ""}>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_pdf", False) else ""}>
           <span class="toggle-slider"></span>
         </label>
-        <div style="font-size:11px;color:#888;margin-top:4px;">需装 pypdf / pdfplumber</div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">pypdf / pdfplumber</div>
       </div>
       <div class="form-group">
-        <label>OCR 图片提取</label>
+        <label>OCR 图片提取 <span class="src-dot {_dot_cls_ocr}" id="dot-enable_ocr" style="font-size:12px;">⬤</span></label>
         <label class="toggle-switch" onclick="toggleInputSource('enable_ocr')">
-          <input type="checkbox" {"checked" if input_src.get("enable_ocr", False) else ""}>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_ocr", False) else ""}>
           <span class="toggle-slider"></span>
         </label>
-        <div style="font-size:11px;color:#888;margin-top:4px;">需装 paddleocr</div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">paddleocr (CPU: paddleocr / GPU: paddleocr-gpu) / easyocr</div>
       </div>
       <div class="form-group">
-        <label>HTML→MD 转换</label>
+        <label>HTML→MD 转换 <span class="src-dot {_dot_cls_html}" id="dot-enable_html2md" style="font-size:12px;">⬤</span></label>
         <label class="toggle-switch" onclick="toggleInputSource('enable_html2md')">
-          <input type="checkbox" {"checked" if input_src.get("enable_html2md", False) else ""}>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if input_src.get("enable_html2md", False) else ""}>
           <span class="toggle-slider"></span>
         </label>
-        <div style="font-size:11px;color:#888;margin-top:4px;">需装 html2text</div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">html2text</div>
       </div>
     </div>
   </div>
@@ -444,19 +480,14 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group">
         <label>启用多知识库路由 <span style="font-weight:400;color:#888;font-size:11px;">（关闭则路由层自动禁用）</span></label>
         <label class="toggle-switch" onclick="toggleKB()">
-          <input type="checkbox" {"checked" if kb_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if kb_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
         </label>
       </div>
     </div>
     <div id="kb-list" style="margin-bottom:8px;">
       {' '.join(f'''<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
         <div style="flex:1;"><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</div>
-        <div style="min-width:200px;">
-          <select class="kb-model-select" data-kb="{name}" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:12px;" onchange="setKbModel('{name}',this.value)">
-            <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
-            {''.join(f'<option value="{m.get("path","")}"{" selected" if info.get("embedding_model","")==m.get("path","") else ""}>{m.get("model_id","")}</option>' for m in models)}
-          </select>
-        </div>
+        <div style="color:#888;font-size:11px;">模型编辑在下方「自动分类规则」中</div>
       </div>''' for name, info in kbs.items())}
     </div>
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
@@ -481,7 +512,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group"><label>知识库嵌入模型</label>
         <select id="rule-model" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
           <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
-          {''.join(f'<option value="{m.get("path","")}">{m.get("model_id","")}</option>' for m in models)}
+          {''.join(f'<option value="{m.get("model_id","")}">[嵌入] {m.get("model_id","")}</option>' for m in models)}
         </select>
         <div style="font-size:11px;color:#888;margin-top:4px;">选空=回退到全局默认模型。已有文档的知识库切换模型后需重新导入。</div>
       </div>
@@ -499,12 +530,17 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group">
         <label>启用路由 <span style="font-weight:400;color:#888;font-size:11px;">（KB路由关闭时自动禁用）</span></label>
         <label class="toggle-switch" onclick="toggleRouter()">
-          <input type="checkbox" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
         </label>
       </div>
       <div class="form-group">
         <label>最低得分阈值</label>
         <input type="number" value="{fb_cfg.get('min_score_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))">
+      </div>
+      <div class="form-group">
+        <label>语义分类阈值</label>
+        <input type="number" value="{router_cfg.get('classify_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','classify_threshold',parseFloat(this.value))">
+        <span style="color:#888;font-size:11px;margin-left:4px;">（入库/出库时 reranker 关键词锚点匹配）</span>
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -532,7 +568,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group">
         <label>启用 Rerank</label>
         <label class="toggle-switch" onclick="toggleReranker()">
-          <input type="checkbox" {"checked" if rerank_cfg.get("enabled", False) else ""}><span class="toggle-slider"></span>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if rerank_cfg.get("enabled", False) else ""}><span class="toggle-slider"></span>
         </label>
       </div>
       <div class="form-group">
@@ -542,6 +578,13 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
           <option value="rule" {"selected" if rerank_cfg.get("mode")=="rule" else ""}>规则排序</option>
           <option value="hybrid" {"selected" if rerank_cfg.get("mode")=="hybrid" else ""}>混合（模型+规则）</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>输出数量</label>
+        <input type="number" min="1" max="50" value="{rerank_cfg.get("top_k", 5)}"
+               onchange="updateConfig('reranker','top_k',parseInt(this.value)||5)"
+               style="width:70px;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+        <span style="color:#888;font-size:11px;margin-left:4px;">（精排后取前 N 条）</span>
       </div>
     </div>
     <div style="margin-top:12px;">
@@ -655,15 +698,7 @@ function updateOverride(strategy, key, value) {{
   }}).catch(function(e){{toast('请求失败', 'error')}});
 }}
 
-function toggleInputSource(key) {{
-  fetch('/api/input-source', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{key: key}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('已更新'); setTimeout(function(){{location.reload()}}, 200); }}
-    else toast('操作失败', 'error');
-  }}).catch(function(e){{toast('请求失败', 'error')}});
-}}
+function toggleInputSource(key) {{ onToggleInputSource(key); }}
 
 function onStrategyChange(strategy) {{
   updateConfig('splitting','strategy',strategy);
@@ -828,8 +863,18 @@ function refreshRules() {{
       var exts = (r.extensions || []).join(', ');
       var modelLabel = '\u9ed8\u8ba4\u6a21\u578b';
       if (kbModels[name]) {{
-        var parts = kbModels[name].split('/');
-        modelLabel = parts[parts.length-1] || kbModels[name];
+        var p = kbModels[name];
+        // 从路径提取模型目录名（跨平台兼容 \ 和 /）
+        var sep = p.indexOf('\\\\') >= 0 ? '\\\\' : '/';
+        var parts = p.split(sep);
+        var dirName = parts[parts.length-1] || p;
+        // 模型目录名含 _ 连接 org_name → org/name 显示
+        var idx = dirName.indexOf('_');
+        if (idx > 0) {{
+          modelLabel = dirName.slice(0, idx) + '/' + dirName.slice(idx + 1);
+        }} else {{
+          modelLabel = dirName;
+        }}
       }}
       var modelHtml = '<br><span style=\"font-size:11px;color:#667eea;\">\u25b6 \u6a21\u578b: ' + modelLabel + '</span>';
       return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;\">' +
@@ -987,12 +1032,26 @@ function rebuildSigs(){{fetch('/api/router/rebuild-signatures',{{method:'POST'}}
 function toggleSortRules(){{var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'\u25b6':'\u25bc';if(!o)refreshSortRules();}}
 function refreshSortRules(){{fetch('/api/reranker/rules',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{var e=document.getElementById('sort-rules-list'),rules=d.rules||[];if(!rules.length){{e.innerHTML='<span style=\"color:#aaa;\">\u6682\u65e0</span>';return}}e.innerHTML=rules.map(function(r,i){{return'<div style=\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;\"><div style=\"flex:1;font-size:12px;\">#'+(i+1)+' '+JSON.stringify(r)+'</div><button class=\"btn btn-danger\" style=\"padding:2px 8px;font-size:11px;\" onclick=\"deleteSortRule('+i+')\">x</button></div>'}}).join('')}});}}
 function deleteSortRule(i){{if(!confirm('\u5220\u9664\u89c4\u5219 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{index:i}})}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u5220\u9664');refreshSortRules()}}else toast(d.error,'error')}});}}
+function setSrcDot(key, cls) {{var el=document.getElementById('dot-'+key);if(el){{el.className='src-dot '+cls;}}}}
+function refreshSrcStatus() {{
+  fetch('/api/dep-check',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(!d.success)return;var map=d.status||{{}};['enable_pdf','enable_ocr','enable_html2md'].forEach(function(k){{var st=map[k]||'missing';setSrcDot(k,st);}});}});
+}}
+function onToggleInputSource(key) {{
+  setSrcDot(key,'checking');
+  fetch('/api/input-source',{{
+    method:'POST',headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{key:key}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if(d.success){{setSrcDot(key,d.dep||'missing');toast('\u5df2\u66f4\u65b0');setTimeout(function(){{location.reload()}},500);}}
+    else{{setSrcDot(key,d.dep||'missing');toast(d.error||'\u64cd\u4f5c\u5931\u8d25','error');}}
+  }}).catch(function(e){{setSrcDot(key,'missing');toast('\u8bf7\u6c42\u5931\u8d25','error');}});
+}}
 function addSortRule(){{showSortRuleEditor()}}
 function showSortRuleEditor(){{document.getElementById('sort-rule-editor-overlay').style.display='flex';onSortRuleTypeChange();}}
 function hideSortRuleEditor(){{document.getElementById('sort-rule-editor-overlay').style.display='none';document.getElementById('sort-rule-params').style.display='none';}}
 function onSortRuleTypeChange(){{var t=document.getElementById("sort-rule-type").value;var e=document.getElementById("sort-rule-params-fields");var p=document.getElementById("sort-rule-params");if(!t){{p.style.display="none";return}}var html="";if(t==="score_weight")html='<div class=\"form-group\"><label>嵌入分权重 (embedding_score)</label><input id=\"sr-emb\" type=\"number\" value=\"0.6\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div><div class=\"form-group\"><label>Rerank分权重 (rerank_score)</label><input id=\"sr-rer\" type=\"number\" value=\"0.4\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="recency")html='<div class=\"form-group\"><label>半衰期天数 (days_halflife)</label><input id=\"sr-days\" type=\"number\" value=\"30\" min=\"1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="source_weight")html='<div class=\"form-group\"><label>来源加权 JSON</label><textarea id=\"sr-sources\" rows=\"3\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: {{legal_gov:1.5, baike:1.0}}\"></textarea></div>';else if(t==="boost_keywords")html='<div class=\"form-group\"><label>关键词（逗号分隔）</label><input id=\"sr-keys\" type=\"text\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: python,api,definitive\"></div><div class=\"form-group\"><label>提升倍数 (boost)</label><input id=\"sr-boost\" type=\"number\" value=\"1.2\" min=\"0\" step=\"0.1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';e.innerHTML=html;p.style.display="block";}}
 function saveSortRule(){{var t=document.getElementById('sort-rule-type').value;if(!t){{toast('\u8bf7\u9009\u62e9\u89c4\u5219\u7c7b\u578b','error');return}}var p={{type:t}};if(t==='score_weight'){{p.embedding_score=parseFloat(document.getElementById('sr-emb').value||0.6);p.rerank_score=parseFloat(document.getElementById('sr-rer').value||0.4)}}else if(t==='recency'){{p.days_halflife=parseInt(document.getElementById('sr-days').value||30)}}else if(t==='source_weight'){{try{{var v=JSON.parse(document.getElementById('sr-sources').value||'{{}}');Object.assign(p,v)}}catch(e){{toast('\u89e3\u6790\u5931\u8d25','error');return}}}}else if(t==='boost_keywords'){{var k=document.getElementById('sr-keys').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});if(!k.length){{toast('\u8bf7\u8f93\u5165\u5173\u952e\u8bcd','error');return}}p.keywords=k;p.boost=parseFloat(document.getElementById('sr-boost').value||1.2)}}fetch('/api/reranker/rules/add',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{rule:p}})}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u6dfb\u52a0');hideSortRuleEditor();refreshSortRules()}}else toast(d.error,'error')}});}}
-window.onload = function() {{ updateAdvView(); refreshGeekTemplates(); refreshRules(); }};
+window.onload = function() {{ updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); }};
 </script>
 </body>
 </html>"""
@@ -1089,9 +1148,49 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 cfg = load_config()
                 if "input_sources" not in cfg:
                     cfg["input_sources"] = {}
-                cfg["input_sources"][key] = not cfg["input_sources"].get(key, False)
+                new_state = not cfg["input_sources"].get(key, False)
+
+                # 开启时自动检测并安装依赖
+                if new_state:
+                    _DEP_MAP = {
+                        "enable_pdf": {"modules": ["pypdf", "pdfplumber"], "pip": "pypdf"},
+                        "enable_ocr": {"modules": ["paddleocr", "easyocr"], "pip": ["paddleocr", "easyocr"]},
+                        "enable_html2md": {"modules": ["html2text"], "pip": "html2text"},
+                    }
+                    info = _DEP_MAP[key]
+                    found = False
+                    pip_targets = info["pip"]
+                    if not isinstance(pip_targets, list):
+                        pip_targets = [pip_targets]
+                    for mod in info["modules"]:
+                        try:
+                            __import__(mod)
+                            found = True
+                            break
+                        except ImportError:
+                            continue
+                    if not found:
+                        for pip_pkg in pip_targets:
+                            print(f"  依赖未安装，自动安装 {pip_pkg}...")
+                            py = sys.executable
+                            r = run_command([py, "-m", "pip", "install", pip_pkg, "-q"], timeout=120)
+                            if r["success"]:
+                                print(f"  [OK] {pip_pkg} 安装成功")
+                                found = True
+                                break
+                            print(f"  [!] {pip_pkg} 安装失败，尝试下一候选")
+                        if not found:
+                            self._send_json({"success": False, "error": f"所有候选依赖均安装失败", "dep": "missing"})
+                            return
+
+                dep_status = _check_dep(key)
+                cfg["input_sources"][key] = new_state
                 save_config(cfg)
-                self._send_json({"success": True, "active": cfg["input_sources"][key]})
+                self._send_json({"success": True, "active": new_state, "dep": dep_status})
+
+            elif path == "/api/dep-check":
+                dep_status = {k: _check_dep(k) for k in ("enable_pdf", "enable_ocr", "enable_html2md")}
+                self._send_json({"success": True, "status": dep_status})
 
             elif path == "/api/prompt":
                 data = self._read_body()
@@ -1220,17 +1319,26 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 if not kb_name:
                     self._send_json({"success": False, "error": "知识库名不能为空"})
                     return
-                from knowledge_base_manager import set_kb_model
+                from knowledge_base_manager import set_kb_model, create_knowledge_base
+                # 如果知识库不存在，自动创建（规则编辑器中保存模型时触发）
+                from knowledge_base_manager import list_knowledge_bases
+                if kb_name not in list_knowledge_bases():
+                    c_ok, c_msg = create_knowledge_base(kb_name)
+                    if not c_ok and "已存在" not in c_msg:
+                        self._send_json({"success": False, "error": f"自动创建知识库失败: {c_msg}"})
+                        return
                 ok, msg = set_kb_model(kb_name, model_id)
                 self._send_json({"success": ok, "message": msg})
 
             elif path == "/api/kb-models":
-                """返回所有知识库的模型配置 + 已下载模型列表"""
+                """返回所有知识库的模型配置 + 下载的嵌入模型列表"""
                 from knowledge_base_manager import list_knowledge_bases, get_kb_model
-                from embedding_model_manager import list_downloaded_models
+                from embedding_model_manager import list_downloaded_models, RECOMMENDED_RERANK_MODELS
                 kbs = list_knowledge_bases()
                 kb_models = {name: get_kb_model(name) for name in kbs}
-                models = list_downloaded_models()
+                all_models = list_downloaded_models()
+                reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
+                models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
                 self._send_json({"success": True, "kb_models": kb_models, "models": models})
 
             elif path == "/api/recommend":
@@ -1335,15 +1443,18 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
 
                             # 监控进度 — 扫描 model_downloads 下该模型的所有缓存文件
                             last_size = 0
-                            model_cache_prefix = f"models--{mid.replace('/', '--')}"
+                            # HuggingFace 格式: models--BAAI--bge-m3
+                            hf_prefix = f"models--{mid.replace('/', '--')}"
+                            # ModelScope 格式: BAAI/bge-m3（直接在 cache_dir 下创建 org/name 目录）
+                            ms_prefix = mid.replace("/", os.sep)
                             while t.is_alive():
                                 time.sleep(5)
                                 cur_size = 0
                                 dl_dir = os.path.join(cache_directory, "model_downloads")
                                 if os.path.isdir(dl_dir):
                                     for root, _, fns in os.walk(dl_dir):
-                                        # 只统计该模型的缓存文件
-                                        if model_cache_prefix not in root:
+                                        # 同时匹配 HF 和 ModelScope 两种缓存目录格式
+                                        if hf_prefix not in root and ms_prefix not in root:
                                             continue
                                         for fn in fns:
                                             if fn.endswith('.incomplete') or fn.endswith('.lock'):
@@ -1402,8 +1513,16 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 try: rebuild_all_signatures(); self._send_json({"success": True})
                 except Exception as e: self._send_json({"success": False, "error": str(e)})
             elif path == "/api/reranker/toggle":
-                cfg = load_config(); rr = cfg.setdefault("reranker", {}); rr["enabled"] = not rr.get("enabled", False)
-                save_config(cfg); self._send_json({"success": True, "enabled": rr["enabled"]})
+                cfg = load_config(); rr = cfg.setdefault("reranker", {})
+                new_enabled = not rr.get("enabled", False)
+                rr["enabled"] = new_enabled
+                # 联动：开启 rerank 时检索更多候选（K=20），关闭时恢复 K=3
+                ret = cfg.setdefault("retrieval", {})
+                if new_enabled:
+                    ret["k"] = 20
+                else:
+                    ret["k"] = 3
+                save_config(cfg); self._send_json({"success": True, "enabled": new_enabled})
             elif path == "/api/reranker/rules":
                 cfg = load_config(); rules = cfg.get("reranker", {}).get("sort_rules", [])
                 self._send_json({"success": True, "rules": rules})

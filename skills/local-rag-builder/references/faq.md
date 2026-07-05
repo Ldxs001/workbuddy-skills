@@ -1,7 +1,7 @@
 # 常见问题 (FAQ) — local-rag-builder
 
 Q: 为什么 Python 3.12 无法安装 chromadb？
-A: chromadb 的 Windows 预编译轮子最高支持到 Python 3.11。建议使用 conda 创建 3.11 虚拟环境。
+A: chromadb 的 Windows 预编译轮子最高支持到 Python 3.11。坑在 Ubuntu / pyenv / conda 环境会更顺利。
 
 Q: 模型下载失败怎么办？
 A: 本工具内置 4 个下载源（ModelScope、HuggingFace 镜像、官方源、LLM 搜索），每个源会自动重试 3 次。如果全部失败，可以尝试：
@@ -32,12 +32,12 @@ A: ModelScope 下载的模型名中 `.` 可能变为 `___`（如 `bge-small-zh-v
 ### 参数错误
 - **`--query` 后无内容**：检查是否使用了引号包裹查询内容，如 `--query "问题"`
 - **`--kb` 指定未知库**：先运行 `python scripts/knowledge_base_manager.py --list` 查看已有知识库
-- **切分参数超出范围**：`--chunk-size` 范围 50–2000，`--overlap` 范围 0–500
+- **切分参数超出范围**：`--chunk-size` 范围 50–5000，`--overlap` 范围 0–1000
 
 ### 依赖错误
 - **ModuleNotFoundError**：运行 `python scripts/rag_env_setup.py --auto-install` 自动安装缺失包
 - **`pip` 安装卡住或失败**：使用国内镜像 `python scripts/rag_env_setup.py --auto-install --mirror aliyun`
-- **chromadb 报错**：确认 Python 版本为 3.8–3.11（3.12 暂不支持 chromadb Windows 轮子）
+- **chromadb 报错**：确认 Python 版本为 3.11+（3.12+ 在 Windows 下可能有 chromadb 轮子兼容问题，Linux/macOS 一般没问题）
 
 ### 环境错误
 - **模型下载全部失败**：检查网络连接，尝试切换镜像源或使用 `--interactive` 手动选择

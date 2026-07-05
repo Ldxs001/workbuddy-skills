@@ -1,3 +1,251 @@
+## [1.3.3] - 2026-07-05
+
+### 修复
+- **`_load_index()` 空字典导致索引丢失**：`if not data:` 把空字典 `{}` 视为未初始化，替换为只剩 `default`，导致所有知识库从索引消失。修复为 `if data is None`，并增加自动恢复逻辑——索引只有 default 时扫描磁盘自动补回其他 KB
+
+---
+
+## [1.3.2] - 2026-07-05
+
+### 新增
+- **ChromaDB 容灾备份**：`add_documents_to_kb()` 入库前自动备份 `chroma.sqlite3.bak`，写入失败自动回滚恢复
+- **HNSW 损坏自动修复**：`retrieve_documents()` 检测到 HNSW 索引损坏时自动清理段数据并重建索引，查询不再中断
+
+### 修复
+- **Python 3.11 f-string 兼容**：修复 GPU OCR 脚本中反斜杠转义导致的 SyntaxError
+- **ChromaDB 文件检测**：`add_documents_to_kb()` 中 `.parquet` 改为 `.sqlite3`，适配新版 ChromaDB
+
+---
+
+## [1.3.1] - 2026-07-05
+
+### 改进
+- **扫描 PDF 自动 OCR**：`import_documents_to_kb()` 自动检测扫描版 PDF，无文本时回退 EasyOCR（不再需要手动写 OCR 脚本）
+- **KB 签名自动更新**：`add_documents_to_kb()` 入库时自动调用 `update_kb_signature()`，签名不再滞后
+- **签名质量提升**：过滤纯数字 token、中文词加权 3x、取中后段代表性片段（跳过封面/目录）
+- **文档一致性修复**：SKILL.md / guide.md / setup-spec.md / faq.md 中 Python 版本从"3.8-3.11"更新为"3.11+"，补充 OCR 回退和签名功能说明
+
+---
+
+## [1.3.0] - 2026-07-05
+
+### 新增
+- **路由层关键词语义分类**：路由开启后，入库和出库共享同一套 reranker 语义匹配逻辑
+  - 入库：`auto_classify()` 新增 `use_semantic` 参数，路由开时用 reranker 对 `rule.keywords × doc_content` 打分，而非硬匹配
+  - 出库：`route_query()` 新增 `① 关键词语义路由` 步骤，先于硬编码和签名回退执行
+  - 扩展名匹配始终精确，不受路由开关影响
+  - CLI：`rag_skill.py --import-file --auto-classify` 自动分类入库
+  - Web UI：路由层新增「语义分类阈值」配置项
+
+---
+
+## [1.2.18] - 2026-07-05
+
+### 修复
+- **Web UI 启动报错 UnboundLocalError**：`generate_html()` 中 `RECOMMENDED_RERANK_MODELS` 在第 119 行使用但在第 128 行才 import，导致 Python 将其视为未绑定的局部变量
+  - 根因：过滤器代码插入位置在 import 语句之前
+  - 修复：将过滤逻辑移到 `from embedding_model_manager import ...` 之后
+
+---
+
+## [1.2.17] - 2026-07-05
+
+### 重构
+- **知识库列表移除嵌入模型下拉框**：图1（KB 列表）的逐 KB 模型选择器与图2（规则编辑器）完全重叠，移除后只显示 KB 名 + 文档数。KB 嵌入模型选择统一在「自动分类规则」编辑弹窗中操作。
+
+---
+
+## [1.2.16] - 2026-07-05
+
+### 修复
+- **知识库嵌入模型选择器存的是文件路径而非模型 ID**：下拉菜单的 `value` 用了 `m.get("path")`，导致 `set_kb_model()` 将完整文件路径写入 KB 配置
+  - 根因：`rag_web_ui.py` 规则编辑器 `<option value="{path}">` 存的是文件路径
+  - 修复：改为 `value="{model_id}"`，保存标准模型 ID
+- **`get_embeddings()` 无法解析 model_id 到文件路径**：KB 配置存的是 model_id（如 `maidalun1020/bce-embedding-base_v1`），但 `get_embeddings()` 直接调 `os.path.exists()` 找不到，fallback 到字母序第一个模型（通常是 reranker）
+  - 修复：新增 `model_index.json` 查找逻辑，将 model_id 转为真实文件路径
+
+---
+
+## [1.2.15] - 2026-07-05
+
+### 修复
+- **Web UI 知识库嵌入模型选择器混入重排序模型**：`list_downloaded_models()` 返回所有已下载模型（嵌入+重排序），知识库规则编辑器的模型下拉列表未做过滤，导致用户可能误选 mxbai-rerank 等重排序模型作为知识库的嵌入模型
+  - 根因：`generate_html()` 和 `/api/kb-models` 接口直接将 `list_downloaded_models()` 结果用于 KB 模型选择器
+  - 修复：SSR 和 API 两端均过滤掉 `RECOMMENDED_RERANK_MODELS` 中的模型
+
+### 改进
+- **模型列表增加标签**：嵌入模型、重排序模型、路由模型的列表项前面分别标注 `[嵌入]`、`[重排序]`、`[路由]` 标签，防止混淆
+
+---
+
+## [1.2.14] - 2026-07-05
+
+### 修复
+- **LICENSE.md 署名**：版权持有者从 `[username-redacted]`（git-sync 脱敏残留）恢复为 `wUwproject`
+
+---
+
+## [1.2.13] - 2026-07-05
+
+### 文档
+- **LICENSE.md**：新增第三方模型许可声明表，列出 BGE/all-MiniLM/e5 等可下载模型的许可协议
+
+---
+
+## [1.2.12] - 2026-07-05
+
+### 新增
+- **EasyOCR 回退机制**：OCR 输入源检测增加 EasyOCR 作为 PaddleOCR 的回退选项。
+  当 PaddleOCR 不可用时（如 PaddlePaddle 兼容性问题），自动切换到 EasyOCR。
+  `_check_dep("enable_ocr")` 现在返回 `ready` 如果 paddleocr 或 easyocr 任一可用。
+  自动安装时先尝试 paddleocr，失败后尝试 easyocr。
+
+### 文档修正
+- **Web UI OCR 描述**：`rag_web_ui.py` 和 `rag_settings.html` 的 OCR 提示文本从 `paddleocr` 改为 `paddleocr (CPU: paddleocr / GPU: paddleocr-gpu) / easyocr`
+- **SKILL.md 限制**：文件类型支持描述从"不支持 PDF、图片OCR"改为"可选扩展支持 PDF/OCR/HTML→MD（输入源开关）"
+
+---
+
+## [1.2.11] - 2026-07-05
+
+### 修复
+
+- **检索 k 值 UI 联动**：开启 Rerank 时 `retrieval.k` 自动设为 20，关闭时恢复 3。
+  之前只在 `retrieve_context()` 层做运行时缩放，但 UI 上 k 值不联动，用户看到的始终是 3。
+  根因：`/api/reranker/toggle` 只改了 `reranker.enabled`，没有同步改 `retrieval.k`。
+- **输入源状态指示器初始状态**：修复页面刚打开时三个状态点显示黑色（无色）的问题。
+  根因：SSR 生成的 `<span class="src-dot">` 缺少初始 CSS 类（ready/missing/off），`refreshSrcStatus()` 异步调用前点显示为默认黑色。
+  修复：`generate_html()` 中根据 toggle 状态和 `_check_dep()` 结果直接 SSR 正确的 CSS 类。
+- **清理冗余代码**：移除 `refreshSrcStatus()` 中的死代码 `var on=document.querySelector(...)`。
+
+---
+
+## [1.2.10] - 2026-07-05
+
+### 新增
+- **检索 k 自动扩容**：rerank 开启时 `retrieve_context()` 自动将 `retrieval.k` 从 3 扩容到 `max(k, reranker.top_k × 4)`（默认 20），保证精排有足够候选池
+  - 根因：rerank 关闭时 k=3 是合理的最终输出数；rerank 开启后 k=3 只能召回 3 个候选，精排无筛选空间
+  - 修复：检索前检测 rerank 开关状态，开启时 `effective_k = max(default_k, reranker_top_k * 4)`
+
+### 文档对齐
+- **architecture.md**：新增 Router/Reranker 模块依赖和查询流程图；添加 k 与 reranker.top_k 参数耦合说明
+- **setup-spec.md**：strategy #7 标注 semantic 使用全局嵌入模型；retrieval.k #14 和 reranker.top_k #29 添加耦合约束说明
+- **SKILL.md**：核心能力表新增路由层（#4）和 Rerank 层（#5），Web 面板描述补充 Router/Rerank 控件
+- **guide.md**：Web 面板功能列表补充 Rerank 层和路由层配置项
+
+---
+
+## [1.2.9] - 2026-07-05
+
+### 修复
+- **语义切分硬编码嵌入模型**：`split_semantic` 和 `split_semantic` 后处理子切均硬编码 `BAAI/bge-small-zh-v1.5`，不随用户配置的嵌入模型变化
+  - 根因：`split_pipeline` 没有 `embeddings` 参数，`_run_secondary` 也没有，`rag_core.import_documents_to_kb` 手里有 `embeddings` 却从未传递
+  - 修复：`split_pipeline` 新增 `embeddings=None` 参数，语义主策略时注入 `strategy_kwargs`；`_run_secondary` 新增 `embeddings=None` 参数，语义子切使用传入模型；`rag_core.import_documents_to_kb` 将 `embeddings` 传入 `split_pipeline`
+  - 向后兼容：不传 `embeddings` 时仍 fallback 到 `bge-small-zh-v1.5`
+- **sentence 切分 fallback delimiter 乱附着**：NLTK 不可用时 regex fallback 吃掉真实标点后硬粘 `delimiters[0]`（"。"），导致 `"你吃饭了吗？"` → `"你吃饭了吗。"`
+  - 根因：`re.split` 非捕获组模式会丢弃 delimiter，后续用 `delimiters[0]` 硬补
+  - 修复：改用捕获组 `(…)` 保留 delimiter，按 i,i+1 配对取出内容+真实标点，空 content 跳过，末尾无标点不追加
+
+### 新增
+- **Web UI Rerank 输出数量控件**：Rerank 层卡片新增 `top_k` 数字输入框，范围 1-50
+- **SKILL.md frontmatter**：新增 `slug` 和 `displayName` 字段，满足 SkillHub 发布要求
+
+---
+
+## [1.2.8] - 2026-07-05
+
+### 新增
+- **输入源状态指示灯**：每个输入源开关旁显示 ⬤ 色点
+  - 🟡 黄 = 开关未开启 / 检测中
+  - 🟢 绿 = 依赖已安装可用
+  - 🔴 红 = 依赖缺失
+  - 页面加载时自动检测依赖状态，开关点击后实时更新
+- 新增 `/api/dep-check` 端点返回所有输入源依赖状态
+
+---
+
+## [1.2.7] - 2026-07-05
+
+### 修复
+- **路由层回退模型选择每次重启后重置**：
+  - 根因：保存时写入 `router.fallback.model_path`，但 HTML 生成时读取 `router.model_path_fallback`，路径不一致导致始终读不到已保存的值，回退到列表第一个模型
+  - 修复：`_mlist("fb")` 的 `current_path` 改为 `fb_cfg.get("model_path", "")`
+
+---
+
+## [1.2.6] - 2026-07-05
+
+### 新增
+- **输入源开关自动安装依赖**：打开 PDF/OCR/HTML→MD 开关时自动检测并 `pip install` 所需包
+  - `enable_pdf` → 依次检测 `pypdf` / `pdfplumber`，都无则装 `pypdf`
+  - `enable_ocr` → 检测 `paddleocr`，无则安装
+  - `enable_html2md` → 检测 `html2text`，无则安装
+  - 安装失败时开关保持关闭，返回错误提示
+
+---
+
+## [1.2.5] - 2026-07-05
+
+### 修复
+- **所有 toggle 开关需要多次点击才能生效**：
+  - 根因：`<label>` 包裹 `<input type="checkbox">` 时，点击 label 同时触发两件事：(1) label 的 `onclick` 调用 API toggle，(2) 浏览器原生将 checkbox 的 `click` 事件冒泡回 label，导致 `onclick` **二次触发**，API 被调两次（刚开又关）
+  - 修复：所有 6 个 toggle 的 `<input>` 添加 `onclick="event.stopPropagation()"`，阻止 checkbox 原生 click 冒泡到 label
+  - 影响范围：Rerank 开关 / 路由开关 / 多知识库路由开关 / PDF 解析开关 / OCR 开关 / HTML→MD 开关
+
+---
+
+## [1.2.4] - 2026-07-05
+
+### 修复
+- **自动分类规则编辑后蓝色三角箭头仍显示"默认模型"**：
+  - 根因1：`saveRule()` 调用 `/api/kb-model` 设置 KB 模型，但目标 KB（规则名）不存在于 `kb_index.json`，`set_kb_model` 返回失败
+  - 修复：`/api/kb-model` 处理时若 KB 不存在则自动创建
+  - 根因2：`refreshRules` 显示用 `split('/')` 提取模型名，Windows 路径用 `\` 无法正确拆分
+  - 修复：自动检测路径分隔符（`\` 或 `/`），提取末段目录名，将 `_` 转为 `/` 显示
+
+---
+
+## [1.2.3] - 2026-07-05
+
+### 修复
+- **`list_downloaded_models` 返回无权重文件的空目录模型**：
+  - 根因：只从 `model_index.json` 读取，不验证文件是否实际存在。目录被删除/损坏后仍显示"已下载"并可被选中
+  - 修复：遍历索引时调用 `_check_integrity()` 过滤，仅返回权重文件完整的模型
+
+---
+
+## [1.2.2] - 2026-07-05
+
+### 修复
+- **Web UI 下载进度监控不兼容 ModelScope 缓存目录结构**：
+  - 根因：ModelScope 的 `snapshot_download(cache_dir=xx)` 将文件写入 `BAAI/bge-m3` 格式（`org/name`），但 Web UI 进度扫描硬编码为 HuggingFace 的 `models--BAAI--bge-m3` 格式
+  - 修复：进度监控同时扫描 HF（`models--`）和 ModelScope（`org/name`）两种缓存路径前缀
+- **`_download_with_modelscope` 未安装时跳过而非自动安装**：
+  - 根因：函数入口只 `import` 检测，未安装就直接返回失败
+  - 修复：`modelscope` 未安装 → 自动 `pip install` → 成功则继续下载，失败才跳下一源
+- **HF ↔ ModelScope 模型 ID 映射**：部分模型在两平台 org/name 不一致导致下载挂起
+  - 新增 `_MS_MODEL_ID_MAP` 映射表，当前覆盖：
+    - `maidalun1020/bce-embedding-base_v1` → `maidalun/bce-embedding-base_v1`
+    - `Alibaba-NLP/gte-Qwen2-7B-instruct` → `iic/gte-Qwen2-7B-instruct`
+  - `_download_with_modelscope` 入口自动查表映射
+- timeout 从 600s 提升至 1800s（BGE-M3 约 2.2GB 需要）
+
+---
+
+## [1.2.0] - 2026-07-05
+
+### 新增
+- **嵌入推荐模型大扩充**：从 6 个增至 14 个，补齐常用多语言系列
+  - `BAAI/bge-m3`：BGE 多语言旗舰，支持 100+ 语言，Dense+Sparse+MultiVec 三种检索方式
+  - `intfloat/multilingual-e5-small/base/large-instruc`：E5 多语言系列（小/中/大），覆盖 100 语言
+  - `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`：多语言 paraphrase，50+ 语言
+  - `BAAI/bge-large-en-v1.5`：英文高精度嵌入
+  - `Alibaba-NLP/gte-Qwen2-7B-instruct`：阿里 GTE 大模型嵌入
+  - `sentence-transformers/all-mpnet-base-v2`：英文高精度嵌入
+- 模型列表重新分组：BGE 系列 / 多语言系列 / 中文双语系列 / 英文系列
+
+---
+
 ## [1.1.3] - 2026-06-21
 
 ### 修复

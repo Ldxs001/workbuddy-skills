@@ -37,6 +37,32 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
 
     if model_path is None:
         model_path = emb_cfg.get("model_path", "")
+
+    # 如果 model_path 不是有效路径，尝试从 model_index.json 解析 model_id → 路径
+    if model_path and not os.path.exists(model_path):
+        from utils import MODELS_DIR
+        index_path = os.path.join(MODELS_DIR, "model_index.json")
+        if os.path.exists(index_path):
+            try:
+                import json
+                with open(index_path, "r", encoding="utf-8") as f:
+                    idx = json.load(f)
+                # 精确匹配 model_id
+                if model_path in idx:
+                    actual = idx[model_path].get("path", "")
+                    if actual and os.path.exists(actual):
+                        model_path = actual
+                # 模糊匹配子路径（如 model_path 是 HuggingFace ID，索引用反斜杠路径）
+                if not os.path.exists(model_path):
+                    for mid, info in idx.items():
+                        if mid.replace("/", "_") in model_path or mid == model_path:
+                            actual = info.get("path", "")
+                            if actual and os.path.exists(actual):
+                                model_path = actual
+                                break
+            except Exception:
+                pass
+
     # 校验：路径为空或路径失效时回退到扫描 MODELS_DIR
     if not model_path or not os.path.exists(model_path):
         models = find_model_dirs(MODELS_DIR)
@@ -65,27 +91,38 @@ def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, e
     if not os.path.exists(kb_path) or not os.listdir(kb_path):
         return []
 
-    vectorstore = Chroma(
-        persist_directory=kb_path,
-        embedding_function=embeddings,
-    )
+    # 尝试检索，HNSW 损坏时自动修复
+    import time as _t
+    for _attempt in range(2):
+        try:
+            vectorstore = Chroma(
+                persist_directory=kb_path,
+                embedding_function=embeddings,
+            )
+            cfg = load_config()
+            ret_cfg = cfg.get("retrieval", {})
+            if k is None:
+                k = ret_cfg.get("k", 3)
+            if score_threshold is None:
+                score_threshold = ret_cfg.get("score_threshold")
 
-    cfg = load_config()
-    ret_cfg = cfg.get("retrieval", {})
-    if k is None:
-        k = ret_cfg.get("k", 3)
-    if score_threshold is None:
-        score_threshold = ret_cfg.get("score_threshold")
+            if score_threshold:
+                retriever = vectorstore.as_retriever(
+                    search_type="similarity_score_threshold",
+                    search_kwargs={"score_threshold": score_threshold, "k": k},
+                )
+            else:
+                retriever = vectorstore.as_retriever(search_kwargs={"k": k})
 
-    if score_threshold:
-        retriever = vectorstore.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={"score_threshold": score_threshold, "k": k},
-        )
-    else:
-        retriever = vectorstore.as_retriever(search_kwargs={"k": k})
-
-    return retriever.invoke(query)
+            return retriever.invoke(query)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "hnsw" in err_str or "segment reader" in err_str or "compactor" in err_str:
+                from knowledge_base_manager import _try_repair_kb, _backup_kb
+                if _attempt == 0 and _try_repair_kb(kb_path):
+                    _backup_kb(kb_path)
+                    continue
+            raise  # 非 HNSW 错误或修复失败则透传
 
 
 def build_context(docs):
@@ -123,12 +160,21 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
         routing_method = "direct"
 
     # ==================== 检索阶段 ====================
+    # Rerank 开启时自动扩容候选池，保证精排有足够的筛选空间
+    reranker_enabled = use_reranker and cfg.get("reranker", {}).get("enabled", False)
+    if reranker_enabled:
+        reranker_top_k = cfg.get("reranker", {}).get("top_k", 5)
+        default_k = cfg.get("retrieval", {}).get("k", 3)
+        effective_k = k if k is not None else max(default_k, reranker_top_k * 4)
+    else:
+        effective_k = k
+
     all_docs = []
     source_kb_map = {}
     for target_kb in kb_names:
         try:
             docs = retrieve_documents(
-                question, kb_name=target_kb, k=k,
+                question, kb_name=target_kb, k=effective_k,
                 score_threshold=score_threshold, embeddings=embeddings,
             )
             for d in docs:
@@ -256,9 +302,36 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
         embeddings = get_embeddings(kb_name=kb_name)
 
     try:
-        from langchain_community.document_loaders import TextLoader
-        loader = TextLoader(file_path, encoding="utf-8")
-        docs = loader.load()
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".pdf":
+            from langchain_community.document_loaders import PyPDFLoader
+            loader = PyPDFLoader(file_path)
+            docs = loader.load()
+            # 扫描版 PDF 自动回退 OCR
+            total_chars = sum(len(d.page_content) for d in docs)
+            if total_chars < 50:
+                try:
+                    from pdf2image import convert_from_path
+                    import numpy as np
+                    import easyocr
+                    reader = easyocr.Reader(["ch_sim", "en"])
+                    images = convert_from_path(file_path, dpi=200)
+                    all_text = []
+                    for img in images:
+                        arr = np.array(img)
+                        result = reader.readtext(arr)
+                        all_text.append("\n".join([r[1] for r in result]))
+                    from langchain_core.documents import Document
+                    docs = [Document(
+                        page_content="\n\n--- 换页 ---\n\n".join(all_text),
+                        metadata={"source": os.path.basename(file_path), "ocr": True}
+                    )]
+                except Exception as ocr_err:
+                    raise RuntimeError(f"PDF 无文本且 OCR 失败: {ocr_err}")
+        else:
+            from langchain_community.document_loaders import TextLoader
+            loader = TextLoader(file_path, encoding="utf-8")
+            docs = loader.load()
     except Exception as e:
         raise RuntimeError(f"文档加载失败: {e}")
 
@@ -280,6 +353,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
         headers_to_split_on=split_cfg.get("headers_to_split_on"),
         strip_headers=split_cfg.get("strip_headers", False),
         strategy_overrides=strategy_overrides,
+        embeddings=embeddings,
     )
 
     # 从 strategy_overrides 注入当前策略的专属参数

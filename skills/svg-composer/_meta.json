@@ -1,6 +1,6 @@
 {
   "name": "svg-composer",
-  "version": "3.3.0",
+  "version": "3.3.2",
   "description": "SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式",
   "author": "wUwproject",
   "license": "MIT",

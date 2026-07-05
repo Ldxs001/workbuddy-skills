@@ -34,12 +34,24 @@ DOWNLOAD_SOURCES = [
 
 # 预配置模型列表
 RECOMMENDED_MODELS = [
+    # ── BGE 系列 ──
     {"id": "BAAI/bge-small-zh-v1.5", "size_mb": 130, "desc": "轻量中文嵌入（推荐）", "type": "bge"},
     {"id": "BAAI/bge-base-zh-v1.5", "size_mb": 400, "desc": "中等中文嵌入", "type": "bge"},
+    {"id": "BAAI/bge-large-zh-v1.5", "size_mb": 1300, "desc": "高精度中文嵌入（大）", "type": "bge"},
+    {"id": "BAAI/bge-m3", "size_mb": 2200, "desc": "多语言旗舰（100+语言，Dense+Sparse+MultiVec）", "type": "bge"},
+    {"id": "BAAI/bge-large-en-v1.5", "size_mb": 1300, "desc": "高精度英文嵌入", "type": "bge"},
+    # ── 多语言系列 ──
+    {"id": "intfloat/multilingual-e5-small", "size_mb": 500, "desc": "多语言 E5 轻量（100语言）", "type": "e5"},
+    {"id": "intfloat/multilingual-e5-base", "size_mb": 1100, "desc": "多语言 E5 中等（100语言）", "type": "e5"},
+    {"id": "intfloat/multilingual-e5-large-instruc", "size_mb": 2200, "desc": "多语言 E5 大（指令微调版）", "type": "e5"},
+    {"id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "size_mb": 470, "desc": "多语言 paraphrase（50+语言）", "type": "st"},
+    # ── 中文/双语系列 ──
     {"id": "shibing624/text2vec-base-chinese", "size_mb": 400, "desc": "轻量中文嵌入（CPU 友好）", "type": "text2vec"},
     {"id": "maidalun1020/bce-embedding-base_v1", "size_mb": 800, "desc": "网易 BCEmbedding", "type": "bce"},
+    {"id": "Alibaba-NLP/gte-Qwen2-7B-instruct", "size_mb": 14000, "desc": "阿里 GTE 大模型嵌入（高精度）", "type": "gte"},
+    # ── 英文系列 ──
     {"id": "sentence-transformers/all-MiniLM-L6-v2", "size_mb": 80, "desc": "英文嵌入（超轻量）", "type": "st"},
-    {"id": "BAAI/bge-large-zh-v1.5", "size_mb": 1300, "desc": "高精度中文嵌入（大）", "type": "bge"},
+    {"id": "sentence-transformers/all-mpnet-base-v2", "size_mb": 420, "desc": "英文嵌入（高精度）", "type": "st"},
 ]
 
 # Rerank / 路由模型列表（与嵌入模型分开管理）
@@ -185,10 +197,37 @@ def _check_integrity(model_path):
     return True, f"找到 {len(model_files)} 个模型文件，共 {total_size / 1e6:.1f}MB"
 
 
-def _download_with_modelscope(model_id, cache_dir):
+# HF → ModelScope 模型 ID 映射（两平台 org/name 不一致时使用）
+_MS_MODEL_ID_MAP = {
+    "maidalun1020/bce-embedding-base_v1": "maidalun/bce-embedding-base_v1",
+    "Alibaba-NLP/gte-Qwen2-7B-instruct": "iic/gte-Qwen2-7B-instruct",
+}
+
+
+def _download_with_modelscope(hf_model_id, cache_dir):
     """使用 ModelScope 下载"""
+    # 模型 ID 映射: HF ID → ModelScope ID
+    model_id = _MS_MODEL_ID_MAP.get(hf_model_id, hf_model_id)
+    # 检测 modelscope 包，未安装则自动安装
+    try:
+        import modelscope  # noqa: F401
+    except ImportError:
+        print("  modelscope 包未安装，尝试自动安装...")
+        py = sys.executable
+        install_result = run_command(
+            [py, "-m", "pip", "install", "modelscope", "-q"],
+            timeout=120
+        )
+        if not install_result["success"]:
+            return {
+                "success": False, "stdout": "",
+                "stderr": f"modelscope 安装失败: {install_result.get('stderr','')[-200:]}",
+                "returncode": -1
+            }
+        print("  [OK] modelscope 安装成功")
     script = f"""
 from modelscope.hub.snapshot_download import snapshot_download
+import sys
 try:
     path = snapshot_download('{model_id}', cache_dir=r'{cache_dir}')
     print(f"SAVED_TO:{{path}}")
@@ -197,7 +236,7 @@ except Exception as e:
     sys.exit(1)
 """
     py = sys.executable
-    result = run_command([py, "-c", script], timeout=600)
+    result = run_command([py, "-c", script], timeout=1800)
     return result
 
 
@@ -436,10 +475,14 @@ def verify_model(model_id_or_path):
 
 
 def list_downloaded_models():
-    """列出已下载的模型"""
+    """列出已下载的模型（仅返回文件完整性通过的模型）"""
     index = _load_index()
     result = []
     for model_id, info in index.items():
+        path = info.get("path", "")
+        ok, _ = _check_integrity(path)
+        if not ok:
+            continue
         info["model_id"] = model_id
         result.append(info)
     return result

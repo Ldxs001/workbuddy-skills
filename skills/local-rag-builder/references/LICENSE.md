@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 [username-redacted]
+Copyright (c) 2026 wUwproject
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,21 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## 第三方模型许可
+
+本工具可下载使用的嵌入模型和重排序模型遵循其各自许可协议：
+
+| 模型 | 许可 |
+|:----|:----|
+| BAAI/bge-small-zh-v1.5 | MIT |
+| BAAI/bge-reranker-v2-m3 | MIT |
+| BAAI/bge-small-en-v1.5 | MIT |
+| BAAI/bge-base-zh-v1.5 | MIT |
+| all-MiniLM-L6-v2 | Apache 2.0 |
+| intfloat/multilingual-e5-small | MIT |
+
+本工具不直接分发上述模型，仅提供下载和管理功能。
+用户使用模型时须遵守对应许可协议的条款。

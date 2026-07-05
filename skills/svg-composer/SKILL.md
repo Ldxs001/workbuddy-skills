@@ -1,6 +1,7 @@
 ---
 name: svg-composer
-version: 3.3.0
+version: 3.3.2
+displayName: svg-composer
 description: SVG 拼接工具，支持内置 FontAwesome 字符集（0-9, A-Z）和四种拼接模式
 author: wUwproject
 tags: ['svg', 'composer', 'fontawesome', 'generation']
@@ -8,7 +9,6 @@ license: MIT
 data_dir: skills/.standardization/svg-composer/data/
 triggers: ['拼接 SVG', '合成图标', 'SVG 组合', '字符拼接', 'svg-composer']
 slug: svg-composer
-displayName: SVG 拼接工具
 trigger: 拼接 SVG
 trigger_negative: 生成 PNG 图片,非拼接矢量绘图
 h1_position: true
