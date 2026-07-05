@@ -114,7 +114,10 @@ def generate_html():
     """生成自包含 HTML 设置界面"""
     cfg = load_config()
     kbs = list_knowledge_bases()
-    models = list_downloaded_models()
+    all_models = list_downloaded_models()
+    # 过滤掉重排序模型，只保留真正的嵌入模型（供知识库嵌入模型选择器使用）
+    reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
+    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
     template = load_template()
     router_cfg = cfg.get("router", {})
     fb_cfg = router_cfg.get("fallback", {})
@@ -143,7 +146,7 @@ def generate_html():
                 hdl = f'onchange=updateConfig("reranker","model_path",this.value)'
             else:
                 hdl = f'onchange=updateConfig("embedding","model_path",this.value)'
-            rows.append(f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="{role}-model" value="{mid}" id="{role[:3]}-{mid}" {checked} {hdl} style="flex-shrink:0;"><label for="{role[:3]}-{mid}" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{mid}">{mid} <span style="color:#888;font-size:11px;">({m["size_mb"]}MB)</span></label><span style="font-size:11px;flex-shrink:0;color:{"#3B6D11" if ok else "#888"};">{st}</span>{bt}</div>')
+            rows.append(f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="{role}-model" value="{mid}" id="{role[:3]}-{mid}" {checked} {hdl} style="flex-shrink:0;"><label for="{role[:3]}-{mid}" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{mid}">{"[嵌入] " if role=="embedding" else "[重排序] " if role=="rerank" else "[路由] "}{mid} <span style="color:#888;font-size:11px;">({m["size_mb"]}MB)</span></label><span style="font-size:11px;flex-shrink:0;color:{"#3B6D11" if ok else "#888"};">{st}</span>{bt}</div>')
         return "\n".join(rows)
     emb_model_html = _mlist("embedding", RECOMMENDED_MODELS, cfg.get("embedding",{}).get("model_path",""))
     rr_model_html = _mlist("rerank", RECOMMENDED_RERANK_MODELS, rerank_cfg.get("model_path",""))
@@ -514,7 +517,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group"><label>知识库嵌入模型</label>
         <select id="rule-model" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
           <option value="">— 默认模型 ({models[0].get("model_id","") if models else "无"}) —</option>
-          {''.join(f'<option value="{m.get("path","")}">{m.get("model_id","")}</option>' for m in models)}
+          {''.join(f'<option value="{m.get("path","")}">[嵌入] {m.get("model_id","")}</option>' for m in models)}
         </select>
         <div style="font-size:11px;color:#888;margin-top:4px;">选空=回退到全局默认模型。已有文档的知识库切换模型后需重新导入。</div>
       </div>
@@ -1328,12 +1331,14 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"success": ok, "message": msg})
 
             elif path == "/api/kb-models":
-                """返回所有知识库的模型配置 + 已下载模型列表"""
+                """返回所有知识库的模型配置 + 下载的嵌入模型列表"""
                 from knowledge_base_manager import list_knowledge_bases, get_kb_model
-                from embedding_model_manager import list_downloaded_models
+                from embedding_model_manager import list_downloaded_models, RECOMMENDED_RERANK_MODELS
                 kbs = list_knowledge_bases()
                 kb_models = {name: get_kb_model(name) for name in kbs}
-                models = list_downloaded_models()
+                all_models = list_downloaded_models()
+                reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
+                models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
                 self._send_json({"success": True, "kb_models": kb_models, "models": models})
 
             elif path == "/api/recommend":
