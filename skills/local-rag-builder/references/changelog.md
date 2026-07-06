@@ -1,3 +1,22 @@
+## [1.4.0] - 2026-07-06
+
+### 修复
+- **多页 PDF 只切第一页**：`import_documents_to_kb()` 预处理时只取 `docs[0].page_content`（PDF 仅第一页），56 页文件只产出 4 块。改为 `"\n\n".join(d.page_content for d in docs)` 拼接全部页
+- **语义子切批次内重复 ID**：SM3 哈希碰撞导致 ChromaDB 抛出 `Expected IDs to be unique`，备份回滚机制反复触发后 HNSW 索引损坏。改为入库前 `seen` 集合去重，保留首个副本
+- **PDF 分类文本乱码**：`run_import()` 用 `open(file, "r", "utf-8")` 读取 PDF 二进制为 UTF-8 文本，中文关键词全变乱码，'LLM' 恰好出现在 ASCII 区域导致路由到 `LLM奠基理论`。改为 PyPDFLoader 提取真实文本
+- **h2 capture group 标题不完整**：`^(\d+|\w+).*仪器设定$` 的 `m.group(1)` 只捕获仪器代码（如 `996`），注入 `## 996` 而非完整的 `## 996 PDA 仪器设定`。改为外层 capture group 包裹整行
+- **Chroma HNSW 索引损坏**：`add_documents()` 在已有 ID 冲突时触发 `except Exception` 备份回滚，多次后 HNSW segment 丢失索引文件（仅剩 `index_metadata.pickle`），全部写入/查询中断。改为 `upsert()` 覆盖而非 `add_documents()`，从源头杜绝 ID 冲突触发备份链
+
+### 改进
+- **PDF 编码乱码检测 + OCR 自动回退**：中文文件名 PDF 在 pypdf 提取后检测 CJK 字符占比，低于 10% 且字符数 > 100 时视为编码异常，自动触发 EasyOCR 重提取。解决部分 PDF（CID 字体/自定义编码）文本关键词不匹配问题。**分类阶段也走 OCR**：保证路由在清晰文本上做决策，而不是先路由到错误 KB 再用 OCR 补救
+- **路由层 hybrid 加权投票**：路由开启时，`auto_classify(use_semantic="hybrid")` 先关键词跑出 top-3 候选池 → 语义 rerank（min-max 归一化处理 logits 负数问题）→ 关键词 40% + 语义 60% 加权投票。路由不再是关键词落空后的回退，而是真正参与分类决策
+- **路由关键词扩充**：`政经文哲` 补充 29 个关键词（马克思/资本论/习近平/新时代/三个代表等）；`诸子百家` 补充国富论/货殖列传/儒家等 13 个关键词
+
+### 技术债
+- **HNSW 损坏重建验证**：4 个损坏 KB（LLM奠基理论/理化检测/白酒/设备条件）通过删除 segment 目录+触发 Chroma 重建全部恢复，数据零丢失
+
+---
+
 ## [1.3.8] - 2026-07-06
 
 ### 修复

@@ -229,13 +229,24 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     try:
         # 对文档内容做 SM3 哈希作为 ID（去重 + 国密合规）
         doc_ids = [sm3(d.page_content.encode("utf-8")) for d in documents]
+        # 批次内去重：相同 SM3 哈希 = 相同内容
+        seen = set()
+        unique_docs, unique_ids = [], []
+        for doc, did in zip(documents, doc_ids):
+            if did not in seen:
+                seen.add(did)
+                unique_docs.append(doc)
+                unique_ids.append(did)
+        if len(unique_docs) < len(documents):
+            print(f"  [dedup] 批次内去重: {len(documents)} → {len(unique_docs)} 块")
+        documents, doc_ids = unique_docs, unique_ids
         # 检查是否已有向量库
         if os.path.exists(persist_dir) and any(f.endswith(".sqlite3") for f in os.listdir(persist_dir)):
             vectorstore = Chroma(
                 persist_directory=persist_dir,
                 embedding_function=embeddings,
             )
-            vectorstore.add_documents(documents, ids=doc_ids)
+            vectorstore.upsert(documents, ids=doc_ids)
         else:
             vectorstore = Chroma.from_documents(
                 documents=documents,
@@ -276,7 +287,8 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
 
     支持：
     - 扩展名匹配（始终精确，不走语义）
-    - 关键词匹配：路由关=硬匹配(in)，路由开=语义匹配(reranker × 关键词锚点)
+    - 关键词匹配：use_semantic=False → 硬匹配(in)；True → 纯语义；
+      "hybrid" → 关键词筛选 top-3 → 语义 rerank → 加权投票
     """
     if rules is None:
         rules = _load_rules()
@@ -288,24 +300,79 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
     ext = os.path.splitext(filename or "")[1].lower() if filename else ""
     best_match = "default"
     best_score = 0
+    is_hybrid = use_semantic == "hybrid"
 
     # 语义模式：复用 FallbackRouter，避免每次循环重载模型
     fallback = None
-    if use_semantic:
+    if use_semantic or is_hybrid:
         try:
             from router import FallbackRouter
             fallback = FallbackRouter()
         except Exception:
             fallback = None
 
+    # Hybrid 模式：先关键词跑出候选池（top-3），再语义打分
+    if is_hybrid and fallback is not None:
+        # 第一轮：关键词硬匹配 → 候选池（按绝对数排序，相同则匹配率高者优先）
+        candidates = []
+        for kb_name, rule in rules.items():
+            for ex in rule.get("extensions", []):
+                if ex.lower() == ext:
+                    return kb_name
+            kw_list = rule.get("keywords", [])
+            kw_score = sum(1 for kw in kw_list if kw.lower() in content_lower)
+            if kw_score > 0 and kw_list:
+                ratio = kw_score / len(kw_list)
+                candidates.append((kb_name, kw_score, ratio))
+        # 先按绝对数降序，相同则按匹配率降序
+        candidates.sort(key=lambda x: (-x[1], -x[2]))
+        candidates = candidates[:3]
+
+        # 第二轮：语义 rerank（仅对候选池打分）
+        if not candidates:
+            return "default"
+        sem_raw = {}
+        for kb_name, kw_score, _ in candidates:
+            rule = rules.get(kb_name, {})
+            keywords = rule.get("keywords", [])
+            if keywords:
+                try:
+                    kw_text = " ".join(keywords)
+                    scores = fallback.score(content, {kb_name: kw_text})
+                    sem_raw[kb_name] = scores.get(kb_name, 0.0)
+                except (ValueError, RuntimeError):
+                    sem_raw[kb_name] = 0.0
+            else:
+                sem_raw[kb_name] = 0.0
+
+        # 候选池内 min-max 归一化（reranker 输出原始 logits 可能为负）
+        sem_vals = list(sem_raw.values())
+        min_s, max_s = min(sem_vals), max(sem_vals)
+        best_score = -float('inf')
+
+        for kb_name, kw_score, _ in candidates:
+            kw_norm = min(kw_score / 3, 1.0)
+            if max_s > min_s:
+                sem_norm = (sem_raw[kb_name] - min_s) / (max_s - min_s)
+            else:
+                sem_norm = 0.5
+            score = kw_norm * 0.4 + sem_norm * 0.6
+            if score > best_score:
+                best_score = score
+                best_match = kb_name
+
+        if best_match == "default":
+            return "default"
+        return best_match
+
     for kb_name, rule in rules.items():
         # 扩展名匹配（始终精确，任何模式都优先）
         for ex in rule.get("extensions", []):
             if ex.lower() == ext:
-                return kb_name  # 扩展名匹配直接命中，不参与语义/硬匹配的分数排序
+                return kb_name
 
         if use_semantic and fallback is not None:
-            # 路由开启：reranker 语义匹配关键词锚点
+            # 路由开启（纯语义）：reranker 语义匹配关键词锚点
             keywords = rule.get("keywords", [])
             if keywords:
                 try:

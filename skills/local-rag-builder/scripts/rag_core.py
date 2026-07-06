@@ -10,9 +10,50 @@ v0.3.0 新增：路由层（router）和重排序层（reranker）集成
 
 import os
 import json
+import re
 
 from config import load_config
 from utils import KB_DIR, MODELS_DIR, find_model_dirs
+
+
+def apply_markdown_preprocess(text: str, preprocess_cfg: dict) -> str:
+    """Markdown 标题预处理：根据正则匹配行，注入 Markdown 标题标记"""
+    if not preprocess_cfg or not preprocess_cfg.get("enabled"):
+        return text
+
+    # 构建 (level_prefix, [compiled_patterns]) 映射，按级别优先
+    patterns = []
+    for level, prefix in [(1, "# "), (2, "## "), (3, "### "), (4, "#### ")]:
+        raw_list = preprocess_cfg.get(f"h{level}_patterns", [])
+        compiled = []
+        for p in raw_list:
+            p = p.strip()
+            if p:
+                try:
+                    compiled.append((re.compile(p), prefix))
+                except re.error:
+                    pass  # 非法正�则忽略
+        patterns.extend(compiled)
+
+    if not patterns:
+        return text
+
+    lines = text.split("\n")
+    result = []
+    for line in lines:
+        stripped = line.strip()
+        matched = False
+        for pattern, prefix in patterns:
+            m = pattern.match(stripped)
+            if m:
+                title = m.group(1) if m.lastindex and m.lastindex >= 1 else stripped
+                result.append(f"{prefix}{title}")
+                matched = True
+                break
+        if not matched:
+            result.append(line)
+
+    return "\n".join(result)
 
 
 def get_embeddings(model_path=None, device="auto", kb_name=None):
@@ -309,6 +350,16 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
             docs = loader.load()
             # 扫描版 PDF 自动回退 OCR
             total_chars = sum(len(d.page_content) for d in docs)
+            # 中文文本质量检测：文件名含中文但提取文本中 CJK 字符占比过低 → 编码乱码
+            fname = os.path.basename(file_path)
+            has_chinese_filename = bool(re.search(r'[\u4e00-\u9fff]', fname))
+            if total_chars >= 50 and has_chinese_filename:
+                all_text = "".join(d.page_content for d in docs)
+                cjk = sum(1 for c in all_text if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
+                cjk_ratio = cjk / max(total_chars, 1)
+                if cjk_ratio < 0.10 and total_chars > 100:
+                    print(f"  [OCR fallback] 中文文件名但 CJK 占比 {cjk_ratio:.1%}，触发 OCR")
+                    total_chars = 0  # 强制走 OCR 回退
             if total_chars < 50:
                 try:
                     from pdf2image import convert_from_path
@@ -361,6 +412,19 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     for k in ("separators", "headers_to_split_on", "strip_headers", "breakpoint_type", "language", "delimiters"):
         if k in over:
             pipeline_kwargs[k] = over[k]
+
+    # Markdown 标题预处理（守卫栈之后、切片之前）
+    preprocess_cfg = cfg.get("preprocess", {})
+    if preprocess_cfg.get("enabled"):
+        # 合并所有页的文本（PDF 多页时 PyPDFLoader 每页一个 Document）
+        text = "\n\n".join(d.page_content for d in docs)
+        docs[0].page_content = apply_markdown_preprocess(text, preprocess_cfg)
+        primary = "headers"
+        pipeline_kwargs["primary"] = "headers"
+        if not pipeline_kwargs.get("headers_to_split_on"):
+            pipeline_kwargs["headers_to_split_on"] = [
+                ("h1", "# "), ("h2", "## "), ("h3", "### "), ("h4", "#### ")
+            ]
 
     chunks = split_pipeline(docs[0].page_content, **pipeline_kwargs)
 

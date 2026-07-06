@@ -72,17 +72,43 @@ def run_import(file_path, kb=None, json_output=False, auto_classify=False):
         router_enabled = cfg.get("router", {}).get("enabled", False)
 
         from knowledge_base_manager import auto_classify as classify_fn
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            content = f.read()
+        # PDF 文件需要用解析器提取文本，不能当 UTF-8 文本读
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".pdf":
+            from langchain_community.document_loaders import PyPDFLoader
+            try:
+                pdf_docs = PyPDFLoader(file_path).load()
+                content = "\n\n".join(d.page_content for d in pdf_docs)
+                # 中文文本质量检测：CJK 占比过低 → OCR
+                total_chars = len(content)
+                cjk = sum(1 for c in content if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
+                cjk_ratio = cjk / max(total_chars, 1)
+                if cjk_ratio < 0.10 and total_chars > 100 and bool(re.search(r'[\u4e00-\u9fff]', file_path)):
+                    print(f"  [OCR] PDF 编码异常（CJK占比{cjk_ratio:.1%}），走 OCR")
+                    from pdf2image import convert_from_path
+                    import numpy as np
+                    import easyocr
+                    reader = easyocr.Reader(["ch_sim", "en"])
+                    images = convert_from_path(file_path, dpi=200)
+                    all_text = []
+                    for img in images:
+                        arr = np.array(img)
+                        result = reader.readtext(arr)
+                        all_text.append("\n".join([r[1] for r in result]))
+                    content = "\n\n--- 换页 ---\n\n".join(all_text)
+            except Exception:
+                content = ""
+        else:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
 
-        # 第一步：关键词硬匹配
-        target_kb = classify_fn(content, filename=file_path, use_semantic=False)
+        # 路由开启：关键词+语义加权投票；关闭：纯关键词
+        if router_enabled:
+            target_kb = classify_fn(content, filename=file_path, use_semantic="hybrid")
+        else:
+            target_kb = classify_fn(content, filename=file_path, use_semantic=False)
 
-        # 第二步：关键词匹配不上 → 路由层语义匹配（仅路由开启时）
-        if target_kb == "default" and router_enabled:
-            target_kb = classify_fn(content, filename=file_path, use_semantic=True)
-
-        # 第三步：兜底 default
+        # 兜底 default
         if not target_kb:
             target_kb = "default"
 

@@ -2,7 +2,7 @@
 name: local-rag-builder
 slug: local-rag-builder
 displayName: local-rag-builder
-version: 1.3.8
+version: 1.4.0
 description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
 license: MIT
@@ -65,12 +65,13 @@ create_permissions_md: true
 | 1 | **环境自动检测修复** | 检测 Python 版本（需 3.11+）、缺失包，自动创建虚拟环境安装 |
 | 2 | **嵌入模型管理** | 多源下载（ModelScope / HuggingFace 镜像 / 官方 / 直连），自动重试，完整性校验，路径修正 |
 | 3 | **5 种切分策略 + GuardStack + 后处理** | 固定窗口、递归切、层级/标题切、按句切、语义切；守卫栈（mermaid/代码块/公式/表格/HTML 保护）；后处理子切（递归/固定/语义，metadata 白名单继承） |
-| 4 | **多知识库管理 + 路由层** | 支持多个向量知识库并行，LLM 自动分类入库或用户指定；路由层（硬编码关键词 → 语义签名回退 → 全库广播兜底） |
+| 4 | **多知识库管理 + 路由层** | 支持多个向量知识库并行，LLM 自动分类入库或用户指定；路由层（关键词语义 rerank → 硬编码关键词 → 语义签名回退 → 全库广播兜底）。入库时路由开=关键词+语义hybrid加权投票，关=纯关键词 |
 | 5 | **Rerank 重排序层** | 可选精排（cross-encoder 模型 / 规则 / 混合），默认关闭。开启后对检索结果重排序，提升 top-K 精度 |
 | 6 | **可调 Prompt** | 模板持久化，支持自定义占位符（`{context}` `{question}`），运行时编辑 |
 | 7 | **Web 可视化界面** | 内嵌 HTML 配置面板：输入源开关、GuardStack 守卫配置、5 策略动态表单 + 后处理配置、Router/Rerank 参数、极客模式 JSON 编辑器 + 配置模板管理、知识库自动分类规则编辑器 |
-| 8 | **扫描 PDF 自动 OCR** | `import_documents_to_kb()` 自动检测扫描版 PDF，无文本时回退 EasyOCR（GPU/CPU 自适应），无需手动区分 |
+| 8 | **扫描 PDF 自动 OCR** | `import_documents_to_kb()` 自动检测扫描版 PDF（无文本时回退 EasyOCR）；新增中文乱码检测（中文文件名 + CJK 字符占比 < 10% → 自动 OCR），无需手动区分 |
 | 9 | **KB 签名自动归纳** | 入库时自动生成知识库内容摘要（词频+代表性片段），Web UI 可查看 |
+| 10 | **Markdown 标题预处理** | 入库前对 PDF/文档进行正则标题匹配，自动注入 `#`/`##` Markdown 标题标记并强制切换为 headers 策略。支持 h1~h4 自定义正则，Web UI 面板可开关+配置预设，极客模式支持精确编辑 |
 
 ### 渐进式文件索引
 
@@ -126,13 +127,16 @@ python scripts/rag_standalone.py --llm-help                  # 查看 LLM 接入
 2. **模型下载** — `embedding_model_manager.py` 下载/校验嵌入模型
    - 输入：模型名称（如 BAAI/bge-small-zh-v1.5）
    - 输出：本地缓存的嵌入模型（支持 ModelScope / HuggingFace 镜像多源重试）
-3. **文档入库** — `text_splitter.py` 切分文档 → `knowledge_base_manager.py` 向量化
-   - 输入：原始文档（txt / md / py / json / yaml）
-   - 输出：向量化存储到指定知识库（Chroma DB）
-4. **模式选择** — 根据用途选择入口
+3. **标题预处理配置（可选）** — Web UI 或极客模式配置 `preprocess.h1_patterns` / `h2_patterns` 正则规则，匹配文档中的章节标题行。启用后自动注入 Markdown 标题标记并强制使用 headers 切分策略，适用于结构化文档
+   - 输入：h1~h4 正则模式
+   - 输出：预处理后的 Markdown 标题文本
+4. **文档入库** — `text_splitter.py` 切分文档 → `knowledge_base_manager.py` 向量化入库（所有文件类型均适用 SM3 哈希去重 + upsert 覆盖写入）
+   - 输入：原始文档（txt / md / py / json / yaml / pdf 等）
+   - 输出：向量化存储到指定知识库（Chroma DB，相同内容 SM3 哈希自动去重）
+5. **模式选择** — 根据用途选择入口
    - **技能模式** → `rag_skill.py`（纯检索，供智能体调用，无需 LLM）
    - **独立模式** → `rag_standalone.py`（检索 + LLM 全链路，需外部 LLM）
-5. **配置调整** — `rag_web_ui.py` 提供可视化面板
+6. **配置调整** — `rag_web_ui.py` 提供可视化面板
 
 → 详见 references/commands.md（命令速查表）
 
@@ -149,7 +153,7 @@ python scripts/rag_standalone.py --llm-help                  # 查看 LLM 接入
 
 ## 限制
 
-- **文件类型支持**：原生支持 txt / md / py / json / yaml 纯文本格式；可选扩展支持 PDF（pypdf/pdfplumber→自动回退 EasyOCR）、图片 OCR（paddleocr→自动回退 easyocr）、HTML→MD 转换（html2text）— 影响：纯文本以外的格式需手动开启输入源开关 🔄 可扩展（输入源开关）
+- **文件类型支持**：原生支持 txt / md / py / json / yaml 纯文本格式；可选扩展支持 PDF（langchain PyPDFLoader → 自动回退 EasyOCR）、图片 OCR（paddleocr→自动回退 easyocr）、HTML→MD 转换（html2text）— 影响：纯文本以外的格式需手动开启输入源开关 🔄 可扩展（输入源开关）
 - **知识库容量**：单个知识库建议 5 万条以内，超过需考虑分段策略优化 — 影响：大规模部署需规划 🟡 有替代方案（分段入库）
 - **模型范围**：仅支持 sentence-transformers/HuggingFace 格式的嵌入模型，不直接支持 OpenAI/Cohere API 格式 — 影响：API 方式无法直接对接 ✅ 已接受
 - **LLM 依赖**：独立模式需要外部 LLM 服务（LM Studio / Ollama / vLLM），技能模式不需要 — 影响：独立模式有额外部署成本 ✅ 已说明

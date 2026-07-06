@@ -192,16 +192,18 @@ python scripts/knowledge_base_manager.py --stats
 
 ### 自动分类规则
 
-配置关键词规则，LLM 可自动将内容归类到指定知识库：
+配置关键词规则，系统自动将内容归类到指定知识库。路由开启时使用 **hybrid 模式**（关键词 top-3 候选池 → 语义 rerank min-max 归一化 → 40/60 加权投票）；路由关闭时只做关键词硬匹配：
 
 ```bash
 # 配置规则：包含"艺术""美术""绘画"的内容归入 art 库
 python scripts/knowledge_base_manager.py --set-rule art "艺术,美术,绘画,雕塑"
 
-# 对一段文本自动分类
+# 对一段文本自动分类（路由关闭：纯关键词）
 python scripts/knowledge_base_manager.py --classify "这幅画是梵高的代表作"
 # 输出: 分类结果: art
-```
+
+# 路由开 + hybrid 导入（auto-classify 触发关键词+语义加权投票）
+python scripts/rag_skill.py --import-file doc.pdf --auto-classify
 
 ### 知识库配置文件 (`data/kb/auto_classify_rules.json`)
 

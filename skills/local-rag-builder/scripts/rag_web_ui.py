@@ -170,6 +170,65 @@ def generate_html():
         if not input_src.get(key, False):
             return "off"
         return _check_dep(key)
+
+    # 预设正则选项
+    PRESET_PATTERNS = {
+        1: [  # h1
+            ("自定义", ""),
+            ("中文章节: 第X章 XXX", "^第[一二三四五六七八九十]+[章节篇]\\s+(.*)$"),
+            ("英文章节: Chapter X", "^Chapter\\s+\\d+\\s*[.:]\\s*(.*)$"),
+            ("数字标题: 1. XXX", "^\\d+\\s*[.．、]\\s*(.*)$"),
+            ("英文字句标题", "^[A-Z][A-Za-z\\s]{10,}$"),
+        ],
+        2: [  # h2
+            ("自定义", ""),
+            ("中文数字: 一、XXX", "^[一二三四五六七八九十]+[、\\.]\\s*(.*)$"),
+            ("数字编号: 1.1 XXX", "^\\d+\\.\\d+\\s+(.*)$"),
+            ("字母编号: A. XXX", "^[A-Z]\\.\\s*(.*)$"),
+            ("括号编号: (1) XXX", "^\\(\\d+\\)\\s+(.*)$"),
+        ],
+        3: [  # h3
+            ("自定义", ""),
+            ("数字编号: 1.1.1 XXX", "^\\d+\\.\\d+\\.\\d+\\s+(.*)$"),
+            ("短横编号: 1-1 XXX", "^\\d+-\\d+\\s+(.*)$"),
+        ],
+        4: [  # h4
+            ("自定义", ""),
+            ("括号编号: (a) XXX", "^\\([a-z]\\)\\s+(.*)$"),
+        ],
+    }
+
+    def _preproc_level_html(preproc_cfg, master_enabled=False):
+        """Generate preprocessor 4-level heading config UI"""
+        labels = ["#", "##", "###", "####"]
+        hints = ["h1", "h2", "h3", "h4"]
+        html_out = ""
+        for idx in range(4):
+            level = idx + 1
+            patterns = preproc_cfg.get(f"h{level}_patterns", []) if preproc_cfg else []
+            cb_checked = len(patterns) > 0
+            text_val = chr(10).join(patterns) if patterns else ""
+            # 透明度只受总开关控制，不受是否有模式影响
+            card_opacity = "1" if master_enabled else "0.45"
+            html_out += f'<div style="border:0.5px solid #ddd;border-radius:8px;padding:10px 12px;opacity:{card_opacity};">'
+            # checkbox row
+            html_out += f'<div style="display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:6px;margin-bottom:4px;">'
+            html_out += f'<input type="checkbox" id="h{level}-enable" onchange="togglePreprocLevel({level},this.checked)" {"checked" if cb_checked else ""}{" disabled" if not master_enabled else ""}>'
+            html_out += f'<label for="h{level}-enable" style="font-size:13px;font-weight:500;font-family:monospace;white-space:nowrap;">{labels[idx]}</label>'
+            html_out += f'<span style="font-size:12px;color:#888;white-space:nowrap;">{hints[idx]}</span>'
+            # preset dropdown
+            presets = PRESET_PATTERNS.get(level, [])
+            html_out += f'<select id="h{level}-preset" style="font-size:13px;padding:4px 8px;border:0.5px solid #aaa;border-radius:4px;width:180px;" onchange="applyPreset({level},this.value)"{" disabled" if not master_enabled else ""}>'
+            for label, _ in presets:
+                val = "" if label == "自定义" else label
+                html_out += f'<option value="{val}">{label}</option>'
+            html_out += f'</select>'
+            html_out += f'</div>'
+            # textarea
+            disabled_ta = not (master_enabled and cb_checked)
+            html_out += f'<textarea id="h{level}-patterns" rows="2" style="width:100%;font-family:monospace;font-size:12px;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;resize:vertical;box-sizing:border-box;line-height:1.5;{"background:#f5f5f5;color:#bbb;" if disabled_ta else ""}"{" disabled" if disabled_ta else ""}>{text_val}</textarea>'
+            html_out += f'</div>'
+        return html_out
     _dot_cls_pdf = _src_dot_class("enable_pdf")
     _dot_cls_ocr = _src_dot_class("enable_ocr")
     _dot_cls_html = _src_dot_class("enable_html2md")
@@ -378,6 +437,21 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <h2>🛡️ 守卫栈 <span style="font-weight:400;color:#888;font-size:12px;">— 预处理，保护特殊内容不被切碎（多选）</span></h2>
     <div style="display:flex;flex-wrap:wrap;gap:10px;">
       {guard_card_html}
+    </div>
+  </div>
+
+  <!-- Markdown 标题预处理 -->
+  <div class="card">
+    <h2>🏷️ Markdown 标题预处理 <span style="font-weight:400;color:#888;font-size:12px;"> — 注入标题标记后使用层级切分</span></h2>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;background:#f5f5f5;border-radius:8px;">
+      <label class="toggle-switch" onclick="togglePreproc(!this.querySelector('input').checked)">
+        <input type="checkbox" id="preproc-enable" onclick="event.stopPropagation();togglePreproc(this.checked)" {'checked' if cfg.get('preprocess',{}).get('enabled') else ''}>
+        <span class="toggle-slider"></span>
+      </label>
+      <span style="font-size:13px;font-weight:500;">启用标题预处理 <span style="font-weight:400;color:#e74c3c;font-size:12px;">（启用后主策略强制为「层级/标题切分」）</span></span>
+    </div>
+    <div id="preproc-levels" style="display:grid;gap:10px;">
+      {_preproc_level_html(cfg.get('preprocess',{}), cfg.get('preprocess',{}).get('enabled', False))}
     </div>
   </div>
 
@@ -705,6 +779,128 @@ function onStrategyChange(strategy) {{
   updateAdvView();
 }}
 
+function togglePreproc(checked) {{
+  fetch('/api/preprocess/toggle', {{
+    method: 'POST', headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify({{enabled: checked}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if(d.success) {{
+      toast(checked ? '已启用预处理' : '已禁用预处理');
+    }}
+  }});
+  for(var l = 1; l <= 4; l++) {{
+    var cb = document.getElementById('h' + l + '-enable');
+    var sel = document.getElementById('h' + l + '-preset');
+    if(cb) {{
+      cb.disabled = !checked;
+      if(!checked) cb.checked = false;
+      togglePreprocLevel(l, cb.checked);
+    }}
+    if(sel) {{ sel.disabled = !checked; }}
+  }}
+  if(checked) {{
+    var sel = document.getElementById('strategy-select');
+    if(sel) {{ sel.value = 'headers'; sel.disabled = true; }}
+  }} else {{
+    var sel = document.getElementById('strategy-select');
+    if(sel) {{ sel.disabled = false; }}
+  }}
+}}
+
+function updatePresetList(level) {{
+  var presetMap = {{
+    1: ["自定义", "中文章节: 第X章 XXX", "英文章节: Chapter X", "数字标题: 1. XXX", "英文字句标题"],
+    2: ["自定义", "中文数字: 一、XXX", "数字编号: 1.1 XXX", "字母编号: A. XXX", "括号编号: (1) XXX"],
+    3: ["自定义", "数字编号: 1.1.1 XXX", "短横编号: 1-1 XXX"],
+    4: ["自定义", "括号编号: (a) XXX"]
+  }};
+  var sel = document.getElementById('h' + level + '-preset');
+  if(!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '';
+  var items = presetMap[level] || [];
+  for(var i = 0; i < items.length; i++) {{
+    var opt = document.createElement('option');
+    opt.value = (i === 0) ? '' : items[i];
+    opt.textContent = items[i];
+    sel.appendChild(opt);
+  }}
+  sel.value = current || '';
+}}
+
+function applyPreset(level, presetLabel) {{
+  var presetRegex = {{
+    "中文章节: 第X章 XXX": "^第[一二三四五六七八九十]+[章节篇]\\\\s+(.*)$",
+    "英文章节: Chapter X": "^Chapter\\\\s+\\\\d+\\\\s*[.:]\\\\s*(.*)$",
+    "数字标题: 1. XXX": "^\\\\d+\\\\s*[.．、]\\\\s*(.*)$",
+    "英文字句标题": "^[A-Z][A-Za-z\\\\s]{10,}$",
+    "中文数字: 一、XXX": "^[一二三四五六七八九十]+[、\\\\.]\\\\s*(.*)$",
+    "数字编号: 1.1 XXX": "^\\\\d+\\\\.\\\\d+\\\\s+(.*)$",
+    "字母编号: A. XXX": "^[A-Z]\\\\.\\\\s*(.*)$",
+    "括号编号: (1) XXX": "^(\\\\d+)\\\\s+(.*)$",
+    "数字编号: 1.1.1 XXX": "^\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\s+(.*)$",
+    "短横编号: 1-1 XXX": "^\\\\d+-\\\\d+\\\\s+(.*)$",
+    "括号编号: (a) XXX": "^([a-z])\\\\s+(.*)$"
+  }};
+  var ta = document.getElementById('h' + level + '-patterns');
+  if(!ta) return;
+  if(!presetLabel || presetLabel === '自定义' || presetLabel === '') {{
+    ta.value = '';
+  }} else {{
+    var regex = presetRegex[presetLabel];
+    if(regex) {{ ta.value = regex; }}
+  }}
+  var cb = document.getElementById('h' + level + '-enable');
+  if(cb && !cb.checked && ta.value) {{
+    cb.checked = true;
+    cb.disabled = false;
+    togglePreprocLevel(level, true);
+  }}
+  if(cb && cb.checked && !ta.value) {{
+    cb.checked = false;
+    togglePreprocLevel(level, false);
+  }}
+  savePreprocConfig();
+}}
+
+function togglePreprocLevel(level, checked) {{
+  var ta = document.getElementById('h' + level + '-patterns');
+  if(checked) {{
+    if(ta) {{ ta.disabled = false; ta.style.background = ''; ta.style.color = ''; }}
+  }} else {{
+    if(ta) {{ ta.disabled = true; ta.style.background = '#f5f5f5'; ta.style.color = '#bbb'; }}
+  }}
+  savePreprocConfig();
+}}
+
+function togglePreprocLevel(level, checked) {{
+  var ta = document.getElementById('h' + level + '-patterns');
+  if(checked) {{
+    if(ta) {{ ta.disabled = false; ta.style.background = ''; ta.style.color = ''; }}
+  }} else {{
+    if(ta) {{ ta.disabled = true; ta.style.background = '#f5f5f5'; ta.style.color = '#bbb'; }}
+  }}
+  savePreprocConfig();
+}}
+
+function savePreprocConfig() {{
+  var enabled = document.getElementById('preproc-enable').checked;
+  var config = {{enabled: enabled, h1_patterns: [], h2_patterns: [], h3_patterns: [], h4_patterns: []}};
+  for(var level = 1; level <= 4; level++) {{
+    var cb = document.getElementById('h' + level + '-enable');
+    var ta = document.getElementById('h' + level + '-patterns');
+    if(cb && cb.checked && ta) {{
+      config['h' + level + '_patterns'] = ta.value.split('\\n').filter(function(l){{return l.trim() !== '';}});
+    }}
+  }}
+  fetch('/api/preprocess/save', {{
+    method: 'POST', headers: {{'Content-Type':'application/json'}},
+    body: JSON.stringify(config)
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if(d.success) toast('已保存');
+  }});
+}}
+
 function onSecondaryChange(val) {{
   fetch('/api/config', {{
     method: 'POST', headers: {{'Content-Type':'application/json'}},
@@ -790,39 +986,43 @@ function applyGeekConfig() {{
 }}
 
 function saveGeekTemplate() {{
-  var name = prompt('\u8f93\u5165\u6a21\u677f\u540d\u79f0\uff08\u4f8b\u5982\uff1a\u201c\u6211\u7684\u6280\u672f\u6587\u6863\u914d\u7f6e\u201d\uff09:');
-  if(!name) return;
-  var label = prompt('\u8f93\u5165\u6a21\u677f\u63cf\u8ff0\uff08\u53ef\u7a7a\uff09:') || name;
-  var raw = document.getElementById('geek-editor').value;
-  fetch('/api/template/save', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{name: name, label: label, config: JSON.parse(raw)}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('\u6a21\u677f\u5df2\u4fdd\u5b58\uff1a'+name); refreshGeekTemplates(); }}
-    else toast(d.error, 'error');
-  }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
+    showPrompt('输入模板名称', '例如：我的技术文档配置', function(name) {{
+    if(!name) return;
+    var raw = document.getElementById('geek-editor').value;
+    fetch('/api/template/save', {{
+      method: 'POST', headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{name: name, label: name, config: JSON.parse(raw)}})
+    }}).then(function(r){{return r.json()}}).then(function(d){{
+      if(d.success) {{ toast('\u6a21\u677f\u5df2\u4fdd\u5b58\uff1a'+name); refreshGeekTemplates(); }}
+      else toast(d.error, 'error');
+    }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
+  }});
 }}
 
 function loadGeekTemplate(name) {{
-  if(!confirm('\u786e\u5b9a\u52a0\u8f7d\u6a21\u677f "'+name+'" \u5e76\u8986\u76d6\u5f53\u524d\u914d\u7f6e\uff1f')) return;
-  fetch('/api/template/load', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{name: name}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('\u5df2\u52a0\u8f7d\u6a21\u677f\uff1a'+name); setTimeout(function(){{location.reload()}}, 300); }}
-    else toast(d.error, 'error');
-  }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
+  showConfirm('\u52a0\u8f7d\u6a21\u677f', '\u786e\u5b9a\u52a0\u8f7d\u6a21\u677f "'+name+'" \u5e76\u8986\u76d6\u5f53\u524d\u914d\u7f6e\uff1f', function(ok) {{
+    if(!ok) return;
+    fetch('/api/template/load', {{
+      method: 'POST', headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{name: name}})
+    }}).then(function(r){{return r.json()}}).then(function(d){{
+      if(d.success) {{ toast('\u5df2\u52a0\u8f7d\u6a21\u677f\uff1a'+name); setTimeout(function(){{location.reload()}}, 300); }}
+      else toast(d.error, 'error');
+    }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
+  }});
 }}
 
 function deleteGeekTemplate(name) {{
-  if(!confirm('\u786e\u5b9a\u5220\u9664\u6a21\u677f "'+name+'"\uff1f')) return;
-  fetch('/api/template/delete', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{name: name}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('\u5df2\u5220\u9664'); refreshGeekTemplates(); }}
-    else toast(d.error, 'error');
-  }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
+  showConfirm('\u5220\u9664\u6a21\u677f', '\u786e\u5b9a\u5220\u9664\u6a21\u677f "'+name+'"\uff1f', function(ok) {{
+    if(!ok) return;
+    fetch('/api/template/delete', {{
+      method: 'POST', headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{name: name}})
+    }}).then(function(r){{return r.json()}}).then(function(d){{
+      if(d.success) {{ toast('\u5df2\u5220\u9664'); refreshGeekTemplates(); }}
+      else toast(d.error, 'error');
+    }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
+  }});
 }}
 
 function refreshGeekTemplates() {{
@@ -1051,8 +1251,75 @@ function showSortRuleEditor(){{document.getElementById('sort-rule-editor-overlay
 function hideSortRuleEditor(){{document.getElementById('sort-rule-editor-overlay').style.display='none';document.getElementById('sort-rule-params').style.display='none';}}
 function onSortRuleTypeChange(){{var t=document.getElementById("sort-rule-type").value;var e=document.getElementById("sort-rule-params-fields");var p=document.getElementById("sort-rule-params");if(!t){{p.style.display="none";return}}var html="";if(t==="score_weight")html='<div class=\"form-group\"><label>嵌入分权重 (embedding_score)</label><input id=\"sr-emb\" type=\"number\" value=\"0.6\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div><div class=\"form-group\"><label>Rerank分权重 (rerank_score)</label><input id=\"sr-rer\" type=\"number\" value=\"0.4\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="recency")html='<div class=\"form-group\"><label>半衰期天数 (days_halflife)</label><input id=\"sr-days\" type=\"number\" value=\"30\" min=\"1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="source_weight")html='<div class=\"form-group\"><label>来源加权 JSON</label><textarea id=\"sr-sources\" rows=\"3\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: {{legal_gov:1.5, baike:1.0}}\"></textarea></div>';else if(t==="boost_keywords")html='<div class=\"form-group\"><label>关键词（逗号分隔）</label><input id=\"sr-keys\" type=\"text\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: python,api,definitive\"></div><div class=\"form-group\"><label>提升倍数 (boost)</label><input id=\"sr-boost\" type=\"number\" value=\"1.2\" min=\"0\" step=\"0.1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';e.innerHTML=html;p.style.display="block";}}
 function saveSortRule(){{var t=document.getElementById('sort-rule-type').value;if(!t){{toast('\u8bf7\u9009\u62e9\u89c4\u5219\u7c7b\u578b','error');return}}var p={{type:t}};if(t==='score_weight'){{p.embedding_score=parseFloat(document.getElementById('sr-emb').value||0.6);p.rerank_score=parseFloat(document.getElementById('sr-rer').value||0.4)}}else if(t==='recency'){{p.days_halflife=parseInt(document.getElementById('sr-days').value||30)}}else if(t==='source_weight'){{try{{var v=JSON.parse(document.getElementById('sr-sources').value||'{{}}');Object.assign(p,v)}}catch(e){{toast('\u89e3\u6790\u5931\u8d25','error');return}}}}else if(t==='boost_keywords'){{var k=document.getElementById('sr-keys').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});if(!k.length){{toast('\u8bf7\u8f93\u5165\u5173\u952e\u8bcd','error');return}}p.keywords=k;p.boost=parseFloat(document.getElementById('sr-boost').value||1.2)}}fetch('/api/reranker/rules/add',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{rule:p}})}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u6dfb\u52a0');hideSortRuleEditor();refreshSortRules()}}else toast(d.error,'error')}});}}
-window.onload = function() {{ updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); }};
+function initPreproc() {{
+  var cb = document.getElementById('preproc-enable');
+  if(cb) {{
+    var checked = cb.checked;
+    for(var l = 1; l <= 4; l++) {{
+      var lcb = document.getElementById('h' + l + '-enable');
+      var lsel = document.getElementById('h' + l + '-preset');
+      if(lcb) {{ lcb.disabled = !checked; }}
+      if(lsel) {{ lsel.disabled = !checked; }}
+    }}
+    if(checked) {{
+      var sel = document.getElementById('strategy-select');
+      if(sel) {{ sel.value = 'headers'; sel.disabled = true; }}
+    }}
+  }}
+}}
+// ===== 模态框（替代 prompt/confirm） =====
+var _modalCb = null;
+var _modalType = '';
+
+function showPrompt(title, placeholder, cb) {{
+  _modalCb = cb; _modalType = 'prompt';
+  document.getElementById('modal-title').textContent = title;
+  var inp = document.getElementById('modal-input');
+  inp.style.display = 'block'; inp.value = ''; inp.placeholder = placeholder || '';
+  document.getElementById('modal-msg').style.display = 'none';
+  document.getElementById('modal-overlay').style.display = 'flex';
+  setTimeout(function(){{inp.focus();}}, 100);
+}}
+
+function showConfirm(title, msg, cb) {{
+  _modalCb = cb; _modalType = 'confirm';
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-input').style.display = 'none';
+  document.getElementById('modal-msg').style.display = 'block';
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}}
+
+function closeModal() {{
+  document.getElementById('modal-overlay').style.display = 'none';
+  if(_modalType === 'prompt' && _modalCb) _modalCb(null);
+  _modalCb = null;
+}}
+
+function confirmModal() {{
+  document.getElementById('modal-overlay').style.display = 'none';
+  if(_modalCb) {{
+    if(_modalType === 'prompt') _modalCb(document.getElementById('modal-input').value);
+    else _modalCb(true);
+  }}
+  _modalCb = null;
+}}
+// ===== 模态框结束 =====
+
+window.onload = function() {{ updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); initPreproc(); }};
 </script>
+<!-- 自定义模态框 HTML -->
+<div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:24px 28px;min-width:360px;max-width:480px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+    <div id="modal-title" style="font-size:15px;font-weight:500;margin-bottom:14px;">输入</div>
+    <input id="modal-input" type="text" style="width:100%;padding:8px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;display:none;" placeholder="">
+    <div id="modal-msg" style="font-size:14px;color:#555;line-height:1.5;display:none;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-success" onclick="confirmModal()">确定</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>"""
 
@@ -1109,6 +1376,26 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     if section not in cfg: cfg[section] = {}
                     cfg[section][key] = value
+                save_config(cfg)
+                self._send_json({"success": True})
+
+            elif path == "/api/preprocess/toggle":
+                data = self._read_body()
+                cfg = load_config()
+                cfg.setdefault("preprocess", {})["enabled"] = data.get("enabled", False)
+                save_config(cfg)
+                self._send_json({"success": True})
+
+            elif path == "/api/preprocess/save":
+                data = self._read_body()
+                cfg = load_config()
+                cfg["preprocess"] = {
+                    "enabled": data.get("enabled", False),
+                    "h1_patterns": data.get("h1_patterns", []),
+                    "h2_patterns": data.get("h2_patterns", []),
+                    "h3_patterns": data.get("h3_patterns", []),
+                    "h4_patterns": data.get("h4_patterns", []),
+                }
                 save_config(cfg)
                 self._send_json({"success": True})
 
