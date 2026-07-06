@@ -2,7 +2,7 @@
 name: local-rag-builder
 slug: local-rag-builder
 displayName: local-rag-builder
-version: 1.3.6
+version: 1.3.7
 description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
 license: MIT
