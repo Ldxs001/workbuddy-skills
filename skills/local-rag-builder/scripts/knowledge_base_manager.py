@@ -8,6 +8,13 @@ import os
 import sys
 import json
 import glob
+
+# ── SM3 国密哈希（Python 内置 hashlib，OpenSSL 1.1.1+） ────────
+import hashlib
+
+def sm3(data: bytes) -> str:
+    """SM3 哈希，返回 64 位十六进制字符串（零依赖）"""
+    return hashlib.new('sm3', data).hexdigest()
 import shutil
 import time
 
@@ -220,18 +227,21 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     _backup_kb(persist_dir)
 
     try:
+        # 对文档内容做 SM3 哈希作为 ID（去重 + 国密合规）
+        doc_ids = [sm3(d.page_content.encode("utf-8")) for d in documents]
         # 检查是否已有向量库
         if os.path.exists(persist_dir) and any(f.endswith(".sqlite3") for f in os.listdir(persist_dir)):
             vectorstore = Chroma(
                 persist_directory=persist_dir,
                 embedding_function=embeddings,
             )
-            vectorstore.add_documents(documents)
+            vectorstore.add_documents(documents, ids=doc_ids)
         else:
             vectorstore = Chroma.from_documents(
                 documents=documents,
                 embedding=embeddings,
                 persist_directory=persist_dir,
+                ids=doc_ids,
             )
     except Exception as e:
         # 写入失败 -> 自动回滚备份
@@ -240,11 +250,13 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
             print(f"  [recovery] 已从备份恢复")
         return False, f"入库失败，已回滚: {str(e)[:80]}"
 
-    # 更新文档计数
+    # 更新文档计数（max 兜底：Chroma 准用 Chroma，WAL 漏计时累加保底）
     try:
-        count = vectorstore._collection.count()
+        chroma_count = vectorstore._collection.count()
     except Exception:
-        count = len(documents)
+        chroma_count = 0
+    accumulated = index[kb_name].get("doc_count", 0) + len(documents)
+    count = max(chroma_count, accumulated)
 
     index[kb_name]["doc_count"] = count
     _save_index(index)

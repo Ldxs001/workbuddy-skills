@@ -1,3 +1,14 @@
+## [1.3.8] - 2026-07-06
+
+### 修复
+- **Chroma doc_count WAL 漏计**：`vectorstore._collection.count()` 因 Chroma SQLite 元数据段不查 WAL 导致最近写入被漏计，HTML 面板文档数不刷新。改为 `max(chroma_count, 累加值)` 兜底
+
+### 变更
+- **SM3 国密哈希去重**：`add_documents_to_kb()` 使用 SM3(content) 作为文档 ID，相同内容重复导入时 Chroma 覆盖而非追加，杜绝重复块
+- SM3 实现使用 Python 内置 `hashlib.new('sm3')`，零第三方依赖，国密合规
+
+---
+
 ## [1.3.7] - 2026-07-06
 
 ### 修复
