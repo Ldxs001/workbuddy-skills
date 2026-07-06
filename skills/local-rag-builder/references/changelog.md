@@ -1,3 +1,10 @@
+## [1.4.1] - 2026-07-06
+
+### 修复
+- **检索 `TextInputSequence must be str` 崩溃**：`FallbackRouter.score()` 将 `_load_signatures()` 返回的 `{"signature": "..."}` 字典直接传给 tokenizer，TypeError 未被 `except ValueError/RuntimeError` 捕获导致 `rag_skill.py --query` 全线崩溃。改为提取 `sig["signature"]` 后传入
+
+---
+
 ## [1.4.0] - 2026-07-06
 
 ### 修复

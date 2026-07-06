@@ -112,7 +112,7 @@ class FallbackRouter:
         self._load_model()
 
         import torch
-        pairs = [[query, sig] for sig in kb_signatures.values()]
+        pairs = [[query, sig["signature"] if isinstance(sig, dict) else sig] for sig in kb_signatures.values()]
         inputs = self._tokenizer(
             pairs, padding=True, truncation=True,
             max_length=512, return_tensors="pt"
