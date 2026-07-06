@@ -1,3 +1,10 @@
+## [1.4.2] - 2026-07-06
+
+### 重构
+- **Prompt 模板系统/用户层分离**：`prompt_manager.py` 重构为 `SYSTEM_PROMPT_PREFIX`（固化，A系统指令+B资料占位+C问题占位+E回答前缀）和 `DEFAULT_USER_TEMPLATE`（可配置，D输出格式指令）。`build_prompt()` 自动拼接。Web UI 只暴露用户层编辑，系统层只读预览。向后兼容自动迁移旧模板
+
+---
+
 ## [1.4.1] - 2026-07-06
 
 ### 修复

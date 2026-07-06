@@ -17,7 +17,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
-from prompt_manager import load_template, save_template, reset_template
+from prompt_manager import load_template, save_template, reset_template, SYSTEM_PROMPT_PREFIX, get_full_prompt
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, download_model
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
 from router import list_kb_signatures, rebuild_all_signatures
@@ -116,6 +116,7 @@ def generate_html():
     kbs = list_knowledge_bases()
     all_models = list_downloaded_models()
     template = load_template()
+    full_prompt_preview = get_full_prompt()
     router_cfg = cfg.get("router", {})
     fb_cfg = router_cfg.get("fallback", {})
     rerank_cfg = cfg.get("reranker", {})
@@ -409,11 +410,19 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
 
   <div class="card">
     <h2>📝 Prompt 模板</h2>
+    <div style="font-size:13px;color:#888;margin-bottom:8px;">
+      系统层（固化，不可编辑）：基于资料回答 + 资料/问题占位符 + 回答前缀<br>
+      用户层（可编辑）：输出格式指令
+    </div>
     <div class="form-group">
-      <textarea id="prompt-template" rows="8" onchange="savePrompt(this.value)">{template}</textarea>
+      <textarea id="prompt-template" rows="8" onchange="savePrompt(this.value)" placeholder="用户层 Prompt，如输出格式要求">{template}</textarea>
     </div>
     <button class="btn btn-secondary" onclick="resetPrompt()">↺ 重置为默认</button>
     <span id="prompt-status" style="margin-left:12px;font-size:13px;color:#888;"></span>
+    <div style="margin-top:10px;font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:8px;">
+      <strong>完整 Prompt 预览（系统层+用户层）：</strong>
+      <pre style="background:#f8f8f8;border:1px solid #eee;border-radius:4px;padding:8px;margin-top:4px;font-size:12px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{full_prompt_preview}</pre>
+    </div>
   </div>
 
   <div class="card">

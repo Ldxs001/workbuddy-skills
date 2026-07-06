@@ -220,7 +220,7 @@ def run_interactive():
             elif cmd == "/prompt":
                 sub = parts[1].lower() if len(parts) > 1 else ""
                 if sub == "show":
-                    print(f"\n当前 Prompt 模板:\n{'-' * 40}\n{load_template()}\n{'-' * 40}")
+                    print(f"\n当前 Prompt 模板（系统层+用户层）:\n{'-' * 40}\n{get_full_prompt()}\n{'-' * 40}")
                 elif sub == "set":
                     print("请输入新模板（输入 END 单独一行结束）：")
                     lines = []

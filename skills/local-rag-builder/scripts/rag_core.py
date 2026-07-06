@@ -295,7 +295,7 @@ def format_skill_output(question, kb_name="default", k=None, score_threshold=Non
       "has_context": bool,      # 是否找到相关内容
     }
     """
-    from prompt_manager import load_template, get_default_template
+    from prompt_manager import load_template, get_default_template, get_full_prompt
 
     # 检索
     retrieval = retrieve_context(
@@ -306,8 +306,8 @@ def format_skill_output(question, kb_name="default", k=None, score_threshold=Non
     context = retrieval["context"]
     has_context = bool(context)
 
-    # 获取 prompt 模板
-    tpl = template or load_template()
+    # 获取完整 prompt（系统层 + 用户层）
+    tpl = get_full_prompt(template)
 
     # 填充占位符
     if has_context:
