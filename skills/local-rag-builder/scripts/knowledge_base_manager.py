@@ -260,7 +260,18 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
     content_lower = content.lower()
     ext = os.path.splitext(filename or "")[1].lower() if filename else ""
     best_match = "default"
-    best_score = 0
+    # 语义模式 reranker 返回 raw logits 可为负数，初始化 -inf 确保负数间正确比较；
+    # 硬匹配分数 >=0，初始化 0 即可
+    best_score = -float('inf') if use_semantic else 0
+
+    # 语义模式：复用 FallbackRouter，避免每次循环重载模型
+    fallback = None
+    if use_semantic:
+        try:
+            from router import FallbackRouter
+            fallback = FallbackRouter()
+        except Exception:
+            fallback = None
 
     for kb_name, rule in rules.items():
         # 扩展名匹配（始终精确，任何模式都优先）
@@ -268,20 +279,20 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
             if ex.lower() == ext:
                 return kb_name  # 扩展名匹配直接命中，不参与语义/硬匹配的分数排序
 
-        if use_semantic:
+        if use_semantic and fallback is not None:
             # 路由开启：reranker 语义匹配关键词锚点
             keywords = rule.get("keywords", [])
             if keywords:
                 try:
-                    from router import FallbackRouter
                     kw_text = " ".join(keywords)
-                    fallback = FallbackRouter()
                     scores = fallback.score(content, {kb_name: kw_text})
                     score = scores.get(kb_name, 0.0)
                 except (ValueError, RuntimeError):
-                    score = 0
+                    score = -float('inf')
+            else:
+                score = -float('inf')
         else:
-            # 路由关闭：硬匹配（关键词 in content）
+            # 路由关闭或 FallbackRouter 初始化失败：硬匹配（关键词 in content）
             score = 0
             for kw in rule.get("keywords", []):
                 if kw.lower() in content_lower:

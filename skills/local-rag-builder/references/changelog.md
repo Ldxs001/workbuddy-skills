@@ -1,3 +1,11 @@
+## [1.3.4] - 2026-07-06
+
+### 修复
+- **`auto_classify()` 语义模式 `best_score` 初始值导致负分被丢弃**：`best_score = 0` 与 reranker 输出的原始 logits（可负）不兼容，英文内容×中文关键词锚点时所有得分均为负 → 永远回退到 `default`。修复为语义模式 `best_score = -float('inf')`，确保负数间正确比较选最高
+- **`FallbackRouter()` 每次 KB 迭代均 new 实例**：循环内 `fallback = FallbackRouter()` 导致每个 KB 重载 1.3GB reranker 模型（7 KB = 7 次加载）。提至循环外单例复用，初始化失败时降级到硬匹配
+
+---
+
 ## [1.3.3] - 2026-07-05
 
 ### 修复
