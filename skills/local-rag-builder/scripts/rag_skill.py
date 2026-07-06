@@ -46,7 +46,7 @@ def run_query(question, kb="default", k=None, threshold=None, template=None, jso
         return 1
 
 
-def run_import(file_path, kb="default", json_output=False, auto_classify=False):
+def run_import(file_path, kb=None, json_output=False, auto_classify=False):
     """导入文件到知识库"""
     if not os.path.exists(file_path):
         _print_error(f"文件不存在: {file_path}", json_output)
@@ -54,29 +54,39 @@ def run_import(file_path, kb="default", json_output=False, auto_classify=False):
     try:
         embeddings = get_embeddings()
 
-        # 自动分类：路由开启时用 reranker 语义匹配，否则用关键词硬匹配
-        do_classify = False
-        router_enabled = False
-        if auto_classify:
-            do_classify = True
-        else:
-            # 流程钩子：auto_classify=False 但路由层开启时自动触发语义分类
-            from config import load_config
-            cfg = load_config()
-            router_enabled = cfg.get("router", {}).get("enabled", False)
-            if router_enabled and kb == "default":
-                do_classify = True
+        # 用户明确指定了 KB → 直接入库，不走路由
+        if kb is not None:
+            result = import_documents_to_kb(file_path, kb, embeddings)
+            if json_output:
+                print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+            else:
+                status = "OK" if result["success"] else "!"
+                print(f"[{status}] {result['message']}")
+                print(f"  切分块数: {result['chunks_count']}")
+                print(f"  来源: {result['source']}")
+            return 0
 
-        if do_classify:
-            from knowledge_base_manager import auto_classify as classify_fn
-            from config import load_config
-            cfg = load_config()
-            router_enabled = cfg.get("router", {}).get("enabled", False)
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-            kb = classify_fn(content, filename=file_path, use_semantic=router_enabled)
+        # 用户未指定 → 自动分类路由
+        from config import load_config
+        cfg = load_config()
+        router_enabled = cfg.get("router", {}).get("enabled", False)
 
-        result = import_documents_to_kb(file_path, kb, embeddings)
+        from knowledge_base_manager import auto_classify as classify_fn
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+
+        # 第一步：关键词硬匹配
+        target_kb = classify_fn(content, filename=file_path, use_semantic=False)
+
+        # 第二步：关键词匹配不上 → 路由层语义匹配（仅路由开启时）
+        if target_kb == "default" and router_enabled:
+            target_kb = classify_fn(content, filename=file_path, use_semantic=True)
+
+        # 第三步：兜底 default
+        if not target_kb:
+            target_kb = "default"
+
+        result = import_documents_to_kb(file_path, target_kb, embeddings)
         if json_output:
             print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         else:
@@ -159,7 +169,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="local-rag-builder 技能接口（纯检索，不调用 LLM）")
     parser.add_argument("--query", type=str, help="检索问题")
-    parser.add_argument("--kb", type=str, default="default", help="知识库名称")
+    parser.add_argument("--kb", type=str, default=None, help="知识库名称（不传则自动分类/路由）")
     parser.add_argument("--k", type=int, help="返回片段数")
     parser.add_argument("--threshold", type=float, help="相似度阈值 (0-1)")
     parser.add_argument("--template", type=str, help="自定义 prompt 模板（含 {context} {question}）")

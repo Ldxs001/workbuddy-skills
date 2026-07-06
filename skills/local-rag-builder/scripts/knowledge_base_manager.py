@@ -19,21 +19,36 @@ AUTO_CLASSIFY_RULES_FILE = os.path.join(KB_DIR, "auto_classify_rules.json")
 
 def _load_index():
     data = safe_json_load(KB_INDEX_FILE, {})
-    if data is None or (isinstance(data, dict) and len(data) == 0):
-        # 初次使用：创建默认 KB
-        data = {"default": {"path": os.path.join(KB_DIR, "default"), "description": "默认知识库"}}
+    if not isinstance(data, dict):
+        data = {}
+
+    # 扫描磁盘，自动补录索引缺失的知识库目录
+    existing = sorted([
+        d for d in os.listdir(KB_DIR)
+        if os.path.isdir(os.path.join(KB_DIR, d))
+    ])
+    changed = False
+    for _name in existing:
+        if _name not in data:
+            data[_name] = {
+                "path": os.path.join(KB_DIR, _name),
+                "description": "",
+                "doc_count": 0,
+            }
+            changed = True
+
+    # 磁盘和索引都空 → 创建 default
+    if not existing and "default" not in data:
+        data["default"] = {
+            "path": os.path.join(KB_DIR, "default"),
+            "description": "默认知识库",
+        }
         os.makedirs(os.path.join(KB_DIR, "default"), exist_ok=True)
+        changed = True
+
+    if changed:
         safe_json_dump(data, KB_INDEX_FILE)
-    elif isinstance(data, dict) and data.get("default") and len(data) == 1:
-        # 只有 default，检查磁盘上是否有其他 KB（索引损坏恢复）
-        import glob as _g
-        existing = [d for d in os.listdir(KB_DIR) if os.path.isdir(os.path.join(KB_DIR, d)) and d != "default"]
-        if existing:
-            for _name in existing:
-                _path = os.path.join(KB_DIR, _name)
-                if _name not in data:
-                    data[_name] = {"path": _path, "description": "", "doc_count": 0}
-            safe_json_dump(data, KB_INDEX_FILE)
+
     return data
 
 
