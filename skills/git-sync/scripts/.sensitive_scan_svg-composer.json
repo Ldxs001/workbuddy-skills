@@ -1,0 +1,20 @@
+[
+  {
+    "file": "references/LICENSE.md",
+    "description": "Markdown 文档",
+    "findings": [
+      {
+        "label": "用户名（来自配置）",
+        "severity": "low",
+        "line": 3,
+        "match": "[username-redacted]",
+        "replace": "[username-redacted]",
+        "span": [
+          34,
+          44
+        ]
+      }
+    ],
+    "severity": "low"
+  }
+]

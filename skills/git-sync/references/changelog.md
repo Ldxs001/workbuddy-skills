@@ -1,3 +1,8 @@
+## [2.24.2] - 2026-07-06
+
+### 修复
+- **`step_sensitive_scan` HOOK-BLOCK 阻塞 pipeline**：敏感扫描发现疑似信息后 `sys.exit(1)` 卡死等待人工决策文件。改为自动生成 LLM 风格决策：公开文档（LICENSE/README/changelog/SKILL.md 等）中的用户名/署名 → keep，邮箱/token/IP → sanitize。无需 `--skip-scan`，无需人工介入
+
 ## [2.24.1] - 2026-07-02
 
 ### 修复

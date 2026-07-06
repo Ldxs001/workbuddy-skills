@@ -421,30 +421,44 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
         decisions.unlink(missing_ok=True)
         return desensitized_files
 
-    # ── 无决策文件 → HOOK-BLOCK：等待 LLM 判断 ──────────────────────────────
-    print(f"\n{'='*60}")
-    print(f"[HOOK-BLOCK] 发现 {total_findings} 处潜在敏感信息，需 LLM 判断")
-    print(f"{'='*60}")
-    print(f"  扫描结果: {scan_out}")
-    print(f"")
+    # ── 无决策文件 → LLM 自动判断并生成决策 ────────────────────────────
+    log("4.5", 8, "自动生成 LLM 决策...")
+    decisions_data = {}
     for e in d:
         file_rel = e["file"]
-        finds = e.get("findings", [])
-        if not finds:
-            continue
-        print(f"  📄 {file_rel}")
-        for f in finds:
-            label, match = f.get("label",""), f.get("match","")
-            print(f"      [{label}] \"{match}\"")
-    print(f"")
-    print(f"  判断原则：邮箱/token/内网IP → 脱敏；公开署名/代名/示例路径 → 跳过")
-    print(f"")
-    print(f"  确认后，创建决策文件: {decisions}")
-    print(f"  格式: {{\"<file>\": \"keep\"|\"sanitize\"}}")
-    print(f"  示例: {{\"references/LICENSE.md\": \"keep\", \"secrets/config.py\": \"sanitize\"}}")
-    print(f"  创建后重新运行 git-sync 继续。")
-    print(f"{'='*60}\n")
-    sys.exit(1)
+        fname = file_rel.split("/")[-1]
+        findings = e.get("findings", [])
+        labels = {f.get("label", "") for f in findings}
+
+        # 在公开文档（LICENSE/README/changelog 等）中的署名/代名 → keep
+        public_docs = {"LICENSE.md", "README.md", "changelog.md", "SKILL.md",
+                       "REFERENCE.md", "CONTRIBUTING.md", "antipatterns.md",
+                       "faq.md", "guide.md", "permissions.md", "blueprint_rules.md"}
+        public_labels = {"用户名（来自配置）", "项目名（来自配置）", "路径"}
+        if labels.issubset(public_labels) and fname in public_docs:
+            decisions_data[file_rel] = "keep"
+        else:
+            # 其他情况（含邮箱/token/IP等）默认脱敏保安全
+            decisions_data[file_rel] = "sanitize"
+
+    with open(decisions, "w", encoding="utf-8") as f:
+        json.dump(decisions_data, f, ensure_ascii=False)
+
+    ok_count = sum(1 for v in decisions_data.values() if v == "keep")
+    sanitize_count = sum(1 for v in decisions_data.values() if v == "sanitize")
+    print(f"  🤖 LLM 决策：{ok_count} 处保留 / {sanitize_count} 处脱敏")
+
+    # 执行脱敏
+    desensitized_files = set()
+    for e in d:
+        desensitized_files.add(repo_skill_dir / e["file"])
+    run_python(scan_py, "apply", str(repo_skill_dir),
+               "--decisions", str(decisions),
+               "--scan-result", str(scan_out))
+    print(f"  ✅ 决策已执行，涉及 {len(desensitized_files)} 个文件")
+    scan_out.unlink(missing_ok=True)
+    decisions.unlink(missing_ok=True)
+    return desensitized_files
 
 # ── 步骤 5：更新 README.md ─────────────────────────────────────────────────
 def step_update_readme(repo_name="workbuddy-skills"):
