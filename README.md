@@ -1,42 +1,9 @@
 # Skills Repository
 
-> **用户技能仓库 + 编排工具** — 由 git-sync 自动同步维护。
+> **用户技能仓库** — 由 git-sync 自动同步维护。
 > 最后更新：2026-07-06
 
-本仓库托管 wUwproject 技能合集及 Skill Pipeline Orchestrator 编排工具，码云（Gitee）和 GitHub 双平台同步。
-
----
-
-## 仓库结构
-
-```
-workbuddy-skills/
-├── Cogito_Scribit/         # 方法论沉淀
-├── LICENSE                 # MIT（skills/ 目录）
-├── LICENSE-APACHE          # Apache 2.0（Orchestrator/ 目录）
-├── README.md
-├── Orchestrator/           # Skill Pipeline Orchestrator 编排工具
-│   ├── LICENSE             # Apache 2.0
-│   ├── README.md
-│   ├── gui_agent.py        # tkinter GUI
-│   ├── chain_engine.py     # 执行引擎
-│   ├── chain_model.py      # 数据模型
-│   └── ...                 # 其他模块
-├── architecture/           # 架构文档
-└── skills/                 # 技能目录（MIT）
-```
-
-## Orchestrator
-
-Skill Pipeline Orchestrator — 用编排替代 ReAct 循环架构的智能体工具。
-详见 [`Orchestrator/README.md`](Orchestrator/README.md)。
-
-核心能力：
-- 三区 GUI：技能列表 / 编排画布 / 输入+控制
-- 顺序/并行/循环三种编排模式
-- 内置 skill-sub 优化、语义拆分、三步自审
-- 颜色校验、HTML 校验、Python 自动装包
-- LLM 粘合层自动读取技能 SKILL.md
+本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
 
 ---
 
@@ -67,6 +34,21 @@ Skill Pipeline Orchestrator — 用编排替代 ReAct 循环架构的智能体�
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。支持文件 CRUD、Python 代码质量流水线、沙箱测试、流程钩子系统。 |
 | `workday-calendar` | 智能周历系统。支持法定假日、补班日、轮休系统（跳过/不跳过法定假双模式）、特殊休息（公休/临修）、个人日程管理。 |
+
+---
+
+## 目录结构
+
+```
+workbuddy-skills/
+├── Cogito_Scribit/
+├── LICENSE
+├── LICENSE-APACHE
+├── Orchestrator/
+├── README.md
+├── architecture/
+└── skills/
+```
 
 ---
 
@@ -104,23 +86,4 @@ rm -rf temp-skills
 
 ## 许可证
 
-本仓库采用双许可证结构：
-
-| 目录 | 许可证 | 文件 |
-|------|--------|------|
-| `skills/` | MIT License | `LICENSE`（根目录） |
-| `Orchestrator/` | Apache 2.0 | `LICENSE-APACHE`（根目录）、`Orchestrator/LICENSE` |
-
-### MIT License — skills/
-```
 MIT License
-Copyright (c) 2026 wUwproject
-```
-适用于 `skills/` 目录下的所有技能。详见根目录 `LICENSE` 文件。
-
-### Apache 2.0 — Orchestrator/
-```
-Copyright 2026 wUwproject
-Licensed under the Apache License, Version 2.0
-```
-适用于 `Orchestrator/` 目录下的编排工具。详见根目录 `LICENSE-APACHE` 文件或 `Orchestrator/LICENSE`。

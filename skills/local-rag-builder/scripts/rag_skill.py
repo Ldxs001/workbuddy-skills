@@ -55,14 +55,26 @@ def run_import(file_path, kb="default", json_output=False, auto_classify=False):
         embeddings = get_embeddings()
 
         # 自动分类：路由开启时用 reranker 语义匹配，否则用关键词硬匹配
+        do_classify = False
+        router_enabled = False
         if auto_classify:
-            from knowledge_base_manager import auto_classify as do_classify
+            do_classify = True
+        else:
+            # 流程钩子：auto_classify=False 但路由层开启时自动触发语义分类
+            from config import load_config
+            cfg = load_config()
+            router_enabled = cfg.get("router", {}).get("enabled", False)
+            if router_enabled and kb == "default":
+                do_classify = True
+
+        if do_classify:
+            from knowledge_base_manager import auto_classify as classify_fn
             from config import load_config
             cfg = load_config()
             router_enabled = cfg.get("router", {}).get("enabled", False)
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
-            kb = do_classify(content, filename=file_path, use_semantic=router_enabled)
+            kb = classify_fn(content, filename=file_path, use_semantic=router_enabled)
 
         result = import_documents_to_kb(file_path, kb, embeddings)
         if json_output:

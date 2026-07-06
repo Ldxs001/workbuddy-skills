@@ -1,8 +1,22 @@
+## [1.3.5] - 2026-07-06
+
+### 新增
+- **run_import() 流程钩子**：当 `auto_classify=False` 且路由层开启（`router.enabled=True`）时，自动触发语义分类，无需调用者显式传 `--auto-classify`
+
+### 变更
+- **FallbackRouter() 提至循环外单例复用**（从 1.3.4 保留）：避免每次 KB 重载 1.3GB reranker 模型
+- **撤回 1.3.4 的 `best_score = -float('inf')` 改动**：该改动拆除了语义模式的安全闸门，导致跨语言场景下 reranker 的噪声负分随机选 KB。恢复 `best_score = 0`，保持零阈值安全回落逻辑
+
+---
+
 ## [1.3.4] - 2026-07-06
 
 ### 修复
 - **`auto_classify()` 语义模式 `best_score` 初始值导致负分被丢弃**：`best_score = 0` 与 reranker 输出的原始 logits（可负）不兼容，英文内容×中文关键词锚点时所有得分均为负 → 永远回退到 `default`。修复为语义模式 `best_score = -float('inf')`，确保负数间正确比较选最高
-- **`FallbackRouter()` 每次 KB 迭代均 new 实例**：循环内 `fallback = FallbackRouter()` 导致每个 KB 重载 1.3GB reranker 模型（7 KB = 7 次加载）。提至循环外单例复用，初始化失败时降级到硬匹配
+- **`FallbackRouter()` 每次 KB 迭代均 new 实例**：循环内 `fallback = FallbackRouter()` 导致每个 KB 重载 1.3GB reranker 模型（7 KB = 7 次加载）。提至循环外单例复用
+
+### 撤回（见 1.3.5）
+- `best_score = -float('inf')` 在跨语言场景下导致噪声路由，已于 1.3.5 撤回
 
 ---
 

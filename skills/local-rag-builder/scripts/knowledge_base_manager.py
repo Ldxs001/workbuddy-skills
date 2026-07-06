@@ -260,9 +260,7 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
     content_lower = content.lower()
     ext = os.path.splitext(filename or "")[1].lower() if filename else ""
     best_match = "default"
-    # 语义模式 reranker 返回 raw logits 可为负数，初始化 -inf 确保负数间正确比较；
-    # 硬匹配分数 >=0，初始化 0 即可
-    best_score = -float('inf') if use_semantic else 0
+    best_score = 0
 
     # 语义模式：复用 FallbackRouter，避免每次循环重载模型
     fallback = None
@@ -288,11 +286,11 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
                     scores = fallback.score(content, {kb_name: kw_text})
                     score = scores.get(kb_name, 0.0)
                 except (ValueError, RuntimeError):
-                    score = -float('inf')
+                    score = 0
             else:
-                score = -float('inf')
+                score = 0
         else:
-            # 路由关闭或 FallbackRouter 初始化失败：硬匹配（关键词 in content）
+            # 路由关闭：硬匹配（关键词 in content）
             score = 0
             for kw in rule.get("keywords", []):
                 if kw.lower() in content_lower:
