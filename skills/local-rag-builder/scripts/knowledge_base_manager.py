@@ -133,6 +133,19 @@ def delete_knowledge_base(name):
 
     del index[name]
     _save_index(index)
+
+    # 清理签名文件中的残留
+    try:
+        sig_file = os.path.join(KB_DIR, "kb_signatures.json")
+        if os.path.exists(sig_file):
+            with open(sig_file, "r", encoding="utf-8") as f:
+                sigs = json.load(f)
+            if name in sigs:
+                del sigs[name]
+                with open(sig_file, "w", encoding="utf-8") as f:
+                    json.dump(sigs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass  # 签名清理失败不阻塞删除
     return True, f"知识库 '{name}' 已删除"
 
 

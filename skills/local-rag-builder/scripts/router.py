@@ -167,76 +167,118 @@ def broadcast_route(question: str, kb_names: list[str]) -> list[str]:
 
 def route_query(question: str) -> dict:
     """
-    完整路由流程（路由层开启时）：
-    ① 关键词语义路由(reranker) — 用规则关键词作为锚点，reranker 语义匹配 query
-    ② 硬编码路由(keywords/exact match + extension) — 精确匹配
-    ③ 回退语义路由(query × KB签名) — KB 签名语义匹配
-    ④ 全量广播 — 兜底
+    两步路由（依路由层开关选择模式）：
 
-    路由层关闭时 → 直接全量广播
+    路由层开启 → 加权语义（reranker × 规则关键词打分）
+    路由层关闭 → 直接关键词匹配
+
+    都没命中 → default KB，不碰 KB 签名（签名可能被污染）
     """
-    from knowledge_base_manager import list_knowledge_bases
+    from knowledge_base_manager import list_knowledge_bases, _load_rules
     cfg = load_config()
     router_cfg = cfg.get("router", {})
+    rules = _load_rules()
 
-    if not router_cfg.get("enabled", True):
-        all_kbs = list(list_knowledge_bases().keys())
-        return {"kb_names": all_kbs, "method": "broadcast", "kb_scores": None}
-
-    # ① 关键词语义路由（用 reranker 对 rule.keywords × query 打分）
-    try:
-        from knowledge_base_manager import _load_rules
-        rules = _load_rules()
-        if rules:
+    if router_cfg.get("enabled", True):
+        # ===== 路由层开启：加权语义 =====
+        # reranker 对 query × 每条规则的关键词做语义打分 → 选最高分 KB
+        classify_threshold = router_cfg.get("classify_threshold", 0.3)
+        try:
             fallback = FallbackRouter()
-            classify_threshold = router_cfg.get("classify_threshold", 0.3)
             best_kb, best_score = None, classify_threshold
-            for kb_name, rule_obj in rules.items():
-                keywords = rule_obj.get("keywords", [])
-                if not keywords:
-                    continue
-                kw_text = " ".join(keywords)
-                scores = fallback.score(question, {kb_name: kw_text})
-                score = scores.get(kb_name, 0.0)
-                if score > best_score:
-                    best_score = score
-                    best_kb = kb_name
+            if rules:
+                for kb_name, rule_obj in rules.items():
+                    keywords = rule_obj.get("keywords", [])
+                    if not keywords:
+                        continue
+                    kw_text = " ".join(keywords)
+                    scores = fallback.score(question, {kb_name: kw_text})
+                    score = scores.get(kb_name, 0.0)
+                    if score > best_score:
+                        best_score = score
+                        best_kb = kb_name
             if best_kb:
                 return {"kb_names": [best_kb], "method": "semantic_keyword", "kb_scores": {best_kb: best_score}}
-    except (ValueError, RuntimeError):
-        pass  # 模型未就绪，降级
+        except (ValueError, RuntimeError):
+            pass
+    else:
+        # ===== 路由层关闭：直接关键词匹配 =====
+        hc_result = hardcoded_route(question)
+        if hc_result:
+            return {"kb_names": [hc_result], "method": "hardcoded", "kb_scores": None}
 
-    # ② 硬编码路由
-    hc_result = hardcoded_route(question)
-    if hc_result:
-        return {"kb_names": [hc_result], "method": "hardcoded", "kb_scores": None}
-
-    # ③ 回退语义路由
-    fallback_enabled = router_cfg.get("fallback", {}).get("enabled", True)
-    if fallback_enabled:
-        signatures = _load_signatures()
-        if signatures:
-            try:
-                fallback = FallbackRouter()
-                best_kb, scores = fallback.route(question, signatures)
-                if best_kb:
-                    return {"kb_names": [best_kb], "method": "fallback", "kb_scores": scores}
-            except (ValueError, RuntimeError):
-                pass
-
-    # ④ 全量广播
-    all_kbs = list(list_knowledge_bases().keys())
-    broadcast_kbs = broadcast_route(question, all_kbs)
-    return {"kb_names": broadcast_kbs, "method": "broadcast", "kb_scores": None}
+    # 都没命中 → default
+    return {"kb_names": ["default"], "method": "default", "kb_scores": None}
 
 
 # ==================== KB 签名自动归纳 ====================
 
-def _build_signature_from_texts(texts: list[str], max_chars: int = 500) -> str:
+def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name: str = "") -> str:
     """
-    从文本列表提取签名：词频统计（排除数字+停用词）+ 代表性片段
+    从文本列表提取签名：用 reranker 语义理解替代硬编码词频统计。
+    以 KB 名称+关键词为查询，对 chunks 打分，取高语义相关片段做签名。
     """
-    combined = " ".join(texts)
+    if not texts:
+        return ""
+
+    # 清洗：去掉 PDF 乱码/Unicode 控制字符
+    def _clean(t):
+        t = t.replace('\u00a0', ' ').replace('\u200b', '').replace('\ufeff', '')
+        t = re.sub(r'uni00a0|uni200b|unifeff|[\x00-\x08\x0b\x0c\x0e-\x1f]', '', t)
+        t = re.sub(r'[^\S\n]{3,}', ' ', t)  # 多个空格合并
+        return t.strip()
+
+    # 去重、去太短、清洗
+    unique = []
+    seen = set()
+    for t in texts:
+        t = _clean(t)
+        if len(t) < 30 or t in seen:
+            continue
+        seen.add(t)
+        unique.append(t)
+    if not unique:
+        return ""
+
+    # 用语义模型找代表片段：以 KB 名为查询，reranker 打分
+    try:
+        router = FallbackRouter()
+        router._load_model()
+        import torch
+        query = kb_name if kb_name else "知识库内容概述"
+        pairs = [[query, t[:512]] for t in unique[:50]]  # 最多评 50 段
+        inputs = router._tokenizer(
+            pairs, padding=True, truncation=True, max_length=512, return_tensors="pt"
+        ).to(router._model.device)
+        with torch.no_grad():
+            scores = router._model(**inputs).logits.squeeze(-1).tolist()
+        if isinstance(scores, float):
+            scores = [scores]
+        ranked = sorted(zip(unique[:len(scores)], scores), key=lambda x: -x[1])
+    except Exception:
+        ranked = [(t, 0) for t in unique[:20]]
+
+    # 从高分片段中提取高频有意义词（不做词频，用语义比对的片段做摘要）
+    top_texts = [t for t, s in ranked[:5] if s > 0.1] or [t for t, _ in ranked[:3]]
+    if not top_texts:
+        top_texts = unique[:3]
+
+    # 取每个高分片段的开头和末尾（最可能含关键词的部分）
+    kw_candidates = []
+    for t in top_texts:
+        # 取前 100 字
+        kw_candidates.append(t[:100])
+        # 如果片段较长，取末尾 80 字（可能含结论）
+        if len(t) > 300:
+            kw_candidates.append(t[-80:])
+
+    # 词频统计（仅从精选片段中提取，排除噪声）
+    noise_words = {  # 精简版
+        "实施日期", "换页", "第页", "图例", "来源", "单位", "摘要", "关键词",
+        "中图分类号", "文献标识码", "文章编号", "收稿日期", "修回日期",
+        "基金项目", "作者简介", "通讯作者", "参考文献", "附录", "表格",
+    }
+    combined = " ".join(kw_candidates)
     tokens = re.findall(r'[\w\u4e00-\u9fff]+', combined.lower())
     stop_words = {
         "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
@@ -246,50 +288,38 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500) -> str:
         "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
         "have", "has", "had", "do", "does", "did", "will", "would", "can",
         "could", "may", "might", "shall", "should", "to", "of", "in", "for",
-        "on", "with", "at", "by", "from", "as", "into", "through", "during",
-        "this", "that", "these", "those", "it", "its", "等", "第", "其",
+        "on", "with", "at", "by", "from", "as", "等", "第", "其",
     }
+    all_stop = stop_words | noise_words
     freq = {}
     for t in tokens:
-        # 过滤：纯数字、太短、停用词
-        if len(t) < 2 or t in stop_words:
+        if len(t) < 2 or t in all_stop or t.isdigit():
             continue
-        if t.isdigit():
+        if re.match(r'^[\d]+[a-z]+$', t) or re.match(r'^[a-z]+[\d]+$', t):
             continue
-        # 中文词权重更高
-        is_cjk = bool(re.match(r'[\u4e00-\u9fff]', t))
-        weight = 3 if is_cjk else 1
+        weight = 3 if re.match(r'[\u4e00-\u9fff]', t) else 1
         freq[t] = freq.get(t, 0) + weight
-
     sorted_words = sorted(freq.items(), key=lambda x: -x[1])
+    top_words = [w for w, _ in sorted_words[:12] if len(w) >= 2]
+    signature = " · ".join(top_words) if top_words else ""
 
-    # 至少取 10 个，最多 20 个，优先中文词
-    top_words = []
-    for w, _ in sorted_words:
-        if len(top_words) >= 20:
+    # 摘要：取最高分片段中最佳的一段
+    excerpt = ""
+    for t, s in ranked[:3]:
+        cleaned = t.strip()[:150]
+        if len(cleaned) >= 40:
+            excerpt = cleaned
             break
-        if len(w) >= 2:
-            top_words.append(w)
-    if len(top_words) < 10:
-        top_words = [w for w, _ in sorted_words[:10]]
-    signature = " · ".join(top_words)
+    if not excerpt and top_texts:
+        excerpt = top_texts[0][:150]
 
-    # 取中后段的内容页（跳过封面/目录），优先含中文的
-    excerpt_parts = []
-    for t in texts[len(texts)//3:len(texts)//3+5]:
-        t = t.strip()
-        if len(t) < 20:
-            continue
-        excerpt_parts.append(t[:150])
-        if len(" ".join(excerpt_parts)) > 300:
-            break
-
-    excerpt = "｜".join(excerpt_parts) if excerpt_parts else ""
-    if excerpt:
-        full = f"【摘要】{signature} | {excerpt}"
-    else:
-        full = f"【摘要】{signature}"
-    return full[:max_chars]
+    if signature and excerpt:
+        return f"【摘要】{signature} | {excerpt}"[:max_chars]
+    elif signature:
+        return f"【摘要】{signature}"[:max_chars]
+    elif excerpt:
+        return excerpt[:max_chars]
+    return ""
 
 
 def induce_kb_signature(kb_name: str, chunks: list = None) -> str:
@@ -326,7 +356,7 @@ def induce_kb_signature(kb_name: str, chunks: list = None) -> str:
 
     if not texts:
         return ""
-    return _build_signature_from_texts(texts)
+    return _build_signature_from_texts(texts, kb_name=kb_name)
 
 
 def update_kb_signature(kb_name: str, chunks: list = None):
@@ -344,13 +374,29 @@ def update_kb_signature(kb_name: str, chunks: list = None):
 
 
 def list_kb_signatures() -> dict:
-    return _load_signatures()
+    """返回所有 KB 签名，兼容新版（string）和旧版（dict）格式"""
+    raw = _load_signatures()
+    result = {}
+    for k, v in raw.items():
+        if isinstance(v, dict):
+            result[k] = v
+        else:
+            result[k] = {"signature": str(v), "version": "plain"}
+    return result
 
 
 def rebuild_all_signatures():
-    """重建所有 KB 签名"""
+    """重建所有 KB 签名，清理已删除 KB 的残留签名"""
     from knowledge_base_manager import list_knowledge_bases
     kbs = list_knowledge_bases()
+    # 加载已有签名，先清理不存在 KB 的旧条目
+    sigs = _load_signatures()
+    stale = [k for k in sigs if k not in kbs]
+    for k in stale:
+        del sigs[k]
+    if stale:
+        _save_signatures(sigs)
+    # 逐个重建
     for kb_name in kbs:
         try:
             update_kb_signature(kb_name)

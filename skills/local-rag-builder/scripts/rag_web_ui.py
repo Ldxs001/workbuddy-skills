@@ -17,7 +17,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
-from prompt_manager import load_template, save_template, reset_template, SYSTEM_PROMPT_PREFIX, get_full_prompt
+from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, PROMPT_PRESETS
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, download_model
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
 from router import list_kb_signatures, rebuild_all_signatures
@@ -110,6 +110,731 @@ def delete_template_config(name):
     return False
 
 
+
+_JS_SCRIPTS = """<script>
+window.PROMPT_SYSTEM_PREFIX = '基于以下资料回答问题。如果资料中没有相关信息，请说"不知道"。\\n\\n资料：\\n{context}\\n\\n问题：\\n{question}\\n\\n回答：';
+
+function toast(msg, type) { type = type || 'success'; const t = document.createElement('div'); t.className = 'toast'; t.style.background = type==='success' ? '#51cf66' : type==='error' ? '#ff6b6b' : '#fcc419'; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){t.remove()}, 2500); }
+
+function setMode(mode) {
+  fetch('/api/mode', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({mode})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已切换'); setTimeout(function(){location.reload()}, 300); }
+    else { toast(d.error, 'error'); }
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function updateConfig(section, key, value) {
+  fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({section: section, key: key, value: value})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('已更新');
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function setKbModel(kbName, modelId) {
+  fetch('/api/kb-model', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kbName, model_id: modelId})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('知识库模型已更新: ' + d.message);
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function updateOverride(strategy, key, value) {
+  fetch('/api/override', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({strategy: strategy, key: key, value: value})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('已更新');
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function toggleInputSource(key) { onToggleInputSource(key); }
+
+function onStrategyChange(strategy) {
+  updateConfig('splitting','strategy',strategy);
+  updateAdvView();
+}
+
+function togglePreproc(checked) {
+  fetch('/api/preprocess/toggle', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({enabled: checked})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) {
+      toast(checked ? '已启用预处理' : '已禁用预处理');
+    }
+  });
+  for(var l = 1; l <= 4; l++) {
+    var cb = document.getElementById('h' + l + '-enable');
+    var sel = document.getElementById('h' + l + '-preset');
+    if(cb) {
+      cb.disabled = !checked;
+      if(!checked) cb.checked = false;
+      togglePreprocLevel(l, cb.checked);
+    }
+    if(sel) { sel.disabled = !checked; }
+  }
+  if(checked) {
+    var sel = document.getElementById('strategy-select');
+    if(sel) { sel.value = 'headers'; sel.disabled = true; }
+  } else {
+    var sel = document.getElementById('strategy-select');
+    if(sel) { sel.disabled = false; }
+  }
+}
+
+function updatePresetList(level) {
+  var presetMap = {
+    1: ["自定义", "中文章节: 第X章 XXX", "英文章节: Chapter X", "数字标题: 1. XXX", "英文字句标题"],
+    2: ["自定义", "中文数字: 一、XXX", "数字编号: 1.1 XXX", "字母编号: A. XXX", "括号编号: (1) XXX"],
+    3: ["自定义", "数字编号: 1.1.1 XXX", "短横编号: 1-1 XXX"],
+    4: ["自定义", "括号编号: (a) XXX"]
+  };
+  var sel = document.getElementById('h' + level + '-preset');
+  if(!sel) return;
+  var current = sel.value;
+  sel.innerHTML = '';
+  var items = presetMap[level] || [];
+  for(var i = 0; i < items.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = (i === 0) ? '' : items[i];
+    opt.textContent = items[i];
+    sel.appendChild(opt);
+  }
+  sel.value = current || '';
+}
+
+function applyPreset(level, presetLabel) {
+  var presetRegex = {
+    "中文章节: 第X章 XXX": "^第[一二三四五六七八九十]+[章节篇]\\\\s+(.*)$",
+    "英文章节: Chapter X": "^Chapter\\\\s+\\\\d+\\\\s*[.:]\\\\s*(.*)$",
+    "数字标题: 1. XXX": "^\\\\d+\\\\s*[.．、]\\\\s*(.*)$",
+    "英文字句标题": "^[A-Z][A-Za-z\\\\s]{10,}$",
+    "中文数字: 一、XXX": "^[一二三四五六七八九十]+[、\\\\.]\\\\s*(.*)$",
+    "数字编号: 1.1 XXX": "^\\\\d+\\\\.\\\\d+\\\\s+(.*)$",
+    "字母编号: A. XXX": "^[A-Z]\\\\.\\\\s*(.*)$",
+    "括号编号: (1) XXX": "^(\\\\d+)\\\\s+(.*)$",
+    "数字编号: 1.1.1 XXX": "^\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\s+(.*)$",
+    "短横编号: 1-1 XXX": "^\\\\d+-\\\\d+\\\\s+(.*)$",
+    "括号编号: (a) XXX": "^([a-z])\\\\s+(.*)$"
+  };
+  var ta = document.getElementById('h' + level + '-patterns');
+  if(!ta) return;
+  if(!presetLabel || presetLabel === '自定义' || presetLabel === '') {
+    ta.value = '';
+  } else {
+    var regex = presetRegex[presetLabel];
+    if(regex) { ta.value = regex; }
+  }
+  var cb = document.getElementById('h' + level + '-enable');
+  if(cb && !cb.checked && ta.value) {
+    cb.checked = true;
+    cb.disabled = false;
+    togglePreprocLevel(level, true);
+  }
+  if(cb && cb.checked && !ta.value) {
+    cb.checked = false;
+    togglePreprocLevel(level, false);
+  }
+  savePreprocConfig();
+}
+
+function togglePreprocLevel(level, checked) {
+  var ta = document.getElementById('h' + level + '-patterns');
+  if(checked) {
+    if(ta) { ta.disabled = false; ta.style.background = ''; ta.style.color = ''; }
+  } else {
+    if(ta) { ta.disabled = true; ta.style.background = '#f5f5f5'; ta.style.color = '#bbb'; }
+  }
+  savePreprocConfig();
+}
+
+function togglePreprocLevel(level, checked) {
+  var ta = document.getElementById('h' + level + '-patterns');
+  if(checked) {
+    if(ta) { ta.disabled = false; ta.style.background = ''; ta.style.color = ''; }
+  } else {
+    if(ta) { ta.disabled = true; ta.style.background = '#f5f5f5'; ta.style.color = '#bbb'; }
+  }
+  savePreprocConfig();
+}
+
+function savePreprocConfig() {
+  var enabled = document.getElementById('preproc-enable').checked;
+  var config = {enabled: enabled, h1_patterns: [], h2_patterns: [], h3_patterns: [], h4_patterns: []};
+  for(var level = 1; level <= 4; level++) {
+    var cb = document.getElementById('h' + level + '-enable');
+    var ta = document.getElementById('h' + level + '-patterns');
+    if(cb && cb.checked && ta) {
+      config['h' + level + '_patterns'] = ta.value.split('\\n').filter(function(l){return l.trim() !== '';});
+    }
+  }
+  fetch('/api/preprocess/save', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(config)
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast('已保存');
+  });
+}
+
+function onSecondaryChange(val) {
+  fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({section: 'splitting', key: 'secondary_strategy', value: val || null})
+  });
+  updateAdvView();
+}
+
+function toggleAdvanced() {
+  var content = document.getElementById('adv-content');
+  var arrow = document.getElementById('adv-arrow');
+  var on = content.style.display === 'block';
+  content.style.display = on ? 'none' : 'block';
+  arrow.textContent = on ? '\u25b6' : '\u25bc';
+}
+
+function savePrompt(content) {
+  fetch('/api/prompt', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({content: content})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { document.getElementById('prompt-status').textContent = '\u2713 \u5df2\u4fdd\u5b58'; toast('\u6a21\u677f\u5df2\u4fdd\u5b58'); }
+    else toast('\u4fdd\u5b58\u5931\u8d25', 'error');
+  }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+}
+
+function resetPrompt() {
+  fetch('/api/prompt/reset', {method:'POST'})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.success) { document.getElementById('prompt-template').value = d.template; toast('\u5df2\u91cd\u7f6e'); }
+  });
+}
+
+function verifyLLM() {
+  fetch('/api/verify-llm').then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('llm-status');
+    el.innerHTML = d.success ? '<span class="status status-ok">\u2713 \u8fde\u63a5\u6b63\u5e38</span>' : '<span class="status status-err">\u2717 '+d.message+'</span>';
+  });
+}
+
+function toggleGuard(name) {
+  fetch('/api/guard/toggle', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('\u5df2\u66f4\u65b0'); setTimeout(function(){location.reload()}, 200); }
+    else toast('\u64cd\u4f5c\u5931\u8d25', 'error');
+  }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+}
+
+function updateStrategyParam(strategy, key, value) {
+  // int 字段转数字
+  if (value === '' || value === null) value = null;
+  else if (!isNaN(value) && value !== true && value !== false) value = parseInt(value);
+  fetch('/api/override', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({strategy: strategy, key: key, value: value})
+  });
+}
+
+function updateStrategyMulti(strategy, key, cb) {
+  // strategy 参数可能是 "strategy_headers"，去掉前缀
+  var clean = strategy.replace(/^strategy_/, '');
+  var checks = document.querySelectorAll('#form-strategy-' + clean + ' input[type=checkbox][value]');
+  var values = [];
+  checks.forEach(function(c) { if(c.checked) values.push(c.value); });
+  fetch('/api/override', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({strategy: clean, key: key, value: values})
+  });
+}
+
+function toggleGeekEdit(on) {
+  var areas = document.querySelectorAll('[id^="geek-editor-"]');
+  for(var i = 0; i < areas.length; i++) {
+    areas[i].readOnly = !on;
+    areas[i].style.background = on ? '#fff' : '#f5f5f5';
+  }
+  document.getElementById('geek-edit-hint').textContent = on ? '编辑模式下可修改 JSON' : '只读模式，可加载已保存模板';
+  document.getElementById('geek-btn-apply').disabled = !on;
+  document.getElementById('geek-btn-save').disabled = !on;
+  document.getElementById('geek-btn-overwrite').disabled = !on;
+  document.getElementById('geek-btn-new').disabled = !on;
+  // 持久化到 config.json
+  fetch('/api/geekedit/toggle', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({enabled: on})
+  });
+}
+
+function _mergeGeekSections() {
+  var a = ['prompt','embedding','splitter','router','other'];
+  var m = {};
+  for(var i = 0; i < a.length; i++) {
+    var ta = document.getElementById('geek-editor-' + a[i]);
+    if(!ta) continue;
+    try { Object.assign(m, JSON.parse(ta.value)); } catch(e) { return {error: '\u5206\u6bb5 ['+a[i]+'] JSON \u9519\u8bef: '+e.message}; }
+  }
+  return m;
+}
+
+function applyGeekConfig() {
+  var m = _mergeGeekSections();
+  if(m.error) { toast(m.error, 'error'); return; }
+  fetch('/api/config/raw', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(m, null, 2)
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { document.getElementById('geek-status').textContent = '\u2713 \u5df2\u5e94\u7528'; toast('\u914d\u7f6e\u5df2\u66f4\u65b0'); }
+    else { toast(d.error, 'error'); }
+  }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+}
+
+function newGeekTemplate() {
+  var ta = document.getElementById('geek-template-name');
+  ta.value = '\u9ed8\u8ba4\u6a21\u677f_' + new Date().toISOString().slice(0,10);
+  toast('\u5df2\u751f\u6210\u65b0\u6a21\u677f\u540d\u79f0\uff0c\u7f16\u8f91\u540e\u70b9\u4fdd\u5b58');
+}
+
+function saveGeekTemplate() {
+  var name = document.getElementById('geek-template-name').value.trim();
+  if(!name) { toast('\u8bf7\u5148\u586b\u5199\u6a21\u677f\u540d\u79f0', 'error'); return; }
+  var m = _mergeGeekSections();
+  if(m.error) { toast(m.error, 'error'); return; }
+  fetch('/api/template/list', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    if(d.templates && d.templates.some(function(t){ return t.name === name; })) {
+      toast('\u6a21\u677f "'+name+'" \u5df2\u5b58\u5728\uff0c\u8bf7\u7528\u8986\u76d6', 'error');
+      return;
+    }
+    fetch('/api/template/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: name, label: name, config: m})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) { toast('\u5df2\u4fdd\u5b58\uff1a'+name); document.getElementById('geek-status').textContent = '\u2713 \u5df2\u4fdd\u5b58'; refreshGeekTemplates(); }
+      else toast(d.error, 'error');
+    }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+  });
+}
+
+function overwriteGeekTemplate() {
+  var name = document.getElementById('geek-template-name').value.trim();
+  if(!name) { toast('\u8bf7\u5148\u586b\u5199\u6a21\u677f\u540d\u79f0', 'error'); return; }
+  var m = _mergeGeekSections();
+  if(m.error) { toast(m.error, 'error'); return; }
+  showConfirm('\u8986\u76d6\u6a21\u677f', '\u786e\u5b9a\u8986\u76d6\u6a21\u677f "'+name+'"\uff1f', function(ok){
+    if(!ok) return;
+    fetch('/api/template/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: name, label: name, config: m})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) { toast('\u5df2\u8986\u76d6\uff1a'+name); document.getElementById('geek-status').textContent = '\u2713 \u5df2\u8986\u76d6'; refreshGeekTemplates(); }
+      else toast(d.error, 'error');
+    }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+  });
+}
+
+function editGeekTemplate(name) {
+  fetch('/api/template/load', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(!d.success) { toast(d.error, 'error'); return; }
+    var cfg = d.config || {};
+    var edit = document.getElementById('geek-edit-toggle').checked;
+    document.getElementById('geek-editor-prompt').value = JSON.stringify({prompt: cfg.prompt || {}}, null, 2);
+    document.getElementById('geek-editor-embedding').value = JSON.stringify({embedding: cfg.embedding || {}, retrieval: cfg.retrieval || {}, reranker: cfg.reranker || {}}, null, 2);
+    document.getElementById('geek-editor-splitter').value = JSON.stringify({splitting: cfg.splitting || {}}, null, 2);
+    document.getElementById('geek-editor-router').value = JSON.stringify({router: cfg.router || {}, guard: cfg.guard || {}}, null, 2);
+    document.getElementById('geek-editor-other').value = JSON.stringify({mode: cfg.mode, input_sources: cfg.input_sources, preprocess: cfg.preprocess, kb: cfg.kb}, null, 2);
+    document.getElementById('geek-template-name').value = name;
+    toast(edit ? '\u5df2\u52a0\u8f7d\u6a21\u677f\uff08\u53ef\u7f16\u8f91\uff09\uff1a'+name : '\u5df2\u52a0\u8f7d\u6a21\u677f\uff08\u53ea\u8bfb\uff09\uff1a'+name);
+  }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+}
+
+function loadGeekTemplate(name) {
+  showConfirm('\u52a0\u8f7d\u6a21\u677f', '\u786e\u5b9a\u52a0\u8f7d\u6a21\u677f "'+name+'" \u5e76\u8986\u76d6\u5f53\u524d\u914d\u7f6e\uff1f', function(ok) {
+    if(!ok) return;
+    fetch('/api/template/load', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: name})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) { toast('\u5df2\u52a0\u8f7d\u6a21\u677f\uff1a'+name); setTimeout(function(){location.reload()}, 300); }
+      else toast(d.error, 'error');
+    }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+  });
+}
+
+function deleteGeekTemplate(name) {
+  showConfirm('\u5220\u9664\u6a21\u677f', '\u786e\u5b9a\u5220\u9664\u6a21\u677f "'+name+'"\uff1f', function(ok) {
+    if(!ok) return;
+    fetch('/api/template/delete', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: name})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) { toast('\u5df2\u5220\u9664'); refreshGeekTemplates(); }
+      else toast(d.error, 'error');
+    }).catch(function(e){toast('\u8bf7\u6c42\u5931\u8d25', 'error')});
+  });
+}
+
+function refreshGeekTemplates() {
+  var el = document.getElementById('template-items');
+  if(!el) return;
+  el.innerHTML = '\u52a0\u8f7d\u4e2d...';
+  fetch('/api/template/list', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    if(!d.templates || d.templates.length === 0) {
+      el.innerHTML = '\u6682\u65e0\u4fdd\u5b58\u7684\u6a21\u677f\u3002';
+      return;
+    }
+    el.innerHTML = d.templates.map(function(t) {
+      return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;\">' +
+        '<span><strong>' + t.label + '</strong> <span style=\"color:#aaa;font-size:11px;\">(' + t.name + ')</span></span>' +
+        '<span>' +
+        '<button class=\"btn btn-primary\" style=\"padding:4px 10px;font-size:11px;margin-right:4px;\" onclick=\"editGeekTemplate(\\'' + t.name + '\\')\">\u7f16\u8f91</button>' +
+        '<button class=\"btn btn-secondary\" style=\"padding:4px 10px;font-size:11px;margin-right:4px;\" onclick=\"loadGeekTemplate(\\'' + t.name + '\\')\">\u52a0\u8f7d</button>' +
+        '<button class=\"btn btn-danger\" style=\"padding:4px 10px;font-size:11px;\" onclick=\"deleteGeekTemplate(\\'' + t.name + '\\')\">\u5220\u9664</button>' +
+        '</span></div>';
+    }).join('');
+  });
+}
+
+function refreshRules() {
+  Promise.all([
+    fetch('/api/rules/list', {method:'POST'}).then(function(r){return r.json()}),
+    fetch('/api/kb-models', {method:'POST'}).then(function(r){return r.json()})
+  ]).then(function(results) {
+    var d = results[0], kbData = results[1];
+    var el = document.getElementById('rules-list');
+    var rules = d.rules || {};
+    var kbModels = (kbData && kbData.kb_models) || {};
+    var names = Object.keys(rules);
+    if (names.length === 0) {
+      el.innerHTML = '\u6682\u65e0\u81ea\u5b9a\u4e49\u89c4\u5219\uff0c\u70b9\u201c\u91cd\u7f6e\u9ed8\u8ba4\u201d\u521b\u5efa\u9ed8\u8ba4\u89c4\u5219\u3002';
+      return;
+    }
+    el.innerHTML = names.map(function(name) {
+      var r = rules[name];
+      var kws = (r.keywords || []).join(', ');
+      var exts = (r.extensions || []).join(', ');
+      var modelLabel = '\u9ed8\u8ba4\u6a21\u578b';
+      if (kbModels[name]) {
+        var p = kbModels[name];
+        // 从路径提取模型目录名（跨平台兼容 \ 和 /）
+        var sep = p.indexOf('\\\\') >= 0 ? '\\\\' : '/';
+        var parts = p.split(sep);
+        var dirName = parts[parts.length-1] || p;
+        // 模型目录名含 _ 连接 org_name → org/name 显示
+        var idx = dirName.indexOf('_');
+        if (idx > 0) {
+          modelLabel = dirName.slice(0, idx) + '/' + dirName.slice(idx + 1);
+        } else {
+          modelLabel = dirName;
+        }
+      }
+      var modelHtml = '<br><span style=\"font-size:11px;color:#667eea;\">\u25b6 \u6a21\u578b: ' + modelLabel + '</span>';
+      return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;\">' +
+        '<div style=\"flex:1;\"><strong>' + name + '</strong> ' +
+        (r.description ? '<span style=\"color:#888;font-size:11px;\">(' + r.description + ')</span>' : '') +
+        '<br><span style=\"font-size:11px;color:#aaa;\">\u5173\u952e\u8bcd: ' + (kws || '\u2014') + ' | \u6269\u5c55\u540d: ' + (exts || '\u2014') + '</span>' +
+        modelHtml + '</div>' +
+        '<span>' +
+        '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;margin-right:4px;\" onclick=\"editRule(\\'' + name + '\\')\">\u7f16\u8f91</button>' +
+        '<button class=\"btn btn-danger\" style=\"padding:3px 10px;font-size:11px;\" onclick=\"deleteRule(\\'' + name + '\\')\">\u5220\u9664</button>' +
+        '</span></div>';
+    }).join('');
+  });
+}
+
+function showRuleEditor(editName) {
+  document.getElementById('rule-editor-overlay').style.display = 'flex';
+  document.getElementById('rule-editor-title').textContent = editName ? '\u7f16\u8f91\u89c4\u5219' : '\u6dfb\u52a0\u89c4\u5219';
+}
+
+function hideRuleEditor() {
+  document.getElementById('rule-editor-overlay').style.display = 'none';
+  document.getElementById('rule-name').value = '';
+  document.getElementById('rule-name').readOnly = false;
+  document.getElementById('rule-keywords').value = '';
+  document.getElementById('rule-extensions').value = '';
+  document.getElementById('rule-desc').value = '';
+  document.getElementById('rule-model').value = '';
+}
+
+function editRule(name) {
+  Promise.all([
+    fetch('/api/rules/list', {method:'POST'}).then(function(r){return r.json()}),
+    fetch('/api/kb-models', {method:'POST'}).then(function(r){return r.json()})
+  ]).then(function(results) {
+    var d = results[0], kbData = results[1];
+    var r = (d.rules || {})[name];
+    if (!r) { toast('\u89c4\u5219\u4e0d\u5b58\u5728', 'error'); return; }
+    document.getElementById('rule-name').value = name;
+    document.getElementById('rule-name').readOnly = true;
+    document.getElementById('rule-keywords').value = (r.keywords || []).join(', ');
+    document.getElementById('rule-extensions').value = (r.extensions || []).join(', ');
+    document.getElementById('rule-desc').value = r.description || '';
+    document.getElementById('rule-editor-title').textContent = '\u7f16\u8f91\u89c4\u5219: ' + name;
+    // 设置模型下拉
+    var kbModels = (kbData && kbData.kb_models) || {};
+    var sel = document.getElementById('rule-model');
+    if (kbModels[name]) {
+      sel.value = kbModels[name];
+    } else {
+      sel.value = '';
+    }
+    document.getElementById('rule-editor-overlay').style.display = 'flex';
+  });
+}
+
+function saveRule() {
+  var name = document.getElementById('rule-name').value.trim();
+  if (!name) { toast('\u8bf7\u8f93\u5165\u77e5\u8bc6\u5e93\u540d', 'error'); return; }
+  var kws = document.getElementById('rule-keywords').value.split(',').map(function(s){return s.trim()}).filter(function(s){return s});
+  var exts = document.getElementById('rule-extensions').value.split(',').map(function(s){return s.trim()}).filter(function(s){return s});
+  var desc = document.getElementById('rule-desc').value.trim();
+  var modelId = document.getElementById('rule-model').value;
+  // 先保存规则，再设置 KB 模型
+  fetch('/api/rules/save', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name, keywords: kws, extensions: exts, description: desc})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (!d.success) { toast(d.error, 'error'); return; }
+    // 设置 KB 模型
+    fetch('/api/kb-model', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({kb_name: name, model_id: modelId})
+    }).then(function(r){return r.json()}).then(function(d2) {
+      toast(d2.success ? '\u89c4\u5219\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u5df2\u66f4\u65b0' : '\u89c4\u5219\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u8bbe\u7f6e\u5931\u8d25');
+      hideRuleEditor();
+      refreshRules();
+    });
+  });
+}
+
+function deleteRule(name) {
+  if (!confirm('\u786e\u5b9a\u5220\u9664\u89c4\u5219 "' + name + '"\uff1f')) return;
+  fetch('/api/rules/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { toast('\u5df2\u5220\u9664'); refreshRules(); }
+    else toast(d.error, 'error');
+  });
+}
+
+function resetRules() {
+  fetch('/api/rules/reset', {method:'POST'})
+  .then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { toast('\u89c4\u5219\u5df2\u91cd\u7f6e'); refreshRules(); }
+    else toast(d.error, 'error');
+  });
+}
+
+function updateAdvView() {
+  var s = document.getElementById('strategy-select').value;
+  var d2 = document.getElementById('secondary-select').value;
+  // 隐藏所有策略和后处理表单
+  document.querySelectorAll('.strategy-form').forEach(function(f) { f.style.display = 'none'; });
+  document.querySelectorAll('.secondary-form').forEach(function(f) { f.style.display = 'none'; });
+  // 显示当前策略表单
+  var cur = document.getElementById('form-strategy-' + s);
+  if (cur) cur.style.display = 'block';
+  // 显示后处理表单
+  var secContainer = document.getElementById('secondary-forms-container');
+  if (d2) {
+    secContainer.style.display = 'block';
+    var secForm = document.getElementById('form-secondary-' + d2);
+    if (secForm) secForm.style.display = 'block';
+  } else {
+    secContainer.style.display = 'none';
+  }
+}
+
+function resetAll() {
+  fetch('/api/reset', {method:'POST'})
+  .then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已重置'); setTimeout(function(){location.reload()}, 500); }
+  });
+}
+
+function downloadModel(id){
+  var el = document.createElement('div');
+  el.id = 'dl-status';
+  el.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;max-width:500px;z-index:9999;background:white;border-radius:12px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;border-left:4px solid #667eea;';
+  el.innerHTML = '<div style=\"display:flex;align-items:center;gap:10px;\"><div style=\"width:20px;height:20px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;\"></div><div style=\"flex:1;\"><strong>下载 ' + id.split('/').pop() + '</strong><br><span id=\"dl-msg\" style=\"color:#888;font-size:12px;\">准备中...</span></div><button onclick=\"this.parentElement.parentElement.remove()\" style=\"background:none;border:none;font-size:18px;cursor:pointer;color:#aaa;\">x</button></div>';
+  document.body.appendChild(el);
+  // 启动下载
+  fetch('/api/download-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})});
+  // 轮询状态
+  var poll = setInterval(function(){
+    fetch('/api/download-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})})
+    .then(function(r){return r.json()}).then(function(d){
+      var msg = document.getElementById('dl-msg');
+      if(!msg){clearInterval(poll);return}
+      if(d.status==='starting') msg.textContent = '准备中...';
+      else if(d.status==='downloading'){msg.innerHTML = (d.message||'下载中...') + '<br><span style=\"color:#aaa;font-size:11px;\">' + (d.size_mb||0) + ' MB | ' + (d.speed||'') + '</span>';}
+      else if(d.status==='done'){msg.textContent = '完成';el.style.borderLeftColor='#3B6D11';clearInterval(poll);setTimeout(function(){el.remove();location.reload()},1000);}
+      else if(d.status==='failed'){msg.textContent = '失败: ' + d.message;el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
+    });
+  },2000);
+}
+function toggleKB(){fetch('/api/kb/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('\u591a\u77e5\u8bc6\u5e93\u8def\u7531:'+(d.enabled?'\u542f\u7528':'\u7981\u7528'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function onFallbackModelChange(v){updateConfig('router','model_path_fallback',v)}
+function toggleRouter(){fetch('/api/router/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('\u8def\u7531:'+(d.enabled?'\u542f\u7528':'\u7981\u7528'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleReranker(){fetch('/api/reranker/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('Rerank:'+(d.enabled?'\u542f\u7528':'\u7981\u7528'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleAdvSig(){var e=document.getElementById('adv-sig-content'),a=document.getElementById('adv-sig-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'\u25b6':'\u25bc';}
+function rebuildSigs(){fetch('/api/router/rebuild-signatures',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('\u5df2\u91cd\u5efa');setTimeout(function(){location.reload()},500)}else toast(d.error,'error')});}
+function toggleSortRules(){var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'\u25b6':'\u25bc';if(!o)refreshSortRules();}
+function refreshSortRules(){fetch('/api/reranker/rules',{method:'POST'}).then(function(r){return r.json()}).then(function(d){var e=document.getElementById('sort-rules-list'),rules=d.rules||[];if(!rules.length){e.innerHTML='<span style=\"color:#aaa;\">\u6682\u65e0</span>';return}e.innerHTML=rules.map(function(r,i){return'<div style=\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;\"><div style=\"flex:1;font-size:12px;\">#'+(i+1)+' '+JSON.stringify(r)+'</div><button class=\"btn btn-danger\" style=\"padding:2px 8px;font-size:11px;\" onclick=\"deleteSortRule('+i+')\">x</button></div>'}).join('')});}
+function deleteSortRule(i){if(!confirm('\u5220\u9664\u89c4\u5219 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('\u5df2\u5220\u9664');refreshSortRules()}else toast(d.error,'error')});}
+function setSrcDot(key, cls) {var el=document.getElementById('dot-'+key);if(el){el.className='src-dot '+cls;}}
+function refreshSrcStatus() {
+  fetch('/api/dep-check',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(!d.success)return;var map=d.status||{};['enable_pdf','enable_ocr','enable_html2md'].forEach(function(k){var st=map[k]||'missing';setSrcDot(k,st);});});
+}
+function onToggleInputSource(key) {
+  setSrcDot(key,'checking');
+  fetch('/api/input-source',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key:key})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success){setSrcDot(key,d.dep||'missing');toast('\u5df2\u66f4\u65b0');setTimeout(function(){location.reload()},500);}
+    else{setSrcDot(key,d.dep||'missing');toast(d.error||'\u64cd\u4f5c\u5931\u8d25','error');}
+  }).catch(function(e){setSrcDot(key,'missing');toast('\u8bf7\u6c42\u5931\u8d25','error');});
+}
+function addSortRule(){showSortRuleEditor()}
+function showSortRuleEditor(){document.getElementById('sort-rule-editor-overlay').style.display='flex';onSortRuleTypeChange();}
+function hideSortRuleEditor(){document.getElementById('sort-rule-editor-overlay').style.display='none';document.getElementById('sort-rule-params').style.display='none';}
+function onSortRuleTypeChange(){var t=document.getElementById("sort-rule-type").value;var e=document.getElementById("sort-rule-params-fields");var p=document.getElementById("sort-rule-params");if(!t){p.style.display="none";return}var html="";if(t==="score_weight")html='<div class=\"form-group\"><label>嵌入分权重 (embedding_score)</label><input id=\"sr-emb\" type=\"number\" value=\"0.6\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div><div class=\"form-group\"><label>Rerank分权重 (rerank_score)</label><input id=\"sr-rer\" type=\"number\" value=\"0.4\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="recency")html='<div class=\"form-group\"><label>半衰期天数 (days_halflife)</label><input id=\"sr-days\" type=\"number\" value=\"30\" min=\"1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="source_weight")html='<div class=\"form-group\"><label>来源加权 JSON</label><textarea id=\"sr-sources\" rows=\"3\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: {legal_gov:1.5, baike:1.0}\"></textarea></div>';else if(t==="boost_keywords")html='<div class=\"form-group\"><label>关键词（逗号分隔）</label><input id=\"sr-keys\" type=\"text\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: python,api,definitive\"></div><div class=\"form-group\"><label>提升倍数 (boost)</label><input id=\"sr-boost\" type=\"number\" value=\"1.2\" min=\"0\" step=\"0.1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';e.innerHTML=html;p.style.display="block";}
+function saveSortRule(){var t=document.getElementById('sort-rule-type').value;if(!t){toast('\u8bf7\u9009\u62e9\u89c4\u5219\u7c7b\u578b','error');return}var p={type:t};if(t==='score_weight'){p.embedding_score=parseFloat(document.getElementById('sr-emb').value||0.6);p.rerank_score=parseFloat(document.getElementById('sr-rer').value||0.4)}else if(t==='recency'){p.days_halflife=parseInt(document.getElementById('sr-days').value||30)}else if(t==='source_weight'){try{var v=JSON.parse(document.getElementById('sr-sources').value||'{}');Object.assign(p,v)}catch(e){toast('\u89e3\u6790\u5931\u8d25','error');return}}else if(t==='boost_keywords'){var k=document.getElementById('sr-keys').value.split(',').map(function(s){return s.trim()}).filter(function(s){return s});if(!k.length){toast('\u8bf7\u8f93\u5165\u5173\u952e\u8bcd','error');return}p.keywords=k;p.boost=parseFloat(document.getElementById('sr-boost').value||1.2)}fetch('/api/reranker/rules/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rule:p})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('\u5df2\u6dfb\u52a0');hideSortRuleEditor();refreshSortRules()}else toast(d.error,'error')});}
+function initPreproc() {
+  var cb = document.getElementById('preproc-enable');
+  if(cb) {
+    var checked = cb.checked;
+    for(var l = 1; l <= 4; l++) {
+      var lcb = document.getElementById('h' + l + '-enable');
+      var lsel = document.getElementById('h' + l + '-preset');
+      if(lcb) { lcb.disabled = !checked; }
+      if(lsel) { lsel.disabled = !checked; }
+    }
+    if(checked) {
+      var sel = document.getElementById('strategy-select');
+      if(sel) { sel.value = 'headers'; sel.disabled = true; }
+    }
+  }
+}
+// ===== 模态框（替代 prompt/confirm） =====
+var _modalCb = null;
+var _modalType = '';
+
+function showPrompt(title, placeholder, cb) {
+  _modalCb = cb; _modalType = 'prompt';
+  document.getElementById('modal-title').textContent = title;
+  var inp = document.getElementById('modal-input');
+  inp.style.display = 'block'; inp.value = ''; inp.placeholder = placeholder || '';
+  document.getElementById('modal-msg').style.display = 'none';
+  document.getElementById('modal-overlay').style.display = 'flex';
+  setTimeout(function(){inp.focus();}, 100);
+}
+
+function showConfirm(title, msg, cb) {
+  _modalCb = cb; _modalType = 'confirm';
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-input').style.display = 'none';
+  document.getElementById('modal-msg').style.display = 'block';
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  if(_modalType === 'prompt' && _modalCb) _modalCb(null);
+  _modalCb = null;
+}
+
+function confirmModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  if(_modalCb) {
+    if(_modalType === 'prompt') _modalCb(document.getElementById('modal-input').value);
+    else _modalCb(true);
+  }
+  _modalCb = null;
+}
+// ===== 模态框结束 =====
+
+window.onload = function() { updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); initPreproc(); initPrompt(); toggleGeekEdit(document.getElementById('geek-edit-toggle').checked); };
+
+// ----- Prompt 模板相关函数 -----
+var _prompt_save_timer = null;
+
+function initPrompt() {
+  var sel = document.getElementById('prompt-preset');
+  if (!sel) return;
+  loadPreset(sel.value);
+  sel.addEventListener('change', function() { loadPreset(this.value); });
+}
+
+function loadPreset(key) {
+  var sel = document.getElementById('prompt-preset');
+  var opt = sel && sel.options[sel.selectedIndex];
+  var tpl = opt && opt.getAttribute('data-template');
+  if (!tpl) return;
+  document.getElementById('prompt-template').value = tpl;
+  renderVariables(tpl);
+  onPromptChange(tpl);
+}
+
+function renderVariables(tpl) {
+  var vars = tpl.match(/\{(\w+)\}/g) || [];
+  var uniq = {};
+  vars.forEach(function(v) { uniq[v] = true; });
+  var placeholders = {
+    dim: '如：价格/性能/质量',
+    role: '如：化学分析师/技术专家',
+    alt: '如：其他品牌/替代方法',
+  };
+  var html = '';
+  for (var v in uniq) {
+    var name = v.slice(1, -1);
+    var hint = placeholders[name] || '请输入' + name;
+    html += '<span style="display:inline-block;margin-right:10px;margin-bottom:4px;">' +
+      name + ': <input type="text" data-var="' + name + '" placeholder="' + hint + '" style="width:140px;padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;vertical-align:middle;"> </span>';
+  }
+  document.getElementById('prompt-variables').innerHTML = html;
+  document.querySelectorAll('#prompt-variables input').forEach(function(el) {
+    el.addEventListener('change', function() {
+      onPromptChange(document.getElementById('prompt-template').value);
+    });
+  });
+}
+
+function onPromptChange(content) {
+  document.getElementById('prompt-status').textContent = '\u23f3 保存中...';
+  if (_prompt_save_timer) clearTimeout(_prompt_save_timer);
+  _prompt_save_timer = setTimeout(function() {
+    fetch('/api/prompt', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({content: content})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) {
+        document.getElementById('prompt-status').textContent = '\u2713 已保存';
+      }
+    });
+  }, 400);
+  // 更新完整预览
+  var prefix = window.PROMPT_SYSTEM_PREFIX || '';
+  var preview = document.getElementById('full-prompt-preview');
+  if (preview) preview.textContent = prefix + content;
+}
+</script>"""
+
 def generate_html():
     """生成自包含 HTML 设置界面"""
     cfg = load_config()
@@ -117,6 +842,14 @@ def generate_html():
     all_models = list_downloaded_models()
     template = load_template()
     full_prompt_preview = get_full_prompt()
+    def _html_attr(s):
+        return s.replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;").replace(">","&gt;").replace("\n","&#10;")
+    preset_options = ""
+    for key, p in PROMPT_PRESETS.items():
+        selected = " selected" if p["template"] == template else ""
+        dt = _html_attr(p["template"])
+        preset_options += f'<option value="{key}" data-template="{dt}"{selected}>{p["label"]}</option>'
+
     router_cfg = cfg.get("router", {})
     fb_cfg = router_cfg.get("fallback", {})
     rerank_cfg = cfg.get("reranker", {})
@@ -289,18 +1022,37 @@ def generate_html():
             fields = _render_field("breakpoint_type", {"type": "select", "label": "断点算法", "options": ["percentile", "gradient", "stddev"], "default": "percentile"}, f"sec_{sname}")
         secondary_forms_html += f'<div id="form-secondary-{sname}" class="secondary-form" style="display:none;">{fields}</div>'
 
-    # 原始 JSON 配置（极客模式）
+    # 原始 JSON 配置（极客模式）— 分段
+    cfg.setdefault("prompt", {})["user_template"] = template
+    cfg["prompt"]["system_prefix"] = get_system_prefix()
+
+    def _section_json(*keys):
+        sub = {}
+        for k in keys:
+            if k in cfg:
+                sub[k] = cfg[k]
+        return json.dumps(sub, ensure_ascii=False, indent=2)
+
+    config_prompt_json = _section_json("prompt")
+    config_embedding_json = _section_json("embedding", "retrieval", "reranker")
+    config_splitter_json = _section_json("splitting")
+    config_router_json = _section_json("router", "guard")
+    config_other_json = _section_json("mode", "input_sources", "preprocess", "kb")
+    geek_edit_enabled = cfg.get("geek_mode", {}).get("edit_enabled", False)
     config_json_str = json.dumps(cfg, ensure_ascii=False, indent=2)
     STRATEGY_LABELS = {
         "fixed": "固定窗口", "recursive": "递归切分", "headers": "层级/标题切",
         "sentence": "按句切", "semantic": "语义切",
     }
 
-    return f"""<!DOCTYPE html>
+    html_out = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 <title>RAG 系统设置面板</title>
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -411,18 +1163,28 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
   <div class="card">
     <h2>📝 Prompt 模板</h2>
     <div style="font-size:13px;color:#888;margin-bottom:8px;">
-      系统层（固化，不可编辑）：基于资料回答 + 资料/问题占位符 + 回答前缀<br>
-      用户层（可编辑）：输出格式指令
+      系统层（固化）：基于资料回答 + 资料/问题占位符 + 回答前缀
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>预设模板</label>
+        <select id="prompt-preset" onchange="loadPreset(this.value)">
+          {preset_options}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>状态</label>
+        <span id="prompt-status" style="line-height:32px;font-size:13px;color:#888;">—</span>
+      </div>
     </div>
     <div class="form-group">
-      <textarea id="prompt-template" rows="8" onchange="savePrompt(this.value)" placeholder="用户层 Prompt，如输出格式要求">{template}</textarea>
+      <textarea id="prompt-template" rows="6" oninput="onPromptChange(this.value)" placeholder="用户层 Prompt，如输出格式要求" style="width:100%;font-family:monospace;font-size:12px;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;resize:vertical;box-sizing:border-box;line-height:1.5;">{template}</textarea>
     </div>
-    <button class="btn btn-secondary" onclick="resetPrompt()">↺ 重置为默认</button>
-    <span id="prompt-status" style="margin-left:12px;font-size:13px;color:#888;"></span>
-    <div style="margin-top:10px;font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:8px;">
-      <strong>完整 Prompt 预览（系统层+用户层）：</strong>
-      <pre style="background:#f8f8f8;border:1px solid #eee;border-radius:4px;padding:8px;margin-top:4px;font-size:12px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">{full_prompt_preview}</pre>
-    </div>
+    <div id="prompt-variables" style="margin-bottom:8px;"></div>
+    <details style="margin-top:10px;font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:8px;">
+      <summary style="cursor:pointer;font-weight:bold;">完整 Prompt 预览（系统层+用户层）</summary>
+      <pre id="full-prompt-preview" style="background:#f8f8f8;border:1px solid #eee;border-radius:4px;padding:8px;margin-top:4px;font-size:12px;white-space:pre-wrap;max-height:300px;overflow-y:auto;">{full_prompt_preview}</pre>
+    </details>
   </div>
 
   <div class="card">
@@ -638,7 +1400,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     </div>
     <div class="collapsible-content" id="adv-sig-content">
       <div style="font-size:12px;color:#888;">
-        {"".join(f'<div style="padding:4px 0;border-bottom:1px solid #eee;"><strong>{name}</strong>: <span style="color:#aaa;">{info.get("signature","")[:80]}...</span></div>' for name, info in kb_sigs.items()) if kb_sigs else '暂无签名'}
+        {"".join(f'<div style="padding:4px 0;border-bottom:1px solid #eee;"><strong>{name}</strong>: <span style="color:#aaa;">{(info.get("signature","") if isinstance(info, dict) else info)[:80]}...</span></div>' for name, info in kb_sigs.items()) if kb_sigs else '暂无签名'}
       </div>
       <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;margin-top:8px;" onclick="rebuildSigs()">🔄 重建所有签名</button>
     </div>
@@ -712,20 +1474,45 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     </div>
   </div>
 
-  <!-- 极客模式：JSON 配置编辑器 + 模板管理 -->
+  <!-- 极客模式：JSON 全量编辑器（分块折叠 + 编辑开关 + 模板管理） -->
   <div class="card" style="margin-bottom: 12px;">
-    <h2>⚡ 极客模式 <span style="font-weight:400;color:#888;font-size:12px;">— 编辑 & 保存复用模板</span></h2>
-    <div class="form-group">
-      <textarea id="geek-editor" rows="10" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'Courier New',monospace;font-size:12px;">{config_json_str}</textarea>
+    <h2>⚡ 极客模式 <span style="font-weight:400;color:#888;font-size:12px;">— JSON 全量编辑/保存/覆盖</span></h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+      <label style="font-size:13px;color:#555;display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="geek-edit-toggle" onchange="toggleGeekEdit(this.checked)" {"checked" if geek_edit_enabled else ""}>
+        启用编辑
+      </label>
+      <span style="font-size:12px;color:#888;" id="geek-edit-hint">编辑模式下可修改 JSON</span>
+      <input type="text" id="geek-template-name" placeholder="模板名称" style="flex:1;min-width:120px;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-danger" onclick="applyGeekConfig()" style="margin-right:4px;">💾 应用</button>
-      <button class="btn btn-secondary" onclick="saveGeekTemplate()" style="margin-right:4px;">📋 另存为模板</button>
-      <button class="btn btn-success" onclick="refreshGeekTemplates()" style="margin-right:4px;">🔄 刷新模板列表</button>
-      <button class="btn btn-danger" onclick="if(confirm('确定重置所有配置为默认？'))resetAll()">↺ 重置默认</button>
+    <details open id="geek-section-prompt" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">📝 Prompt 模板</summary>
+      <textarea id="geek-editor-prompt" rows="3" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_prompt_json}</textarea>
+    </details>
+    <details id="geek-section-embedding" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">📦 嵌入模型 & 检索</summary>
+      <textarea id="geek-editor-embedding" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_embedding_json}</textarea>
+    </details>
+    <details id="geek-section-splitter" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">✂️ 切片策略</summary>
+      <textarea id="geek-editor-splitter" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_splitter_json}</textarea>
+    </details>
+    <details id="geek-section-router" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🔀 路由 & Guard & 重排序</summary>
+      <textarea id="geek-editor-router" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_router_json}</textarea>
+    </details>
+    <details id="geek-section-other" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">⚙️ 其他（模式/输入源/预处理）</summary>
+      <textarea id="geek-editor-other" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_other_json}</textarea>
+    </details>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+      <button class="btn btn-secondary" id="geek-btn-apply" onclick="applyGeekConfig()">💾 应用全部</button>
+      <button class="btn btn-secondary" id="geek-btn-new" onclick="newGeekTemplate()">📄 新建</button>
+      <button class="btn btn-secondary" id="geek-btn-save" onclick="saveGeekTemplate()">💿 保存</button>
+      <button class="btn btn-secondary" id="geek-btn-overwrite" onclick="overwriteGeekTemplate()">📝 覆盖</button>
+      <button class="btn btn-success" id="geek-btn-refresh" onclick="refreshGeekTemplates()">🔄 刷新模板</button>
+      <span id="geek-status" style="font-size:13px;color:#888;margin-left:4px;"></span>
     </div>
-    <span id="geek-status" style="font-size:13px;color:#888;margin-left:8px;"></span>
-
     <div id="template-list" style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;">
       <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">已保存模板</div>
       <div id="template-items" style="font-size:13px;color:#888;">加载中...</div>
@@ -738,585 +1525,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
   </div>
 </div>
 
-<script>
-function toast(msg, type) {{ type = type || 'success'; const t = document.createElement('div'); t.className = 'toast'; t.style.background = type==='success' ? '#51cf66' : type==='error' ? '#ff6b6b' : '#fcc419'; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){{t.remove()}}, 2500); }}
 
-function setMode(mode) {{
-  fetch('/api/mode', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{mode}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('已切换'); setTimeout(function(){{location.reload()}}, 300); }}
-    else {{ toast(d.error, 'error'); }}
-  }}).catch(function(e){{toast('请求失败', 'error')}});
-}}
-
-function updateConfig(section, key, value) {{
-  fetch('/api/config', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{section: section, key: key, value: value}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) toast('已更新');
-    else toast(d.error, 'error');
-  }}).catch(function(e){{toast('请求失败', 'error')}});
-}}
-
-function setKbModel(kbName, modelId) {{
-  fetch('/api/kb-model', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{kb_name: kbName, model_id: modelId}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) toast('知识库模型已更新: ' + d.message);
-    else toast(d.error, 'error');
-  }}).catch(function(e){{toast('请求失败', 'error')}});
-}}
-
-function updateOverride(strategy, key, value) {{
-  fetch('/api/override', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{strategy: strategy, key: key, value: value}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) toast('已更新');
-    else toast(d.error, 'error');
-  }}).catch(function(e){{toast('请求失败', 'error')}});
-}}
-
-function toggleInputSource(key) {{ onToggleInputSource(key); }}
-
-function onStrategyChange(strategy) {{
-  updateConfig('splitting','strategy',strategy);
-  updateAdvView();
-}}
-
-function togglePreproc(checked) {{
-  fetch('/api/preprocess/toggle', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{enabled: checked}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{
-      toast(checked ? '已启用预处理' : '已禁用预处理');
-    }}
-  }});
-  for(var l = 1; l <= 4; l++) {{
-    var cb = document.getElementById('h' + l + '-enable');
-    var sel = document.getElementById('h' + l + '-preset');
-    if(cb) {{
-      cb.disabled = !checked;
-      if(!checked) cb.checked = false;
-      togglePreprocLevel(l, cb.checked);
-    }}
-    if(sel) {{ sel.disabled = !checked; }}
-  }}
-  if(checked) {{
-    var sel = document.getElementById('strategy-select');
-    if(sel) {{ sel.value = 'headers'; sel.disabled = true; }}
-  }} else {{
-    var sel = document.getElementById('strategy-select');
-    if(sel) {{ sel.disabled = false; }}
-  }}
-}}
-
-function updatePresetList(level) {{
-  var presetMap = {{
-    1: ["自定义", "中文章节: 第X章 XXX", "英文章节: Chapter X", "数字标题: 1. XXX", "英文字句标题"],
-    2: ["自定义", "中文数字: 一、XXX", "数字编号: 1.1 XXX", "字母编号: A. XXX", "括号编号: (1) XXX"],
-    3: ["自定义", "数字编号: 1.1.1 XXX", "短横编号: 1-1 XXX"],
-    4: ["自定义", "括号编号: (a) XXX"]
-  }};
-  var sel = document.getElementById('h' + level + '-preset');
-  if(!sel) return;
-  var current = sel.value;
-  sel.innerHTML = '';
-  var items = presetMap[level] || [];
-  for(var i = 0; i < items.length; i++) {{
-    var opt = document.createElement('option');
-    opt.value = (i === 0) ? '' : items[i];
-    opt.textContent = items[i];
-    sel.appendChild(opt);
-  }}
-  sel.value = current || '';
-}}
-
-function applyPreset(level, presetLabel) {{
-  var presetRegex = {{
-    "中文章节: 第X章 XXX": "^第[一二三四五六七八九十]+[章节篇]\\\\s+(.*)$",
-    "英文章节: Chapter X": "^Chapter\\\\s+\\\\d+\\\\s*[.:]\\\\s*(.*)$",
-    "数字标题: 1. XXX": "^\\\\d+\\\\s*[.．、]\\\\s*(.*)$",
-    "英文字句标题": "^[A-Z][A-Za-z\\\\s]{10,}$",
-    "中文数字: 一、XXX": "^[一二三四五六七八九十]+[、\\\\.]\\\\s*(.*)$",
-    "数字编号: 1.1 XXX": "^\\\\d+\\\\.\\\\d+\\\\s+(.*)$",
-    "字母编号: A. XXX": "^[A-Z]\\\\.\\\\s*(.*)$",
-    "括号编号: (1) XXX": "^(\\\\d+)\\\\s+(.*)$",
-    "数字编号: 1.1.1 XXX": "^\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\s+(.*)$",
-    "短横编号: 1-1 XXX": "^\\\\d+-\\\\d+\\\\s+(.*)$",
-    "括号编号: (a) XXX": "^([a-z])\\\\s+(.*)$"
-  }};
-  var ta = document.getElementById('h' + level + '-patterns');
-  if(!ta) return;
-  if(!presetLabel || presetLabel === '自定义' || presetLabel === '') {{
-    ta.value = '';
-  }} else {{
-    var regex = presetRegex[presetLabel];
-    if(regex) {{ ta.value = regex; }}
-  }}
-  var cb = document.getElementById('h' + level + '-enable');
-  if(cb && !cb.checked && ta.value) {{
-    cb.checked = true;
-    cb.disabled = false;
-    togglePreprocLevel(level, true);
-  }}
-  if(cb && cb.checked && !ta.value) {{
-    cb.checked = false;
-    togglePreprocLevel(level, false);
-  }}
-  savePreprocConfig();
-}}
-
-function togglePreprocLevel(level, checked) {{
-  var ta = document.getElementById('h' + level + '-patterns');
-  if(checked) {{
-    if(ta) {{ ta.disabled = false; ta.style.background = ''; ta.style.color = ''; }}
-  }} else {{
-    if(ta) {{ ta.disabled = true; ta.style.background = '#f5f5f5'; ta.style.color = '#bbb'; }}
-  }}
-  savePreprocConfig();
-}}
-
-function togglePreprocLevel(level, checked) {{
-  var ta = document.getElementById('h' + level + '-patterns');
-  if(checked) {{
-    if(ta) {{ ta.disabled = false; ta.style.background = ''; ta.style.color = ''; }}
-  }} else {{
-    if(ta) {{ ta.disabled = true; ta.style.background = '#f5f5f5'; ta.style.color = '#bbb'; }}
-  }}
-  savePreprocConfig();
-}}
-
-function savePreprocConfig() {{
-  var enabled = document.getElementById('preproc-enable').checked;
-  var config = {{enabled: enabled, h1_patterns: [], h2_patterns: [], h3_patterns: [], h4_patterns: []}};
-  for(var level = 1; level <= 4; level++) {{
-    var cb = document.getElementById('h' + level + '-enable');
-    var ta = document.getElementById('h' + level + '-patterns');
-    if(cb && cb.checked && ta) {{
-      config['h' + level + '_patterns'] = ta.value.split('\\n').filter(function(l){{return l.trim() !== '';}});
-    }}
-  }}
-  fetch('/api/preprocess/save', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify(config)
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) toast('已保存');
-  }});
-}}
-
-function onSecondaryChange(val) {{
-  fetch('/api/config', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{section: 'splitting', key: 'secondary_strategy', value: val || null}})
-  }});
-  updateAdvView();
-}}
-
-function toggleAdvanced() {{
-  var content = document.getElementById('adv-content');
-  var arrow = document.getElementById('adv-arrow');
-  var on = content.style.display === 'block';
-  content.style.display = on ? 'none' : 'block';
-  arrow.textContent = on ? '\u25b6' : '\u25bc';
-}}
-
-function savePrompt(content) {{
-  fetch('/api/prompt', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{content: content}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ document.getElementById('prompt-status').textContent = '\u2713 \u5df2\u4fdd\u5b58'; toast('\u6a21\u677f\u5df2\u4fdd\u5b58'); }}
-    else toast('\u4fdd\u5b58\u5931\u8d25', 'error');
-  }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
-}}
-
-function resetPrompt() {{
-  fetch('/api/prompt/reset', {{method:'POST'}})
-  .then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ document.getElementById('prompt-template').value = d.template; toast('\u5df2\u91cd\u7f6e'); }}
-  }});
-}}
-
-function verifyLLM() {{
-  fetch('/api/verify-llm').then(function(r){{return r.json()}}).then(function(d){{
-    var el = document.getElementById('llm-status');
-    el.innerHTML = d.success ? '<span class="status status-ok">\u2713 \u8fde\u63a5\u6b63\u5e38</span>' : '<span class="status status-err">\u2717 '+d.message+'</span>';
-  }});
-}}
-
-function toggleGuard(name) {{
-  fetch('/api/guard/toggle', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{name: name}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('\u5df2\u66f4\u65b0'); setTimeout(function(){{location.reload()}}, 200); }}
-    else toast('\u64cd\u4f5c\u5931\u8d25', 'error');
-  }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
-}}
-
-function updateStrategyParam(strategy, key, value) {{
-  // int 字段转数字
-  if (value === '' || value === null) value = null;
-  else if (!isNaN(value) && value !== true && value !== false) value = parseInt(value);
-  fetch('/api/override', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{strategy: strategy, key: key, value: value}})
-  }});
-}}
-
-function updateStrategyMulti(strategy, key, cb) {{
-  // strategy 参数可能是 "strategy_headers"，去掉前缀
-  var clean = strategy.replace(/^strategy_/, '');
-  var checks = document.querySelectorAll('#form-strategy-' + clean + ' input[type=checkbox][value]');
-  var values = [];
-  checks.forEach(function(c) {{ if(c.checked) values.push(c.value); }});
-  fetch('/api/override', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{strategy: clean, key: key, value: values}})
-  }});
-}}
-
-function applyGeekConfig() {{
-  var raw = document.getElementById('geek-editor').value;
-  try {{ JSON.parse(raw); }} catch(e) {{ toast('JSON 格式错误: '+e.message, 'error'); return; }}
-  fetch('/api/config/raw', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: raw
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ document.getElementById('geek-status').textContent = '\u2713 \u5df2\u5e94\u7528'; toast('\u914d\u7f6e\u5df2\u66f4\u65b0'); }}
-    else {{ toast(d.error, 'error'); }}
-  }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
-}}
-
-function saveGeekTemplate() {{
-    showPrompt('输入模板名称', '例如：我的技术文档配置', function(name) {{
-    if(!name) return;
-    var raw = document.getElementById('geek-editor').value;
-    fetch('/api/template/save', {{
-      method: 'POST', headers: {{'Content-Type':'application/json'}},
-      body: JSON.stringify({{name: name, label: name, config: JSON.parse(raw)}})
-    }}).then(function(r){{return r.json()}}).then(function(d){{
-      if(d.success) {{ toast('\u6a21\u677f\u5df2\u4fdd\u5b58\uff1a'+name); refreshGeekTemplates(); }}
-      else toast(d.error, 'error');
-    }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
-  }});
-}}
-
-function loadGeekTemplate(name) {{
-  showConfirm('\u52a0\u8f7d\u6a21\u677f', '\u786e\u5b9a\u52a0\u8f7d\u6a21\u677f "'+name+'" \u5e76\u8986\u76d6\u5f53\u524d\u914d\u7f6e\uff1f', function(ok) {{
-    if(!ok) return;
-    fetch('/api/template/load', {{
-      method: 'POST', headers: {{'Content-Type':'application/json'}},
-      body: JSON.stringify({{name: name}})
-    }}).then(function(r){{return r.json()}}).then(function(d){{
-      if(d.success) {{ toast('\u5df2\u52a0\u8f7d\u6a21\u677f\uff1a'+name); setTimeout(function(){{location.reload()}}, 300); }}
-      else toast(d.error, 'error');
-    }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
-  }});
-}}
-
-function deleteGeekTemplate(name) {{
-  showConfirm('\u5220\u9664\u6a21\u677f', '\u786e\u5b9a\u5220\u9664\u6a21\u677f "'+name+'"\uff1f', function(ok) {{
-    if(!ok) return;
-    fetch('/api/template/delete', {{
-      method: 'POST', headers: {{'Content-Type':'application/json'}},
-      body: JSON.stringify({{name: name}})
-    }}).then(function(r){{return r.json()}}).then(function(d){{
-      if(d.success) {{ toast('\u5df2\u5220\u9664'); refreshGeekTemplates(); }}
-      else toast(d.error, 'error');
-    }}).catch(function(e){{toast('\u8bf7\u6c42\u5931\u8d25', 'error')}});
-  }});
-}}
-
-function refreshGeekTemplates() {{
-  fetch('/api/template/list', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
-    var el = document.getElementById('template-items');
-    if(!d.templates || d.templates.length === 0) {{
-      el.innerHTML = '\u6682\u65e0\u4fdd\u5b58\u7684\u6a21\u677f\u3002\u8c03\u597d\u53c2\u6570\u540e\u70b9\u201c\u53e6\u5b58\u4e3a\u6a21\u677f\u201d\u4fdd\u5b58\u3002';
-      return;
-    }}
-    el.innerHTML = d.templates.map(function(t) {{
-      return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;\">' +
-        '<span><strong>' + t.label + '</strong> <span style=\"color:#aaa;font-size:11px;\">(' + t.name + ')</span></span>' +
-        '<span>' +
-        '<button class=\"btn btn-secondary\" style=\"padding:4px 12px;font-size:12px;margin-right:4px;\" onclick=\"loadGeekTemplate(\\'' + t.name + '\\')\">\u52a0\u8f7d</button>' +
-        '<button class=\"btn btn-danger\" style=\"padding:4px 12px;font-size:12px;\" onclick=\"deleteGeekTemplate(\\'' + t.name + '\\')\">\u5220\u9664</button>' +
-        '</span></div>';
-    }}).join('');
-  }});
-}}
-
-function refreshRules() {{
-  Promise.all([
-    fetch('/api/rules/list', {{method:'POST'}}).then(function(r){{return r.json()}}),
-    fetch('/api/kb-models', {{method:'POST'}}).then(function(r){{return r.json()}})
-  ]).then(function(results) {{
-    var d = results[0], kbData = results[1];
-    var el = document.getElementById('rules-list');
-    var rules = d.rules || {{}};
-    var kbModels = (kbData && kbData.kb_models) || {{}};
-    var names = Object.keys(rules);
-    if (names.length === 0) {{
-      el.innerHTML = '\u6682\u65e0\u81ea\u5b9a\u4e49\u89c4\u5219\uff0c\u70b9\u201c\u91cd\u7f6e\u9ed8\u8ba4\u201d\u521b\u5efa\u9ed8\u8ba4\u89c4\u5219\u3002';
-      return;
-    }}
-    el.innerHTML = names.map(function(name) {{
-      var r = rules[name];
-      var kws = (r.keywords || []).join(', ');
-      var exts = (r.extensions || []).join(', ');
-      var modelLabel = '\u9ed8\u8ba4\u6a21\u578b';
-      if (kbModels[name]) {{
-        var p = kbModels[name];
-        // 从路径提取模型目录名（跨平台兼容 \ 和 /）
-        var sep = p.indexOf('\\\\') >= 0 ? '\\\\' : '/';
-        var parts = p.split(sep);
-        var dirName = parts[parts.length-1] || p;
-        // 模型目录名含 _ 连接 org_name → org/name 显示
-        var idx = dirName.indexOf('_');
-        if (idx > 0) {{
-          modelLabel = dirName.slice(0, idx) + '/' + dirName.slice(idx + 1);
-        }} else {{
-          modelLabel = dirName;
-        }}
-      }}
-      var modelHtml = '<br><span style=\"font-size:11px;color:#667eea;\">\u25b6 \u6a21\u578b: ' + modelLabel + '</span>';
-      return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;\">' +
-        '<div style=\"flex:1;\"><strong>' + name + '</strong> ' +
-        (r.description ? '<span style=\"color:#888;font-size:11px;\">(' + r.description + ')</span>' : '') +
-        '<br><span style=\"font-size:11px;color:#aaa;\">\u5173\u952e\u8bcd: ' + (kws || '\u2014') + ' | \u6269\u5c55\u540d: ' + (exts || '\u2014') + '</span>' +
-        modelHtml + '</div>' +
-        '<span>' +
-        '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;margin-right:4px;\" onclick=\"editRule(\\'' + name + '\\')\">\u7f16\u8f91</button>' +
-        '<button class=\"btn btn-danger\" style=\"padding:3px 10px;font-size:11px;\" onclick=\"deleteRule(\\'' + name + '\\')\">\u5220\u9664</button>' +
-        '</span></div>';
-    }}).join('');
-  }});
-}}
-
-function showRuleEditor(editName) {{
-  document.getElementById('rule-editor-overlay').style.display = 'flex';
-  document.getElementById('rule-editor-title').textContent = editName ? '\u7f16\u8f91\u89c4\u5219' : '\u6dfb\u52a0\u89c4\u5219';
-}}
-
-function hideRuleEditor() {{
-  document.getElementById('rule-editor-overlay').style.display = 'none';
-  document.getElementById('rule-name').value = '';
-  document.getElementById('rule-name').readOnly = false;
-  document.getElementById('rule-keywords').value = '';
-  document.getElementById('rule-extensions').value = '';
-  document.getElementById('rule-desc').value = '';
-  document.getElementById('rule-model').value = '';
-}}
-
-function editRule(name) {{
-  Promise.all([
-    fetch('/api/rules/list', {{method:'POST'}}).then(function(r){{return r.json()}}),
-    fetch('/api/kb-models', {{method:'POST'}}).then(function(r){{return r.json()}})
-  ]).then(function(results) {{
-    var d = results[0], kbData = results[1];
-    var r = (d.rules || {{}})[name];
-    if (!r) {{ toast('\u89c4\u5219\u4e0d\u5b58\u5728', 'error'); return; }}
-    document.getElementById('rule-name').value = name;
-    document.getElementById('rule-name').readOnly = true;
-    document.getElementById('rule-keywords').value = (r.keywords || []).join(', ');
-    document.getElementById('rule-extensions').value = (r.extensions || []).join(', ');
-    document.getElementById('rule-desc').value = r.description || '';
-    document.getElementById('rule-editor-title').textContent = '\u7f16\u8f91\u89c4\u5219: ' + name;
-    // 设置模型下拉
-    var kbModels = (kbData && kbData.kb_models) || {{}};
-    var sel = document.getElementById('rule-model');
-    if (kbModels[name]) {{
-      sel.value = kbModels[name];
-    }} else {{
-      sel.value = '';
-    }}
-    document.getElementById('rule-editor-overlay').style.display = 'flex';
-  }});
-}}
-
-function saveRule() {{
-  var name = document.getElementById('rule-name').value.trim();
-  if (!name) {{ toast('\u8bf7\u8f93\u5165\u77e5\u8bc6\u5e93\u540d', 'error'); return; }}
-  var kws = document.getElementById('rule-keywords').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});
-  var exts = document.getElementById('rule-extensions').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});
-  var desc = document.getElementById('rule-desc').value.trim();
-  var modelId = document.getElementById('rule-model').value;
-  // 先保存规则，再设置 KB 模型
-  fetch('/api/rules/save', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{name: name, keywords: kws, extensions: exts, description: desc}})
-  }}).then(function(r){{return r.json()}}).then(function(d) {{
-    if (!d.success) {{ toast(d.error, 'error'); return; }}
-    // 设置 KB 模型
-    fetch('/api/kb-model', {{
-      method: 'POST', headers: {{'Content-Type':'application/json'}},
-      body: JSON.stringify({{kb_name: name, model_id: modelId}})
-    }}).then(function(r){{return r.json()}}).then(function(d2) {{
-      toast(d2.success ? '\u89c4\u5219\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u5df2\u66f4\u65b0' : '\u89c4\u5219\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u8bbe\u7f6e\u5931\u8d25');
-      hideRuleEditor();
-      refreshRules();
-    }});
-  }});
-}}
-
-function deleteRule(name) {{
-  if (!confirm('\u786e\u5b9a\u5220\u9664\u89c4\u5219 "' + name + '"\uff1f')) return;
-  fetch('/api/rules/delete', {{
-    method: 'POST', headers: {{'Content-Type':'application/json'}},
-    body: JSON.stringify({{name: name}})
-  }}).then(function(r){{return r.json()}}).then(function(d) {{
-    if (d.success) {{ toast('\u5df2\u5220\u9664'); refreshRules(); }}
-    else toast(d.error, 'error');
-  }});
-}}
-
-function resetRules() {{
-  fetch('/api/rules/reset', {{method:'POST'}})
-  .then(function(r){{return r.json()}}).then(function(d) {{
-    if (d.success) {{ toast('\u89c4\u5219\u5df2\u91cd\u7f6e'); refreshRules(); }}
-    else toast(d.error, 'error');
-  }});
-}}
-
-function updateAdvView() {{
-  var s = document.getElementById('strategy-select').value;
-  var d2 = document.getElementById('secondary-select').value;
-  // 隐藏所有策略和后处理表单
-  document.querySelectorAll('.strategy-form').forEach(function(f) {{ f.style.display = 'none'; }});
-  document.querySelectorAll('.secondary-form').forEach(function(f) {{ f.style.display = 'none'; }});
-  // 显示当前策略表单
-  var cur = document.getElementById('form-strategy-' + s);
-  if (cur) cur.style.display = 'block';
-  // 显示后处理表单
-  var secContainer = document.getElementById('secondary-forms-container');
-  if (d2) {{
-    secContainer.style.display = 'block';
-    var secForm = document.getElementById('form-secondary-' + d2);
-    if (secForm) secForm.style.display = 'block';
-  }} else {{
-    secContainer.style.display = 'none';
-  }}
-}}
-
-function resetAll() {{
-  fetch('/api/reset', {{method:'POST'}})
-  .then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success) {{ toast('已重置'); setTimeout(function(){{location.reload()}}, 500); }}
-  }});
-}}
-
-function downloadModel(id){{
-  var el = document.createElement('div');
-  el.id = 'dl-status';
-  el.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;max-width:500px;z-index:9999;background:white;border-radius:12px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;border-left:4px solid #667eea;';
-  el.innerHTML = '<div style=\"display:flex;align-items:center;gap:10px;\"><div style=\"width:20px;height:20px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;\"></div><div style=\"flex:1;\"><strong>下载 ' + id.split('/').pop() + '</strong><br><span id=\"dl-msg\" style=\"color:#888;font-size:12px;\">准备中...</span></div><button onclick=\"this.parentElement.parentElement.remove()\" style=\"background:none;border:none;font-size:18px;cursor:pointer;color:#aaa;\">x</button></div>';
-  document.body.appendChild(el);
-  // 启动下载
-  fetch('/api/download-model',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{model_id:id}})}});
-  // 轮询状态
-  var poll = setInterval(function(){{
-    fetch('/api/download-status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{model_id:id}})}})
-    .then(function(r){{return r.json()}}).then(function(d){{
-      var msg = document.getElementById('dl-msg');
-      if(!msg){{clearInterval(poll);return}}
-      if(d.status==='starting') msg.textContent = '准备中...';
-      else if(d.status==='downloading'){{msg.innerHTML = (d.message||'下载中...') + '<br><span style=\"color:#aaa;font-size:11px;\">' + (d.size_mb||0) + ' MB | ' + (d.speed||'') + '</span>';}}
-      else if(d.status==='done'){{msg.textContent = '完成';el.style.borderLeftColor='#3B6D11';clearInterval(poll);setTimeout(function(){{el.remove();location.reload()}},1000);}}
-      else if(d.status==='failed'){{msg.textContent = '失败: ' + d.message;el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}}
-    }});
-  }},2000);
-}}
-function toggleKB(){{fetch('/api/kb/toggle',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u591a\u77e5\u8bc6\u5e93\u8def\u7531:'+(d.enabled?'\u542f\u7528':'\u7981\u7528'));setTimeout(function(){{location.reload()}},200)}}else toast(d.error,'error')}});}}
-function onFallbackModelChange(v){{updateConfig('router','model_path_fallback',v)}}
-function toggleRouter(){{fetch('/api/router/toggle',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u8def\u7531:'+(d.enabled?'\u542f\u7528':'\u7981\u7528'));setTimeout(function(){{location.reload()}},200)}}else toast(d.error,'error')}});}}
-function toggleReranker(){{fetch('/api/reranker/toggle',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('Rerank:'+(d.enabled?'\u542f\u7528':'\u7981\u7528'));setTimeout(function(){{location.reload()}},200)}}else toast(d.error,'error')}});}}
-function toggleAdvSig(){{var e=document.getElementById('adv-sig-content'),a=document.getElementById('adv-sig-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'\u25b6':'\u25bc';}}
-function rebuildSigs(){{fetch('/api/router/rebuild-signatures',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u91cd\u5efa');setTimeout(function(){{location.reload()}},500)}}else toast(d.error,'error')}});}}
-function toggleSortRules(){{var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'\u25b6':'\u25bc';if(!o)refreshSortRules();}}
-function refreshSortRules(){{fetch('/api/reranker/rules',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{var e=document.getElementById('sort-rules-list'),rules=d.rules||[];if(!rules.length){{e.innerHTML='<span style=\"color:#aaa;\">\u6682\u65e0</span>';return}}e.innerHTML=rules.map(function(r,i){{return'<div style=\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;\"><div style=\"flex:1;font-size:12px;\">#'+(i+1)+' '+JSON.stringify(r)+'</div><button class=\"btn btn-danger\" style=\"padding:2px 8px;font-size:11px;\" onclick=\"deleteSortRule('+i+')\">x</button></div>'}}).join('')}});}}
-function deleteSortRule(i){{if(!confirm('\u5220\u9664\u89c4\u5219 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{index:i}})}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u5220\u9664');refreshSortRules()}}else toast(d.error,'error')}});}}
-function setSrcDot(key, cls) {{var el=document.getElementById('dot-'+key);if(el){{el.className='src-dot '+cls;}}}}
-function refreshSrcStatus() {{
-  fetch('/api/dep-check',{{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(!d.success)return;var map=d.status||{{}};['enable_pdf','enable_ocr','enable_html2md'].forEach(function(k){{var st=map[k]||'missing';setSrcDot(k,st);}});}});
-}}
-function onToggleInputSource(key) {{
-  setSrcDot(key,'checking');
-  fetch('/api/input-source',{{
-    method:'POST',headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{key:key}})
-  }}).then(function(r){{return r.json()}}).then(function(d){{
-    if(d.success){{setSrcDot(key,d.dep||'missing');toast('\u5df2\u66f4\u65b0');setTimeout(function(){{location.reload()}},500);}}
-    else{{setSrcDot(key,d.dep||'missing');toast(d.error||'\u64cd\u4f5c\u5931\u8d25','error');}}
-  }}).catch(function(e){{setSrcDot(key,'missing');toast('\u8bf7\u6c42\u5931\u8d25','error');}});
-}}
-function addSortRule(){{showSortRuleEditor()}}
-function showSortRuleEditor(){{document.getElementById('sort-rule-editor-overlay').style.display='flex';onSortRuleTypeChange();}}
-function hideSortRuleEditor(){{document.getElementById('sort-rule-editor-overlay').style.display='none';document.getElementById('sort-rule-params').style.display='none';}}
-function onSortRuleTypeChange(){{var t=document.getElementById("sort-rule-type").value;var e=document.getElementById("sort-rule-params-fields");var p=document.getElementById("sort-rule-params");if(!t){{p.style.display="none";return}}var html="";if(t==="score_weight")html='<div class=\"form-group\"><label>嵌入分权重 (embedding_score)</label><input id=\"sr-emb\" type=\"number\" value=\"0.6\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div><div class=\"form-group\"><label>Rerank分权重 (rerank_score)</label><input id=\"sr-rer\" type=\"number\" value=\"0.4\" min=\"0\" max=\"1\" step=\"0.05\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="recency")html='<div class=\"form-group\"><label>半衰期天数 (days_halflife)</label><input id=\"sr-days\" type=\"number\" value=\"30\" min=\"1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';else if(t==="source_weight")html='<div class=\"form-group\"><label>来源加权 JSON</label><textarea id=\"sr-sources\" rows=\"3\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: {{legal_gov:1.5, baike:1.0}}\"></textarea></div>';else if(t==="boost_keywords")html='<div class=\"form-group\"><label>关键词（逗号分隔）</label><input id=\"sr-keys\" type=\"text\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\" placeholder=\"例: python,api,definitive\"></div><div class=\"form-group\"><label>提升倍数 (boost)</label><input id=\"sr-boost\" type=\"number\" value=\"1.2\" min=\"0\" step=\"0.1\" style=\"width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;\"></div>';e.innerHTML=html;p.style.display="block";}}
-function saveSortRule(){{var t=document.getElementById('sort-rule-type').value;if(!t){{toast('\u8bf7\u9009\u62e9\u89c4\u5219\u7c7b\u578b','error');return}}var p={{type:t}};if(t==='score_weight'){{p.embedding_score=parseFloat(document.getElementById('sr-emb').value||0.6);p.rerank_score=parseFloat(document.getElementById('sr-rer').value||0.4)}}else if(t==='recency'){{p.days_halflife=parseInt(document.getElementById('sr-days').value||30)}}else if(t==='source_weight'){{try{{var v=JSON.parse(document.getElementById('sr-sources').value||'{{}}');Object.assign(p,v)}}catch(e){{toast('\u89e3\u6790\u5931\u8d25','error');return}}}}else if(t==='boost_keywords'){{var k=document.getElementById('sr-keys').value.split(',').map(function(s){{return s.trim()}}).filter(function(s){{return s}});if(!k.length){{toast('\u8bf7\u8f93\u5165\u5173\u952e\u8bcd','error');return}}p.keywords=k;p.boost=parseFloat(document.getElementById('sr-boost').value||1.2)}}fetch('/api/reranker/rules/add',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{rule:p}})}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success){{toast('\u5df2\u6dfb\u52a0');hideSortRuleEditor();refreshSortRules()}}else toast(d.error,'error')}});}}
-function initPreproc() {{
-  var cb = document.getElementById('preproc-enable');
-  if(cb) {{
-    var checked = cb.checked;
-    for(var l = 1; l <= 4; l++) {{
-      var lcb = document.getElementById('h' + l + '-enable');
-      var lsel = document.getElementById('h' + l + '-preset');
-      if(lcb) {{ lcb.disabled = !checked; }}
-      if(lsel) {{ lsel.disabled = !checked; }}
-    }}
-    if(checked) {{
-      var sel = document.getElementById('strategy-select');
-      if(sel) {{ sel.value = 'headers'; sel.disabled = true; }}
-    }}
-  }}
-}}
-// ===== 模态框（替代 prompt/confirm） =====
-var _modalCb = null;
-var _modalType = '';
-
-function showPrompt(title, placeholder, cb) {{
-  _modalCb = cb; _modalType = 'prompt';
-  document.getElementById('modal-title').textContent = title;
-  var inp = document.getElementById('modal-input');
-  inp.style.display = 'block'; inp.value = ''; inp.placeholder = placeholder || '';
-  document.getElementById('modal-msg').style.display = 'none';
-  document.getElementById('modal-overlay').style.display = 'flex';
-  setTimeout(function(){{inp.focus();}}, 100);
-}}
-
-function showConfirm(title, msg, cb) {{
-  _modalCb = cb; _modalType = 'confirm';
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-input').style.display = 'none';
-  document.getElementById('modal-msg').style.display = 'block';
-  document.getElementById('modal-msg').textContent = msg;
-  document.getElementById('modal-overlay').style.display = 'flex';
-}}
-
-function closeModal() {{
-  document.getElementById('modal-overlay').style.display = 'none';
-  if(_modalType === 'prompt' && _modalCb) _modalCb(null);
-  _modalCb = null;
-}}
-
-function confirmModal() {{
-  document.getElementById('modal-overlay').style.display = 'none';
-  if(_modalCb) {{
-    if(_modalType === 'prompt') _modalCb(document.getElementById('modal-input').value);
-    else _modalCb(true);
-  }}
-  _modalCb = null;
-}}
-// ===== 模态框结束 =====
-
-window.onload = function() {{ updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); initPreproc(); }};
-</script>
 <!-- 自定义模态框 HTML -->
 <div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;padding:24px 28px;min-width:360px;max-width:480px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
@@ -1330,7 +1539,10 @@ window.onload = function() {{ updateAdvView(); refreshGeekTemplates(); refreshRu
   </div>
 </div>
 </body>
-</html>"""
+</html>
+"""
+    html_out += _JS_SCRIPTS
+    return html_out
 
 
 class RAGHandler(http.server.BaseHTTPRequestHandler):
@@ -1357,6 +1569,9 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
         if path == "/" or path == "/index.html":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.end_headers()
             self.wfile.write(generate_html().encode("utf-8"))
         else:
@@ -1802,6 +2017,13 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                                      "speed": t.get("speed","")})
                 else:
                     self._send_json({"success": False, "status": "unknown"})
+            elif path == "/api/geekedit/toggle":
+                d = self._read_body()
+                on = d.get("enabled", False)
+                cfg = load_config()
+                cfg.setdefault("geek_mode", {})["edit_enabled"] = on
+                save_config(cfg)
+                self._send_json({"success": True})
             elif path == "/api/router/toggle":
                 cfg = load_config(); rc = cfg.setdefault("router", {}); rc["enabled"] = not rc.get("enabled", True)
                 save_config(cfg); self._send_json({"success": True, "enabled": rc["enabled"]})
@@ -1844,7 +2066,7 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
 def start_server(port=PORT):
     """启动 HTTP 服务器"""
     handler = RAGHandler
-    with socketserver.TCPServer(("", port), handler) as httpd:
+    with socketserver.ThreadingTCPServer(("", port), handler) as httpd:
         print(f"[OK] RAG 设置面板: http://localhost:{port}")
         print(f"  在浏览器中打开即可可视化配置")
         print(f"  按 Ctrl+C 停止服务器")
