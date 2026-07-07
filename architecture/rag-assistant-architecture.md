@@ -210,86 +210,179 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
 
 ---
 
-## 四、外部接口
+## 四、记忆系统 — `memory.py`
 
-### 4.1 LLM 后端接口
+记忆系统是 Agent 维持对话连续性的核心，统一管理short-termsession、压缩摘要、知识缺口和用户习惯。
 
-#### 请求格式（统一转换为后端对应协议）
+### 4.1 短期记忆
 
-| 场景 | 协议 | 端点 |
+| 方法 | 功能 | 存储 |
 |------|------|------|
-| LM Studio 聊天 | HTTP POST | `http://localhost:1234/v1/chat/completions` |
-| Ollama 聊天 | HTTP POST | `http://localhost:11434/api/chat` |
-| LM Studio 模型列表 | HTTP GET | `http://localhost:1234/v1/models` |
-| Ollama 模型列表 | HTTP GET | `http://localhost:11434/api/tags` |
+| `append_short_term(session_id, role, content)` | 追加一条对话记录 | `data/sessions/{session_id}.txt` |
+| `get_short_term(session_id)` | 读取完整对话历史 | 返回 `str` |
+| `clear_short_term(session_id)` | 清空对话历史 | 删除文件 |
+| `pop_oldest_lines(session_id, n)` | 弹出最旧的 N 行（用于压缩） | 返回被移除的文本 |
+| `short_term_line_count(session_id)` | 当前行数 | 返回 `int` |
+| `needs_compression(session_id)` | 行数 > 40 触发压缩开关 | 返回 `bool` |
 
-**请求体格式**（以 LM Studio 为例）：
-```json
-{
-  "model": "qwen/qwen3.5-35b-a3b",
-  "messages": [
-    {"role": "system", "content": "..."},
-    {"role": "user", "content": "..."}
-  ],
-  "max_tokens": 40960,
-  "temperature": 0.7,
-  "stream": false
-}
-```
+当 `short_term_line_count() > 40` 时触发压缩流程：
+- `pop_oldest_lines()` 取出最旧对话 → 调 LLM 压缩为摘要 → `store_compressed()` 存入长时记忆
 
-**响应格式**：
-```json
-{
-  "text": "最终回答内容",
-  "reasoning": "思考链内容（如模型支持）",
-  "raw": { ... "原始完整响应" }
-}
-```
+### 4.2 长时记忆（压缩摘要）
 
-### 4.2 RAG 配置页接口
+| 方法 | 功能 | 存储 |
+|------|------|------|
+| `store_compressed(session_id, summary)` | 追加一条压缩摘要 | `data/memory/compressed_{session_id}.txt` |
+| `get_compressed(session_id, limit=3)` | 返回最近 N 条摘要 | 返回 `str`（多摘要拼接） |
 
-RAG 配置页（`scripts/rag_web_ui.py`）以 subprocess 方式启动在 port 8766：
+Agent 每次调用 LLM 前通过 `build_context()` 拼接长时摘要 + 近期对话：
 
-| 端点 | 说明 |
-|------|------|
-| `rag_web_ui.py` | 模型下载、知识库管理、文本切分配置、路由规则编辑、Prompt 模板管理 |
-
-启动方式：
 ```python
-subprocess.Popen(["python", "scripts/rag_web_ui.py", "--port", "8766"])
+def build_context(self, session_id="default"):
+    compressed = self.get_compressed(session_id)
+    recent = self.get_short_term(session_id)
+    # 拼接格式
 ```
 
-### 4.3 知识库存储接口
+### 4.3 知识缺口记录 — `record_gap` / `get_gaps`
 
-| 存储 | 格式 | 路径 |
-|------|------|------|
-| 向量数据 | Chroma (sqlite3 + parquet) | `data/kb/{kb_name}/` |
-| KB 索引 | JSON | `data/kb/kb_index.json` |
-| KB 签名 | JSON | `data/kb/kb_signatures.json` |
-| 分类规则 | JSON | `data/kb/auto_classify_rules.json` |
+记录检索不到答案的查询，分析知识库覆盖盲区：
 
-### 4.4 配置接口
+```json
+{
+  "query": "三个代表与老子无为而治的相同点",
+  "kb": "政经文哲",
+  "count": 3,
+  "first_seen": "2026-07-08T04:20:13",
+  "last_seen": "2026-07-08T04:25:27"
+}
+```
 
-配置文件：`data/config/rag_config.json`
+保留最近 200 条，相同 query 自动累加计数。
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `embedding.model_path` | string | `""` | 嵌入模型路径，空则自动扫描 |
-| `router.enabled` | bool | `true` | 启用路由层 |
-| `reranker.enabled` | bool | `false` | 启用重排序 |
-| `retrieval.k` | int | `5` | 每库检索 top-K |
-| `retrieval.score_threshold` | float | `0.0` | 相似度阈值 |
-| `llm_backend` | string | `"lmstudio"` | LLM 后端类型 |
-| `llm_model` | string | `""` | 模型名称 |
-| `llm_timeout` | int | `180` | API 超时秒数 |
-| `llm_max_tokens` | int | `4096` | 最大输出 token 数 |
-| `web_search_enabled` | bool | `false` | 联网搜索开关 |
+### 4.4 用户习惯记录 — `record_habit` / `get_habits`
+
+```json
+{
+  "total_queries": 42,
+  "rag_queries": 35,
+  "chat_ratio": 0.17,
+  "import_events": 2,
+  "recent_rag_queries": ["...", "..."],
+  "last_active": "2026-07-08T05:00:00"
+}
+```
+
+### 4.5 与 Agent 的集成
+
+Agent 的 `chat()` 入口自动处理记忆：
+
+```
+chat(message)
+  ↓
+build_context("default")            # 读取压缩摘要 + 近期对话
+  ↓
+LLM 决策 + 执行
+  ↓
+append_short_term("default", message)  # 写入用户输入
+append_short_term("default", reply)    # 写入助手回复
+record_habit(message, is_rag, ...)     # 记录习惯
+↓ 如果检索结果为空
+record_gap(query, kb)                  # 记录知识缺口
+```
 
 ---
 
-## 五、流程详解
+## 五、外部接口
 
-### 5.1 完整请求生命周期
+### 5.1 Python 编程接口（API）
+
+| 类 | 入口方法 | 返回格式 |
+|----|---------|---------|
+| `Agent` | `.chat(message) → dict` | `{"text", "success", "reasoning", "kb", ...}` |
+| | `.reset_session()` | 无返回值 |
+| `Memory` | `.get_short_term(id) → str` | 对话历史文本 |
+| | `.append_short_term(id, role, content)` | 无返回值 |
+| | `.get_gaps(min_count) → list[dict]` | `[{"query", "kb", "count", ...}]` |
+| | `.get_habits() → dict` | `{"total_queries", "chat_ratio", ...}` |
+| `LLMClient` | `.chat(messages) → dict` | `{"text", "reasoning", "raw"}` |
+| | `.list_models() → list[str]` | 模型名列表 |
+| | `.check_health() → bool` | 连接状态 |
+| `RAGWrapper` | `.query(question, kb_name) → dict` | `{"context", "docs", "kb", "has_context"}` |
+| | `.import_file(path, kb_name) → dict` | `{"success", "doc_count", "kb"}` |
+| | `.import_text(text, kb_name, title) → dict` | `{"success", "doc_count", "kb"}` |
+| | `.list_kbs() → dict` | 知识库字典 |
+| `WebSearch` | `.search(query, max_results) → dict` | `{"results": [{"title", "url", "snippet"}], "success"}` |
+
+### 5.2 HTTP REST API（web_ui.py, port 8765）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/` | 主页面 HTML |
+| GET | `/api/config` | 读取全局配置 |
+| GET | `/api/kbs` | 知识库列表 |
+| GET | `/api/llm/models?backend=xxx` | 扫描模型列表 |
+| GET | `/api/llm/test` | 测试 LLM 连接 |
+| GET | `/api/config/llm` | 读取 LLM 配置 |
+| GET | `/api/agent/gaps` | 知识缺口 |
+| GET | `/api/agent/query?q=&kb=` | 查询知识库 |
+| GET | `/api/chat?q=` | 对话（GET） |
+| GET | `/api/memory/reset` | 重置对话 |
+| POST | `/api/chat` | 对话（POST）`{"message": "..."}` |
+| POST | `/api/agent/query` | 查询 `{"message", "kb"}` |
+| POST | `/api/agent/import` | 导入 `{"path"}` 或 `{"text", "title", "kb"}` |
+| POST | `/api/config/llm` | 更新 LLM 配置 `{"backend", "model", "timeout", "maxtokens"}` |
+| POST | `/api/search/toggle` | 搜索开关 `{"enabled"}` |
+
+所有 POST 接口接受 `Content-Type: application/json`，返回 `{"success": True/False, ...}`。
+
+### 5.3 LLM 后端协议
+
+| 后端 | 端点 | 本地端口 | 请求字段 | 响应字段 |
+|------|------|---------|---------|---------|
+| LM Studio | POST `/v1/chat/completions` | 1234 | `model`, `messages`, `max_tokens`, `temperature` | `choices[0].message.content`, `choices[0].message.reasoning_content` |
+| Ollama | POST `/api/chat` | 11434 | `model`, `messages`, `options.num_predict`, `options.temperature` | `message.content`, `message.reasoning_content` |
+
+### 5.4 Agent 动作协议（LLM ↔ Agent 通信）
+
+LLM 在回复中嵌入 `<<ACTION ...>>` 标记控制 Agent 行为：
+
+```python
+<<ACTION type="query" entities="实体1,实体2" attrs="属性A,属性B" rel="关系词" kb="知识库名">>
+<<ACTION type="search" query="搜索词">>
+<<ACTION type="import" path="文件路径" content="文本" kb="知识库" title="标题">>
+```
+
+解析结果：`_parse_action(reply) → (params_dict, error_msg)`
+- `(None, None)` — 无动作，正常聊天
+- `(None, "原因")` — 格式错误，返回给 LLM 修正
+- `({...}, None)` — 解析成功，进入校验执行
+
+### 5.5 搜索引擎协议
+
+| 引擎 | 方式 | API Key |
+|------|------|---------|
+| DuckDuckGo | `requests.get(html.duckduckgo.com/html/)` | 无需 Key |
+| Tavily | `POST api.tavily.com/search` | 需配置 Key |
+
+### 5.6 技能依赖接口
+
+RAG Assistant 通过 `rag_wrapper.py` 封装以下技能模块，不改造内部逻辑：
+
+| 技能模块 | 导入函数 | 用途 |
+|---------|---------|------|
+| `rag_core` | `retrieve_context` | 检索主入口（路由→检索→reranker→build） |
+| `rag_core` | `get_embeddings` | 嵌入模型管理 |
+| `knowledge_base_manager` | `list_knowledge_bases` | 知识库枚举 |
+| `knowledge_base_manager` | `auto_classify` | 自动分类路由 |
+| `config` | `load_config / save_config` | 配置持久化 |
+| `prompt_manager` | `get_full_prompt` | Prompt 模板 |
+
+---
+
+## 六、流程详解
+
+### 6.1 完整请求生命周期
 
 ```
 用户发送消息
@@ -327,7 +420,7 @@ _parse_action(reply)
 回答返回前端
 ```
 
-### 5.2 自修正循环
+### 6.2 自修正循环
 
 ```
 LLM 输出
@@ -344,7 +437,7 @@ _parse_action
 全新 system + user prompt 重新回答（不污染上下文）
 ```
 
-### 5.3 SM3 去重策略
+### 6.3 SM3 去重策略
 
 组合切片检索到的 docs 在合入最终上下文前，按内容做 SM3 哈希去重：
 
@@ -362,7 +455,7 @@ for doc in all_docs:
 
 ---
 
-## 六、与 Orchestrator 的关系
+## 七、与 Orchestrator 的关系
 
 | 维度 | RAG Assistant | Orchestrator |
 |------|---------------|-------------|
@@ -377,7 +470,7 @@ for doc in all_docs:
 
 ---
 
-## 七、部署与启动流程
+## 八、部署与启动流程
 
 ```
 setup.bat
@@ -395,7 +488,7 @@ python main.py
 
 ---
 
-## 八、安全与隐私
+## 九、安全与隐私
 
 - **无外部调用**：所有 LLM 请求发向本地 LM Studio / Ollama，不上传数据
 - **本地知识库**：Chroma 向量库存储在本地 `data/kb/`，不离开用户机器
