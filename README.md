@@ -37,6 +37,17 @@
 
 ---
 
+## 智能体列表
+
+本仓库也托管独立运行的智能体项目：
+
+| 名称 | 描述 |
+|------|------|
+| `rag-assistant` | 独立 RAG 智能体。支持本地知识库问答、组合式语义查询（LLM 自动实体/属性分词 → 穷举切片 → 多库检索 → SM3 去重合并 → LLM 综合回答）。LM Studio / Ollama 双后端。基于 local-rag-builder 技能构建。 |
+| `Orchestrator` | Skill 调用链编排器。将多个 Skill 组装为可重复执行的调用链，支持循环/分支/拓扑排序。 |
+
+---
+
 ## 目录结构
 
 ```
@@ -46,6 +57,7 @@ workbuddy-skills/
 ├── LICENSE-APACHE
 ├── Orchestrator/
 ├── README.md
+├── rag-assistant/
 ├── architecture/
 └── skills/
 ```

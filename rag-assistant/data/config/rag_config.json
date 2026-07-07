@@ -1,0 +1,17 @@
+{
+  "embedding": {
+    "model_path": "",
+    "normalize_embeddings": true
+  },
+  "router": {
+    "enabled": true,
+    "fallback": {"model_path": ""}
+  },
+  "reranker": {"enabled": false, "top_k": 5},
+  "retrieval": {"k": 5, "score_threshold": 0.0},
+  "llm_backend": "lmstudio",
+  "llm_model": "",
+  "llm_timeout": 180,
+  "llm_max_tokens": 4096,
+  "web_search_enabled": false
+}

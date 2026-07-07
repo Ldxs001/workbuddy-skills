@@ -1,0 +1,18 @@
+# ── 核心 RAG 依赖 ────────────────────────────
+langchain>=0.1
+langchain-community>=0.3
+langchain-huggingface>=0.1
+langchain-chroma>=0.1
+langchain-text-splitters>=0.3
+chromadb>=0.5
+sentence-transformers>=3.0
+huggingface-hub>=0.20
+modelscope>=1.15
+openai>=1.0
+
+# ── 输入源 ───────────────────────────────────
+easyocr>=1.7        # OCR（扫描版 PDF）
+
+# ── Web 与工具 ─────────────────────────────
+requests>=2.28
+duckduckgo_search>=4.0  # 联网搜索（可选）
