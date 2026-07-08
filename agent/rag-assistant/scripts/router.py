@@ -309,7 +309,17 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
         "基金项目", "作者简介", "通讯作者", "参考文献", "附录", "表格",
     }
     combined = " ".join(kw_candidates)
-    tokens = re.findall(r'[\w\u4e00-\u9fff]+', combined.lower())
+    # 中文分词（优先 jieba，无 jieba 时用正则兜底）
+    tokens = []
+    try:
+        import jieba
+        for seg in re.split(r'([\u4e00-\u9fff]+)', combined):
+            if re.match(r'[\u4e00-\u9fff]+', seg):
+                tokens.extend(jieba.lcut(seg.lower()))
+            else:
+                tokens.extend(re.findall(r'[a-zA-Z]{4,}', seg.lower()))
+    except ImportError:
+        tokens = re.findall(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{4,}', combined.lower())
     stop_words = {
         "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
         "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
