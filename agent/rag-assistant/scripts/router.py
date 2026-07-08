@@ -170,37 +170,45 @@ def route_query(question: str) -> dict:
     """
     两步路由（依路由层开关选择模式）：
 
-    路由层开启 → 加权语义（reranker × 规则关键词打分）
+    路由层开启 → 嵌入模型 × KB 签名
     路由层关闭 → 直接关键词匹配
 
-    都没命中 → default KB，不碰 KB 签名（签名可能被污染）
+    都没命中 → default KB
     """
-    from knowledge_base_manager import list_knowledge_bases, _load_rules
+    from knowledge_base_manager import list_knowledge_bases
     cfg = load_config()
     router_cfg = cfg.get("router", {})
-    rules = _load_rules()
 
     if router_cfg.get("enabled", True):
-        # ===== 路由层开启：加权语义 =====
-        # reranker 对 query × 每条规则的关键词做语义打分 → 选最高分 KB
+        # ===== 路由层开启：嵌入模型 × KB 签名关键词 =====
         classify_threshold = router_cfg.get("classify_threshold", 0.3)
         try:
-            fallback = FallbackRouter()
+            from rag_core import get_embeddings
+            import numpy as np
+            emb = get_embeddings()
+            sigs = list_kb_signatures()
+            if not sigs:
+                return {"kb_names": ["default"], "method": "default", "kb_scores": None}
+
+            qv = np.array(emb.embed_query(question))
             best_kb, best_score = None, classify_threshold
-            if rules:
-                for kb_name, rule_obj in rules.items():
-                    keywords = rule_obj.get("keywords", [])
-                    if not keywords:
-                        continue
-                    kw_text = " ".join(keywords)
-                    scores = fallback.score(question, {kb_name: kw_text})
-                    score = scores.get(kb_name, 0.0)
-                    if score > best_score:
-                        best_score = score
-                        best_kb = kb_name
+            for kb_name, sig_info in sigs.items():
+                sig_text = sig_info.get("signature", "") if isinstance(sig_info, dict) else sig_info
+                if not sig_text:
+                    continue
+                # 提取关键词部分（去掉 【摘要】 前缀和 | 摘录 后缀）
+                kw_part = sig_text.split("|")[0].replace("【摘要】", "").replace(" · ", " ").strip()
+                if not kw_part:
+                    continue
+                sv = np.array(emb.embed_query(kw_part))
+                sim = float(np.dot(qv, sv) / (np.linalg.norm(qv) * np.linalg.norm(sv)))
+                if sim > best_score:
+                    best_score = sim
+                    best_kb = kb_name
             if best_kb:
-                return {"kb_names": [best_kb], "method": "semantic_keyword", "kb_scores": {best_kb: best_score}}
-        except (ValueError, RuntimeError):
+                return {"kb_names": [best_kb], "method": "embedding_signature",
+                        "kb_scores": {best_kb: best_score}}
+        except Exception:
             pass
     else:
         # ===== 路由层关闭：直接关键词匹配 =====
@@ -361,7 +369,7 @@ def induce_kb_signature(kb_name: str, chunks: list = None) -> str:
 
 
 def update_kb_signature(kb_name: str, chunks: list = None):
-    """更新指定 KB 的签名（入库时自动调用）"""
+    """更新指定 KB 的签名（入库时自动调用），同时反哺关键词"""
     sig = induce_kb_signature(kb_name, chunks)
     if not sig:
         return
@@ -372,6 +380,49 @@ def update_kb_signature(kb_name: str, chunks: list = None):
         "auto_updated": True,
     }
     _save_signatures(sigs)
+
+    # === 反哺：签名关键词 → auto_classify_rules ===
+    try:
+        from knowledge_base_manager import _load_rules, set_classify_rule
+        import numpy as np
+
+        # 从签名中提取关键词
+        kw_part = sig.split("|")[0].replace("【摘要】", "").replace(" · ", " ").strip()
+        if not kw_part:
+            return
+        new_kws = [w.strip() for w in kw_part.replace(" · ", " ").split() if len(w.strip()) >= 2]
+
+        rules = _load_rules()
+        existing = set(rules.get(kb_name, {}).get("keywords", []))
+
+        # 用嵌入模型比对：新词与现有词的相似度
+        from rag_core import get_embeddings
+        emb = get_embeddings()
+        appended = 0
+        max_kw = 30  # 每个 KB 关键词上限
+
+        for nk in new_kws:
+            if nk in existing:
+                continue
+            if len(existing) >= max_kw:
+                break
+            # 与现有关键词比较，只有都不相似时才追加
+            is_novel = True
+            nk_vec = np.array(emb.embed_query(nk))
+            for ek in existing:
+                ek_vec = np.array(emb.embed_query(ek))
+                sim = float(np.dot(nk_vec, ek_vec) / (np.linalg.norm(nk_vec) * np.linalg.norm(ek_vec)))
+                if sim > 0.7:
+                    is_novel = False
+                    break
+            if is_novel:
+                existing.add(nk)
+                appended += 1
+
+        if appended > 0:
+            set_classify_rule(kb_name, keywords=list(existing))
+    except Exception:
+        pass
 
 
 def list_kb_signatures() -> dict:
