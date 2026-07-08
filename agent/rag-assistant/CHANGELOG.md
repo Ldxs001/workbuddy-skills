@@ -5,6 +5,19 @@
 
 ---
 
+## [0.5.3] - 2026-07-09
+
+### 新增
+- **TF-IDF 签名生成**：`rebuild_all_signatures()` 两轮扫描——第一轮收集所有 KB 词频算 IDF，第二轮用 TF-IDF 重排签名词，消除跨 KB 通用词干扰。单次入库用纯频率（无 IDF 上下文）
+- **动态反哺**：每次反哺将签名词 + 现有规则词与签名做嵌入相似度，取 top-30 写入规则。原始关键词标记 `_originals` 永不被移除，新词仅在剩余空位中按相似度排序填充
+- **jieba 依赖声明**：`requirements.txt` 添加 jieba≥0.42；代码加 `ImportError` 兜底，无 jieba 时降级正则分词
+
+### 变更
+- 反哺从重新处理 chunks 改为直接复用签名关键词，避免重复计算
+- `update_kb_signature`, `induce_kb_signature`, `_build_signature_from_texts` 新增 `idf` 参数透传
+
+---
+
 ## [0.5.2] - 2026-07-09
 
 ### 变更
