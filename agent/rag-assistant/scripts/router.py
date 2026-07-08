@@ -243,7 +243,8 @@ def route_query(question: str) -> dict:
 
 # ==================== KB 签名自动归纳 ====================
 
-def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name: str = "") -> str:
+def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name: str = "",
+                                 idf: dict = None) -> str:
     """
     从文本列表提取签名：用 reranker 语义理解替代硬编码词频统计。
     以 KB 名称+关键词为查询，对 chunks 打分，取高语义相关片段做签名。
@@ -336,6 +337,19 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
         "any", "more", "most", "other", "such", "into", "than", "also",
         "very", "just", "about", "over", "there", "here", "then", "his",
         "her", "our", "your", "upon", "within", "without", "through",
+        # 中文虚词/泛用词（jieba 会拆出但无关键词价值）
+        "进行", "包括", "方面", "随着", "通过", "以及", "其中", "因此", "此外",
+        "同时", "基于", "之间", "之后", "之前", "以上", "以下", "主要", "不同",
+        "一般", "一定", "一种", "一个", "一些", "可以", "需要", "必须", "可能",
+        "应该", "能够", "利用", "采用", "具有", "属于", "作为", "用于", "包括",
+        "涉及", "相关", "分别", "按照", "根据", "由于", "经过", "结合", "以及",
+        "其中", "方面", "领域", "行业", "类型", "状态", "说明", "使用", "系统",
+        "研究", "分析", "提出", "建立", "实现", "方法",
+        "要求", "条件", "内容", "部分", "方式", "过程", "结果", "作用", "影响",
+        "变化", "情况", "问题", "关系", "结构", "功能", "特点", "特征", "性质",
+        "水平", "试验", "检测", "测试", "测量", "检验", "标准", "规则", "规程",
+        "参加", "频次", "时间", "技术", "开发", "方面",
+        "一方面", "另一方面", "此外", "同时", "目前", "当前",
     }
     all_stop = stop_words | noise_words
     freq = {}
@@ -349,6 +363,12 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
             continue
         weight = 3 if re.match(r'[\u4e00-\u9fff]', t) else 1
         freq[t] = freq.get(t, 0) + weight
+
+    # TF-IDF 加权：乘以 IDF（全局稀有度），消除跨 KB 通用词
+    if idf:
+        for w in freq:
+            freq[w] = freq[w] * idf.get(w, 1.0)
+
     sorted_words = sorted(freq.items(), key=lambda x: -x[1])
     top_words = [w for w, _ in sorted_words[:12] if len(w) >= 2]
     signature = " · ".join(top_words) if top_words else ""
@@ -360,7 +380,7 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
     return ""
 
 
-def induce_kb_signature(kb_name: str, chunks: list = None) -> str:
+def induce_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> str:
     """
     自动归纳 KB 签名。
     chunks 为可选（入库时直接传入），否则从 Chroma 读取。
@@ -394,12 +414,12 @@ def induce_kb_signature(kb_name: str, chunks: list = None) -> str:
 
     if not texts:
         return ""
-    return _build_signature_from_texts(texts, kb_name=kb_name)
+    return _build_signature_from_texts(texts, kb_name=kb_name, idf=idf)
 
 
-def update_kb_signature(kb_name: str, chunks: list = None):
+def update_kb_signature(kb_name: str, chunks: list = None, idf: dict = None):
     """更新指定 KB 的签名（入库时自动调用），同时反哺关键词"""
-    sig = induce_kb_signature(kb_name, chunks)
+    sig = induce_kb_signature(kb_name, chunks, idf=idf)
     if not sig:
         return
     sigs = _load_signatures()
@@ -410,62 +430,50 @@ def update_kb_signature(kb_name: str, chunks: list = None):
     }
     _save_signatures(sigs)
 
-    # === 反哺：reranker 去垃圾 → 频率统计 → 嵌入去重 → auto_classify_rules ===
-    if chunks:
+    # === 反哺：签名词 + 现有规则词 → 排序取 top-30，原始关键词不动 ===
+    if sig:
         try:
-            from knowledge_base_manager import _load_rules, set_classify_rule
+            from knowledge_base_manager import _load_rules, _save_rules, set_classify_rule
             import numpy as np
             from rag_core import get_embeddings
             emb = get_embeddings()
             rules = _load_rules()
-            existing = set(rules.get(kb_name, {}).get("keywords", []))
+            entry = rules.get(kb_name, {})
+            existing = list(entry.get("keywords", []))
             max_kw = 30
 
-            texts = [c.page_content if hasattr(c, "page_content") else str(c) for c in chunks]
+            # 首次反哺时标记原始关键词
+            if "_originals" not in entry:
+                entry["_originals"] = list(existing)
 
-            # 频率统计（语言无关，加停用词过滤避免垃圾词入规则）
-            stop_for_feed = {
-                "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-                "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
-                "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "吗",
-                "把", "被", "让", "给", "为", "所", "以", "能", "于", "之", "与",
-                "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-                "have", "has", "had", "do", "does", "did", "will", "would", "can",
-                "could", "may", "might", "shall", "should", "to", "of", "in", "for",
-                "on", "with", "at", "by", "from", "as", "等", "第", "其",
-                "and", "but", "or", "nor", "not", "no", "so", "if", "then", "else",
-                "he", "she", "it", "its", "they", "them", "their", "this", "that",
-                "these", "those", "which", "who", "whom", "what", "where", "when",
-                "why", "how", "all", "each", "every", "both", "few", "many", "some",
-                "any", "more", "most", "other", "such", "into", "than", "also",
-                "very", "just", "about", "over", "there", "here", "then", "his",
-                "her", "our", "your", "upon", "within", "without", "through",
-            }
-            freq = {}
-            for t in texts:
-                for m in re.finditer(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{3,20}', t):
-                    w = m.group().strip().lower()
-                    if w in stop_for_feed or re.match(r'^\d', w) or len(w) < 2:
-                        continue
-                    freq[w] = freq.get(w, 0) + 1
+            originals = set(entry["_originals"])
 
-            # 嵌入去重，追加
-            for word, _ in sorted(freq.items(), key=lambda x: -x[1]):
-                if word in existing or len(existing) >= max_kw:
-                    continue
-                wv = np.array(emb.embed_query(word))
-                is_novel = True
-                for ek in list(existing):
-                    ev = np.array(emb.embed_query(ek))
-                    s = float(np.dot(wv, ev) / (np.linalg.norm(wv) * np.linalg.norm(ev)))
-                    if s > 0.6:
-                        is_novel = False
-                        break
-                if is_novel:
-                    existing.add(word)
+            # 收集候选：签名词 + 现有规则词
+            sig_kws = [w.strip().lower() for w in sig.split(" · ")[:5] if len(w.strip()) >= 2]
+            scored = []
+            sig_query = sig.replace(" · ", " ")[:200]
+            sig_vec = np.array(emb.embed_query(sig_query))
 
-            if len(existing) > len(rules.get(kb_name, {}).get("keywords", [])):
-                set_classify_rule(kb_name, keywords=list(existing))
+            all_words = set(existing) | set(sig_kws)
+            for w in all_words:
+                wv = np.array(emb.embed_query(w))
+                sim = float(np.dot(sig_vec, wv) / (np.linalg.norm(sig_vec) * np.linalg.norm(wv)))
+                scored.append((w, sim, w in originals))
+
+            # 原始词无条件保留，剩余按相似度排序填充
+            non_originals = [(w, s) for w, s, orig in scored if not orig]
+            non_originals.sort(key=lambda x: -x[1])
+
+            result = list(originals)
+            for w, s in non_originals:
+                if len(result) >= max_kw:
+                    break
+                if w not in result:
+                    result.append(w)
+
+            if set(result) != set(existing):
+                entry["keywords"] = result
+                _save_rules(rules)
         except Exception:
             pass
 
@@ -483,22 +491,86 @@ def list_kb_signatures() -> dict:
 
 
 def rebuild_all_signatures():
-    """重建所有 KB 签名，清理已删除 KB 的残留签名"""
+    """重建所有 KB 签名，清理已删除 KB 的残留签名（两轮：先收集 IDF，再生成签名）"""
     from knowledge_base_manager import list_knowledge_bases
+    from rag_core import get_embeddings
     kbs = list_knowledge_bases()
-    # 加载已有签名，先清理不存在 KB 的旧条目
+
+    # 清理已删除 KB 的旧条目
     sigs = _load_signatures()
     stale = [k for k in sigs if k not in kbs]
     for k in stale:
         del sigs[k]
     if stale:
         _save_signatures(sigs)
-    # 逐个重建
+
+    # 第一轮：收集所有 KB 的词频，计算 IDF
+    print("  计算 IDF...")
+    doc_freq = {}  # 每个词出现在几个 KB 中
+    per_kb_freq = {}  # 每个 KB 的词频
     for kb_name in kbs:
         try:
-            update_kb_signature(kb_name)
+            sig_info = sigs.get(kb_name, {})
+            texts = []
+            if isinstance(sig_info, dict) and sig_info.get("texts"):
+                texts = sig_info["texts"]
+            # 从 Chroma 获取文本
+            chunk_texts = []
+            try:
+                from langchain_chroma import Chroma
+                from knowledge_base_manager import _load_index
+                index = _load_index()
+                if kb_name in index:
+                    persist_dir = index[kb_name]["path"]
+                    if os.path.exists(persist_dir):
+                        embeddings = get_embeddings(kb_name=kb_name)
+                        vs = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+                        try:
+                            all_docs = vs.get()
+                            chunk_texts = all_docs.get("documents", []) or []
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            words = set()
+            for ct in chunk_texts:
+                for m in re.finditer(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{4,}', ct.lower()):
+                    w = m.group().strip()
+                    if len(w) >= 2:
+                        words.add(w)
+            for w in words:
+                doc_freq[w] = doc_freq.get(w, 0) + 1
+            per_kb_freq[kb_name] = chunk_texts
+        except Exception:
+            continue
+
+    # 计算 IDF
+    n_kbs = max(len(kbs), 1)
+    idf = {}
+    for w, df in doc_freq.items():
+        idf[w] = __import__("math").log((n_kbs + 1) / (df + 1)) + 1
+
+    # 第二轮：逐个生成签名（传入 IDF）
+    print("  生成签名...")
+    for kb_name in kbs:
+        try:
+            # 临时修改 function 调用方式: 直接生成签名
+            sig_info = sigs.get(kb_name, {})
+            chunk_texts = per_kb_freq.get(kb_name, [])
+            # convert chunk_texts to Document objects for induce
+            from langchain_core.documents import Document
+            docs = [Document(page_content=t) for t in chunk_texts[:200]]
+            sig = induce_kb_signature(kb_name, chunks=docs, idf=idf)
+            if not sig:
+                continue
+            sigs[kb_name] = {
+                "signature": sig,
+                "updated_at": str(__import__("datetime").datetime.now()),
+                "auto_updated": True,
+            }
         except Exception as e:
             print(f"  [!] 重建签名失败 {kb_name}: {e}")
+    _save_signatures(sigs)
 
 
 if __name__ == "__main__":
