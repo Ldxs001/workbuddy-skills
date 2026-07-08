@@ -431,9 +431,10 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
 
     ok, msg = add_documents_to_kb(kb_name, chunks, embeddings)
 
-    # 导入后自动更新 KB 签名
+    # 导入后自动更新 KB 签名（仅精排开时，因为签名需 reranker）
+    rerank_cfg = cfg.get("reranker", {})
     router_cfg = cfg.get("router", {})
-    if router_cfg.get("enabled", True) and router_cfg.get("fallback", {}).get("auto_update_signatures", True):
+    if rerank_cfg.get("enabled", False) and router_cfg.get("enabled", True) and router_cfg.get("fallback", {}).get("auto_update_signatures", True):
         try:
             from router import update_kb_signature
             update_kb_signature(kb_name, chunks)

@@ -187,7 +187,7 @@
     }
   ],
   "kb": "白酒",
-  "route_method": "semantic_keyword",
+  "route_method": "embedding_signature",
   "confidence": 0.85,
   "has_context": true,
   "search_used": false,
@@ -200,7 +200,7 @@
 | `text` | string | LLM 生成回答文本 |
 | `sources` | array | 检索来源列表（仅 `return_sources=true` 时返回） |
 | `kb` | string | 实际命中的知识库 |
-| `route_method` | string | 路由方法：`"hardcoded"` / `"semantic_keyword"` / `"default"` / `"direct"` |
+| `route_method` | string | 路由方法：`"hardcoded"` / `"embedding_signature"` / `"embedding_keyword"` / `"default"` / `"direct"` |
 | `has_context` | boolean | 是否检索到相关内容 |
 | `search_used` | boolean | 是否触发了联网搜索回退 |
 | `latency_ms` | int | 处理耗时（毫秒） |
@@ -532,7 +532,7 @@ RAG Assistant **不内置 watcher 实现**。以下规范供外部系统编写�
     }
   ],
   "kb": "白酒",
-  "route_method": "semantic_keyword",
+  "route_method": "embedding_signature",
   "confidence": 0.85,
   "has_context": true,
   "search_used": false,
@@ -638,7 +638,7 @@ python main.py migrate                      # 从 local-rag-builder 迁移数据
 |------|---------|--------|------|---------|
 | **嵌入模型** | `rag_config.embedding.model_path` | HuggingFace ID 或本地路径 | `maidalun1020/bce-embedding-base_v1` | ModelScope / HuggingFace |
 | **Reranker 模型** | `rag_config.reranker.model_path` | HuggingFace ID 或本地路径 | `BAAI/bge-reranker-base` | ModelScope / HuggingFace |
-| **路由 Fallback 模型** | `rag_config.router.fallback.model_path` | HuggingFace ID 或本地路径 | `mixedbread-ai/mxbai-rerank-base-v1` | ModelScope / HuggingFace |
+| **路由模型** | 跟随嵌入模型 + 精排模型 | 出库路由始终用嵌入模型做余弦相似度；精排开时路由×KB签名，关时×关键词。精排模型同时用于 KB 签名生成 | `maidalun1020/bce-embedding-base_v1`（路由）+ `mxbai-rerank-base-v1`（签名/精排） | — |
 | **LLM 模型** | `rag_config.llm.model_name` + `llm_backend` | 后端 + 模型名组合 | `lmstudio` + `qwen/qwen3.5-35b-a3b` | Ollama / LM Studio |
 
 ### 5.2 嵌入模型规范
@@ -699,7 +699,7 @@ python scripts/embedding_model_manager.py --model BAAI/bge-small-zh-v1.5
 | 值 | 说明 |
 |------|------|
 | `"hardcoded"` | 命中硬编码关键词规则 |
-| `"semantic_keyword"` | 语义 reranker × 规则关键词加权 |
+| `"embedding_signature"` | 嵌入模型 × KB签名关键词（精排开时）或 × 规则关键词（精排关时） |
 | `"default"` | 无匹配，路由到 default |
 | `"direct"` | 用户指定了知识库，直接检索 |
 | `"broadcast"` | 失败后全量广播所有 KB |

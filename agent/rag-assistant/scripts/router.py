@@ -170,44 +170,65 @@ def route_query(question: str) -> dict:
     """
     两步路由（依路由层开关选择模式）：
 
-    路由层开启 → 嵌入模型 × KB 签名
+    路由层开启 → 嵌入模型 × KB 签名（精排开时）或 × 关键词（精排关时）
     路由层关闭 → 直接关键词匹配
 
     都没命中 → default KB
+
+    精排（reranker）关闭时不会生成 KB 签名，因此路由降级到关键词。
     """
     from knowledge_base_manager import list_knowledge_bases
     cfg = load_config()
     router_cfg = cfg.get("router", {})
+    rerank_cfg = cfg.get("reranker", {})
+    reranker_enabled = rerank_cfg.get("enabled", False)
 
     if router_cfg.get("enabled", True):
-        # ===== 路由层开启：嵌入模型 × KB 签名关键词 =====
+        from rag_core import get_embeddings
+        import numpy as np
         classify_threshold = router_cfg.get("classify_threshold", 0.3)
         try:
-            from rag_core import get_embeddings
-            import numpy as np
             emb = get_embeddings()
-            sigs = list_kb_signatures()
-            if not sigs:
-                return {"kb_names": ["default"], "method": "default", "kb_scores": None}
-
             qv = np.array(emb.embed_query(question))
-            best_kb, best_score = None, classify_threshold
-            for kb_name, sig_info in sigs.items():
-                sig_text = sig_info.get("signature", "") if isinstance(sig_info, dict) else sig_info
-                if not sig_text:
-                    continue
-                # 提取关键词部分（去掉 【摘要】 前缀和 | 摘录 后缀）
-                kw_part = sig_text.split("|")[0].replace("【摘要】", "").replace(" · ", " ").strip()
-                if not kw_part:
-                    continue
-                sv = np.array(emb.embed_query(kw_part))
-                sim = float(np.dot(qv, sv) / (np.linalg.norm(qv) * np.linalg.norm(sv)))
-                if sim > best_score:
-                    best_score = sim
-                    best_kb = kb_name
-            if best_kb:
-                return {"kb_names": [best_kb], "method": "embedding_signature",
-                        "kb_scores": {best_kb: best_score}}
+
+            # 精排开 → 有 KB 签名 → 嵌入 × 签名关键词
+            if reranker_enabled:
+                sigs = list_kb_signatures()
+                if sigs:
+                    best_kb, best_score = None, classify_threshold
+                    for kb_name, sig_info in sigs.items():
+                        sig_text = sig_info.get("signature", "") if isinstance(sig_info, dict) else sig_info
+                        if not sig_text:
+                            continue
+                        kw_part = sig_text.split("|")[0].replace("【摘要】", "").replace(" · ", " ").strip()
+                        if not kw_part:
+                            continue
+                        sv = np.array(emb.embed_query(kw_part))
+                        sim = float(np.dot(qv, sv) / (np.linalg.norm(qv) * np.linalg.norm(sv)))
+                        if sim > best_score:
+                            best_score = sim
+                            best_kb = kb_name
+                    if best_kb:
+                        return {"kb_names": [best_kb], "method": "embedding_signature",
+                                "kb_scores": {best_kb: best_score}}
+
+            # 精排关 → 无 KB 签名（或签名不存在）→ 嵌入 × 关键词
+            from knowledge_base_manager import _load_rules
+            rules = _load_rules()
+            if rules:
+                best_kb, best_score = None, classify_threshold
+                for kb_name, rule_obj in rules.items():
+                    kws = rule_obj.get("keywords", [])
+                    if not kws:
+                        continue
+                    kv = np.array(emb.embed_query(" ".join(kws)))
+                    sim = float(np.dot(qv, kv) / (np.linalg.norm(qv) * np.linalg.norm(kv)))
+                    if sim > best_score:
+                        best_score = sim
+                        best_kb = kb_name
+                if best_kb:
+                    return {"kb_names": [best_kb], "method": "embedding_keyword",
+                            "kb_scores": {best_kb: best_score}}
         except Exception:
             pass
     else:
@@ -312,22 +333,9 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
     top_words = [w for w, _ in sorted_words[:12] if len(w) >= 2]
     signature = " · ".join(top_words) if top_words else ""
 
-    # 摘要：取最高分片段中最佳的一段
-    excerpt = ""
-    for t, s in ranked[:3]:
-        cleaned = t.strip()[:150]
-        if len(cleaned) >= 40:
-            excerpt = cleaned
-            break
-    if not excerpt and top_texts:
-        excerpt = top_texts[0][:150]
-
-    if signature and excerpt:
-        return f"【摘要】{signature} | {excerpt}"[:max_chars]
-    elif signature:
-        return f"【摘要】{signature}"[:max_chars]
-    elif excerpt:
-        return excerpt[:max_chars]
+    # 返回纯关键词列表
+    if signature:
+        return signature[:max_chars]
     return ""
 
 
@@ -381,48 +389,63 @@ def update_kb_signature(kb_name: str, chunks: list = None):
     }
     _save_signatures(sigs)
 
-    # === 反哺：签名关键词 → auto_classify_rules ===
-    try:
-        from knowledge_base_manager import _load_rules, set_classify_rule
-        import numpy as np
+    # === 反哺：reranker 去垃圾 → 频率统计 → 嵌入去重 → auto_classify_rules ===
+    if chunks:
+        try:
+            from knowledge_base_manager import _load_rules, set_classify_rule
+            import numpy as np
+            from rag_core import get_embeddings
+            emb = get_embeddings()
+            rules = _load_rules()
+            existing = set(rules.get(kb_name, {}).get("keywords", []))
+            max_kw = 30
 
-        # 从签名中提取关键词
-        kw_part = sig.split("|")[0].replace("【摘要】", "").replace(" · ", " ").strip()
-        if not kw_part:
-            return
-        new_kws = [w.strip() for w in kw_part.replace(" · ", " ").split() if len(w.strip()) >= 2]
+            texts = [c.page_content if hasattr(c, "page_content") else str(c) for c in chunks]
 
-        rules = _load_rules()
-        existing = set(rules.get(kb_name, {}).get("keywords", []))
+            # 第一步：提取候选词
+            raw = set()
+            for t in texts:
+                for m in re.finditer(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{3,20}', t):
+                    w = m.group().strip().lower()
+                    if re.match(r'^\d', w) or len(w) < 2:
+                        continue
+                    raw.add(w)
 
-        # 用嵌入模型比对：新词与现有词的相似度
-        from rag_core import get_embeddings
-        emb = get_embeddings()
-        appended = 0
-        max_kw = 30  # 每个 KB 关键词上限
+            # 第二步：reranker 过滤垃圾词
+            router = FallbackRouter()
+            valid = set()
+            for w in raw:
+                scores = router.score(w, {"key": "keyword"})
+                if scores.get("key", -999) > 0.05:
+                    valid.add(w)
 
-        for nk in new_kws:
-            if nk in existing:
-                continue
-            if len(existing) >= max_kw:
-                break
-            # 与现有关键词比较，只有都不相似时才追加
-            is_novel = True
-            nk_vec = np.array(emb.embed_query(nk))
-            for ek in existing:
-                ek_vec = np.array(emb.embed_query(ek))
-                sim = float(np.dot(nk_vec, ek_vec) / (np.linalg.norm(nk_vec) * np.linalg.norm(ek_vec)))
-                if sim > 0.7:
-                    is_novel = False
-                    break
-            if is_novel:
-                existing.add(nk)
-                appended += 1
+            # 第三步：频率统计排序
+            freq = {}
+            for t in texts:
+                for m in re.finditer(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{3,20}', t):
+                    w = m.group().strip().lower()
+                    if w in valid:
+                        freq[w] = freq.get(w, 0) + 1
 
-        if appended > 0:
-            set_classify_rule(kb_name, keywords=list(existing))
-    except Exception:
-        pass
+            # 第四步：嵌入去重，追加
+            for word, _ in sorted(freq.items(), key=lambda x: -x[1]):
+                if word in existing or len(existing) >= max_kw:
+                    continue
+                wv = np.array(emb.embed_query(word))
+                is_novel = True
+                for ek in list(existing):
+                    ev = np.array(emb.embed_query(ek))
+                    s = float(np.dot(wv, ev) / (np.linalg.norm(wv) * np.linalg.norm(ev)))
+                    if s > 0.6:
+                        is_novel = False
+                        break
+                if is_novel:
+                    existing.add(word)
+
+            if len(existing) > len(rules.get(kb_name, {}).get("keywords", [])):
+                set_classify_rule(kb_name, keywords=list(existing))
+        except Exception:
+            pass
 
 
 def list_kb_signatures() -> dict:

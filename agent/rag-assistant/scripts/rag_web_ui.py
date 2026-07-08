@@ -1530,7 +1530,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <div class="form-row">
       <div class="form-group" style="border-right:1px solid #eee;padding-right:16px;">
         <label style="font-weight:600;color:#333;">📥 入库路由</label>
-        <div style="font-size:12px;color:#888;margin-bottom:8px;">文档入库时自动分类到对应知识库</div>
+        <div style="font-size:12px;color:#888;margin-bottom:8px;">文档入库时自动分类到对应知识库（始终用嵌入模型）</div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
           <label class="toggle-switch" onclick="toggleImportClassify()">
             <input type="checkbox" onclick="event.stopPropagation();" {"checked" if kb_cfg.get("auto_classify", False) else ""}><span class="toggle-slider"></span>
@@ -1543,7 +1543,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       </div>
       <div class="form-group" style="flex:2;padding-left:16px;">
         <label style="font-weight:600;color:#333;">📤 出库路由</label>
-        <div style="font-size:12px;color:#888;margin-bottom:8px;">用户提问时路由到对应知识库检索</div>
+        <div style="font-size:12px;color:#888;margin-bottom:8px;">用户提问时路由到对应知识库检索（始终用嵌入模型，精排开时签名路由，关时关键词路由）</div>
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
           <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
             启用 <label class="toggle-switch" onclick="toggleRouter()">
@@ -1555,7 +1555,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
           </label>
         </div>
         <div style="font-size:11px;color:#aaa;margin-top:4px;">
-          跟随精排模型：{rerank_cfg.get("model_path","mxbai-rerank-base-v1")}
+          精排开→嵌入模型×签名　精排关→嵌入模型×关键词
         </div>
       </div>
     </div>
