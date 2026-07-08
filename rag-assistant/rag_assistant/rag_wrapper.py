@@ -74,6 +74,8 @@ class RAGWrapper:
         try:
             from rag_core import import_documents_to_kb
             doc_count = import_documents_to_kb(file_path, kb_name=kb_name)
+            if doc_count is False or (isinstance(doc_count, str) and "失败" in doc_count):
+                return {"success": False, "error": str(doc_count), "kb": kb_name}
             return {"success": True, "doc_count": doc_count, "kb": kb_name}
         except Exception as e:
             return {"success": False, "error": str(e)}

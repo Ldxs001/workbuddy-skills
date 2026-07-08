@@ -45,7 +45,12 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 <<ACTION type="search" query="搜索词">>
 
 ## 导入入库
-<<ACTION type="import" path="路径" content="文本" kb="知识库名" title="标题">
+<<ACTION type="import" content="入库的完整文本内容">
+  或
+<<ACTION type="import" path="MANIFEST">
+- **用户说"入库"且有"已上传文件到服务器"的通知 → 用 path="MANIFEST"**，系统自动处理所有待入库文件
+- **用户说了"把这些入库"等引用对话内容 → 用 content 参数**，把要入库的完整文本写在 content 里
+- **绝对不要自己编造文件路径！不要写具体的文件路径，用 path="MANIFEST" 让系统处理**
 
 ## 规则
 - 闲聊/打招呼 → 直接回答
@@ -156,53 +161,70 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             return None
 
         if atype == "import":
-            if not any(kw in original_msg.lower() for kw in ["导入", "入库", "import", "加入", "放进去"]):
+            if not any(kw in original_msg.lower() for kw in ["导入", "入库", "import", "加入", "放进去", "保存", "存档"]):
                 return "用户没有说导入/入库，不要输出 import 指令，直接回答"
             if not action.get("path") and not action.get("content"):
-                return "import 指令需要提供 path（文件路径）或 content（文本内容）"
+                return "import 需要 content（文本内容）或 path（文件路径）。如果用户说'将这些入库'，用 content 参数把对话内容放进去"
             p = action.get("path", "")
-            if p:
+            if p and p != "MANIFEST":
                 cp = p.strip('"').strip("'").strip()
                 if not os.path.exists(cp):
-                    return "路径不存在（用户提供的路径找不到文件），直接告知用户"
-            # kb 同样校验
+                    paths = [pp.strip() for pp in cp.split(",") if pp.strip()]
+                    if not paths or not all(os.path.exists(pp) for pp in paths):
+                        return f"路径不存在: {cp}。多个文件路径可以用逗号分隔"
+            # kb 校验：只要用户没明确说知识库名，就不准用 kb 参数
             ikb = action.get("kb", "")
-            if ikb and ikb not in original_msg:
-                return f"知识库「{ikb}」不是用户说的名称，去掉 kb 参数"
+            if ikb:
+                if ikb not in original_msg:
+                    return f"知识库「{ikb}」不是用户说的名称。去掉 kb 参数让系统自动分类路由"
+                # 即使出现在原话中也必须是真的知识库
+                try:
+                    kbs = self.rag.list_kbs() if self.rag and self.rag.ready else {}
+                    if ikb not in kbs:
+                        return f"知识库「{ikb}」系统中不存在。去掉 kb 参数让系统自动分类路由"
+                except Exception:
+                    pass
             return None
 
         # search 校验
         if atype == "search" and not action.get("query", ""):
             return "search 需要 query 参数"
 
-        # kb 校验：不能自己造知识库名
-        kb = action.get("kb", "")
-        if kb:
-            # 检查用户原话里是否有这个 kb 名
-            if kb not in original_msg:
-                # 检查是不是真的知识库
-                try:
-                    kbs = self.rag.list_kbs() if hasattr(self, 'rag') and self.rag.ready else {}
-                    if kb not in kbs:
-                        return f"你指定了知识库「{kb}」，但用户没说这个名称，系统中也不存在该知识库。去掉 kb 参数，让系统自动路由。"
-                except Exception:
-                    pass
-
         return None
 
     def _build_first_pass_messages(self, message: str) -> list:
-        """构建第一轮 LLM 消息"""
+        """构建第一轮 LLM 消息：系统提示 → 历史消息对 → 当前提问"""
         msgs = [{"role": "system", "content": self._system_prompt()}]
-        mem_ctx = self.memory.build_context(self.session_id)
-        if mem_ctx.strip():
-            msgs.append({"role": "system", "content": f"【对话记忆】\n{mem_ctx}"})
+
+        # 解析 session 文件为真实的 user/assistant 消息对
+        # 跳过最后一条（刚 append 的当前消息，避免重复），最后统一追加
+        raw = self.memory.get_short_term(self.session_id)
+        if raw.strip():
+            lines = raw.strip().split("\n")
+            # 去掉最后一行（刚写入的当前消息）
+            if lines:
+                lines = lines[:-1]
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] (\w+): (.+)', line)
+                if m:
+                    role = "user" if m.group(1) == "user" else "assistant"
+                    msgs.append({"role": role, "content": m.group(2)})
+
+        # 追加压缩摘要作为 System context（历史脉络，不占轮次位置）
+        compressed = self.memory.get_compressed(self.session_id)
+        if compressed:
+            msgs.append({"role": "system", "content": f"【历史对话摘要】\n{compressed}"})
+
         msgs.append({"role": "user", "content": message})
         return msgs
 
     # ═══════════════ 第二轮：生成回答 ═══════════════
 
     def _second_pass(self, message: str, context: dict, action: dict) -> dict:
-        """LLM 第二轮：有了检索结果后生成回答"""
+        """LLM 第二轮：有了检索结果后生成回答（也带历史对话）"""
         ctx_text = context.get("context", "")
         kb = action.get("kb", context.get("kb", ""))
         if ctx_text:
@@ -210,10 +232,21 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         else:
             sys_msg = f"知识库（{kb}）中没有找到相关信息。请礼貌告知用户。"
 
-        msgs = [
-            {"role": "system", "content": sys_msg},
-            {"role": "user", "content": message},
-        ]
+        msgs = [{"role": "system", "content": sys_msg}]
+
+        # 带上历史对话，保持上下文连贯
+        raw = self.memory.get_short_term(self.session_id)
+        if raw.strip():
+            for line in raw.strip().split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] (\w+): (.+)', line)
+                if m:
+                    role = "user" if m.group(1) == "user" else "assistant"
+                    msgs.append({"role": role, "content": m.group(2)})
+
+        msgs.append({"role": "user", "content": message})
         return self.llm.chat(msgs, stream=False)
 
     # ═══════════════ 动作解析 ═══════════════
@@ -224,24 +257,45 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         - (None, "原因"): 有 <<ACTION 但格式错误
         - ({...}, None): 解析成功
         """
-        lines = text.strip().split("\n")
-        action_line = None
-        for line in lines:
-            stripped = line.strip()
-            if re.match(r"^<<ACTION\s", stripped):
-                action_line = stripped
-                break
-
-        if not action_line:
+        # 跨行匹配 <<ACTION ... >> 全文（content 可能含换行）
+        m = re.search(r'<<ACTION\s+(.+?)>>', text, re.DOTALL)
+        if not m:
             return None, None  # 没有动作
 
-        match = _ACTION_PATTERN.search(action_line)
-        if not match or match.group(1).upper() != "ACTION":
-            return None, f"<<ACTION>> 格式无法解析: {action_line[:60]}"
-
+        raw_params = m.group(1).strip()
+        # 解析 key="value"：手工状态机，正确处理 Windows 路径 `\` 和文件名内 `"` 
         params = {}
-        for k, v in re.findall(r'(\w+)=["\']([^"\']+)["\']', match.group(2) or ""):
-            params[k] = v
+        i = 0
+        while i < len(raw_params):
+            # 跳过空白
+            while i < len(raw_params) and raw_params[i] in ' \t\r\n':
+                i += 1
+            if i >= len(raw_params):
+                break
+            # 匹配 key=
+            km = re.match(r'(\w+)=', raw_params[i:])
+            if not km:
+                break
+            key = km.group(1)
+            i += km.end()
+            if i >= len(raw_params) or raw_params[i] not in '"\'':
+                break
+            quote = raw_params[i]
+            i += 1
+            # 收集 value：只有 \" 和 \\ 是转义，其他 \X 保持原样（适配 Windows 路径）
+            val = []
+            while i < len(raw_params):
+                ch = raw_params[i]
+                if ch == '\\' and i + 1 < len(raw_params) and raw_params[i + 1] in (quote, '\\'):
+                    val.append(raw_params[i + 1])
+                    i += 2
+                elif ch == quote:
+                    i += 1
+                    break
+                else:
+                    val.append(ch)
+                    i += 1
+            params[key] = ''.join(val)
 
         action_type = params.get("type", "")
         if action_type not in ("query", "search", "import"):
@@ -334,9 +388,52 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             return self._do_import_text(content, kb, title)
         if path:
             clean = path.strip('"').strip("'").strip()
-            if not os.path.exists(clean):
-                return {"text": f"路径不存在: {clean}", "success": False}
-            return self._do_import(clean, kb)
+            # path="MANIFEST" → 从 manifest 读取待入库文件列表
+            if clean == "MANIFEST":
+                manifest_path = os.path.join(self.data_dir, "import_manifest.json")
+                if not os.path.exists(manifest_path):
+                    return {"text": "没有待入库的文件", "success": False}
+                try:
+                    with open(manifest_path, "r", encoding="utf-8") as f:
+                        manifest = json.load(f)
+                except Exception as e:
+                    return {"text": f"读取文件清单失败: {e}", "success": False}
+            else:
+                # 逗号分隔的多个路径
+                paths_to_import = [pp.strip() for pp in clean.split(",") if pp.strip()] if "," in clean else [clean]
+                manifest = [{"path": pp, "count": 0} for pp in paths_to_import]
+            imported_all = 0
+            failed_all = 0
+            for item in manifest:
+                pp = item["path"] if isinstance(item, dict) else item
+                if not os.path.exists(pp):
+                    failed_all += 1
+                    continue
+                result = self._do_import(pp, kb)
+                if result.get("success"):
+                    imported_all += 1
+                    # 导入成功后清理临时上传目录下的文件
+                    imports_dir = os.path.join(self.data_dir, "imports")
+                    if pp.startswith(imports_dir):
+                        try:
+                            os.unlink(pp)
+                        except Exception:
+                            pass
+                else:
+                    failed_all += 1
+            # 清空 manifest
+            if clean == "MANIFEST":
+                try:
+                    with open(manifest_path, "w", encoding="utf-8") as f:
+                        json.dump([], f)
+                except Exception:
+                    pass
+            if failed_all == 0 and imported_all > 0:
+                return {"text": f"已导入 {imported_all} 个文件" + (f"，{failed_all} 个失败" if failed_all else ""), "success": True, "kb": kb or ""}
+            elif imported_all == 0:
+                return {"text": "导入失败", "success": False}
+            else:
+                return {"text": f"已导入 {imported_all} 个文件，{failed_all} 个失败", "success": True, "kb": kb or ""}
         return {"text": "指令缺少 path 或 content", "success": False}
 
     # ═══════════════ 导入实现 ═══════════════
@@ -389,11 +486,16 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         try:
             if not self.memory.needs_compression(self.session_id):
                 return
-            old = self.memory.pop_oldest_lines(self.session_id, 30)
+            old = self.memory.pop_oldest_lines(self.session_id)
             if not old.strip():
                 return
             resp = self.llm.chat([
-                {"role": "system", "content": "你是一个对话摘要助手。"},
+                {"role": "system", "content": "你是一个对话摘要助手。请保留以下关键信息：\n"
+                 "1. 用户的核心需求/主题（如「白酒和啤酒香味物质对比」）\n"
+                 "2. 已得到的结论/答案要点\n"
+                 "3. 用户明确要继续追问的方向\n"
+                 "4. 最近3条消息的原文（保留准确措辞）\n"
+                 "压缩后控制在 200 字以内。"},
                 {"role": "user", "content": f"压缩以下对话：\n{old}"},
             ])
             summary = resp.get("text", "")

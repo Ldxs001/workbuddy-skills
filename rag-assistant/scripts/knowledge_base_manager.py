@@ -259,7 +259,7 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
                 persist_directory=persist_dir,
                 embedding_function=embeddings,
             )
-            vectorstore.upsert(documents, ids=doc_ids)
+            vectorstore.add_documents(documents, ids=doc_ids)
         else:
             vectorstore = Chroma.from_documents(
                 documents=documents,

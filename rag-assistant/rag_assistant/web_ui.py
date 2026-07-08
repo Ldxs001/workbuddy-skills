@@ -74,6 +74,10 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._handle_agent_query_post()
         elif path == "/api/agent/import":
             self._handle_agent_import()
+        elif path == "/api/agent/upload-files":
+            self._handle_agent_upload_files()
+        elif path == "/api/memory/inject":
+            self._handle_memory_inject()
         elif path == "/api/config/llm":
             self._update_llm_config()
         elif path == "/api/search/toggle":
@@ -142,6 +146,15 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 .msg {{ max-width: 80%; margin-bottom: 16px; padding: 12px 16px; border-radius: 12px; line-height: 1.6; font-size: 14px; white-space: pre-wrap; }}
 .msg.user {{ background: #667eea; color: #fff; margin-left: auto; border-radius: 12px 12px 4px 12px; }}
 .msg.assistant {{ background: #fff; color: #333; border: 1px solid #e0e0e0; margin-right: auto; border-radius: 12px 12px 12px 4px; }}
+.msg.assistant p {{ margin: 4px 0; }}
+.msg.assistant ul, .msg.assistant ol {{ margin: 4px 0; padding-left: 20px; }}
+.msg.assistant code {{ background: #f0f0f5; padding: 1px 4px; border-radius: 3px; font-size: 13px; }}
+.msg.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }}
+.msg.assistant pre code {{ background: none; padding: 0; }}
+.msg.assistant table {{ border-collapse: collapse; margin: 6px 0; font-size: 13px; }}
+.msg.assistant th, .msg.assistant td {{ border: 1px solid #ddd; padding: 4px 8px; text-align: left; }}
+.msg.assistant th {{ background: #f5f5fa; }}
+.msg.assistant blockquote {{ border-left: 3px solid #667eea; margin: 6px 0; padding: 4px 12px; color: #555; }}
 .msg.system {{ background: #fff3cd; color: #856404; text-align: center; font-size: 12px; max-width: 100%; }}
 .chat-input {{ display: flex; gap: 8px; padding: 12px 20px; background: #fff; border-top: 1px solid #e0e0e0; }}
 .chat-input textarea {{ flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-size: 14px; outline: none; }}
@@ -149,6 +162,10 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 .chat-input button {{ padding: 10px 24px; background: #667eea; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }}
 .chat-input button:hover {{ background: #5a6fd6; }}
 .chat-input button:disabled {{ background: #ccc; cursor: not-allowed; }}
+/* ── 推理链 ── */
+.reasoning-toggle {{ font-size: 12px; color: #888; cursor: pointer; margin-top: 8px; padding: 2px 0; user-select: none; }}
+.reasoning-toggle:hover {{ color: #667eea; }}
+.reasoning-body {{ font-size: 12px; color: #666; background: #f8f8fc; border-left: 2px solid #667eea; padding: 8px 12px; margin-top: 4px; border-radius: 0 6px 6px 0; white-space: pre-wrap; line-height: 1.5; }}
 /* ── 状态栏 ── */
 .status-bar {{ display: flex; gap: 16px; padding: 6px 20px; background: #f0f0f5; font-size: 12px; color: #888; border-bottom: 1px solid #e0e0e0; }}
 .status-item {{ display: flex; align-items: center; gap: 4px; }}
@@ -215,11 +232,38 @@ function sendMessage() {{
   }});
 }}
 
-function addMessage(text, role, id) {{
+function addMessage(text, role, id, reasoning) {{
   var div = document.createElement('div');
   div.className = 'msg ' + role;
   if (id) div.id = id;
-  div.textContent = text;
+
+  if (role === 'assistant' && window.marked) {{
+    div.innerHTML = marked.parse(text);
+  }} else {{
+    div.textContent = text;
+  }}
+
+  // 推理链（可折叠）
+  if (reasoning) {{
+    var toggle = document.createElement('div');
+    toggle.className = 'reasoning-toggle';
+    toggle.textContent = '🧠 推理过程 ▸';
+    toggle.onclick = function() {{
+      var body = div.querySelector('.reasoning-body');
+      if (body) {{
+        var hidden = body.style.display === 'block';
+        body.style.display = hidden ? 'none' : 'block';
+        toggle.textContent = hidden ? '🧠 推理过程 ▸' : '🧠 推理过程 ▾';
+      }}
+    }};
+    var body = document.createElement('div');
+    body.className = 'reasoning-body';
+    body.textContent = reasoning;
+    body.style.display = 'none';
+    div.appendChild(toggle);
+    div.appendChild(body);
+  }}
+
   document.getElementById('chat-messages').appendChild(div);
   div.scrollIntoView({{behavior:'smooth', block:'end'}});
 }}
@@ -327,43 +371,81 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
           <div class="msg assistant">你好！我是 RAG 知识库助手。<br>输入问题直接问，📄📁 选择文件入库，/import 路径导入。</div>
         </div>
         <div class="chat-input">
-          <input type="file" id="file-input" multiple style="display:none" onchange="uploadFiles(this.files)">
-          <input type="file" id="folder-input" webkitdirectory style="display:none" onchange="uploadFiles(this.files)">
+          <input type="file" id="file-input" multiple style="display:none" onchange="onFileSelected(this.files)">
+          <input type="file" id="folder-input" webkitdirectory style="display:none" onchange="onFolderSelected(this.files)">
           <button onclick="document.getElementById('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
           <button onclick="document.getElementById('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
+          <div id="file-status" style="display:none;flex:0 0 auto;max-width:260px;padding:6px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:12px;color:#2e7d32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
           <textarea id="chat-input" rows="2" placeholder="输入问题或提问文件内容..."></textarea>
           <button id="send-btn" onclick="sendMessage()">发送</button>
         </div>
         <script>
-        function uploadFiles(files) {{
+        var uploadedPaths = [];
+
+        function formatSize(bytes) {{
+          if (bytes < 1024) return bytes + ' B';
+          if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+          return (bytes / 1048576).toFixed(1) + ' MB';
+        }}
+
+        function onFileSelected(files) {{
           if (!files.length) return;
-          addMessage('正在读取 ' + files.length + ' 个文件...', 'system', 'importing');
+          addMessage('正在上传 ' + files.length + ' 个文件到服务器...', 'system', 'uploading');
+          uploadToServer(Array.from(files));
+        }}
 
-          var imported = 0, failed = 0, total = files.length;
+        function onFolderSelected(files) {{
+          if (!files.length) return;
+          addMessage('正在上传 ' + files.length + ' 个文件到服务器...', 'system', 'uploading');
+          uploadToServer(Array.from(files));
+        }}
 
-          function processFile(i) {{
+        function uploadToServer(files) {{
+          var done = 0, total = files.length;
+          var uploaded = [];
+          function next(i) {{
             if (i >= files.length) {{
-              var el = document.getElementById('importing');
+              var el = document.getElementById('uploading');
               if (el) el.remove();
-              addMessage('已导入 ' + imported + ' 个文件' + (failed ? '，' + failed + ' 个失败' : ''), 'system');
+              if (uploaded.length) {{
+                var msg = '📦 已上传 ' + uploaded.length + ' 个文件到服务器，可以说「入库」批量导入';
+                addMessage(msg, 'system');
+                // 注入 session，不传具体路径（由 manifest 管理）
+                fetch('/api/memory/inject', {{
+                  method:'POST', headers:{{'Content-Type':'application/json'}},
+                  body:JSON.stringify({{text: uploaded.length + ' 个文件已上传到服务器'}})
+                }});
+              }}
+              updateFileStatus();
               return;
             }}
             var file = files[i];
             var reader = new FileReader();
             reader.onload = function(e) {{
-              var content = e.target.result;
-              fetch('/api/agent/import', {{
+              var base64 = e.target.result.split(',')[1];
+              fetch('/api/agent/upload-files', {{
                 method:'POST', headers:{{'Content-Type':'application/json'}},
-                body:JSON.stringify({{title: file.name, content: content, kb: 'default'}})
+                body:JSON.stringify({{name: file.name, data: base64}})
               }}).then(function(r){{return r.json()}}).then(function(d){{
-                if (d.success) imported++; else failed++;
-                processFile(i + 1);
+                if (d.success && d.path) {{ uploadedPaths.push(d.path); uploaded.push(d.path); }}
+                next(i + 1);
               }});
             }};
-            reader.readAsText(file);
+            reader.readAsDataURL(file);
           }}
-          processFile(0);
-        }}{{
+          next(0);
+        }}
+
+        function updateFileStatus() {{
+          var el = document.getElementById('file-status');
+          if (!uploadedPaths.length) {{ el.style.display = 'none'; return; }}
+          var names = uploadedPaths.map(function(p){{ return p.split('/').pop() || p.split('\\\\').pop(); }}).slice(0, 3).join(', ');
+          el.textContent = '📦 已上传 ' + uploadedPaths.length + ' 个文件: ' + names;
+          if (uploadedPaths.length > 3) el.textContent += ' ...';
+          el.style.display = 'inline';
+        }}
+
+        function resetMemory() {{
           if(!confirm('确定重置当前对话？')) return;
           fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{
             if(d.success) {{ document.getElementById('chat-messages').innerHTML = '<div class=\\"msg assistant\\">对话已重置。</div>'; }}
@@ -539,6 +621,61 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
             return
         result = self.agent.rag.import_file(file_path, kb_name)
         self._send_json(result)
+
+    def _handle_agent_upload_files(self):
+        """POST /api/agent/upload-files {name, data( base64)} — 上传到服务器临时目录，不导入"""
+        body = self._read_body()
+        filename = body.get("name", "untitled")
+        base64_data = body.get("data", "")
+        if not base64_data:
+            self._send_json({"success": False, "error": "缺少 data"})
+            return
+        import base64
+        try:
+            raw = base64.b64decode(base64_data)
+        except Exception as e:
+            self._send_json({"success": False, "error": f"base64 解码失败: {e}"})
+            return
+        import_dir = os.path.join(self.agent.data_dir, "imports")
+        os.makedirs(import_dir, exist_ok=True)
+        tmp_path = os.path.join(import_dir, filename)
+        if os.path.exists(tmp_path):
+            base_name, ext = os.path.splitext(filename)
+            n = 1
+            while os.path.exists(tmp_path):
+                tmp_path = os.path.join(import_dir, f"{base_name}_{n}{ext}")
+                n += 1
+        try:
+            with open(tmp_path, "wb") as f:
+                f.write(raw)
+            # 写入清单供 LLM 用 path="MANIFEST" 批量导入
+            try:
+                import json as _json
+                manifest_path = os.path.join(self.agent.data_dir, "import_manifest.json")
+                manifest = []
+                if os.path.exists(manifest_path):
+                    with open(manifest_path, "r", encoding="utf-8") as f:
+                        manifest = _json.load(f)
+                manifest.append({"path": tmp_path, "name": filename})
+                with open(manifest_path, "w", encoding="utf-8") as f:
+                    _json.dump(manifest, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+            self._send_json({"success": True, "path": tmp_path})
+        except Exception as e:
+            self._send_json({"success": False, "error": str(e)})
+
+    def _handle_memory_inject(self):
+        """注入消息到 session（不触发 LLM）"""
+        body = self._read_body()
+        text = body.get("text", "")
+        if not text or not self.agent:
+            self._send_json({"success": False})
+            return
+        # 文件路径单独存 manifest，session 里只通知有文件待入库
+        self.agent.memory.append_short_term(self.agent.session_id, "user",
+            f"[系统通知] {text}。可输入「入库」使用 path=\"MANIFEST\" 批量导入")
+        self._send_json({"success": True})
 
     def _toggle_search(self):
         body = self._read_body()

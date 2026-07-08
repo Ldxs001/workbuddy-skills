@@ -18,6 +18,7 @@ SCRIPTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts
 if SCRIPTS_PATH not in sys.path:
     sys.path.insert(0, SCRIPTS_PATH)
 
+from rag_assistant import __version__ as rag_version
 from rag_assistant.agent import Agent
 from rag_assistant.web_ui import start_web_ui
 
@@ -312,7 +313,7 @@ def main():
     # ── 普通模式 ──
     print()
     print("=" * 50)
-    print("  RAG 智能助手 v0.1.0")
+    print(f"  RAG 智能助手 v{rag_version}")
     print("=" * 50)
     print(f"  RAG 模块: {'✅ 就绪' if agent.rag.ready else '❌ 未加载'}")
     print(f"  LLM 后端: {agent.llm.backend}")

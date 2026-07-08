@@ -14,7 +14,10 @@ class Memory:
     """统一记忆管理"""
 
     # 短期超过此行数触发压缩
-    COMPRESS_THRESHOLD = 40
+    # 每轮对话=2行(user+assistant)，100行=最近50轮
+    COMPRESS_THRESHOLD = 100
+    # 压缩时移除的最旧行数，保留最近行数=THRESHOLD - COMPRESS_REMOVE
+    COMPRESS_REMOVE = 40
 
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
@@ -64,7 +67,10 @@ class Memory:
         content = self.get_short_term(session_id)
         return len([l for l in content.split("\n") if l.strip()])
 
-    def pop_oldest_lines(self, session_id: str, n: int) -> str:
+    def pop_oldest_lines(self, session_id: str, n: int = None) -> str:
+        """取最旧 n 行做压缩，保留剩余。n 默认 COMPRESS_REMOVE"""
+        if n is None:
+            n = self.COMPRESS_REMOVE
         """
         从短期记忆中取出最旧的 N 行，返回取出的文本
         剩余部分写回文件
