@@ -5,6 +5,29 @@
 
 ---
 
+## [0.3.0] - 2026-07-08
+
+### 修复
+- **ChromaDB 入库崩溃**：`knowledge_base_manager.py` 中 `vectorstore.upsert()` → `add_documents()`。`langchain-chroma` v1.1.0 未封装 `upsert` 方法，导致每次写入均抛出 `AttributeError` 并触发 recovery 回滚，所有 PDF 实际从未入库
+- **`rag_wrapper.import_file()` 谎报成功**：底层 `add_documents_to_kb()` 返回 `False"` 但 wrapper 无视返回值，永远返回 `{"success": True}`，误导用户以为导入成功
+- **`_parse_action()` 正则断裂**：原 regex 将 Windows 路径中的 `\U` 当作 Unicode 转义、文件名中的 `"` 当作 value 结束符，导致路径截断和无限重试循环。重写为状态机解析，仅 `\"` 和 `\\` 为转义，`\X` 原样保留
+- **`_build_first_pass_messages()` 丢路径**：session 文件多行注入后按行解析，后换行路径被 `.+` 丢弃，LLM 看不到上传的文件路径。改为单行注入 + 文件路径走 `import_manifest.json` 独立管理
+- **`_validate_action()` import 校验**：LLM 用逗号分隔多文件路径时 `os.path.exists()` 检查整个字符串必然失败，现支持逗号拆分逐个校验
+- **`_exec_import()` 多文件支持**：逗号分隔路径拆分为逐个导入，清理临时文件
+
+### 新增
+- **`path="MANIFEST"` 批量导入**：上传文件路径写入 `data/import_manifest.json`，LLM 只需输出 `path="MANIFEST"` 即可触发批量导入，彻底规避路径转义问题
+- **`POST /api/agent/upload-files`**：浏览器文件上传端点，接收 base64 二进制保存到 `data/imports/` 并写入 manifest
+- **`POST /api/memory/inject`**：向 session 注入系统通知而不触发 LLM 决策循环
+- **Web UI 文件上传状态条**：显示上传的文件数量、大小和文件名
+
+### 变更
+- 压缩阈值：`COMPRESS_THRESHOLD` 40 → 100，`COMPRESS_REMOVE` = 40
+- `_build_first_pass_messages`：历史对话解析为真实 user/assistant 角色消息对，而非塞入 System Message
+- `_second_pass`：带上历史对话上下文
+
+---
+
 ## [0.2.0] - 2026-07-08
 
 ### 新增
