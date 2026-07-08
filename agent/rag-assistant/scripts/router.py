@@ -319,11 +319,21 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
         "have", "has", "had", "do", "does", "did", "will", "would", "can",
         "could", "may", "might", "shall", "should", "to", "of", "in", "for",
         "on", "with", "at", "by", "from", "as", "等", "第", "其",
+        "and", "but", "or", "nor", "not", "no", "so", "if", "then", "else",
+        "he", "she", "it", "its", "they", "them", "their", "this", "that",
+        "these", "those", "which", "who", "whom", "what", "where", "when",
+        "why", "how", "all", "each", "every", "both", "few", "many", "some",
+        "any", "more", "most", "other", "such", "into", "than", "also",
+        "very", "just", "about", "over", "there", "here", "then", "his",
+        "her", "our", "your", "upon", "within", "without", "through",
     }
     all_stop = stop_words | noise_words
     freq = {}
     for t in tokens:
-        if len(t) < 2 or t in all_stop or t.isdigit():
+        if t in all_stop or t.isdigit():
+            continue
+        is_cjk = bool(re.match(r'[\u4e00-\u9fff]', t))
+        if (is_cjk and len(t) < 2) or (not is_cjk and len(t) < 4):
             continue
         if re.match(r'^[\d]+[a-z]+$', t) or re.match(r'^[a-z]+[\d]+$', t):
             continue
@@ -403,32 +413,33 @@ def update_kb_signature(kb_name: str, chunks: list = None):
 
             texts = [c.page_content if hasattr(c, "page_content") else str(c) for c in chunks]
 
-            # 第一步：提取候选词
-            raw = set()
-            for t in texts:
-                for m in re.finditer(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{3,20}', t):
-                    w = m.group().strip().lower()
-                    if re.match(r'^\d', w) or len(w) < 2:
-                        continue
-                    raw.add(w)
-
-            # 第二步：reranker 过滤垃圾词
-            router = FallbackRouter()
-            valid = set()
-            for w in raw:
-                scores = router.score(w, {"key": "keyword"})
-                if scores.get("key", -999) > 0.05:
-                    valid.add(w)
-
-            # 第三步：频率统计排序
+            # 频率统计（语言无关，加停用词过滤避免垃圾词入规则）
+            stop_for_feed = {
+                "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
+                "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
+                "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "吗",
+                "把", "被", "让", "给", "为", "所", "以", "能", "于", "之", "与",
+                "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+                "have", "has", "had", "do", "does", "did", "will", "would", "can",
+                "could", "may", "might", "shall", "should", "to", "of", "in", "for",
+                "on", "with", "at", "by", "from", "as", "等", "第", "其",
+                "and", "but", "or", "nor", "not", "no", "so", "if", "then", "else",
+                "he", "she", "it", "its", "they", "them", "their", "this", "that",
+                "these", "those", "which", "who", "whom", "what", "where", "when",
+                "why", "how", "all", "each", "every", "both", "few", "many", "some",
+                "any", "more", "most", "other", "such", "into", "than", "also",
+                "very", "just", "about", "over", "there", "here", "then", "his",
+                "her", "our", "your", "upon", "within", "without", "through",
+            }
             freq = {}
             for t in texts:
                 for m in re.finditer(r'[\u4e00-\u9fff]{2,8}|[a-zA-Z]{3,20}', t):
                     w = m.group().strip().lower()
-                    if w in valid:
-                        freq[w] = freq.get(w, 0) + 1
+                    if w in stop_for_feed or re.match(r'^\d', w) or len(w) < 2:
+                        continue
+                    freq[w] = freq.get(w, 0) + 1
 
-            # 第四步：嵌入去重，追加
+            # 嵌入去重，追加
             for word, _ in sorted(freq.items(), key=lambda x: -x[1]):
                 if word in existing or len(existing) >= max_kw:
                     continue
