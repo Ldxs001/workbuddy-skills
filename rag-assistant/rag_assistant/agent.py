@@ -404,6 +404,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 manifest = [{"path": pp, "count": 0} for pp in paths_to_import]
             imported_all = 0
             failed_all = 0
+            imported_kbs = {}
             for item in manifest:
                 pp = item["path"] if isinstance(item, dict) else item
                 if not os.path.exists(pp):
@@ -412,6 +413,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 result = self._do_import(pp, kb)
                 if result.get("success"):
                     imported_all += 1
+                    actual_kb = result.get("kb", kb or "default")
+                    imported_kbs[actual_kb] = imported_kbs.get(actual_kb, 0) + 1
                     # 导入成功后清理临时上传目录下的文件
                     imports_dir = os.path.join(self.data_dir, "imports")
                     if pp.startswith(imports_dir):
@@ -428,12 +431,18 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                         json.dump([], f)
                 except Exception:
                     pass
+            kb_summary = ", ".join(f"{k}({v})" for k, v in sorted(imported_kbs.items())) if imported_kbs else kb or ""
+            msg = f"已导入 {imported_all} 个文件"
+            if imported_kbs:
+                msg += f"\n自动分类路由：{kb_summary}"
+            if failed_all:
+                msg += f"，{failed_all} 个失败"
             if failed_all == 0 and imported_all > 0:
-                return {"text": f"已导入 {imported_all} 个文件" + (f"，{failed_all} 个失败" if failed_all else ""), "success": True, "kb": kb or ""}
+                return {"text": msg, "success": True, "kb": kb_summary}
             elif imported_all == 0:
                 return {"text": "导入失败", "success": False}
             else:
-                return {"text": f"已导入 {imported_all} 个文件，{failed_all} 个失败", "success": True, "kb": kb or ""}
+                return {"text": msg, "success": True, "kb": kb_summary}
         return {"text": "指令缺少 path 或 content", "success": False}
 
     # ═══════════════ 导入实现 ═══════════════
@@ -449,7 +458,42 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
     def _do_import(self, path: str, kb: str) -> dict:
         path = path.strip('"').strip("'")
         if not kb:
-            kb = self._resolve_kb(os.path.basename(path), filename=os.path.basename(path))
+            # 入库路由：受 kb.auto_classify 控制，用向量模型对文档正文×各KB关键词做余弦相似度
+            try:
+                from config import load_config
+                from knowledge_base_manager import _load_rules
+                from rag_core import get_embeddings
+                cfg = load_config()
+                if cfg.get("kb", {}).get("enabled", True) and cfg.get("kb", {}).get("auto_classify", False):
+                    ext = os.path.splitext(path)[1].lower()
+                    content = ""
+                    if ext == ".pdf":
+                        from langchain_community.document_loaders import PyPDFLoader
+                        pdf_docs = PyPDFLoader(path).load()
+                        content = "\n\n".join(d.page_content[:500] for d in pdf_docs[:4])
+                    elif ext in (".txt", ".md", ".html"):
+                        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read(6000)
+                    if content:
+                        import numpy as np
+                        emb = get_embeddings()
+                        doc_vec = np.array(emb.embed_query(content))
+                        rules = _load_rules()
+                        best_kb, best_score = "default", -1
+                        for kb_name, rule in rules.items():
+                            kws = rule.get("keywords", [])
+                            if not kws:
+                                continue
+                            kw_vec = np.array(emb.embed_query(" ".join(kws)))
+                            sim = np.dot(doc_vec, kw_vec) / (np.linalg.norm(doc_vec) * np.linalg.norm(kw_vec))
+                            if sim > best_score:
+                                best_score, best_kb = sim, kb_name
+                        if best_kb != "default":
+                            kb = best_kb
+                if not kb:
+                    kb = "default"
+            except Exception:
+                kb = "default"
         try:
             if os.path.isfile(path):
                 r = self.rag.import_file(path, kb_name=kb)

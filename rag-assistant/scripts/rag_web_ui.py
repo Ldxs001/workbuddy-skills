@@ -781,7 +781,7 @@ function downloadModel(id){
   },2000);
 }
 function toggleKB(){fetch('/api/kb/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('多知识库路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
-function onFallbackModelChange(v){updateConfig('router','model_path_fallback',v)}
+function toggleImportClassify(){fetch('/api/kb/auto-classify/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('入库路由:'+(d.enabled?'向量模型':'纯关键词'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleRouter(){fetch('/api/router/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleReranker(){fetch('/api/reranker/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('Rerank:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleAdvSig(){var e=document.getElementById('adv-sig-content'),a=document.getElementById('adv-sig-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';}
@@ -1526,28 +1526,37 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
 
   <!-- 路由层 -->
   <div class="card">
-    <h2>🌐 路由层 <span style="font-weight:400;color:#888;font-size:12px;">— 硬编码(来自KB规则)→语义回退→全量广播</span></h2>
+    <h2>🌐 路由层 <span style="font-weight:400;color:#888;font-size:12px;">— 入库（文档→KB）+ 出库（问题→KB）</span></h2>
     <div class="form-row">
-      <div class="form-group">
-        <label>启用路由 <span style="font-weight:400;color:#888;font-size:11px;">（KB路由关闭时自动禁用）</span></label>
-        <label class="toggle-switch" onclick="toggleRouter()">
-          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
-        </label>
+      <div class="form-group" style="border-right:1px solid #eee;padding-right:16px;">
+        <label style="font-weight:600;color:#333;">📥 入库路由</label>
+        <div style="font-size:12px;color:#888;margin-bottom:8px;">文档入库时自动分类到对应知识库</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+          <label class="toggle-switch" onclick="toggleImportClassify()">
+            <input type="checkbox" onclick="event.stopPropagation();" {"checked" if kb_cfg.get("auto_classify", False) else ""}><span class="toggle-slider"></span>
+          </label>
+          <span style="font-size:13px;color:#555;">{"向量模型路由" if kb_cfg.get("auto_classify", False) else "纯关键词匹配"}</span>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">
+          嵌入模型：{cfg.get("embedding",{}).get("model_path","bce-embedding-base_v1")}
+        </div>
       </div>
-      <div class="form-group">
-        <label>最低得分阈值</label>
-        <input type="number" value="{fb_cfg.get('min_score_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))">
-      </div>
-      <div class="form-group">
-        <label>语义分类阈值</label>
-        <input type="number" value="{router_cfg.get('classify_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','classify_threshold',parseFloat(this.value))">
-        <span style="color:#888;font-size:11px;margin-left:4px;">（入库/出库时 reranker 关键词锚点匹配）</span>
-      </div>
-    </div>
-    <div style="margin-top:12px;">
-      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">回退语义路由模型 <span style="font-weight:400;color:#888;font-size:11px;">（每个模型独立下载，选中即生效）</span></div>
-      <div style="max-height:200px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
-        {fb_model_html}
+      <div class="form-group" style="flex:2;padding-left:16px;">
+        <label style="font-weight:600;color:#333;">📤 出库路由</label>
+        <div style="font-size:12px;color:#888;margin-bottom:8px;">用户提问时路由到对应知识库检索</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+            启用 <label class="toggle-switch" onclick="toggleRouter()">
+              <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
+            </label>
+          </label>
+          <label style="font-size:12px;color:#888;">最低得分阈值
+            <input type="number" value="{fb_cfg.get('min_score_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
+          </label>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">
+          跟随精排模型：{rerank_cfg.get("model_path","mxbai-rerank-base-v1")}
+        </div>
       </div>
     </div>
     <div class="collapsible" onclick="toggleAdvSig()" style="margin-top:8px;">
@@ -2088,6 +2097,9 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/kb/toggle":
                 cfg = load_config(); kb = cfg.setdefault("kb", {}); kb["enabled"] = not kb.get("enabled", True)
                 save_config(cfg); self._send_json({"success": True, "enabled": kb["enabled"]})
+            elif path == "/api/kb/auto-classify/toggle":
+                cfg = load_config(); kb = cfg.setdefault("kb", {}); kb["auto_classify"] = not kb.get("auto_classify", False)
+                save_config(cfg); self._send_json({"success": True, "enabled": kb["auto_classify"]})
             elif path == "/api/download-model":
                 d = self._read_body(); mid = d.get("model_id","")
                 if not mid:

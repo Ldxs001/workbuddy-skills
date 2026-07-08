@@ -5,6 +5,24 @@
 
 ---
 
+## [0.4.0] - 2026-07-08
+
+### 新增
+- **入库路由独立化**：从原有路由层分离为独立体系，受 `kb.auto_classify` 控制。启用时使用向量模型（`get_embeddings()`）对文档正文×各KB关键词做余弦相似度匹配，路由到最佳知识库；关闭时走纯关键词匹配
+- **HTML 路由层 UI 重构**：卡片拆分为 📥入库路由 + 📤出库路由左右两栏，各自显示当前模型和开关状态。出库路由模型跟随精排，移除独立选择器
+- **多知识库主开关 `kb.enabled`**：关闭时入库路由（`_do_import`）和出库路由均不生效，全进 default
+
+### 变更
+- **KB 签名写入**：`rag_core.py` 中 `update_kb_signature()` 增加 `router.enabled` 检查，关闭时跳过签名写入，避免无意义加载
+- **`FallbackRouter` 模型源**：`router.py` 优先读 `reranker.model_path`，兼容旧 `fallback.model_path` 作为回退
+- **`_exec_import` 返回增强**：MANIFEST 批量导入后返回各 KB 分布明细，LLM 可据此告知用户路由结果
+
+### 修复
+- **空 KB 名 bug**：`_resolve_kb` 对不可分类文件返回 "" 时，更早降级为 `"default"`
+- **`knowledge_base_manager.py` 恢复原始**：hybrid 模式的降级改动已还原，不污染技能代码
+
+---
+
 ## [0.3.0] - 2026-07-08
 
 ### 修复

@@ -433,7 +433,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
 
     # 导入后自动更新 KB 签名
     router_cfg = cfg.get("router", {})
-    if router_cfg.get("fallback", {}).get("auto_update_signatures", True):
+    if router_cfg.get("enabled", True) and router_cfg.get("fallback", {}).get("auto_update_signatures", True):
         try:
             from router import update_kb_signature
             update_kb_signature(kb_name, chunks)

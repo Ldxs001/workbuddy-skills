@@ -84,7 +84,8 @@ class FallbackRouter:
             cfg = load_config()
             router_cfg = cfg.get("router", {})
             fallback_cfg = router_cfg.get("fallback", {})
-            self.model_path = fallback_cfg.get("model_path", "")
+            rerank_cfg = cfg.get("reranker", {})
+            self.model_path = rerank_cfg.get("model_path", "") or fallback_cfg.get("model_path", "")
 
         if not self.model_path or not os.path.exists(self.model_path):
             from utils import MODELS_DIR, find_model_dirs
