@@ -54,10 +54,13 @@ rag-assistant/
 ├── main.py                          # 入口
 ├── setup.bat                        # Windows 一键启动
 ├── requirements.txt                 # 依赖清单
+├── CHANGELOG.md                     # 版本更新日志
+├── RAG_PROTOCOL.md                  # 外部接入协议规范（HTTP/CLI/文件交互）
+├── llms.txt                         # AI 可读的项目自描述文档（llmstxt.org）
 ├── .gitignore
 │
 ├── rag_assistant/                   # 智能体核心
-│   ├── agent.py                     # Agent 决策循环（~430 行）
+│   ├── agent.py                     # Agent 决策循环（~500 行）
 │   ├── web_ui.py                    # Web 界面（port 8765）
 │   ├── llm_client.py                # LLM 统一客户端
 │   ├── rag_wrapper.py               # RAG 封装层
@@ -89,6 +92,8 @@ rag-assistant/
     ├── sessions/                    # 会话历史
     ├── memory/                      # 记忆数据
     ├── prompts/                     # 提示词模板
+    ├── import_manifest.json          # 待入库文件清单
+    ├── imports/                      # 浏览器上传临时目录（入库后自动清理）
     └── cache/                       # 缓存
 ```
 
@@ -116,6 +121,13 @@ LLM 输出
 #### _parse_action
 
 从 LLM 输出中提取 `<<ACTION type="..." ...>>` 指令，返回 `(params_dict, error_msg)` 二元组：
+
+解析器使用**状态机逐字符扫描**，而非正则表达式，以解决两个实际痛点：
+
+1. **Windows 路径兼容**：`C:\Users\...` 中的反斜杠不会被当作转义前缀，`\U` 不被解释为 Unicode 序列
+2. **文件名含引号**：仅 `\"` 和 `\\` 视为转义，其他 `\X` 保持字面量，支持 `尊"礼"与崇"力".pdf` 这类文件名
+
+返回格式：
 - `(None, None)` — 无动作标记，正常聊天
 - `(None, "原因")` — 有 `<<ACTION` 但格式错误
 - `({...}, None)` — 解析成功
@@ -178,15 +190,18 @@ slices = [
 | `/api/llm/models` | GET | 扫描后端可用模型列表 |
 | `/api/llm/test` | GET | 测试 LLM 连接 |
 | `/api/kbs/list` | GET | 知识库列表 |
-| `/api/kbs/import` | POST | 导入文件到知识库 |
-| `/api/import/file` | POST | 上传文件入库 |
-| `/api/import/folder` | POST | 上传文件夹入库 |
+| `/api/agent/import` | POST | 导入文件/文本到知识库 `{"path"}` / `{"content", "title"}` |
+| `/api/agent/upload-files` | POST | 浏览器上传文件到服务器临时目录 `{"name", "data(base64)"}` |
+| `/api/memory/inject` | POST | 向 session 注入系统通知（不触发 LLM）`{"text"}` |
 | `/api/memory/reset` | POST | 重置对话历史 |
+| `/api/search/toggle` | POST | 联网搜索开关 `{"enabled"}` |
 
 **关键交互细节**：
 - `loadModels()` 在页面加载后 500ms 触发，填充模型下拉框
 - 配置保存后立即同步到 `self.agent.llm.*` 运行时实例
 - `llm_max_tokens` 和 `llm_timeout` 持久化到 `config.json`
+
+**文件上传流程**：点击 `📄` 或 `📁` 按钮选择文件后，文件以 base64 二进制上传到服务器 `data/imports/` 目录并记录到 `import_manifest.json`，同时聊天框出现系统通知。用户输入"入库"后 LLM 发出 `path="MANIFEST"` 指令，系统读取清单逐个走完整导入管线（PyPDFLoader → OCR 回退 → 自动路由 → 切片 → 嵌入）。此设计将文件选择与入库决策分离，避免 LLM 直接处理具体路径字符串带来的编码问题。
 
 ### 3.4 RAG 封装层 — `rag_wrapper.py`
 
@@ -223,10 +238,10 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
 | `clear_short_term(session_id)` | 清空对话历史 | 删除文件 |
 | `pop_oldest_lines(session_id, n)` | 弹出最旧的 N 行（用于压缩） | 返回被移除的文本 |
 | `short_term_line_count(session_id)` | 当前行数 | 返回 `int` |
-| `needs_compression(session_id)` | 行数 > 40 触发压缩开关 | 返回 `bool` |
+| `needs_compression(session_id)` | 行数 > 100 触发压缩开关 | 返回 `bool` |
 
-当 `short_term_line_count() > 40` 时触发压缩流程：
-- `pop_oldest_lines()` 取出最旧对话 → 调 LLM 压缩为摘要 → `store_compressed()` 存入长时记忆
+当 `short_term_line_count() > 100` 时触发压缩流程：
+- `pop_oldest_lines()` 取出最旧 40 行对话 → 调 LLM 压缩为摘要（压缩指令结构化要求保留核心需求、已得结论、追问方向、最近 3 条原文） → `store_compressed()` 存入长时记忆
 
 ### 4.2 长时记忆（压缩摘要）
 
@@ -280,16 +295,23 @@ Agent 的 `chat()` 入口自动处理记忆：
 ```
 chat(message)
   ↓
-build_context("default")            # 读取压缩摘要 + 近期对话
+append_short_term("default", message)    # 写入用户输入
+  ↓
+_build_first_pass_messages(message)
+  ├─ system prompt（含动作格式说明）
+  ├─ 解析 session 文件为真实 user/assistant 消息对（非 system 角色）
+  ├─ 追加压缩摘要作为 system context
+  └─ 追加当前消息作为 user message
   ↓
 LLM 决策 + 执行
   ↓
-append_short_term("default", message)  # 写入用户输入
-append_short_term("default", reply)    # 写入助手回复
-record_habit(message, is_rag, ...)     # 记录习惯
+append_short_term("default", reply)      # 写入助手回复
+record_habit(message, is_rag, ...)       # 记录习惯
 ↓ 如果检索结果为空
-record_gap(query, kb)                  # 记录知识缺口
+record_gap(query, kb)                    # 记录知识缺口
 ```
+
+历史对话以真实 `user`/`assistant` 角色消息对的形式传入 LLM，而非塞入单条 system 消息。`_second_pass()` 也携带历史对话，保证跨轮连贯性。
 
 ---
 
@@ -330,7 +352,9 @@ record_gap(query, kb)                  # 记录知识缺口
 | GET | `/api/memory/reset` | 重置对话 |
 | POST | `/api/chat` | 对话（POST）`{"message": "..."}` |
 | POST | `/api/agent/query` | 查询 `{"message", "kb"}` |
-| POST | `/api/agent/import` | 导入 `{"path"}` 或 `{"text", "title", "kb"}` |
+| POST | `/api/agent/import` | 导入 `{"path"}` 或 `{"content", "title", "kb"}` |
+| POST | `/api/agent/upload-files` | 上传文件到服务器临时目录 `{"name", "data(base64)"}` |
+| POST | `/api/memory/inject` | 注入系统通知 `{"text"}` |
 | POST | `/api/config/llm` | 更新 LLM 配置 `{"backend", "model", "timeout", "maxtokens"}` |
 | POST | `/api/search/toggle` | 搜索开关 `{"enabled"}` |
 
@@ -350,7 +374,8 @@ LLM 在回复中嵌入 `<<ACTION ...>>` 标记控制 Agent 行为：
 ```python
 <<ACTION type="query" entities="实体1,实体2" attrs="属性A,属性B" rel="关系词" kb="知识库名">>
 <<ACTION type="search" query="搜索词">>
-<<ACTION type="import" path="文件路径" content="文本" kb="知识库" title="标题">>
+<<ACTION type="import" content="入库的完整文本内容">
+<<ACTION type="import" path="MANIFEST">        # 批量导入所有待入库文件
 ```
 
 解析结果：`_parse_action(reply) → (params_dict, error_msg)`
@@ -415,7 +440,12 @@ _parse_action(reply)
          → _second_pass(message, context, action)
            → LLM 基于上下文生成回答
        → type == "import"
-         → rag.import_file(path)
+         → path == "MANIFEST"
+           → 读取 import_manifest.json → 逐个 import_file()
+         → path == 具体路径
+           → rag.import_file(path)
+         → 含 content
+           → rag.import_text(content)
        ↓
 回答返回前端
 ```
