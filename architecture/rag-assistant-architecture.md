@@ -58,7 +58,7 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 ### 2.1 文件结构
 
 ```
-rag-assistant/
+agent/rag-assistant/
 ├── main.py                          # 入口
 ├── setup.bat                        # Windows 一键启动
 ├── requirements.txt                 # 依赖清单

@@ -5,7 +5,7 @@ displayName: local-rag-builder
 version: 1.5.0
 description: 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理
 author: wUwproject
-license: MIT
+license: MIT-0
 sensitive_access: true
 critical_write: false
 trigger: ['搭建 RAG 系统', '本地知识库', '嵌入模型下载', '文本切分', '向量检索', 'RAG 环境配置', '下载模型', '入库文档', '切分文档', '知识库管理']
