@@ -399,7 +399,7 @@ RAG Assistant 通过 `rag_wrapper.py` 封装以下技能模块，不改造内部
 | `rag_core` | `retrieve_context` | 检索主入口（路由→检索→reranker→build） |
 | `rag_core` | `get_embeddings` | 嵌入模型管理 |
 | `knowledge_base_manager` | `list_knowledge_bases` | 知识库枚举 |
-| `knowledge_base_manager` | `auto_classify` | 自动分类路由 |
+| `knowledge_base_manager` | `_load_rules` / `auto_classify` | 自动分类规则（入库路由用 `_load_rules` 列出 KB 关键词，出库路由用 `auto_classify` 做硬编码匹配） |
 | `config` | `load_config / save_config` | 配置持久化 |
 | `prompt_manager` | `get_full_prompt` | Prompt 模板 |
 
