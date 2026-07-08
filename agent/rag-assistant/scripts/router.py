@@ -332,6 +332,7 @@ def _build_signature_from_texts(texts: list[str], max_chars: int = 500, kb_name:
     sorted_words = sorted(freq.items(), key=lambda x: -x[1])
     top_words = [w for w, _ in sorted_words[:12] if len(w) >= 2]
     signature = " · ".join(top_words) if top_words else ""
+    signature = " · ".join(top_words) if top_words else ""
 
     # 返回纯关键词列表
     if signature:
