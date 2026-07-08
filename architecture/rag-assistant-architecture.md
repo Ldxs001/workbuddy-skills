@@ -37,6 +37,14 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 | **技能完整走 > 绕路** | 每片独立走 route_query → retrieve_documents → reranker → build_context 全流程，不改造技能内部逻辑 |
 | **配置持久化 > 运行时内存** | 所有 LLM 配置（backend/model/timeout/max_tokens）写入 config.json，刷新页面不丢 |
 
+### 1.2 路由开关行为
+
+| 开关 | 控制 | 开 | 关 |
+|------|------|----|----|
+| `kb.enabled` | 多知识库路由主开关 | 允许入库/出库路由工作 | 全部路由失效，全进 default |
+| `kb.auto_classify` | 入库路由 | 向量模型余弦相似度匹配最佳 KB | 纯关键词匹配，无匹配进 default |
+| `router.enabled` | 出库路由 | hardcoded → reranker × KB 签名 → 全库广播 | 纯关键词匹配 + **不写 KB 签名** |
+
 ---
 
 ## 二、三层架构
@@ -399,7 +407,7 @@ RAG Assistant 通过 `rag_wrapper.py` 封装以下技能模块，不改造内部
 | `rag_core` | `retrieve_context` | 检索主入口（路由→检索→reranker→build） |
 | `rag_core` | `get_embeddings` | 嵌入模型管理 |
 | `knowledge_base_manager` | `list_knowledge_bases` | 知识库枚举 |
-| `knowledge_base_manager` | `_load_rules` / `auto_classify` | 入库路由用 `_load_rules` 列出各 KB 关键词做嵌入相似度；出库路由用 `auto_classify` 做第一层硬编码匹配，未命中时走 `FallbackRouter` reranker × KB 签名
+| `knowledge_base_manager` | `_load_rules` / `auto_classify` | 入库路由：`_load_rules` 列出各 KB 关键词做嵌入余弦相似度（`kb.auto_classify` 开时）；出库路由：`auto_classify` 做第一层硬编码匹配，未命中时走 `FallbackRouter` reranker × KB 签名（`router.enabled` 开时）。`kb.enabled` 关时全部路由失效，全进 default
 | `config` | `load_config / save_config` | 配置持久化 |
 | `prompt_manager` | `get_full_prompt` | Prompt 模板 |
 
