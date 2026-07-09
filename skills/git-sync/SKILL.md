@@ -5,7 +5,7 @@ displayName: Git Sync
 version: 2.26.1
 author: wUwproject
 license: MIT
-description: 将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复_push_with_cred_url/pull_with_cred_url 未检查 URL 内嵌 token 的缺陷（remote URL 已含 token 时不需查 git-credentials）。
+description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。
 sensitive_access: true
 critical_write: false
 permission_weight: CRITICAL
@@ -26,36 +26,54 @@ data_dir_compliance: true
 
 ## 约束
 
-- **单技能同步** — 一次只能同步一个 skill，不支持批量
-- **网络依赖** — 推送 Gitee/GitHub 需要可用网络连接，超时阈值 60 秒
+- **自动检测类型** — 自动识别 skill（`_meta.json`）或 agent（`rag_assistant/__init__.py`），分别走不同发布流程
+- **`all` 模式** — `git-sync all` 遍历 `skills/` 和 `agent/` 全部项目
+- **网络依赖** — 推送 Gitee/GitHub/ClawHub/SkillHub/PyPI 需要可用网络连接，超时阈值 60 秒
 - **冲突不自动合并** — git merge 冲突需人工介入
 - **固定仓库** — 同步目标固定为 `~/.workbuddy/workbuddy-skills/`
-- **参数约束** — skill-name 不含路径分隔符，version 格式要求严格 x.y.z
-- **仓库规模** — 支持 1-50 个技能，每个技能目录 ≤ 500MB
+- **参数约束** — 项目名不含路径分隔符，version 格式严格 x.y.z
+- **仓库规模** — 支持 1-50 个项目，每个 ≤ 500MB
 - **数据持久性** — manifest.json 记录同步状态，不备份远程仓库数据
 
 ## 触发条件
 
 **正向触发：**
-- 「同步/上传/推送/发布某个 skill」
-- 「打包某个 skill」
-- 「更新 README.md 的技能列表」
-- 「检查某个 skill 的版本号」
+- 「同步/上传/推送/发布某个 skill 或 agent」
+- 「全量同步/全部发布」
+- 「发布到 ClawHub/SkillHub/PyPI」
+- 「创建 Release」
+- 「打包/更新 README.md」
+- 「检查版本号」
 
 **否定条件：**
 - 用户只是说「帮我看看这个文件」——没有同步/打包意图
-- 用户要求「用 git 提交代码」——这是通用 git 操作，不是 skill 同步
-- 用户提到「同步」但指的是文件同步（如「同步到云端」）——不是 skill 仓库同步
+- 用户要求「用 git 提交代码」——这是通用 git 操作，不是本技能
 
 ## 核心能力
 
 > 📚 **渐进式加载**：本技能采用渐进式 MD 体系，`SKILL.md` 为入口（≤230行），详细内容拆分到 `references/*.md` 按需加载。
 
-- **三端同步** —— 码云、GitHub、本地 `.dist/` 目录
+- **全平台发布** —— Gitee + GitHub + ClawHub + SkillHub + PyPI，一次同步全自动
+- **类型自动识别** —— skill（`_meta.json`）/ agent（`__init__.py`），版本号各自读取
+- **`all` 批量模式** —— 遍历全部 skills 和 agents 逐个同步
+- **LLM 文件过滤** —— 同步前引导 LLM 审核文件清单，只复制允许的文件进仓库
+- **LLM 脱敏** —— 同步后引导 LLM 扫描敏感信息并自动决策脱敏
 - **版本号三方对比** —— `_meta.json` / `SKILL.md` frontmatter / changelog
-- **敏感信息过滤** —— 自动扫描并脱敏 `secrets/regex/telemetry`
 - **SKILL.md 规范审查** —— 内联审计（版本一致性 + R-23 脚本引用检查）
 - **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页
+- **PyPI 隔离构建** —— 拷贝源码到临时目录 → 生成 setup.py → build → twine 上传
+- **Release 创建** —— git tag + GitHub API Release（技能用 `{name}-v{ver}`，智能体用 `v{ver}`）
+
+### 平台发布差异
+
+| 平台 | 版本读取源 | 命令/工具 | 注意事项 |
+|------|-----------|-----------|---------|
+| Gitee | `_meta.json` (skill) / `__init__.py` (agent) | `git push` | SSH/HTTPS 凭证自动解析，支持 pull --rebase 重试 |
+| GitHub | 同上 | `git push` | 同 Gitee，443 超时常见，会 retry |
+| ClawHub | `_meta.json` 的 slug/version/tags | `npx clawhub publish` | API 成功时 CLI 可能误报 `invalid value`（已知 bug），检查 `ok` 关键字即可 |
+| SkillHub | **必须传 `--version`**（单独读取 SKILL.md frontmatter 不可靠） | `skills_store_cli.py publish` | 不加 `--version` 可能读到旧版本导致发布失败 |
+| PyPI | `__init__.py` 的 `__version__` | 隔离构建 → `twine upload --disable-progress` | Windows 上 twine 的 Rich 进度条有 GBK 编码 bug，必须加 `--disable-progress` |
+| Release | 同步后当前版本 | `git tag` + GitHub API | tag 格式: skill=`{name}-v{ver}`, agent=`v{ver}`
 
 ### 渐进式文件索引
 
