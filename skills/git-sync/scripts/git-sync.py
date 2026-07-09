@@ -1005,10 +1005,10 @@ def step_skillhub_publish(name: str, version: str):
     if not sd.is_dir(): print("  ❌ 技能目录不存在"); return
     cli = Path.home() / ".skillhub" / "skills_store_cli.py"
     if not cli.exists(): print("  ❌ SkillHub CLI 不存在"); return
-    r = subprocess.run([sys.executable,str(cli),"publish",str(sd),"--changelog",f"v{version}"],
+    r = subprocess.run([sys.executable,str(cli),"publish",str(sd),"--version",version,"--changelog",f"v{version}"],
                       capture_output=True,text=True)
-    if r.returncode==0: print(f"  ✅ SkillHub: {name}")
-    else: print(f"  ⚠️  SkillHub: {r.stderr[:200]}")
+    if r.returncode==0: print(f"  ✅ SkillHub: {name} v{version}")
+    else: print(f"  ⚠️  SkillHub: {r.stderr[:250]}")
 
 def step_release_create(name: str, typ: str, version: str):
     log(9,8,f"创建 Release: {name} v{version}...")
