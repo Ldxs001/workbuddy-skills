@@ -95,4 +95,5 @@ rm -rf temp-skills
 
 ## 许可证
 
-MIT License
+- MIT License（适用于大部分技能）
+- Apache License 2.0（适用于 `Orchestrator/`）
