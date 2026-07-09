@@ -1,3 +1,8 @@
+## [2.26.6] - 2026-07-09
+
+### 修复
+- **displayName 不一致**：ClawHub/SkillHub 发布的显示名统一为 kebab-case（`git-sync`），废除驼峰格式 `Git Sync`
+
 ## [2.26.5] - 2026-07-09
 
 ### 修复
