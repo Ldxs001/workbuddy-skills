@@ -989,28 +989,26 @@ setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
     shutil.rmtree(build_dir,ignore_errors=True)
 
 def step_clawhub_publish(name: str, version: str):
-    log(8,8,f"发布 {name} 到 ClawHub...")
     sd = WORK_REPO / "skills" / name
-    if not sd.is_dir(): log(8,8,"技能目录不存在","err"); return
+    if not sd.is_dir(): print("  ❌ 技能目录不存在"); return
     meta = json.loads((sd/"_meta.json").read_text(encoding="utf-8"))
     slug = meta.get("slug",name)
     cmd = f'npx clawhub publish "{sd}" --slug "{slug}" --name "{meta.get("displayName",name)}" --version "{version}" --changelog "v{version}"'
     if meta.get("tags"):
         cmd += ' --tags "' + ",".join(meta["tags"]) + '"'
     r = subprocess.run(cmd, capture_output=True, text=True, shell=True)
-    if r.returncode==0 or "ok" in r.stdout.lower(): log(8,8,f"ClawHub: {slug}","ok")
-    else: log(8,8,f"ClawHub: {r.stderr[:200]}","warn")
+    if r.returncode==0 or "ok" in r.stdout.lower(): print(f"  ✅ ClawHub: {slug}")
+    else: print(f"  ⚠️  ClawHub: {r.stderr[:200]}")
 
 def step_skillhub_publish(name: str, version: str):
-    log(8,8,f"发布 {name} 到 SkillHub...")
     sd = WORK_REPO / "skills" / name
-    if not sd.is_dir(): log(8,8,"技能目录不存在","err"); return
+    if not sd.is_dir(): print("  ❌ 技能目录不存在"); return
     cli = Path.home() / ".skillhub" / "skills_store_cli.py"
-    if not cli.exists(): log(8,8,"SkillHub CLI 不存在","err"); return
+    if not cli.exists(): print("  ❌ SkillHub CLI 不存在"); return
     r = subprocess.run([sys.executable,str(cli),"publish",str(sd),"--changelog",f"v{version}"],
                       capture_output=True,text=True)
-    if r.returncode==0: log(8,8,f"SkillHub: {name}","ok")
-    else: log(8,8,f"SkillHub: {r.stderr[:200]}","warn")
+    if r.returncode==0: print(f"  ✅ SkillHub: {name}")
+    else: print(f"  ⚠️  SkillHub: {r.stderr[:200]}")
 
 def step_release_create(name: str, typ: str, version: str):
     log(9,8,f"创建 Release: {name} v{version}...")
@@ -1136,10 +1134,12 @@ def main():
         print("❌ 无法读取版本号")
         sys.exit(1)
 
-    # ── market-only 模式 ──────────────────────────────────────
+    # ── market-only 模式（直接输出，不走 LOG_BUFFER）───────────────
     if market_only:
         if is_skill:
+            print(f"  发布 {name} 到 ClawHub...")
             step_clawhub_publish(name, version)
+            print(f"  发布 {name} 到 SkillHub...")
             step_skillhub_publish(name, version)
         elif do_pypi:
             step_pypi_publish(name, version, src_dir)
@@ -1211,10 +1211,12 @@ def main():
                 zip_file = step_pack_zip(name, version, SKILLS_DIR, skip_scan)
                 step_build_index()
 
-    # ── 市场/PyPI 发布（同步完成后运行，不静默）─────────────────────
+    # ── 市场/PyPI 发布（同步完成后运行，直接输出）─────────────────────
     if not skip_market:
         if is_skill:
+            print(f"\n  发布 {name} 到 ClawHub...")
             step_clawhub_publish(name, version)
+            print(f"  发布 {name} 到 SkillHub...")
             step_skillhub_publish(name, version)
         if is_agent and do_pypi:
             step_pypi_publish(name, version, src_dir)
