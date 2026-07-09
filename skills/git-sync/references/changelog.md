@@ -1,3 +1,14 @@
+## [2.26.2] - 2026-07-09
+
+### 修复
+- **ClawHub 发布在 Windows 上崩溃**：subprocess 调用 npx 需要 shell=True，否则找不到可执行文件
+- **SkillHub 发布版本错误**：必须显式传 `--version` 参数，不可依赖 SKILL.md frontmatter（平台上已有旧版本时 frontmatter 读取不可靠）
+- **Market-only/正常模式输出被吞**：market 步骤改用 print() 直接输出，不走 LOG_BUFFER
+
+### 文档
+- 全面更新 SKILL.md 描述、约束、触发条件、核心能力和平台发布差异表
+- 更新 references/guide.md 完整执行流程（步骤 0→9）和新版调用方式
+
 ## [2.26.1] - 2026-07-09
 
 ### 变更

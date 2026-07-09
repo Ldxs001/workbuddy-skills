@@ -4,30 +4,74 @@
 
 ---
 
-## 完整执行流程（步骤 0 → 6）
+## 完整执行流程（步骤 0 → 9）
 
-### 步骤 0：安全校验（v1.4 新增）
+### 步骤 0：参数解析 + 类型检测（v2.25+）
+
+| 操作 | 说明 |
+|------|------|
+| 参数解析 | `--skip-scan` / `--skip-market` / `--market-only` / `--pypi` / `--release` |
+| `all` 模式 | `git-sync all` 遍历 `skills/` 和 `agent/` 全部项目 |
+| 类型检测 | 自动识别 skill（`_meta.json`）或 agent（`__init__.py`） |
+| 版本号读取 | skill→`_meta.json`，agent→`__init__.py` 中的 `__version__` |
+
+### 步骤 0.5：文件路径校准（v2.3+）
 
 | 校验项 | 规则 |
 |--------|------|
 | 路径穿越防护 | 拒绝 `../`、`..\\`、`/` 开头、`C:` 开头 |
-| 目标路径范围 | `realpath` 必须在 `WORK_REPO/skills/` 内 |
-| 同步工具选择 | 优先 `rsync --delete`，不可用则 `rm -rf` + `cp -r` |
+| 目标路径范围 | `realpath` 必须在 `WORK_REPO/{skills|agent}/` 内 |
 
-### 步骤 0.5：维护清单检查（v1.3 新增）
+### 步骤 0.7：版本号比对（v1.6+）
 
-同步前自动检查 `manifest.json`，决定行为：
+与仓库中已有版本对比，决定是否需要同步：版本相同跳过，本地更新则正常升级。
 
-| 检查结果 | 行为 |
-|---------|------|
-| `FOUND:uploaded` | ✅ 继续执行 |
-| `FOUND:not-uploaded` | ⏳ 继续执行，完成后标记 uploaded=true |
-| `NOT_FOUND` | ❓ 询问：加入清单 / 仅本次同步 / 中止 |
+### 步骤 1：维护清单检查（v1.3+）
 
-### 步骤 0.7：版本号三方对比（v1.6 新增）
+同步前自动检查 `manifest.json`。
 
-> 这一步检查的是**清单 version vs 待推送 version**，属于三单一致的前置校验。
-> 三单一致完整定义见 `reference.md` 的三单一致模型。
+### 步骤 2~3.5：标准校验（仅 skill）
+
+| 步骤 | 操作 | 适用 |
+|------|------|------|
+| 2 | `_meta.json` 标准化校验 | skill 仅 |
+| 3 | SKILL.md 规范审查（只读） | skill 仅 |
+
+### 步骤 3.7：LLM 文件过滤器（v2.26+，替换硬编码黑名单）
+
+Python 扫描源目录文件树 + 自动查找规则文件（`blueprint*`, `*rules*`, `blueprints/`），生成 `.file_filter_{name}.json`。LLM 审核后返回允许列表，**只复制允许的文件**。
+
+### 步骤 4：同步文件
+
+仅复制 LLM 允许列表中的文件到 `workbuddy-skills/` 仓库。
+
+### 步骤 4.5：LLM 脱敏
+
+扫描已同步文件中的敏感信息（邮箱/token/IP），LLM 自动决策 keep/sanitize，执行脱敏。
+
+### 步骤 5：更新 README.md（仅 skill）
+
+### 步骤 6：提交并推送到双平台
+
+Gitee + GitHub，失败自动 pull --rebase 重试。
+
+### 步骤 6.7：更新清单上传状态
+
+### 步骤 7：生成 ZIP 安装包（仅 skill）
+
+### 步骤 7.5：打包前敏感扫描
+
+### 步骤 8：发布到平台（非静默，直接输出）
+
+| 类型 | 平台 | 命令 |
+|------|------|------|
+| skill | ClawHub | `npx clawhub publish`（shell=True，已知 CLI bug）|
+| skill | SkillHub | `skills_store_cli.py publish --version <ver>`（必须传 --version）|
+| agent | PyPI | 隔离构建 → `twine upload --disable-progress`（--pypi 标志）|
+
+### 步骤 9：创建 Release（--release 标志）
+
+git tag + GitHub API，skill tag=`{name}-v{ver}`，agent tag=`v{ver}`。
 
 | 对比结果 | 行为 |
 |---------|------|
@@ -248,13 +292,35 @@ pacman -S rsync
 
 ### 正确调用方式
 
-```bash
-# ✅ 推荐：先 cd 到脚本目录，再执行
-cd ~/.workbuddy/skills/git-sync/scripts
-bash git-sync.sh <skill-name> <version>
+本机 rsync 不可用，实际走 `git-sync.py`。支持以下用法：
 
-# ❌ 避免：直接从其他目录用绝对路径调用
-bash "C:/Users/sm001/.workbuddy/skills/git-sync/scripts/git-sync.sh" <skill-name> <version>
+```bash
+# 基础用法（自动识别类型）
+python git-sync.py <name>
+
+# 指定版本
+python git-sync.py <name> <version>
+
+# 跳过敏感扫描
+python git-sync.py <name> --skip-scan
+
+# 跳过市场发布
+python git-sync.py <name> --skip-market
+
+# 只发市场不推 git
+python git-sync.py <name> --market-only
+
+# 发布到 PyPI（仅 agent）
+python git-sync.py <name> --pypi
+
+# 创建 Release
+python git-sync.py <name> --release
+
+# 全部项目
+python git-sync.py all
+
+# 组合使用
+python git-sync.py rag-assistant --pypi --release --skip-market
 ```
 
 ---
