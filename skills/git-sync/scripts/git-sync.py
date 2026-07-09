@@ -138,15 +138,19 @@ def step_manifest(skill_name: str, version: str, repo_name="workbuddy-skills"):
         log(1, 8, "在清单中，已上传", "ok")
 
 # ── 步骤 2：版本号对比 ───────────────────────────────────────────────────────
-def step_version_compare(skill_name: str, local_ver: str) -> str:
+def step_version_compare(skill_name: str, local_ver: str, work_repo_subdir: str = "skills/unknown") -> str:
     log(2, 8, "版本号对比（仓库 vs 本地源文件）...")
-    repo_meta = WORK_REPO / "skills" / skill_name / "_meta.json"
+    # 先查 _meta.json（skill），再查 __init__.py（agent）
+    repo_meta = WORK_REPO / work_repo_subdir / "_meta.json"
+    repo_init = WORK_REPO / work_repo_subdir / "rag_assistant" / "__init__.py"
     repo_ver = ""
     if repo_meta.exists():
-        try:
-            repo_ver = json.load(open(repo_meta, encoding="utf-8"))["version"]
-        except Exception:
-            pass
+        try: repo_ver = json.load(open(repo_meta, encoding="utf-8"))["version"]
+        except: pass
+    elif repo_init.exists():
+        import re
+        m = re.search(r'__version__\s*=\s*"([^"]+)"', repo_init.read_text(encoding="utf-8"))
+        if m: repo_ver = m.group(1)
     # 统一去掉 v 前缀
     def _strip_v(s):
         return s[1:] if s.startswith("v") else s
@@ -634,7 +638,7 @@ def _pull_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
         run_git("remote", "set-url", remote_name, raw_url,
                  workdir=WORK_REPO, check=False)
 
-def step_commit_and_push(skill_name: str, version: str):
+def step_commit_and_push(skill_name: str, version: str, work_repo_subdir: str = "skills/unknown"):
     log(6, 8, "提交并推送...")
     if not WORK_REPO.exists():
         log(6, 8, f"工作仓库不存在: {WORK_REPO}", "err")
@@ -653,7 +657,7 @@ def step_commit_and_push(skill_name: str, version: str):
     run_git("config", "user.name",  git_user,  check=False)
 
     # add
-    run_git("add", f"skills/{skill_name}/")
+    run_git("add", f"{work_repo_subdir}/")
     run_git("add", "README.md", check=False)
 
     # commit
@@ -856,8 +860,112 @@ def get_meta_desc(meta_file: Path) -> str:
         return r.stdout.strip()
     return ""
 
+# ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
+
+def step_pypi_publish(name: str, version: str, src_dir: Path):
+    """发布到 PyPI（隔离构建）"""
+    log(8, 8, f"发布 {name} 到 PyPI...")
+    pypi_name = f"{name}-ldxs"
+    build_dir = Path(tempfile.gettempdir()) / f"pypi_build_{name}_{version}"
+    if build_dir.exists(): shutil.rmtree(build_dir)
+    shutil.copytree(src_dir, build_dir,
+                    ignore=shutil.ignore_patterns("__pycache__","*.pyc","dist","build","*.egg-info"))
+    from pathlib import Path as _P
+    _P(str(build_dir / "setup.py")).write_text(textwrap.dedent(f'''\
+from setuptools import setup, find_packages
+import os
+with open(os.path.join(os.path.dirname(__file__),"rag_assistant","__init__.py")) as f:
+    for l in f:
+        if l.startswith("__version__"): V=l.split('"')[1]; break
+    else: V="{version}"
+req_p=os.path.join(os.path.dirname(__file__),"requirements.txt")
+with open(req_p) as f: REQ=[l.strip() for l in f if l.strip() and not l.startswith("#")]
+REQ=[r for r in REQ if not r.startswith("langchain")]
+readme_p=os.path.join(os.path.dirname(__file__),"README.md")
+LD=open(readme_p,encoding="utf-8").read() if os.path.exists(readme_p) else "{name}"
+setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
+      long_description=LD,long_description_content_type="text/markdown",
+      author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
+      url="https://github.com/Ldxs001/workbuddy-skills",
+      packages=find_packages(),include_package_data=True,
+      python_requires=">=3.10",install_requires=REQ,
+      entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
+      classifiers=["Development Status :: 4 - Beta","Intended Audience :: Developers",
+                   "License :: OSI Approved :: Apache Software License",
+                   "Programming Language :: Python :: 3",
+                   "Topic :: Scientific/Engineering :: Artificial Intelligence"])
+'''), encoding="utf-8")
+    _P(str(build_dir / "MANIFEST.in")).write_text(
+        "include requirements.txt\ninclude README.md\ninclude LICENSE\ninclude setup.py\ninclude main.py\n"
+        "recursive-include scripts/ *.py\nprune __pycache__\nprune *.pyc\n", encoding="utf-8")
+    r = subprocess.run([sys.executable, "-m", "build"], cwd=str(build_dir), capture_output=True, text=True)
+    if r.returncode != 0: log(8,8,"PyPI 构建失败","err"); shutil.rmtree(build_dir,ignore_errors=True); return
+    token = ""
+    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),capture_output=True,text=True).stdout.strip()
+    if ":" in rmt and "@" in rmt:
+        tp = rmt.split("//")[1].split("@")[0]
+        if ":" in tp: token = tp.split(":")[1]
+    if not token: token = os.environ.get("PYPI_TOKEN","")
+    if not token: log(8,8,"未找到 PyPI token","err"); shutil.rmtree(build_dir,ignore_errors=True); return
+    whl = build_dir / "dist" / f"{pypi_name.replace('-','_')}-{version}-py3-none-any.whl"
+    if whl.exists():
+        r = subprocess.run([sys.executable,"-m","twine","upload","--disable-progress",str(whl),"-u","__token__","-p",token],
+                          capture_output=True,text=True,cwd=str(build_dir))
+        if r.returncode==0: log(8,8,f"PyPI: https://pypi.org/project/{pypi_name}/","ok")
+        else: log(8,8,f"PyPI 上传失败: {r.stderr[:200]}","err")
+    shutil.rmtree(build_dir,ignore_errors=True)
+
+def step_clawhub_publish(name: str, version: str):
+    log(8,8,f"发布 {name} 到 ClawHub...")
+    sd = WORK_REPO / "skills" / name
+    if not sd.is_dir(): log(8,8,"技能目录不存在","err"); return
+    meta = json.loads((sd/"_meta.json").read_text(encoding="utf-8"))
+    slug = meta.get("slug",name)
+    cmd = ["npx","clawhub","publish",str(sd),"--slug",slug,"--name",meta.get("displayName",name),
+           "--version",version,"--changelog",f"v{version}"]
+    if meta.get("tags"): cmd+=["--tags",",".join(meta["tags"])]
+    r = subprocess.run(cmd,capture_output=True,text=True)
+    if r.returncode==0 or "ok" in r.stdout.lower(): log(8,8,f"ClawHub: {slug}","ok")
+    else: log(8,8,f"ClawHub: {r.stderr[:200]}","warn")
+
+def step_skillhub_publish(name: str, version: str):
+    log(8,8,f"发布 {name} 到 SkillHub...")
+    sd = WORK_REPO / "skills" / name
+    if not sd.is_dir(): log(8,8,"技能目录不存在","err"); return
+    cli = Path.home() / ".skillhub" / "skills_store_cli.py"
+    if not cli.exists(): log(8,8,"SkillHub CLI 不存在","err"); return
+    r = subprocess.run([sys.executable,str(cli),"publish",str(sd),"--changelog",f"v{version}"],
+                      capture_output=True,text=True)
+    if r.returncode==0: log(8,8,f"SkillHub: {name}","ok")
+    else: log(8,8,f"SkillHub: {r.stderr[:200]}","warn")
+
+def step_release_create(name: str, typ: str, version: str):
+    log(9,8,f"创建 Release: {name} v{version}...")
+    tag = f"v{version}" if typ=="agent" else f"{name}-v{version}"
+    subprocess.run(["git","tag",tag],cwd=str(WORK_REPO),capture_output=True)
+    for rm in ["gitee","github","origin"]:
+        subprocess.run(["git","push",rm,tag],cwd=str(WORK_REPO),capture_output=True,timeout=30)
+    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),capture_output=True,text=True).stdout.strip()
+    token=""
+    if ":" in rmt and "@" in rmt:
+        tp=rmt.split("//")[1].split("@")[0]
+        if ":" in tp: token=tp.split(":")[1]
+    if token:
+        b=json.dumps({"tag_name":tag,"name":f"{name} v{version}",
+                      "body":f"## {name} v{version}\n\n由 git-sync 自动发布","draft":False,"prerelease":False})
+        r=subprocess.run(["curl","-s","-X","POST",
+                         "https://api.github.com/repos/Ldxs001/workbuddy-skills/releases",
+                         "-H",f"Authorization: token {token}","-H","Content-Type: application/json","-d",b],
+                        capture_output=True,text=True)
+        try:
+            u=json.loads(r.stdout).get("html_url","")
+            log(9,8,f"Release: {u}","ok")
+        except: log(9,8,"Release tag 已推送 (API 异常)","warn")
+    else: log(9,8,f"tag 已推送: {tag}","warn")
+
 # ── 主流程 ────────────────────────────────────────────────────────────────────
 def main():
+    global QUIET_MODE
     # ── 0. 彻底阻止 CredentialHelperSelector 弹窗 ──────────────────────
     # 方案：在最早时机固化 credential.helper 配置，所有后续 git 命令直接继承
     # 同时用 GIT_CREDENTIAL_HELPER 环境变量双重保险
@@ -885,65 +993,160 @@ def main():
     # ────────────────────────────────────────────────────────────────────────
 
     parser = argparse.ArgumentParser(description="git-sync.py v2.12.0")
-    parser.add_argument("skill_name", nargs="?", default="",
-                        help="技能名称（如 skill-standardization）")
-    parser.add_argument("--skip-scan", action="store_true",
-                        help="跳过敏感信息扫描")
+    parser.add_argument("name", nargs="?", default="",
+                        help="项目名称（自动检测 skill/agent）")
+    parser.add_argument("--skip-scan", action="store_true", help="跳过敏感信息扫描")
+    parser.add_argument("--skip-market", action="store_true", help="跳过市场/PyPI 发布")
+    parser.add_argument("--market-only", action="store_true", help="只发市场/PyPI，不发 git")
+    parser.add_argument("--pypi", action="store_true", help="发布到 PyPI（仅 agent）")
+    parser.add_argument("--release", action="store_true", help="创建 Release")
     args = parser.parse_args()
 
-    skill_name = args.skill_name
-    skip_scan  = args.skip_scan
+    name = args.name
+    skip_scan = args.skip_scan
+    skip_market = args.skip_market
+    market_only = args.market_only
+    do_pypi = args.pypi
+    do_release = args.release
 
-    if not skill_name:
-        print(f"用法: python {sys.argv[0]} <skill-name> [--skip-scan]")
+    # ── all 模式 ──────────────────────────────────────────────
+    if name == "all":
+        for sd in sorted(SKILLS_DIR.iterdir()):
+            if sd.is_dir() and (sd / "_meta.json").exists():
+                subprocess.run([sys.executable, __file__, sd.name] + sys.argv[2:],
+                              capture_output=not QUIET_MODE)
+        for ad in sorted((SKILLS_DIR.parent / "agent").iterdir()):
+            if ad.is_dir() and (ad / "rag_assistant" / "__init__.py").exists():
+                subprocess.run([sys.executable, __file__, ad.name] + sys.argv[2:],
+                              capture_output=not QUIET_MODE)
+        return
+
+    if not name:
+        print(f"用法: python {sys.argv[0]} <name> [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]")
+        print("       python {sys.argv[0]} all")
         sys.exit(1)
 
-    # 强制从 _meta.json 读取版本号，禁止 LLM 手动传参
-    meta_file = SKILLS_DIR / skill_name / "_meta.json"
+    # ── 类型检测 ──────────────────────────────────────────────
+    skill_dir = SKILLS_DIR / name
+    agent_dir = SKILLS_DIR.parent / "agent" / name
+    is_skill = (skill_dir / "_meta.json").exists()
+    is_agent = (agent_dir / "rag_assistant" / "__init__.py").exists()
+    if is_skill:
+        typ = "skill"
+        src_dir = skill_dir
+        work_repo_subdir = f"skills/{name}"
+    elif is_agent:
+        typ = "agent"
+        src_dir = agent_dir
+        work_repo_subdir = f"agent/{name}"
+    else:
+        print(f"❌ 未找到项目: {name}（不在 skills/ 也不在 agent/）")
+        sys.exit(1)
+    print(f"  类型: {typ}")
+
+    # ── 读取版本号 ────────────────────────────────────────────
     version = ""
-    if meta_file.exists():
-        try:
-            version = json.load(open(meta_file, encoding="utf-8"))["version"]
-        except Exception:
-            pass
+    if is_skill:
+        meta_file = skill_dir / "_meta.json"
+        if meta_file.exists():
+            try:
+                version = json.loads(meta_file.read_text(encoding="utf-8"))["version"]
+            except Exception:
+                pass
+    else:
+        init_file = agent_dir / "rag_assistant" / "__init__.py"
+        if init_file.exists():
+            import re
+            m = re.search(r'__version__\s*=\s*"([^"]+)"', init_file.read_text(encoding="utf-8"))
+            if m: version = m.group(1)
     if not version:
-        print("❌ 无法从 _meta.json 读取版本号，拒绝同步")
+        print("❌ 无法读取版本号")
         sys.exit(1)
+
+    # ── market-only 模式 ──────────────────────────────────────
+    if market_only:
+        if is_skill:
+            step_clawhub_publish(name, version)
+            step_skillhub_publish(name, version)
+        elif do_pypi:
+            step_pypi_publish(name, version, src_dir)
+        if do_release:
+            step_release_create(name, typ, version)
+        return
 
     # 静默执行各步骤，收集日志
-    global QUIET_MODE
     QUIET_MODE = True
     import contextlib
     with open(os.devnull, 'w', encoding='utf-8') as _null:
         with contextlib.redirect_stdout(_null), contextlib.redirect_stderr(_null):
-            step_manifest(skill_name, version)
-            compare_result = step_version_compare(skill_name, version)
-            step_normalize_meta(meta_file, skill_name, version)
+            step_manifest(name, version)
+            compare_result = step_version_compare(name, version, work_repo_subdir)
+
+            if is_skill:
+                step_normalize_meta(meta_file, name, version)
 
             # 步骤 4：同步文件（版本相同时跳过）
             skipped_sync = (compare_result == "skip_sync")
             if skipped_sync:
                 log(4, 8, "跳过文件同步（版本相同）", "skip")
-                repo_skill_dir = WORK_REPO / "skills" / skill_name
+                repo_skill_dir = WORK_REPO / work_repo_subdir
             else:
                 log(4, 8, "同步文件到工作仓库...")
-                repo_skill_dir = sync_files(skill_name, SKILLS_DIR, WORK_REPO)
+                # 对于 skill 用原 sync_files，对于 agent 用自定义复制
+                if is_skill:
+                    repo_skill_dir = sync_files(name, SKILLS_DIR, WORK_REPO)
+                else:
+                    dst = WORK_REPO / work_repo_subdir
+                    if dst.exists(): shutil.rmtree(dst)
+                    os.makedirs(dst, exist_ok=True)
+                    for item in src_dir.rglob("*"):
+                        if item.name.lower() == "nul": continue
+                        if item.is_file() and not any(p.startswith(".") for p in item.relative_to(src_dir).parts):
+                            try:
+                                rel = item.relative_to(src_dir)
+                                (dst / rel).parent.mkdir(parents=True, exist_ok=True)
+                                shutil.copy2(item, dst / rel)
+                            except: pass
+                    count = sum(1 for _ in dst.rglob("*") if _.is_file())
+                    repo_skill_dir = dst
+                    log(4, 8, f"已同步 {count} 个文件", "ok")
 
-            desensitized_files = step_sensitive_scan(skill_name, repo_skill_dir, skip_scan)
-            step_update_readme()
+            desensitized_files = step_sensitive_scan(name, repo_skill_dir, skip_scan)
+            if is_skill:
+                step_update_readme()
 
-            gitee_ok, github_ok = step_commit_and_push(skill_name, version)
-            step_update_manifest_uploaded(skill_name, version, gitee_ok, github_ok)
+            gitee_ok, github_ok = step_commit_and_push(name, version, work_repo_subdir)
+            step_update_manifest_uploaded(name, version, gitee_ok, github_ok)
 
-            # 审计放在 manifest 更新之后
-            audit_result = step_skill_audit(
-                skill_name, SKILLS_DIR, MANIFEST_FILE,
-                desensitized_files=desensitized_files,
-                repo_skill_dir=repo_skill_dir
-            )
+            # 审计（仅 skill）
+            audit_result = {}
+            if is_skill:
+                audit_result = step_skill_audit(
+                    name, SKILLS_DIR, MANIFEST_FILE,
+                    desensitized_files=desensitized_files,
+                    repo_skill_dir=repo_skill_dir
+                )
 
-            zip_file = step_pack_zip(skill_name, version, SKILLS_DIR, skip_scan)
-            step_build_index()
+            # ZIP + index（仅 skill）
+            zip_file = None
+            if is_skill:
+                zip_file = step_pack_zip(name, version, SKILLS_DIR, skip_scan)
+                step_build_index()
+
+    # ── 市场/PyPI 发布（同步完成后运行，不静默）─────────────────────
+    if not skip_market:
+        if is_skill:
+            step_clawhub_publish(name, version)
+            step_skillhub_publish(name, version)
+        if is_agent and do_pypi:
+            step_pypi_publish(name, version, src_dir)
+    if do_release:
+        step_release_create(name, typ, version)
+
+    # ── 打印步骤日志 ─────────────────────────────────────────────────
+    QUIET_MODE = False
+    for line in LOG_BUFFER:
+        print(line)
 
     # ── 打印步骤日志 ─────────────────────────────────────────────────
     QUIET_MODE = False
@@ -953,7 +1156,7 @@ def main():
     # ── 固定格式输出报告 ─────────────────────────────────────────────
     print()
     print("=" * 60)
-    print(f"  git-sync 执行报告：{skill_name} v{version}")
+    print(f"  git-sync 执行报告：{name} v{version}")
     print("=" * 60)
 
     # 表格 1：推送情况
@@ -1027,9 +1230,9 @@ def main():
         print("  审计结论：未执行或执行失败")
 
     # ZIP 路径
-    print()
-    print(f"ZIP 包：{zip_file}")
-    print(f"HTML 索引：{DIST_DIR / 'index.html'}")
+    if zip_file:
+        print(f"ZIP 包：{zip_file}")
+        print(f"HTML 索引：{DIST_DIR / 'index.html'}")
 
     print()
     print("=" * 60)
