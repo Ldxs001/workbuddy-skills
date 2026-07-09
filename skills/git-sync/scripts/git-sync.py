@@ -994,10 +994,10 @@ def step_clawhub_publish(name: str, version: str):
     if not sd.is_dir(): log(8,8,"技能目录不存在","err"); return
     meta = json.loads((sd/"_meta.json").read_text(encoding="utf-8"))
     slug = meta.get("slug",name)
-    cmd = ["npx","clawhub","publish",str(sd),"--slug",slug,"--name",meta.get("displayName",name),
-           "--version",version,"--changelog",f"v{version}"]
-    if meta.get("tags"): cmd+=["--tags",",".join(meta["tags"])]
-    r = subprocess.run(cmd,capture_output=True,text=True)
+    cmd = f'npx clawhub publish "{sd}" --slug "{slug}" --name "{meta.get("displayName",name)}" --version "{version}" --changelog "v{version}"'
+    if meta.get("tags"):
+        cmd += ' --tags "' + ",".join(meta["tags"]) + '"'
+    r = subprocess.run(cmd, capture_output=True, text=True, shell=True)
     if r.returncode==0 or "ok" in r.stdout.lower(): log(8,8,f"ClawHub: {slug}","ok")
     else: log(8,8,f"ClawHub: {r.stderr[:200]}","warn")
 
