@@ -327,9 +327,8 @@ def _ignore_patterns(path, names):
                     ignored.add(name); break
     return ignored
 
-def sync_files(skill_name: str, skills_dir: Path, work_repo: Path, skip_filter: bool = False):
-    """用 Python 逐个复制文件（替代 shutil.copytree，避免 Windows 保留设备名问题）
-    所有文件都会被复制（仅排除 nul），后续由 LLM 过滤器决定删除哪些"""
+def sync_files(skill_name: str, skills_dir: Path, work_repo: Path, allowed_files: set = None):
+    """用 Python 逐个复制文件。只复制 allowed_files 集合中的文件（全部保留时传 None）"""
     src = skills_dir / skill_name
     dst = work_repo / "skills" / skill_name
     if dst.exists():
@@ -337,20 +336,21 @@ def sync_files(skill_name: str, skills_dir: Path, work_repo: Path, skip_filter: 
     os.makedirs(dst, exist_ok=True)
     file_count = 0
     for item in src.rglob("*"):
-        # Windows 保留设备名：在 Windows 上 os.path.exists('nul') 始终返回 True
-        # 即使目录中根本没有这个文件。Path.rglob 遍历时如果构造出 'nul' 路径
-        # is_file() 会返回 False（设备不是文件），但 shutil.copy2 会崩溃
         if item.name.lower() == "nul":
             continue
         if item.is_file():
             try:
                 rel = item.relative_to(src)
+                rel_str = str(rel).replace("\\", "/")
+                # LLM 文件过滤：仅复制允许列表中的文件
+                if allowed_files is not None and rel_str not in allowed_files:
+                    continue
                 dst_file = dst / rel
                 dst_file.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(item, dst_file)
                 file_count += 1
             except (OSError, shutil.Error):
-                pass  # 跳过无法复制的文件
+                pass
     # 二次保险：清理残留的 __pycache__
     for root, dirs, _ in os.walk(dst):
         for d in dirs:
@@ -860,63 +860,62 @@ def get_meta_desc(meta_file: Path) -> str:
     return ""
 
 # ── LLM 文件过滤器（替代硬编码黑名单）──────────────────────────────
-# 同步完成后，列出所有文件给 LLM 判断哪些不应在发布仓库中。
-# LLM 返回决策文件后，按决策删除多余文件。
-def step_llm_file_filter(name: str, repo_dir: Path):
-    """列出同步后的文件 → 写扫描报告 → 等待 LLM 决策 → 删除多余文件"""
+# 在同步前执行，LLM 审核源文件列表，只有通过审核的文件才被复制到仓库
+def step_llm_file_filter(name: str, src_dir: Path) -> set:
+    """扫描源文件 → 引导 LLM 判断 → 返回允许复制的文件相对路径集合"""
     filter_scan = SCRIPT_DIR / f".file_filter_{name}.json"
     filter_decisions = filter_scan.with_suffix(".json.decisions.json")
 
-    # 收集文件树
+    # 收集源文件树
     tree = []
-    for f in sorted(repo_dir.rglob("*")):
+    for f in sorted(src_dir.rglob("*")):
         if f.is_file() and f.name.lower() not in ("nul", "nul "):
-            rel = str(f.relative_to(repo_dir)).replace("\\", "/")
+            rel = str(f.relative_to(src_dir)).replace("\\", "/")
             size = f.stat().st_size
             tree.append({"path": rel, "size": size})
 
-    # 写扫描报告
     report = {
         "project": name,
-        "root": str(repo_dir),
-        "files": tree,
+        "root": str(src_dir),
         "total_files": len(tree),
+        "files": tree,
         "guidelines": (
-            "请检查以上文件列表，标记出不应存在于公开发布仓库中的文件。"
-            "常见不应发布的文件类型包括：\n"
+            "请审查以上文件列表，判断哪些文件应该一起发布到公开的代码仓库。\n\n"
+            "应排除的文件类型：\n"
             "- 缓存目录：__pycache__/, .cache/, .mypy_cache/, .pytest_cache/\n"
-            "- 构建产物：dist/, build/, *.egg-info/, *.pyc\n"
+            "- 构建产物：dist/, build/, *.egg-info/, *.pyc, *.pyo\n"
             "- 依赖目录：node_modules/, .venv/, .tox/\n"
-            "- IDE/编辑器配置文件：.vscode/, .idea/, *.swp, *.swo\n"
+            "- 大体积数据/模型文件：*.pt, *.pth, *.bin, *.onnx, *.gguf（模型权重）\n"
+            "  data/models/, data/dbs/, *.db, *.sqlite（本地数据/数据库）\n"
+            "- 个人配置/凭证：config.json, .env, *.token, credentials*\n"
+            "- IDE/编辑器文件：.vscode/, .idea/, *.swp, *.swo\n"
             "- 操作系统文件：.DS_Store, Thumbs.db\n"
             "- 日志/临时文件：*.log, *.tmp, *.bak\n"
-            "- 版本控制元数据：.git/\n"
-            "- 大体积数据文件（明显不是代码）：*.zip, *.tar.gz, *.mp4, *.avi\n\n"
-            "请以 JSON 格式返回要删除的文件路径列表：{\"remove\": [\"path1\", \"path2\"]}"
+            "- 版本控制：.git/, .gitignore 本身可以保留\n"
+            "- 私库数据：data/kb/, data/chroma/（RAG 知识库数据）\n\n"
+            "请以 JSON 返回应保留的文件路径列表（不要返回要删除的，返回要保留的）：\n"
+            "{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}"
         )
     }
     filter_scan.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    # 如果已有决策文件，直接执行
     if filter_decisions.exists():
         try:
             decisions = json.loads(filter_decisions.read_text(encoding="utf-8"))
-            to_remove = decisions.get("remove", [])
-            for rel_path in to_remove:
-                target = repo_dir / rel_path
-                if target.exists():
-                    if target.is_dir():
-                        shutil.rmtree(target, ignore_errors=True)
-                    else:
-                        target.unlink(missing_ok=True)
-            removed = len(to_remove)
-            log("4.2", 8, f"LLM 文件过滤器：移除了 {removed} 个文件/目录", "ok")
+            allowed = set(decisions.get("allow", []))
+            cnt = len(allowed)
+            log("3.7", 8, f"LLM 文件过滤器：{cnt}/{len(tree)} 个文件通过", "ok")
+            filter_scan.unlink(missing_ok=True)
+            filter_decisions.unlink(missing_ok=True)
+            return allowed
         except Exception as e:
-            log("4.2", 8, f"LLM 决策解析失败: {e}", "warn")
-        filter_scan.unlink(missing_ok=True)
-        filter_decisions.unlink(missing_ok=True)
+            log("3.7", 8, f"LLM 决策解析失败: {e}，默认保留所有文件", "warn")
+            filter_scan.unlink(missing_ok=True)
+            filter_decisions.unlink(missing_ok=True)
     else:
-        log("4.2", 8, f"LLM 决策文件未生成，保留所有文件（共 {len(tree)} 个）", "skip")
+        log("3.7", 8, f"LLM 决策文件未生成（共 {len(tree)} 个文件，默认全部保留）", "skip")
+    # 没有决策文件时保留所有
+    return {f["path"] for f in tree}
 
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
 
@@ -1150,27 +1149,29 @@ def main():
                 repo_skill_dir = WORK_REPO / work_repo_subdir
             else:
                 log(4, 8, "同步文件到工作仓库...")
-                # 对于 skill 用原 sync_files，对于 agent 用自定义复制
+                # LLM 文件过滤：在复制前决定哪些文件可以进仓库
+                allowed = step_llm_file_filter(name, src_dir)
                 if is_skill:
-                    repo_skill_dir = sync_files(name, SKILLS_DIR, WORK_REPO)
+                    repo_skill_dir = sync_files(name, SKILLS_DIR, WORK_REPO, allowed)
                 else:
                     dst = WORK_REPO / work_repo_subdir
                     if dst.exists(): shutil.rmtree(dst)
                     os.makedirs(dst, exist_ok=True)
+                    file_count = 0
                     for item in src_dir.rglob("*"):
                         if item.name.lower() == "nul": continue
-                        if item.is_file() and not any(p.startswith(".") for p in item.relative_to(src_dir).parts):
+                        if item.is_file():
                             try:
                                 rel = item.relative_to(src_dir)
+                                rel_str = str(rel).replace("\\", "/")
+                                if rel_str not in allowed: continue
                                 (dst / rel).parent.mkdir(parents=True, exist_ok=True)
                                 shutil.copy2(item, dst / rel)
+                                file_count += 1
                             except: pass
                     count = sum(1 for _ in dst.rglob("*") if _.is_file())
                     repo_skill_dir = dst
                     log(4, 8, f"已同步 {count} 个文件", "ok")
-
-            # 替换硬编码黑名单：LLM 动态判断哪些文件不该存在
-            step_llm_file_filter(name, repo_skill_dir)
 
             desensitized_files = step_sensitive_scan(name, repo_skill_dir, skip_scan)
             if is_skill:
