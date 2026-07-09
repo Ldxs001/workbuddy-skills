@@ -1,3 +1,16 @@
+## [2.25.0] - 2026-07-09
+### 新增
+- **类型自动检测**：自动识别 skill（_meta.json）和 agent（__init__.py），skill 走原流程，agent 同步到 agent/ 目录
+- **all 模式**：git-sync all 遍历全部 skills + agents
+- **ClawHub 自动发布**：推送到 git 后自动执行 clawhub publish（skill）
+- **SkillHub 自动发布**：推送到 git 后自动执行 skillhub publish（skill）
+- **PyPI 发布**：--pypi 标志，隔离构建 + twine 上传
+- **Release 创建**：--release 标志，git tag + GitHub API Release
+
+### 变更
+- 参数解析新增 --skip-market / --market-only / --pypi / --release
+- step_commit_and_push / step_version_compare 支持动态子目录路径
+
 ## [2.24.2] - 2026-07-06
 
 ### 修复
