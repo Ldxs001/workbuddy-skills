@@ -1,3 +1,12 @@
+## [2.26.1] - 2026-07-09
+
+### 变更
+- **LLM 文件过滤器改用 Python 扫描**：Python glob 自动查找规则文件（blueprint*, *rules*, blueprints/），读取内容后与文件树一并传给 LLM。LLM 只做决策判断，不扫描目录，大幅节省 token
+- **引导优化**：明确要求保留所有 .py 代码文件、文档、许可证等核心文件
+
+### 修复
+- 移除对 `references/blueprint_rules.md` 的硬编码路径引用，改为 Python 动态扫描
+
 ## [2.26.0] - 2026-07-09
 ### 变更
 - **移除硬编码黑名单**：不再使用 EXCLUDE_PATTERNS（__pycache__/, *.bak, node_modules/ 等）排除文件
