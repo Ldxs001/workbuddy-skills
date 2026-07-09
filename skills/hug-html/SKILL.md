@@ -1,9 +1,8 @@
 ---
+displayName: hug-html
 name: hug-html
-slug: hug-html
-displayName: Hug HTML
 tags: ['html', 'grid', 'template', 'visual-editor', 'module-library', 'style-presets', 'layout', 'chinese-error-handling']
-version: 3.3.0
+version: 3.3.1
 author: Ldxs
 license: MIT
 description: 8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling
