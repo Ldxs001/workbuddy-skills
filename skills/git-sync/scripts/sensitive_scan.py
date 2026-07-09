@@ -90,10 +90,10 @@ SENSITIVE_PATTERNS = [
         "severity": "critical",
         "flags": re.DOTALL,
     },
-    # 5. 本地绝对路径（Windows + Unix）
+    # 5. 本地绝对路径（Windows 反斜杠格式 + Git Bash 格式）
     {
         "label": "本地绝对路径",
-        "regex": r"""(?i)[a-zA-Z]:\\[Users|home|root]\\[a-zA-Z0-9._-]+""",
+        "regex": r"""(?i)([a-zA-Z]:\\[Users|home|root]\\[a-zA-Z0-9._-]+|/[a-zA-Z]/[Uu]sers/[a-zA-Z0-9._-]+)""",
         "replace": "[local-path-redacted]",
         "severity": "medium",
     },

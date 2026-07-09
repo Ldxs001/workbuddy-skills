@@ -433,12 +433,14 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
         findings = e.get("findings", [])
         labels = {f.get("label", "") for f in findings}
 
-        # 在公开文档（LICENSE/README/changelog 等）中的署名/代名 → keep
+        # 在公开文档中的署名/代名/示例路径 → keep；真实本地路径 → sanitize
         public_docs = {"LICENSE.md", "README.md", "changelog.md", "SKILL.md",
                        "REFERENCE.md", "CONTRIBUTING.md", "antipatterns.md",
                        "faq.md", "guide.md", "permissions.md", "blueprint_rules.md"}
-        public_labels = {"用户名（来自配置）", "项目名（来自配置）", "路径"}
-        if labels.issubset(public_labels) and fname in public_docs:
+        public_labels = {"用户名（来自配置）", "项目名（来自配置）"}
+        is_all_public = labels.issubset(public_labels) and fname in public_docs
+        has_real_path = any("本地绝对路径" in l or "家目录路径" in l or "路径" in l for l in labels)
+        if is_all_public and not has_real_path:
             decisions_data[file_rel] = "keep"
         else:
             # 其他情况（含邮箱/token/IP等）默认脱敏保安全
