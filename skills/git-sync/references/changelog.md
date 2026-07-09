@@ -1,3 +1,9 @@
+## [2.26.0] - 2026-07-09
+### 变更
+- **移除硬编码黑名单**：不再使用 EXCLUDE_PATTERNS（__pycache__/, *.bak, node_modules/ 等）排除文件
+- **LLM 文件过滤器**：新增 step_llm_file_filter，在同步前引导 LLM 审核源文件列表，决定哪些文件可以进入仓库。模型权重、私库数据、缓存文件等由 LLM 判断后排除，不再依赖穷举黑名单
+- **同步前置过滤**：LLM 返回允许列表后，sync_files 只复制允许的文件，仓库中只进干净数据
+
 ## [2.25.0] - 2026-07-09
 ### 新增
 - **类型自动检测**：自动识别 skill（_meta.json）和 agent（__init__.py），skill 走原流程，agent 同步到 agent/ 目录
