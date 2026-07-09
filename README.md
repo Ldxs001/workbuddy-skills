@@ -1,9 +1,9 @@
 # Skills Repository
 
-> **用户技能仓库** — 由 git-sync 自动同步维护。
+> **用户技能仓库与智能体仓库** — 由 git-sync 自动同步维护。
 > 最后更新：2026-07-09
 
-本仓库托管 wUwproject 技能合集，码云（Gitee）和 GitHub 双平台同步。
+本仓库托管 wUwproject 技能合集与智能体项目，码云（Gitee）和 GitHub 双平台同步。
 
 ---
 
@@ -34,6 +34,15 @@
 | `triphasic-execution` | Execute→Review→Advance 三步循环执行框架。增强步骤规划能力、增强语义理解；明确空转/重试/换思路/求助完整流转规则；最多重试3次、最多空转3次强制约束。 |
 | `universal-file-ops` | 为普通大模型/智能体用户提供一站式文件操作与 Python 代码质量保障能力。支持文件 CRUD、Python 代码质量流水线、沙箱测试、流程钩子系统。 |
 | `workday-calendar` | 智能周历系统。支持法定假日、补班日、轮休系统（跳过/不跳过法定假双模式）、特殊休息（公休/临修）、个人日程管理。 |
+
+## 智能体列表
+
+以下为仓库中实际存在的智能体项目：
+
+| 智能体名 | 描述 |
+|----------|------|
+| `Orchestrator` | 智能体 |
+| `rag-assistant` | rag-assistant: 独立智能体，封装 local-rag-builder 技能 |
 
 ---
 
