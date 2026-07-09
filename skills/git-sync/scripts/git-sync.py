@@ -874,39 +874,26 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
             size = f.stat().st_size
             tree.append({"path": rel, "size": size})
 
-    # 读取蓝皮书（如果存在）
-    blueprint = src_dir / "references" / "blueprint_rules.md"
-    blueprint_rules = ""
-    if blueprint.exists():
-        blueprint_rules = blueprint.read_text(encoding="utf-8")[:2000]
-    
     report = {
         "project": name,
         "root": str(src_dir),
         "total_files": len(tree),
         "files": tree,
-        "blueprint_rules": blueprint_rules,
         "guidelines": (
             "请审查以上文件列表，判断哪些文件应该一起发布到公开的代码仓库。\n\n"
             "背景：此为 AI Agent/Skill 项目，将发布到公开的代码仓库（GitHub/Gitee/ClawHub/SkillHub）。\n"
-            "目标是只留下用户需要的最小可运行代码集，排除以下类型：\n\n"
-            "应排除的文件类型（参考上述 project_rules 和以下通用规则）：\n"
-            "- 缓存目录：__pycache__/, .cache/, .mypy_cache/, .pytest_cache/\n"
-            "- 构建产物：dist/, build/, *.egg-info/, *.pyc, *.pyo\n"
-            "- 依赖目录：node_modules/, .venv/, .tox/\n"
-            "- 大体积数据/模型文件：*.pt, *.pth, *.bin, *.onnx, *.gguf（模型权重）\n"
-            "  data/models/, data/dbs/, *.db, *.sqlite（本地数据/数据库）\n"
-            "- 个人配置/凭证：config.json, .env, *.token, credentials*\n"
-            "- IDE/编辑器文件：.vscode/, .idea/, *.swp, *.swo\n"
-            "- 操作系统文件：.DS_Store, Thumbs.db\n"
-            "- 日志/临时文件：*.log, *.tmp, *.bak\n"
-            "- 版本控制：.git/, .gitignore 本身可以保留\n"
-            "- 私库数据：data/kb/, data/chroma/（RAG 知识库数据）\n\n"
-            "注意：确认以下核心文件被保留：\n"
-            "- 代码文件（.py, .js, .ts, .sh 等）\n"
-            "- 文档（README.md, SKILL.md, references/ 下的文档）\n"
-            "- 配置文件（_meta.json, requirements.txt, MANIFEST.in）\n"
-            "- 许可证（LICENSE）\n\n"
+            "目标是只保留用户需要的最小可运行代码集。\n\n"
+            "请先扫描项目目录，查找项目自身的规则文件\n"
+            "（如 blueprints/, rules/, *.rules.md, *.blueprint.md 等），\n"
+            "结合项目的类型（skill/agent/文档）判断哪些文件应保留。\n\n"
+            "通用排除参考：\n"
+            "- 缓存目录（__pycache__/, .cache/, .mypy_cache/）\n"
+            "- 构建产物（dist/, build/, .egg-info/, *.pyc）\n"
+            "- 依赖目录（node_modules/, .venv/, .tox/）\n"
+            "- 大体积模型权重/data（*.pt, *.pth, *.gguf, data/models/, data/kb/, *.db）\n"
+            "- 个人配置/凭证（config.json, .env, *.token, credentials*）\n"
+            "- IDE/系统文件（.vscode/, .DS_Store, Thumbs.db, *.log, *.tmp, *.bak）\n"
+            "- .git/ 排除，.gitignore 可保留\n\n"
             "请以 JSON 返回应保留的文件路径列表：\n"
             "{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}"
         )
