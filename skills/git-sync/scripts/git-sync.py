@@ -45,10 +45,8 @@ if hasattr(sys.stdout, "reconfigure"):
 # ── 路径配置 ───────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent.resolve()
 
-# ZIP 打包排除模式（支持 *.ext, dir/, 精确名）
+# ZIP 打包排除模式（仅保留 Windows 保留设备名，其余由 LLM 动态判断）
 EXCLUDE_PATTERNS = [
-    "*.bak", "__pycache__/", "*.pyc", ".git/", ".mcp.json",
-    "node_modules/", ".DS_Store", "Thumbs.db",
     "nul", "NUL",  # Windows 保留设备名，在目录中无法删除且 copytree 崩溃
 ]
 
@@ -329,8 +327,9 @@ def _ignore_patterns(path, names):
                     ignored.add(name); break
     return ignored
 
-def sync_files(skill_name: str, skills_dir: Path, work_repo: Path):
-    """用 Python 逐个复制文件（替代 shutil.copytree，避免 Windows 保留设备名问题）"""
+def sync_files(skill_name: str, skills_dir: Path, work_repo: Path, skip_filter: bool = False):
+    """用 Python 逐个复制文件（替代 shutil.copytree，避免 Windows 保留设备名问题）
+    所有文件都会被复制（仅排除 nul），后续由 LLM 过滤器决定删除哪些"""
     src = skills_dir / skill_name
     dst = work_repo / "skills" / skill_name
     if dst.exists():
@@ -860,6 +859,65 @@ def get_meta_desc(meta_file: Path) -> str:
         return r.stdout.strip()
     return ""
 
+# ── LLM 文件过滤器（替代硬编码黑名单）──────────────────────────────
+# 同步完成后，列出所有文件给 LLM 判断哪些不应在发布仓库中。
+# LLM 返回决策文件后，按决策删除多余文件。
+def step_llm_file_filter(name: str, repo_dir: Path):
+    """列出同步后的文件 → 写扫描报告 → 等待 LLM 决策 → 删除多余文件"""
+    filter_scan = SCRIPT_DIR / f".file_filter_{name}.json"
+    filter_decisions = filter_scan.with_suffix(".json.decisions.json")
+
+    # 收集文件树
+    tree = []
+    for f in sorted(repo_dir.rglob("*")):
+        if f.is_file() and f.name.lower() not in ("nul", "nul "):
+            rel = str(f.relative_to(repo_dir)).replace("\\", "/")
+            size = f.stat().st_size
+            tree.append({"path": rel, "size": size})
+
+    # 写扫描报告
+    report = {
+        "project": name,
+        "root": str(repo_dir),
+        "files": tree,
+        "total_files": len(tree),
+        "guidelines": (
+            "请检查以上文件列表，标记出不应存在于公开发布仓库中的文件。"
+            "常见不应发布的文件类型包括：\n"
+            "- 缓存目录：__pycache__/, .cache/, .mypy_cache/, .pytest_cache/\n"
+            "- 构建产物：dist/, build/, *.egg-info/, *.pyc\n"
+            "- 依赖目录：node_modules/, .venv/, .tox/\n"
+            "- IDE/编辑器配置文件：.vscode/, .idea/, *.swp, *.swo\n"
+            "- 操作系统文件：.DS_Store, Thumbs.db\n"
+            "- 日志/临时文件：*.log, *.tmp, *.bak\n"
+            "- 版本控制元数据：.git/\n"
+            "- 大体积数据文件（明显不是代码）：*.zip, *.tar.gz, *.mp4, *.avi\n\n"
+            "请以 JSON 格式返回要删除的文件路径列表：{\"remove\": [\"path1\", \"path2\"]}"
+        )
+    }
+    filter_scan.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # 如果已有决策文件，直接执行
+    if filter_decisions.exists():
+        try:
+            decisions = json.loads(filter_decisions.read_text(encoding="utf-8"))
+            to_remove = decisions.get("remove", [])
+            for rel_path in to_remove:
+                target = repo_dir / rel_path
+                if target.exists():
+                    if target.is_dir():
+                        shutil.rmtree(target, ignore_errors=True)
+                    else:
+                        target.unlink(missing_ok=True)
+            removed = len(to_remove)
+            log("4.2", 8, f"LLM 文件过滤器：移除了 {removed} 个文件/目录", "ok")
+        except Exception as e:
+            log("4.2", 8, f"LLM 决策解析失败: {e}", "warn")
+        filter_scan.unlink(missing_ok=True)
+        filter_decisions.unlink(missing_ok=True)
+    else:
+        log("4.2", 8, f"LLM 决策文件未生成，保留所有文件（共 {len(tree)} 个）", "skip")
+
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
 
 def step_pypi_publish(name: str, version: str, src_dir: Path):
@@ -1110,6 +1168,9 @@ def main():
                     count = sum(1 for _ in dst.rglob("*") if _.is_file())
                     repo_skill_dir = dst
                     log(4, 8, f"已同步 {count} 个文件", "ok")
+
+            # 替换硬编码黑名单：LLM 动态判断哪些文件不该存在
+            step_llm_file_filter(name, repo_skill_dir)
 
             desensitized_files = step_sensitive_scan(name, repo_skill_dir, skip_scan)
             if is_skill:
