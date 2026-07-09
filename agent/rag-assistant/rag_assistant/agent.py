@@ -71,7 +71,9 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         if action and action["type"] == "import":
             result = self._exec_import(action, message)
             self.memory.append_short_term(self.session_id, "assistant", result.get("text", ""))
-            self.memory.record_habit(message, is_rag=False, is_chat=False, is_import=True)
+            imported_kbs = result.get("imported_kbs", {})
+            primary_kb = max(imported_kbs, key=imported_kbs.get) if imported_kbs else ""
+            self.memory.record_habit(message, is_rag=False, is_chat=False, is_import=True, kb=primary_kb)
             result["success"] = True
             return result
 
@@ -84,7 +86,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 self.memory.append_short_term(self.session_id, "assistant", reply2)
             self._compress_if_needed()
             self.memory.record_habit(message, is_rag=action["type"] == "query",
-                                     is_chat=action["type"] != "query", is_import=False)
+                                     is_chat=action["type"] != "query", is_import=False,
+                                     kb=context.get("routed_kb", ""))
             result["success"] = True
             return result
 
@@ -92,7 +95,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         if reply:
             self.memory.append_short_term(self.session_id, "assistant", reply)
         self._compress_if_needed()
-        self.memory.record_habit(message, is_rag=False, is_chat=True, is_import=False)
+        self.memory.record_habit(message, is_rag=False, is_chat=True, is_import=False, kb="")
         decision["success"] = True
         return decision
 
@@ -217,6 +220,16 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         compressed = self.memory.get_compressed(self.session_id)
         if compressed:
             msgs.append({"role": "system", "content": f"【历史对话摘要】\n{compressed}"})
+
+        # 追加用户画像提示（方案 C：prompt_manager 模块）
+        try:
+            from prompt_manager import build_persona_prompt
+            persona_text = self.memory.build_persona_context()
+            persona_prompt = build_persona_prompt(persona_text)
+            if persona_prompt:
+                msgs.append({"role": "system", "content": persona_prompt})
+        except Exception:
+            pass
 
         msgs.append({"role": "user", "content": message})
         return msgs
@@ -348,9 +361,13 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         from knowledge_base_manager import sm3
         seen_hashes = set()
         all_docs = []
+        routed_kb = ""
         for sq in slices:
             try:
                 r = self.rag.query(sq, kb_name=kb if kb else None)
+                # 捕获路由实际 KB（取第一个有返回值的）
+                if not routed_kb:
+                    routed_kb = r.get("kb", "")
                 for d in r.get("docs", []):
                     content = d.get("content") if isinstance(d, dict) else (
                         d.page_content if hasattr(d, "page_content") else ""
@@ -363,7 +380,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 continue
 
         if not all_docs:
-            return {"context": "", "kb": kb, "success": False, "has_context": False}
+            return {"context": "", "kb": kb, "routed_kb": routed_kb, "success": False, "has_context": False}
 
         # 用技能自身的 build_context 拼接去重后的结果
         try:
@@ -375,7 +392,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                     d.page_content[:500] if hasattr(d, "page_content") else str(d)[:500]
                 ) for d in all_docs[:5]
             )
-        return {"context": context, "kb": kb, "success": True, "has_context": True}
+        return {"context": context, "kb": kb, "routed_kb": routed_kb, "success": True, "has_context": True}
 
     def _exec_import(self, action: dict, original_msg: str) -> dict:
         """执行导入操作"""
@@ -438,11 +455,11 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             if failed_all:
                 msg += f"，{failed_all} 个失败"
             if failed_all == 0 and imported_all > 0:
-                return {"text": msg, "success": True, "kb": kb_summary}
+                return {"text": msg, "success": True, "kb": kb_summary, "imported_kbs": imported_kbs}
             elif imported_all == 0:
-                return {"text": "导入失败", "success": False}
+                return {"text": "导入失败", "success": False, "imported_kbs": imported_kbs}
             else:
-                return {"text": msg, "success": True, "kb": kb_summary}
+                return {"text": msg, "success": True, "kb": kb_summary, "imported_kbs": imported_kbs}
         return {"text": "指令缺少 path 或 content", "success": False}
 
     # ═══════════════ 导入实现 ═══════════════

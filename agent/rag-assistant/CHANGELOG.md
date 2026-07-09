@@ -5,7 +5,22 @@
 
 ---
 
-## [0.5.3] - 2026-07-09
+## [0.6.0] - 2026-07-09
+
+### 新增
+- **用户习惯画像系统**：`memory.py` 新增三阶层级分析——规则级语言风格分类（句式/语气/深度）、OCEAN 五维人格衰减更新、`get_persona()` 合成画像输出
+- **记忆注入**：`agent.py` 将用户画像作为 system role 消息注入 LLM prompt（方案 C，`prompt_manager.build_persona_prompt()` 扩展点）
+- **kbs_used 修复**：路由层（`router.route_query()`）每轮返回实际路由 KB，`_exec_query()`/`_exec_import()` 捕获并传入 `record_habit(kb=...)`，`kbs_used` 不再为空
+- **Prompt 自定义预设**：`prompt_manager.py` 新增 `save_custom_preset()` / `delete_custom_preset()` / `get_all_presets()`；`rag_web_ui.py` 新增"保存为预设"按钮 + "删除预设"按钮 + 对应 API 端点
+
+### 变更
+- `memory.py` `record_habit()` 新增 `kb` 参数，新增语言分析和 OCEAN 更新逻辑
+- `rag_web_ui.py` 预设下拉改用 `<optgroup>` 分区（内置/自定义），选项带 `data-builtin` 属性
+- 旧 `user_habits.json` 无画像字段时自动补默认值，向后兼容
+
+---
+
+
 
 ### 新增
 - **TF-IDF 签名生成**：`rebuild_all_signatures()` 两轮扫描——第一轮收集所有 KB 词频算 IDF，第二轮用 TF-IDF 重排签名词，消除跨 KB 通用词干扰。单次入库用纯频率（无 IDF 上下文）

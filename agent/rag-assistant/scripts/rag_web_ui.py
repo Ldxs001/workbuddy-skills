@@ -17,7 +17,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
-from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, PROMPT_PRESETS
+from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, PROMPT_PRESETS, get_all_presets
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, download_model
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
 from router import list_kb_signatures, rebuild_all_signatures
@@ -410,6 +410,39 @@ function resetPrompt() {
   .then(function(r){return r.json()}).then(function(d){
     if(d.success) { document.getElementById('prompt-template').value = d.template; toast('已重置'); }
   });
+}
+
+function savePreset() {
+  var tpl = document.getElementById('prompt-template').value.trim();
+  if (!tpl) { toast('模板内容为空', 'error'); return; }
+  var name = prompt('请输入预设名称：');
+  if (!name) return;
+  var msgEl = document.getElementById('preset-action-msg');
+  msgEl.textContent = '⏳ 保存中...';
+  fetch('/api/prompt/presets/save', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({label: name, template: tpl})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('预设「'+name+'」已保存'); msgEl.textContent = '✓ 已保存，刷新后可见'; }
+    else { toast('保存失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
+  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
+}
+
+function deletePreset() {
+  var sel = document.getElementById('prompt-preset');
+  var opt = sel && sel.options[sel.selectedIndex];
+  var key = opt && opt.value;
+  if (!key) return;
+  if (!confirm('确定删除预设「'+opt.text+'」？')) return;
+  var msgEl = document.getElementById('preset-action-msg');
+  msgEl.textContent = '⏳ 删除中...';
+  fetch('/api/prompt/presets/delete', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key: key})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已删除'); msgEl.textContent = '✓ 已删除'; location.reload(); }
+    else { toast('删除失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
+  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
 }
 
 function verifyLLM() {
@@ -893,6 +926,11 @@ function loadPreset(key) {
   document.getElementById('prompt-template').value = tpl;
   renderVariables(tpl);
   onPromptChange(tpl);
+  // 仅自定义预设显示删除按钮
+  var builtin = opt && opt.getAttribute('data-builtin');
+  var delBtn = document.getElementById('btn-delete-preset');
+  if (delBtn) delBtn.style.display = (builtin === '0') ? 'inline-block' : 'none';
+  document.getElementById('preset-action-msg').textContent = '';
 }
 
 function renderVariables(tpl) {
@@ -1018,10 +1056,24 @@ def generate_html():
     def _html_attr(s):
         return s.replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;").replace(">","&gt;").replace("\n","&#10;")
     preset_options = ""
-    for key, p in PROMPT_PRESETS.items():
-        selected = " selected" if p["template"] == template else ""
-        dt = _html_attr(p["template"])
-        preset_options += f'<option value="{key}" data-template="{dt}"{selected}>{p["label"]}</option>'
+    all_presets = get_all_presets()
+    # 内置预设
+    builtins = {k: v for k, v in all_presets.items() if v.get("built_in")}
+    customs = {k: v for k, v in all_presets.items() if not v.get("built_in")}
+    if builtins:
+        preset_options += '<optgroup label="内置预设">'
+        for key, p in builtins.items():
+            selected = " selected" if p["template"] == template else ""
+            dt = _html_attr(p["template"])
+            preset_options += f'<option value="{key}" data-template="{dt}" data-builtin="1"{selected}>{p["label"]}</option>'
+        preset_options += '</optgroup>'
+    if customs:
+        preset_options += '<optgroup label="自定义预设">'
+        for key, p in customs.items():
+            selected = " selected" if p["template"] == template else ""
+            dt = _html_attr(p["template"])
+            preset_options += f'<option value="{key}" data-template="{dt}" data-builtin="0"{selected}>{p["label"]}</option>'
+        preset_options += '</optgroup>'
 
     router_cfg = cfg.get("router", {})
     fb_cfg = router_cfg.get("fallback", {})
@@ -1373,6 +1425,11 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <textarea id="prompt-template" rows="6" oninput="onPromptChange(this.value)" placeholder="用户层 Prompt，如输出格式要求" style="width:100%;font-family:monospace;font-size:12px;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;resize:vertical;box-sizing:border-box;line-height:1.5;">{template}</textarea>
     </div>
     <div id="prompt-variables" style="margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="savePreset()" style="padding:4px 12px;font-size:12px;">💾 保存为预设</button>
+      <button class="btn btn-secondary" id="btn-delete-preset" onclick="deletePreset()" style="padding:4px 12px;font-size:12px;display:none;color:#c00;border-color:#c00;">🗑 删除此预设</button>
+      <span id="preset-action-msg" style="font-size:12px;color:#888;line-height:28px;"></span>
+    </div>
     <details style="margin-top:10px;font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:8px;">
       <summary style="cursor:pointer;font-weight:bold;">完整 Prompt 预览（系统层+用户层）</summary>
       <pre id="full-prompt-preview" style="background:#f8f8f8;border:1px solid #eee;border-radius:4px;padding:8px;margin-top:4px;font-size:12px;white-space:pre-wrap;max-height:300px;overflow-y:auto;">{full_prompt_preview}</pre>
@@ -1528,35 +1585,34 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
   <div class="card">
     <h2>🌐 路由层 <span style="font-weight:400;color:#888;font-size:12px;">— 入库（文档→KB）+ 出库（问题→KB）</span></h2>
     <div class="form-row">
-      <div class="form-group" style="border-right:1px solid #eee;padding-right:16px;">
-        <label style="font-weight:600;color:#333;">📥 入库路由</label>
-        <div style="font-size:12px;color:#888;margin-bottom:8px;">文档入库时自动分类到对应知识库（始终用嵌入模型）</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <!-- 入库路由 -->
+      <div class="form-group">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <label style="font-weight:600;color:#333;white-space:nowrap;">📥 入库路由</label>
           <label class="toggle-switch" onclick="toggleImportClassify()">
             <input type="checkbox" onclick="event.stopPropagation();" {"checked" if kb_cfg.get("auto_classify", False) else ""}><span class="toggle-slider"></span>
           </label>
-          <span style="font-size:13px;color:#555;">{"向量模型路由" if kb_cfg.get("auto_classify", False) else "纯关键词匹配"}</span>
+          <span style="font-size:13px;color:#555;white-space:nowrap;">{"向量模型路由" if kb_cfg.get("auto_classify", False) else "纯关键词匹配"}</span>
         </div>
-        <div style="font-size:11px;color:#aaa;margin-top:4px;">
-          嵌入模型：{cfg.get("embedding",{}).get("model_path","bce-embedding-base_v1")}
-        </div>
+        <div style="font-size:12px;color:#888;margin-bottom:6px;">文档入库时自动分类到对应知识库（始终用嵌入模型）</div>
+        <div style="font-size:11px;color:#aaa;">嵌入模型：{cfg.get("embedding",{}).get("model_path","bce-embedding-base_v1")}</div>
       </div>
-      <div class="form-group" style="flex:2;padding-left:16px;">
-        <label style="font-weight:600;color:#333;">📤 出库路由</label>
-        <div style="font-size:12px;color:#888;margin-bottom:8px;">用户提问时路由到对应知识库检索（始终用嵌入模型，精排开时签名路由，关时关键词路由）</div>
-        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
-          <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
-            启用 <label class="toggle-switch" onclick="toggleRouter()">
-              <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
-            </label>
+      <!-- 出库路由 -->
+      <div class="form-group">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <label style="font-weight:600;color:#333;white-space:nowrap;">📤 出库路由</label>
+          <label class="toggle-switch" onclick="toggleRouter()">
+            <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
           </label>
-          <label style="font-size:12px;color:#888;">最低得分阈值
+          <span style="font-size:13px;color:#555;white-space:nowrap;">{"已启用" if router_cfg.get("enabled", True) else "已禁用"}</span>
+        </div>
+        <div style="font-size:12px;color:#888;margin-bottom:6px;">用户提问时路由到对应知识库检索（始终用嵌入模型，精排开时签名路由，关时关键词路由）</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:12px;color:#888;white-space:nowrap;">最低得分阈值
             <input type="number" value="{fb_cfg.get('min_score_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
           </label>
         </div>
-        <div style="font-size:11px;color:#aaa;margin-top:4px;">
-          精排开→嵌入模型×签名　精排关→嵌入模型×关键词
-        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">精排开→嵌入模型×签名　精排关→嵌入模型×关键词</div>
       </div>
     </div>
     <div class="collapsible" onclick="toggleAdvSig()" style="margin-top:8px;">
@@ -1889,6 +1945,27 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/prompt/reset":
                 tpl = reset_template()
                 self._send_json({"success": True, "template": tpl})
+
+            elif path == "/api/prompt/presets/save":
+                data = self._read_body()
+                label = data.get("label", "").strip()
+                template = data.get("template", "").strip()
+                if not label or not template:
+                    self._send_json({"success": False, "error": "名称和模板不能为空"})
+                else:
+                    from prompt_manager import save_custom_preset
+                    result = save_custom_preset(label, template)
+                    self._send_json(result)
+
+            elif path == "/api/prompt/presets/delete":
+                data = self._read_body()
+                key = data.get("key", "")
+                if not key:
+                    self._send_json({"success": False, "error": "缺少 key"})
+                else:
+                    from prompt_manager import delete_custom_preset
+                    result = delete_custom_preset(key)
+                    self._send_json(result)
 
             elif path == "/api/verify-llm":
                 ok, msg = verify_llm_connection()

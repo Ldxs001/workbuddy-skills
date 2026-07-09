@@ -1,23 +1,12 @@
-# 运行时
-server.pid
-*.pyc
+# ── 数据目录（知识库、模型等，首次运行自动生成）────
+data/
+
+# ── Python ────────────────────────────────────
 __pycache__/
+*.pyc
+*.pyo
+*.egg-info/
 
-# 用户数据
-data/sessions/
-data/memory/
-
-# 知识库（用户自行导入）
-data/kb/*/chroma.sqlite3
-
-# 模型文件（通过 embedding_model_manager.py 下载）
-data/models/*/
-!data/models/.gitkeep
-
-# 缓存
-data/cache/
-
-# IDE
-.workbuddy/
-.vscode/
-.idea/
+# ── 系统 ─────────────────────────────────────
+.DS_Store
+Thumbs.db

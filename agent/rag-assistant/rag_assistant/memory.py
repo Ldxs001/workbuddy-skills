@@ -1,8 +1,9 @@
 """
-记忆系统：短期原文 + 压缩摘要 + 知识缺口
+记忆系统：短期原文 + 压缩摘要 + 知识缺口 + 用户习惯画像
 """
 import os
 import json
+import re
 import logging
 from datetime import datetime
 from typing import Optional
@@ -167,18 +168,134 @@ class Memory:
             logger.error(f"读取知识缺口失败: {e}")
             return []
 
-    # ═══════════════ 用户习惯 ═══════════════
+    # ═══════════════ 用户习惯与性格画像 ═══════════════
+
+    # 人格衰减基数：每次更新时旧值 * DECAY_BASE，新样本加权
+    PERSONALITY_DECAY = 0.98
+
+    @staticmethod
+    def _classify_sentence(msg: str) -> dict:
+        """规则级语言分析：句式 + 语气 + 深度"""
+        if not msg:
+            return {"sentence_type": "statement", "tone": "neutral", "depth": "shallow"}
+
+        # 句式分类
+        sentence_type = "statement"
+        has_question_mark = bool(re.search(r'[?？]', msg))
+        has_rhetorical = bool(re.search(r'难道|岂|何尝|不是吗|不觉得|不就', msg))
+        has_imperative_start = bool(re.match(r'^[请给帮列做写](.{0,20})', msg))
+        has_exclamation = bool(re.search(r'[!！]', msg))
+
+        if has_rhetorical or (has_question_mark and re.search(r'吗|呢|难道|岂', msg)):
+            sentence_type = "rhetorical"
+        elif has_question_mark or re.search(r'什么|怎么|为什么|如何|是否|有没有|多少|哪', msg):
+            sentence_type = "question"
+        elif has_exclamation or has_imperative_start:
+            sentence_type = "imperative"
+
+        # 语气分类
+        tone = "neutral"
+        if re.search(r'具体|详细|数据|来源|参数|标准|依据|不是|不对|根本|明明|到底|究竟', msg):
+            tone = "critical"
+        elif re.search(r'好奇|有趣|有意思|原理|机制|本质|本质上是', msg):
+            tone = "curious"
+        elif re.search(r'呵呵|哈[哈哈]|哦[哦]|就这|就这点|所以呢|然后呢', msg):
+            tone = "sarcastic"
+        elif len(msg.strip()) <= 8:
+            tone = "terse"
+        elif re.search(r'非常|太[棒好]|绝对|完全|终于|太好了|太棒了|厉害', msg):
+            tone = "enthusiastic"
+
+        # 深度估计
+        n = len(msg.strip())
+        if n < 10:
+            depth = "shallow"
+        elif n < 50:
+            depth = "medium"
+        else:
+            depth = "deep"
+
+        return {"sentence_type": sentence_type, "tone": tone, "depth": depth}
+
+    @staticmethod
+    def _ocean_delta(msg: str, is_rag: bool, is_chat: bool, is_import: bool,
+                     analysis: dict) -> dict:
+        """根据单次交互计算 OCEAN 各维度增量（每个维度 -1~+1）"""
+        tone = analysis.get("tone", "neutral")
+        stype = analysis.get("sentence_type", "statement")
+        depth = analysis.get("depth", "shallow")
+
+        d = {"openness": 0.0, "conscientiousness": 0.0,
+             "extraversion": 0.0, "agreeableness": 0.0, "neuroticism": 0.0}
+
+        # 从操作类型推断
+        if is_rag:
+            d["openness"] += 0.3       # 检索行为 = 探索新信息
+            d["conscientiousness"] += 0.1
+        if is_import:
+            d["conscientiousness"] += 0.4   # 导入 = 有条理
+        if is_chat:
+            d["extraversion"] += 0.2   # 聊天 = 社交意愿
+
+        # 从语气推断
+        if tone == "critical":
+            d["conscientiousness"] += 0.25  # 追求精确
+            d["agreeableness"] -= 0.2       # 对抗性
+            d["neuroticism"] += 0.15        # 不满情绪
+        elif tone == "curious":
+            d["openness"] += 0.3
+            d["agreeableness"] += 0.15
+        elif tone == "sarcastic":
+            d["agreeableness"] -= 0.3
+            d["neuroticism"] += 0.2
+            d["extraversion"] -= 0.1
+        elif tone == "terse":
+            d["extraversion"] -= 0.15
+            d["conscientiousness"] += 0.1   # 直奔主题
+        elif tone == "enthusiastic":
+            d["extraversion"] += 0.25
+            d["agreeableness"] += 0.15
+
+        # 从句式推断
+        if stype == "rhetorical":
+            d["neuroticism"] += 0.15
+            d["agreeableness"] -= 0.1
+        elif stype == "imperative":
+            d["conscientiousness"] += 0.1
+            d["agreeableness"] -= 0.1
+
+        # 深度
+        if depth == "deep":
+            d["openness"] += 0.15
+            d["conscientiousness"] += 0.2
+        elif depth == "shallow":
+            d["neuroticism"] += 0.05
+
+        return d
 
     def record_habit(self, msg: str, is_rag: bool, is_chat: bool, is_import: bool, kb: str = ""):
-        """记录用户使用习惯"""
+        """记录用户使用习惯与性格画像"""
         path = os.path.join(self.memory_dir, "user_habits.json")
         try:
-            habits = {"rag_queries": 0, "chat_messages": 0, "imports": 0,
-                      "kbs_used": {}, "total": 0}
+            # 默认初始化
+            habits = {
+                "rag_queries": 0, "chat_messages": 0, "imports": 0,
+                "kbs_used": {}, "total": 0,
+                "linguistic": {"sentence_type": {}, "tone": {}, "depth": {}, "total_analyzed": 0},
+                "personality": {"openness": 0.5, "conscientiousness": 0.5,
+                                "extraversion": 0.5, "agreeableness": 0.5, "neuroticism": 0.5},
+                "decay_base": self.PERSONALITY_DECAY,
+            }
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
-                    habits = json.load(f)
+                    existing = json.load(f)
+                # 兼容旧数据：无画像字段时保留旧结构
+                for k in habits:
+                    if k not in existing:
+                        existing[k] = habits[k]
+                habits = existing
 
+            # ── 统计计数（原逻辑）──
             habits["total"] = habits.get("total", 0) + 1
             if is_rag:
                 habits["rag_queries"] = habits.get("rag_queries", 0) + 1
@@ -195,6 +312,25 @@ class Memory:
             if is_rag:
                 recent.append(msg[:80])
                 habits["recent_queries"] = recent[-5:]
+
+            # ── 语言风格分析（规则级）──
+            analysis = self._classify_sentence(msg)
+            ling = habits.setdefault("linguistic", {})
+            for cat, val in analysis.items():
+                bucket = ling.setdefault(cat, {})
+                bucket[val] = bucket.get(val, 0) + 1
+            ling["total_analyzed"] = ling.get("total_analyzed", 0) + 1
+
+            # ── OCEAN 人格更新（衰减 + 增量）──
+            decay = habits.get("decay_base", self.PERSONALITY_DECAY)
+            delta = self._ocean_delta(msg, is_rag, is_chat, is_import, analysis)
+            personality = habits.setdefault("personality", {})
+            for dim in ("openness", "conscientiousness", "extraversion",
+                        "agreeableness", "neuroticism"):
+                old = personality.get(dim, 0.5)
+                # 衰减 + 新样本加权
+                new_val = old * decay + delta.get(dim, 0.0) * (1 - decay)
+                personality[dim] = max(0.0, min(1.0, new_val))  # 钳制 0-1
 
             habits["last_active"] = datetime.now().isoformat()
 
@@ -214,6 +350,102 @@ class Memory:
         except (OSError, json.JSONDecodeError) as e:
             logger.error(f"读取用户习惯失败: {e}")
             return {}
+
+    def get_persona(self) -> dict:
+        """合成用户画像：语言风格 + 人格 + 使用偏好"""
+        habits = self.get_habits()
+        if not habits:
+            return {}
+
+        ling = habits.get("linguistic", {})
+        personality = habits.get("personality", {})
+        total_analyzed = ling.get("total_analyzed", 0) or 1  # 防除零
+
+        # 语言风格占比
+        def _top_pct(bucket):
+            if not bucket:
+                return "", 0.0
+            top_k = max(bucket, key=bucket.get)
+            return top_k, bucket[top_k] / total_analyzed
+
+        top_type, type_pct = _top_pct(ling.get("sentence_type", {}))
+        top_tone, tone_pct = _top_pct(ling.get("tone", {}))
+        top_depth, depth_pct = _top_pct(ling.get("depth", {}))
+
+        # 人格标签映射
+        def _dim_label(dim, val):
+            labels = {
+                "openness": ("守成型", "探索型")[val > 0.55],
+                "conscientiousness": ("随性型", "严谨型")[val > 0.55],
+                "extraversion": ("内敛型", "外放型")[val > 0.55],
+                "agreeableness": ("对抗型", "亲和型")[val > 0.55],
+                "neuroticism": ("稳定型", "敏感型")[val < 0.45],
+            }
+            return labels.get(dim, "")
+
+        return {
+            "linguistic_summary": {
+                "dominant_type": top_type,
+                "type_ratio": round(type_pct, 2),
+                "dominant_tone": top_tone,
+                "tone_ratio": round(tone_pct, 2),
+                "dominant_depth": top_depth,
+                "depth_ratio": round(depth_pct, 2),
+            },
+            "personality": {dim: round(val, 2) for dim, val in personality.items()},
+            "personality_labels": {dim: _dim_label(dim, personality.get(dim, 0.5))
+                                   for dim in personality},
+            "behavior": {
+                "rag_pct": round(habits.get("rag_queries", 0) / max(habits.get("total", 1), 1), 2),
+                "chat_pct": round(habits.get("chat_messages", 0) / max(habits.get("total", 1), 1), 2),
+                "import_pct": round(habits.get("imports", 0) / max(habits.get("total", 1), 1), 2),
+            },
+            "total_interactions": habits.get("total", 0),
+        }
+
+    def build_persona_context(self) -> str:
+        """生成用户画像提示文本（用于拼入 LLM prompt）"""
+        persona = self.get_persona()
+        if not persona or persona.get("total_interactions", 0) < 3:
+            return ""
+
+        ling = persona.get("linguistic_summary", {})
+        pl = persona.get("personality_labels", {})
+        pv = persona.get("personality", {})
+        bhv = persona.get("behavior", {})
+
+        parts = ["【用户习惯画像】"]
+
+        # 语言风格
+        stype = ling.get("dominant_type", "")
+        tone = ling.get("dominant_tone", "")
+        depth = ling.get("dominant_depth", "")
+        if stype:
+            parts.append(f"语言风格：以{stype}句为主（{ling.get('type_ratio', 0):.0%}），"
+                         f"语气偏{tone}（{ling.get('tone_ratio', 0):.0%}），"
+                         f"深度以{depth}为主（{ling.get('depth_ratio', 0):.0%}）")
+
+        # 人格
+        labels = [v for k, v in pl.items() if v]
+        if labels:
+            parts.append(f"人格倾向：{'、'.join(labels)}")
+        # 人格数值（仅当有明显倾向时）
+        notable = []
+        for dim, val in pv.items():
+            if val > 0.65:
+                notable.append(f"{dim}(偏高{val:.2f})")
+            elif val < 0.35:
+                notable.append(f"{dim}(偏低{val:.2f})")
+        if notable:
+            parts.append(f"人格细节：{'；'.join(notable)}")
+
+        # 行为偏好
+        if bhv.get("rag_pct", 0) > 0.5:
+            parts.append("行为偏好：高频使用知识库检索")
+        if bhv.get("import_pct", 0) > 0.2:
+            parts.append("行为偏好：常导入文档到知识库")
+
+        return "\n".join(parts)
 
     # ═══════════════ 构建上下文 ═══════════════
 

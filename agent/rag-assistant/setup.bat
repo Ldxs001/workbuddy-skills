@@ -66,9 +66,19 @@ echo ========================================
 echo   Ready. Launching RAG Assistant...
 echo ========================================
 
+:: Kill old instances
+if exist "%~dp0server.pid" (
+    set /p OLD_PID=<"%~dp0server.pid"
+    taskkill /f /pid !OLD_PID! >nul 2>&1
+    ping 127.0.0.1 -n 2 >nul
+    del "%~dp0server.pid" 2>nul
+)
+:: Kill orphaned RAG config subprocesses (port 8766)
+for /f "tokens=5" %%a in ('netstat -ano ^| find ":8766 " 2^>nul') do taskkill /f /pid %%a >nul 2>&1
+
 :: Start server
 cd /d "%~dp0"
-start /B "" python main.py
+start /B "" python main.py --pidfile "%~dp0server.pid"
 
 :: Wait for server to start
 echo Waiting for server...
