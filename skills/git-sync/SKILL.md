@@ -2,7 +2,7 @@
 name: git-sync
 slug: git-sync
 displayName: Git Sync
-version: 2.26.4
+version: 2.26.5
 author: wUwproject
 license: MIT
 description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。
@@ -144,6 +144,7 @@ bash ~/.workbuddy/skills/git-sync/scripts/git-sync.sh workday-calendar --push-on
 [7/8] 提交推送 → 码云 ✅ / GitHub ✅
 [8/8] 打包索引 → 跳过（--push-only）
 最终输出: 码云 ✅ / GitHub ✅ → 版本 2.2.1 已同步
+
 ## 工作流程
 
 1. **触发判断** → 输入 用户请求文本 → 输出 触发决策（继续/拒绝） — 解析用户请求，判断是否为同步/推送/打包意图
@@ -154,6 +155,7 @@ bash ~/.workbuddy/skills/git-sync/scripts/git-sync.sh workday-calendar --push-on
 6. **更新 README** → 输入 skills/ 目录 → 输出 更新后的 README.md — 全量扫描 workrepo/skills/，重新生成 README.md
 7. **提交推送** → 输入 提交信息 → 输出 推送状态（成功/失败） — git add/commit/push 到码云 + GitHub
 8. **打包索引** → 输入 技能目录 → 输出 .zip 文件 + index.html — 将 skill 目录打包为 .zip，更新 .dist/index.html
+
 ## 数据目录说明
 
 本技能的数据文件存放在：

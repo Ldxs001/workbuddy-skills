@@ -1228,11 +1228,6 @@ def main():
     for line in LOG_BUFFER:
         print(line)
 
-    # ── 打印步骤日志 ─────────────────────────────────────────────────
-    QUIET_MODE = False
-    for line in LOG_BUFFER:
-        print(line)
-
     # ── 固定格式输出报告 ─────────────────────────────────────────────
     print()
     print("=" * 60)
@@ -1245,12 +1240,14 @@ def main():
     print("-" * 32)
     gitee_ver = version if gitee_ok else "未推送"
     github_ver = version if github_ok else "未推送"
-    # 跳过文件同步时，状态显示"⏭️ 跳过"而非"✅ 成功"
-    if skipped_sync:
+    # 跳过文件同步时，状态优先显示"⏭️ 跳过"，但推送成功时仍显示"✅ 成功"
+    if skipped_sync and not gitee_ok:
         gitee_status = "⏭️ 跳过"
-        github_status = "⏭️ 跳过"
     else:
         gitee_status = "✅ 成功" if gitee_ok else "❌ 失败"
+    if skipped_sync and not github_ok:
+        github_status = "⏭️ 跳过"
+    else:
         github_status = "✅ 成功" if github_ok else "❌ 失败"
     print(f"{'码云':<10} {gitee_status:<10} {gitee_ver:<12}")
     print(f"{'GitHub':<10} {github_status:<10} {github_ver:<12}")
