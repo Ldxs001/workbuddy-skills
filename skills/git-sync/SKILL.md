@@ -2,7 +2,7 @@
 name: git-sync
 slug: git-sync
 displayName: Git Sync
-version: 2.26.3
+version: 2.26.4
 author: wUwproject
 license: MIT
 description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。
@@ -20,9 +20,9 @@ create_permissions_md: true
 h1_position: true
 data_dir_compliance: true
 ---
-# git-sync — 三端同步技能
+# git-sync — 全平台发布工具
 
-将 skill 代码规范化推送到**码云（Gitee）**、**GitHub**，并生成 **ZIP 安装包**。
+将 skill/agent 代码规范化推送到**码云（Gitee）**、**GitHub**，并支持 **ClawHub**、**SkillHub**、**PyPI** 发布与 **Release 创建**。
 
 ## 约束
 
@@ -90,15 +90,14 @@ data_dir_compliance: true
 
 | 能力 | 说明 | 限制 |
 |------|------|------|
-| **三端同步** | 将 skill 同步到码云、GitHub 和本地 .dist/ 目录 | 一次只能同步一个 skill，不支持批量 |
+| **全平台同步** | 将 skill/agent 同步到码云、GitHub、ClawHub、SkillHub、PyPI | 按 skill/agent 逐个同步，支持 `all` 批量模式 |
 | **版本号三方对比** | 自动对比 _meta.json / SKILL.md frontmatter / changelog 的版本一致性 | 仅检测 x.y.z 格式版本号，不处理其他格式 |
 | **敏感信息过滤** | 自动扫描并脱敏 secrets/regex/telemetry | 扫描范围限于 skill 目录，不扫描系统目录 |
 | **SKILL.md 规范审查** | 内联审计版本一致性 + R-23 脚本引用检查 | 仅做静态文本分析，不验证运行时行为 |
 | **ZIP 打包 + HTML 索引** | 生成安装包 + 可视化索引页 | 打包前需先同步到 workrepo |
 
 **不支持：**
-- 通用 git 提交：本技能专注于 skill 仓库同步，通用 git 操作由用户手动完成
-- 批量推送：不支持同时推送多个 skill，需逐个同步
+- 通用 git 提交：本技能专注于 skill/agent 仓库同步，通用 git 操作由用户手动完成
 - merge 冲突解决：遇到 git merge 冲突时不会自动合并，需要用户手动处理
 
 ## 快速开始

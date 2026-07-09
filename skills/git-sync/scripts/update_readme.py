@@ -109,6 +109,38 @@ def generate_readme(repo_path, readme_path):
         table_lines.append(f"| `{name}` | {desc} |")
     table = "\n".join(table_lines)
 
+    # 扫描智能体目录
+    agent_dir = os.path.join(repo_path, "agent")
+    actual_agents = []
+    if os.path.isdir(agent_dir):
+        for entry in sorted(os.listdir(agent_dir)):
+            full = os.path.join(agent_dir, entry)
+            if os.path.isdir(full):
+                # 从 __init__.py 读取描述
+                init_py = os.path.join(full, "rag_assistant", "__init__.py")
+                desc = "智能体"
+                if os.path.exists(init_py):
+                    try:
+                        with open(init_py, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        # 从文档字符串取第一行作为描述
+                        m = re.search(r'"""(.*?)"""', content, re.DOTALL)
+                        if m:
+                            desc = m.group(1).strip().split("\n")[0][:120]
+                    except Exception:
+                        pass
+                actual_agents.append((entry, desc))
+        if actual_agents:
+            _safe_print(f"扫描到 {len(actual_agents)} 个智能体目录:")
+            for name, desc in actual_agents:
+                _safe_print(f"  - {name}: {desc[:60]}")
+
+    # 生成智能体列表表格
+    agent_table_lines = []
+    for name, desc in actual_agents:
+        agent_table_lines.append(f"| `{name}` | {desc} |")
+    agent_table = "\n".join(agent_table_lines)
+
     # 生成目录树（从仓库根目录实际扫描）
     SKIP_ROOT = {".git", "__pycache__", ".gitignore", "README.md.bak"}
     root_entries = []
@@ -138,7 +170,7 @@ def generate_readme(repo_path, readme_path):
     # 构建新的 README.md
     new_readme = f"""# {readme_title}
 
-> **用户技能仓库** — 由 git-sync 自动同步维护。
+> **用户技能仓库与智能体仓库** — 由 git-sync 自动同步维护。
 > 最后更新：{today}
 
 {readme_desc}
@@ -152,7 +184,20 @@ def generate_readme(repo_path, readme_path):
 | 技能名 | 描述 |
 |--------|------|
 {table}
+"""
 
+    if actual_agents:
+        new_readme += f"""
+## 智能体列表
+
+以下为仓库中实际存在的智能体项目：
+
+| 智能体名 | 描述 |
+|----------|------|
+{agent_table}
+"""
+
+    new_readme += f"""
 ---
 
 ## 目录结构
@@ -198,7 +243,8 @@ rm -rf temp-skills
 
 ## 许可证
 
-MIT License
+- MIT License（适用于大部分技能）
+- Apache License 2.0（适用于 `Orchestrator/`）
 """
 
     # 写回文件

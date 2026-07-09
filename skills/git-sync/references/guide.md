@@ -94,13 +94,12 @@ git tag + GitHub API，skill tag=`{name}-v{ver}`，agent tag=`v{ver}`。
 | `author` | 从 config.json 读取（缺省为 `your-name-here`） |
 | `tags` | 设为空数组 `[]` |
 
-### 步骤 1.5：SKILL.md 规范化审查（v1.8 新增）
+### 步骤 1.5：SKILL.md 内联审计（v2.6.31+）
 
-- **工具**：`-m scripts.skill_audit`（独立 Python CLI，零依赖）
-- **规则集**：R-01 ~ R-10（4 ERROR + 6 WARN）
+- **方式**：`git-sync.py` 内置 `step_skill_audit()`，作为同步工作流的一部分自动执行
+- **检查项**：版本一致性（`_meta.json` vs `SKILL.md` frontmatter）+ R-23 脚本引用规范
 - **模式**：纯警告不阻断（始终 exit(0)）
-- **输出**：人类可读终端报告 + 支持 `--json` 模式
-- **特性**：同义词关键词匹配容忍章节命名不一致
+- **输出**：终端打印检查报告（ERROR=0 WARN=N PASS=M）
 
 ### 步骤 2：同步文件到工作仓库
 
@@ -166,6 +165,7 @@ git add → git commit → git pull --rebase → git push
 ```json
 {
   "author": "你的作者名",
+  "email": "你的邮箱（可选，用于 git commit author）",
   "gitee": {
     "user": "你的码云用户名",
     "repo": "workbuddy-skills",
@@ -186,6 +186,7 @@ git add → git commit → git pull --rebase → git push
 | 字段 | 影响范围 |
 |------|---------|
 | `author` | `_meta.json` 默认作者名；敏感扫描中的用户名检测基准 |
+| `email` | git commit 的 author email（`git-sync.py` 中的 `step_commit_and_push()` 使用） |
 | `gitee.user` / `github.user` | 生成的查看链接和 README 安装命令中的用户名占位符 |
 | `gitee.repo` / `github.repo` | 工作仓库名称（通常两个平台相同） |
 | `branch` | 推送目标分支（通常为 main） |
@@ -211,9 +212,9 @@ git add → git commit → git pull --rebase → git push
 当 `rsync` 不可用时，脚本会 fallback 到 `sync_with_exclude.py`（Python 方案）。
 
 **问题根因：**
-- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`/c/Users/...` → `C:\Users\...`）
+- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`[local-path-redacted]` → `C:\Users\...`）
 - 如果 `python` 是 **Windows 原生 exe**（如 `.workbuddy\binaries\...`），路径不会被转换
-- Python 收到 `/c/Users/...` 会误解为 `C:\c\Users\...`，导致文件找不到
+- Python 收到 `[local-path-redacted]` 会误解为 `C:\c\Users\...`，导致文件找不到
 
 **症状：**
 ```

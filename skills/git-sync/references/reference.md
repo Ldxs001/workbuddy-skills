@@ -285,25 +285,18 @@ README.md（技能列表 + 目录树）
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `SKILLS_DIR` | `~/.workbuddy/skills` | 技能源目录（本地 skill 所在位置） |
-| `WORK_REPO` | `~/.workbuddy/workbuddy-skills` | Git 工作仓库（推送目标） |
-| `MANIFEST_FILE` | `scripts/manifest.json` | 维护清单文件路径 |
-| `DIST_DIR` | ``~/.workbuddy/skills/.dist`（运行时目录）/` | ZIP 统一输出目录（v1.5 新增） |
+| `SKILLS_DIR` | `~/.workbuddy/skills`（Python 中为 `Path.home() / "WorkBuddy" / "skills"`） | 技能源目录（本地 skill 所在位置） |
+| `WORK_REPO` | `~/.workbuddy/workbuddy-skills`（Python `_paths.py` 中为 `Path.home() / "WorkBuddy" / "workbuddy-skills"`） | Git 工作仓库（推送目标）。注意：Windows 上 `~` 与 `Path.home()` 可能解析为不同的物理目录 |
+| `MANIFEST_FILE` | `skills/.standardization/git-sync/data/manifest.json`（绝对路径 `~/.workbuddy/skills/.standardization/git-sync/data/manifest.json`） | 维护清单文件路径 |
+| `DIST_DIR` | `~/.workbuddy/skills/.dist` | ZIP 统一输出目录 |
 
-## ZIP 打包排除列表
+## ZIP 打包：LLM 动态过滤（v2.26+）
 
-以下文件/目录**不会**被包含在生成的 ZIP 包中：
+自 v2.26.0 起，ZIP 包的排除列表由 **LLM 文件过滤器**（`step_llm_file_filter()`）动态生成，不再使用硬编码的排除模式列表。仅保留 Windows 保留名 `nul` 的硬排除。
 
-| 类别 | 排除项 |
-|------|--------|
-| 缓存 | `__pycache__/`, `*.pyc`, `.DS_Store`, `Thumbs.db` |
-| 版本控制 | `.git/` |
-| 打包产物 | `*.zip` |
-| 本地预览 | `*.html` |
-| 日志 | `*.log` |
-| 脚本自身 | `git-sync.sh`, `update_manifest_version.py`, `preview_server.py`, `build_index_now.py` |
-| 运行时数据 | `.decisions.json`, `.sensitive_scan_*.json` |
-| 杂项 | `._*`, `ZIP_OUT`, `*.gitignore` |
+LLM 会在文件同步步骤前审核文件清单，保留核心代码文件（`.py`、`.md`、配置、许可等），排除运行时缓存（`__pycache__`、`*.pyc`）、日志、操作系统元文件（`.DS_Store`、`Thumbs.db`）等非必要文件。
+
+如果需要手动干预排除逻辑，请修改 `step_llm_file_filter()` 的 LLM prompt 模板（`git-sync.py`）。
 
 ## Skill 标准目录结构
 
@@ -343,25 +336,28 @@ README.md（技能列表 + 目录树）
 
 > **注意**：`_meta.json` 的 `author` 字段是署名，默认不脱敏。
 
-### 三种运行模式
+### 运行模式（v2.24.2+ — 全自动 LLM 决策）
 
-通过环境变量 `GIT_SYNC_SENSITIVE_MODE` 或 `--skip-scan` 参数控制：
+自 v2.24.2 起，敏感扫描已完全自动化，由 LLM 决策每条敏感信息是否脱敏，无需人工交互。
 
 | 模式 | 配置方式 | 行为 |
 |------|---------|------|
-| **交互提示**（默认） | 不配置或 `prompt` | 扫描后按文件粒度交互确认 |
-| **总是脱敏** | `GIT_SYNC_SENSITIVE_MODE=always-sanitize` | 自动全部脱敏（非交互） |
+| **自动 LLM 决策**（默认） | 不配置或 `prompt` | 扫描后 LLM 自动分类每项发现：public_docs 中的署名/path 保留；Token/私钥 自动脱敏；邮箱/路径 按 context 判断 |
+| **总是脱敏** | `GIT_SYNC_SENSITIVE_MODE=always-sanitize` | 自动全部脱敏（非交互，用于 ZIP 包） |
 | **保持不变** | `GIT_SYNC_SENSITIVE_MODE=keep-as-is` 或 `--skip-scan` | 跳过扫描，源文件不动 |
 
-### 交互式确认选项
+### LLM 自动决策规则
 
-扫描完成后用户可选：
+LLM 接收扫描发现列表后，按以下原则自动判断：
 
-1. **全部脱敏** — 公开上架场景推荐
-2. **全部保留** — 私有仓库场景
-3. **逐个文件选择** — 对每个文件单独决定
-4. **逐项细选** — 对单文件的每个敏感条目逐一确认
-5. **中止同步/打包**
+| 敏感类型 | LLM 决策倾向 | 示例 |
+|----------|-------------|------|
+| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `[email-redacted]` 在 LICENSE 中 → 保留 |
+| Token / API Key | 一律脱敏 | `api_key=sk-xxx` → 替换为 `<REDACTED>` |
+| 私钥内容 | 一律脱敏 | PEM 格式密钥 → 替换 |
+| 内网 IP | 脱敏 | `[internal-ip-redacted]` → `<REDACTED_IP>` |
+| 本地绝对路径 | public_docs 中的路径 → 保留；代码中硬编码 → 脱敏 | `C:\Users\sm001` 在文档中 → 保留 |
+| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `[username-redacted]` → 保留 |
 
 ### 打包时行为
 

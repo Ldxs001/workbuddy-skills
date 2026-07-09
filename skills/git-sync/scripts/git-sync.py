@@ -958,8 +958,8 @@ readme_p=os.path.join(os.path.dirname(__file__),"README.md")
 LD=open(readme_p,encoding="utf-8").read() if os.path.exists(readme_p) else "{name}"
 setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       long_description=LD,long_description_content_type="text/markdown",
-      author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
-      url="https://github.com/Ldxs001/workbuddy-skills",
+      author="Ldxs ([username-redacted])",author_email="[email-redacted]",
+      url="https://github.com/[username-redacted]/workbuddy-skills",
       packages=find_packages(),include_package_data=True,
       python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
@@ -1025,7 +1025,7 @@ def step_release_create(name: str, typ: str, version: str):
         b=json.dumps({"tag_name":tag,"name":f"{name} v{version}",
                       "body":f"## {name} v{version}\n\n由 git-sync 自动发布","draft":False,"prerelease":False})
         r=subprocess.run(["curl","-s","-X","POST",
-                         "https://api.github.com/repos/Ldxs001/workbuddy-skills/releases",
+                         "https://api.github.com/repos/[username-redacted]/workbuddy-skills/releases",
                          "-H",f"Authorization: token {token}","-H","Content-Type: application/json","-d",b],
                         capture_output=True,text=True)
         try:

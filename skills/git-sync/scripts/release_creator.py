@@ -6,7 +6,7 @@ def main():
         print("用法: release_creator.py <name> <type> <version>")
         sys.exit(1)
     name, typ, version = sys.argv[1], sys.argv[2], sys.argv[3]
-    repo = "Ldxs001/workbuddy-skills"
+    repo = "[username-redacted]/workbuddy-skills"
     tag = f"v{version}" if typ == "agent" else f"{name}-v{version}"
 
     # 1. 创建本地 tag
@@ -36,12 +36,12 @@ def main():
         capture_output=True, text=True
     ).stdout.strip()
     if ":" in remote_url and "@" in remote_url:
-        # https://user:token@github.com/repo
-        token_part = remote_url.split("//")[1].split("@")[0]
+        # https://user:[email-redacted]/repo
+        token_part = [credential-redacted]("//")[1].split("@")[0]
         if ":" in token_part:
-            token = token_part.split(":")[1]
+            token = [credential-redacted](":")[1]
     elif "token" in remote_url:
-        token = remote_url.split("token=")[1].split("&")[0]
+        token = [credential-redacted]("token=")[1].split("&")[0]
 
     if token:
         body = f"## {name} v{version}\n\n自动发布 by git-sync"

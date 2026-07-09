@@ -120,17 +120,18 @@ python manifest.py sync-readme workbuddy-skills
 
 ### Q11: 扫描结果误报怎么办？
 
-敏感信息扫描基于正则模式匹配，常见误报包括：
+自 v2.24.2 起，敏感扫描由 **LLM 自动决策**，无需人工交互。LLM 会根据 context 自动判断：
 
-| 误报场景 | 示例 | 处理 |
-|---------|------|------|
-| 示例邮箱 | `[email-redacted]` 在文档示例中 | 选择"逐项细选"，跳过该条目 |
-| 类似 Token 字符串 | UUID 格式的 ID 被 Token 规则命中 | 同上，交互式跳过 |
-| 用户名匹配 | 配置中的用户名出现在代码注释中 | 这是 low 级别，可保留 |
+| 误报场景 | LLM 自动处理 |
+|---------|-------------|
+| 示例邮箱在文档中 | 识别为 public_docs 中的署名邮箱 → 保留 |
+| 类似 Token 的 UUID 字符串 | 匹配 Token 模式但缺乏密钥上下文 → LLM 判断为 false positive，保留 |
+| 配置用户名在代码注释中 | 匹配 config.json 中的 author/gitee.user → 标记为 low，保留 |
+| 本地路径在文档中 | public_docs 中的路径 → 保留；代码中硬编码 → 脱敏 |
 
-对于私有仓库场景，可以直接用 `--skip-scan` 跳过扫描。
+如果仍需手动跳过，可用 `--skip-scan` 跳过整个扫描阶段。
 
-⚠️ **安全警告**：私有内容经常被后续镜像、打包分享、或推送到其他 remote（如 GitHub fork、团队成员 clone 后外传）。跳过扫描会削弱安全控制，增加凭证、Token 或其他敏感信息被传播的风险。仅在完全确认无敏感信息时使用 `--skip-scan`。
+⚠️ **安全警告**：跳过扫描会削弱安全控制，增加凭证、Token 或其他敏感信息被传播的风险。仅在完全确认无敏感信息时使用。
 
 ### Q12: 脱敏后的文件能恢复吗？
 
@@ -153,13 +154,11 @@ python manifest.py sync-readme workbuddy-skills
 
 ### Q14: 如何单独运行审查？
 
-```bash
-# 审查单个 skill
-python -m scripts.skill_audit audit ~/.workbuddy/skills/my-skill
+自 v2.6.31 起，审查已内联到 `git-sync.py` 的 `step_skill_audit()` 中，作为同步工作流的一部分自动执行。不再提供独立 CLI。
 
-# 审查所有 skills
-python -m scripts.skill_audit audit-all ~/.workbuddy/skills
+审查作为步骤 3.5（规范元数据之后、文件同步之前）自动运行，检查：
+- 版本一致性（`_meta.json` vs `SKILL.md` frontmatter）
+- R-23 脚本引用规范
 
-# JSON 输出（供脚本解析）
-python -m scripts.skill_audit audit ~/.workbuddy/skills/my-skill --json
+无需手动调用。如果需要跳过审查，目前不支持单独跳过，但审查本身是纯警告模式，不影响同步流程。
 ```

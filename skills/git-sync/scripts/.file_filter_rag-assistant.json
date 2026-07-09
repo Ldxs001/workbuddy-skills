@@ -1,0 +1,1221 @@
+{
+  "project": "rag-assistant",
+  "root": "C:\\Users\\sm001\\.workbuddy\\agent\\rag-assistant",
+  "total_files": 303,
+  "files": [
+    {
+      "path": ".gitignore",
+      "size": 406
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 11458
+    },
+    {
+      "path": "LICENSE",
+      "size": 590
+    },
+    {
+      "path": "llms.txt",
+      "size": 5615
+    },
+    {
+      "path": "main.py",
+      "size": 13328
+    },
+    {
+      "path": "rag_assistant/__init__.py",
+      "size": 93
+    },
+    {
+      "path": "rag_assistant/agent.py",
+      "size": 26549
+    },
+    {
+      "path": "rag_assistant/llm_client.py",
+      "size": 5559
+    },
+    {
+      "path": "rag_assistant/memory.py",
+      "size": 19137
+    },
+    {
+      "path": "rag_assistant/rag_wrapper.py",
+      "size": 4426
+    },
+    {
+      "path": "rag_assistant/search.py",
+      "size": 4269
+    },
+    {
+      "path": "rag_assistant/web_ui.py",
+      "size": 34894
+    },
+    {
+      "path": "RAG_PROTOCOL.md",
+      "size": 19270
+    },
+    {
+      "path": "requirements.txt",
+      "size": 868
+    },
+    {
+      "path": "scripts/config.py",
+      "size": 3742
+    },
+    {
+      "path": "scripts/embedding_model_manager.py",
+      "size": 26824
+    },
+    {
+      "path": "scripts/knowledge_base_manager.py",
+      "size": 21621
+    },
+    {
+      "path": "scripts/prompt_manager.py",
+      "size": 5674
+    },
+    {
+      "path": "scripts/rag_core.py",
+      "size": 17661
+    },
+    {
+      "path": "scripts/rag_env_setup.py",
+      "size": 21285
+    },
+    {
+      "path": "scripts/rag_setup_orchestrator.py",
+      "size": 22139
+    },
+    {
+      "path": "scripts/rag_skill.py",
+      "size": 10915
+    },
+    {
+      "path": "scripts/rag_standalone.py",
+      "size": 15040
+    },
+    {
+      "path": "scripts/rag_web_ui.py",
+      "size": 130711
+    },
+    {
+      "path": "scripts/reranker.py",
+      "size": 12282
+    },
+    {
+      "path": "scripts/router.py",
+      "size": 24933
+    },
+    {
+      "path": "scripts/text_splitter.py",
+      "size": 28874
+    },
+    {
+      "path": "scripts/utils.py",
+      "size": 7751
+    },
+    {
+      "path": "setup.bat",
+      "size": 2714
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/licenses/AUTHORS",
+      "size": 2201
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/licenses/LICENSE",
+      "size": 1441
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/METADATA",
+      "size": 3812
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/RECORD",
+      "size": 2529
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/REQUESTED",
+      "size": 0
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/WHEEL",
+      "size": 87
+    },
+    {
+      "path": "vendor/bin/markdownify.exe",
+      "size": 108364
+    },
+    {
+      "path": "vendor/bs4/__init__.py",
+      "size": 44562
+    },
+    {
+      "path": "vendor/bs4/__pycache__/__init__.cpython-311.pyc",
+      "size": 43139
+    },
+    {
+      "path": "vendor/bs4/__pycache__/__init__.cpython-314.pyc",
+      "size": 45602
+    },
+    {
+      "path": "vendor/bs4/__pycache__/_deprecation.cpython-311.pyc",
+      "size": 4172
+    },
+    {
+      "path": "vendor/bs4/__pycache__/_deprecation.cpython-314.pyc",
+      "size": 4961
+    },
+    {
+      "path": "vendor/bs4/__pycache__/_typing.cpython-311.pyc",
+      "size": 4629
+    },
+    {
+      "path": "vendor/bs4/__pycache__/_typing.cpython-314.pyc",
+      "size": 6536
+    },
+    {
+      "path": "vendor/bs4/__pycache__/_warnings.cpython-311.pyc",
+      "size": 5986
+    },
+    {
+      "path": "vendor/bs4/__pycache__/_warnings.cpython-314.pyc",
+      "size": 6482
+    },
+    {
+      "path": "vendor/bs4/__pycache__/css.cpython-311.pyc",
+      "size": 14569
+    },
+    {
+      "path": "vendor/bs4/__pycache__/css.cpython-314.pyc",
+      "size": 14869
+    },
+    {
+      "path": "vendor/bs4/__pycache__/dammit.cpython-311.pyc",
+      "size": 53401
+    },
+    {
+      "path": "vendor/bs4/__pycache__/dammit.cpython-314.pyc",
+      "size": 56379
+    },
+    {
+      "path": "vendor/bs4/__pycache__/diagnose.cpython-311.pyc",
+      "size": 14408
+    },
+    {
+      "path": "vendor/bs4/__pycache__/element.cpython-311.pyc",
+      "size": 124641
+    },
+    {
+      "path": "vendor/bs4/__pycache__/element.cpython-314.pyc",
+      "size": 137270
+    },
+    {
+      "path": "vendor/bs4/__pycache__/exceptions.cpython-311.pyc",
+      "size": 2101
+    },
+    {
+      "path": "vendor/bs4/__pycache__/exceptions.cpython-314.pyc",
+      "size": 2066
+    },
+    {
+      "path": "vendor/bs4/__pycache__/filter.cpython-311.pyc",
+      "size": 31072
+    },
+    {
+      "path": "vendor/bs4/__pycache__/filter.cpython-314.pyc",
+      "size": 33687
+    },
+    {
+      "path": "vendor/bs4/__pycache__/formatter.cpython-311.pyc",
+      "size": 11123
+    },
+    {
+      "path": "vendor/bs4/__pycache__/formatter.cpython-314.pyc",
+      "size": 11129
+    },
+    {
+      "path": "vendor/bs4/_deprecation.py",
+      "size": 2408
+    },
+    {
+      "path": "vendor/bs4/_typing.py",
+      "size": 7549
+    },
+    {
+      "path": "vendor/bs4/_warnings.py",
+      "size": 4711
+    },
+    {
+      "path": "vendor/bs4/builder/__init__.py",
+      "size": 31194
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/__init__.cpython-311.pyc",
+      "size": 29933
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/__init__.cpython-314.pyc",
+      "size": 32016
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/_html5lib.cpython-311.pyc",
+      "size": 25267
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/_html5lib.cpython-314.pyc",
+      "size": 31105
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/_htmlparser.cpython-311.pyc",
+      "size": 17747
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/_htmlparser.cpython-314.pyc",
+      "size": 18412
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/_lxml.cpython-311.pyc",
+      "size": 20535
+    },
+    {
+      "path": "vendor/bs4/builder/__pycache__/_lxml.cpython-314.pyc",
+      "size": 21853
+    },
+    {
+      "path": "vendor/bs4/builder/_html5lib.py",
+      "size": 23607
+    },
+    {
+      "path": "vendor/bs4/builder/_htmlparser.py",
+      "size": 19866
+    },
+    {
+      "path": "vendor/bs4/builder/_lxml.py",
+      "size": 18969
+    },
+    {
+      "path": "vendor/bs4/css.py",
+      "size": 12713
+    },
+    {
+      "path": "vendor/bs4/dammit.py",
+      "size": 57485
+    },
+    {
+      "path": "vendor/bs4/diagnose.py",
+      "size": 7846
+    },
+    {
+      "path": "vendor/bs4/element.py",
+      "size": 125805
+    },
+    {
+      "path": "vendor/bs4/exceptions.py",
+      "size": 951
+    },
+    {
+      "path": "vendor/bs4/filter.py",
+      "size": 29180
+    },
+    {
+      "path": "vendor/bs4/formatter.py",
+      "size": 10478
+    },
+    {
+      "path": "vendor/bs4/py.typed",
+      "size": 0
+    },
+    {
+      "path": "vendor/markdownify/__init__.py",
+      "size": 30403
+    },
+    {
+      "path": "vendor/markdownify/__init__.pyi",
+      "size": 2149
+    },
+    {
+      "path": "vendor/markdownify/__pycache__/__init__.cpython-311.pyc",
+      "size": 36727
+    },
+    {
+      "path": "vendor/markdownify/__pycache__/__init__.cpython-314.pyc",
+      "size": 36045
+    },
+    {
+      "path": "vendor/markdownify/__pycache__/main.cpython-311.pyc",
+      "size": 5266
+    },
+    {
+      "path": "vendor/markdownify/main.py",
+      "size": 4530
+    },
+    {
+      "path": "vendor/markdownify/py.typed",
+      "size": 1
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/entry_points.txt",
+      "size": 54
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/LICENSE",
+      "size": 1083
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/METADATA",
+      "size": 9922
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/RECORD",
+      "size": 1196
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/REQUESTED",
+      "size": 0
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/top_level.txt",
+      "size": 12
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/WHEEL",
+      "size": 91
+    },
+    {
+      "path": "vendor/NOTICE.md",
+      "size": 2988
+    },
+    {
+      "path": "vendor/pypdf/__init__.py",
+      "size": 1283
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/__init__.cpython-311.pyc",
+      "size": 1719
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/__init__.cpython-314.pyc",
+      "size": 1478
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_cmap.cpython-311.pyc",
+      "size": 17695
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_cmap.cpython-314.pyc",
+      "size": 17701
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_doc_common.cpython-311.pyc",
+      "size": 70959
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_doc_common.cpython-314.pyc",
+      "size": 76573
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_encryption.cpython-311.pyc",
+      "size": 61882
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_encryption.cpython-314.pyc",
+      "size": 62361
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_font.cpython-311.pyc",
+      "size": 35150
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_font.cpython-314.pyc",
+      "size": 33753
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_page.cpython-311.pyc",
+      "size": 120629
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_page.cpython-314.pyc",
+      "size": 124294
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_page_labels.cpython-311.pyc",
+      "size": 12378
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_page_labels.cpython-314.pyc",
+      "size": 12463
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_protocols.cpython-311.pyc",
+      "size": 5311
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_protocols.cpython-314.pyc",
+      "size": 7352
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_reader.cpython-311.pyc",
+      "size": 70694
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_reader.cpython-314.pyc",
+      "size": 71719
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_utils.cpython-311.pyc",
+      "size": 26350
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_utils.cpython-314.pyc",
+      "size": 29397
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_version.cpython-311.pyc",
+      "size": 212
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_version.cpython-314.pyc",
+      "size": 189
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_writer.cpython-311.pyc",
+      "size": 160872
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/_writer.cpython-314.pyc",
+      "size": 163993
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/constants.cpython-311.pyc",
+      "size": 27492
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/constants.cpython-314.pyc",
+      "size": 27501
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/errors.cpython-311.pyc",
+      "size": 4551
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/errors.cpython-314.pyc",
+      "size": 3924
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/filters.cpython-311.pyc",
+      "size": 37552
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/filters.cpython-314.pyc",
+      "size": 38287
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/pagerange.cpython-311.pyc",
+      "size": 10178
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/pagerange.cpython-314.pyc",
+      "size": 11181
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/papersizes.cpython-311.pyc",
+      "size": 1627
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/papersizes.cpython-314.pyc",
+      "size": 1753
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/types.cpython-311.pyc",
+      "size": 2139
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/types.cpython-314.pyc",
+      "size": 2566
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/xmp.cpython-311.pyc",
+      "size": 47971
+    },
+    {
+      "path": "vendor/pypdf/__pycache__/xmp.cpython-314.pyc",
+      "size": 54950
+    },
+    {
+      "path": "vendor/pypdf/_cmap.py",
+      "size": 13508
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__init__.py",
+      "size": 1373
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/__init__.cpython-311.pyc",
+      "size": 2143
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/__init__.cpython-314.pyc",
+      "size": 2568
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/_codecs.cpython-311.pyc",
+      "size": 11100
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/_codecs.cpython-314.pyc",
+      "size": 12457
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/adobe_glyphs.cpython-311.pyc",
+      "size": 702633
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/adobe_glyphs.cpython-314.pyc",
+      "size": 691279
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/core_font_metrics.cpython-311.pyc",
+      "size": 105339
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/core_font_metrics.cpython-314.pyc",
+      "size": 102503
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/pdfdoc.cpython-311.pyc",
+      "size": 1650
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/pdfdoc.cpython-314.pyc",
+      "size": 5858
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/std.cpython-311.pyc",
+      "size": 1525
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/std.cpython-314.pyc",
+      "size": 5752
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/symbol.cpython-311.pyc",
+      "size": 1942
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/symbol.cpython-314.pyc",
+      "size": 6177
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/zapfding.cpython-311.pyc",
+      "size": 2178
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__pycache__/zapfding.cpython-314.pyc",
+      "size": 6413
+    },
+    {
+      "path": "vendor/pypdf/_codecs/_codecs.py",
+      "size": 10717
+    },
+    {
+      "path": "vendor/pypdf/_codecs/adobe_glyphs.py",
+      "size": 447213
+    },
+    {
+      "path": "vendor/pypdf/_codecs/core_font_metrics.py",
+      "size": 114968
+    },
+    {
+      "path": "vendor/pypdf/_codecs/pdfdoc.py",
+      "size": 4269
+    },
+    {
+      "path": "vendor/pypdf/_codecs/std.py",
+      "size": 2630
+    },
+    {
+      "path": "vendor/pypdf/_codecs/symbol.py",
+      "size": 3734
+    },
+    {
+      "path": "vendor/pypdf/_codecs/zapfding.py",
+      "size": 3742
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__init__.py",
+      "size": 2770
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/__init__.cpython-311.pyc",
+      "size": 1357
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/__init__.cpython-314.pyc",
+      "size": 975
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/_base.cpython-311.pyc",
+      "size": 1051
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/_base.cpython-314.pyc",
+      "size": 1340
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/_cryptography.cpython-311.pyc",
+      "size": 8107
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/_cryptography.cpython-314.pyc",
+      "size": 8799
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/_fallback.cpython-311.pyc",
+      "size": 4813
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__pycache__/_pycryptodome.cpython-311.pyc",
+      "size": 5763
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_base.py",
+      "size": 1735
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_cryptography.py",
+      "size": 5265
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_fallback.py",
+      "size": 3382
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_pycryptodome.py",
+      "size": 4020
+    },
+    {
+      "path": "vendor/pypdf/_doc_common.py",
+      "size": 55294
+    },
+    {
+      "path": "vendor/pypdf/_encryption.py",
+      "size": 53649
+    },
+    {
+      "path": "vendor/pypdf/_font.py",
+      "size": 32151
+    },
+    {
+      "path": "vendor/pypdf/_page.py",
+      "size": 96078
+    },
+    {
+      "path": "vendor/pypdf/_page_labels.py",
+      "size": 9929
+    },
+    {
+      "path": "vendor/pypdf/_protocols.py",
+      "size": 2123
+    },
+    {
+      "path": "vendor/pypdf/_reader.py",
+      "size": 66477
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/__init__.py",
+      "size": 8592
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/__pycache__/__init__.cpython-311.pyc",
+      "size": 11324
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/__pycache__/__init__.cpython-314.pyc",
+      "size": 12926
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/__pycache__/_text_extractor.cpython-311.pyc",
+      "size": 17194
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/__pycache__/_text_extractor.cpython-314.pyc",
+      "size": 20451
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__init__.py",
+      "size": 340
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/__init__.cpython-311.pyc",
+      "size": 605
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/__init__.cpython-314.pyc",
+      "size": 494
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/_fixed_width_page.cpython-311.pyc",
+      "size": 22390
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/_fixed_width_page.cpython-314.pyc",
+      "size": 21853
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/_text_state_manager.cpython-311.pyc",
+      "size": 11102
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/_text_state_manager.cpython-314.pyc",
+      "size": 12752
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/_text_state_params.cpython-311.pyc",
+      "size": 10210
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__pycache__/_text_state_params.cpython-314.pyc",
+      "size": 11327
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/_fixed_width_page.py",
+      "size": 17319
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/_text_state_manager.py",
+      "size": 7517
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/_text_state_params.py",
+      "size": 6513
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_text_extractor.py",
+      "size": 14856
+    },
+    {
+      "path": "vendor/pypdf/_utils.py",
+      "size": 21513
+    },
+    {
+      "path": "vendor/pypdf/_version.py",
+      "size": 23
+    },
+    {
+      "path": "vendor/pypdf/_writer.py",
+      "size": 134780
+    },
+    {
+      "path": "vendor/pypdf/annotations/__init__.py",
+      "size": 990
+    },
+    {
+      "path": "vendor/pypdf/annotations/__pycache__/__init__.cpython-311.pyc",
+      "size": 1316
+    },
+    {
+      "path": "vendor/pypdf/annotations/__pycache__/_base.cpython-311.pyc",
+      "size": 1936
+    },
+    {
+      "path": "vendor/pypdf/annotations/__pycache__/_markup_annotations.cpython-311.pyc",
+      "size": 18641
+    },
+    {
+      "path": "vendor/pypdf/annotations/__pycache__/_non_markup_annotations.cpython-311.pyc",
+      "size": 5809
+    },
+    {
+      "path": "vendor/pypdf/annotations/_base.py",
+      "size": 961
+    },
+    {
+      "path": "vendor/pypdf/annotations/_markup_annotations.py",
+      "size": 11862
+    },
+    {
+      "path": "vendor/pypdf/annotations/_non_markup_annotations.py",
+      "size": 3656
+    },
+    {
+      "path": "vendor/pypdf/constants.py",
+      "size": 23632
+    },
+    {
+      "path": "vendor/pypdf/errors.py",
+      "size": 1947
+    },
+    {
+      "path": "vendor/pypdf/filters.py",
+      "size": 32233
+    },
+    {
+      "path": "vendor/pypdf/generic/__init__.py",
+      "size": 3468
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/__init__.cpython-311.pyc",
+      "size": 2244
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/__init__.cpython-314.pyc",
+      "size": 2327
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_appearance_stream.cpython-311.pyc",
+      "size": 31183
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_appearance_stream.cpython-314.pyc",
+      "size": 30106
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_base.cpython-311.pyc",
+      "size": 46722
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_base.cpython-314.pyc",
+      "size": 54951
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_data_structures.cpython-311.pyc",
+      "size": 88066
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_data_structures.cpython-314.pyc",
+      "size": 92039
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_files.cpython-311.pyc",
+      "size": 22046
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_files.cpython-314.pyc",
+      "size": 23962
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_fit.cpython-311.pyc",
+      "size": 7843
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_fit.cpython-314.pyc",
+      "size": 8195
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_image_inline.cpython-311.pyc",
+      "size": 11688
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_image_inline.cpython-314.pyc",
+      "size": 11632
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_image_xobject.cpython-311.pyc",
+      "size": 27567
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_link.cpython-311.pyc",
+      "size": 7503
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_link.cpython-314.pyc",
+      "size": 7976
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_outline.cpython-311.pyc",
+      "size": 2351
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_outline.cpython-314.pyc",
+      "size": 2116
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_rectangle.cpython-311.pyc",
+      "size": 8563
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_rectangle.cpython-314.pyc",
+      "size": 10890
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_utils.cpython-311.pyc",
+      "size": 9611
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_utils.cpython-314.pyc",
+      "size": 9477
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_viewerpref.cpython-311.pyc",
+      "size": 10589
+    },
+    {
+      "path": "vendor/pypdf/generic/__pycache__/_viewerpref.cpython-314.pyc",
+      "size": 11501
+    },
+    {
+      "path": "vendor/pypdf/generic/_appearance_stream.py",
+      "size": 30337
+    },
+    {
+      "path": "vendor/pypdf/generic/_base.py",
+      "size": 33427
+    },
+    {
+      "path": "vendor/pypdf/generic/_data_structures.py",
+      "size": 69487
+    },
+    {
+      "path": "vendor/pypdf/generic/_files.py",
+      "size": 16327
+    },
+    {
+      "path": "vendor/pypdf/generic/_fit.py",
+      "size": 5515
+    },
+    {
+      "path": "vendor/pypdf/generic/_image_inline.py",
+      "size": 13281
+    },
+    {
+      "path": "vendor/pypdf/generic/_image_xobject.py",
+      "size": 23739
+    },
+    {
+      "path": "vendor/pypdf/generic/_link.py",
+      "size": 6138
+    },
+    {
+      "path": "vendor/pypdf/generic/_outline.py",
+      "size": 1094
+    },
+    {
+      "path": "vendor/pypdf/generic/_rectangle.py",
+      "size": 3924
+    },
+    {
+      "path": "vendor/pypdf/generic/_utils.py",
+      "size": 7514
+    },
+    {
+      "path": "vendor/pypdf/generic/_viewerpref.py",
+      "size": 6835
+    },
+    {
+      "path": "vendor/pypdf/pagerange.py",
+      "size": 7108
+    },
+    {
+      "path": "vendor/pypdf/papersizes.py",
+      "size": 1413
+    },
+    {
+      "path": "vendor/pypdf/py.typed",
+      "size": 0
+    },
+    {
+      "path": "vendor/pypdf/types.py",
+      "size": 1915
+    },
+    {
+      "path": "vendor/pypdf/xmp.py",
+      "size": 31655
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/licenses/LICENSE",
+      "size": 1605
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/METADATA",
+      "size": 7229
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/RECORD",
+      "size": 8298
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/REQUESTED",
+      "size": 0
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/WHEEL",
+      "size": 82
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/LICENSE",
+      "size": 1066
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/METADATA",
+      "size": 1658
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/RECORD",
+      "size": 561
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/top_level.txt",
+      "size": 4
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/WHEEL",
+      "size": 109
+    },
+    {
+      "path": "vendor/six.py",
+      "size": 34703
+    },
+    {
+      "path": "vendor/soupsieve/__init__.py",
+      "size": 4581
+    },
+    {
+      "path": "vendor/soupsieve/__meta__.py",
+      "size": 6766
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/__init__.cpython-311.pyc",
+      "size": 6049
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/__init__.cpython-314.pyc",
+      "size": 7166
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/__meta__.cpython-311.pyc",
+      "size": 8898
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/__meta__.cpython-314.pyc",
+      "size": 9209
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/css_match.cpython-311.pyc",
+      "size": 69804
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/css_match.cpython-314.pyc",
+      "size": 80881
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/css_parser.cpython-311.pyc",
+      "size": 57716
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/css_parser.cpython-314.pyc",
+      "size": 60270
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/css_types.cpython-311.pyc",
+      "size": 20240
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/css_types.cpython-314.pyc",
+      "size": 22968
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/pretty.cpython-311.pyc",
+      "size": 5872
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/pretty.cpython-314.pyc",
+      "size": 5709
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/util.cpython-311.pyc",
+      "size": 5589
+    },
+    {
+      "path": "vendor/soupsieve/__pycache__/util.cpython-314.pyc",
+      "size": 6011
+    },
+    {
+      "path": "vendor/soupsieve/css_match.py",
+      "size": 61404
+    },
+    {
+      "path": "vendor/soupsieve/css_parser.py",
+      "size": 49081
+    },
+    {
+      "path": "vendor/soupsieve/css_types.py",
+      "size": 10014
+    },
+    {
+      "path": "vendor/soupsieve/pretty.py",
+      "size": 4362
+    },
+    {
+      "path": "vendor/soupsieve/py.typed",
+      "size": 0
+    },
+    {
+      "path": "vendor/soupsieve/util.py",
+      "size": 3352
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/licenses/LICENSE.md",
+      "size": 1096
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/METADATA",
+      "size": 4635
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/RECORD",
+      "size": 1383
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/WHEEL",
+      "size": 87
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/licenses/LICENSE",
+      "size": 13936
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/METADATA",
+      "size": 3310
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/RECORD",
+      "size": 580
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/WHEEL",
+      "size": 82
+    },
+    {
+      "path": "vendor/typing_extensions.py",
+      "size": 165012
+    }
+  ],
+  "project_rules": "",
+  "guidelines": "请审查以上文件列表，结合 project_rules（项目自身规则文件）和以下通用规则，\n判断哪些文件应该一起发布到公开的代码仓库。\n\n项目类型：AI Agent\n\n通用排除参考：\n- 缓存目录（__pycache__/, .cache/, .mypy_cache/, .pytest_cache/）\n- 构建产物（dist/, build/, .egg-info/, *.pyc, *.pyo）\n- 依赖目录（node_modules/, .venv/, .tox/）\n- 大体积模型权重/data（*.pt, *.pth, *.gguf, data/models/, data/kb/, *.db, *.sqlite）\n- 个人配置/凭证（config.json, .env, *.token, credentials*）\n- IDE/系统文件（.vscode/, .idea/, .DS_Store, Thumbs.db）\n- 日志/临时文件（*.log, *.tmp, *.bak）\n- .git/ 排除，.gitignore 可保留\n\n确认以下核心文件被保留：\n- 所有 .py 代码文件\n- 文档（README.md, SKILL.md, references/ 下的文档）\n- 配置文件（_meta.json, requirements.txt, setup.py）\n- 许可证（LICENSE）\n\n请以 JSON 返回应保留的文件路径列表：\n{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}"
+}

@@ -1,7 +1,16 @@
+## [2.26.4] - 2026-07-09
+
+### 文档
+- **SKILL.md 全面更新**：移除过时的"三端同步"描述，替换为"全平台发布工具"；删除"不支持批量"的矛盾声明；能力表更新为全平台 + 支持 `all` 模式
+- **reference.md 修复**：MANIFEST_FILE 路径（`scripts/manifest.json` → 正确绝对路径）、WORK_REPO 跨平台说明、敏感扫描更新为 LLM 自动决策模式、ZIP 排除更新为 LLM 动态过滤（v2.26+）
+- **guide.md 修复**：skill_audit 独立 CLI → 内联审计；config.json 模板增加 `email` 字段
+- **faq.md 修复**：Q11 更新为 LLM 自动决策；Q14 更新为内联审计说明（删除已失效的 CLI 命令）
+- **update_readme.py 更新**：新增 agent/ 目录扫描 + 智能体列表表格；许可部分增加 Apache 2.0；config.json readme.description 恢复用户自定义文案（"合集与智能体项目"）
+
 ## [2.26.3] - 2026-07-09
 
 ### 修复
-- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `/c/Users/sm001/...` 未被扫描发现
+- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `[local-path-redacted]/...` 未被扫描发现
 - **LLM 决策逻辑修复**：`"路径"` 之前被纳入 public_labels 允许列表，导致公开文档中的真实路径被 keep。改为仅当没有 "本地绝对路径" / "家目录路径" 标签时才 keep
 
 ### 变更
