@@ -217,7 +217,7 @@ git add → git commit → git pull --rebase → git push
 
 **症状：**
 ```
-C:\Users\sm001\.workbuddy\binaries\python\...\python.exe: can't open file 'c:\\c\\Users\\...'
+C:\Users\USERNAME\.workbuddy\binaries\python\...\python.exe: can't open file 'c:\\c\\Users\\...'
 ```
 
 **解决方案（任选其一）：**
@@ -236,10 +236,10 @@ C:\Users\sm001\.workbuddy\binaries\python\...\python.exe: can't open file 'c:\\c
 
 ```bash
 # 在 Git Bash 中执行，下载 rsync.exe 到 PortableGit/usr/bin/
-cd /c/Users/sm001/.workbuddy/vendor/PortableGit/usr/bin/
+cd $HOME/.workbuddy/vendor/PortableGit/usr/bin/
 # 从 Git for Windows 获取 rsync 工具
 # 在 Git Bash 中执行：
-cd /c/Users/sm001/.workbuddy/vendor/PortableGit/usr/bin/
+cd $HOME/.workbuddy/vendor/PortableGit/usr/bin/
 # 安装 rsync（如已安装可跳过）
 # 验证
 rsync --version

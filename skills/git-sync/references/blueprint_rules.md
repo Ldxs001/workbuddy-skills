@@ -63,7 +63,7 @@
 ### 脱敏方式
 
 - **路径**：只替换"标识用户/机器身份的前缀"，保留功能后缀
-  - `C:\Users\sm001\skills\novel-weaver\...` → `[LOCAL_PATH]\skills\novel-weaver\...`
+  - `C:\Users\USERNAME\skills\novel-weaver\...` → `[LOCAL_PATH]\skills\novel-weaver\...`
 - **凭据**：替换为 `[REDACTED]`
   - `token = "abc123"` → `token = "[REDACTED]"`
 - **邮箱**：替换为 `[EMAIL]`

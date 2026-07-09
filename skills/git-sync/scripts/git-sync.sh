@@ -151,12 +151,12 @@ fi
 # 路径配置
 SKILL_MD="$SRC_DIR/SKILL.md"
 META_FILE_JSON="$SRC_DIR/_meta.json"
-WORK_REPO="/c/Users/sm001/.workbuddy/workbuddy-skills"
+WORK_REPO="$HOME/.workbuddy/workbuddy-skills"
 REPO_NAME="workbuddy-skills"
 DIST_DIR="$SKILLS_DIR/.dist"
 ZIP_NAME="${SKILL_NAME}-v${VERSION}.zip"
 ZIP_FILE="$DIST_DIR/$ZIP_NAME"
-MANIFEST_FILE="/c/Users/sm001/.workbuddy/skills/.standardization/git-sync/data/manifest.json"
+MANIFEST_FILE="$HOME/.workbuddy/skills/.standardization/git-sync/data/manifest.json"
 README_FILE="$WORK_REPO/README.md"
 
 # 读取 description（仅 skill 有 meta.json）
