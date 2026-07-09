@@ -95,5 +95,5 @@ rm -rf temp-skills
 
 ## 许可证
 
-- MIT License（适用于大部分技能）
-- Apache License 2.0（适用于 `Orchestrator/`）
+- MIT License（适用于 `skills/` 目录下的所有技能）
+- Apache License 2.0（适用于 `agent/` 目录下的智能体）
