@@ -11,8 +11,8 @@ import time
 import threading
 from pathlib import Path
 
-# 数据根目录：rag-assistant/data/
-DATA_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"))
+# 数据根目录：统一到项目根目录 data/
+DATA_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data"))
 _kb_dir_abs     = os.path.join(DATA_ROOT, "kb")
 _models_dir_abs = os.path.join(DATA_ROOT, "models")
 _prompts_dir_abs = os.path.join(DATA_ROOT, "prompts")

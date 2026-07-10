@@ -11,8 +11,8 @@ LLM 接入配置（在 config 中设置）:
   - 各平台默认地址见 references/llm-setup.md
 
 用法:
-  python scripts/rag_standalone.py                  # 交互式 CLI
-  python scripts/rag_standalone.py --query "问题"     # 单次问答
+  python rag_assistant/engine/rag_standalone.py                  # 交互式 CLI
+  python rag_assistant/engine/rag_standalone.py --query "问题"     # 单次问答
 """
 
 import os

@@ -9,7 +9,7 @@ v0.2.0
 - prompt 模板在输出中被正确填充，智能体直接使用即可
 
 用法:
-  python scripts/rag_skill.py --query "问题" --kb default [--template "模板"] [--json]
+  rag_assistant/engine/rag_skill.py --query "问题" --kb default [--template "模板"] [--json]
 """
 
 import os
