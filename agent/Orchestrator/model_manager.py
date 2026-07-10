@@ -169,7 +169,7 @@ KNOWN_SEARCH_PATHS = {
 # 已知模型的快速索引（避免全盘扫描）
 # ---------------------------------------------------------------
 KNOWN_MODELS = [
-    # === local_agent / qwen ===
+    # === Orchestrator / qwen ===
     ModelInfo(
         name="qwen3.6-35b-a3b-Q4_K_M",
         path=os.path.expanduser(

@@ -2,7 +2,6 @@
 tools/skill_loader.py — 动态技能加载器
 
 通过读取 SKILL.md 让智能体理解任意技能的能力，无需写 adapter。
-工作方式和你（WorkBuddy）读文档→执行脚本完全一致。
 """
 
 import glob
@@ -145,18 +144,16 @@ def _read_skill_summary(skill_dir: str) -> str:
 
 class LoadSkillTool(BaseTool):
     """
-    加载任意 WorkBuddy 技能。
+    加载任意技能。
 
     读取技能的 SKILL.md，让智能体理解其能力和用法。
     之后可以调用 python_execute 来执行技能的脚本。
-
-    等价于 WorkBuddy 自己加载技能的方式——读文档，然后执行。
     """
 
     def __init__(self, extra_dirs: list[str] = None):
         super().__init__(
             name="load_skill",
-            description="加载一个 WorkBuddy 技能，读取其 SKILL.md 并理解它的能力和用法。之后你可以通过 python_execute 调用它的脚本。",
+            description="加载一个技能，读取其 SKILL.md 并理解它的能力和用法。之后你可以通过 python_execute 调用它的脚本。",
         )
         self.extra_dirs = extra_dirs or []
 
@@ -181,7 +178,7 @@ class LoadSkillTool(BaseTool):
             if not skills:
                 return ToolResult(
                     False,
-                    error="未找到任何技能。技能应放在 ~/.workbuddy/skills/ 下",
+                    error="未找到任何技能。请在配置页添加技能路径。",
                 )
             lines = [f"找到 {len(skills)} 个技能:\n"]
             for s in skills:

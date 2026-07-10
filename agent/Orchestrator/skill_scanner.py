@@ -11,7 +11,10 @@ if _DIR not in sys.path:
 
 from chain_model import SkillInfo
 
-SKILLS_BASE = os.path.expanduser("~/.workbuddy/skills")
+# 默认技能路径：仅项目内 skills/，不存在则空（不回退到全局目录）
+_PROJECT_ROOT = os.path.dirname(_DIR)  # Orchestrator/
+_LOCAL_SKILLS = os.path.join(_PROJECT_ROOT, "skills")
+SKILLS_BASE = _LOCAL_SKILLS if os.path.isdir(_LOCAL_SKILLS) else None
 
 
 def _parse_frontmatter(text: str) -> dict:
@@ -54,9 +57,9 @@ def _parse_frontmatter(text: str) -> dict:
 
 def scan_skills(*base_dirs: str) -> list[SkillInfo]:
     """扫描一个或多个技能目录，返回所有技能的 SkillInfo 列表
-    不传参数时默认扫描 ~/.workbuddy/skills/
+    不传参数时默认扫描项目内 skills/，不存在则返回空列表
     """
-    dirs = list(base_dirs) if base_dirs else [SKILLS_BASE]
+    dirs = list(base_dirs) if base_dirs else ([SKILLS_BASE] if SKILLS_BASE else [])
     all_skills = []
     seen_names: set[str] = set()
 

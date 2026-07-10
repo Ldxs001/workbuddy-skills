@@ -49,13 +49,21 @@ class PipelineNode:
     loop_end: Optional[int] = None
     loop_times: Optional[int] = None
     input_text: str = ""          # 用户对该步骤的输入
+    params: dict = field(default_factory=dict)  # skill-sub 参数 / 自定义参数
+    # 以下字段由 skill-sub 优化时注入，Pipeline 不展示
+    # - cohesion_checks: list[dict]  黏连点检查结果
+    # - milestones: list[str]        里程碑标记
+    # - input_spec / output_spec: str 数据契约
+    extra: dict = field(default_factory=dict)  # 其他扩展字段（skill-sub 富数据）
 
     def to_dict(self) -> dict:
         d = {"id": self.id, "skill_name": self.skill_name,
              "display_name": self.display_name, "mode": self.mode,
              "input_text": self.input_text,
              "loop_start": self.loop_start, "loop_end": self.loop_end,
-             "loop_times": self.loop_times}
+             "loop_times": self.loop_times,
+             "params": self.params,
+             "extra": self.extra}
         if self.children:
             d["children"] = [c.to_dict() for c in self.children]
         return d
@@ -73,6 +81,8 @@ class PipelineNode:
             loop_end=d.get("loop_end"),
             loop_times=d.get("loop_times"),
             input_text=d.get("input_text", ""),
+            params=d.get("params", {}),
+            extra=d.get("extra", {}),
         )
 
 

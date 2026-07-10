@@ -8,7 +8,7 @@ from tkinter import ttk, filedialog, messagebox, simpledialog
 from datetime import datetime
 from typing import Optional
 
-# 支持直接运行 (python gui_agent.py) 和模块运行 (python -m local_agent.gui_agent)
+# 支持直接运行 (python gui_agent.py) 和模块运行 (python -m orchestrator.gui_agent)
 _DIR = os.path.dirname(os.path.abspath(__file__))
 if _DIR not in sys.path:
     sys.path.insert(0, _DIR)
@@ -19,7 +19,7 @@ from chain_engine import execute_pipeline, OUTPUT_DIR
 from llm_client import LLMClient
 
 CHAINS_DIR = os.path.join(_DIR, "chains")
-SETTINGS_PATH = os.path.join(_DIR, "settings.json")
+SETTINGS_PATH = os.path.join(_DIR, "..", "data", "config", "settings.json")
 
 DEFAULT_SETTINGS = {
     "skill_dirs": [os.path.expanduser("~/.workbuddy/skills")],
@@ -43,7 +43,7 @@ def get_llm() -> LLMClient:
     global _llm
     if _llm is None:
         from agent_config import AgentConfig
-        cfg_path = os.path.join(_DIR, "working_memory.json")
+        cfg_path = os.path.join(_DIR, "..", "data", "memory", "working_memory.json")
         cfg = AgentConfig.load(cfg_path) if os.path.isfile(cfg_path) else AgentConfig()
         _llm = LLMClient(cfg)  # LLMClient 接受 AgentConfig 对象
     return _llm

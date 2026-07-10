@@ -10,12 +10,17 @@ from typing import Optional
 DEFAULT_CONFIG = {
     # LLM 连接
     "llm": {
+        "backend": "lmstudio",        # ollama / lmstudio / openai
         "base_url": "http://localhost:1234/v1",
-        "api_key": "not-needed",
-        "model_name": "qwen/qwen3.6-35b-a3b",
+        "api_key": "",
+        "model_name": "",
         "temperature": 0.3,
         "max_tokens": 16384,
         "top_p": 0.9,
+        "timeout": 180,
+        # 各后端专属默认地址
+        "ollama_url": "http://localhost:11434",
+        "lmstudio_url": "http://localhost:1234",
     },
     # 智能体循环
     "agent": {
@@ -51,16 +56,32 @@ class AgentConfig:
     # LLM
     # ------------------------------------------------------------------
     @property
+    def llm_backend(self) -> str:
+        return self.data["llm"].get("backend", "lmstudio")
+
+    @property
     def llm_base_url(self) -> str:
         return self.data["llm"]["base_url"]
 
     @property
     def llm_api_key(self) -> str:
-        return self.data["llm"]["api_key"]
+        return self.data["llm"].get("api_key", "")
 
     @property
     def llm_model(self) -> str:
-        return self.data["llm"]["model_name"]
+        return self.data["llm"].get("model_name", "")
+
+    @property
+    def llm_timeout(self) -> int:
+        return self.data["llm"].get("timeout", 180)
+
+    @property
+    def llm_ollama_url(self) -> str:
+        return self.data["llm"].get("ollama_url", "http://localhost:11434")
+
+    @property
+    def llm_lmstudio_url(self) -> str:
+        return self.data["llm"].get("lmstudio_url", "http://localhost:1234")
 
     @property
     def llm_temperature(self) -> float:
@@ -92,6 +113,10 @@ class AgentConfig:
     @property
     def agent_stop_on_tool_error(self) -> bool:
         return self.data["agent"]["stop_on_tool_error"]
+
+    @property
+    def user_prompt(self) -> str:
+        return self.data.get("prompt", {}).get("user", "")
 
     # ------------------------------------------------------------------
     # Memory

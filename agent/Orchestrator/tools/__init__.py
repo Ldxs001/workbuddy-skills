@@ -1,5 +1,5 @@
 """
-local_agent/tools/ — 智能体工具集合
+orchestrator/tools/ — 智能体工具集合
 
 内置工具:
   - skill_loader.LoadSkillTool — 动态加载任意技能（读 SKILL.md）
