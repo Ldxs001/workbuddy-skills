@@ -9,6 +9,10 @@
 
 ### 修复
 - **main.py 启动崩溃**：`SCRIPTS_PATH` 未定义 → `NameError`。变量已改名 `ENGINE_PATH` 但引用未同步改，两处修正为 `ENGINE_PATH`。
+- **Web UI 配置页空白**：`web_ui.py` 中 ENGINE_PATH 和子进程 rag_script 路径均多了一层 `dirname`，导致引擎模块 `from config import load_config` 找不到，`SKILL_AVAILABLE=False`，配置 Tab 显示"技能模块未加载"。修复路径计算
+- **testLLM 未定义**：`</script>` 提前闭合将 `testLLM()` 函数抛到 HTML 文本中，浏览器作为标签解析不执行。修复 script 块边界
+- **测试按钮无响应**：`_serve_llm_test()` 方法体只有 agent 空检查，缺少实际 LLM 测试调用。补上 `agent.llm.check_health()` 逻辑
+- **数据目录双路径**：`engine/utils.py` 中 `DATA_ROOT` 通过两层 `dirname` 计算出 `rag_assistant/data/`，但真实数据在项目根 `data/`，导致 RAG 配置子进程读不到知识库。改为三层 `dirname` 统一到项目根目录
 
 ---
 

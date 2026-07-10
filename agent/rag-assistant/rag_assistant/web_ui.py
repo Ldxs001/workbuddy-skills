@@ -15,10 +15,10 @@ from threading import Thread
 
 logger = logging.getLogger(__name__)
 
-# ── 使用本地 scripts/ 副本（自包含） ─────────────
-SCRIPTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
-if SCRIPTS_PATH not in sys.path:
-    sys.path.insert(0, SCRIPTS_PATH)
+# ── 使用本地 engine/ 副本（自包含） ─────────────
+ENGINE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "engine")
+if ENGINE_PATH not in sys.path:
+    sys.path.insert(0, ENGINE_PATH)
 
 try:
     from prompt_manager import get_full_prompt, PROMPT_PRESETS
@@ -128,7 +128,7 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>RAG 智能助手</title>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="icon" href="data:,">
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; color: #333; }}
@@ -349,7 +349,7 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
             document.getElementById('llm-config').textContent = (cfg.model || '-') + ' / ' + (cfg.max_tokens || '?') + ' tok';
           }});
         }}, 1000);
-        </script>
+
         function testLLM() {{
           document.getElementById('llm-status').textContent = '测试中...';
           fetch('/api/llm/test').then(function(r){{return r.json()}}).then(function(d){{
@@ -531,6 +531,8 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         if not self.agent:
             self._send_json({"success": False, "error": "智能体未就绪"})
             return
+        ok = self.agent.llm.check_health()
+        self._send_json({"success": ok})
 
     def _serve_llm_config_get(self):
         """返回当前 LLM 配置"""
@@ -726,7 +728,7 @@ def start_web_ui(agent, port: int = 8765, host: str = "0.0.0.0"):
     # 启动 RAG 配置服务器（独立子进程，避免库初始化冲突）
     try:
         import subprocess
-        rag_script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "rag_web_ui.py")
+        rag_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "engine", "rag_web_ui.py")
         subprocess.Popen(
             [sys.executable, rag_script, "--port", str(rag_port)],
             creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
