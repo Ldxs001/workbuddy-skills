@@ -13,10 +13,10 @@ import argparse
 # 禁用 pyc 缓存（防止旧缓存导致加载旧代码）
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
-# 自身 scripts/ 目录（自包含技能副本）
-SCRIPTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
-if SCRIPTS_PATH not in sys.path:
-    sys.path.insert(0, SCRIPTS_PATH)
+# 自身 engine/ 目录（自包含技能引擎）
+ENGINE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rag_assistant", "engine")
+if ENGINE_PATH not in sys.path:
+    sys.path.insert(0, ENGINE_PATH)
 
 from rag_assistant import __version__ as rag_version
 from rag_assistant.agent import Agent

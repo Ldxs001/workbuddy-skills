@@ -5,6 +5,13 @@
 
 ---
 
+## [0.6.1] - 2026-07-10
+
+### 修复
+- **main.py 启动崩溃**：`SCRIPTS_PATH` 未定义 → `NameError`。变量已改名 `ENGINE_PATH` 但引用未同步改，两处修正为 `ENGINE_PATH`。
+
+---
+
 ## [0.6.0] - 2026-07-09
 
 ### 新增
@@ -146,7 +153,7 @@
 所有 `rag_assistant/` 模块均为 07-07 新建，基于技能能力重新设计上层架构。
 
 ### 架构（自包容技能副本）
-- `scripts/` — local-rag-builder 完整技能副本（rag_core / router / reranker / text_splitter / KB 管理 / 嵌入模型管理 / prompt 管理）
+- `engine/` — local-rag-builder 完整技能引擎（rag_core / router / reranker / text_splitter / KB 管理 / 嵌入模型管理 / prompt 管理）
 - `vendor/` — 嵌入第三方依赖（bs4 / pypdf / markdownify / soupsieve）
 - `rag_assistant/agent.py` — LLM 自主决策循环（query / search / import 三动作 + 自修正 + 穷举组合查询）
 - `rag_assistant/rag_wrapper.py` — 技能封装桥接层，保持技能完整流程
