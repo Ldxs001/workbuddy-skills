@@ -2,7 +2,7 @@
 name: skill-sub
 slug: skill-sub
 displayName: skill-sub
-version: 1.38.0
+version: 1.38.1
 author: wUwproject
 license: MIT
 description: 调用链编排技能 — 既是调用链编辑器，也是粗粒度规划器。理解用户意图 → 规划 Skill 参与顺序 → 更新/保存/推荐调用链 → 拼接为调用链（支持循环/分支编排、子步骤拓扑排序、准确步骤计数）。
@@ -65,7 +65,9 @@ trigger_danger: remove_dangerous
 | 引用的 skill 不存在 | skill_name 对应的 skill 未安装 | 检查 skill 名称是否正确 |
 | 检测到定时/自动化意图，但未提供 --schedule | 描述中含"每天/每周/定时"等词但没给调度配置 | 添加 --schedule 参数，或删除描述中的时间相关词 |
 
-> **强制规则**：用户描述中包含定时/自动化意图（如"每天"、"每周"、"自动执行"等）时，**必须**提供 `--schedule` 参数配置调度信息，否则链创建被拦截。不依赖 AI 自觉判断。## 触发条件
+> **强制规则**：用户描述中包含定时/自动化意图（如"每天"、"每周"、"自动执行"等）时，**必须**提供 `--schedule` 参数配置调度信息，否则链创建被拦截。 不依赖 AI 自觉判断。
+
+## 触发条件
 
 **正向触发：**
 - 规划类：「帮我规划一下...」、「...的步骤是什么」
@@ -127,7 +129,7 @@ trigger_danger: remove_dangerous
 | `references/private_blueprint.md` | 参考文档 | 链私有蓝皮书基线保护机制 | 无 |
 | `references/llm_params.md` | 参考文档 | LLM 参数格式与门禁对应关系 | 无 |
 | `references/chain_search.md` | 参考文档 | 自增强闭环历史链搜索 | 无 |
-## 
+
 ## 快速开始
 
 
@@ -180,6 +182,7 @@ LLM 参数参见渐进式文件索引表
 ### 自增强闭环
 
 自增强闭环参见渐进式文件索引表
+
 ## 配置
 
 

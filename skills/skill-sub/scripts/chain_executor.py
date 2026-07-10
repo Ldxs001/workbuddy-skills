@@ -685,7 +685,7 @@ def main():
     plan_parser.add_argument("--verbose", "-v", action="store_true", help="详细输出")
     plan_parser.add_argument("--json", action="store_true", help="JSON 格式输出")
     plan_parser.add_argument("--output", "-o", help="保存执行计划到文件")
-    plan_    parser.add_argument("--force-health", action="store_true",
+    plan_parser.add_argument("--force-health", action="store_true",
                              help="跳过链蓝皮书基线健康检查")
     plan_parser.add_argument("--force-hooks", action="store_true",
                              help="跳过流程钩子验证（不推荐）")
