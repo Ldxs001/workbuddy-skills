@@ -1,0 +1,9 @@
+# Orchestrator 依赖清单
+
+# LLM 后端（选装其一）
+# llama-cpp-python          # 直接加载 GGUF（GPU 加速需额外配置）
+
+# 标准库依赖（无需安装）
+# - urllib (LLM 客户端)
+# - json / os / sys / argparse
+# - tkinter (GUI 模式)

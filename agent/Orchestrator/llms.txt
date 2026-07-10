@@ -1,0 +1,100 @@
+# Orchestrator v1.1.0
+
+> 基于本地 LLM 的 Python 智能体系统 / Skill Pipeline Orchestrator。
+> 运行时动态加载 WorkBuddy 技能（读 SKILL.md），自动编排流水线。
+
+---
+
+## 是什么
+
+Orchestrator 是一个 **平台编排型智能体**。它不内嵌任何技能代码，而是运行时扫描 `~/.workbuddy/skills/` 下的 SKILL.md，动态理解和加载技能。
+
+**核心特质**：
+- 多 LLM 后端：LM Studio / Ollama / Custom API / 直接加载 GGUF
+- 动态技能加载：运行时读 SKILL.md，无需写适配代码
+- Skill Pipeline：链式/并行编排多个技能
+- 工具集合：文件读写、网页抓取、搜索、Python 执行
+
+---
+
+## 启动方式
+
+### 一键安装启动
+```bash
+setup.bat                                # 检测环境 → 装依赖 → 选择模式
+```
+
+### 手动启动
+```bash
+python main.py                            # 默认 LM Studio 后端
+python main.py --web                      # Web UI（对话+配置+Pipeline）
+python main.py --query "你的问题"          # 单次问答
+python main.py --backend ollama           # Ollama 后端
+python main.py --check                    # 仅检测后端连接
+```
+
+---
+
+## 架构总览
+
+```
+main.py ─── 入口（CLI 交互 / 单次问答 / 检测）
+  │
+  └── orchestrator/           ← 智能体核心层
+      ├── agent_loop.py       ← ReAct 决策循环（Think → Act → Observe）
+      ├── agent_config.py     ← 代码配置（dataclass + property）
+      ├── llm_client.py       ← LLM 客户端（urllib，零依赖）
+      ├── memory.py           ← 两层记忆（会话 + 持久化工作记忆）
+      ├── model_manager.py    ← 统一模型管理器（发现/加载/卸载/GPU仲裁）
+      ├── direct_llm_client.py ← 直接加载 GGUF（GPU/CPU 分摊）
+      ├── gui_agent.py        ← tkinter 流水线编排 GUI
+      ├── chain_engine.py     ← 流水线执行引擎
+      ├── chain_model.py      ← 流水线数据模型
+      ├── skill_scanner.py    ← 技能目录扫描器
+      ├── tool_base.py        ← 工具抽象基类
+      │
+      ├── tools/              ← 工具集合
+      │   ├── skill_loader.py ← 动态技能加载器
+      │   ├── file_tool.py    ← 文件操作工具
+      │   ├── web_tool.py     ← 网络工具
+      │   └── rag_tool.py     ← RAG 检索工具
+      │
+      ├── chains/             ← 预编排流水线定义
+      └── working_memory.json ← 工作记忆持久化
+```
+
+---
+
+## 能力清单
+
+### 多 LLM 后端
+- **LM Studio**: 默认 (http://localhost:1234/v1)
+- **Ollama**: --backend ollama
+- **Custom**: --backend custom --base-url URL --model NAME
+- **Direct GGUF**: --direct，自动发现 ~/.lmstudio/models/
+
+### 动态技能加载
+- 扫描 `~/.workbuddy/skills/` 下的 SKILL.md
+- 运行时通过 `load_skill` 工具加载任意技能
+- 自动解析 frontmatter、参数 Schema、触发词
+
+### 工具集合
+- 文件操作：读/写/列出目录
+- 网络：网页抓取 / 搜索
+- RAG：调用 local-rag-builder 技能
+- Python 执行：沙箱执行代码
+
+### Skill Pipeline 编排
+- 链式/并行节点
+- 循环和条件分支
+- GUI 可视化编排界面
+
+---
+
+## 配置
+
+| 文件 | 作用 |
+|------|------|
+| `data/config/settings.json` | 运行时配置（技能路径、超时等） |
+| `data/memory/working_memory.json` | 工作记忆持久化 |
+| `main.py` 配置区 | 代码级默认配置（后端、模型、参数） |

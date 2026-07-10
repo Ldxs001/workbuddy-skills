@@ -26,7 +26,7 @@ class LLMClient:
         self.temperature = config.llm_temperature
         self.max_tokens = config.llm_max_tokens
         self.top_p = config.llm_top_p
-        self.api_key = [credential-redacted]
+        self.api_key = config.llm_api_key
         self.timeout = config.llm_timeout
         self.stream_timeout = max(config.llm_timeout, 300)
 

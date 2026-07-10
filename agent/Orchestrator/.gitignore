@@ -1,0 +1,32 @@
+# ── Python ────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+
+# ── 运行时数据 ──────────────────────────────
+data/
+output/
+*.log
+server.pid
+working_memory.json
+
+# ── IDE ───────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── 系统 ─────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── 工具 ──────────────────────────────────────
+.codemate/
+
+# ── 测试临时文件 ─────────────────────────────
+test_batch*.json
+test_out*.json
+test_parloop*.json
+server.port
