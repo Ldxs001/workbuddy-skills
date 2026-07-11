@@ -232,26 +232,35 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     if not unique:
         return ""
     
-    # --- 1. BCE 语义质心：四分法采样（确保全域覆盖 + 随机防偏倚）---
+    # --- 1. BCE 语义质心：自适应采样 + 四分法（确保全域覆盖 + 随机防偏倚）---
     emb = get_embeddings()
     try:
-        # 动态采样总数：小 KB 全量，大 KB 按 sqrt 增长
-        n_sample = min(len(unique), 50 + int(len(unique) ** 0.5) * 5)
-        if len(unique) > n_sample:
-            # 四分法：均匀四等分，每份内随机采样
-            n_per_quarter = n_sample // 4
+        N = len(unique)
+        # 动态采样量
+        if N < 200:
+            n_sample = N
+        elif N < 2000:
+            n_sample = min(N, max(200, int(N * 0.3)), 400)
+        else:
+            n_sample = min(N, max(400, int(N * 0.2)), 500)
+
+        import random
+        if n_sample >= N:
+            sampled = unique  # 全量
+        elif N < 500:
+            sampled = random.sample(unique, n_sample)  # 全域随机
+        else:
+            # 四分 + 每份随机
+            quarter_size = N // 4
+            base = n_sample // 4
             remainder = n_sample % 4
-            quarter_size = len(unique) // 4
             sampled = []
-            import random
             for q in range(4):
                 start = q * quarter_size
-                end = start + quarter_size if q < 3 else len(unique)
+                end = start + quarter_size if q < 3 else N
                 pool = unique[start:end]
-                take = n_per_quarter + (1 if q < remainder else 0)
-                sampled.extend(random.sample(pool, min(take, len(pool))))
-        else:
-            sampled = unique[:n_sample]
+                take = base + (1 if q < remainder else 0)
+                sampled.extend(random.sample(pool, take))
         chunk_vecs = np.array([emb.embed_query(t[:512]) for t in sampled])
         centroid = chunk_vecs.mean(axis=0)
         dists = np.linalg.norm(chunk_vecs - centroid, axis=1)
