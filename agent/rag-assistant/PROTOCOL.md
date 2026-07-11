@@ -422,7 +422,8 @@
 
   // ── 极客模式 ──
   "geek_mode": {
-    "edit_enabled": false                        // 是否允许直接编辑配置
+    "edit_enabled": false                        // 是否允许直接编辑配置（Web UI 极客模式面板）
+    // 编辑器分区：Prompt / 嵌入模型&检索 / 重排序 / 切片 / 路由层 / 知识库 / LLM / 其他
   }
 }
 ```
@@ -451,13 +452,14 @@
 
 | 配置路径 | 类型 | 默认 | 说明 |
 |---------|------|------|------|
-| `router.enabled` | bool | true | 开启路由层 |
+| `router.enabled` | bool | true | 开启出库路由层（查询→最佳 KB） |
 | `router.fallback.enabled` | bool | true | 开启语义回退路由 |
 | `reranker.enabled` | bool | true | 开启重排序 |
 | `web_search_enabled` | bool | true | 开启联网搜索 |
 | `input_sources.enable_pdf` | bool | true | 开启 PDF 解析 |
 | `input_sources.enable_ocr` | bool | true | 开启 OCR 回退 |
-| `kb.auto_classify` | bool | false | 导入时自动分类 |
+| `kb.enabled` | bool | true | 开启多知识库（关闭时全走 default） |
+| `kb.auto_classify` | bool | false | 入库时自动分类（入库路由：嵌入模型 × KB关键词） |
 | `geek_mode.edit_enabled` | bool | false | 是否允许配置编辑 |
 
 ---

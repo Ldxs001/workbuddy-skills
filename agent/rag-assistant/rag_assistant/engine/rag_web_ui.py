@@ -1277,10 +1277,13 @@ def generate_html():
         return json.dumps(sub, ensure_ascii=False, indent=2)
 
     config_prompt_json = _section_json("prompt")
-    config_embedding_json = _section_json("embedding", "retrieval", "reranker")
+    config_emb_retrieval_json = _section_json("embedding", "retrieval")
+    config_reranker_json = _section_json("reranker")
     config_splitter_json = _section_json("splitting")
-    config_router_json = _section_json("router", "guard")
-    config_other_json = _section_json("mode", "input_sources", "preprocess", "kb")
+    config_router_json = _section_json("router")
+    config_kb_json = _section_json("kb")
+    config_llm_json = _section_json("llm")
+    config_other_json = _section_json("mode", "input_sources", "preprocess", "guard")
     geek_edit_enabled = cfg.get("geek_mode", {}).get("edit_enabled", False)
     config_json_str = json.dumps(cfg, ensure_ascii=False, indent=2)
     STRATEGY_LABELS = {
@@ -1728,17 +1731,29 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">📝 Prompt 模板</summary>
       <textarea id="geek-editor-prompt" rows="3" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_prompt_json}</textarea>
     </details>
-    <details id="geek-section-embedding" style="margin-bottom:6px;">
-      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">📦 嵌入模型 & 检索</summary>
-      <textarea id="geek-editor-embedding" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_embedding_json}</textarea>
+    <details id="geek-section-emb-retrieval" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🧠 嵌入模型 & 检索参数</summary>
+      <textarea id="geek-editor-emb-retrieval" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_emb_retrieval_json}</textarea>
+    </details>
+    <details id="geek-section-reranker" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🏷️ 重排序</summary>
+      <textarea id="geek-editor-reranker" rows="4" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_reranker_json}</textarea>
     </details>
     <details id="geek-section-splitter" style="margin-bottom:6px;">
       <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">✂️ 切片策略</summary>
       <textarea id="geek-editor-splitter" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_splitter_json}</textarea>
     </details>
     <details id="geek-section-router" style="margin-bottom:6px;">
-      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🔀 路由 & Guard & 重排序</summary>
-      <textarea id="geek-editor-router" rows="5" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_router_json}</textarea>
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🔀 路由层（出库路由 × KB签名）</summary>
+      <textarea id="geek-editor-router" rows="4" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_router_json}</textarea>
+    </details>
+    <details id="geek-section-kb" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">📚 知识库（入库路由 × 自动分类）</summary>
+      <textarea id="geek-editor-kb" rows="4" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_kb_json}</textarea>
+    </details>
+    <details id="geek-section-llm" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🤖 LLM</summary>
+      <textarea id="geek-editor-llm" rows="4" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_llm_json}</textarea>
     </details>
     <details id="geek-section-other" style="margin-bottom:6px;">
       <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">⚙️ 其他（模式/输入源/预处理）</summary>
