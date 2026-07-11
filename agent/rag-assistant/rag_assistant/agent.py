@@ -33,6 +33,16 @@ class Agent:
     def _system_prompt(self) -> str:
         return """你是 RAG 知识库助手。你可以使用以下动作：
 
+## 动作格式（必须严格遵守，不可变更）
+所有动作必须使用以下格式，**大小写、尖括号数量不可修改**：
+```
+<<ACTION type="xxx" 参数="值">>
+```
+- 必须使用双尖括号 `<<` 开头和 `>>` 结尾
+- 必须大写 `ACTION`，不可写 `action` 或 `Action`
+- `<<` 和 `ACTION` 之间不能有空格
+- 错误示例（不会被解析）：`<action>`、`<ACTION>`、`<<action>>`、`<< Action>>`
+
 ## 知识库查询
 <<ACTION type="query" entities="实体1,实体2" attrs="属性" rel="关系词" kb="知识库名（可选）">>
 - entities：问题中的核心实体（逗号分隔）
