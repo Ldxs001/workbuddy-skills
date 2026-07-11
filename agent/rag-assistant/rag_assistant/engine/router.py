@@ -266,12 +266,14 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
         originals = [kb_name]
     
     try:
-        ref_vec = np.array(emb.embed_query(" ".join(originals)))
+        # 每个原始关键词单独嵌入（vs 聚合为一个向量，通用中文词容易蹭相似度）
+        orig_vecs = [np.array(emb.embed_query(o)) for o in originals if o.strip()]
         scored = []
         for w in freq:
             wv = np.array(emb.embed_query(w))
-            sim = float(np.dot(wv, ref_vec) / (np.linalg.norm(wv) * np.linalg.norm(ref_vec) + 1e-10))
-            scored.append((w, sim))
+            # 取候选词与各个原始关键词的最大相似度
+            best = max(float(np.dot(wv, ov) / (np.linalg.norm(wv) * np.linalg.norm(ov) + 1e-10)) for ov in orig_vecs)
+            scored.append((w, best))
         scored.sort(key=lambda x: -x[1])
     except Exception:
         scored = sorted(freq.items(), key=lambda x: -x[1])
