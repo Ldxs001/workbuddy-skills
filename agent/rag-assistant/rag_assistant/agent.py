@@ -15,7 +15,7 @@ from .search import WebSearch
 
 logger = logging.getLogger(__name__)
 
-_ACTION_PATTERN = re.compile(r"<<(\w+)(?:\s+(.+?))?>>", re.DOTALL)
+_ACTION_STRIP = re.compile(r'<{1,2}\s*ACTION\s+.*?>{1,2}', re.DOTALL | re.IGNORECASE)
 
 
 class Agent:
@@ -76,7 +76,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         # 导入动作（独立执行，不需要第二轮 LLM）
         if action and action["type"] == "import":
             result = self._exec_import(action, message)
-            self.memory.append_short_term(self.session_id, "assistant", re.sub(r'<<ACTION\s+.*?>>', '', result.get("text", "")).strip())
+            self.memory.append_short_term(self.session_id, "assistant", _ACTION_STRIP.sub('', result.get("text", "")).strip())
             imported_kbs = result.get("imported_kbs", {})
             primary_kb = max(imported_kbs, key=imported_kbs.get) if imported_kbs else ""
             self.memory.record_habit(message, is_rag=False, is_chat=False, is_import=True, kb=primary_kb)
@@ -89,7 +89,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             result = self._second_pass(message, context, action)
             reply2 = result.get("text", "")
             if reply2:
-                self.memory.append_short_term(self.session_id, "assistant", re.sub(r'<<ACTION\s+.*?>>', '', reply2).strip())
+                self.memory.append_short_term(self.session_id, "assistant", _ACTION_STRIP.sub('', reply2).strip())
             self._compress_if_needed()
             self.memory.record_habit(message, is_rag=action["type"] == "query",
                                      is_chat=action["type"] != "query", is_import=False,
@@ -99,7 +99,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
         # 直接回答（无动作）
         if reply:
-            self.memory.append_short_term(self.session_id, "assistant", re.sub(r'<<ACTION\s+.*?>>', '', reply).strip())
+            self.memory.append_short_term(self.session_id, "assistant", _ACTION_STRIP.sub('', reply).strip())
         self._compress_if_needed()
         self.memory.record_habit(message, is_rag=False, is_chat=True, is_import=False, kb="")
         decision["success"] = True
@@ -279,8 +279,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         - (None, "原因"): 有 <<ACTION 但格式错误
         - ({...}, None): 解析成功
         """
-        # 跨行匹配 <<ACTION ... >> 全文（content 可能含换行）
-        m = re.search(r'<<ACTION\s+(.+?)>>', text, re.DOTALL)
+        # 跨行匹配 ACTION 命令（兼容 <<ACTION / <<action / <action 等格式）
+        m = re.search(r'<{1,2}\s*(?:action|ACTION|Action)\s+(.+?)>{1,2}', text, re.DOTALL)
         if not m:
             return None, None  # 没有动作
 
