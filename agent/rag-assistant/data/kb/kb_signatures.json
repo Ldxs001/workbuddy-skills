@@ -1,0 +1,109 @@
+{
+  "白酒": {
+    "signature": "诸多方面 · 基本要素 · 基本 · 各种 · 管理水平 · 先进经验 · 列举 · 经验丰富 · 何种 · 工艺 · 产业链 · 关于",
+    "updated_at": "2026-07-11 23:04:24.778134",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "啤酒": {
+    "signature": "发酵 · 酵母 · 啤酒 · 酿造 · 保持 · 风味 · 菌株 · 培养基 · 溶液 · 称取 · 溶解 · 重要",
+    "updated_at": "2026-07-11 12:58:02.500161",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "其他酒": {
+    "signature": "橡木 · 荔枝 · 白兰地 · 烘烤 · 陈酿 · 风味 · 金黄色 · 香气 · 品种 · 酒香 · 增加 · 浓郁",
+    "updated_at": "2026-07-11 12:29:25.567019",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "理化检测": {
+    "signature": "gbfgigr · engineering · components · resource · exploiting · characterize · mainly · technology · signal · information · related · marine",
+    "updated_at": "2026-07-11 23:22:34.547027",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "LLM奠基理论": {
+    "signature": "transformer · decoder · encoder · neural · gradients · transformations · rdmodel · convolutional · dmodel · convolutions · convolution · softmax",
+    "updated_at": "2026-07-12 00:03:33.262793",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "意识与神经科学": {
+    "signature": "consciousness · brain · neurons · conscious · introspection · perception · information · sense · anatomy · understanding · concepts · scientific",
+    "updated_at": "2026-07-11 23:41:50.229064",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "τ scaling": {
+    "signature": "kernels · hyper · furthermore · evolution · proposedmhc · proposemanifold · core · hardware · introducing · optimizations · optimizing · optimization",
+    "updated_at": "2026-07-11 23:46:44.272668",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "量子物理和弦": {
+    "signature": "quantum · physics · fisica · evolution · invariant · photon · photonic · transcend · discussion · parameter · spectra · inferred",
+    "updated_at": "2026-07-11 23:48:42.809122",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "生物医疗": {
+    "signature": "",
+    "tags": "生物·医疗·医学伦理·药物",
+    "updated_at": "2026-07-12",
+    "method": "word_freq",
+    "auto_updated": false
+  },
+  "设备条件": {
+    "signature": "质谱仪 · 仪器 · 色谱 · 质谱 · spectra · 扫描模式 · 满足要求 · 脉冲序列 · 周期时间 · 检测器 · 过滤器 · scan",
+    "updated_at": "2026-07-11 23:08:40.016463",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "政经文哲": {
+    "signature": "政治经济学 · 马克思主义 · 资本论 · 社会科学 · 经济学 · 计量经济学 · 唯物史观 · 马克思主义者 · 理论体系 · 社会意识 · 唯心史观 · 劳动价值论",
+    "updated_at": "2026-07-11 23:08:24.226896",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "诸子百家": {
+    "signature": "中国 · 宋代 · 出版社 · 中国人民大学 · 理论 · 欧洲 · 文艺复兴 · 几百年 · 四大发明 · 三大 · 发明 · 产生",
+    "updated_at": "2026-07-11 14:16:51.179170",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "历史脉络": {
+    "signature": "西周时期 · 春秋战国 · 帝制时代 · 春秋时期 · 中国史 · 历代 · 西周时代 · 历史 · 汉承秦 · 先秦 · 南北朝 · 秦朝",
+    "updated_at": "2026-07-11 22:46:16.924539",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "default": {
+    "signature": "",
+    "updated_at": ""
+  },
+  "数字与建模": {
+    "signature": "simulations · types · models · systems · theoretical · framework · system · model · essential · analysis · classes · numerical",
+    "updated_at": "2026-07-11 23:19:54.706872",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "大模型万象": {
+    "signature": "models · model · paradigm · gradient · examples · scaling · evaluating · benchmarks · autoregressive · tuning · example · refer",
+    "updated_at": "2026-07-12 00:02:38.382764",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "检测技术": {
+    "signature": "spectrometry · spectrometer · spectra · molecular · chemical · chemistry · spectrum · molecules · chem · theory · molecule · substances",
+    "updated_at": "2026-07-11 21:45:32.029388",
+    "auto_updated": true,
+    "method": "word_freq"
+  },
+  "天体物理与宇宙起源": {
+    "signature": "gravitational · astrophysicsmanuscript · astronomy · telescope · telescopes · planet · planetary · planets · exoplanet · exoplanets · stellar · satellites",
+    "updated_at": "2026-07-11 23:23:34.697811",
+    "auto_updated": true,
+    "method": "word_freq"
+  }
+}
