@@ -83,25 +83,31 @@ def load_config():
         return DEFAULT_CONFIG.copy()
     # 合并缺失的默认字段（兼容顶层非 dict 字段）
     merged = DEFAULT_CONFIG.copy()
+    needs_save = False
     if isinstance(cfg, dict):
         for k, v in cfg.items():
             if k in DEFAULT_CONFIG and isinstance(DEFAULT_CONFIG[k], dict) and isinstance(v, dict):
                 merged[k].update(v)
-                # 补全子字段
                 for sk, sv in DEFAULT_CONFIG[k].items():
                     if sk not in v:
                         merged[k][sk] = sv
             else:
                 merged[k] = v
 
-    # 迁移旧版顶层 LLM key 到 llm 子字典（覆盖默认值）
-    llm = merged.setdefault("llm", {})
-    for old_key, new_key in [("llm_backend", "backend"), ("llm_model", "model"),
-                              ("llm_timeout", "timeout"), ("llm_max_tokens", "max_tokens")]:
-        if old_key in merged:
-            llm[new_key] = merged.pop(old_key)
-    # 兼容旧 field 名
-    llm.pop("model_name", None)
+        # 迁移旧版顶层 LLM key 到 llm 子字典（覆盖默认值）
+        llm = merged.setdefault("llm", {})
+        for old_key, new_key in [("llm_backend", "backend"), ("llm_model", "model"),
+                                  ("llm_timeout", "timeout"), ("llm_max_tokens", "max_tokens")]:
+            if old_key in merged:
+                llm[new_key] = merged.pop(old_key)
+                needs_save = True
+        llm.pop("model_name", None)
+
+    if needs_save:
+        try:
+            safe_json_dump(merged, get_config_path())
+        except Exception:
+            pass
     return merged
 
 

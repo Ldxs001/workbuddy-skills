@@ -618,7 +618,7 @@ function hideModal() {{
         if backend:
             self.agent.llm.backend = backend
             cfg = load_config() if SKILL_AVAILABLE else {}
-            cfg["llm_backend"] = backend
+            cfg.setdefault("llm", {})["backend"] = backend
             if SKILL_AVAILABLE:
                 save_config(cfg)
         models = self.agent.llm.list_models()
