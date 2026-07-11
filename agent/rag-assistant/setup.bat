@@ -80,10 +80,13 @@ for /f "tokens=5" %%a in ('netstat -ano ^| find ":8766 " 2^>nul') do taskkill /f
 cd /d "%~dp0"
 start /B "" python main.py --pidfile "%~dp0server.pid"
 
-:: Wait for server to start（含 KB 索引探测，约 15 秒）
+:: Wait for server to start（轮询端口，自适应等待）
 echo Waiting for server...
-echo   加载模型 + 探测 18 个 KB 索引，请稍候...
-ping 127.0.0.1 -n 18 >nul
+echo   加载模型 + KB 索引探测中，请稍候...
+:wait_loop
+timeout /t 1 /nobreak >nul 2>&1
+netstat -ano 2>nul | findstr ":8765 " | findstr "LISTENING" >nul
+if errorlevel 1 goto wait_loop
 
 :: Open browser
 start http://localhost:8765
