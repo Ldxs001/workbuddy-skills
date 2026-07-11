@@ -1,15 +1,16 @@
 # =============================================================================
 # PyPI Trusted Publisher — 全自动发布工作流
-# 触发方式: git tag pypi/<type>/<name>/v<version> && git push --tags
-#   例: git tag pypi/agents/rag-assistant/v0.8.3 && git push --tags
-#   例: git tag pypi/skills/git-sync/v2.27.1 && git push --tags
+# 触发方式: git push --tags (匹配 v* 自动识别项目)
+#   例: git tag v0.8.5 && git push --tags            → agent rag-assistant
+#   例: git tag git-sync-v2.28.0 && git push --tags  → skill git-sync
 # =============================================================================
 name: Publish to PyPI (Trusted Publisher)
 
 on:
   push:
     tags:
-      - 'pypi/**/v*'
+      - 'v*'
+      - '*-v*'
 
 jobs:
   publish:
@@ -20,36 +21,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Parse tag and extract package info
+      - name: Detect project from tag
         id: info
         run: |
-          echo "=== ENV DUMP ==="
-          echo "GITHUB_REF=$GITHUB_REF"
-          echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
-          echo "GITHUB_REF_TYPE=$GITHUB_REF_TYPE"
-          echo "GITHUB_WORKFLOW=$GITHUB_WORKFLOW"
-          echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
-          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
-          echo "=== CHECKOUT ==="
-          pwd
-          ls -la
-          echo "=== DIRECTORY CHECK ==="
-          test -d agents && echo "agents/ exists" || echo "agents/ MISSING"
-          test -d skills && echo "skills/ exists" || echo "skills/ MISSING"
+          TAG="${GITHUB_REF_NAME}"
+          VERSION=""
+          TYPE=""
+          NAME=""
 
-          # Parse tag
-          REF="$GITHUB_REF"
-          TAG="${REF#refs/tags/}"
-          echo "REF=$REF TAG=$TAG"
-          REST="${TAG#pypi/}"
-          VERSION="${REST##*/}"
-          VERSION="${VERSION#v}"
-          TYPES_AND_NAMES="${REST%/v*}"
-          TYPE="${TYPES_AND_NAMES%%/*}"
-          NAME="${TYPES_AND_NAMES#*/}"
+          # 格式1: v0.8.5 → agent, 在 agents/ 目录中查找匹配版本的项目
+          if echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            VERSION="${TAG#v}"
+            TYPE="agents"
+            # 扫描 agents/ 目录，找版本号匹配的项目
+            for dir in agents/*/; do
+              init_file="${dir}rag_assistant/__init__.py"
+              if [ -f "$init_file" ]; then
+                ver=$(grep '__version__' "$init_file" | sed 's/.*"\(.*\)".*/\1/')
+                if [ "$ver" = "$VERSION" ]; then
+                  NAME=$(basename "$dir")
+                  echo "Found agent: $NAME v$VERSION"
+                  break
+                fi
+              fi
+            done
+          else
+            # 格式2: skill-name-v1.2.3 → skill
+            VERSION=$(echo "$TAG" | sed 's/.*-v\([0-9.]*\)$/\1/')
+            NAME=$(echo "$TAG" | sed 's/-v[0-9.]*$//')
+            TYPE="skills"
+          fi
 
           echo "VERSION=$VERSION TYPE=$TYPE NAME=$NAME"
-          exit 0  # stop here for debugging
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "pypi_name=${NAME}-ldxs" >> $GITHUB_OUTPUT
+
+          if [ -z "$NAME" ] || [ -z "$VERSION" ]; then
+            echo "::error::无法从 tag $TAG 识别项目"
+            exit 1
+          fi
+          if [ ! -d "$TYPE/$NAME" ]; then
+            echo "::error::目录 $TYPE/$NAME 不存在"
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -61,18 +77,11 @@ jobs:
 
       - name: Build wheel
         run: |
-          REF="$GITHUB_REF"
-          TAG="${REF#refs/tags/}"
-          REST="${TAG#pypi/}"
-          VERSION="${REST##*/}"
-          VERSION="${VERSION#v}"
-          TYPES_AND_NAMES="${REST%/v*}"
-          TYPE="${TYPES_AND_NAMES%%/*}"
-          NAME="${TYPES_AND_NAMES#*/}"
-          PYPI_NAME="${NAME}-ldxs"
-
           python .github/scripts/pypi-build.py \
-            "$TYPE" "$NAME" "$VERSION" "$PYPI_NAME"
+            "${{ steps.info.outputs.type }}" \
+            "${{ steps.info.outputs.name }}" \
+            "${{ steps.info.outputs.version }}" \
+            "${{ steps.info.outputs.pypi_name }}"
 
       - name: Upload to PyPI (Trusted Publisher)
         uses: pypa/gh-action-pypi-publish@release/v1
