@@ -224,7 +224,12 @@ def _try_repair_kb(persist_dir: str) -> bool:
 
 def add_documents_to_kb(kb_name, documents, embeddings=None):
     """向知识库添加文档"""
+    from config import load_config
     from langchain_chroma import Chroma
+
+    # 检查 KB 是否暂停写入
+    if kb_name in load_config().get("kb_paused", []):
+        return False, f"知识库「{kb_name}」已暂停写入，仅可查询"
 
     index = _load_index()
     if kb_name not in index:
@@ -274,21 +279,20 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
             print(f"  [recovery] 已从备份恢复")
         return False, f"入库失败，已回滚: {str(e)[:80]}"
 
-    # 更新文档计数（max 兜底：Chroma 准用 Chroma，WAL 漏计时累加保底）
+    # 更新文档计数：直接取 ChromaDB 真实计数，唯一可靠来源
     try:
-        chroma_count = vectorstore._collection.count()
+        count = vectorstore._collection.count()
     except Exception:
-        chroma_count = 0
-    accumulated = index[kb_name].get("doc_count", 0) + len(documents)
-    count = max(chroma_count, accumulated)
+        # ChromaDB 不可用时回退到累积计数
+        count = index[kb_name].get("doc_count", 0) + len(unique_docs)
 
     index[kb_name]["doc_count"] = count
     _save_index(index)
 
     # 更新 KB 签名（入库时自动归纳）
     try:
-        from router import update_kb_signature
-        update_kb_signature(kb_name, documents)
+        from router import build_kb_signature
+        build_kb_signature(kb_name, documents)
     except Exception:
         pass
 
@@ -309,6 +313,14 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
     if not rules:
         return "default"
 
+    # 过滤掉暂停写入的 KB→自动路由到次高分 KB
+    from config import load_config
+    _paused = load_config().get("kb_paused", [])
+    if _paused:
+        rules = {k: v for k, v in rules.items() if k not in _paused}
+    if not rules:
+        return "default"
+
     content_lower = content.lower()
     ext = os.path.splitext(filename or "")[1].lower() if filename else ""
     best_match = "default"
@@ -319,7 +331,7 @@ def auto_classify(content, rules=None, filename=None, use_semantic=False):
     fallback = None
     if use_semantic or is_hybrid:
         try:
-            from router import FallbackRouter
+            from reranker import FallbackRouter
             fallback = FallbackRouter()
         except Exception:
             fallback = None

@@ -59,9 +59,9 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
 ## 关键：只对最新消息做决策
 - 下方消息列表中，最后一条 user 消息是用户的当前提问
-- 之前的消息是历史对话，其中可能包含已执行过的 <<ACTION>> 指令
-- **那些是已经执行完毕的历史记录，不要重复执行或参考它们的内容来构造新的 <<ACTION>>**
+- 之前的消息是历史记录，不要重复执行或参考它们的内容来构造新的 <<ACTION>>
 - 只根据最新一条 user 消息的内容决定：直接回答 / 查知识库 / 搜网页 / 入库
+- **用户说"入库"或"导入"时，表示要导入文件，用 type="import" path="MANIFEST"，不要查知识库**
 """
 
     def chat(self, message: str, stream: bool = False) -> dict:
@@ -76,7 +76,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         # 导入动作（独立执行，不需要第二轮 LLM）
         if action and action["type"] == "import":
             result = self._exec_import(action, message)
-            self.memory.append_short_term(self.session_id, "assistant", result.get("text", ""))
+            self.memory.append_short_term(self.session_id, "assistant", re.sub(r'<<ACTION\s+.*?>>', '', result.get("text", "")).strip())
             imported_kbs = result.get("imported_kbs", {})
             primary_kb = max(imported_kbs, key=imported_kbs.get) if imported_kbs else ""
             self.memory.record_habit(message, is_rag=False, is_chat=False, is_import=True, kb=primary_kb)
@@ -89,7 +89,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             result = self._second_pass(message, context, action)
             reply2 = result.get("text", "")
             if reply2:
-                self.memory.append_short_term(self.session_id, "assistant", reply2)
+                self.memory.append_short_term(self.session_id, "assistant", re.sub(r'<<ACTION\s+.*?>>', '', reply2).strip())
             self._compress_if_needed()
             self.memory.record_habit(message, is_rag=action["type"] == "query",
                                      is_chat=action["type"] != "query", is_import=False,
@@ -99,7 +99,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
         # 直接回答（无动作）
         if reply:
-            self.memory.append_short_term(self.session_id, "assistant", reply)
+            self.memory.append_short_term(self.session_id, "assistant", re.sub(r'<<ACTION\s+.*?>>', '', reply).strip())
         self._compress_if_needed()
         self.memory.record_habit(message, is_rag=False, is_chat=True, is_import=False, kb="")
         decision["success"] = True
@@ -202,30 +202,13 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         return None
 
     def _build_first_pass_messages(self, message: str) -> list:
-        """构建第一轮 LLM 消息：系统提示 → 历史消息对 → 当前提问"""
+        """构建第一轮 LLM 消息：系统提示 → 当前提问（历史以压缩摘要形式传入，不传完整对话）"""
         msgs = [{"role": "system", "content": self._system_prompt()}]
 
-        # 解析 session 文件为真实的 user/assistant 消息对
-        # 跳过最后一条（刚 append 的当前消息，避免重复），最后统一追加
-        raw = self.memory.get_short_term(self.session_id)
-        if raw.strip():
-            lines = raw.strip().split("\n")
-            # 去掉最后一行（刚写入的当前消息）
-            if lines:
-                lines = lines[:-1]
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] (\w+): (.+)', line)
-                if m:
-                    role = "user" if m.group(1) == "user" else "assistant"
-                    msgs.append({"role": role, "content": m.group(2)})
-
-        # 追加压缩摘要作为 System context（历史脉络，不占轮次位置）
+        # 压缩摘要作为 System context（历史脉络，不占轮次位置）
         compressed = self.memory.get_compressed(self.session_id)
         if compressed:
-            msgs.append({"role": "system", "content": f"【历史对话摘要】\n{compressed}"})
+            msgs.append({"role": "system", "content": f"【历史对话，仅作参考】\n{compressed}"})
 
         # 追加用户画像提示（方案 C：prompt_manager 模块）
         try:
@@ -247,7 +230,12 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         ctx_text = context.get("context", "")
         kb = action.get("kb", context.get("kb", ""))
         if ctx_text:
-            sys_msg = f"基于以下资料回答用户问题。\n资料（来自 {kb}）：\n{ctx_text}"
+            sys_msg = f"基于以下资料回答用户问题。\n资料（来自 {kb}）：\n{ctx_text}\n\n"
+            sys_msg += "## 引用要求\n"
+            sys_msg += "- 回答中每个具体事实/数字/结论后面必须标注来源资料的段落编号 **[n]**\n"
+            sys_msg += "- 资料中每个段落前面有 `[n]` 序号标记\n"
+            sys_msg += "- 如果你引用了一段资料，在你的回答对应的位置写上 **[n]**\n"
+            sys_msg += "- 如果资料中没有相关信息，说'知识库中没有相关信息'，不要自己编造\n"
         else:
             sys_msg = f"知识库（{kb}）中没有找到相关信息。请礼貌告知用户。"
 
@@ -263,10 +251,25 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] (\w+): (.+)', line)
                 if m:
                     role = "user" if m.group(1) == "user" else "assistant"
-                    msgs.append({"role": role, "content": m.group(2)})
+                if m:
+                    role = "user" if m.group(1) == "user" else "assistant"
+                    msgs.append({"role": role, "content": f"[历史对话] {m.group(2)}"})
 
         msgs.append({"role": "user", "content": message})
-        return self.llm.chat(msgs, stream=False)
+        resp = self.llm.chat(msgs, stream=False)
+        reply = resp.get("text", "")
+
+        # 引用门禁：校验 LLM 回答中的 [n] 引用是否在资料中真实存在
+        if ctx_text and reply:
+            cited = set(int(n) for n in re.findall(r'\[(\d+)\]', reply))
+            max_para = len(ctx_text.split("\n"))
+            fake_cites = [n for n in cited if n < 1 or n > max_para]
+            if fake_cites:
+                logger.warning(f"LLM 引用了不存在的段落 {fake_cites}，回应注入告警")
+                reply += f"\n\n> ⚠️ 以上回答中包含未在资料中出现的引用标记 {fake_cites}，请注意验证。"
+            if not cited and ctx_text.strip():
+                logger.info(f"LLM 回答未标注引用")
+        return resp
 
     # ═══════════════ 动作解析 ═══════════════
 
@@ -428,32 +431,34 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             imported_all = 0
             failed_all = 0
             imported_kbs = {}
-            for item in manifest:
-                pp = item["path"] if isinstance(item, dict) else item
-                if not os.path.exists(pp):
-                    failed_all += 1
-                    continue
-                result = self._do_import(pp, kb)
-                if result.get("success"):
-                    imported_all += 1
-                    actual_kb = result.get("kb", kb or "default")
-                    imported_kbs[actual_kb] = imported_kbs.get(actual_kb, 0) + 1
-                    # 导入成功后清理临时上传目录下的文件
-                    imports_dir = os.path.join(self.data_dir, "imports")
-                    if pp.startswith(imports_dir):
-                        try:
-                            os.unlink(pp)
-                        except Exception:
-                            pass
-                else:
-                    failed_all += 1
-            # 清空 manifest
-            if clean == "MANIFEST":
-                try:
-                    with open(manifest_path, "w", encoding="utf-8") as f:
-                        json.dump([], f)
-                except Exception:
-                    pass
+            try:
+                for item in manifest:
+                    pp = item["path"] if isinstance(item, dict) else item
+                    if not os.path.exists(pp):
+                        failed_all += 1
+                        continue
+                    result = self._do_import(pp, kb)
+                    if result.get("success"):
+                        imported_all += 1
+                        actual_kb = result.get("kb", kb or "default")
+                        imported_kbs[actual_kb] = imported_kbs.get(actual_kb, 0) + 1
+                        # 导入成功后清理临时上传目录下的文件
+                        imports_dir = os.path.join(self.data_dir, "imports")
+                        if pp.startswith(imports_dir):
+                            try:
+                                os.unlink(pp)
+                            except Exception:
+                                pass
+                    else:
+                        failed_all += 1
+            finally:
+                # 无论循环是否异常，都清空 manifest 防止残留
+                if clean == "MANIFEST":
+                    try:
+                        with open(manifest_path, "w", encoding="utf-8") as f:
+                            json.dump([], f)
+                    except Exception:
+                        pass
             kb_summary = ", ".join(f"{k}({v})" for k, v in sorted(imported_kbs.items())) if imported_kbs else kb or ""
             msg = f"已导入 {imported_all} 个文件"
             if imported_kbs:

@@ -33,7 +33,7 @@ Implementation of stream filters; §7.4 Filters of the PDF 2.0 specification.
 used for the names of filters in an inline image object.
 """
 __author__ = "Mathieu Fenniak"
-__author_email__ = "[email-redacted]"
+__author_email__ = "biziqe@mathieu.fenniak.net"
 
 import binascii
 import math

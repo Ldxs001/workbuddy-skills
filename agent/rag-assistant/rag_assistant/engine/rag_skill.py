@@ -79,12 +79,12 @@ def run_import(file_path, kb=None, json_output=False, auto_classify=False):
             try:
                 pdf_docs = PyPDFLoader(file_path).load()
                 content = "\n\n".join(d.page_content for d in pdf_docs)
-                # 中文文本质量检测：CJK 占比过低 → OCR
+                # 文本质量检测：CJK 占比过低 → OCR（无文本层或编码乱码）
                 total_chars = len(content)
                 cjk = sum(1 for c in content if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
                 cjk_ratio = cjk / max(total_chars, 1)
-                if cjk_ratio < 0.10 and total_chars > 100 and bool(re.search(r'[\u4e00-\u9fff]', file_path)):
-                    print(f"  [OCR] PDF 编码异常（CJK占比{cjk_ratio:.1%}），走 OCR")
+                if total_chars == 0 or (cjk_ratio < 0.10 and total_chars > 100):
+                    print(f"  [OCR] PDF {'无文本层' if total_chars==0 else f'CJK占比{cjk_ratio:.1%}'}，走 OCR")
                     from pdf2image import convert_from_path
                     import numpy as np
                     import easyocr

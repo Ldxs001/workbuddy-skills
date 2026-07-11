@@ -34,6 +34,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
 
     # ── 类变量（由外部注入） ──────────────────────
     agent = None
+    main_port = 8765
+    rag_port = 8766
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -279,7 +281,7 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
     def _render_config_tab(self) -> str:
         """配置 Tab：LLM 设置 + RAG 配置 iframe"""
         import time
-        rag_port = self.agent.config.get("rag_config_port", 8766) if self.agent else 8766
+        rag_port = type(self).rag_port  # 通过类变量读取真实端口
         cfg = load_config() if SKILL_AVAILABLE else {}
         llm_backend = cfg.get("llm_backend", "ollama")
         llm_max_tokens = cfg.get("llm_max_tokens", 4096)
@@ -701,14 +703,38 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         logger.debug(f"HTTP: {format % args}")
 
 
+def _port_in_use(port: int) -> bool:
+    """检查端口是否被占用"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+
+def _find_ports(base: int, count: int = 2, max_range: int = 2000) -> list[int]:
+    """在 [base, base+max_range) 范围内找 count 个连续可用端口"""
+    for start in range(base, base + max_range, count):
+        ports = list(range(start, start + count))
+        if not any(_port_in_use(p) for p in ports):
+            return ports
+    raise RuntimeError(f"在 {base}~{base+max_range} 范围内无法找到 {count} 个连续可用端口")
+
+
 def start_web_ui(agent, port: int = 8765, host: str = "0.0.0.0"):
-    """启动 Web 界面（自动杀掉旧进程，启动独立 RAG 配置服务器）"""
+    """启动 Web 界面（自动查找可用端口，启动独立 RAG 配置服务器）"""
     AssistantHandler.agent = agent
-    rag_port = port + 1  # RAG 配置服务器端口
+
+    # 在 2000 端口范围内找两个连续可用端口
+    ports = _find_ports(port, count=2)
+    main_port, rag_port = ports[0], ports[1]
+    AssistantHandler.main_port = main_port
+    AssistantHandler.rag_port = rag_port
+
+    print(f"  🌐 主界面: http://{host}:{main_port}")
+    print(f"  🔧 配置页: http://{host}:{rag_port}")
 
     # 自动杀掉占用端口的旧进程
     import subprocess, time
-    for p in [port, rag_port]:
+    for p in [main_port, rag_port]:
         try:
             result = subprocess.run(
                 f'netstat -ano | findstr ":{p}"',
@@ -738,9 +764,9 @@ def start_web_ui(agent, port: int = 8765, host: str = "0.0.0.0"):
         print(f"  ⚠️ RAG 配置服务器启动失败: {e}")
 
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    server = socketserver.ThreadingTCPServer((host, port), AssistantHandler)
-    logger.info(f"Web 界面已启动: http://{host}:{port}")
-    print(f"  🌐 http://localhost:{port}")
+    server = socketserver.ThreadingTCPServer((host, main_port), AssistantHandler)
+    logger.info(f"Web 界面已启动: http://{host}:{main_port}")
+    print(f"  🌐 http://localhost:{main_port}")
     print(f"  ⚙️ 配置 | 💬 对话")
     try:
         server.serve_forever()

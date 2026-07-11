@@ -334,8 +334,14 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
 
     v0.3.0 新增：导入后自动更新 KB 签名
     """
+    from config import load_config
     from text_splitter import split_pipeline
     from knowledge_base_manager import add_documents_to_kb
+
+    # 检查 KB 是否暂停写入
+    cfg = load_config()
+    if kb_name in cfg.get("kb_paused", []):
+        return {"success": False, "error": f"知识库「{kb_name}」已暂停写入，仅可查询", "chunks_count": 0}
 
     if embeddings is None:
         embeddings = get_embeddings(kb_name=kb_name)
@@ -348,11 +354,16 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
             docs = loader.load()
             # 扫描版 PDF 自动回退 OCR
             total_chars = sum(len(d.page_content) for d in docs)
-            # 中文文本质量检测：文件名含中文但提取文本中 CJK 字符占比过低 → 编码乱码
+            # 无文本层（0 字符或极少字符）→ 直接 OCR，与文件名无关
+            if total_chars < 50:
+                print(f"  [OCR fallback] 提取文本仅 {total_chars} 字符，走 OCR")
+                total_chars = 0  # 强制走 OCR 回退
+            # 中文文件名 + CJK 占比过低 → 编码乱码，触发 OCR
             fname = os.path.basename(file_path)
             has_chinese_filename = bool(re.search(r'[\u4e00-\u9fff]', fname))
             if total_chars >= 50 and has_chinese_filename:
                 all_text = "".join(d.page_content for d in docs)
+                total_chars = len(all_text)
                 cjk = sum(1 for c in all_text if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
                 cjk_ratio = cjk / max(total_chars, 1)
                 if cjk_ratio < 0.10 and total_chars > 100:
@@ -424,7 +435,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
                 ("h1", "# "), ("h2", "## "), ("h3", "### "), ("h4", "#### ")
             ]
 
-    chunks = split_pipeline(docs[0].page_content, **pipeline_kwargs)
+    chunks = split_pipeline("\n\n".join(d.page_content for d in docs), **pipeline_kwargs)
 
     for chunk in chunks:
         chunk.metadata["source"] = os.path.basename(file_path)

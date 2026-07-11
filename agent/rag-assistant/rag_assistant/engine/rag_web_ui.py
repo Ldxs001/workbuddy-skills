@@ -636,21 +636,25 @@ function refreshGeekTemplates() {
 function refreshRules() {
   Promise.all([
     fetch('/api/rules/list', {method:'POST'}).then(function(r){return r.json()}),
-    fetch('/api/kb-models', {method:'POST'}).then(function(r){return r.json()})
+    fetch('/api/kb-models', {method:'POST'}).then(function(r){return r.json()}),
+    fetch('/api/kb-paused', {method:'POST'}).then(function(r){return r.json()})
   ]).then(function(results) {
-    var d = results[0], kbData = results[1];
+    var d = results[0], kbData = results[1], pausedData = results[2];
     var el = document.getElementById('rules-list');
     var rules = d.rules || {};
     var kbModels = (kbData && kbData.kb_models) || {};
+    var paused = (pausedData && pausedData.paused) || [];
     var names = Object.keys(rules);
     if (names.length === 0) {
-      el.innerHTML = '暂无自定义规则，点“重置默认”创建默认规则。';
+      el.innerHTML = '暂无自定义规则，点"重置默认"创建默认规则。';
       return;
     }
     el.innerHTML = names.map(function(name) {
       var r = rules[name];
       var kws = (r.keywords || []).join(', ');
       var exts = (r.extensions || []).join(', ');
+      var isPaused = paused.indexOf(name) !== -1;
+      var statusBadge = isPaused ? '<span style=\"display:inline-block;padding:1px 6px;font-size:10px;border-radius:4px;background:#ffebee;color:#d32f2f;margin-left:6px;\">⏸ 暂停写入</span>' : '<span style=\"display:inline-block;padding:1px 6px;font-size:10px;border-radius:4px;background:#e8f5e9;color:#2e7d32;margin-left:6px;\">▶ 正常</span>';
       var modelLabel = '默认模型';
       if (kbModels[name]) {
         var p = kbModels[name];
@@ -667,13 +671,17 @@ function refreshRules() {
         }
       }
       var modelHtml = '<br><span style=\"font-size:11px;color:#667eea;\">▶ 模型: ' + modelLabel + '</span>';
+      var pauseBtn = isPaused
+        ? '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;\" onclick=\"pauseRule(\\'' + name + '\\')\">▶ 恢复</button>'
+        : '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;background:#fff3e0;border-color:#ff9800;color:#e65100;\" onclick=\"pauseRule(\\'' + name + '\\')\">⏸ 暂停</button>';
       return '<div style=\"display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;\">' +
-        '<div style=\"flex:1;\"><strong>' + name + '</strong> ' +
-        (r.description ? '<span style=\"color:#888;font-size:11px;\">(' + r.description + ')</span>' : '') +
+        '<div style=\"flex:1;\"><strong>' + name + '</strong>' + statusBadge +
+        (r.description ? '<span style=\"color:#888;font-size:11px;margin-left:4px;\">(' + r.description + ')</span>' : '') +
         '<br><span style=\"font-size:11px;color:#aaa;\">关键词: ' + (kws || '—') + ' | 扩展名: ' + (exts || '—') + '</span>' +
         modelHtml + '</div>' +
-        '<span>' +
-        '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;margin-right:4px;\" onclick=\"editRule(\\'' + name + '\\')\">编辑</button>' +
+        '<span style=\"display:flex;align-items:center;gap:4px;flex-wrap:wrap;\">' +
+        pauseBtn +
+        '<button class=\"btn btn-secondary\" style=\"padding:3px 10px;font-size:11px;\" onclick=\"editRule(\\'' + name + '\\')\">编辑</button>' +
         '<button class=\"btn btn-danger\" style=\"padding:3px 10px;font-size:11px;\" onclick=\"deleteRule(\\'' + name + '\\')\">删除</button>' +
         '</span></div>';
     }).join('');
@@ -753,6 +761,16 @@ function deleteRule(name) {
     body: JSON.stringify({name: name})
   }).then(function(r){return r.json()}).then(function(d) {
     if (d.success) { toast('已删除'); refreshRules(); }
+    else toast(d.error, 'error');
+  });
+}
+
+function pauseRule(name) {
+  fetch('/api/rules/pause', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.success) { toast(d.msg || '已切换'); refreshRules(); }
     else toast(d.error, 'error');
   });
 }
@@ -2076,6 +2094,26 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 from knowledge_base_manager import reset_classify_rules
                 ok, msg = reset_classify_rules()
                 self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb-paused":
+                self._send_json({"success": True, "paused": load_config().get("kb_paused", [])})
+
+            elif path == "/api/rules/pause":
+                body = self._read_body()
+                name = (body or {}).get("name", "")
+                if not name:
+                    self._send_json({"success": False, "error": "缺少知识库名"})
+                    return
+                cfg = load_config()
+                paused = cfg.setdefault("kb_paused", [])
+                if name in paused:
+                    paused.remove(name)
+                    msg = f"⏸ → ▶ {name} 已恢复写入"
+                else:
+                    paused.append(name)
+                    msg = f"▶ → ⏸ {name} 已暂停写入"
+                save_config(cfg)
+                self._send_json({"success": True, "msg": msg})
 
             elif path == "/api/kb-model":
                 data = self._read_body()

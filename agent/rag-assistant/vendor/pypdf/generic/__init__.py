@@ -27,7 +27,7 @@
 
 """Implementation of generic PDF objects (dictionary, number, string, ...)."""
 __author__ = "Mathieu Fenniak"
-__author_email__ = "[email-redacted]"
+__author_email__ = "biziqe@mathieu.fenniak.net"
 
 from ..constants import OutlineFontFlag
 from ._base import (

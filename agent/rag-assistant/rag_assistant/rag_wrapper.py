@@ -8,9 +8,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-SCRIPTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
-if SCRIPTS_PATH not in sys.path:
-    sys.path.insert(0, SCRIPTS_PATH)
+ENGINE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "engine")
+if ENGINE_PATH not in sys.path:
+    sys.path.insert(0, ENGINE_PATH)
 
 
 class RAGWrapper:

@@ -28,7 +28,7 @@ import operator
 import sys
 import types
 
-__author__ = "Benjamin Peterson <[email-redacted]>"
+__author__ = "Benjamin Peterson <benjamin@python.org>"
 __version__ = "1.17.0"
 
 

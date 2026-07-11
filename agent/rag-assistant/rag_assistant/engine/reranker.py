@@ -137,6 +137,21 @@ class ModelReranker:
             reranker_cfg = cfg.get("reranker", {})
             self.model_path = reranker_cfg.get("model_path", "")
 
+        # 解析 HuggingFace model ID → 本地路径（同 get_embeddings 逻辑）
+        if self.model_path and not os.path.exists(self.model_path):
+            from utils import MODELS_DIR, safe_json_load
+            index_path = os.path.join(MODELS_DIR, "model_index.json")
+            idx = safe_json_load(index_path, {})
+            if self.model_path in idx:
+                actual = idx[self.model_path].get("path", "")
+                if actual and os.path.exists(actual):
+                    self.model_path = actual
+                else:
+                    dirname = self.model_path.replace("/", "_")
+                    local_path = os.path.join(MODELS_DIR, dirname)
+                    if os.path.exists(local_path):
+                        self.model_path = local_path
+
         if not self.model_path or not os.path.exists(self.model_path):
             from utils import MODELS_DIR, find_model_dirs
             models = find_model_dirs(MODELS_DIR)
@@ -340,3 +355,88 @@ if __name__ == "__main__":
                 print(f"  #{i+1} [{score:.4f}] {content}...")
     else:
         parser.print_help()
+
+
+class FallbackRouter:
+    """语义回退路由（从 router.py 迁入，精排模块的一部分）
+    
+    用 cross-encoder 对 query 和 KB 签名打分，选出最佳 KB。
+    仅用于知识库 auto_classify hybrid 模式，不在路由层使用。
+    """
+
+    def __init__(self, model_path: str = None):
+        self.model_path = model_path
+        self._model = None
+        self._tokenizer = None
+
+    def _load_model(self):
+        if self._model is not None:
+            return
+        if not self.model_path:
+            cfg = load_config()
+            router_cfg = cfg.get("router", {})
+            fallback_cfg = router_cfg.get("fallback", {})
+            rerank_cfg = cfg.get("reranker", {})
+            self.model_path = rerank_cfg.get("model_path", "") or fallback_cfg.get("model_path", "")
+        if self.model_path and not os.path.exists(self.model_path):
+            from utils import MODELS_DIR, safe_json_load
+            index_path = os.path.join(MODELS_DIR, "model_index.json")
+            idx = safe_json_load(index_path, {})
+            if self.model_path in idx:
+                actual = idx[self.model_path].get("path", "")
+                if actual and os.path.exists(actual):
+                    self.model_path = actual
+                else:
+                    dirname = self.model_path.replace("/", "_")
+                    local_path = os.path.join(MODELS_DIR, dirname)
+                    if os.path.exists(local_path):
+                        self.model_path = local_path
+        if not self.model_path or not os.path.exists(self.model_path):
+            from utils import MODELS_DIR, find_model_dirs
+            models = find_model_dirs(MODELS_DIR)
+            if not models:
+                raise ValueError("未找到 rerank 模型")
+            self.model_path = models[0]["path"]
+        try:
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            self._tokenizer = AutoTokenizer.from_pretrained(self.model_path, local_files_only=True)
+            self._model = AutoModelForSequenceClassification.from_pretrained(
+                self.model_path, local_files_only=True
+            ).to(device).eval()
+        except Exception as e:
+            raise RuntimeError(f"加载 rerank 模型失败: {e}")
+
+    def score(self, query: str, kb_signatures: dict[str, str]) -> dict[str, float]:
+        if not kb_signatures:
+            return {}
+        self._load_model()
+        import torch
+        pairs = [[query, sig["signature"] if isinstance(sig, dict) else sig] for sig in kb_signatures.values()]
+        inputs = self._tokenizer(pairs, padding=True, truncation=True, max_length=512, return_tensors="pt").to(self._model.device)
+        with torch.no_grad():
+            outputs = self._model(**inputs)
+            scores = outputs.logits.squeeze(-1).tolist()
+        if isinstance(scores, float):
+            scores = [scores]
+        kb_names = list(kb_signatures.keys())
+        result = {}
+        for i, name in enumerate(kb_names):
+            result[name] = round(scores[i] if i < len(scores) else 0.0, 4)
+        return result
+
+    def route(self, query: str, signatures: dict[str, str], threshold: float = None) -> tuple[Optional[str], dict[str, float]]:
+        cfg = load_config()
+        router_cfg = cfg.get("router", {})
+        fallback_cfg = router_cfg.get("fallback", {})
+        if threshold is None:
+            threshold = fallback_cfg.get("min_score_threshold", 0.3)
+        scores = self.score(query, signatures)
+        if not scores:
+            return None, scores
+        best_kb = max(scores, key=scores.get)
+        best_score = scores[best_kb]
+        if best_score < threshold:
+            return None, scores
+        return best_kb, scores

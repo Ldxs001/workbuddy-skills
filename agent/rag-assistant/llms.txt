@@ -38,7 +38,7 @@ main.py ─── 入口（CLI / Web / Batch 三模式）
   │   ├── search.py           ← 联网搜索回退（DuckDuckGo / Tavily）
   │   └── web_ui.py           ← 自包含 HTTP 服务器 + 前端页面
   │
-  ├── scripts/                ← local-rag-builder 技能完整副本
+  ├── engine/                ← local-rag-builder 技能引擎
   │   ├── rag_core.py         ← 检索/路由/rerank 编排核心
   │   ├── router.py           ← 两级路由（硬编码关键词 + 语义 reranker）
   │   ├── knowledge_base_manager.py  ← 知识库 CRUD + 自动分类
@@ -62,7 +62,7 @@ main.py ─── 入口（CLI / Web / Batch 三模式）
 | 文件 | 作用 |
 |------|------|
 | `main.py` | 入口，三模式启动器 |
-| `RAG_PROTOCOL.md` | **外部接入协议** — API 契约、配置 Schema、文件交互格式 |
+| `PROTOCOL.md` | **外部接入协议** — API 契约、配置 Schema、文件交互格式 |
 | `data/config/rag_config.json` | 引擎全量配置（路由、rerank、切分、检索、LLM、嵌入） |
 | `data/kb/kb_index.json` | 知识库索引 |
 | `setup.bat` | Windows 一键安装启动脚本 |
@@ -89,7 +89,7 @@ LLM 自动判断：直接回答 / 查知识库 / 搜网页 / 导入文件
 - 用户习惯学习（统计 RAG/聊天/导入频率）
 
 ### 外部接入
-详见 `RAG_PROTOCOL.md`：
+详见 `PROTOCOL.md`：
 - REST API 13 个端点，JSON Schema 完整定义
 - CLI `--batch` / `--jsonl` 批量处理模式，结构化输入输出
 - `config.json` 配置驱动引擎行为变更

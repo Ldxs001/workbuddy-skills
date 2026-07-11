@@ -5,6 +5,40 @@
 
 ---
 
+## [0.8.0] - 2026-07-11
+
+### 修复
+- **PDF 只导入第 1 页**：`import_documents_to_kb` 使用 `docs[0].page_content` 只取 PyPDFLoader 第 1 页，多页 PDF 丢失 90%+ 内容。改为 `"\n\n".join(d.page_content for d in docs)` 合并全部页
+- **OCR 触发条件依赖文件名**：英文扫描版 PDF（无中文文件名、0 字符提取）被跳过 OCR。改为 `total_chars < 50` 无条件走 OCR，不再检查文件名
+- **英文 PDF 误触发 OCR**：去掉了 `has_chinese_filename` 条件后所有英文论文走了 OCR。恢复为中文文件名 + CJK < 10% 才触发，0 字符独立走 OCR
+- **LM Studio 超时**（未改动代码，需在 LM Studio 侧调大请求超时）
+
+### 新增
+- **KB 暂停写入**：配置页自动分类规则每行增加暂停/恢复按钮，暂停期间自动路由跳过该 KB，指定导入拒绝，查询不受影响
+
+### 重构
+- **历史对话隔离**：第一轮 LLM 决策不再传完整对话历史（仅压缩摘要），第二轮生成回答时仍带完整历史。写入记忆时自动剥离 `<<ACTION>>` 标签。历史消息加 `[历史对话]` 前缀
+- **引用校验**：第二轮系统提示强制要求回答标注 `[n]` 引用，生成后校验引用编号是否在资料段落范围内
+
+---
+
+## [0.7.0] - 2026-07-11
+
+### 修复
+- **导入计数不准**：`_exec_import` 导入统计与 ChromaDB 实际数据不一致。根因是 manifest 残留旧路径（`try/finally` 修复）和 `add_documents_to_kb` 用 `max(chroma, accumulated)` 漂移（改为直接取 chroma 真实值）
+- **语义子切被跳过**：`_run_secondary_without_inherit` 缺少 `secondary="semantic"` 分支，`recursive→semantic` 子切被 `else: return chunks` 静默吞掉
+- **reranker 路径解析错**：`FallbackRouter._load_model()` 未通过 `model_index.json` 解析 HuggingFace ID→本地路径，fallback 到 `find_model_dirs` 随机选模型
+- **签名反哺毒化关键词**：reranker 加载失败时降级为垃圾词频签名并反哺进 `auto_classify_rules`，修复为返回空签名不反哺
+- **Web UI 端口不准确**：`_render_config_tab` 硬编码 8766，`start_web_ui` 算出的 `rag_port` 没传进去。改为 `_find_ports()` 自动查找 + 类变量传递
+- **manifest 异常残留**：导入后清空 manifest 代码在 for 循环尾部，异常跳出时跳过。改为 `try/finally` 包裹
+
+### 重构
+- **KB 签名生成新流程**：BCE 语义质心提取 → jieba 候选词 → 停用词过滤 → BCE vs 原始关键词排序 → top-12 签名 / top-30 反哺。不再依赖 reranker
+- **精排/路由解耦**：`FallbackRouter` 从 `router.py` 迁入 `reranker.py`，路由层不再引用 reranker 模块
+- **kb_index.json 路径修正**：12 个 KB 的 `path` 从旧 `local-rag-builder` 位置改指向 `rag-assistant/data/kb/`
+
+---
+
 ## [0.6.2] - 2026-07-10
 
 ### 修复

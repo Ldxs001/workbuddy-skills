@@ -476,12 +476,12 @@ def split_pipeline(text, guards=None, primary="recursive", secondary=None,
             chunks = _run_secondary(chunks, secondary, chunk_size, chunk_overlap, embeddings=embeddings)
         else:
             # 固定/递归/按句：纯子切，不继承位置 metadata
-            chunks = _run_secondary_without_inherit(chunks, secondary, chunk_size, chunk_overlap)
+            chunks = _run_secondary_without_inherit(chunks, secondary, chunk_size, chunk_overlap, embeddings=embeddings)
 
     return chunks
 
 
-def _run_secondary_without_inherit(chunks, secondary_strategy, chunk_size, chunk_overlap):
+def _run_secondary_without_inherit(chunks, secondary_strategy, chunk_size, chunk_overlap, embeddings=None):
     """后处理但不继承 metadata（用于 fixed/recursive/sentence 主策略）"""
     if not secondary_strategy or secondary_strategy == "none":
         return chunks
@@ -492,6 +492,18 @@ def _run_secondary_without_inherit(chunks, secondary_strategy, chunk_size, chunk
     elif secondary_strategy == "fixed":
         from langchain_text_splitters import CharacterTextSplitter
         splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap, separator="")
+    elif secondary_strategy == "semantic":
+        try:
+            from langchain_experimental.text_splitter import SemanticChunker
+            if embeddings is None:
+                from langchain_huggingface import HuggingFaceEmbeddings
+                embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
+            splitter = SemanticChunker(
+                embeddings=embeddings,
+                breakpoint_threshold_type="percentile",
+            )
+        except ImportError:
+            return chunks
     else:
         return chunks
 

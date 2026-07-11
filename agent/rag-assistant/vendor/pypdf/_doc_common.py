@@ -1,5 +1,5 @@
 # Copyright (c) 2006, Mathieu Fenniak
-# Copyright (c) 2007, Ashish Kulkarni <[email-redacted]>
+# Copyright (c) 2007, Ashish Kulkarni <kulkarni.ashish@gmail.com>
 # Copyright (c) 2024, Pubpub-ZZ
 #
 # All rights reserved.
