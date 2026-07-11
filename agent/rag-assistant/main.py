@@ -292,25 +292,28 @@ def main():
     logger.info("正在初始化 RAG 智能体...")
     agent = Agent(config)
 
-    # 启动时试探性查询所有 KB，HNSW 损坏的提前修复
-    try:
-        from rag_core import get_embeddings, retrieve_documents
-        emb = get_embeddings()
-        kb_dir = os.path.join(data_dir, "kb")
-        if os.path.isdir(kb_dir):
-            for entry in sorted(os.listdir(kb_dir)):
-                if not os.path.isdir(os.path.join(kb_dir, entry)) or entry.startswith("."):
-                    continue
-                kb_path = os.path.join(kb_dir, entry, "chroma.sqlite3")
-                if not os.path.isfile(kb_path):
-                    continue
-                try:
-                    retrieve_documents("test", kb_name=entry, k=1, embeddings=emb)
-                except Exception:
-                    logger.warning(f"知识库 [{entry}] HNSW 损坏，已清理（查询时自动重建）")
-    except Exception:
-        pass
-    logger.info("知识库索引检查完成")
+    # 后台探测 KB 索引完整性（不阻塞服务器启动）
+    def _probe_all_kbs():
+        try:
+            from rag_core import get_embeddings, retrieve_documents
+            emb = get_embeddings()
+            kb_dir = os.path.join(data_dir, "kb")
+            if os.path.isdir(kb_dir):
+                for entry in sorted(os.listdir(kb_dir)):
+                    kp = os.path.join(kb_dir, entry)
+                    if not os.path.isdir(kp) or entry.startswith("."):
+                        continue
+                    if not os.path.isfile(os.path.join(kp, "chroma.sqlite3")):
+                        continue
+                    try:
+                        retrieve_documents("test", kb_name=entry, k=1, embeddings=emb)
+                    except Exception:
+                        logger.warning(f"知识库 [{entry}] HNSW 损坏，已清理")
+        except Exception:
+            pass
+        logger.info("后台 KB 完整性检查完成")
+    import threading
+    threading.Thread(target=_probe_all_kbs, daemon=True).start()
 
     if not agent.rag.ready:
         logger.warning("RAG 模块未就绪 - 请确保 data/ 目录下有知识库和模型")
