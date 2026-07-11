@@ -5,6 +5,11 @@
 
 ---
 
+## [0.8.1] - 2026-07-11
+
+### 修复
+- **修复 PyPI 元数据缺少 long_description**：之前 0.8.0 的 wheel 因构建时缺少 `pyproject.toml`，setuptools>=61 将 `Description` 标记为 `Dynamic`，导致 PyPI 页面不显示项目说明。本次通过 Trusted Publisher 重新构建发布
+
 ## [0.8.0] - 2026-07-11
 
 ### 修复
