@@ -306,9 +306,11 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         import time
         rag_port = type(self).rag_port  # 通过类变量读取真实端口
         cfg = load_config() if SKILL_AVAILABLE else {}
-        llm_backend = cfg.get("llm_backend", "ollama")
-        llm_max_tokens = cfg.get("llm_max_tokens", 4096)
-        llm_timeout = cfg.get("llm_timeout", 180)
+        llm = cfg.get("llm", {})
+        llm_backend = llm.get("backend", "ollama")
+        llm_max_tokens = llm.get("max_tokens", 4096)
+        llm_timeout = llm.get("timeout", 180)
+        llm_model = llm.get("model", "")
         web_search = cfg.get("web_search_enabled", True)
         return f"""
         <div style="padding:12px 16px;background:#f5f6fa;border-bottom:1px solid #e0e0e0;">
@@ -320,10 +322,10 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
             <select id="llm-model" onchange="saveLLM()" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
               <option value="">-- 模型 --</option>
             </select>
-            <input type="number" id="llm-timeout" value="{llm_timeout}" min="30" max="600" step="30" onchange="saveLLM()" style="width:70px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;" title="超时秒数">
+            <input type="number" id="llm-timeout" value="{llm_timeout}" min="30" max="3600" step="30" onchange="saveLLM()" style="width:70px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;" title="超时秒数">
             <input type="number" id="llm-maxtokens" value="{llm_max_tokens}" min="512" max="131072" step="1024" onchange="saveLLM()" style="width:90px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;" title="最大输出token数">
             <button onclick="loadModels()" style="padding:6px 12px;background:#f0f0f5;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:12px;">🔄</button>
-            <button onclick="testLLM()" style="padding:6px 12px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">测试</button>
+            <button onclick="testLLM()" style="padding:6px 12px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">测试</button>
             <label style="font-size:13px;display:flex;align-items:center;gap:4px;">
               <input type="checkbox" id="web-search" onchange="saveLLM()" {"checked" if web_search else ""} style="accent-color:#667eea;">
               联网搜索
