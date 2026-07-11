@@ -935,6 +935,17 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
 
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
 
+def _find_pkg_dir(build_dir: Path) -> str:
+    for item in sorted(build_dir.iterdir()):
+        if item.is_dir() and not item.name.startswith("_") and not item.name.startswith(".")\
+           and item.name not in ("scripts","__pycache__","venv","env","dist","build","vendor","tools"):
+            if (item / "__init__.py").exists():
+                return item.name
+    for item in build_dir.iterdir():
+        if item.is_dir() and (item / "__init__.py").exists():
+            return item.name
+    return ""
+
 def step_pypi_publish(name: str, version: str, src_dir: Path):
     """发布到 PyPI（隔离构建）"""
     log(8, 8, f"发布 {name} 到 PyPI...")
@@ -943,49 +954,87 @@ def step_pypi_publish(name: str, version: str, src_dir: Path):
     if build_dir.exists(): shutil.rmtree(build_dir)
     shutil.copytree(src_dir, build_dir,
                     ignore=shutil.ignore_patterns("__pycache__","*.pyc","dist","build","*.egg-info"))
+    pkg_dir = _find_pkg_dir(build_dir)
+    if not pkg_dir:
+        log(8,8,"PyPI 构建失败: 未检测到包目录","err")
+        shutil.rmtree(build_dir,ignore_errors=True)
+        return
     from pathlib import Path as _P
+    _P(str(build_dir / "pyproject.toml")).write_text(
+        "[build-system]\nrequires = [\"setuptools>=61\"]\nbuild-backend = \"setuptools.build_meta\"\n",
+        encoding="utf-8")
     _P(str(build_dir / "setup.py")).write_text(textwrap.dedent(f'''\
-from setuptools import setup, find_packages
 import os
-with open(os.path.join(os.path.dirname(__file__),"rag_assistant","__init__.py")) as f:
-    for l in f:
-        if l.startswith("__version__"): V=l.split('"')[1]; break
-    else: V="{version}"
-req_p=os.path.join(os.path.dirname(__file__),"requirements.txt")
-with open(req_p) as f: REQ=[l.strip() for l in f if l.strip() and not l.startswith("#")]
-REQ=[r for r in REQ if not r.startswith("langchain")]
-readme_p=os.path.join(os.path.dirname(__file__),"README.md")
-LD=open(readme_p,encoding="utf-8").read() if os.path.exists(readme_p) else "{name}"
-setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
+from setuptools import setup, find_packages
+PKG="{pkg_dir}"
+f=os.path.join(os.path.dirname(__file__),PKG,"__init__.py")
+V="{version}"
+if os.path.exists(f):
+    with open(f) as fp:
+        V=next((l.split('"')[1] for l in fp if l.startswith("__version__")),V)
+rf=os.path.join(os.path.dirname(__file__),"requirements.txt")
+REQ=[]
+if os.path.exists(rf):
+    with open(rf) as fp: REQ=[l.strip() for l in fp if l.strip() and not l.startswith("#")]
+rm=os.path.join(os.path.dirname(__file__),"README.md")
+LD="{name}"
+if os.path.exists(rm):
+    with open(rm,encoding="utf-8") as fp: LD=fp.read()
+setup(name="{pypi_name}",version=V,description="{name}",
       long_description=LD,long_description_content_type="text/markdown",
       author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
       url="https://github.com/Ldxs001/workbuddy-skills",
-      packages=find_packages(),include_package_data=True,
-      python_requires=">=3.10",install_requires=REQ,
+      packages=find_packages(include=[PKG,PKG+".*"]),
+      include_package_data=True,python_requires=">=3.10",
+      install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
       classifiers=["Development Status :: 4 - Beta","Intended Audience :: Developers",
                    "License :: OSI Approved :: Apache Software License",
                    "Programming Language :: Python :: 3",
                    "Topic :: Scientific/Engineering :: Artificial Intelligence"])
-'''), encoding="utf-8")
-    _P(str(build_dir / "MANIFEST.in")).write_text(
-        "include requirements.txt\ninclude README.md\ninclude LICENSE\ninclude setup.py\ninclude main.py\n"
-        "recursive-include scripts/ *.py\nprune __pycache__\nprune *.pyc\n", encoding="utf-8")
-    r = subprocess.run([sys.executable, "-m", "build"], cwd=str(build_dir), capture_output=True, text=True)
-    if r.returncode != 0: log(8,8,"PyPI 构建失败","err"); shutil.rmtree(build_dir,ignore_errors=True); return
+\'\'\'), encoding="utf-8")
+    _P(str(build_dir / "MANIFEST.in")).write_text(manifest, encoding="utf-8")
+
+    r = subprocess.run([sys.executable, "-m", "build", "--wheel"], cwd=str(build_dir),
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        log(8,8,"PyPI 构建失败","err")
+        shutil.rmtree(build_dir,ignore_errors=True)
+        return
+
+    # 验证 wheel 元数据包含 long_description
+    whl_pattern = f"{pypi_name.replace('-','_')}-{version}-py3-none-any.whl"
+    whl_path = build_dir / "dist" / whl_pattern
+    if whl_path.exists():
+        import zipfile
+        with zipfile.ZipFile(str(whl_path)) as zf:
+            for mf in zf.namelist():
+                if mf.endswith("METADATA"):
+                    meta = zf.read(mf).decode("utf-8")
+                    if "Description:" not in meta and "Description-Content-Type:" not in meta:
+                        log(8,8,"PyPI 构建警告: 元数据缺少 long_description","warn")
+                    break
+
     token = ""
-    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),capture_output=True,text=True).stdout.strip()
+    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),
+                         capture_output=True,text=True).stdout.strip()
     if ":" in rmt and "@" in rmt:
         tp = rmt.split("//")[1].split("@")[0]
         if ":" in tp: token = tp.split(":")[1]
     if not token: token = os.environ.get("PYPI_TOKEN","")
-    if not token: log(8,8,"未找到 PyPI token","err"); shutil.rmtree(build_dir,ignore_errors=True); return
-    whl = build_dir / "dist" / f"{pypi_name.replace('-','_')}-{version}-py3-none-any.whl"
-    if whl.exists():
-        r = subprocess.run([sys.executable,"-m","twine","upload","--disable-progress",str(whl),"-u","__token__","-p",token],
+    if not token:
+        log(8,8,"未找到 PyPI token, 跳过上传","warn")
+        shutil.rmtree(build_dir,ignore_errors=True)
+        return
+
+    if whl_path.exists():
+        r = subprocess.run([sys.executable,"-m","twine","upload","--disable-progress",str(whl_path),
+                           "-u","__token__","-p",token],
                           capture_output=True,text=True,cwd=str(build_dir))
-        if r.returncode==0: log(8,8,f"PyPI: https://pypi.org/project/{pypi_name}/","ok")
-        else: log(8,8,f"PyPI 上传失败: {r.stderr[:200]}","err")
+        if r.returncode==0:
+            log(8,8,f"PyPI: https://pypi.org/project/{pypi_name}/","ok")
+        else:
+            log(8,8,f"PyPI 上传失败: {r.stderr[:200]}","err")
     shutil.rmtree(build_dir,ignore_errors=True)
 
 def step_clawhub_publish(name: str, version: str):

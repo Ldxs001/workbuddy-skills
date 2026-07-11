@@ -1,3 +1,11 @@
+## [2.28.0] - 2026-07-11
+
+### 修复
+- **pypi_publish 丢失 long_description**：`python -m build` 无 `pyproject.toml` 时 setuptools>=61 将 description 标记为 Dynamic，PyPI 不显示项目说明。新增 `pyproject.toml` 生成，强制 setuptools 不派生 Dynamic 元数据
+- **pypi_publish 硬编码 rag_assistant 包名**：`step_pypi_publish` 和 `pypi_publish.py` 均硬编码 `rag_assistant` 包路径。新增 `_find_pkg_dir()` 动态检测含 `__init__.py` 的包目录，通用化任意 agent/skill
+- **pypi_publish 硬编码工作路径**：`pypi_publish.py` 写死 `~/.workbuddy/workbuddy-skills`，在不同克隆路径下崩溃。改为通过 `git remote get-url origin` 动态获取或环境变量 / `.pypirc` 回退
+- **构建后元数据验证**：新增 wheel METADATA 检查，确认 Description 字段存在，缺少时 warn
+
 ## [2.27.1] - 2026-07-11
 
 ### 修复
