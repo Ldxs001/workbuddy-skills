@@ -5,6 +5,26 @@
 
 ---
 
+## [0.8.5] - 2026-07-12
+
+### 修复
+- **入库路由改为语义分类**：`_resolve_kb()` 从关键词硬匹配改为 cross-encoder 语义路由，`use_semantic=True`
+- **`_resolve_kb()` 尊重 `kb.auto_classify` 配置**：修复 HTML 开关与代码脱节
+- **生物医疗 KB 恢复**：从旧 skill 目录恢复 225 篇真实医学文档，清除党建污染
+- **KB 签名重算**：从真实医学内容重算为 `biomedical · aetiology · pathogenesis · clinical · medical`
+- **`get_embeddings()` 缓存**：组合查询不再重复加载模型（18 次→1 次）
+- **setup.bat 自适应等待**：轮询端口取代硬编码秒数，chcp 65001 修复中文乱码
+- **启动 KB 探测改为阻塞并显示详细状态**：每库 ✅/❌ 状态 + 总数
+
+### 重构
+- **LLM 配置统一到 `llm` 子字典**：极客模式、配置面板、LLMClient 读取同一数据源
+- **Web UI 标记渲染**：marked CDN 加载，markdown 真正生效
+- **Web UI 模态弹窗**：confirm() 替换为自定义模态
+
+### 新增
+- **聊天历史持久化**：刷新页面不丢对话
+- **压缩上下文 / 清除上下文 按钮**
+
 ## [0.8.4] - 2026-07-12
 
 ### 修复
