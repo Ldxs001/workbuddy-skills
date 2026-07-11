@@ -57,6 +57,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._serve_agent_gaps()
         elif path.startswith("/api/agent/query"):
             self._handle_agent_query(parsed.query)
+        elif path == "/api/chat/history":
+            self._handle_chat_history()
         elif path.startswith("/api/chat"):
             self._handle_chat_get(parsed)
         elif path == "/api/memory/reset":
@@ -453,6 +455,20 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
             if(d.success) {{ document.getElementById('chat-messages').innerHTML = '<div class=\\"msg assistant\\">对话已重置。</div>'; }}
           }});
         }}
+
+        // 页面加载时恢复聊天历史
+        function loadChatHistory() {{
+          fetch('/api/chat/history').then(function(r){{return r.json()}}).then(function(d){{
+            if(d.success && d.messages && d.messages.length) {{
+              var container = document.getElementById('chat-messages');
+              container.innerHTML = '';
+              d.messages.forEach(function(m){{
+                addMessage(m.content, m.role);
+              }});
+            }}
+          }});
+        }}
+        setTimeout(loadChatHistory, 200);
         </script>
         """
 
@@ -491,6 +507,28 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
 
         result = self.agent.chat(msg)
         self._send_json(result)
+
+    def _handle_chat_history(self):
+        """返回当前 session 的聊天历史"""
+        if not self.agent:
+            self._send_json({"messages": [], "success": False})
+            return
+        raw = self.agent.memory.get_short_term(self.agent.session_id)
+        if not raw:
+            self._send_json({"messages": [], "success": True})
+            return
+        messages = []
+        for line in raw.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if "] user: " in line:
+                content = line.split("] user: ", 1)[1]
+                messages.append({"role": "user", "content": content})
+            elif "] assistant: " in line:
+                content = line.split("] assistant: ", 1)[1]
+                messages.append({"role": "assistant", "content": content})
+        self._send_json({"messages": messages, "success": True})
 
     def _update_llm_config(self):
         body = self._read_body()
