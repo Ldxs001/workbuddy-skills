@@ -141,6 +141,7 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>RAG 智能助手</title>
 <link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; color: #333; }}
@@ -178,6 +179,18 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 .modal-btn-primary:hover {{ background:#b71c1c; }}
 .modal-btn {{ padding:8px 20px;background:#f0f0f0;color:#555;border:none;border-radius:6px;cursor:pointer;font-size:13px; }}
 .modal-btn:hover {{ background:#e0e0e0; }}
+/* ── 标记渲染 ── */
+.msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 {{ margin: 0.5em 0 0.25em; }}
+.msg.assistant h1 {{ font-size: 1.3em; }} .msg.assistant h2 {{ font-size: 1.15em; }} .msg.assistant h3 {{ font-size: 1.05em; }}
+.msg.assistant p {{ margin: 0.4em 0; }}
+.msg.assistant table {{ border-collapse: collapse; margin: 0.5em 0; font-size: 13px; width: 100%; }}
+.msg.assistant th, .msg.assistant td {{ border: 1px solid #ddd; padding: 6px 10px; text-align: left; }}
+.msg.assistant th {{ background: #f0f0f5; font-weight: 600; }}
+.msg.assistant code {{ background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 0.95em; }}
+.msg.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }}
+.msg.assistant blockquote {{ border-left: 3px solid #667eea; margin: 0.5em 0; padding: 4px 12px; color: #666; }}
+.msg.assistant ul, .msg.assistant ol {{ margin: 0.3em 0; padding-left: 1.5em; }}
+.msg.assistant li {{ margin: 0.15em 0; }}
 /* ── 推理链 ── */
 .reasoning-toggle {{ font-size: 12px; color: #888; cursor: pointer; margin-top: 8px; padding: 2px 0; user-select: none; }}
 .reasoning-toggle:hover {{ color: #667eea; }}
