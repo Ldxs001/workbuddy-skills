@@ -56,8 +56,12 @@ def apply_markdown_preprocess(text: str, preprocess_cfg: dict) -> str:
     return "\n".join(result)
 
 
+# 嵌入模型缓存（同一路径只加载一次）
+_EMBEDDING_CACHE: dict = {}
+
+
 def get_embeddings(model_path=None, device="auto", kb_name=None):
-    """获取嵌入模型实例"""
+    """获取嵌入模型实例（已缓存，同一路径只加载一次）"""
     from langchain_huggingface import HuggingFaceEmbeddings
     import torch
 
@@ -112,11 +116,18 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    return HuggingFaceEmbeddings(
+    # 缓存命中 → 直接返回
+    cache_key = f"{model_path}::{device}"
+    if cache_key in _EMBEDDING_CACHE:
+        return _EMBEDDING_CACHE[cache_key]
+
+    emb = HuggingFaceEmbeddings(
         model_name=model_path,
         model_kwargs={"device": device, "local_files_only": True},
         encode_kwargs={"normalize_embeddings": emb_cfg.get("normalize_embeddings", True)},
     )
+    _EMBEDDING_CACHE[cache_key] = emb
+    return emb
 
 
 def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, embeddings=None):
