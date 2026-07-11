@@ -232,10 +232,17 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     if not unique:
         return ""
     
-    # --- 1. BCE 语义质心：取质心最近的 chunk（最代表 KB 整体内容）---
+    # --- 1. BCE 语义质心：取质心最近的 chunk（均匀采样覆盖全 KB）---
     emb = get_embeddings()
     try:
-        chunk_vecs = np.array([emb.embed_query(t[:512]) for t in unique[:50]])
+        # 均匀采样：覆盖全域而非前 N 个（Chromadb 按插入序返回，前 N 个可能来自同份文档）
+        n_sample = min(100, len(unique))
+        if len(unique) > n_sample:
+            step = len(unique) // n_sample
+            sampled = [unique[i] for i in range(0, len(unique), step)][:n_sample]
+        else:
+            sampled = unique[:n_sample]
+        chunk_vecs = np.array([emb.embed_query(t[:512]) for t in sampled])
         centroid = chunk_vecs.mean(axis=0)
         dists = np.linalg.norm(chunk_vecs - centroid, axis=1)
         nearest_idx = np.argsort(dists)[:20]
