@@ -24,22 +24,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug tag info
+        run: |
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          echo "GITHUB_REF_TYPE: $GITHUB_REF_TYPE"
+          ls -la agents/ 2>/dev/null || echo "agents/ dir not found"
+          ls -la skills/ 2>/dev/null | head -3 || echo "skills/ dir not found"
+
       - name: Parse tag & validate
         id: info
         run: |
           TAG="${GITHUB_REF_NAME}"
-          # format: pypi/<type>/<name>/v<version>  (可嵌套)
-          # e.g. pypi/agents/rag-assistant/v0.8.3
-          # e.g. pypi/skills/git-sync/v2.27.1
+          echo "TAG=$TAG"
           REST="${TAG#pypi/}"
-          # 版本号：取最后一段，去掉 v 前缀
+          echo "REST=$REST"
           VERSION="${REST##*/}"
+          echo "VERSION_RAW=$VERSION"
           VERSION="${VERSION#v}"
-          # 去掉尾部 /v版本 得到 类型/名称
           TYPE_AND_NAME="${REST%/v*}"
-          # 类型是第一段
+          echo "TYPE_AND_NAME=$TYPE_AND_NAME"
           TYPE="${TYPE_AND_NAME%%/*}"
-          # 名称是去掉类型后的部分
           NAME="${TYPE_AND_NAME#*/}"
           PYPI_NAME="${NAME}-ldxs"
 
