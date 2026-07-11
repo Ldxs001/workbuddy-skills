@@ -292,28 +292,35 @@ def main():
     logger.info("正在初始化 RAG 智能体...")
     agent = Agent(config)
 
-    # 后台探测 KB 索引完整性（不阻塞服务器启动）
-    def _probe_all_kbs():
-        try:
-            from rag_core import get_embeddings, retrieve_documents
-            emb = get_embeddings()
-            kb_dir = os.path.join(data_dir, "kb")
-            if os.path.isdir(kb_dir):
-                for entry in sorted(os.listdir(kb_dir)):
-                    kp = os.path.join(kb_dir, entry)
-                    if not os.path.isdir(kp) or entry.startswith("."):
-                        continue
-                    if not os.path.isfile(os.path.join(kp, "chroma.sqlite3")):
-                        continue
-                    try:
-                        retrieve_documents("test", kb_name=entry, k=1, embeddings=emb)
-                    except Exception:
-                        logger.warning(f"知识库 [{entry}] HNSW 损坏，已清理")
-        except Exception:
-            pass
-        logger.info("后台 KB 完整性检查完成")
-    import threading
-    threading.Thread(target=_probe_all_kbs, daemon=True).start()
+    # 探测所有 KB 索引完整性（阻塞，跑完才启动服务器）
+    print("  检查知识库索引...")
+    kb_ok = kb_bad = 0
+    try:
+        from rag_core import get_embeddings, retrieve_documents
+        emb = get_embeddings()
+        kb_dir = os.path.join(data_dir, "kb")
+        if os.path.isdir(kb_dir):
+            for entry in sorted(os.listdir(kb_dir)):
+                kp = os.path.join(kb_dir, entry)
+                if not os.path.isdir(kp) or entry.startswith("."):
+                    continue
+                if not os.path.isfile(os.path.join(kp, "chroma.sqlite3")):
+                    continue
+                try:
+                    retrieve_documents("test", kb_name=entry, k=1, embeddings=emb)
+                    kb_ok += 1
+                except Exception:
+                    logger.warning(f"  知识库 [{entry}] HNSW 损坏，已清理")
+                    kb_bad += 1
+    except Exception:
+        pass
+    if kb_ok + kb_bad > 0:
+        detail = f"  ✅ {kb_ok} 正常" if kb_ok else ""
+        if kb_bad:
+            detail += f"  ❌ {kb_bad} 损坏(已修复)"
+        print(f"  知识库: {kb_ok + kb_bad} 个 ({kb_ok} 正常{' / ' + str(kb_bad) + ' 已修复' if kb_bad else ''})")
+    else:
+        print("  知识库: 无")
 
     if not agent.rag.ready:
         logger.warning("RAG 模块未就绪 - 请确保 data/ 目录下有知识库和模型")
