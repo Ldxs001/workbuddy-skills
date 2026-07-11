@@ -594,21 +594,18 @@ function hideModal() {{
     def _update_llm_config(self):
         body = self._read_body()
         cfg = load_config() if SKILL_AVAILABLE else {}
-        backend = body.get("backend", cfg.get("llm_backend", "ollama"))
-        model = body.get("model", cfg.get("llm_model", ""))
-        timeout = body.get("timeout", cfg.get("llm_timeout", 180))
-        maxtokens = body.get("maxtokens", cfg.get("llm_max_tokens", 4096))
-        cfg["llm_backend"] = backend
-        cfg["llm_model"] = model
-        cfg["llm_timeout"] = timeout
-        cfg["llm_max_tokens"] = maxtokens
+        llm = cfg.setdefault("llm", {})
+        llm["backend"] = body.get("backend", llm.get("backend", "ollama"))
+        llm["model"] = body.get("model", llm.get("model", ""))
+        llm["timeout"] = body.get("timeout", llm.get("timeout", 180))
+        llm["max_tokens"] = body.get("maxtokens", llm.get("max_tokens", 4096))
         if SKILL_AVAILABLE:
             save_config(cfg)
         if self.agent:
-            self.agent.llm.backend = backend
-            self.agent.llm.model = model
-            self.agent.llm.timeout = timeout
-            self.agent.llm.max_tokens = maxtokens
+            self.agent.llm.backend = llm["backend"]
+            self.agent.llm.model = llm["model"]
+            self.agent.llm.timeout = llm["timeout"]
+            self.agent.llm.max_tokens = llm["max_tokens"]
         self._send_json({"success": True})
 
     def _serve_llm_models(self, query=""):

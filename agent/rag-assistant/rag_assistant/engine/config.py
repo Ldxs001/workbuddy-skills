@@ -56,9 +56,11 @@ DEFAULT_CONFIG = {
     "llm": {
         "base_url": "http://localhost:1234/v1",
         "api_key": "not-needed",
+        "backend": "ollama",
+        "model": "",
         "temperature": 0.1,
-        "max_tokens": 512,
-        "model_name": "",
+        "max_tokens": 4096,
+        "timeout": 180,
     },
     "kb": {
         "active_kb": "default",
@@ -91,6 +93,15 @@ def load_config():
                         merged[k][sk] = sv
             else:
                 merged[k] = v
+
+    # 迁移旧版顶层 LLM key 到 llm 子字典（覆盖默认值）
+    llm = merged.setdefault("llm", {})
+    for old_key, new_key in [("llm_backend", "backend"), ("llm_model", "model"),
+                              ("llm_timeout", "timeout"), ("llm_max_tokens", "max_tokens")]:
+        if old_key in merged:
+            llm[new_key] = merged.pop(old_key)
+    # 兼容旧 field 名
+    llm.pop("model_name", None)
     return merged
 
 

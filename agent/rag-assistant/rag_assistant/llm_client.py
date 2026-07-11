@@ -21,12 +21,13 @@ class LLMClient:
 
     def __init__(self, config: dict = None):
         self.config = config or {}
-        self.backend = self.config.get("llm_backend", "ollama")
-        self.model = self.config.get("llm_model", "")
+        llm_cfg = self.config.get("llm", {})
+        self.backend = llm_cfg.get("backend", "ollama")
+        self.model = llm_cfg.get("model", "")
         self.ollama_url = self.config.get("ollama_url", DEFAULT_OLLAMA_URL)
         self.lmstudio_url = self.config.get("lmstudio_url", DEFAULT_LMSTUDIO_URL)
-        self.timeout = self.config.get("llm_timeout", 180)
-        self.max_tokens = self.config.get("llm_max_tokens", 4096)
+        self.timeout = llm_cfg.get("timeout", 180)
+        self.max_tokens = llm_cfg.get("max_tokens", 4096)
         self._session = requests.Session()
         self._session.headers.update({"Content-Type": "application/json"})
 
