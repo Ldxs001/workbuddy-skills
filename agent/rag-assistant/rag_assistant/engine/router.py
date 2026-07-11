@@ -232,15 +232,24 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     if not unique:
         return ""
     
-    # --- 1. BCE 语义质心：取质心最近的 chunk（均匀采样覆盖全 KB）---
+    # --- 1. BCE 语义质心：四分法采样（确保全域覆盖 + 随机防偏倚）---
     emb = get_embeddings()
     try:
-        # 均匀采样：覆盖全域而非前 N 个（Chromadb 按插入序返回，前 N 个可能来自同份文档）
-        # 动态采样：小 KB 全量，大 KB 按 sqrt 增长，避免固定窗口过稀/过密
+        # 动态采样总数：小 KB 全量，大 KB 按 sqrt 增长
         n_sample = min(len(unique), 50 + int(len(unique) ** 0.5) * 5)
         if len(unique) > n_sample:
-            step = len(unique) // n_sample
-            sampled = [unique[i] for i in range(0, len(unique), step)][:n_sample]
+            # 四分法：均匀四等分，每份内随机采样
+            n_per_quarter = n_sample // 4
+            remainder = n_sample % 4
+            quarter_size = len(unique) // 4
+            sampled = []
+            import random
+            for q in range(4):
+                start = q * quarter_size
+                end = start + quarter_size if q < 3 else len(unique)
+                pool = unique[start:end]
+                take = n_per_quarter + (1 if q < remainder else 0)
+                sampled.extend(random.sample(pool, min(take, len(pool))))
         else:
             sampled = unique[:n_sample]
         chunk_vecs = np.array([emb.embed_query(t[:512]) for t in sampled])
