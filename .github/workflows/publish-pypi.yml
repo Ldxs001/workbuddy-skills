@@ -1,0 +1,93 @@
+# =============================================================================
+# PyPI Trusted Publisher — 全自动发布工作流
+# 触发方式: git tag pypi/<type>/<name>/v<version> && git push --tags
+#   例: git tag pypi/agents/rag-assistant/v1.0.0 && git push --tags
+#   例: git tag pypi/skills/git-sync/v2.27.1 && git push --tags
+# =============================================================================
+name: Publish to PyPI (Trusted Publisher)
+
+on:
+  push:
+    tags:
+      - 'pypi/*/v*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      type: ${{ steps.info.outputs.type }}
+      name: ${{ steps.info.outputs.name }}
+      version: ${{ steps.info.outputs.version }}
+      pypi_name: ${{ steps.info.outputs.pypi_name }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse tag & validate
+        id: info
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # format: pypi/<type>/<name>/v<version>
+          # e.g. pypi/agents/rag-assistant/v1.0.0
+          # e.g. pypi/skills/git-sync/v2.27.1
+          TYPE=$(echo "$TAG" | cut -d'/' -f2)
+          NAME=$(echo "$TAG" | cut -d'/' -f3)
+          VERSION=$(echo "$TAG" | cut -d'/' -f4 | sed 's/^v//')
+          PYPI_NAME="${NAME}-ldxs"
+
+          if [ -z "$TYPE" ] || [ -z "$NAME" ] || [ -z "$VERSION" ]; then
+            echo "❌ Invalid tag format: $TAG"
+            echo "   Expected: pypi/<type>/<name>/v<version>"
+            exit 1
+          fi
+
+          if [ "$TYPE" != "skills" ] && [ "$TYPE" != "agents" ]; then
+            echo "❌ Invalid type '$TYPE'. Must be 'skills' or 'agents'"
+            exit 1
+          fi
+
+          DIR="${TYPE}/${NAME}"
+          if [ ! -d "$DIR" ]; then
+            echo "❌ Directory '$DIR' does not exist"
+            exit 1
+          fi
+
+          echo "✅ Validated: $TYPE/$NAME v$VERSION -> PyPI: $PYPI_NAME"
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "pypi_name=$PYPI_NAME" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # 必须 — OIDC 获取 PyPI 临时凭证
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: pip install --upgrade pip build
+
+      - name: Build wheel
+        run: |
+          TYPE="${{ needs.validate.outputs.type }}"
+          NAME="${{ needs.validate.outputs.name }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          PYPI_NAME="${{ needs.validate.outputs.pypi_name }}"
+
+          python .github/scripts/pypi-build.py \
+            "$TYPE" "$NAME" "$VERSION" "$PYPI_NAME"
+
+      - name: Upload to PyPI (Trusted Publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          print-hash: true
