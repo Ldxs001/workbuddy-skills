@@ -3,7 +3,7 @@
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-08
+> 更新：2026-07-11 (v0.8.0)
 
 ---
 
@@ -73,9 +73,10 @@ agent/rag-assistant/
 │   ├── llm_client.py                # LLM 统一客户端
 │   ├── rag_wrapper.py               # RAG 封装层
 │   ├── search.py                    # 联网搜索
-│   └── memory.py                    # 记忆管理
+│   ├── memory.py                    # 记忆管理
+│   └── _fix_rag.py                  # 破损数据修复工具
 │
-├── scripts/                         # local-rag-builder 技能核心
+├── rag_assistant/engine/            # local-rag-builder 技能核心（独立副本）
 │   ├── rag_core.py                  # RAG 核心：检索/嵌入/导入
 │   ├── router.py                    # 路由层
 │   ├── reranker.py                  # 重排序
@@ -111,7 +112,7 @@ agent/rag-assistant/
 
 ### 3.1 决策循环 — `agent.py`
 
-核心是 `_decide_with_retry()` 方法，实现 **LLM 决策 → 解析 → 校验 → 自修正** 闭环：
+核心是 `_decide_with_retry()` 方法，实现 **LLM 决策 → 解析 → 校验 → 自修正** 闭环。第一轮决策（`_build_first_pass_messages`）**不传完整历史对话**，仅传压缩摘要作为 system context，避免上一轮查询 entities 泄漏到当前决策：
 
 ```
 LLM 输出
@@ -209,7 +210,9 @@ slices = [
 - 配置保存后立即同步到 `self.agent.llm.*` 运行时实例
 - `llm_max_tokens` 和 `llm_timeout` 持久化到 `config.json`
 
-**文件上传流程**：点击 `📄` 或 `📁` 按钮选择文件后，文件以 base64 二进制上传到服务器 `data/imports/` 目录并记录到 `import_manifest.json`，同时聊天框出现系统通知。用户输入"入库"后 LLM 发出 `path="MANIFEST"` 指令，系统读取清单逐个走完整导入管线（PyPDFLoader → OCR 回退 → 自动路由 → 切片 → 嵌入）。此设计将文件选择与入库决策分离，避免 LLM 直接处理具体路径字符串带来的编码问题。
+**文件上传流程**：点击 `📄` 或 `📁` 按钮选择文件后，文件以 base64 二进制上传到服务器 `data/imports/` 目录并记录到 `import_manifest.json`，同时聊天框出现系统通知。用户输入"入库"后 LLM 发出 `path="MANIFEST"` 指令，系统读取清单逐个走完整导入管线（PyPDFLoader → OCR 回退 → 自动路由 → 切片 → 嵌入）。
+
+**PDF 导入**：多页 PDF 合并全部页内容后切分（`"\n\n".join(d.page_content for d in docs)`），不再仅取第 1 页。OCR 回退条件：`total_chars < 50`（扫描版 PDF 无文本层）无条件触发；`total_chars >= 50` + 中文文件名 + CJK 占比 < 10% 也触发（编码乱码检测）。英文正常 PDF 不走 OCR。
 
 ### 3.4 RAG 封装层 — `rag_wrapper.py`
 
@@ -230,6 +233,31 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
 ### 3.5 搜索模块 — `search.py`
 
 可选的联网搜索插件，通过 `web_search_enabled` 配置开关。使用 DuckDuckGo 等免费搜索 API，返回网页摘要作为补充上下文。
+
+---
+
+### 3.6 引用校验 — `agent.py`
+
+v0.8.0 新增：LLM 回答后校验引用编号。第二轮系统提示强制要求：
+- 每个具体事实/数字后面标注来源段落编号 `[n]`
+- LLM 回答后提取所有 `[n]` 引用，检查编号是否在资料段落范围内
+- 不存在的段落编号 → 告警追加到回答尾部
+- 无引用 → 记录日志（不作为错误）
+
+---
+
+### 3.7 KB 暂停写入
+
+v0.8.0 新增：配置页自动分类规则表格每行增加暂停/恢复按钮。
+
+| 场景 | 行为 |
+|------|------|
+| 自动路由入库 | `auto_classify()` 从 rules 中过滤掉 `kb_paused` 列表中的 KB，文件自动路由到次高分的非暂停 KB |
+| 用户指定入库 | `add_documents_to_kb()` 拒绝写入，提示"已暂停，请恢复或选其他 KB" |
+| 查询/检索 | 完全不受影响 |
+| 恢复暂停 | 再次点击按钮，KB 恢复为可写入，路由重新考虑 |
+
+配置存储：`rag_config.json` 的 `kb_paused` 数组。
 
 ---
 
@@ -305,21 +333,25 @@ chat(message)
   ↓
 append_short_term("default", message)    # 写入用户输入
   ↓
-_build_first_pass_messages(message)
+_build_first_pass_messages(message)      # 第一轮决策：不传完整历史
   ├─ system prompt（含动作格式说明）
-  ├─ 解析 session 文件为真实 user/assistant 消息对（非 system 角色）
-  ├─ 追加压缩摘要作为 system context
-  └─ 追加当前消息作为 user message
+  ├─ 压缩摘要作为 system context（【历史对话，仅作参考】）
+  ├─ 用户画像提示（可选）
+  └─ 当前消息作为 user message
   ↓
-LLM 决策 + 执行
+LLM 决策（query/search/import/直接回答）
   ↓
-append_short_term("default", reply)      # 写入助手回复
+执行动作
+  ↓
+append_short_term("default", reply)      # 写入助手回复（自动剥离 <<ACTION>> 标签）
 record_habit(message, is_rag, ...)       # 记录习惯
 ↓ 如果检索结果为空
 record_gap(query, kb)                    # 记录知识缺口
 ```
 
-历史对话以真实 `user`/`assistant` 角色消息对的形式传入 LLM，而非塞入单条 system 消息。`_second_pass()` 也携带历史对话，保证跨轮连贯性。
+**历史隔离**（v0.8.0）：第一轮决策不传完整历史对话，仅传压缩摘要作为 system context。避免上一轮的 entities 泄漏到当前决策。第二轮 `_second_pass()` 仍携带带 `[历史对话]` 前缀的历史消息，保证跨轮追问的上下文连贯性。
+
+**ACTION 剥离**（v0.8.0）：写入记忆时自动使用 `re.sub(r'<<ACTION\s+.*?>>', '', content)` 剥离内部指令标签，记忆文件只有纯对话内容，不残留系统内部指令。
 
 ---
 
