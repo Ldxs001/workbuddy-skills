@@ -289,10 +289,17 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         - (None, "原因"): 有 <<ACTION 但格式错误
         - ({...}, None): 解析成功
         """
-        # 跨行匹配 ACTION 命令（兼容 <<ACTION / <<action / <action 等格式）
-        m = re.search(r'<{1,2}\s*(?:action|ACTION|Action)\s+(.+?)>{1,2}', text, re.DOTALL)
-        if not m:
-            return None, None  # 没有动作
+        # 精准匹配标准格式 <<ACTION ...>>
+        m = re.search(r'<<ACTION\s+(.+?)>>', text, re.DOTALL)
+        if m:
+            raw_params = m.group(1).strip()
+        else:
+            # 检查是否有类似动作但格式错误的写法，进入修正循环
+            bad = re.search(r'<{1,2}\s*(?:action|Action|query|import|search)\b', text, re.IGNORECASE)
+            if bad:
+                return None, f"动作格式错误：必须使用 <<ACTION>> 格式（双尖括号、大写ACTION），收到非标准写法「{bad.group()}」。请修正后重试"
+            # 完全没有动作标记
+            return None, None
 
         raw_params = m.group(1).strip()
         # 解析 key="value"：手工状态机，正确处理 Windows 路径 `\` 和文件名内 `"` 
