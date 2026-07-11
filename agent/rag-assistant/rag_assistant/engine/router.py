@@ -236,7 +236,8 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     emb = get_embeddings()
     try:
         # 均匀采样：覆盖全域而非前 N 个（Chromadb 按插入序返回，前 N 个可能来自同份文档）
-        n_sample = min(100, len(unique))
+        # 动态采样：小 KB 全量，大 KB 按 sqrt 增长，避免固定窗口过稀/过密
+        n_sample = min(len(unique), 50 + int(len(unique) ** 0.5) * 5)
         if len(unique) > n_sample:
             step = len(unique) // n_sample
             sampled = [unique[i] for i in range(0, len(unique), step)][:n_sample]
