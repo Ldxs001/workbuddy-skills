@@ -503,7 +503,7 @@ function toggleGeekEdit(on) {
 }
 
 function _mergeGeekSections() {
-  var a = ['prompt','embedding','splitter','router','other'];
+  var a = ['prompt','emb-retrieval','reranker','splitter','router','kb','llm','other'];
   var m = {};
   for(var i = 0; i < a.length; i++) {
     var ta = document.getElementById('geek-editor-' + a[i]);
@@ -515,14 +515,14 @@ function _mergeGeekSections() {
 
 function applyGeekConfig() {
   var m = _mergeGeekSections();
-  if(m.error) { toast(m.error, 'error'); return; }
+  if(m.error) { showModal('JSON 错误', m.error, [{text:'知道了'}]); return; }
   fetch('/api/config/raw', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify(m, null, 2)
   }).then(function(r){return r.json()}).then(function(d){
-    if(d.success) { document.getElementById('geek-status').textContent = '✓ 已应用'; toast('配置已更新'); }
-    else { toast(d.error, 'error'); }
-  }).catch(function(e){toast('请求失败', 'error')});
+    if(d.success) { document.getElementById('geek-status').textContent = '✓ 已应用'; showModal('配置已更新', '所有修改已保存', [{text:'知道了'}]); }
+    else { showModal('更新失败', d.error || '未知错误', [{text:'知道了'}]); }
+  }).catch(function(e){showModal('请求失败', e.message, [{text:'知道了'}])});
 }
 
 function newGeekTemplate() {
@@ -1282,7 +1282,12 @@ def generate_html():
     config_splitter_json = _section_json("splitting")
     config_router_json = _section_json("router")
     config_kb_json = _section_json("kb")
-    config_llm_json = _section_json("llm")
+    # LLM 区：合并子 dict + 顶层 key（llm_backend/llm_model/llm_timeout/llm_max_tokens）
+    llm_merged = dict(cfg.get("llm", {}))
+    for k in ("llm_backend", "llm_model", "llm_timeout", "llm_max_tokens"):
+        if k in cfg:
+            llm_merged[k] = cfg[k]
+    config_llm_json = json.dumps({"llm": llm_merged}, ensure_ascii=False, indent=2)
     config_other_json = _section_json("mode", "input_sources", "preprocess", "guard")
     geek_edit_enabled = cfg.get("geek_mode", {}).get("edit_enabled", False)
     config_json_str = json.dumps(cfg, ensure_ascii=False, indent=2)
@@ -2037,6 +2042,26 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({"success": False, "error": "JSON 格式错误"})
                     return
                 if save_config(new_cfg):
+                    self._send_json({"success": True})
+                else:
+                    self._send_json({"success": False, "error": "写入失败"})
+
+            elif path == "/api/config/raw":
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length)
+                try:
+                    new_cfg = json.loads(body)
+                except json.JSONDecodeError:
+                    self._send_json({"success": False, "error": "JSON 格式错误"})
+                    return
+                # 从 llm 区提取顶层 LLM 键并合并
+                llm_sec = new_cfg.get("llm", {})
+                for k in ("llm_backend", "llm_model", "llm_timeout", "llm_max_tokens"):
+                    if k in llm_sec:
+                        new_cfg[k] = llm_sec.pop(k)
+                cur = load_config()
+                cur.update(new_cfg)
+                if save_config(cur):
                     self._send_json({"success": True})
                 else:
                     self._send_json({"success": False, "error": "写入失败"})
