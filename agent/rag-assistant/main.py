@@ -288,6 +288,39 @@ def main():
     os.makedirs(os.path.join(data_dir, "memory"), exist_ok=True)
     os.makedirs(os.path.join(data_dir, "sessions"), exist_ok=True)
 
+    # 启动前检查所有 KB 的 HNSW 索引完整性
+    logger.info("检查知识库索引完整性...")
+    kb_dir = os.path.join(data_dir, "kb")
+    if os.path.isdir(kb_dir):
+        repaired = 0
+        for entry in os.listdir(kb_dir):
+            kb_path = os.path.join(kb_dir, entry)
+            if not os.path.isdir(kb_path) or entry.startswith("."):
+                continue
+            sqlite = os.path.join(kb_path, "chroma.sqlite3")
+            if not os.path.isfile(sqlite):
+                continue
+            # 检查 UUID 目录下索引文件是否完整
+            idx_ok = False
+            for sub in os.listdir(kb_path):
+                sub_path = os.path.join(kb_path, sub)
+                if os.path.isdir(sub_path) and len(sub) == 36:
+                    idx_files = [f for f in os.listdir(sub_path) if f.endswith(('.bin', '.idx', '.pickle'))]
+                    if len(idx_files) >= 2:
+                        idx_ok = True
+                        break
+            if not idx_ok:
+                import shutil
+                for sub in os.listdir(kb_path):
+                    sub_path = os.path.join(kb_path, sub)
+                    if os.path.isdir(sub_path) and len(sub) == 36:
+                        shutil.rmtree(sub_path, ignore_errors=True)
+                repaired += 1
+        if repaired:
+            logger.info(f"已清理 {repaired} 个损坏的 KB 索引（启动时自动重建）")
+        else:
+            logger.info("所有 KB 索引正常")
+
     # 初始化智能体
     logger.info("正在初始化 RAG 智能体...")
     agent = Agent(config)
