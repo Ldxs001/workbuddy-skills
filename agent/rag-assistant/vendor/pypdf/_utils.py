@@ -27,7 +27,7 @@
 
 """Utility functions for PDF library."""
 __author__ = "Mathieu Fenniak"
-__author_email__ = "biziqe@mathieu.fenniak.net"
+__author_email__ = "[email-redacted]"
 
 import functools
 import logging
