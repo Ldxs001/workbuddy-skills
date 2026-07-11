@@ -9,7 +9,7 @@ name: Publish to PyPI (Trusted Publisher)
 on:
   push:
     tags:
-      - 'pypi/*/v*'
+      - 'pypi/**/v*'
 
 jobs:
   validate:
@@ -28,12 +28,16 @@ jobs:
         id: info
         run: |
           TAG="${GITHUB_REF_NAME}"
-          # format: pypi/<type>/<name>/v<version>
-          # e.g. pypi/agents/rag-assistant/v1.0.0
+          # format: pypi/<type>/<name>/v<version>  (可嵌套)
+          # e.g. pypi/agents/rag-assistant/v0.8.2
           # e.g. pypi/skills/git-sync/v2.27.1
-          TYPE=$(echo "$TAG" | cut -d'/' -f2)
-          NAME=$(echo "$TAG" | cut -d'/' -f3)
-          VERSION=$(echo "$TAG" | cut -d'/' -f4 | sed 's/^v//')
+          REST="${TAG#pypi/}"
+          # 版本号是最后一段
+          VERSION="$(echo "$REST" | rev | cut -d'/' -f1 | rev | sed 's/^v//')"
+          # 类型是第一段
+          TYPE="$(echo "$REST" | cut -d'/' -f1)"
+          # 包名是中间所有段
+          NAME="$(echo "$REST" | rev | cut -d'/' -f2- | rev | cut -d'/' -f2-)"
           PYPI_NAME="${NAME}-ldxs"
 
           if [ -z "$TYPE" ] || [ -z "$NAME" ] || [ -z "$VERSION" ]; then
