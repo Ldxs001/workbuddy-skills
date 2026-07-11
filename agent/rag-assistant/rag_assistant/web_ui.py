@@ -174,6 +174,10 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 .chat-input button {{ padding: 10px 24px; background: #667eea; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }}
 .chat-input button:hover {{ background: #5a6fd6; }}
 .chat-input button:disabled {{ background: #ccc; cursor: not-allowed; }}
+.modal-btn-primary {{ padding:8px 20px;background:#d32f2f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500; }}
+.modal-btn-primary:hover {{ background:#b71c1c; }}
+.modal-btn {{ padding:8px 20px;background:#f0f0f0;color:#555;border:none;border-radius:6px;cursor:pointer;font-size:13px; }}
+.modal-btn:hover {{ background:#e0e0e0; }}
 /* ── 推理链 ── */
 .reasoning-toggle {{ font-size: 12px; color: #888; cursor: pointer; margin-top: 8px; padding: 2px 0; user-select: none; }}
 .reasoning-toggle:hover {{ color: #667eea; }}
@@ -195,6 +199,15 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
   {config_html}
 </div>
 <div id="chat-content" class="tab-content">{chat_html}</div>
+
+<!-- 模态弹窗 -->
+<div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;">
+  <div id="modal-box" style="background:#fff;border-radius:12px;padding:24px;min-width:320px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <div id="modal-title" style="font-size:16px;font-weight:600;color:#333;margin-bottom:12px;"></div>
+    <div id="modal-msg" style="font-size:14px;color:#555;margin-bottom:20px;line-height:1.5;"></div>
+    <div id="modal-buttons" style="display:flex;gap:8px;justify-content:flex-end;"></div>
+  </div>
+</div>
 
 <script>
 function switchTab(name) {{
@@ -396,11 +409,32 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         <script>
         var uploadedPaths = [];
 
-        function formatSize(bytes) {{
-          if (bytes < 1024) return bytes + ' B';
-          if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-          return (bytes / 1048576).toFixed(1) + ' MB';
-        }}
+function formatSize(bytes) {{
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}}
+
+// ── 模态弹窗 ──
+function showModal(title, msg, buttons) {{
+  var overlay = document.getElementById('modal-overlay');
+  var box = document.getElementById('modal-box');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent = msg;
+  var btns = document.getElementById('modal-buttons');
+  btns.innerHTML = '';
+  (buttons || [{{text:'确定',primary:true,action:function(){{hideModal();}}}}]).forEach(function(b){{
+    var btn = document.createElement('button');
+    btn.textContent = b.text;
+    btn.className = b.primary ? 'modal-btn-primary' : 'modal-btn';
+    btn.onclick = function(){{ if(b.action) b.action(); if(!b.keepOpen) hideModal(); }};
+    btns.appendChild(btn);
+  }});
+  overlay.style.display = 'flex';
+}}
+function hideModal() {{
+  document.getElementById('modal-overlay').style.display = 'none';
+}}
 
         function onFileSelected(files) {{
           if (!files.length) return;
@@ -460,10 +494,10 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         }}
 
         function resetMemory() {{
-          if(!confirm('确定重置当前对话？')) return;
-          fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{
-            if(d.success) {{ document.getElementById('chat-messages').innerHTML = '<div class=\\"msg assistant\\">对话已重置。</div>'; }}
-          }});
+          showModal('重置对话', '确定重置当前对话？所有历史消息将被清空。', [
+            {{text:'取消',action:function(){{}}}},
+            {{text:'确定重置',primary:true,action:function(){{fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) document.getElementById('chat-messages').innerHTML = '<div class=\"msg assistant\">对话已重置。</div>';}});}}}}
+          ]);
         }}
 
         function compressMemory() {{
@@ -471,20 +505,16 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
             if(d.success) {{
               addMessage('上下文已压缩' + (d.count ? '（压缩 ' + d.count + ' 行）' : ''), 'system');
             }} else {{
-              addMessage('压缩失败: ' + (d.error || ''), 'system');
+              showModal('压缩失败', d.error || '未知错误', [{{text:'知道了'}}]);
             }}
           }});
         }}
 
         function clearContext() {{
-          if(!confirm('确定清除上下文？后台会先保存当前对话摘要再清空。')) return;
-          fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
-            if(d.success) {{
-              document.getElementById('chat-messages').innerHTML = '<div class=\\"msg assistant\\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>';
-            }} else {{
-              addMessage('清除失败: ' + (d.error || ''), 'system');
-            }}
-          }});
+          showModal('清除上下文', '确定清除上下文？后台会先保存当前对话摘要再清空。', [
+            {{text:'取消',action:function(){{}}}},
+            {{text:'确定清除',primary:true,action:function(){{fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) document.getElementById('chat-messages').innerHTML = '<div class=\"msg assistant\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>'; else showModal('清除失败', d.error || '未知错误', [{{text:'知道了'}}]);}});}}}}
+          ]);
         }}
 
         // 页面加载时恢复聊天历史
