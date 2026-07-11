@@ -1,7 +1,7 @@
 # =============================================================================
 # PyPI Trusted Publisher — 全自动发布工作流
 # 触发方式: git tag pypi/<type>/<name>/v<version> && git push --tags
-#   例: git tag pypi/agents/rag-assistant/v1.0.0 && git push --tags
+#   例: git tag pypi/agents/rag-assistant/v0.8.3 && git push --tags
 #   例: git tag pypi/skills/git-sync/v2.27.1 && git push --tags
 # =============================================================================
 name: Publish to PyPI (Trusted Publisher)
@@ -12,73 +12,61 @@ on:
       - 'pypi/**/v*'
 
 jobs:
-  validate:
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      type: ${{ steps.info.outputs.type }}
-      name: ${{ steps.info.outputs.name }}
-      version: ${{ steps.info.outputs.version }}
-      pypi_name: ${{ steps.info.outputs.pypi_name }}
     permissions:
+      id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug tag info
-        run: |
-          echo "GITHUB_REF: $GITHUB_REF"
-          echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
-          echo "GITHUB_REF_TYPE: $GITHUB_REF_TYPE"
-          ls -la agents/ 2>/dev/null || echo "agents/ dir not found"
-          ls -la skills/ 2>/dev/null | head -3 || echo "skills/ dir not found"
-
-      - name: Parse tag & validate
+      - name: Parse tag and extract package info
         id: info
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          echo "TAG=$TAG"
+          # Use GITHUB_REF instead of GITHUB_REF_NAME for reliability
+          REF="$GITHUB_REF"
+          # Remove refs/tags/ prefix
+          TAG="${REF#refs/tags/}"
+          # Remove pypi/ prefix
           REST="${TAG#pypi/}"
-          echo "REST=$REST"
-          VERSION="${REST##*/}"
-          echo "VERSION_RAW=$VERSION"
-          VERSION="${VERSION#v}"
-          TYPE_AND_NAME="${REST%/v*}"
-          echo "TYPE_AND_NAME=$TYPE_AND_NAME"
-          TYPE="${TYPE_AND_NAME%%/*}"
-          NAME="${TYPE_AND_NAME#*/}"
-          PYPI_NAME="${NAME}-ldxs"
 
+          # Extract version: everything after the last /
+          VERSION="${REST##*/}"
+          VERSION="${VERSION#v}"
+
+          # Extract type+name: remove /v* suffix
+          TYPES_AND_NAMES="${REST%/v*}"
+          # TYPE is the first segment
+          TYPE="${TYPES_AND_NAMES%%/*}"
+          # NAME is everything after TYPE
+          NAME="${TYPES_AND_NAMES#*/}"
+
+          echo "REF=$REF"
+          echo "TAG=$TAG"
+          echo "REST=$REST"
+          echo "VERSION=$VERSION"
+          echo "TYPE=$TYPE"
+          echo "NAME=$NAME"
+
+          # Validate
           if [ -z "$TYPE" ] || [ -z "$NAME" ] || [ -z "$VERSION" ]; then
-            echo "❌ Invalid tag format: $TAG"
-            echo "   Expected: pypi/<type>/<name>/v<version>"
+            echo "::error::Invalid tag format. Expected: pypi/<type>/<name>/v<version>"
             exit 1
           fi
-
           if [ "$TYPE" != "skills" ] && [ "$TYPE" != "agents" ]; then
-            echo "❌ Invalid type '$TYPE'. Must be 'skills' or 'agents'"
+            echo "::error::Invalid type '$TYPE'. Must be 'skills' or 'agents'"
             exit 1
           fi
 
           DIR="${TYPE}/${NAME}"
           if [ ! -d "$DIR" ]; then
-            echo "❌ Directory '$DIR' does not exist"
+            echo "::error::Directory '$DIR' does not exist at $(pwd)"
+            ls -la
             exit 1
           fi
 
-          echo "✅ Validated: $TYPE/$NAME v$VERSION -> PyPI: $PYPI_NAME"
-          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "pypi_name=$PYPI_NAME" >> "$GITHUB_OUTPUT"
-
-  publish:
-    needs: validate
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # 必须 — OIDC 获取 PyPI 临时凭证
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
+          PYPI_NAME="${NAME}-ldxs"
+          echo "PYPI_NAME=$PYPI_NAME"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -90,10 +78,15 @@ jobs:
 
       - name: Build wheel
         run: |
-          TYPE="${{ needs.validate.outputs.type }}"
-          NAME="${{ needs.validate.outputs.name }}"
-          VERSION="${{ needs.validate.outputs.version }}"
-          PYPI_NAME="${{ needs.validate.outputs.pypi_name }}"
+          REF="$GITHUB_REF"
+          TAG="${REF#refs/tags/}"
+          REST="${TAG#pypi/}"
+          VERSION="${REST##*/}"
+          VERSION="${VERSION#v}"
+          TYPES_AND_NAMES="${REST%/v*}"
+          TYPE="${TYPES_AND_NAMES%%/*}"
+          NAME="${TYPES_AND_NAMES#*/}"
+          PYPI_NAME="${NAME}-ldxs"
 
           python .github/scripts/pypi-build.py \
             "$TYPE" "$NAME" "$VERSION" "$PYPI_NAME"
