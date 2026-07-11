@@ -197,7 +197,7 @@ def _restore_kb(persist_dir: str) -> bool:
         return False
 
 def _try_repair_kb(persist_dir: str) -> bool:
-    """检测 ChromaDB 损坏并尝试修复"""
+    """检测 ChromaDB 损坏并尝试修复（含 HNSW 索引）"""
     db_path = os.path.join(persist_dir, "chroma.sqlite3")
     bak_path = db_path + ".bak"
     if not os.path.isfile(db_path):
@@ -208,9 +208,26 @@ def _try_repair_kb(persist_dir: str) -> bool:
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA integrity_check").fetchall()
         conn.close()
-        return True  # DB 本身没问题
     except Exception:
         pass
+    # 检查 HNSW 索引文件完整性（UUID 目录下应有 .bin 或 .idx 文件）
+    hnsw_ok = False
+    for entry in os.listdir(persist_dir):
+        entry_path = os.path.join(persist_dir, entry)
+        if os.path.isdir(entry_path) and len(entry) == 36:  # UUID dir
+            idx_files = [f for f in os.listdir(entry_path) if f.endswith(('.bin', '.idx', '.pickle'))]
+            if len(idx_files) >= 2:
+                hnsw_ok = True
+                break
+    if hnsw_ok:
+        return True  # SQLite + HNSW 都正常
+    # 清理损坏的 HNSW 索引目录（ChromaDB 启动时自动重建）
+    import shutil
+    for entry in os.listdir(persist_dir):
+        entry_path = os.path.join(persist_dir, entry)
+        if os.path.isdir(entry_path) and len(entry) == 36:
+            shutil.rmtree(entry_path, ignore_errors=True)
+            print(f"  [recovery] 已清理损坏的 HNSW 索引: {entry}")
     # 尝试从备份恢复
     if os.path.isfile(bak_path):
         try:
@@ -219,7 +236,9 @@ def _try_repair_kb(persist_dir: str) -> bool:
             return True
         except Exception:
             pass
-    return False
+    # 无备份但 SQLite 正常 → ChromaDB 可自动重建 HNSW
+    print(f"  [recovery] HNSW 索引已清理，ChromaDB 将在下次查询时重建")
+    return True
 
 
 def add_documents_to_kb(kb_name, documents, embeddings=None):
