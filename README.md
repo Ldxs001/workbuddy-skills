@@ -21,7 +21,7 @@
 | `git-sync` | 将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复_push_with_cred_url/pull_with_cred_url 未检查 URL 内嵌 token 的缺陷（remote URL 已含 token 时不需查 git-credentials）。 |
 | `hug-html` | 8种原子组件自由组合 + 3级约束, cell merging, two-level module system (base + composite), 7+ built-in templates, grid-aware visual editor, style presets, post-generation audit, user template save-as, Chinese error handling |
 | `latex-modular` | LaTeX 模块化组合技能。提取 LaTeX 文档头/组件（表格、图片、列表、章节样式）作为可组合模块，通过 Python 脚本稳定组合生成不报错的 lualatex 文档，支持从原始 LaTeX 代码重构进模块化体系。 |
-| `local-rag-builder` | 技能描述 |
+| `local-rag-builder` | 本地 RAG 系统搭建技能，支持环境检测修复、嵌入模型多源下载、5种切分策略 + GuardStack + 后处理 + 插件注册、多知识库管理 + 自动分类规则、可调 Prompt、Web 可视化配置 + 极客模式 + 模板管理 |
 | `memory-pet` | 宠物记忆压缩技能 - 通过文本块宠物交互触发记忆保存。纯ASCII文字图，Python全量管理，亲密度衰减与逃跑机制，跨平台智能体记忆系统。 |
 | `novel-weaver` | 结构化小说写作辅助技能。场景配置→大纲生成→因果链双重验证→pipeline 流程门禁→子结构先行规划→情绪混合系统→文风约束→人格驱动→分段写作→连通性补充→风格校验+逻辑检查(含实体状态+关系链)+大纲忠实度+结尾收束验证+实体关系追踪+角色别名识别+跨章行为摘要。全流程硬约束+门禁跟踪。 |
 | `round-robin-allocator` | 均匀轮转分配工具 — 将 N 个对象在 T 个轮次中按比例分配 K 种选项，最大化覆盖多样性，支持四种后处理模式调整重复分布。 |

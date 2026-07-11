@@ -1,0 +1,51 @@
+{
+  "mode": "integrated",
+  "preprocess": {
+    "enabled": true,
+    "h1_patterns": [
+      "^仪器方法\\s*[：:]\\s*(.+)$"
+    ],
+    "h2_patterns": [
+      "^(996|W2690/5|W2996|W410|W486|W600).*仪器设定$",
+      "^W2690/5\\s*梯度表$",
+      "^(996|W2996).*事件表$"
+    ],
+    "h3_patterns": [],
+    "h4_patterns": []
+  },
+  "splitting": {
+    "strategy": "headers",
+    "chunk_size": 400,
+    "chunk_overlap": 30,
+    "separators": [
+      "\n\n",
+      "\n",
+      "。",
+      "；",
+      "，",
+      " ",
+      ""
+    ],
+    "headers_to_split_on": [
+      ["#", "h1"],
+      ["##", "h2"],
+      ["###", "h3"]
+    ]
+  },
+  "embedding": {
+    "device": "cpu",
+    "model": "BAAI/bge-small-zh-v1.5"
+  },
+  "reranker": {
+    "enabled": false
+  },
+  "router": {
+    "enabled": false
+  },
+  "input_sources": {
+    "enable_pdf": true,
+    "enable_ocr": false,
+    "enable_html2md": true,
+    "pdf_backend": "pypdf"
+  }
+}
