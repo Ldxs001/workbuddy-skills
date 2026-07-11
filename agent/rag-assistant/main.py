@@ -30,6 +30,13 @@ logger = logging.getLogger("rag-assistant")
 
 
 def load_config() -> dict:
+    """从引擎的正确位置加载配置"""
+    try:
+        from config import load_config as engine_load
+        return engine_load()
+    except ImportError:
+        pass
+    # fallback: 顶层 config.json（兼容旧版）
     config_file = os.path.join(os.path.dirname(__file__), "config.json")
     if os.path.exists(config_file):
         with open(config_file, "r", encoding="utf-8") as f:

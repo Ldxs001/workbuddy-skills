@@ -63,6 +63,10 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._handle_chat_get(parsed)
         elif path == "/api/memory/reset":
             self._reset_memory()
+        elif path == "/api/memory/compress":
+            self._compress_memory()
+        elif path == "/api/memory/clear-context":
+            self._clear_context()
         else:
             self.send_response(404)
             self.end_headers()
@@ -86,6 +90,10 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._update_llm_config()
         elif path == "/api/search/toggle":
             self._toggle_search()
+        elif path == "/api/memory/compress":
+            self._compress_memory()
+        elif path == "/api/memory/clear-context":
+            self._clear_context()
         else:
             self.send_response(404)
             self.end_headers()
@@ -369,7 +377,9 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         <div class="status-bar">
           <span class="status-item">📚 知识库: <span id="kb-status">-</span></span>
           <span class="status-item">⚙️ <span id="llm-config">-</span></span>
-          <span class="status-item">🧠 <a href="#" onclick="resetMemory()" style="color:#667eea;">重置对话</a></span>
+          <span class="status-item">🧠 <a href="#" onclick="compressMemory()" style="color:#f0a030;">压缩上下文</a></span>
+          <span class="status-item">🧠 <a href="#" onclick="clearContext()" style="color:#d32f2f;">清除上下文</a></span>
+          <span class="status-item">🧠 <a href="#" onclick="resetMemory()" style="color:#888;">重置对话</a></span>
         </div>
         <div class="chat-messages" id="chat-messages">
           <div class="msg assistant">你好！我是 RAG 知识库助手。<br>输入问题直接问，📄📁 选择文件入库，/import 路径导入。</div>
@@ -453,6 +463,27 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
           if(!confirm('确定重置当前对话？')) return;
           fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{
             if(d.success) {{ document.getElementById('chat-messages').innerHTML = '<div class=\\"msg assistant\\">对话已重置。</div>'; }}
+          }});
+        }}
+
+        function compressMemory() {{
+          fetch('/api/memory/compress', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
+            if(d.success) {{
+              addMessage('上下文已压缩' + (d.count ? '（压缩 ' + d.count + ' 行）' : ''), 'system');
+            }} else {{
+              addMessage('压缩失败: ' + (d.error || ''), 'system');
+            }}
+          }});
+        }}
+
+        function clearContext() {{
+          if(!confirm('确定清除上下文？后台会先保存当前对话摘要再清空。')) return;
+          fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
+            if(d.success) {{
+              document.getElementById('chat-messages').innerHTML = '<div class=\\"msg assistant\\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>';
+            }} else {{
+              addMessage('清除失败: ' + (d.error || ''), 'system');
+            }}
           }});
         }}
 
@@ -690,14 +721,19 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         try:
             with open(tmp_path, "wb") as f:
                 f.write(raw)
-            # 写入清单供 LLM 用 path="MANIFEST" 批量导入
+            # 写入清单 — 去重（按路径），防止跨会话累积
             try:
                 import json as _json
                 manifest_path = os.path.join(self.agent.data_dir, "import_manifest.json")
                 manifest = []
                 if os.path.exists(manifest_path):
                     with open(manifest_path, "r", encoding="utf-8") as f:
-                        manifest = _json.load(f)
+                        existing = _json.load(f)
+                    existing_paths = {e["path"] for e in existing if isinstance(e, dict)}
+                    if tmp_path not in existing_paths:
+                        manifest = existing
+                # 只保留磁盘上仍存在的文件，清除失效路径
+                manifest = [e for e in manifest if isinstance(e, dict) and os.path.exists(e.get("path", ""))]
                 manifest.append({"path": tmp_path, "name": filename})
                 with open(manifest_path, "w", encoding="utf-8") as f:
                     _json.dump(manifest, f, ensure_ascii=False, indent=2)
@@ -736,6 +772,34 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
             self._send_json({"success": True})
         else:
             self._send_json({"success": False, "error": "智能体未就绪"})
+
+    def _compress_memory(self):
+        if not self.agent:
+            self._send_json({"success": False, "error": "智能体未就绪"})
+            return
+        sid = self.agent.session_id
+        mem = self.agent.memory
+        line_count = mem.short_term_line_count(sid)
+        if line_count == 0:
+            self._send_json({"success": True, "count": 0, "text": "没有可压缩的内容"})
+            return
+        n = min(40, line_count)
+        removed = mem.pop_oldest_lines(sid, n)
+        mem.store_compressed(sid, removed)
+        self._send_json({"success": True, "count": n})
+
+    def _clear_context(self):
+        if not self.agent:
+            self._send_json({"success": False, "error": "智能体未就绪"})
+            return
+        sid = self.agent.session_id
+        mem = self.agent.memory
+        content = mem.get_short_term(sid)
+        if content.strip():
+            mem.store_compressed(sid, "[手动清除前]\n" + content)
+        mem.clear_short_term(sid)
+        saved = len([l for l in content.split("\n") if l.strip()]) if content.strip() else 0
+        self._send_json({"success": True, "saved_lines": saved})
 
     def log_message(self, format, *args):
         logger.debug(f"HTTP: {format % args}")
