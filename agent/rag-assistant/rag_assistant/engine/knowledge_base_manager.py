@@ -173,13 +173,23 @@ def get_kb_vectorstore(kb_name, embeddings):
 _BACKUP_LOCK = set()
 
 def _backup_kb(persist_dir: str) -> str | None:
-    """备份 ChromaDB sqlite3 文件，返回备份路径"""
+    """备份完整 KB 目录（SQLite + HNSW 索引），返回备份路径"""
     db_path = os.path.join(persist_dir, "chroma.sqlite3")
     if not os.path.isfile(db_path):
         return None
     bak_path = db_path + ".bak"
     try:
+        if os.path.exists(bak_path):
+            os.remove(bak_path)
         shutil.copy2(db_path, bak_path)
+        # 同时备份 HNSW UUID 目录
+        for entry in os.listdir(persist_dir):
+            if len(entry) == 36 and os.path.isdir(os.path.join(persist_dir, entry)):
+                bak_hnsw = bak_path + ".hnsw"
+                if os.path.exists(bak_hnsw):
+                    shutil.rmtree(bak_hnsw, ignore_errors=True)
+                shutil.copytree(os.path.join(persist_dir, entry), bak_hnsw)
+                break
         return bak_path
     except Exception:
         return None
@@ -221,8 +231,18 @@ def _try_repair_kb(persist_dir: str) -> bool:
                 break
     if hnsw_ok:
         return True  # SQLite + HNSW 都正常
-    # 清理损坏的 HNSW 索引目录（ChromaDB 启动时自动重建）
     import shutil
+    # 优先从 HNSW 备份恢复
+    bak_hnsw = bak_path + ".hnsw"
+    if os.path.isdir(bak_hnsw):
+        for entry in os.listdir(persist_dir):
+            entry_path = os.path.join(persist_dir, entry)
+            if os.path.isdir(entry_path) and len(entry) == 36:
+                shutil.rmtree(entry_path, ignore_errors=True)
+        shutil.copytree(bak_hnsw, os.path.join(persist_dir, os.path.basename(os.path.normpath(bak_hnsw))))
+        print(f"  [recovery] 已从 HNSW 备份恢复索引")
+        return True
+    # 无备份 → 清理损坏目录，ChromaDB 启动时自动重建
     for entry in os.listdir(persist_dir):
         entry_path = os.path.join(persist_dir, entry)
         if os.path.isdir(entry_path) and len(entry) == 36:
