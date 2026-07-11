@@ -495,7 +495,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
     def _resolve_kb(self, content: str, filename: str = "") -> str:
         try:
             from knowledge_base_manager import auto_classify
-            kb = auto_classify(content, filename=filename)
+            kb = auto_classify(content, filename=filename, use_semantic=True)
             return kb if kb else "default"
         except Exception:
             return "default"
