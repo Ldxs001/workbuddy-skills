@@ -23,50 +23,33 @@ jobs:
       - name: Parse tag and extract package info
         id: info
         run: |
-          # Use GITHUB_REF instead of GITHUB_REF_NAME for reliability
-          REF="$GITHUB_REF"
-          # Remove refs/tags/ prefix
-          TAG="${REF#refs/tags/}"
-          # Remove pypi/ prefix
-          REST="${TAG#pypi/}"
+          echo "=== ENV DUMP ==="
+          echo "GITHUB_REF=$GITHUB_REF"
+          echo "GITHUB_REF_NAME=$GITHUB_REF_NAME"
+          echo "GITHUB_REF_TYPE=$GITHUB_REF_TYPE"
+          echo "GITHUB_WORKFLOW=$GITHUB_WORKFLOW"
+          echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+          echo "=== CHECKOUT ==="
+          pwd
+          ls -la
+          echo "=== DIRECTORY CHECK ==="
+          test -d agents && echo "agents/ exists" || echo "agents/ MISSING"
+          test -d skills && echo "skills/ exists" || echo "skills/ MISSING"
 
-          # Extract version: everything after the last /
+          # Parse tag
+          REF="$GITHUB_REF"
+          TAG="${REF#refs/tags/}"
+          echo "REF=$REF TAG=$TAG"
+          REST="${TAG#pypi/}"
           VERSION="${REST##*/}"
           VERSION="${VERSION#v}"
-
-          # Extract type+name: remove /v* suffix
           TYPES_AND_NAMES="${REST%/v*}"
-          # TYPE is the first segment
           TYPE="${TYPES_AND_NAMES%%/*}"
-          # NAME is everything after TYPE
           NAME="${TYPES_AND_NAMES#*/}"
 
-          echo "REF=$REF"
-          echo "TAG=$TAG"
-          echo "REST=$REST"
-          echo "VERSION=$VERSION"
-          echo "TYPE=$TYPE"
-          echo "NAME=$NAME"
-
-          # Validate
-          if [ -z "$TYPE" ] || [ -z "$NAME" ] || [ -z "$VERSION" ]; then
-            echo "::error::Invalid tag format. Expected: pypi/<type>/<name>/v<version>"
-            exit 1
-          fi
-          if [ "$TYPE" != "skills" ] && [ "$TYPE" != "agents" ]; then
-            echo "::error::Invalid type '$TYPE'. Must be 'skills' or 'agents'"
-            exit 1
-          fi
-
-          DIR="${TYPE}/${NAME}"
-          if [ ! -d "$DIR" ]; then
-            echo "::error::Directory '$DIR' does not exist at $(pwd)"
-            ls -la
-            exit 1
-          fi
-
-          PYPI_NAME="${NAME}-ldxs"
-          echo "PYPI_NAME=$PYPI_NAME"
+          echo "VERSION=$VERSION TYPE=$TYPE NAME=$NAME"
+          exit 0  # stop here for debugging
 
       - name: Set up Python
         uses: actions/setup-python@v5
