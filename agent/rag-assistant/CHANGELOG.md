@@ -5,6 +5,11 @@
 
 ---
 
+## [0.9.4] - 2026-07-13
+### 修复
+- **PyPI 重新发布**：0.9.3 为 rebase 后的残缺版本（缺少根目录文件），0.9.4 重新发布含完整根目录的版本
+- **GitHub Actions 修复**：补 `permissions.attestations: write` + `skip-existing: true`
+
 ## [0.9.3] - 2026-07-13
 
 ### 修复
