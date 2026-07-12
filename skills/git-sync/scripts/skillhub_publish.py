@@ -1,5 +1,6 @@
 """SkillHub 发布器 — git-sync 子模块"""
 import sys, subprocess, json, os
+from _paths import WORK_REPO
 
 def main():
     if len(sys.argv) < 3:
@@ -7,7 +8,7 @@ def main():
         sys.exit(1)
     name, version = sys.argv[1], sys.argv[2]
 
-    work_repo = os.path.expanduser("~/.workbuddy/workbuddy-skills")
+    work_repo = str(WORK_REPO)
     skill_dir = os.path.join(work_repo, "skills", name)
 
     if not os.path.isdir(skill_dir):

@@ -16,6 +16,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -W)"
 SKILLS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd -W)"
 WORKSPACE_ROOT="$(cd "$SKILLS_DIR/.." && pwd -W)"
+# 从 _paths.py 读取统一管理的仓库路径
+WORK_REPO="$(python -c "import sys; sys.path.insert(0,'$SCRIPT_DIR'); from _paths import WORK_REPO; print(WORK_REPO)" 2>/dev/null || echo "$HOME/.workbuddy/workbuddy-skills")"
 NAME="${1:-}"
 VERSION="${2:-}"
 SKIP_SCAN=false
@@ -36,7 +38,7 @@ detect_type() {
     local name="$1"
     if [ -f "$SKILLS_DIR/$name/_meta.json" ]; then
         echo "skill"
-    elif [ -d "$SKILLS_DIR/../agent/$name" ]; then
+    elif [ -d "$WORK_REPO/agent/$name" ]; then
         echo "agent"
     else
         echo "unknown"
@@ -55,7 +57,7 @@ if [ "$NAME" = "all" ]; then
         echo ">>> 技能: $s"
         bash "$0" "$s" "$@" --skip-market 2>&1 || true
     done
-    for agent in "$SKILLS_DIR/../agent"/*/; do
+    for agent in "$WORK_REPO/agent"/*/; do
         [ ! -d "$agent" ] && continue
         a=$(basename "$agent")
         echo ""
@@ -90,6 +92,10 @@ elif [ "$TYPE" = "agent" ]; then
     SRC_DIR="$SKILLS_DIR/../agent/$NAME"
     WORK_REPO_DIR="agent/$NAME"
     META_FILE="$SRC_DIR/rag_assistant/__init__.py"
+    # 兼容：如果 ~/.workbuddy/agent/ 不存在，从 $WORK_REPO 直接读取
+    if [ ! -d "$SRC_DIR" ]; then
+        SRC_DIR="$WORK_REPO/$WORK_REPO_DIR"
+    fi
 fi
 
 SKILL_NAME="$NAME"
@@ -151,7 +157,6 @@ fi
 # 路径配置
 SKILL_MD="$SRC_DIR/SKILL.md"
 META_FILE_JSON="$SRC_DIR/_meta.json"
-WORK_REPO="$HOME/WorkBuddy/workbuddy-skills"
 REPO_NAME="workbuddy-skills"
 DIST_DIR="$SKILLS_DIR/.dist"
 ZIP_NAME="${SKILL_NAME}-v${VERSION}.zip"

@@ -1,5 +1,8 @@
 """GitHub Release 创建器 — git-sync 子模块"""
 import subprocess, sys, json, os
+from _paths import WORK_REPO
+
+WORK_REPO_STR = str(WORK_REPO)
 
 def main():
     if len(sys.argv) < 4:
@@ -10,29 +13,29 @@ def main():
     tag = f"v{version}" if typ == "agent" else f"{name}-v{version}"
 
     # 1. 创建本地 tag
-    subprocess.run(["git", "tag", tag], cwd=os.path.expanduser("~/.workbuddy/workbuddy-skills"), capture_output=True)
+    subprocess.run(["git", "tag", tag], cwd=WORK_REPO_STR, capture_output=True)
 
     # 2. 推送到 GitHub
-    subprocess.run(["git", "push", "origin", tag], cwd=os.path.expanduser("~/.workbuddy/workbuddy-skills"), capture_output=True)
+    subprocess.run(["git", "push", "origin", tag], cwd=WORK_REPO_STR, capture_output=True)
 
     # 3. 推送到 Gitee
-    subprocess.run(["git", "push", "gitee", tag], cwd=os.path.expanduser("~/.workbuddy/workbuddy-skills"), capture_output=True)
+    subprocess.run(["git", "push", "gitee", tag], cwd=WORK_REPO_STR, capture_output=True)
 
     # 4. 创建 GitHub Release
     token = subprocess.run(
         ["git", "remote", "get-url", "origin"],
-        cwd=os.path.expanduser("~/.workbuddy/workbuddy-skills"),
+        cwd=WORK_REPO_STR,
         capture_output=True, text=True
     ).stdout.split("@")[0].split("//")[-1] if "@" in subprocess.run(
         ["git", "remote", "get-url", "origin"],
-        cwd=os.path.expanduser("~/.workbuddy/workbuddy-skills"),
+        cwd=WORK_REPO_STR,
         capture_output=True, text=True
     ).stdout else ""
     
     # 从 remote URL 提取 token
     remote_url = subprocess.run(
         ["git", "remote", "get-url", "origin"],
-        cwd=os.path.expanduser("~/.workbuddy/workbuddy-skills"),
+        cwd=WORK_REPO_STR,
         capture_output=True, text=True
     ).stdout.strip()
     if ":" in remote_url and "@" in remote_url:
