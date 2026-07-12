@@ -1010,11 +1010,12 @@ function updatePreview() {
   var fb = document.getElementById('slot-fallback').value.trim();
   var preview = document.getElementById('full-prompt-preview');
   if (!preview) return;
-  var text = '【系统层（锁定）】\n基于以下资料回答用户问题。不能脱离资料编造。\n';
-  text += cite ? '【引用格式】' + cite + '\n' : '';
-  text += style ? '【输出风格】' + style + '\n' : '';
-  text += '\n资料（来自 {kb}）：\n{context}\n\n问题：\n{question}\n\n回答：';
-  text += fb ? '\n' + fb : '';
+  var n = String.fromCharCode(10);
+  var text = '【系统层（锁定）】' + n + '基于以下资料回答用户问题。不能脱离资料编造。' + n;
+  text += cite ? '【引用格式】' + cite + n : '';
+  text += style ? '【输出风格】' + style + n : '';
+  text += n + '资料（来自 {kb}）：' + n + '{context}' + n + n + '问题：' + n + '{question}' + n + n + '回答：';
+  text += fb ? n + fb : '';
   preview.textContent = text;
 }
 
@@ -1933,7 +1934,7 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
   </div>
 </div>
 <script>
-var hasRerankerModel={{{"true" if has_rr else "false"}}};var hasNLIModel={{{"true" if has_nli else "false"}}};var hasEmbeddingModel={{{"true" if has_emb else "false"}}};
+var hasRerankerModel={"true" if has_rr else "false"};var hasNLIModel={"true" if has_nli else "false"};var hasEmbeddingModel={"true" if has_emb else "false"};
 </script>
 </body>
 </html>
