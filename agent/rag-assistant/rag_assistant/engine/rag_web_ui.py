@@ -1023,18 +1023,19 @@ function savePreset() {
   var cite = document.getElementById('slot-cite').value.trim();
   var style = document.getElementById('slot-style').value.trim();
   var fb = document.getElementById('slot-fallback').value.trim();
-  if (!cite && !style && !fb) { toast('至少填写一个插槽', 'error'); return; }
-  var name = prompt('请输入预设名称：');
-  if (!name) return;
-  var msgEl = document.getElementById('preset-action-msg');
-  msgEl.textContent = '⏳ 保存中...';
-  fetch('/api/prompt/presets/save', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({label: name, slots: {cite_format: cite, output_style: style, fallback: fb}})
-  }).then(function(r){return r.json()}).then(function(d){
-    if(d.success) { toast('预设「'+name+'」已保存'); msgEl.textContent = '✓ 已保存，刷新后可见'; }
-    else { toast('保存失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
-  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
+  if (!cite && !style && !fb) { showModal('错误', '至少填写一个插槽', [{text:'知道了'}]); return; }
+  showPrompt('保存预设', '请输入预设名称：', function(name) {
+    if (!name) return;
+    var msgEl = document.getElementById('preset-action-msg');
+    msgEl.textContent = '⏳ 保存中...';
+    fetch('/api/prompt/presets/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({label: name, slots: {cite_format: cite, output_style: style, fallback: fb}})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) { msgEl.textContent = '✓ 已保存，刷新后可见'; showModal('保存成功', '预设「'+name+'」已保存', [{text:'知道了'}]); }
+      else { msgEl.textContent = ''; showModal('保存失败', d.error||'未知错误', [{text:'知道了'}]); }
+    }).catch(function(e){ msgEl.textContent = ''; showModal('请求失败', e.message, [{text:'知道了'}]) });
+  });
 }
 
 function deletePreset() {
@@ -1042,28 +1043,32 @@ function deletePreset() {
   var opt = sel && sel.options[sel.selectedIndex];
   var key = opt && opt.value;
   if (!key) return;
-  if (!confirm('确定删除预设「'+opt.text+'」？')) return;
-  var msgEl = document.getElementById('preset-action-msg');
-  msgEl.textContent = '⏳ 删除中...';
-  fetch('/api/prompt/presets/delete', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({key: key})
-  }).then(function(r){return r.json()}).then(function(d){
-    if(d.success) { toast('已删除'); msgEl.textContent = '✓ 已删除'; location.reload(); }
-    else { toast('删除失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
-  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
+  showConfirm('确认删除', '确定删除预设「'+opt.text+'」？', function(ok) {
+    if (!ok) return;
+    var msgEl = document.getElementById('preset-action-msg');
+    msgEl.textContent = '⏳ 删除中...';
+    fetch('/api/prompt/presets/delete', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({key: key})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.success) { msgEl.textContent = '✓ 已删除'; showModal('删除成功', '预设已删除', [{text:'知道了', cb:function(){location.reload()}}]); }
+      else { msgEl.textContent = ''; showModal('删除失败', d.error||'未知错误', [{text:'知道了'}]); }
+    }).catch(function(e){ msgEl.textContent = ''; showModal('请求失败', e.message, [{text:'知道了'}]) });
+  });
 }
 
 function resetSlots() {
-  if (!confirm('重置所有插槽为默认值？')) return;
-  fetch('/api/slots/reset', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
-    if(d.success) {
-      document.getElementById('slot-cite').value = d.slots.cite_format;
-      document.getElementById('slot-style').value = d.slots.output_style;
-      document.getElementById('slot-fallback').value = d.slots.fallback;
-      onSlotsChange();
-      toast('已重置');
-    }
+  showConfirm('重置插槽', '重置所有插槽为默认值？', function(ok) {
+    if (!ok) return;
+    fetch('/api/slots/reset', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(d.success) {
+        document.getElementById('slot-cite').value = d.slots.cite_format;
+        document.getElementById('slot-style').value = d.slots.output_style;
+        document.getElementById('slot-fallback').value = d.slots.fallback;
+        onSlotsChange();
+        showModal('已重置', '插槽已恢复默认值', [{text:'知道了'}]);
+      }
+    });
   });
 }
 
