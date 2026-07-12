@@ -932,6 +932,16 @@ function showConfirm(title, msg, cb) {
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
+function showModal(title, msg, buttons) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('modal-msg').style.display = 'block';
+  document.getElementById('modal-input').style.display = 'none';
+  document.getElementById('modal-cancel').style.display = 'none';
+  document.getElementById('modal-overlay').style.display = 'flex';
+  _modalCb = null;
+}
+
 function closeModal() {
   document.getElementById('modal-overlay').style.display = 'none';
   if(_modalType === 'prompt' && _modalCb) _modalCb(null);
