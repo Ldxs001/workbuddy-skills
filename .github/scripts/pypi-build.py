@@ -230,7 +230,7 @@ def main():
 
     print(f":: PyPI Build — {pkg_type}/{name} v{version} -> {pypi_name}")
 
-    if pkg_type == "agents":
+    if pkg_type in ("agent", "agents"):
         build_agent(name, version, pypi_name)
     elif pkg_type == "skills":
         build_skill(name, version, pypi_name)
