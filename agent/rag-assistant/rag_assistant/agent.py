@@ -376,15 +376,21 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         for e in entity_list:
             for a in attr_list:
                 _slices.add(f"{e} {a}")
-        # 多实体组合
+        # 多实体组合（含 rel 时两两配对）
         if len(entity_list) >= 2:
             joined = ' '.join(entity_list)
-            # 组合实体 × 各属性
+            # 组合实体 × 各属性（全拼，覆盖非对比场景）
             for a in attr_list:
                 _slices.add(f"{joined} {a}")
-            # 组合实体 × 关系词
+            # 有比较意图时：两两配对 × attrs × rel，更精准
             if rel:
-                _slices.add(f"{joined} {rel}")
+                import itertools
+                for e1, e2 in itertools.combinations(entity_list, 2):
+                    if attr_list:
+                        for a in attr_list:
+                            _slices.add(f"{e1} {e2} {a} {rel}")
+                    else:
+                        _slices.add(f"{e1} {e2} {rel}")
         slices = list(_slices)
 
         logger.info(f"组合查询: entities={entity_list}, attrs={attr_list}, rel={rel}")
