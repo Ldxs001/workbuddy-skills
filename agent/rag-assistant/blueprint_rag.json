@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "description": "rag-assistant agent 同步蓝图",
+  "include": [
+    "rag_assistant/**/*.py",
+    "main.py",
+    "setup.bat",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "PROTOCOL.md",
+    "requirements.txt",
+    ".github/**/*"
+  ],
+  "exclude": [
+    "__pycache__",
+    "*.pyc",
+    "dist",
+    "build",
+    ".git"
+  ]
+}
