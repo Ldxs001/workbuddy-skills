@@ -2411,86 +2411,76 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({"success": False, "error": "empty"})
                     return
                 # 启动后台线程下载
+                from utils import cache_directory
+                import os, threading
+                _download_tasks[mid] = {"status": "starting", "message": "准备中", "size_mb": 0, "speed": ""}
                 def _dl_job(mid):
                     try:
                         from embedding_model_manager import DOWNLOAD_SOURCES, download_model
-                        from utils import cache_directory
-                        import os, time, threading
-
-                        _download_tasks[mid] = {"status": "starting", "source": "准备中", "attempt": 0, "message": "", "size_mb": 0, "speed": ""}
                         sources = [s["name"] for s in DOWNLOAD_SOURCES[:4] if s["name"] != "llm_find"]
                         _download_tasks[mid]["status"] = "downloading"
-                        _download_tasks[mid]["source"] = sources[0] if sources else "?"
                         _download_tasks[mid]["message"] = f"正在从 {sources[0] if sources else '?'} 下载..."
-
-                        dl_ok = [False]
-                        def _do_dl():
-                            try:
-                                r = download_model(mid, sources=sources)
-                                dl_ok[0] = r.get("success", False)
-                            except Exception as e:
-                                _download_tasks[mid]["message"] = str(e)
-                            if not dl_ok[0]:
-                                _download_tasks[mid]["status"] = "failed"
-                                _download_tasks[mid]["message"] = "所有源均失败"
-                        t = threading.Thread(target=_do_dl, daemon=True)
-                        t.start()
-
-                        last_size = 0
-                        hf_prefix = f"models--{mid.replace('/', '--')}"
-                        ms_prefix = mid.replace("/", os.sep)
-                        while t.is_alive():
-                            time.sleep(5)
-                            cur_size = 0
-                            dl_dir = os.path.join(cache_directory, "model_downloads")
-                            if os.path.isdir(dl_dir):
-                                for root, _, fns in os.walk(dl_dir):
-                                    if hf_prefix not in root and ms_prefix not in root:
-                                        continue
-                                    for fn in fns:
-                                        if fn.endswith('.incomplete') or fn.endswith('.lock'):
-                                            continue
-                                        fp = os.path.join(root, fn)
-                                        try:
-                                            if os.path.isfile(fp):
-                                                cur_size += os.path.getsize(fp)
-                                        except:
-                                            pass
-                            size_mb = cur_size / (1024*1024)
-                            spd = (cur_size - last_size) / 5
-                            if spd >= 1024*1024:
-                                spd_str = f"{spd/1024/1024:.1f} MB/s"
-                            elif spd >= 1024:
-                                spd_str = f"{spd/1024:.0f} KB/s"
-                            else:
-                                spd_str = f"{spd:.0f} B/s"
-                            _download_tasks[mid].update({"size_mb": round(size_mb, 1), "speed": spd_str})
-                            last_size = cur_size
-
-                        if dl_ok[0]:
-                            _download_tasks[mid] = {"status": "done", "source": "", "attempt": 0,
-                                                    "message": "下载完成", "size_mb": _download_tasks[mid].get("size_mb", 0), "speed": ""}
-                        elif _download_tasks[mid]["status"] != "failed":
-                            _download_tasks[mid] = {"status": "failed", "source": "", "attempt": 0,
-                                                    "message": "下载失败", "size_mb": _download_tasks[mid].get("size_mb", 0), "speed": ""}
+                        r = download_model(mid, sources=sources)
+                        if r.get("success", False):
+                            _download_tasks[mid] = {"status": "done", "message": "下载完成", "size_mb": 0, "speed": ""}
+                        else:
+                            _download_tasks[mid] = {"status": "failed", "message": r.get("message","所有源均失败"), "size_mb": 0, "speed": ""}
                     except Exception as e:
-                        _download_tasks[mid] = {"status": "failed", "source": "", "attempt": 0,
-                                                "message": str(e), "size_mb": 0, "speed": ""}
+                        _download_tasks[mid] = {"status": "failed", "message": str(e), "size_mb": 0, "speed": ""}
                 t = threading.Thread(target=_dl_job, args=(mid,), daemon=True)
                 t.start()
+                self._send_json({"success": True})
 
             elif path == "/api/download-status":
                 d = self._read_body(); mid = d.get("model_id","")
-                if mid in _download_tasks:
-                    t = _download_tasks[mid]
-                    self._send_json({"success": True, "status": t.get("status",""),
-                                     "source": t.get("source",""),
-                                     "attempt": t.get("attempt",0),
-                                     "message": t.get("message",""),
-                                     "size_mb": t.get("size_mb",0),
-                                     "speed": t.get("speed","")})
-                else:
-                    self._send_json({"success": False, "status": "unknown"})
+                task = _download_tasks.get(mid, {})
+                status = task.get("status", "unknown")
+                size_mb = task.get("size_mb", 0)
+                speed = task.get("speed", "")
+
+                # 已完成/失败 → 直接返回
+                if status in ("done", "failed"):
+                    self._send_json({"success": True, "status": status, "message": task.get("message",""),
+                                     "size_mb": size_mb, "speed": speed})
+                    return
+
+                # 查 model_index.json 是否有已完成记录
+                try:
+                    from embedding_model_manager import _load_index
+                    idx = _load_index()
+                    if mid in idx and idx[mid].get("status") == "ready":
+                        _download_tasks[mid] = {"status": "done", "message": "下载完成", "size_mb": 0, "speed": ""}
+                        self._send_json({"success": True, "status": "done", "message": "下载完成", "size_mb": 0, "speed": ""})
+                        return
+                except Exception:
+                    pass
+
+                # 查缓存目录看文件大小（huggingface 缓存 + 本地 model_downloads）
+                hf_prefix = f"models--{mid.replace('/', '--')}"
+                size_now = 0
+                for dl_dir in [
+                    os.path.join(cache_directory, "model_downloads"),
+                    os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub"),
+                ]:
+                    if os.path.isdir(dl_dir):
+                        for root, _, fns in os.walk(dl_dir):
+                            if hf_prefix not in root and mid.replace("/", os.sep) not in root:
+                                continue
+                            for fn in fns:
+                                if fn.endswith(('.lock', '.incomplete')): continue
+                                try:
+                                    size_now += os.path.getsize(os.path.join(root, fn))
+                                except: pass
+
+                size_mb = round(size_now / (1024*1024), 1)
+                prev = task.get("_last_size", 0)
+                spd = abs(size_now - prev) / 2 if prev > 0 else 0
+                spd_str = f"{spd/1024/1024:.1f} MB/s" if spd >= 1024*1024 else f"{spd/1024:.0f} KB/s" if spd >= 1024 else f"{spd:.0f} B/s"
+                _download_tasks[mid] = {"status": status, "message": task.get("message",""),
+                                        "size_mb": size_mb, "speed": spd_str, "_last_size": size_now}
+
+                self._send_json({"success": True, "status": status, "message": f"{'启动中...' if status=='starting' else '下载中...'}",
+                                 "size_mb": size_mb, "speed": spd_str})
             elif path == "/api/geekedit/toggle":
                 d = self._read_body()
                 on = d.get("enabled", False)

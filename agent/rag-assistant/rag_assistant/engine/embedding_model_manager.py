@@ -126,12 +126,6 @@ def probe_all_models():
 
     # 先确定哪些源可达
     reachable = _probe_sources()
-    # 优先用 ModelScope
-    preferred_source = None
-    for src in ["modelscope", "hf_mirror", "hf_official"]:
-        if reachable.get(src):
-            preferred_source = src
-            break
 
     base_urls = {
         "modelscope": "https://www.modelscope.cn/api/v1/models/{}",
@@ -160,13 +154,16 @@ def probe_all_models():
         if mid in _AVAILABILITY_CACHE:
             return mid, _AVAILABILITY_CACHE[mid]
 
-        if preferred_source and preferred_source in base_urls:
-            url = base_urls[preferred_source].format(mid)
+        # 遍历所有可达源，有一个能访问就算可用
+        for src in ["modelscope", "hf_mirror", "hf_official"]:
+            if not reachable.get(src) or src not in base_urls:
+                continue
+            url = base_urls[src].format(mid)
             try:
                 r = _req.get(url, timeout=3, headers={"User-Agent": "Mozilla/5.0"})
-                status = "available" if r.status_code == 200 else "unavailable"
-                _AVAILABILITY_CACHE[mid] = status
-                return mid, status
+                if r.status_code == 200:
+                    _AVAILABILITY_CACHE[mid] = "available"
+                    return mid, "available"
             except Exception:
                 pass
 
