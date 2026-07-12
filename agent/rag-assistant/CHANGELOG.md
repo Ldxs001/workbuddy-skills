@@ -5,6 +5,23 @@
 
 ---
 
+## [0.9.3] - 2026-07-13
+
+### 修复
+- **下载进度检测**：改为查磁盘文件大小（huggingface 缓存 + model_downloads 双目录扫），不依赖子进程输出解析
+- **NLI 模型探测遍历所有源**：ModelScope 第一个可达但无此模型时，改遍历所有可达源再判定
+- **NLI 模型列表**：移除 hf-mirror 无权限的 `mDeBERTa-v3-base-xnli`，保留 `mDeBERTa-v3-base-mnli-xnli`（双源训练质量更好）
+- **`showModal` 函数缺失**：补上定义，修复模态框未响应
+- **`{true}` JS 语法错误**：`var hasNLIModel={true}` → `var hasNLIModel=true`
+- **Prompt preview `\n` 被 Python 转义**：改用 `String.fromCharCode(10)` 拼换行
+- **保存预设 API 读错字段**：读取 `data.template` 修复为 `data.slots`
+
+## [0.9.2] - 2026-07-13
+
+### 修复
+- **NLI 模型探测失败**：探测只试第一个可达源（ModelScope），ModelScope 无 MoritzLaurer 模型导致 mDeBERTa 全标不可用。改为遍历所有可达源
+- **NLI 模型列表清理**：移除 hf-mirror 无权限的 `mDeBERTa-v3-base-xnli`，保留双源版 `mDeBERTa-v3-base-mnli-xnli`
+
 ## [0.9.1] - 2026-07-13
 
 ### 修复
