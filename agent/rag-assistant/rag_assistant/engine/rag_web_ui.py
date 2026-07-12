@@ -17,7 +17,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
-from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, PROMPT_PRESETS, get_all_presets
+from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, get_all_presets, SECOND_PASS_TEMPLATE
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS, ALL_RECOMMENDED_MODELS, download_model, probe_all_models, _AVAILABILITY_CACHE
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
 from router import list_kb_signatures, rebuild_all_signatures
@@ -214,7 +214,7 @@ def delete_template_config(name):
 
 
 _JS_SCRIPTS = """<script>
-window.PROMPT_SYSTEM_PREFIX = '基于以下资料回答问题。如果资料中没有相关信息，请说"不知道"。\\n\\n资料：\\n{context}\\n\\n问题：\\n{question}\\n\\n回答：';
+// window.PROMPT_SYSTEM_PREFIX is deprecated - slots are used instead
 
 function toast(msg, type) { type = type || 'success'; const t = document.createElement('div'); t.className = 'toast'; t.style.background = type==='success' ? '#51cf66' : type==='error' ? '#ff6b6b' : '#fcc419'; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){t.remove()}, 2500); }
 
@@ -406,43 +406,7 @@ function savePrompt(content) {
 }
 
 function resetPrompt() {
-  fetch('/api/prompt/reset', {method:'POST'})
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.success) { document.getElementById('prompt-template').value = d.template; toast('已重置'); }
-  });
-}
-
-function savePreset() {
-  var tpl = document.getElementById('prompt-template').value.trim();
-  if (!tpl) { toast('模板内容为空', 'error'); return; }
-  var name = prompt('请输入预设名称：');
-  if (!name) return;
-  var msgEl = document.getElementById('preset-action-msg');
-  msgEl.textContent = '⏳ 保存中...';
-  fetch('/api/prompt/presets/save', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({label: name, template: tpl})
-  }).then(function(r){return r.json()}).then(function(d){
-    if(d.success) { toast('预设「'+name+'」已保存'); msgEl.textContent = '✓ 已保存，刷新后可见'; }
-    else { toast('保存失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
-  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
-}
-
-function deletePreset() {
-  var sel = document.getElementById('prompt-preset');
-  var opt = sel && sel.options[sel.selectedIndex];
-  var key = opt && opt.value;
-  if (!key) return;
-  if (!confirm('确定删除预设「'+opt.text+'」？')) return;
-  var msgEl = document.getElementById('preset-action-msg');
-  msgEl.textContent = '⏳ 删除中...';
-  fetch('/api/prompt/presets/delete', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({key: key})
-  }).then(function(r){return r.json()}).then(function(d){
-    if(d.success) { toast('已删除'); msgEl.textContent = '✓ 已删除'; location.reload(); }
-    else { toast('删除失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
-  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
+  // 旧版保留，新UI用resetSlots
 }
 
 function verifyLLM() {
@@ -984,26 +948,32 @@ function confirmModal() {
 }
 // ===== 模态框结束 =====
 
-window.onload = function() { updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); initPreproc(); initPrompt(); toggleGeekEdit(document.getElementById('geek-edit-toggle').checked); };
+window.onload = function() { updateAdvView(); refreshGeekTemplates(); refreshRules(); refreshSrcStatus(); initPreproc(); initSlots(); toggleGeekEdit(document.getElementById('geek-edit-toggle').checked); };
 
-// ----- Prompt 模板相关函数 -----
-var _prompt_save_timer = null;
+// ----- Prompt 插槽管理（替代旧的 textarea 模式） -----
+var _slot_save_timer = null;
 
-function initPrompt() {
+function initSlots() {
+  // 预设切换时更新插槽
   var sel = document.getElementById('prompt-preset');
   if (!sel) return;
-  loadPreset(sel.value);
-  sel.addEventListener('change', function() { loadPreset(this.value); });
+  applyPresetToSlots(sel.value);
+  sel.addEventListener('change', function() {
+    applyPresetToSlots(this.value);
+  });
 }
 
-function loadPreset(key) {
+function applyPresetToSlots(key) {
   var sel = document.getElementById('prompt-preset');
   var opt = sel && sel.options[sel.selectedIndex];
-  var tpl = opt && opt.getAttribute('data-template');
-  if (!tpl) return;
-  document.getElementById('prompt-template').value = tpl;
-  renderVariables(tpl);
-  onPromptChange(tpl);
+  if (!opt) return;
+  var cite = opt.getAttribute('data-cite');
+  var style = opt.getAttribute('data-style');
+  var fb = opt.getAttribute('data-fallback');
+  if (cite) document.getElementById('slot-cite').value = cite;
+  if (style) document.getElementById('slot-style').value = style;
+  if (fb) document.getElementById('slot-fallback').value = fb;
+  onSlotsChange();
   // 仅自定义预设显示删除按钮
   var builtin = opt && opt.getAttribute('data-builtin');
   var delBtn = document.getElementById('btn-delete-preset');
@@ -1011,47 +981,89 @@ function loadPreset(key) {
   document.getElementById('preset-action-msg').textContent = '';
 }
 
-function renderVariables(tpl) {
-  var vars = tpl.match(/\{(\w+)\}/g) || [];
-  var uniq = {};
-  vars.forEach(function(v) { uniq[v] = true; });
-  var placeholders = {
-    dim: '如：价格/性能/质量',
-    role: '如：化学分析师/技术专家',
-    alt: '如：其他品牌/替代方法',
-  };
-  var html = '';
-  for (var v in uniq) {
-    var name = v.slice(1, -1);
-    var hint = placeholders[name] || '请输入' + name;
-    html += '<span style="display:inline-block;margin-right:10px;margin-bottom:4px;">' +
-      name + ': <input type="text" data-var="' + name + '" placeholder="' + hint + '" style="width:140px;padding:2px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;vertical-align:middle;"> </span>';
-  }
-  document.getElementById('prompt-variables').innerHTML = html;
-  document.querySelectorAll('#prompt-variables input').forEach(function(el) {
-    el.addEventListener('change', function() {
-      onPromptChange(document.getElementById('prompt-template').value);
-    });
-  });
-}
-
-function onPromptChange(content) {
+function onSlotsChange() {
   document.getElementById('prompt-status').textContent = '⏳ 保存中...';
-  if (_prompt_save_timer) clearTimeout(_prompt_save_timer);
-  _prompt_save_timer = setTimeout(function() {
-    fetch('/api/prompt', {
+  if (_slot_save_timer) clearTimeout(_slot_save_timer);
+  _slot_save_timer = setTimeout(function() {
+    var slots = {
+      cite_format: document.getElementById('slot-cite').value.trim(),
+      output_style: document.getElementById('slot-style').value.trim(),
+      fallback: document.getElementById('slot-fallback').value.trim()
+    };
+    fetch('/api/slots', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({content: content})
+      body: JSON.stringify(slots)
     }).then(function(r){return r.json()}).then(function(d){
       if(d.success) {
         document.getElementById('prompt-status').textContent = '✓ 已保存';
+        updatePreview();
+      } else {
+        document.getElementById('prompt-status').textContent = '✗ 保存失败';
       }
     });
   }, 400);
-  // 更新完整预览
-  var prefix = window.PROMPT_SYSTEM_PREFIX || '';
+}
+
+function updatePreview() {
+  var cite = document.getElementById('slot-cite').value.trim();
+  var style = document.getElementById('slot-style').value.trim();
+  var fb = document.getElementById('slot-fallback').value.trim();
   var preview = document.getElementById('full-prompt-preview');
-  if (preview) preview.textContent = prefix + content;
+  if (!preview) return;
+  var text = '【系统层（锁定）】\n基于以下资料回答用户问题。不能脱离资料编造。\n';
+  text += cite ? '【引用格式】' + cite + '\n' : '';
+  text += style ? '【输出风格】' + style + '\n' : '';
+  text += '\n资料（来自 {kb}）：\n{context}\n\n问题：\n{question}\n\n回答：';
+  text += fb ? '\n' + fb : '';
+  preview.textContent = text;
+}
+
+function savePreset() {
+  var cite = document.getElementById('slot-cite').value.trim();
+  var style = document.getElementById('slot-style').value.trim();
+  var fb = document.getElementById('slot-fallback').value.trim();
+  if (!cite && !style && !fb) { toast('至少填写一个插槽', 'error'); return; }
+  var name = prompt('请输入预设名称：');
+  if (!name) return;
+  var msgEl = document.getElementById('preset-action-msg');
+  msgEl.textContent = '⏳ 保存中...';
+  fetch('/api/prompt/presets/save', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({label: name, slots: {cite_format: cite, output_style: style, fallback: fb}})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('预设「'+name+'」已保存'); msgEl.textContent = '✓ 已保存，刷新后可见'; }
+    else { toast('保存失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
+  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
+}
+
+function deletePreset() {
+  var sel = document.getElementById('prompt-preset');
+  var opt = sel && sel.options[sel.selectedIndex];
+  var key = opt && opt.value;
+  if (!key) return;
+  if (!confirm('确定删除预设「'+opt.text+'」？')) return;
+  var msgEl = document.getElementById('preset-action-msg');
+  msgEl.textContent = '⏳ 删除中...';
+  fetch('/api/prompt/presets/delete', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key: key})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast('已删除'); msgEl.textContent = '✓ 已删除'; location.reload(); }
+    else { toast('删除失败: '+(d.error||''), 'error'); msgEl.textContent = ''; }
+  }).catch(function(e){ toast('请求失败', 'error'); msgEl.textContent = ''; });
+}
+
+function resetSlots() {
+  if (!confirm('重置所有插槽为默认值？')) return;
+  fetch('/api/slots/reset', {method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    if(d.success) {
+      document.getElementById('slot-cite').value = d.slots.cite_format;
+      document.getElementById('slot-style').value = d.slots.output_style;
+      document.getElementById('slot-fallback').value = d.slots.fallback;
+      onSlotsChange();
+      toast('已重置');
+    }
+  });
 }
 
 // ── 环境检测与安装 ──────────────────────────────
@@ -1129,28 +1141,38 @@ def generate_html():
     cfg = load_config()
     kbs = list_knowledge_bases()
     all_models = list_downloaded_models()
-    template = load_template()
-    full_prompt_preview = get_full_prompt()
+    from prompt_manager import load_slots, get_all_presets, SECOND_PASS_TEMPLATE, DEFAULT_SLOTS
+    slots = load_slots()
+    cite_format = slots.get("cite_format", DEFAULT_SLOTS["cite_format"])
+    output_style = slots.get("output_style", DEFAULT_SLOTS["output_style"])
+    fallback = slots.get("fallback", DEFAULT_SLOTS["fallback"])
+    full_prompt_preview = SECOND_PASS_TEMPLATE.format(
+        cite_format=cite_format, output_style=output_style, fallback=fallback,
+        context="{context}", question="{question}", kb="{kb}"
+    )
     def _html_attr(s):
         return s.replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;").replace(">","&gt;").replace("\n","&#10;")
     preset_options = ""
     all_presets = get_all_presets()
-    # 内置预设
     builtins = {k: v for k, v in all_presets.items() if v.get("built_in")}
     customs = {k: v for k, v in all_presets.items() if not v.get("built_in")}
     if builtins:
         preset_options += '<optgroup label="内置预设">'
         for key, p in builtins.items():
-            selected = " selected" if p["template"] == template else ""
-            dt = _html_attr(p["template"])
-            preset_options += f'<option value="{key}" data-template="{dt}" data-builtin="1"{selected}>{p["label"]}</option>'
+            s = p.get("slots", {})
+            cite = _html_attr(s.get("cite_format", ""))
+            style = _html_attr(s.get("output_style", ""))
+            fb = _html_attr(s.get("fallback", ""))
+            preset_options += f'<option value="{key}" data-cite="{cite}" data-style="{style}" data-fallback="{fb}" data-builtin="1">{p["label"]}</option>'
         preset_options += '</optgroup>'
     if customs:
         preset_options += '<optgroup label="自定义预设">'
         for key, p in customs.items():
-            selected = " selected" if p["template"] == template else ""
-            dt = _html_attr(p["template"])
-            preset_options += f'<option value="{key}" data-template="{dt}" data-builtin="0"{selected}>{p["label"]}</option>'
+            s = p.get("slots", {})
+            cite = _html_attr(s.get("cite_format", ""))
+            style = _html_attr(s.get("output_style", ""))
+            fb = _html_attr(s.get("fallback", ""))
+            preset_options += f'<option value="{key}" data-cite="{cite}" data-style="{style}" data-fallback="{fb}" data-builtin="0">{p["label"]}</option>'
         preset_options += '</optgroup>'
 
     router_cfg = cfg.get("router", {})
@@ -1333,7 +1355,9 @@ def generate_html():
         secondary_forms_html += f'<div id="form-secondary-{sname}" class="secondary-form" style="display:none;">{fields}</div>'
 
     # 原始 JSON 配置（极客模式）— 分段
-    cfg.setdefault("prompt", {})["user_template"] = template
+    # 极客模式中展示 slots 配置
+    cfg.setdefault("prompt_slots", {})
+    cfg.setdefault("prompt", {})["slots"] = {"cite_format": cite_format, "output_style": output_style, "fallback": fallback}
     cfg["prompt"]["system_prefix"] = get_system_prefix()
 
     def _section_json(*keys):
@@ -1496,14 +1520,14 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
   </div>
 
   <div class="card">
-    <h2>📝 Prompt 模板</h2>
+    <h2>📝 用户提示词配置</h2>
     <div style="font-size:13px;color:#888;margin-bottom:8px;">
-      系统层（固化）：基于资料回答 + 资料/问题占位符 + 回答前缀
+      系统提示词已锁定（不能编造 + 资料/问题占位符），以下三个插槽可自定义
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>预设模板</label>
-        <select id="prompt-preset" onchange="loadPreset(this.value)">
+        <select id="prompt-preset" onchange="applyPresetToSlots(this.value)">
           {preset_options}
         </select>
       </div>
@@ -1512,12 +1536,27 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
         <span id="prompt-status" style="line-height:32px;font-size:13px;color:#888;">—</span>
       </div>
     </div>
-    <div class="form-group">
-      <textarea id="prompt-template" rows="6" oninput="onPromptChange(this.value)" placeholder="用户层 Prompt，如输出格式要求" style="width:100%;font-family:monospace;font-size:12px;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;resize:vertical;box-sizing:border-box;line-height:1.5;">{template}</textarea>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-weight:500;font-size:13px;">引用格式</label>
+      <input id="slot-cite" type="text" value="{cite_format}" oninput="onSlotsChange()"
+             placeholder="每个结论后面用 [n] 标注来源的段落编号"
+             style="width:100%;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;">
     </div>
-    <div id="prompt-variables" style="margin-bottom:8px;"></div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-weight:500;font-size:13px;">输出风格</label>
+      <input id="slot-style" type="text" value="{output_style}" oninput="onSlotsChange()"
+             placeholder="用 Markdown 格式输出"
+             style="width:100%;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;">
+    </div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-weight:500;font-size:13px;">资料不足时</label>
+      <input id="slot-fallback" type="text" value="{fallback}" oninput="onSlotsChange()"
+             placeholder="如果资料中没有明确结论，可以结合资料进行分析推理，但不能编造不存在的内容"
+             style="width:100%;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;">
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
       <button class="btn btn-secondary" onclick="savePreset()" style="padding:4px 12px;font-size:12px;">💾 保存为预设</button>
+      <button class="btn btn-secondary" onclick="resetSlots()" style="padding:4px 12px;font-size:12px;">↺ 重置默认</button>
       <button class="btn btn-secondary" id="btn-delete-preset" onclick="deletePreset()" style="padding:4px 12px;font-size:12px;display:none;color:#c00;border-color:#c00;">🗑 删除此预设</button>
       <span id="preset-action-msg" style="font-size:12px;color:#888;line-height:28px;"></span>
     </div>
@@ -2083,6 +2122,17 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/prompt/reset":
                 tpl = reset_template()
                 self._send_json({"success": True, "template": tpl})
+
+            elif path == "/api/slots":
+                data = self._read_body()
+                from prompt_manager import save_slots
+                save_slots(data)
+                self._send_json({"success": True})
+
+            elif path == "/api/slots/reset":
+                from prompt_manager import save_slots, DEFAULT_SLOTS
+                save_slots(DEFAULT_SLOTS)
+                self._send_json({"success": True, "slots": DEFAULT_SLOTS})
 
             elif path == "/api/prompt/presets/save":
                 data = self._read_body()

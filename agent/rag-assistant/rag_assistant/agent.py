@@ -241,12 +241,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         ctx_text = context.get("context", "")
         kb = action.get("kb", context.get("kb", ""))
         if ctx_text:
-            sys_msg = f"基于以下资料回答用户问题。\n资料（来自 {kb}）：\n{ctx_text}\n\n"
-            sys_msg += "## 引用要求\n"
-            sys_msg += "- 回答中每个具体事实/数字/结论后面必须标注来源资料的段落编号 **[n]**\n"
-            sys_msg += "- 资料中每个段落前面有 `[n]` 序号标记\n"
-            sys_msg += "- 如果你引用了一段资料，在你的回答对应的位置写上 **[n]**\n"
-            sys_msg += "- 如果资料中没有相关信息，说'知识库中没有相关信息'，不要自己编造\n"
+            from prompt_manager import build_second_pass_prompt
+            sys_msg = build_second_pass_prompt(context=ctx_text, question=message, kb=kb)
         else:
             sys_msg = f"知识库（{kb}）中没有找到相关信息。请礼貌告知用户。"
 
