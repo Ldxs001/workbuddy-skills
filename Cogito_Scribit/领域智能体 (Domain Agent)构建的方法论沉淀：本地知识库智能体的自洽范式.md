@@ -98,8 +98,8 @@
     AB X, AB Y, AB R
 
 第二阶段：并行检索
-  切片 1 → 路由 → Chroma → reranker → context
-  切片 2 → 路由 → Chroma → reranker → context
+  切片 1 → 路由 → Chroma → reranker → NLI → context
+  切片 2 → 路由 → Chroma → reranker → NLI → context
   ... 共 N×M 路
   ↓
   SM3 去重合并
