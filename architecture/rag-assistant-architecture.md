@@ -3,7 +3,7 @@
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-11 (v0.8.0)
+> 更新：2026-07-12 (v0.9.0)
 
 ---
 
@@ -21,7 +21,8 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
               1. 路由（route_query → 嵌入模型 × KB签名/关键词）
               2. 检索（retrieve_documents → Chroma 相似度）
               3. (可选) 重排序（reranker）
-              4. 构建上下文（build_context）
+              4. (可选) NLI 三向分类（entailment/neutral/contradiction）
+              5. 构建上下文（build_context，含 NLI 标签渲染）
            → [SM3 去重合并] 按内容哈希去重
            → [LLM 综合回答] 基于完整上下文生成回答
 ```
@@ -83,6 +84,7 @@ agent/rag-assistant/
 │   ├── knowledge_base_manager.py    # 知识库管理
 │   ├── config.py                    # 配置管理
 │   ├── embedding_model_manager.py   # 模型下载管理
+│   ├── nli_classifier.py              # NLI 三向分类器（v0.9.0 新增）
 │   ├── rag_skill.py                 # 技能接口
 │   ├── rag_standalone.py            # 独立模式
 │   ├── rag_web_ui.py                # RAG 配置页
@@ -224,7 +226,8 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
     → route_query(question)                 # 路由：哪个知识库？
       → retrieve_documents(question, kb)    # 检索：取 top-K chunk
         → (可选) reranker.rerank(docs)       # 精排
-      → build_context(docs)                 # 构建上下文
+      → (可选) nli_classifier.classify(docs) # NLI 三向标注
+      → build_context(docs)                 # 构建上下文（含 NLI 标签）
   → return {context, docs, kb, has_context}
 ```
 
@@ -442,6 +445,7 @@ RAG Assistant 通过 `rag_wrapper.py` 封装以下技能模块，不改造内部
 | `knowledge_base_manager` | `_load_rules` / `auto_classify` | 入库路由：`_load_rules` 列出各 KB 关键词做嵌入余弦相似度（`kb.auto_classify` 开时）；出库路由：`auto_classify` 做第一层硬编码匹配，未命中时走嵌入模型 × KB 签名关键词或规则关键词（`router.enabled` 开时，具体取决于精排开关）。`kb.enabled` 关时全部路由失效，全进 default
 | `config` | `load_config / save_config` | 配置持久化 |
 | `prompt_manager` | `get_full_prompt` | Prompt 模板 |
+| `nli_classifier` | `NLIClassifier.classify` | NLI 三向分类（v0.9.0 新增） |
 
 ---
 
@@ -474,7 +478,7 @@ _parse_action(reply)
            → for each slice:
                 rag.query(slice, kb_name)
                   → retrieve_context(slice, ...)
-                    → route_query → retrieve_documents → (reranker) → build_context
+                    → route_query → retrieve_documents → (reranker) → (NLI) → build_context
            → SM3 去重合并
            → return {context, docs, kb}
          → _second_pass(message, context, action)
