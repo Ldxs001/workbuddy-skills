@@ -66,8 +66,9 @@ python main.py
               1. 路由（嵌入模型 × KB签名/关键词）
               2. 检索（Chroma 相似度）
               3. (可选) 重排序（reranker）
-           → [SM3 去重合并]
-           → [LLM 综合回答]
+              4. (可选) NLI 三向分类（entailment/neutral/contradiction）
+           → [SM3 去重合并]（保留 NLI 标签）
+           → [LLM 综合回答]（带 NLI 标签辅助判断）
 ```
 
 ## 依赖
