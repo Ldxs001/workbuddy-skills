@@ -2138,12 +2138,13 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/prompt/presets/save":
                 data = self._read_body()
                 label = data.get("label", "").strip()
-                template = data.get("template", "").strip()
-                if not label or not template:
-                    self._send_json({"success": False, "error": "名称和模板不能为空"})
+                slots = data.get("slots", {})
+                description = data.get("description", "")
+                if not label or not slots:
+                    self._send_json({"success": False, "error": "名称和插槽不能为空"})
                 else:
                     from prompt_manager import save_custom_preset
-                    result = save_custom_preset(label, template)
+                    result = save_custom_preset(label, slots, description)
                     self._send_json(result)
 
             elif path == "/api/prompt/presets/delete":
