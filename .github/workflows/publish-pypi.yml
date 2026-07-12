@@ -18,6 +18,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      attestations: write
     steps:
       - uses: actions/checkout@v4
 
@@ -84,7 +85,8 @@ jobs:
             "${{ steps.info.outputs.pypi_name }}"
 
       - name: Upload to PyPI (Trusted Publisher)
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
           packages-dir: dist/
           print-hash: true
+          skip-existing: true
