@@ -1545,9 +1545,9 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
     </div>
     <div class="form-group" style="margin-bottom:10px;">
       <label style="font-weight:500;font-size:13px;">输出风格</label>
-      <input id="slot-style" type="text" value="{output_style}" oninput="onSlotsChange()"
-             placeholder="用 Markdown 格式输出"
-             style="width:100%;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;">
+      <textarea id="slot-style" rows="4" oninput="onSlotsChange()"
+             placeholder="用 Markdown 格式输出。支持多行，如：&#10;## 核心结论&#10;...&#10;## 第一层...&#10;"
+             style="width:100%;padding:6px 8px;border:0.5px solid #ddd;border-radius:4px;font-size:12px;box-sizing:border-box;resize:vertical;font-family:monospace;line-height:1.5;">{output_style}</textarea>
     </div>
     <div class="form-group" style="margin-bottom:10px;">
       <label style="font-weight:500;font-size:13px;">资料不足时</label>
