@@ -283,6 +283,9 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     originals = rule.get("_originals", rule.get("keywords", [kb_name]))
     if not originals:
         originals = [kb_name]
+    # 确保 KB 名称始终作为原始关键词之一，防止领域词被其他词（如化学分析术语）挤出 top-12
+    if kb_name not in originals:
+        originals = [kb_name] + originals
     
     try:
         # 每个原始关键词单独嵌入（vs 聚合为一个向量，通用中文词容易蹭相似度）

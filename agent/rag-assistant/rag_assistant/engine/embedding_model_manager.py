@@ -64,6 +64,128 @@ RECOMMENDED_RERANK_MODELS = [
     {"id": "Alibaba-NLP/gte-multilingual-reranker-base", "size_mb": 600, "desc": "阿里出品，中文友好", "type": "rerank"},
 ]
 
+# NLI 模型列表
+RECOMMENDED_NLI_MODELS = [
+    # 多语言（含中文）
+    {"id": "MoritzLaurer/mDeBERTa-v3-base-xnli", "size_mb": 540, "desc": "多语言 NLI（含中文），XNLI 15语言，推荐", "type": "nli"},
+    {"id": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli", "size_mb": 540, "desc": "多语言 NLI（MNLI+XNLI 双源）", "type": "nli"},
+    # 纯英文
+    {"id": "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli", "size_mb": 540, "desc": "英文 NLI，MNLI+FEVER+ANLI 三源，SOTA", "type": "nli"},
+    {"id": "cross-encoder/nli-deberta-v3-base", "size_mb": 540, "desc": "英文 NLI，标准化 DeBERTa-v3 cross-encoder", "type": "nli"},
+    {"id": "cross-encoder/nli-roberta-base", "size_mb": 480, "desc": "英文 NLI，RoBERTa 架构", "type": "nli"},
+    {"id": "cross-encoder/nli-distilroberta-base", "size_mb": 260, "desc": "英文 NLI 轻量，CPU 友好", "type": "nli"},
+]
+
+# 所有推荐模型的汇总列表（用于网络探测）
+ALL_RECOMMENDED_MODELS = RECOMMENDED_MODELS + RECOMMENDED_RERANK_MODELS + RECOMMENDED_NLI_MODELS
+
+# 模型 ID → type 映射表（用于下载索引）
+_MODEL_TYPE_MAP = {m["id"].lower(): m.get("type", "") for m in ALL_RECOMMENDED_MODELS}
+
+def _get_model_type(model_id: str) -> str:
+    """根据 model_id 查找模型类型（embedding/rerank/nli/bge/...）"""
+    return _MODEL_TYPE_MAP.get(model_id.lower(), "")
+
+# 网络探测缓存
+_AVAILABILITY_CACHE = {}
+# 源连通性缓存（只测一次）
+_SOURCE_REACHABLE = {}
+
+
+def _probe_sources(timeout=4):
+    """快速探测各下载源是否可达，每个源只测一次"""
+    if _SOURCE_REACHABLE:
+        return _SOURCE_REACHABLE
+
+    import requests as _req
+
+    probes = [
+        ("modelscope", "https://www.modelscope.cn/api/v1/models/BAAI/bge-small-zh-v1.5"),
+        ("hf_mirror", "https://hf-mirror.com/api/models/BAAI/bge-small-zh-v1.5"),
+        ("hf_official", "https://huggingface.co/api/models/BAAI/bge-small-zh-v1.5"),
+    ]
+
+    for name, url in probes:
+        try:
+            r = _req.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+            _SOURCE_REACHABLE[name] = r.status_code == 200
+        except Exception:
+            _SOURCE_REACHABLE[name] = False
+
+    return _SOURCE_REACHABLE
+
+
+def probe_all_models():
+    """
+    全量并行探测所有模型的可下载性。
+    先测各源连通性（3次HTTP请求），再对每个模型只发1次HTTP请求（到可达源）。
+    并行执行，全部完成估约 3-5 秒。
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import requests as _req
+
+    # 先确定哪些源可达
+    reachable = _probe_sources()
+    # 优先用 ModelScope
+    preferred_source = None
+    for src in ["modelscope", "hf_mirror", "hf_official"]:
+        if reachable.get(src):
+            preferred_source = src
+            break
+
+    base_urls = {
+        "modelscope": "https://www.modelscope.cn/api/v1/models/{}",
+        "hf_mirror": "https://hf-mirror.com/api/models/{}",
+        "hf_official": "https://huggingface.co/api/models/{}",
+    }
+
+    # 收集所有模型 ID（已下载的跳过）
+    ids = set()
+    try:
+        index = _load_index()
+    except Exception:
+        index = {}
+    for m in ALL_RECOMMENDED_MODELS:
+        mid = m["id"]
+        if mid in index and index[mid].get("status") == "ready":
+            _AVAILABILITY_CACHE[mid] = "available"
+        else:
+            ids.add(mid)
+
+    if not ids:
+        return dict(_AVAILABILITY_CACHE)
+
+    def _check(mid):
+        # 已缓存则跳过
+        if mid in _AVAILABILITY_CACHE:
+            return mid, _AVAILABILITY_CACHE[mid]
+
+        if preferred_source and preferred_source in base_urls:
+            url = base_urls[preferred_source].format(mid)
+            try:
+                r = _req.get(url, timeout=3, headers={"User-Agent": "Mozilla/5.0"})
+                status = "available" if r.status_code == 200 else "unavailable"
+                _AVAILABILITY_CACHE[mid] = status
+                return mid, status
+            except Exception:
+                pass
+
+        _AVAILABILITY_CACHE[mid] = "unavailable"
+        return mid, "unavailable"
+
+    # 并行探测
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        futures = [pool.submit(_check, mid) for mid in ids]
+        for f in as_completed(futures):
+            f.result()  # 触发异常（如果有）
+
+    return dict(_AVAILABILITY_CACHE)
+
+
+def get_probe_status(model_id):
+    """获取单模型探测状态（缓存），未探测返回 None"""
+    return _AVAILABILITY_CACHE.get(model_id)
+
 MODEL_INDEX_FILE = os.path.join(MODELS_DIR, "model_index.json")
 
 
@@ -420,6 +542,7 @@ def download_model(model_id, sources=None, max_retries_per_source=3, max_sources
                             "source": source_name,
                             "size_mb": round(dir_size(target_dir), 1),
                             "status": "ready",
+                            "type": _get_model_type(model_id),
                         }
                         _save_index(index)
 

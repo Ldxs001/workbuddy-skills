@@ -5,6 +5,27 @@
 
 ---
 
+## [0.9.0] - 2026-07-12
+
+### 新增
+- **NLI 三向分类器**：`engine/nli_classifier.py` — cross-encoder 对 (query, doc) 输出 entailment/neutral/contradiction 概率。独立开关，6 个推荐模型（含多语言 XNLI 和英文 SOTA）。使用 slice 关键词做分类，适配穷举组合查询模式。在 reranker 之后或向量召回之后运行。标签透传：[NLI: entailment, 92%]
+- **网络探测**：`embedding_model_manager.probe_all_models()` 先测下载源连通性（ModelScope/HF Mirror/HF Official），再 10 线程并行探测所有 26 个模型，结果 🟢/🔴 实时增量更新到 Web UI
+- **Web UI toggle 守卫**：路由/reranker/NLI 无已下载模型时 toggle 灰化 + 红色提示文字
+- **Config 自动修正模型路径**：`load_config()` 在配置路径无效时自动指向第一个已下载的同类型模型
+
+### 修复
+- **切片中文逗号未识别**：`re.split(r'[,，]', ...)` 支持中英文逗号
+- **比较意图词重复**：rel 非空时自动从 attr_list 移除{异同,区别,差别,对比,...}
+- **NLI 模型中英文混用 Bug**：多语言 NLI（mDeBERTa）仅 ModelScope 不存 → 改用 cross-encoder/nli-deberta-v3-base（ModelScope 有）
+- **NLI 下载线程崩溃**（所有 import 移入 try 块内）
+- **探测结果卡住不更新**（clearInterval 过早停止 + 去重统计修复）
+- **探测路由 404**（`do_GET` 缺 `/api/availability-status`）
+- **KB 数据污染**：221 chunks 跨库迁移（白酒→政经文哲53、白酒→设备条件56、理化检测→生物医疗56、设备条件→生物医疗5、检测技术→天体物理51）
+- **Agent system prompt 重写**：entities=取主体/名词, attrs=取目的, rel=取行为
+- **"2嵌入模型"计数Bug**：`rag_web_ui.py` 仅过滤 reranker，NLI 模型被计入嵌入模型计数，修复为同时过滤 NLI 模型
+- **model_index.json type 字段缺失**：`download_model()` 保存索引时未写入 type，新增 `_get_model_type()` 映射表自动写入；已补全现有 5 个条目的 type 值
+- **KB 签名 originals 缺少 kb_name**：`build_kb_signature()` 自动将 kb_name 前置到 originals 列表，防止化学词主导签名。白酒签名首词从"酒体"修复为"白酒"
+
 ## [0.8.6] - 2026-07-12
 
 ### 修复

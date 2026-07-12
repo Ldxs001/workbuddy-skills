@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
 from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, PROMPT_PRESETS, get_all_presets
-from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, download_model
+from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS, ALL_RECOMMENDED_MODELS, download_model, probe_all_models, _AVAILABILITY_CACHE
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
 from router import list_kb_signatures, rebuild_all_signatures
 from rag_standalone import verify_llm_connection
@@ -503,7 +503,7 @@ function toggleGeekEdit(on) {
 }
 
 function _mergeGeekSections() {
-  var a = ['prompt','emb-retrieval','reranker','splitter','router','kb','llm','other'];
+  var a = ['prompt','emb-retrieval','reranker','nli','splitter','router','kb','llm','other'];
   var m = {};
   for(var i = 0; i < a.length; i++) {
     var ta = document.getElementById('geek-editor-' + a[i]);
@@ -828,13 +828,73 @@ function downloadModel(id){
       else if(d.status==='downloading'){msg.innerHTML = (d.message||'下载中...') + '<br><span style=\"color:#aaa;font-size:11px;\">' + (d.size_mb||0) + ' MB | ' + (d.speed||'') + '</span>';}
       else if(d.status==='done'){msg.textContent = '完成';el.style.borderLeftColor='#3B6D11';clearInterval(poll);setTimeout(function(){el.remove();location.reload()},1000);}
       else if(d.status==='failed'){msg.textContent = '失败: ' + d.message;el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
+      else if(!d.success && d.status==='unknown'){msg.textContent = '启动中...';}
     });
   },2000);
+  // 超过 60 秒无响应则显示超时
+  setTimeout(function(){
+    var msg = document.getElementById('dl-msg');
+    if(msg && msg.textContent==='准备中...'||msg && msg.textContent==='启动中...'){msg.textContent='超时: 下载未响应';el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
+  },60000);
 }
 function toggleKB(){fetch('/api/kb/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('多知识库路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleImportClassify(){fetch('/api/kb/auto-classify/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('入库路由:'+(d.enabled?'向量模型':'纯关键词'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
-function toggleRouter(){fetch('/api/router/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
-function toggleReranker(){fetch('/api/reranker/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('Rerank:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleRouter(){if(!hasEmbeddingModel){toast('未检测到已下载的嵌入模型，请先下载','error');return;}fetch('/api/router/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleReranker(){if(!hasRerankerModel){toast('未检测到已下载的 Rerank 模型，请先下载','error');return;}fetch('/api/reranker/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('Rerank:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleNLI(){if(!hasNLIModel){toast('未检测到已下载的 NLI 模型，请先下载','error');return;}fetch('/api/nli/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('NLI:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function probeAvailability(){
+  var indicators=document.querySelectorAll('#probe-indicator-embedding,#probe-indicator-rerank,#probe-indicator-nli');
+  // 统计唯一模型ID数（排除 fb 列表的重复）
+  var seen=[];var uniqueCount=0;
+  var allIndicators=document.querySelectorAll('.avail-indicator');
+  for(var i=0;i<allIndicators.length;i++){
+    var mid=allIndicators[i].getAttribute('data-model-id');
+    if(seen.indexOf(mid)===-1){seen.push(mid);uniqueCount++;}
+  }
+  for(var i=0;i<indicators.length;i++)indicators[i].textContent='⏳ 检测中...';
+  // 先看缓存里有没有
+  fetch('/api/availability-status').then(function(r){return r.json()}).then(function(d){
+    if(d.success && d.results){
+      updateAvailIndicators(d.results);
+      var done=Object.keys(d.results).length;
+      if(done>=uniqueCount){clearIndicators(indicators);return;}
+    }
+    // 启动后台探测（POST）
+    fetch('/api/probe-availability',{method:'POST'});
+    // 持续轮询，增量更新，直到全部完成
+    var elapsed=0;
+    var poll=setInterval(function(){
+      elapsed+=1500;
+      fetch('/api/availability-status').then(function(r){return r.json()}).then(function(d2){
+        if(!d2.success||!d2.results)return;
+        updateAvailIndicators(d2.results);
+        var done2=Object.keys(d2.results).length;
+        if(done2>=uniqueCount||elapsed>30000){
+          clearInterval(poll);
+          clearIndicators(indicators);
+        }
+      });
+    },1500);
+  });
+}
+function clearIndicators(els){for(var i=0;i<els.length;i++)els[i].textContent='';}
+function updateAvailIndicators(results){
+  for(var mid in results){
+    var el=document.querySelector('.avail-indicator[data-model-id="'+mid.replace(/['"]/g,'')+'"]');
+    if(!el)continue;
+    var status=results[mid];
+    var dot=status==='available'?'🟢':'🔴';
+    var tip=status==='available'?'可下载':'当前网络不可用';
+    el.innerHTML=dot;
+    el.title=tip;
+    el.style.display='inline';
+    el.style.marginLeft='6px';
+    el.style.fontSize='13px';
+    el.style.cursor='help';
+  }
+}
+// 页面加载后自动探测（直接 setTimeout，不依赖 load 事件）
+setTimeout(probeAvailability, 1200);
 function toggleAdvSig(){var e=document.getElementById('adv-sig-content'),a=document.getElementById('adv-sig-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';}
 function rebuildSigs(){fetch('/api/router/rebuild-signatures',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已重建');setTimeout(function(){location.reload()},500)}else toast(d.error,'error')});}
 function toggleSortRules(){var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';if(!o)refreshSortRules();}
@@ -1099,12 +1159,16 @@ def generate_html():
     kb_cfg = cfg.get("kb", {})
     kb_sigs = list_kb_signatures()
     # Build model lists
-    from embedding_model_manager import RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS
     dl = list_downloaded_models()
     dl_ids = {m.get("model_id","").lower() for m in dl}
+    # 检查各类别是否有已下载模型
+    has_emb = dl and any(m["id"].lower() in dl_ids for m in RECOMMENDED_MODELS)
+    has_rr = dl and any(m["id"].lower() in dl_ids for m in RECOMMENDED_RERANK_MODELS)
+    has_nli = dl and any(m["id"].lower() in dl_ids for m in RECOMMENDED_NLI_MODELS)
     # 过滤掉重排序模型，只保留真正的嵌入模型（供 KB 嵌入模型选择器使用）
     reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
-    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
+    nli_ids = {m["id"].lower() for m in RECOMMENDED_NLI_MODELS}
+    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids and m.get("model_id","").lower() not in nli_ids]
     Q = "'"
     def _mlist(role, models_def, current_path=""):
         """生成模型列表：role=embedding|rerank|fb, models_def=模型定义列表"""
@@ -1121,13 +1185,16 @@ def generate_html():
                 hdl = f'onchange=onFallbackModelChange({Q}{mid}{Q})'
             elif role=="rerank":
                 hdl = f'onchange=updateConfig("reranker","model_path",this.value)'
+            elif role=="nli":
+                hdl = f'onchange=updateConfig("nli","model_path",this.value)'
             else:
                 hdl = f'onchange=updateConfig("embedding","model_path",this.value)'
-            rows.append(f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="{role}-model" value="{mid}" id="{role[:3]}-{mid}" {checked} {hdl} style="flex-shrink:0;"><label for="{role[:3]}-{mid}" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{mid}">{"[嵌入] " if role=="embedding" else "[重排序] " if role=="rerank" else "[路由] "}{mid} <span style="color:#888;font-size:11px;">({m["size_mb"]}MB)</span></label><span style="font-size:11px;flex-shrink:0;color:{"#3B6D11" if ok else "#888"};">{st}</span>{bt}</div>')
+            rows.append(f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eee;"><input type="radio" name="{role}-model" value="{mid}" id="{role[:3]}-{mid}" {checked} {hdl} style="flex-shrink:0;"><label for="{role[:3]}-{mid}" style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{mid}">{"[嵌入] " if role=="embedding" else "[重排序] " if role=="rerank" else "[路由] " if role=="fb" else "[NLI] "}{mid} <span style="color:#888;font-size:11px;">({m["size_mb"]}MB)</span><span class="avail-indicator" data-model-id="{mid}" style="display:none;"></span></label><span style="font-size:11px;flex-shrink:0;color:{"#3B6D11" if ok else "#888"};">{st}</span>{bt}</div>')
         return "\n".join(rows)
     emb_model_html = _mlist("embedding", RECOMMENDED_MODELS, cfg.get("embedding",{}).get("model_path",""))
     rr_model_html = _mlist("rerank", RECOMMENDED_RERANK_MODELS, rerank_cfg.get("model_path",""))
-    fb_model_html = _mlist("fb", RECOMMENDED_RERANK_MODELS, fb_cfg.get("model_path",""))
+    nli_model_html = _mlist("nli", RECOMMENDED_NLI_MODELS, cfg.get("nli",{}).get("model_path",""))
+    fb_model_html = "<!-- 路由已改用嵌入模型，fb 选择器已废弃 -->"
     guard_labels = {"mermaid": "🧜 Mermaid", "code": "💻 代码块", "math": "∑ LaTeX公式", "table": "📊 表格", "html": "🌐 HTML结构"}
     active_guards = cfg.get("splitting", {}).get("guards", ["code"])
     guard_card_html = ""
@@ -1279,6 +1346,7 @@ def generate_html():
     config_prompt_json = _section_json("prompt")
     config_emb_retrieval_json = _section_json("embedding", "retrieval")
     config_reranker_json = _section_json("reranker")
+    config_nli_json = _section_json("nli")
     config_splitter_json = _section_json("splitting")
     config_router_json = _section_json("router")
     config_kb_json = _section_json("kb")
@@ -1348,6 +1416,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans
 .toggle-slider:before {{ position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: 0.3s; border-radius: 50%; }}
 input:checked + .toggle-slider {{ background: #667eea; }}
 input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
+input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
+.toggle-switch.disabled {{ opacity: 0.5; cursor: not-allowed; }}
 .src-dot {{ transition: color 0.3s; }}
 .src-dot.ready {{ color: #2b8a3e; }}
 .src-dot.missing {{ color: #c92a2a; }}
@@ -1458,7 +1528,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
   </div>
 
   <div class="card">
-    <h2>📦 嵌入模型</h2>
+    <h2>📦 嵌入模型 <span id="probe-indicator-embedding" style="font-weight:400;color:#888;font-size:12px;"></span></h2>
     <div style="max-height:300px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
       {emb_model_html}
     </div>
@@ -1622,10 +1692,11 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div class="form-group">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
           <label style="font-weight:600;color:#333;white-space:nowrap;">📤 出库路由</label>
-          <label class="toggle-switch" onclick="toggleRouter()">
-            <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""}><span class="toggle-slider"></span>
+          <label class="toggle-switch {"disabled" if not has_emb else ""}" onclick='if(!hasEmbeddingModel)return;toggleRouter()'>
+            <input type="checkbox" onclick="event.stopPropagation();" {"checked" if router_cfg.get("enabled", True) else ""} {"disabled" if not has_emb else ""}><span class="toggle-slider"></span>
           </label>
           <span style="font-size:13px;color:#555;white-space:nowrap;">{"已启用" if router_cfg.get("enabled", True) else "已禁用"}</span>
+          <span style="font-size:11px;color:#c92a2a;{"display:inline" if not has_emb else "display:none"};">请先下载嵌入模型</span>
         </div>
         <div style="font-size:12px;color:#888;margin-bottom:6px;">用户提问时路由到对应知识库检索（始终用嵌入模型，精排开时签名路由，关时关键词路由）</div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -1654,9 +1725,10 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <div class="form-row">
       <div class="form-group">
         <label>启用 Rerank</label>
-        <label class="toggle-switch" onclick="toggleReranker()">
-          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if rerank_cfg.get("enabled", False) else ""}><span class="toggle-slider"></span>
+        <label class="toggle-switch {"disabled" if not has_rr else ""}" onclick='if(!hasRerankerModel)return;toggleReranker()'>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if rerank_cfg.get("enabled", False) else ""} {"disabled" if not has_rr else ""}><span class="toggle-slider"></span>
         </label>
+        <span style="font-size:11px;color:#c92a2a;margin-left:8px;{"display:inline" if not has_rr else "display:none"};">请先下载 Rerank 模型</span>
       </div>
       <div class="form-group">
         <label>模式</label>
@@ -1675,7 +1747,7 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       </div>
     </div>
     <div style="margin-top:12px;">
-      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Rerank 模型</div>
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Rerank 模型 <span id="probe-indicator-rerank" style="font-weight:400;color:#888;font-size:11px;"></span></div>
       <div style="max-height:200px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
         {rr_model_html}
       </div>
@@ -1689,6 +1761,31 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="refreshSortRules()">🔄 刷新</button>
         <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="addSortRule()">➕ 添加规则</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NLI 分类层 -->
+  <div class="card">
+    <h2>🏷️ NLI 语义分类 <span style="font-weight:400;color:#888;font-size:12px;">— 对结合结果做蕴含/中立/矛盾三向标注（默认关闭）</span></h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>启用 NLI</label>
+        <label class="toggle-switch {"disabled" if not has_nli else ""}" onclick='if(!hasNLIModel)return;toggleNLI()'>
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if cfg.get("nli",{}).get("enabled", False) else ""} {"disabled" if not has_nli else ""}><span class="toggle-slider"></span>
+        </label>
+        <span style="color:#888;font-size:11px;margin-left:8px;">NLI 用 slice 关键词对每个 doc 做分类</span>
+        <span style="font-size:11px;color:#c92a2a;margin-left:4px;{"display:inline" if not has_nli else "display:none"};">请先下载 NLI 模型</span>
+      </div>
+      <div class="form-group">
+        <label>输出数量</label>
+        <span style="font-size:13px;color:#888;padding:6px 0;display:block;">跟随前级输出（rank=on 用 reranker.top_k，rank=off 用 retrieval.k）</span>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">NLI 模型 <span id="probe-indicator-nli" style="font-weight:400;color:#888;font-size:11px;"></span></div>
+      <div style="max-height:200px;width:100%;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:8px;">
+        {nli_model_html}
       </div>
     </div>
   </div>
@@ -1738,6 +1835,10 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     <details id="geek-section-reranker" style="margin-bottom:6px;">
       <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🏷️ 重排序</summary>
       <textarea id="geek-editor-reranker" rows="4" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_reranker_json}</textarea>
+    </details>
+    <details id="geek-section-nli" style="margin-bottom:6px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">🏷️ NLI 语义分类</summary>
+      <textarea id="geek-editor-nli" rows="3" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;margin-top:4px;resize:vertical;box-sizing:border-box;">{config_nli_json}</textarea>
     </details>
     <details id="geek-section-splitter" style="margin-bottom:6px;">
       <summary style="cursor:pointer;font-weight:600;font-size:13px;color:#555;padding:3px 0;">✂️ 切片策略</summary>
@@ -1792,6 +1893,9 @@ input:checked + .toggle-slider:before {{ transform: translateX(18px); }}
     </div>
   </div>
 </div>
+<script>
+var hasRerankerModel={{{"true" if has_rr else "false"}}};var hasNLIModel={{{"true" if has_nli else "false"}}};var hasEmbeddingModel={{{"true" if has_emb else "false"}}};
+</script>
 </body>
 </html>
 """
@@ -1828,6 +1932,8 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Expires", "0")
             self.end_headers()
             self.wfile.write(generate_html().encode("utf-8"))
+        elif path == "/api/availability-status":
+            self._send_json({"success": True, "results": dict(_AVAILABILITY_CACHE)})
         else:
             self.send_response(404)
             self.end_headers()
@@ -1846,8 +1952,7 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 cfg = load_config()
                 if section == "router":
                     rt = cfg.setdefault("router", {}); fb = rt.setdefault("fallback", {})
-                    if key == "model_path_fallback": fb["model_path"] = value
-                    elif key == "fallback_threshold": fb["min_score_threshold"] = value
+                    if key == "fallback_threshold": fb["min_score_threshold"] = value
                     else: rt[key] = value
                 elif section == "reranker":
                     cfg.setdefault("reranker", {})[key] = value
@@ -2153,12 +2258,13 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/kb-models":
                 """返回所有知识库的模型配置 + 下载的嵌入模型列表"""
                 from knowledge_base_manager import list_knowledge_bases, get_kb_model
-                from embedding_model_manager import list_downloaded_models, RECOMMENDED_RERANK_MODELS
+                from embedding_model_manager import list_downloaded_models, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS
                 kbs = list_knowledge_bases()
                 kb_models = {name: get_kb_model(name) for name in kbs}
                 all_models = list_downloaded_models()
                 reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
-                models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids]
+                nli_ids = {m["id"].lower() for m in RECOMMENDED_NLI_MODELS}
+                models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids and m.get("model_id","").lower() not in nli_ids]
                 self._send_json({"success": True, "kb_models": kb_models, "models": models})
 
             elif path == "/api/recommend":
@@ -2238,84 +2344,73 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({"success": False, "error": "empty"})
                     return
                 # 启动后台线程下载
-                def _dl_thread(mid):
-                    def _run():
+                def _dl_job(mid):
+                    try:
                         from embedding_model_manager import DOWNLOAD_SOURCES, download_model
                         from utils import cache_directory
-                        try:
-                            _download_tasks[mid] = {"status": "starting", "source": "准备中", "attempt": 0, "message": "", "size_mb": 0, "speed": ""}
-                            # 搜集有效源
-                            sources = [s["name"] for s in DOWNLOAD_SOURCES[:4] if s["name"] != "llm_find"]
-                            _download_tasks[mid]["status"] = "downloading"
-                            _download_tasks[mid]["source"] = sources[0] if sources else "?"
-                            _download_tasks[mid]["message"] = f"正在从 {sources[0] if sources else '?'} 下载..."
+                        import os, time, threading
 
-                            # 启动下载子线程
-                            dl_ok = [False]
-                            def _do_dl():
-                                try:
-                                    r = download_model(mid, sources=sources)
-                                    dl_ok[0] = r.get("success", False)
-                                except Exception as e:
-                                    _download_tasks[mid]["message"] = str(e)
-                                if not dl_ok[0]:
-                                    _download_tasks[mid]["status"] = "failed"
-                                    _download_tasks[mid]["message"] = "所有源均失败"
-                            t = threading.Thread(target=_do_dl, daemon=True)
-                            t.start()
+                        _download_tasks[mid] = {"status": "starting", "source": "准备中", "attempt": 0, "message": "", "size_mb": 0, "speed": ""}
+                        sources = [s["name"] for s in DOWNLOAD_SOURCES[:4] if s["name"] != "llm_find"]
+                        _download_tasks[mid]["status"] = "downloading"
+                        _download_tasks[mid]["source"] = sources[0] if sources else "?"
+                        _download_tasks[mid]["message"] = f"正在从 {sources[0] if sources else '?'} 下载..."
 
-                            # 监控进度 — 扫描 model_downloads 下该模型的所有缓存文件
-                            last_size = 0
-                            # HuggingFace 格式: models--BAAI--bge-m3
-                            hf_prefix = f"models--{mid.replace('/', '--')}"
-                            # ModelScope 格式: BAAI/bge-m3（直接在 cache_dir 下创建 org/name 目录）
-                            ms_prefix = mid.replace("/", os.sep)
-                            while t.is_alive():
-                                time.sleep(5)
-                                cur_size = 0
-                                dl_dir = os.path.join(cache_directory, "model_downloads")
-                                if os.path.isdir(dl_dir):
-                                    for root, _, fns in os.walk(dl_dir):
-                                        # 同时匹配 HF 和 ModelScope 两种缓存目录格式
-                                        if hf_prefix not in root and ms_prefix not in root:
+                        dl_ok = [False]
+                        def _do_dl():
+                            try:
+                                r = download_model(mid, sources=sources)
+                                dl_ok[0] = r.get("success", False)
+                            except Exception as e:
+                                _download_tasks[mid]["message"] = str(e)
+                            if not dl_ok[0]:
+                                _download_tasks[mid]["status"] = "failed"
+                                _download_tasks[mid]["message"] = "所有源均失败"
+                        t = threading.Thread(target=_do_dl, daemon=True)
+                        t.start()
+
+                        last_size = 0
+                        hf_prefix = f"models--{mid.replace('/', '--')}"
+                        ms_prefix = mid.replace("/", os.sep)
+                        while t.is_alive():
+                            time.sleep(5)
+                            cur_size = 0
+                            dl_dir = os.path.join(cache_directory, "model_downloads")
+                            if os.path.isdir(dl_dir):
+                                for root, _, fns in os.walk(dl_dir):
+                                    if hf_prefix not in root and ms_prefix not in root:
+                                        continue
+                                    for fn in fns:
+                                        if fn.endswith('.incomplete') or fn.endswith('.lock'):
                                             continue
-                                        for fn in fns:
-                                            if fn.endswith('.incomplete') or fn.endswith('.lock'):
-                                                continue
-                                            fp = os.path.join(root, fn)
-                                            try:
-                                                if os.path.isfile(fp):
-                                                    cur_size += os.path.getsize(fp)
-                                            except:
-                                                pass
-                                size_mb = cur_size / (1024*1024)
-                                spd = (cur_size - last_size) / 5
-                                if spd >= 1024*1024:
-                                    spd_str = f"{spd/1024/1024:.1f} MB/s"
-                                elif spd >= 1024:
-                                    spd_str = f"{spd/1024:.0f} KB/s"
-                                else:
-                                    spd_str = f"{spd:.0f} B/s"
-                                _download_tasks[mid].update({
-                                    "size_mb": round(size_mb, 1),
-                                    "speed": spd_str,
-                                })
-                                last_size = cur_size
+                                        fp = os.path.join(root, fn)
+                                        try:
+                                            if os.path.isfile(fp):
+                                                cur_size += os.path.getsize(fp)
+                                        except:
+                                            pass
+                            size_mb = cur_size / (1024*1024)
+                            spd = (cur_size - last_size) / 5
+                            if spd >= 1024*1024:
+                                spd_str = f"{spd/1024/1024:.1f} MB/s"
+                            elif spd >= 1024:
+                                spd_str = f"{spd/1024:.0f} KB/s"
+                            else:
+                                spd_str = f"{spd:.0f} B/s"
+                            _download_tasks[mid].update({"size_mb": round(size_mb, 1), "speed": spd_str})
+                            last_size = cur_size
 
-                            # 下载完成
-                            if dl_ok[0]:
-                                _download_tasks[mid] = {"status": "done", "source": "", "attempt": 0,
-                                                        "message": "下载完成", "size_mb": _download_tasks[mid].get("size_mb", 0), "speed": ""}
-                            elif _download_tasks[mid]["status"] != "failed":
-                                _download_tasks[mid] = {"status": "failed", "source": "", "attempt": 0,
-                                                        "message": "下载失败", "size_mb": _download_tasks[mid].get("size_mb", 0), "speed": ""}
-                        except Exception as e:
+                        if dl_ok[0]:
+                            _download_tasks[mid] = {"status": "done", "source": "", "attempt": 0,
+                                                    "message": "下载完成", "size_mb": _download_tasks[mid].get("size_mb", 0), "speed": ""}
+                        elif _download_tasks[mid]["status"] != "failed":
                             _download_tasks[mid] = {"status": "failed", "source": "", "attempt": 0,
-                                                    "message": str(e), "size_mb": 0, "speed": ""}
-                    t = threading.Thread(target=_run, daemon=True)
-                    t.start()
-                _dl_thread(mid)
-                self._send_json({"success": True, "message": "下载已启动"})
+                                                    "message": "下载失败", "size_mb": _download_tasks[mid].get("size_mb", 0), "speed": ""}
+                    except Exception as e:
+                        _download_tasks[mid] = {"status": "failed", "source": "", "attempt": 0,
+                                                "message": str(e), "size_mb": 0, "speed": ""}
+                t = threading.Thread(target=_dl_job, args=(mid,), daemon=True)
+                t.start()
 
             elif path == "/api/download-status":
                 d = self._read_body(); mid = d.get("model_id","")
@@ -2365,6 +2460,18 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 cfg = load_config(); rules = cfg.get("reranker", {}).get("sort_rules", [])
                 if 0 <= idx < len(rules): rules.pop(idx); save_config(cfg)
                 self._send_json({"success": True})
+            elif path == "/api/nli/toggle":
+                cfg = load_config(); nli = cfg.setdefault("nli", {})
+                nli["enabled"] = not nli.get("enabled", False)
+                save_config(cfg); self._send_json({"success": True, "enabled": nli["enabled"]})
+            elif path == "/api/probe-availability":
+                # 后台启动全量探测
+                import threading
+                t = threading.Thread(target=lambda: probe_all_models(), daemon=True)
+                t.start()
+                self._send_json({"success": True, "message": "探测已启动"})
+            elif path == "/api/availability-status":
+                self._send_json({"success": True, "results": dict(_AVAILABILITY_CACHE)})
             else:
                 self._send_json({"error": "unknown endpoint"}, 404)
 

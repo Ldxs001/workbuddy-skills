@@ -44,10 +44,11 @@ class Agent:
 - 错误示例（不会被解析）：`<action>`、`<ACTION>`、`<<action>>`、`<< Action>>`
 
 ## 知识库查询
-<<ACTION type="query" entities="实体1,实体2" attrs="属性" rel="关系词" kb="知识库名（可选）">>
-- entities：问题中的核心实体（逗号分隔）
-- attrs：查询的属性/维度
-- rel：实体间的关系（多个实体时填写）
+<<ACTION type="query" entities="名词1,名词2" attrs="目的" rel="行为" kb="知识库名（可选）">>
+- entities：**取主体/名词**。问题中涉及的核心事物、人物、概念，如"茅台"、"五粮液"、"神经网络"。多个用逗号分隔
+- attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel
+- rel：**取行为**。实体间的动作/关系。当有多个 entities 且它们之间存在动作关系（对比、区别、异同、差别、关系、比较等）时填写
+- 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
 
@@ -168,11 +169,11 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
         if atype == "query":
             if not action.get("entities") and not action.get("attrs"):
-                return "query 必须用 entities 和 attrs 参数标注成分，不要用 question。请标注出实体和属性后重试"
+                return "query 必须用 entities（主体/名词）和 attrs（目的）参数标注成分，不要用 question"
             if not action.get("entities"):
-                return "query 缺少 entities（实体），请标出问题中的实体"
+                return "query 缺少 entities（主体/名词），请标出问题中涉及的核心事物"
             if not action.get("attrs"):
-                return "query 缺少 attrs（属性），请标出问题的属性维度"
+                return "query 缺少 attrs（目的），请标出用户想查询的目标"
             # kb 校验
             qkb = action.get("kb", "")
             if qkb and qkb not in original_msg:
@@ -366,18 +367,28 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             return {"context": "", "kb": kb, "success": False, "has_context": False,
                     "error": "缺少 entities 或 attrs 参数"}
 
-        # 穷举组合
-        entity_list = [e.strip() for e in entities.split(",") if e.strip()]
-        attr_list = [a.strip() for a in attrs.split(",") if a.strip()]
+        # 穷举组合（支持中英文逗号）
+        import re
+        entity_list = [e.strip() for e in re.split(r'[,，]', entities) if e.strip()]
+        attr_list = [a.strip() for a in re.split(r'[,，]', attrs) if a.strip()]
+        # 如果指定了 rel（比较关系），从 attrs 中排除比较意图关键词
+        if rel:
+            _compare_kw = {"异同", "区别", "差别", "对比", "共同点", "不同点", "异同点", "差异"}
+            attr_list = [a for a in attr_list if a not in _compare_kw]
         _slices = set()
+        # 单实体 × 各属性
         for e in entity_list:
             for a in attr_list:
                 _slices.add(f"{e} {a}")
+        # 多实体组合
         if len(entity_list) >= 2:
+            joined = ' '.join(entity_list)
+            # 组合实体 × 各属性
             for a in attr_list:
-                _slices.add(f"{' '.join(entity_list)} {a}")
+                _slices.add(f"{joined} {a}")
+            # 组合实体 × 关系词
             if rel:
-                _slices.add(f"{' '.join(entity_list)} {rel}")
+                _slices.add(f"{joined} {rel}")
         slices = list(_slices)
 
         logger.info(f"组合查询: entities={entity_list}, attrs={attr_list}, rel={rel}")

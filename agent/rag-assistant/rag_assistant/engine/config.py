@@ -48,6 +48,11 @@ DEFAULT_CONFIG = {
         "top_k": 5,
         "sort_rules": [],
     },
+    "nli": {
+        "enabled": False,
+        "model_path": "MoritzLaurer/mDeBERTa-v3-base-xnli",
+        "top_k": 0,
+    },
     "retrieval": {
         "k": 3,
         "score_threshold": None,
@@ -108,6 +113,28 @@ def load_config():
             safe_json_dump(merged, get_config_path())
         except Exception:
             pass
+
+    # ═══════════ 模型路径自动修正 ═══════════
+    # 如果配置的模型路径无效（空/不存在/未下载），且有已下载的同类型模型，自动用第一个
+    try:
+        from embedding_model_manager import list_downloaded_models as _list_dl
+        _dl = _list_dl()
+        if _dl:
+            _dl_ids = {m["model_id"] for m in _dl}
+            # 类型映射：config section → model_index type
+            _type_map = {"embedding": "embedding", "reranker": "rerank", "nli": "nli"}
+            for _section, _key in [("embedding", "model_path"), ("reranker", "model_path"), ("nli", "model_path")]:
+                _path = merged.get(_section, {}).get(_key, "")
+                # 检查路径是否有效（在已下载列表中或是本地路径）
+                _valid = _path and (_path in _dl_ids or os.path.exists(_path))
+                if not _valid:
+                    _t = _type_map.get(_section)
+                    _candidates = [m for m in _dl if m.get("type") == _t]
+                    if _candidates:
+                        merged.setdefault(_section, {})[_key] = _candidates[0]["model_id"]
+    except Exception:
+        pass
+
     return merged
 
 

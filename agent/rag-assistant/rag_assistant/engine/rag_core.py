@@ -176,13 +176,34 @@ def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, e
 
 
 def build_context(docs):
-    """从检索结果构建上下文字符串"""
+    """从检索结果构建上下文字符串（含 NLI 标签渲染）"""
     parts = []
     for i, doc in enumerate(docs):
-        content = doc.page_content if hasattr(doc, "page_content") else str(doc)
-        meta = doc.metadata if hasattr(doc, "metadata") else {}
-        source = meta.get("source", meta.get("h1", f"[{i + 1}]"))
-        parts.append(f"[片段 {i + 1}] (来源: {source})\n{content}")
+        # 提取内容、元数据、NLI 标签（兼容 Document 和 dict 两种格式）
+        if hasattr(doc, "page_content"):
+            content = doc.page_content
+            meta = doc.metadata if hasattr(doc, "metadata") else {}
+            nli_label = meta.get("nli_label") if isinstance(meta, dict) else None
+            source = meta.get("source", meta.get("h1", f"[{i + 1}]"))
+        elif isinstance(doc, dict):
+            content = doc.get("content", str(doc))
+            meta = doc.get("metadata", {})
+            nli_label = doc.get("nli_label") or (meta.get("nli_label") if isinstance(meta, dict) else None)
+            source = meta.get("source", meta.get("h1", f"[{i + 1}]")) if isinstance(meta, dict) else f"[{i + 1}]"
+        else:
+            content = str(doc)
+            meta = {}
+            nli_label = None
+            source = f"[{i + 1}]"
+
+        # NLI 标签渲染
+        label_str = ""
+        if nli_label and isinstance(nli_label, dict):
+            max_label = max(["entailment", "neutral", "contradiction"], key=lambda k: nli_label.get(k, 0))
+            conf = nli_label.get(max_label, 0)
+            label_str = f" [NLI: {max_label}, {conf:.0%}]"
+
+        parts.append(f"[片段 {i + 1}] (来源: {source}){label_str}\n{content}")
     return "\n\n---\n\n".join(parts)
 
 
@@ -247,6 +268,27 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
     else:
         reranked_docs = all_docs
 
+    # ==================== NLI 分类阶段 ====================
+    # 与 reranker 完全独立的开关，用 slice 关键词对 doc 做三向分类
+    use_nli = cfg.get("nli", {}).get("enabled", False)
+    if use_nli and reranked_docs:
+        try:
+            from nli_classifier import NLIClassifier
+            nli_cfg = cfg.get("nli", {})
+            nli_top_k = nli_cfg.get("top_k", 0)
+            classifier = NLIClassifier(nli_cfg.get("model_path", ""))
+            nli_results = classifier.classify(question, reranked_docs, top_k=nli_top_k)
+            # 将 NLI 标签写入每个 Document 的 metadata
+            for nr in nli_results:
+                doc = nr["doc"]
+                label_dict = {k: v for k, v in nr.items() if k != "doc"}
+                if hasattr(doc, "metadata") and isinstance(doc.metadata, dict):
+                    doc.metadata["nli_label"] = label_dict
+                elif isinstance(doc, dict):
+                    doc["nli_label"] = label_dict
+        except Exception:
+            pass  # NLI 失败不影响主流程
+
     # ==================== 构建输出 ====================
     if not reranked_docs:
         return {
@@ -265,10 +307,17 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
     serialized = []
     for d in reranked_docs:
         source_kb = source_kb_map.get(id(d), kb_name)
+        # 提取 NLI 标签（Document metadata 或 dict 顶层）
+        nli_label = None
+        if hasattr(d, "metadata") and isinstance(d.metadata, dict):
+            nli_label = d.metadata.get("nli_label")
+        elif isinstance(d, dict):
+            nli_label = d.get("nli_label")
         serialized.append({
             "content": d.page_content if hasattr(d, "page_content") else str(d),
             "metadata": d.metadata if hasattr(d, "metadata") else {},
             "length": len(d.page_content) if hasattr(d, "page_content") else len(str(d)),
+            "nli_label": nli_label,
             "_kb": source_kb,
         })
 
