@@ -38,7 +38,7 @@
 ## [2.26.3] - 2026-07-09
 
 ### 修复
-- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `/c/Users/sm001/...` 未被扫描发现
+- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `[local-path-redacted]/...` 未被扫描发现
 - **LLM 决策逻辑修复**：`"路径"` 之前被纳入 public_labels 允许列表，导致公开文档中的真实路径被 keep。改为仅当没有 "本地绝对路径" / "家目录路径" 标签时才 keep
 
 ### 变更

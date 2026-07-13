@@ -7,7 +7,7 @@
         "label": "用户名（来自配置）",
         "severity": "low",
         "line": 11,
-        "match": "wUwproject",
+        "match": "[username-redacted]",
         "replace": "[username-redacted]",
         "span": [
           177,
@@ -25,7 +25,7 @@
         "label": "用户名（来自配置）",
         "severity": "low",
         "line": 3,
-        "match": "wUwproject",
+        "match": "[username-redacted]",
         "replace": "[username-redacted]",
         "span": [
           32,

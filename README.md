@@ -1,7 +1,7 @@
 # Skills Repository
 
 > **用户技能仓库与智能体仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-07-11
+> 最后更新：2026-07-13
 
 本仓库托管 wUwproject 技能合集与智能体项目，码云（Gitee）和 GitHub 双平台同步。
 
@@ -56,6 +56,7 @@ workbuddy-skills/
 ├── README.md
 ├── agent/
 ├── architecture/
+├── dist/
 └── skills/
 ```
 
