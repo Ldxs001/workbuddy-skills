@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.28.0",
-  "description": "将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复_push_with_cred_url/pull_with_cred_url 未检查 URL 内嵌 token 的缺陷（remote URL 已含 token 时不需查 git-credentials）。",
+  "version": "2.27.2",
+  "description": "将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复 step_llm_file_filter 决策缺失时 return set() 而非 sys.exit(1)，防止误删。",
   "author": "wUwproject",
   "tags": [
     "sync",

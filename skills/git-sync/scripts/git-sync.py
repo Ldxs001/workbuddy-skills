@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.12.0 - 完整 Python 版 git-sync
+git-sync.py v2.27.2 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [--skip-scan]
 """
@@ -11,12 +11,13 @@ import shutil
 import subprocess
 import argparse
 import builtins
+import textwrap
 
 # ── 路径集中管理 ─────────────────────────────────────────
 from _paths import (
     _data_dir_abs, DEFAULT_DATA_DIR_RAW, SKILL_DIR, SKILLS_ROOT as SKILLS_DIR,
     WORK_REPO, DIST_DIR, MANIFEST_FILE, README_FILE, GIT_CREDENTIALS,
-    SCAN_OUT_PREFIX,
+    SCAN_OUT_PREFIX, CONFIG_FILE,
 )
 
 # ── 编码安全 ─────────────────────────────────────────────
@@ -929,112 +930,95 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
             filter_scan.unlink(missing_ok=True)
             filter_decisions.unlink(missing_ok=True)
     else:
-        log("3.7", 8, f"LLM 决策文件未生成（无蓝图/无 LLM 响应），阻断：不保留任何文件", "warn")
-        # fail closed：无决策不放行
-        return set()
+        filter_scan.unlink(missing_ok=True)
+        return None  # 不破坏，等 LLM 审查后写决策文件再重跑
 
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
 
-def _find_pkg_dir(build_dir: Path) -> str:
-    for item in sorted(build_dir.iterdir()):
-        if item.is_dir() and not item.name.startswith("_") and not item.name.startswith(".")\
-           and item.name not in ("scripts","__pycache__","venv","env","dist","build","vendor","tools"):
-            if (item / "__init__.py").exists():
-                return item.name
-    for item in build_dir.iterdir():
-        if item.is_dir() and (item / "__init__.py").exists():
-            return item.name
-    return ""
-
 def step_pypi_publish(name: str, version: str, src_dir: Path):
-    """发布到 PyPI（隔离构建）"""
+    """发布到 PyPI（隔离构建，包含 pyproject.toml + long_description 修复）"""
     log(8, 8, f"发布 {name} 到 PyPI...")
     pypi_name = f"{name}-ldxs"
     build_dir = Path(tempfile.gettempdir()) / f"pypi_build_{name}_{version}"
     if build_dir.exists(): shutil.rmtree(build_dir)
     shutil.copytree(src_dir, build_dir,
                     ignore=shutil.ignore_patterns("__pycache__","*.pyc","dist","build","*.egg-info"))
-    pkg_dir = _find_pkg_dir(build_dir)
-    if not pkg_dir:
-        log(8,8,"PyPI 构建失败: 未检测到包目录","err")
-        shutil.rmtree(build_dir,ignore_errors=True)
-        return
     from pathlib import Path as _P
-    _P(str(build_dir / "pyproject.toml")).write_text(
-        "[build-system]\nrequires = [\"setuptools>=61\"]\nbuild-backend = \"setuptools.build_meta\"\n",
-        encoding="utf-8")
+
+    # 检测包目录名
+    pkg_dir = None
+    for d in ["rag_assistant", name.replace("-", "_"), name]:
+        if (build_dir / d).is_dir() and (build_dir / d / "__init__.py").exists():
+            pkg_dir = d; break
+    if not pkg_dir:
+        for d in build_dir.iterdir():
+            if d.is_dir() and not d.name.startswith(".") and d.name not in ("scripts","references","data","__pycache__"):
+                if (d / "__init__.py").exists(): pkg_dir = d.name; break
+    pkg_dir = pkg_dir or "rag_assistant"
+
+    # pyproject.toml（防止 setuptools>=61 Dynamic description bug）
+    _P(str(build_dir / "pyproject.toml")).write_text(textwrap.dedent(f"""\
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+"""), encoding="utf-8")
+
+    # setup.py（动态读取版本号 + long_description）
     _P(str(build_dir / "setup.py")).write_text(textwrap.dedent(f'''\
-import os
 from setuptools import setup, find_packages
-PKG="{pkg_dir}"
-f=os.path.join(os.path.dirname(__file__),PKG,"__init__.py")
+import os
+init_p=os.path.join(os.path.dirname(__file__),"{pkg_dir}","__init__.py")
 V="{version}"
-if os.path.exists(f):
-    with open(f) as fp:
-        V=next((l.split('"')[1] for l in fp if l.startswith("__version__")),V)
-rf=os.path.join(os.path.dirname(__file__),"requirements.txt")
+if os.path.exists(init_p):
+    with open(init_p) as f:
+        for l in f:
+            if l.startswith("__version__"): V=l.split('"')[1]; break
+req_p=os.path.join(os.path.dirname(__file__),"requirements.txt")
 REQ=[]
-if os.path.exists(rf):
-    with open(rf) as fp: REQ=[l.strip() for l in fp if l.strip() and not l.startswith("#")]
-rm=os.path.join(os.path.dirname(__file__),"README.md")
+if os.path.exists(req_p):
+    with open(req_p) as f: REQ=[l.strip() for l in f if l.strip() and not l.startswith("#")]
+    REQ=[r for r in REQ if not r.startswith("langchain")]
+readme_p=os.path.join(os.path.dirname(__file__),"README.md")
 LD="{name}"
-if os.path.exists(rm):
-    with open(rm,encoding="utf-8") as fp: LD=fp.read()
-setup(name="{pypi_name}",version=V,description="{name}",
+if os.path.exists(readme_p):
+    with open(readme_p,encoding="utf-8") as f: LD=f.read()
+setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       long_description=LD,long_description_content_type="text/markdown",
       author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
       url="https://github.com/Ldxs001/workbuddy-skills",
-      packages=find_packages(include=[PKG,PKG+".*"]),
-      include_package_data=True,python_requires=">=3.10",
-      install_requires=REQ,
+      packages=find_packages(),include_package_data=True,
+      python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
       classifiers=["Development Status :: 4 - Beta","Intended Audience :: Developers",
                    "License :: OSI Approved :: Apache Software License",
                    "Programming Language :: Python :: 3",
                    "Topic :: Scientific/Engineering :: Artificial Intelligence"])
-\'\'\'), encoding="utf-8")
-    _P(str(build_dir / "MANIFEST.in")).write_text(manifest, encoding="utf-8")
-
-    r = subprocess.run([sys.executable, "-m", "build", "--wheel"], cwd=str(build_dir),
-                       capture_output=True, text=True)
+'''), encoding="utf-8")
+    _P(str(build_dir / "MANIFEST.in")).write_text(
+        f"include requirements.txt\ninclude README.md\ninclude LICENSE\ninclude setup.py\ninclude main.py\n"
+        f"graft {pkg_dir}/\nprune __pycache__\nprune *.pyc\n", encoding="utf-8")
+    r = subprocess.run([sys.executable, "-m", "build"], cwd=str(build_dir), capture_output=True, text=True)
     if r.returncode != 0:
-        log(8,8,"PyPI 构建失败","err")
-        shutil.rmtree(build_dir,ignore_errors=True)
-        return
-
-    # 验证 wheel 元数据包含 long_description
-    whl_pattern = f"{pypi_name.replace('-','_')}-{version}-py3-none-any.whl"
-    whl_path = build_dir / "dist" / whl_pattern
-    if whl_path.exists():
-        import zipfile
-        with zipfile.ZipFile(str(whl_path)) as zf:
-            for mf in zf.namelist():
-                if mf.endswith("METADATA"):
-                    meta = zf.read(mf).decode("utf-8")
-                    if "Description:" not in meta and "Description-Content-Type:" not in meta:
-                        log(8,8,"PyPI 构建警告: 元数据缺少 long_description","warn")
-                    break
-
+        log(8,8,f"PyPI 构建失败: {r.stderr[:200]}","err")
+        shutil.rmtree(build_dir,ignore_errors=True); return
+    # 从 .pypirc 取 token
     token = ""
-    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),
-                         capture_output=True,text=True).stdout.strip()
-    if ":" in rmt and "@" in rmt:
-        tp = rmt.split("//")[1].split("@")[0]
-        if ":" in tp: token = tp.split(":")[1]
+    pypirc = Path.home() / ".pypirc"
+    if pypirc.exists():
+        for line in pypirc.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("password"):
+                token = line.split("=", 1)[1].strip()
+                break
     if not token: token = os.environ.get("PYPI_TOKEN","")
     if not token:
-        log(8,8,"未找到 PyPI token, 跳过上传","warn")
-        shutil.rmtree(build_dir,ignore_errors=True)
-        return
-
-    if whl_path.exists():
-        r = subprocess.run([sys.executable,"-m","twine","upload","--disable-progress",str(whl_path),
-                           "-u","__token__","-p",token],
+        log(8,8,"未找到 PyPI token（.pypirc / PYPI_TOKEN）","err")
+        shutil.rmtree(build_dir,ignore_errors=True); return
+    whl = build_dir / "dist" / f"{pypi_name.replace('-','_')}-{version}-py3-none-any.whl"
+    if whl.exists():
+        r = subprocess.run([sys.executable,"-m","twine","upload","--disable-progress",str(whl),"-u","__token__","-p",token],
                           capture_output=True,text=True,cwd=str(build_dir))
-        if r.returncode==0:
-            log(8,8,f"PyPI: https://pypi.org/project/{pypi_name}/","ok")
-        else:
-            log(8,8,f"PyPI 上传失败: {r.stderr[:200]}","err")
+        if r.returncode==0: log(8,8,f"PyPI: https://pypi.org/project/{pypi_name}/","ok")
+        else: log(8,8,f"PyPI 上传失败: {r.stderr[:200]}","err")
     shutil.rmtree(build_dir,ignore_errors=True)
 
 def step_clawhub_publish(name: str, version: str):
@@ -1065,6 +1049,11 @@ def step_release_create(name: str, typ: str, version: str):
     subprocess.run(["git","tag",tag],cwd=str(WORK_REPO),capture_output=True)
     for rm in ["gitee","github","origin"]:
         subprocess.run(["git","push",rm,tag],cwd=str(WORK_REPO),capture_output=True,timeout=30)
+    # 额外推 pypi trigger tag，触发 GitHub Actions Trusted Publisher 工作流
+    pypi_tag = f"pypi/{typ}s/{name}/v{version}"
+    subprocess.run(["git","tag",pypi_tag],cwd=str(WORK_REPO),capture_output=True)
+    for rm in ["gitee","github","origin"]:
+        subprocess.run(["git","push",rm,pypi_tag],cwd=str(WORK_REPO),capture_output=True,timeout=30)
     rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),capture_output=True,text=True).stdout.strip()
     token=""
     if ":" in rmt and "@" in rmt:
@@ -1146,22 +1135,42 @@ def main():
         print("       python {sys.argv[0]} all")
         sys.exit(1)
 
-    # ── 类型检测 ──────────────────────────────────────────────
-    skill_dir = SKILLS_DIR / name
-    agent_dir = SKILLS_DIR.parent / "agent" / name
-    is_skill = (skill_dir / "_meta.json").exists()
-    is_agent = (agent_dir / "rag_assistant" / "__init__.py").exists()
-    if is_skill:
-        typ = "skill"
-        src_dir = skill_dir
-        work_repo_subdir = f"skills/{name}"
-    elif is_agent:
-        typ = "agent"
-        src_dir = agent_dir
-        work_repo_subdir = f"agent/{name}"
-    else:
-        print(f"❌ 未找到项目: {name}（不在 skills/ 也不在 agent/）")
-        sys.exit(1)
+    # ── 类型检测（支持 config.source_overrides 覆盖源路径）──
+    is_skill = False
+    is_agent = False
+    override_dir = None
+    try:
+        cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+        overrides = cfg.get("source_overrides", {})
+        if name in overrides:
+            override_dir = Path(overrides[name])
+            if override_dir.is_dir():
+                if (override_dir / "_meta.json").exists():
+                    is_skill, typ, src_dir, work_repo_subdir = True, "skill", override_dir, f"skills/{name}"
+                elif (override_dir / "rag_assistant" / "__init__.py").exists():
+                    is_agent, typ, src_dir, work_repo_subdir = True, "agent", override_dir, f"agent/{name}"
+                else:
+                    print(f"❌ source_overrides 路径存在但无法识别类型: {override_dir}")
+                    sys.exit(1)
+    except Exception:
+        pass
+
+    if not override_dir:
+        skill_dir = SKILLS_DIR / name
+        agent_dir = SKILLS_DIR.parent / "agent" / name
+        is_skill = (skill_dir / "_meta.json").exists()
+        is_agent = (agent_dir / "rag_assistant" / "__init__.py").exists()
+        if is_skill:
+            typ = "skill"
+            src_dir = skill_dir
+            work_repo_subdir = f"skills/{name}"
+        elif is_agent:
+            typ = "agent"
+            src_dir = agent_dir
+            work_repo_subdir = f"agent/{name}"
+        else:
+            print(f"❌ 未找到项目: {name}（不在 skills/、agent/ 也不在 source_overrides）")
+            sys.exit(1)
     print(f"  类型: {typ}")
 
     # ── 读取版本号 ────────────────────────────────────────────
@@ -1174,7 +1183,7 @@ def main():
             except Exception:
                 pass
     else:
-        init_file = agent_dir / "rag_assistant" / "__init__.py"
+        init_file = src_dir / "rag_assistant" / "__init__.py"
         if init_file.exists():
             import re
             m = re.search(r'__version__\s*=\s*"([^"]+)"', init_file.read_text(encoding="utf-8"))
@@ -1216,6 +1225,9 @@ def main():
                 log(4, 8, "同步文件到工作仓库...")
                 # LLM 文件过滤：在复制前决定哪些文件可以进仓库
                 allowed = step_llm_file_filter(name, src_dir)
+                if allowed is None:
+                    log(4, 8, "LLM 文件审查未完成，跳过本次同步", "skip")
+                    return
                 if is_skill:
                     repo_skill_dir = sync_files(name, SKILLS_DIR, WORK_REPO, allowed)
                 else:
