@@ -5,6 +5,14 @@
 
 ---
 
+## [1.0.1] - 2026-07-14
+### 修复
+- **Qwen jinja template 连续 role 报错**：`_second_pass()` 中 `reasoning` 行被错标为 `assistant`，导致 messages 出现连续两个 assistant/user，触发 Qwen chat_template 渲染失败（"No user query found"）。修复为跳过 `reasoning` 行，保证 user/assistant 严格交替
+- **evidence key 校验反馈不明确**：`"以下词缺少原文出处"` 未指明问题出在 evidence key 必须与 entities/attrs 精确一致，导致 LLM 连续 6 次修错方向（去改 value 而非 key）。修复反馈消息为 `"以下词缺少 evidence key（必须与 entities/attrs 中的写法精确一致，不可改词）"`，同步修正 system prompt 中 evidence 说明
+
+### 新增
+- **新增查询类型：多维度分析**：BUILTIN_QUERY_TYPES 新增 `analysis` 类型，覆盖单主体+多分析维度场景（如"AI如何模仿人类情感、有什么缺陷、人类的独一无二性体现在哪里"）。entities=分析主体，attrs=分析维度A,分析维度B,分析维度C，rel=对比分析。不修改算法逻辑
+
 ## [1.0.0] - 2026-07-14
 ### 修复
 - **穷举组合算法修复**：单实体+多属性+rel 场景下，rel 的语义值未进入切片（`if len(entity_list) >= 2:` 短路导致 rel 切片完全丢失）。修复为三层泛化规则：

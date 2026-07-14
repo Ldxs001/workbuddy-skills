@@ -46,6 +46,15 @@ BUILTIN_QUERY_TYPES = {
             "rel": '"对比"',
         }
     },
+    "analysis": {
+        "label": "多维度分析",
+        "example": '"AI如何模仿人类情感、有什么缺陷、人类的独一无二性体现在哪里"',
+        "rules": {
+            "entities": "分析主体",
+            "attrs": "分析维度A,分析维度B,分析维度C",
+            "rel": "对比分析",
+        }
+    },
 }
 
 
@@ -81,7 +90,7 @@ class Agent:
 - attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel
 - rel：**取行为**。实体间的动作/关系。当存在比较、对比、对立关系时填写，填一个最贴切的词即可（如 rel="对比"）。
 - 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
-- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 是填的词，value 是这个词在用户问题中的原文出处。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **词可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但 value 必须使用原文原句，不能自己编造。
+- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词在用户问题中的原文出处。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但 evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
 
@@ -325,7 +334,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             # evidence 校验
             raw_ev = action.get("evidence", "")
             if not raw_ev:
-                return "query 缺少 evidence 参数。每个 entity 和 attr 都必须提供原文出处，格式：evidence='{\"词\":\"原文出处\"}'"
+                return "query 缺少 evidence 参数。每个 entity 和 attr 都必须提供原文出处，格式：evidence='{\"词\":\"原文出处\"}'。注意：evidence 的 key 必须与 entities/attrs 中的写法精确一致，不可改词、不可增减字"
             try:
                 ev = json.loads(raw_ev)
             except (json.JSONDecodeError, TypeError):
@@ -336,7 +345,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             all_terms = [t.strip() for t in re.split(r'[,，]', all_raw) if t.strip()]
             missing = [t for t in all_terms if t not in ev]
             if missing:
-                return f"以下词缺少原文出处: {', '.join(missing)}。请补充 evidence 中的对应条目"
+                return f"以下词缺少 evidence key（必须与 entities/attrs 中的写法精确一致，不可改词）: {', '.join(missing)}。请补充 evidence 中的对应条目"
             fakes = [f"「{k}」的出处「{v}」" for k, v in ev.items() if v not in original_msg]
             if fakes:
                 return f"以下出处不存在于用户问题中，必须使用原文原句: {'; '.join(fakes)}"
@@ -414,7 +423,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
         msgs = [{"role": "system", "content": sys_msg}]
 
-        # 带上历史对话，保持上下文连贯
+        # 带上历史对话，保持上下文连贯（只带 user/assistant，跳过 reasoning 防止连续 role）
         raw = self.memory.get_short_term(self.session_id)
         if raw.strip():
             for line in raw.strip().split("\n"):
@@ -423,9 +432,10 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                     continue
                 m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] (\w+): (.+)', line)
                 if m:
-                    role = "user" if m.group(1) == "user" else "assistant"
-                if m:
-                    role = "user" if m.group(1) == "user" else "assistant"
+                    role_raw = m.group(1)
+                    if role_raw == "reasoning":
+                        continue
+                    role = "user" if role_raw == "user" else "assistant"
                     msgs.append({"role": role, "content": f"[历史对话] {m.group(2)}"})
 
         msgs.append({"role": "user", "content": message})
