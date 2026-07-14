@@ -5,6 +5,10 @@
 
 ---
 
+## [1.0.3] - 2026-07-14
+### 里程碑
+- **PyPI 分类器升级为 5 - Production/Stable（正式版）**：pypi-build.py 构建脚本的 `Development Status` 从 `4 - Beta` 改为 `5 - Production/Stable`
+
 ## [1.0.2] - 2026-07-14
 ### 修复
 - **web_ui.py BUILTIN_QUERY_TYPES 缺 `analysis` 类型**：v1.0.1 后端 agent.py 已新增"多维度分析"查询类型，但 web_ui.py 的内置类型列表未同步，导致 Web 配置页面"查询类型参考"只显示 3 个老类型。已补全
