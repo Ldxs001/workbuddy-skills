@@ -5,6 +5,11 @@
 
 ---
 
+## [1.0.2] - 2026-07-14
+### 修复
+- **web_ui.py BUILTIN_QUERY_TYPES 缺 `analysis` 类型**：v1.0.1 后端 agent.py 已新增"多维度分析"查询类型，但 web_ui.py 的内置类型列表未同步，导致 Web 配置页面"查询类型参考"只显示 3 个老类型。已补全
+- **`compare` 类型 attrs 描述误导为单维度**：示例和 attrs 说明暗示只能填单个维度，导致 LLM 不敢填多维度。改为例句展示单维+多维两种场景，attrs 标注"多个用逗号分隔"
+
 ## [1.0.1] - 2026-07-14
 ### 修复
 - **Qwen jinja template 连续 role 报错**：`_second_pass()` 中 `reasoning` 行被错标为 `assistant`，导致 messages 出现连续两个 assistant/user，触发 Qwen chat_template 渲染失败（"No user query found"）。修复为跳过 `reasoning` 行，保证 user/assistant 严格交替

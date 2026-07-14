@@ -55,6 +55,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._serve_llm_config_get()
         elif path == "/api/config/search":
             self._serve_search_config_get()
+        elif path == "/api/config/query_types":
+            self._serve_query_types()
         elif path == "/api/agent/gaps":
             self._serve_agent_gaps()
         elif path.startswith("/api/agent/query"):
@@ -94,6 +96,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._update_search_config()
         elif path == "/api/search/toggle":
             self._toggle_search()
+        elif path == "/api/config/query_types":
+            self._update_query_types()
         elif path == "/api/memory/compress":
             self._compress_memory()
         elif path == "/api/memory/clear-context":
@@ -243,8 +247,8 @@ function switchTab(name) {{
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab')[map[name] || 0].classList.add('active');
-  document.getElementById(name + '-content').classList.add('active');
-  if (name === 'chat') document.getElementById('chat-input').focus();
+  [credential-redacted](name + '-content').classList.add('active');
+  if (name === 'chat') [credential-redacted]('chat-input').focus();
 }}
 
 // ── 对话 ──
@@ -252,36 +256,36 @@ let isStreaming = false;
 
 function sendMessage() {{
   if (isStreaming) return;
-  var input = document.getElementById('chat-input');
+  var input = [credential-redacted]('chat-input');
   var msg = input.value.trim();
   if (!msg) return;
   input.value = '';
   addMessage(msg, 'user');
   addMessage('思考中...', 'assistant', 'thinking');
   isStreaming = true;
-  document.getElementById('send-btn').disabled = true;
+  [credential-redacted]('send-btn').disabled = true;
 
   fetch('/api/chat', {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{message: msg}})
   }}).then(function(r){{return r.json()}}).then(function(d){{
-    var thinking = document.getElementById('thinking');
+    var thinking = [credential-redacted]('thinking');
     if (thinking) thinking.remove();
     if (d.success) {{
       addMessage(d.text, 'assistant', null, d.reasoning);
-      document.getElementById('kb-status').textContent = d.kb || '-';
+      [credential-redacted]('kb-status').textContent = d.kb || '-';
     }} else {{
       addMessage('抱歉，处理出错：' + (d.error || '未知错误'), 'system');
     }}
     isStreaming = false;
-    document.getElementById('send-btn').disabled = false;
+    [credential-redacted]('send-btn').disabled = false;
   }}).catch(function(e){{
-    var thinking = document.getElementById('thinking');
+    var thinking = [credential-redacted]('thinking');
     if (thinking) thinking.remove();
     addMessage('网络错误：' + e.message, 'system');
     isStreaming = false;
-    document.getElementById('send-btn').disabled = false;
+    [credential-redacted]('send-btn').disabled = false;
   }});
 }}
 
@@ -372,11 +376,11 @@ function addMessage(text, role, id, reasoning) {{
     div.appendChild(body);
   }}
 
-  document.getElementById('chat-messages').appendChild(div);
+  [credential-redacted]('chat-messages').appendChild(div);
   div.scrollIntoView({{behavior:'smooth', block:'end'}});
 }}
 
-document.getElementById('chat-input').addEventListener('keydown', function(e) {{
+[credential-redacted]('chat-input').addEventListener('keydown', function(e) {{
   if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
 }});
 </script>
@@ -443,26 +447,232 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
               <span id="search-status" style="font-size:11px;color:#888;"></span>
             </div>
           </div>
+          <div id="query-type-section" style="margin:8px 16px;background:#fff;border:1px solid #ddd;border-radius:8px;">
+            <div onclick="toggleQueryTypes()" style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;user-select:none;">
+              📋 查询类型参考 ▸
+            </div>
+            <div id="query-type-panel" style="display:none;padding:0 14px 14px;">
+              <div style="margin-bottom:10px;font-size:12px;color:#888;">
+                添加或编辑查询类型的填写指引，<code>_system_prompt()</code> 会自动展开。内置类型不可删除。
+              </div>
+              <div id="query-type-list"></div>
+              <button onclick="showAddQueryTypeForm()" style="margin-top:8px;padding:6px 14px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">+ 添加类型</button>
+            </div>
+          </div>
+          <script>
+          var queryTypes = {{}};
+
+          function toggleQueryTypes() {{
+            var p = [credential-redacted]('query-type-panel');
+            var h = p.previousElementSibling;
+            p.style.display = p.style.display === 'none' ? 'block' : 'none';
+            h.textContent = p.style.display === 'block' ? '📋 查询类型参考 ▾' : '📋 查询类型参考 ▸';
+            if (p.style.display === 'block' && !Object.keys(queryTypes).length) loadQueryTypes();
+          }}
+
+          function loadQueryTypes() {{
+            fetch('/api/config/query_types').then(function(r){{return r.json()}}).then(function(d){{
+              if (!d.success) return;
+              queryTypes = d.types || {{}};
+              renderQueryTypes();
+            }});
+          }}
+
+          function renderQueryTypes() {{
+            var list = [credential-redacted]('query-type-list');
+            list.innerHTML = '';
+            Object.keys(queryTypes).forEach(function(key) {{
+              var t = queryTypes[key];
+              var card = document.createElement('div');
+              card.style.cssText = 'margin:6px 0;padding:10px 12px;background:#f8f9fc;border-radius:6px;font-size:12px;';
+              // 标题行
+              var hdr = document.createElement('div');
+              hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;';
+              var st = document.createElement('strong');
+              st.textContent = t.label || key;
+              hdr.appendChild(st);
+              var bg = document.createElement('span');
+              bg.style.cssText = 'font-size:11px;color:' + (t.built_in ? '#888' : '#667eea') + ';';
+              bg.textContent = t.built_in ? '内置' : '自定义';
+              hdr.appendChild(bg);
+              card.appendChild(hdr);
+              // 示例
+              if (t.example) {{
+                var ex = document.createElement('div');
+                ex.style.cssText = 'color:#666;margin-bottom:4px;';
+                ex.textContent = '示例: ' + t.example;
+                card.appendChild(ex);
+              }}
+              // 规则表
+              if (t.rules) {{
+                var gd = document.createElement('div');
+                gd.style.cssText = 'color:#555;display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11px;';
+                var addRow = function(lb, vl) {{
+                  var l = document.createElement('span');
+                  l.style.cssText = 'color:#999;';
+                  l.textContent = lb;
+                  gd.appendChild(l);
+                  var v = document.createElement('span');
+                  v.textContent = vl || '-';
+                  gd.appendChild(v);
+                }};
+                addRow('entities', t.rules.entities);
+                addRow('attrs', t.rules.attrs);
+                addRow('rel', t.rules.rel);
+                card.appendChild(gd);
+              }}
+              // 操作按钮（仅自定义）
+              if (!t.built_in) {{
+                (function(k) {{
+                  var bw = document.createElement('div');
+                  bw.style.cssText = 'margin-top:6px;text-align:right;';
+                  var eb = document.createElement('button');
+                  eb.textContent = '编辑';
+                  eb.style.cssText = 'padding:2px 8px;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-size:11px;background:#fff;margin-right:4px;';
+                  eb.addEventListener('click', function() {{ editQueryType(k); }});
+                  bw.appendChild(eb);
+                  var db = document.createElement('button');
+                  db.textContent = '删除';
+                  db.style.cssText = 'padding:2px 8px;border:1px solid #e55;border-radius:4px;cursor:pointer;font-size:11px;background:#fff;color:#e55;';
+                  db.addEventListener('click', function() {{ deleteQueryType(k); }});
+                  bw.appendChild(db);
+                  card.appendChild(bw);
+                }})(key);
+              }}
+              list.appendChild(card);
+            }});
+          }}
+
+          function showQueryTypeForm(existing, onSave) {{
+            var overlay = [credential-redacted]('modal-overlay');
+            var box = [credential-redacted]('modal-box');
+            box.style.maxWidth = '560px';
+            [credential-redacted]('modal-title').textContent = existing ? '编辑查询类型' : '添加查询类型';
+            var msg = [credential-redacted]('modal-msg');
+            msg.innerHTML = '';
+            msg.style.textAlign = 'left';
+            msg.style.fontSize = '13px';
+            msg.style.color = '#444';
+            msg.style.marginBottom = '16px';
+            msg.style.maxHeight = '60vh';
+            msg.style.overflowY = 'auto';
+            var addField = function(lbl, help, value) {{
+              var wrap = document.createElement('div');
+              wrap.style.cssText = 'margin-bottom:12px;';
+              var l = document.createElement('div');
+              l.style.cssText = 'font-weight:500;margin-bottom:4px;color:#333;';
+              l.textContent = lbl;
+              wrap.appendChild(l);
+              var input = document.createElement('input');
+              input.type = 'text';
+              input.style.cssText = 'width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;box-sizing:border-box;';
+              input.value = value || '';
+              wrap.appendChild(input);
+              wrap._input = input;
+              if (help) {{
+                var h = document.createElement('div');
+                h.style.cssText = 'font-size:11px;color:#999;margin-top:3px;line-height:1.4;';
+                h.textContent = help;
+                wrap.appendChild(h);
+              }}
+              msg.appendChild(wrap);
+              return wrap;
+            }};
+            var existingRules = (existing && existing.rules) ? existing.rules : {{}};
+            var labelF = addField('类型名称 *', '内部 key，自动用 custom_<时间戳> 生成', existing ? existing.label : '');
+            var exampleF = addField('示例问题', '一个能代表此类问题的问题示例。LLM 通过示例学习模式', existing ? existing.example : '');
+            var entitiesF = addField('entities 填写规则', '说明此类问题，entities 应该填什么。例如：取主体/名词，问题涉及的核心事物', existingRules.entities || '');
+            var attrsF = addField('attrs 填写规则', '说明此类问题，attrs 应该填什么。例如：目的/属性，用户想查询的维度', existingRules.attrs || '');
+            var relF = addField('rel 填写规则', '说明此类问题，rel 应该填什么。例如：留空 / 对比 / 因果', existingRules.rel || '');
+            var btns = [credential-redacted]('modal-buttons');
+            btns.innerHTML = '';
+            var cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.className = 'modal-btn';
+            cancelBtn.onclick = function() {{ hideModal(); }};
+            btns.appendChild(cancelBtn);
+            var saveBtn = document.createElement('button');
+            saveBtn.textContent = '保存';
+            saveBtn.className = 'modal-btn-primary';
+            saveBtn.onclick = function() {{
+              var data = {{
+                label: labelF._input.value.trim(),
+                example: exampleF._input.value.trim(),
+                rules: {{
+                  entities: entitiesF._input.value.trim(),
+                  attrs: attrsF._input.value.trim(),
+                  rel: relF._input.value.trim()
+                }}
+              }};
+              if (!data.label) {{
+                showModal('提示', '类型名称不能为空', [{{text:'知道了'}}]);
+                return;
+              }}
+              hideModal();
+              onSave(data);
+            }};
+            btns.appendChild(saveBtn);
+            overlay.style.display = 'flex';
+            labelF._input.focus();
+          }}
+
+          function saveQueryType(existing, data) {{
+            var body = {{label:data.label, example:data.example, rules:data.rules}};
+            if (existing) body.key = existing;
+            fetch('/api/config/query_types', {{
+              method:'POST', headers:{{'Content-Type':'application/json'}},
+              body:JSON.stringify(body)
+            }}).then(function(r){{return r.json()}}).then(function(d){{
+              if (d.success) loadQueryTypes();
+            }});
+          }}
+
+          function showAddQueryTypeForm() {{
+            showQueryTypeForm(null, function(data) {{ saveQueryType(null, data); }});
+          }}
+
+          function editQueryType(key) {{
+            var t = queryTypes[key];
+            if (!t) return;
+            showQueryTypeForm(t, function(data) {{ saveQueryType(key, data); }});
+          }}
+
+          function deleteQueryType(key) {{
+            var t = queryTypes[key];
+            if (!t) return;
+            showModal('删除确认', '确定删除查询类型「' + (t.label || key) + '」？', [
+              {{text:'取消', action:function(){{}}}},
+              {{text:'确定删除', primary:true, action:function(){{
+                fetch('/api/config/query_types', {{
+                  method:'POST', headers:{{'Content-Type':'application/json'}},
+                  body:JSON.stringify({{action:'delete', key:key}})
+                }}).then(function(r){{return r.json()}}).then(function(d){{
+                  if (d.success) loadQueryTypes();
+                }});
+              }} }}
+            ]);
+          }}
+          </script>
         </div>
         <iframe src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:calc(100vh - 100px);border:none;"></iframe>
         <script>
         function saveLLM() {{
-          var savedModel = document.getElementById('llm-model').value;
+          var savedModel = [credential-redacted]('llm-model').value;
           fetch('/api/config/llm', {{
             method:'POST', headers:{{'Content-Type':'application/json'}},
             body:JSON.stringify({{
-              backend: document.getElementById('llm-backend').value,
-              model: document.getElementById('llm-model').value,
-              timeout: parseInt(document.getElementById('llm-timeout').value) || 180,
-              maxtokens: parseInt(document.getElementById('llm-maxtokens').value) || 4096
+              backend: [credential-redacted]('llm-backend').value,
+              model: [credential-redacted]('llm-model').value,
+              timeout: parseInt([credential-redacted]('llm-timeout').value) || 180,
+              maxtokens: parseInt([credential-redacted]('llm-maxtokens').value) || 4096
             }})
           }}).then(function(){{
-            if(savedModel) document.getElementById('llm-model').value = savedModel;
+            if(savedModel) [credential-redacted]('llm-model').value = savedModel;
           }});
         }}
         function loadModels() {{
-          var sel = document.getElementById('llm-model');
-          var backend = document.getElementById('llm-backend').value;
+          var sel = [credential-redacted]('llm-model');
+          var backend = [credential-redacted]('llm-backend').value;
           sel.innerHTML = '<option value="">加载中...</option>';
           fetch('/api/llm/models?backend=' + encodeURIComponent(backend))
             .then(function(r){{return r.json()}})
@@ -472,32 +682,32 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
                 d.models.forEach(function(m){{
                   var o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
                 }});
-              document.getElementById('llm-status').textContent = (d.models||[]).length + ' 个模型';
-              document.getElementById('llm-config').textContent = (d.models||[]).length + ' 个模型';
+              [credential-redacted]('llm-status').textContent = (d.models||[]).length + ' 个模型';
+              [credential-redacted]('llm-config').textContent = (d.models||[]).length + ' 个模型';
             }});
         }}
         setTimeout(loadModels, 500);
         // 等模型加载完后恢复配置
         setTimeout(function check(){{
-          var sel = document.getElementById('llm-model');
+          var sel = [credential-redacted]('llm-model');
           if(sel.options.length <= 1) {{ setTimeout(check, 500); return; }}
           fetch('/api/config/llm').then(function(r){{return r.json()}}).then(function(cfg){{
             if(cfg.model) for(var i=0;i<sel.options.length;i++)
               if(sel.options[i].value === cfg.model) {{ sel.value = cfg.model; break; }}
-            document.getElementById('llm-config').textContent = (cfg.model || '-') + ' / ' + (cfg.max_tokens || '?') + ' tok';
+            [credential-redacted]('llm-config').textContent = (cfg.model || '-') + ' / ' + (cfg.max_tokens || '?') + ' tok';
           }});
         }}, 1000);
 
         function testLLM() {{
-          document.getElementById('llm-status').textContent = '测试中...';
+          [credential-redacted]('llm-status').textContent = '测试中...';
           fetch('/api/llm/test').then(function(r){{return r.json()}}).then(function(d){{
-            document.getElementById('llm-status').textContent = d.success ? '✓ 连接正常' : '✖ 连接失败';
+            [credential-redacted]('llm-status').textContent = d.success ? '✓ 连接正常' : '✖ 连接失败';
           }});
         }}
 
         function toggleWebSearch() {{
-          var enabled = document.getElementById('web-search-enabled').checked;
-          document.getElementById('search-config').style.display = enabled ? 'block' : 'none';
+          var enabled = [credential-redacted]('web-search-enabled').checked;
+          [credential-redacted]('search-config').style.display = enabled ? 'block' : 'none';
           fetch('/api/search/toggle', {{
             method:'POST', headers:{{'Content-Type':'application/json'}},
             body:JSON.stringify({{enabled: enabled}})
@@ -505,29 +715,29 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         }}
 
         function onSearchBackendChange() {{
-          var v = document.getElementById('search-backend').value;
-          document.getElementById('search-key-group').style.display = (v==='tavily' || v==='custom') ? 'inline-block' : 'none';
-          document.getElementById('search-google-group').style.display = (v==='google') ? 'inline-block' : 'none';
-          document.getElementById('search-bing-group').style.display = (v==='bing') ? 'inline-block' : 'none';
-          document.getElementById('search-custom-group').style.display = (v==='custom') ? 'inline-block' : 'none';
+          var v = [credential-redacted]('search-backend').value;
+          [credential-redacted]('search-key-group').style.display = (v==='tavily' || v==='custom') ? 'inline-block' : 'none';
+          [credential-redacted]('search-google-group').style.display = (v==='google') ? 'inline-block' : 'none';
+          [credential-redacted]('search-bing-group').style.display = (v==='bing') ? 'inline-block' : 'none';
+          [credential-redacted]('search-custom-group').style.display = (v==='custom') ? 'inline-block' : 'none';
           saveSearchConfig();
         }}
 
         function saveSearchConfig() {{
           var body = {{
-            enabled: document.getElementById('web-search-enabled').checked,
-            backend: document.getElementById('search-backend').value,
-            api_key: document.getElementById('search-api-key') ? document.getElementById('search-api-key').value : '',
-            google_key: document.getElementById('search-google-key') ? document.getElementById('search-google-key').value : '',
-            google_cx: document.getElementById('search-google-cx') ? document.getElementById('search-google-cx').value : '',
-            bing_key: document.getElementById('search-bing-key') ? document.getElementById('search-bing-key').value : '',
-            custom_url: document.getElementById('search-custom-url') ? document.getElementById('search-custom-url').value : '',
+            enabled: [credential-redacted]('web-search-enabled').checked,
+            backend: [credential-redacted]('search-backend').value,
+            api_key: [credential-redacted]('search-api-key') ? [credential-redacted]('search-api-key').value : '',
+            google_key: [credential-redacted]('search-google-key') ? [credential-redacted]('search-google-key').value : '',
+            google_cx: [credential-redacted]('search-google-cx') ? [credential-redacted]('search-google-cx').value : '',
+            bing_key: [credential-redacted]('search-bing-key') ? [credential-redacted]('search-bing-key').value : '',
+            custom_url: [credential-redacted]('search-custom-url') ? [credential-redacted]('search-custom-url').value : '',
           }};
           fetch('/api/config/search', {{
             method:'POST', headers:{{'Content-Type':'application/json'}},
             body:JSON.stringify(body)
           }}).then(function(r){{return r.json()}}).then(function(d){{
-            document.getElementById('search-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败';
+            [credential-redacted]('search-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败';
           }});
         }}
 
@@ -550,8 +760,8 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
         <div class="chat-input">
           <input type="file" id="file-input" multiple style="display:none" onchange="onFileSelected(this.files)">
           <input type="file" id="folder-input" webkitdirectory style="display:none" onchange="onFolderSelected(this.files)">
-          <button onclick="document.getElementById('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
-          <button onclick="document.getElementById('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
+          <button onclick="[credential-redacted]('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
+          <button onclick="[credential-redacted]('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
           <div id="file-status" style="display:none;flex:0 0 auto;max-width:260px;padding:6px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:12px;color:#2e7d32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
           <textarea id="chat-input" rows="2" placeholder="输入问题或提问文件内容..."></textarea>
           <button id="send-btn" onclick="sendMessage()">发送</button>
@@ -567,11 +777,11 @@ function formatSize(bytes) {{
 
 // ── 模态弹窗 ──
 function showModal(title, msg, buttons) {{
-  var overlay = document.getElementById('modal-overlay');
-  var box = document.getElementById('modal-box');
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-msg').textContent = msg;
-  var btns = document.getElementById('modal-buttons');
+  var overlay = [credential-redacted]('modal-overlay');
+  var box = [credential-redacted]('modal-box');
+  [credential-redacted]('modal-title').textContent = title;
+  [credential-redacted]('modal-msg').textContent = msg;
+  var btns = [credential-redacted]('modal-buttons');
   btns.innerHTML = '';
   (buttons || [{{text:'确定',primary:true,action:function(){{hideModal();}}}}]).forEach(function(b){{
     var btn = document.createElement('button');
@@ -583,7 +793,7 @@ function showModal(title, msg, buttons) {{
   overlay.style.display = 'flex';
 }}
 function hideModal() {{
-  document.getElementById('modal-overlay').style.display = 'none';
+  [credential-redacted]('modal-overlay').style.display = 'none';
 }}
 
         function onFileSelected(files) {{
@@ -603,7 +813,7 @@ function hideModal() {{
           var uploaded = [];
           function next(i) {{
             if (i >= files.length) {{
-              var el = document.getElementById('uploading');
+              var el = [credential-redacted]('uploading');
               if (el) el.remove();
               if (uploaded.length) {{
                 var msg = '📦 已上传 ' + uploaded.length + ' 个文件到服务器，可以说「入库」批量导入';
@@ -635,7 +845,7 @@ function hideModal() {{
         }}
 
         function updateFileStatus() {{
-          var el = document.getElementById('file-status');
+          var el = [credential-redacted]('file-status');
           if (!uploadedPaths.length) {{ el.style.display = 'none'; return; }}
           var names = uploadedPaths.map(function(p){{ return p.split('/').pop() || p.split('\\\\').pop(); }}).slice(0, 3).join(', ');
           el.textContent = '📦 已上传 ' + uploadedPaths.length + ' 个文件: ' + names;
@@ -646,7 +856,7 @@ function hideModal() {{
         function resetMemory() {{
           showModal('重置对话', '确定重置当前对话？所有历史消息将被清空。', [
             {{text:'取消',action:function(){{}}}},
-            {{text:'确定重置',primary:true,action:function(){{fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) document.getElementById('chat-messages').innerHTML = '<div class=\"msg assistant\">对话已重置。</div>';}});}}}}
+            {{text:'确定重置',primary:true,action:function(){{fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) [credential-redacted]('chat-messages').innerHTML = '<div class=\"msg assistant\">对话已重置。</div>';}});}}}}
           ]);
         }}
 
@@ -663,7 +873,7 @@ function hideModal() {{
         function clearContext() {{
           showModal('清除上下文', '确定清除上下文？后台会先保存当前对话摘要再清空。', [
             {{text:'取消',action:function(){{}}}},
-            {{text:'确定清除',primary:true,action:function(){{fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) document.getElementById('chat-messages').innerHTML = '<div class=\"msg assistant\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>'; else showModal('清除失败', d.error || '未知错误', [{{text:'知道了'}}]);}});}}}}
+            {{text:'确定清除',primary:true,action:function(){{fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) [credential-redacted]('chat-messages').innerHTML = '<div class=\"msg assistant\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>'; else showModal('清除失败', d.error || '未知错误', [{{text:'知道了'}}]);}});}}}}
           ]);
         }}
 
@@ -671,7 +881,7 @@ function hideModal() {{
         function loadChatHistory() {{
           fetch('/api/chat/history').then(function(r){{return r.json()}}).then(function(d){{
             if(d.success && d.messages && d.messages.length) {{
-              var container = document.getElementById('chat-messages');
+              var container = [credential-redacted]('chat-messages');
               container.innerHTML = '';
               d.messages.forEach(function(m){{
                 addMessage(m.content, m.role, null, m.reasoning || null);
@@ -994,6 +1204,76 @@ function hideModal() {{
         if self.agent and hasattr(self.agent, 'web_search_enabled'):
             self.agent.web_search_enabled = cfg["web_search_enabled"]
         self._send_json({"success": True})
+
+    # ═══════════════ 查询类型管理 ═══════════════
+    BUILTIN_QUERY_TYPES = {
+        "fact": {"label": "事实查询", "example": '"茅台的价格是多少？"',
+                 "rules": {"entities": "主体/名词", "attrs": "目的/属性", "rel": "留空"},
+                 "built_in": True},
+        "compare": {"label": "实体对比",
+                    "example": '"茅台和五粮液酿造工艺异同" 或 "茅台和五粮液在口感、工艺、历史方面的对比"',
+                    "rules": {"entities": "被对比的多个实体，逗号分隔",
+                              "attrs": "对比维度，多个用逗号分隔（如 酿造工艺 或 酿造工艺,口感,历史）",
+                              "rel": "对比"},
+                    "built_in": True},
+        "opposition": {"label": "二元对立", "example": '"AI是顺着倾向回答还是独立思考"',
+                       "rules": {"entities": "主体", "attrs": "对立面A,对立面B", "rel": "对比"},
+                       "built_in": True},
+        "analysis": {"label": "多维度分析",
+                     "example": '"AI如何模仿人类情感、有什么缺陷、人类的独一无二性体现在哪里"',
+                     "rules": {"entities": "分析主体", "attrs": "分析维度A,分析维度B,分析维度C",
+                               "rel": "对比分析"},
+                     "built_in": True},
+    }
+
+    def _serve_query_types(self):
+        """返回所有查询类型（内置+自定义）"""
+        types = dict(self.BUILTIN_QUERY_TYPES)
+        if SKILL_AVAILABLE:
+            try:
+                cfg = load_config()
+                custom = cfg.get("query_types", {})
+                if isinstance(custom, dict):
+                    for k, v in custom.items():
+                        v["built_in"] = False
+                        types[k] = v
+            except Exception:
+                pass
+        self._send_json({"types": types, "success": True})
+
+    def _update_query_types(self):
+        body = self._read_body()
+        action = body.get("action", "save")
+        if action == "delete":
+            key = body.get("key", "")
+            if not key or key in self.BUILTIN_QUERY_TYPES:
+                self._send_json({"success": False, "error": "内置类型不可删除"})
+                return
+            if SKILL_AVAILABLE:
+                cfg = load_config()
+                types = cfg.get("query_types", {})
+                if isinstance(types, dict) and key in types:
+                    del types[key]
+                    cfg["query_types"] = types
+                    save_config(cfg)
+            self._send_json({"success": True})
+            return
+        # save / update
+        label = body.get("label", "").strip()
+        example = body.get("example", "").strip()
+        rules = body.get("rules", {})
+        if not label or not rules:
+            self._send_json({"success": False, "error": "名称和填写规则不能为空"})
+            return
+        import time
+        key = body.get("key", "") or f"custom_{int(time.time())}"
+        entry = {"label": label, "example": example, "rules": rules, "built_in": False}
+        if SKILL_AVAILABLE:
+            cfg = load_config()
+            types = cfg.setdefault("query_types", {})
+            types[key] = entry
+            save_config(cfg)
+        self._send_json({"success": True, "key": key})
 
     def _reset_memory(self):
         if self.agent:
