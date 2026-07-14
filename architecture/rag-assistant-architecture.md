@@ -3,7 +3,7 @@
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-13 (v0.9.5)
+> 更新：2026-07-14 (v1.0.0)
 
 ---
 
@@ -16,7 +16,12 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
   → [LLM 决策层]
        ├─ 闲聊 → 直接回答
        └─ 知识库查询 → entities/attrs/rel 分词
-           → [组合展开器] 穷举 entities × attrs（≥2 entity 时两两配对 + attrs + rel）
+           → [组合展开器] 穷举三层泛化规则：
+              第一层：entity × attr 笛卡尔积（事实块检索，始终执行）
+              第二层：全实体联合 × attr（多实体时执行）
+              第三层：rel 驱动两两无重复配对
+                - ≥2 entities：entity 两两配对 × attr × rel
+                - 1 entity：attr 两两配对 × rel
            → [多切片检索] 每片独立走完整 RAG 流程
               1. 路由（route_query → 嵌入模型 × KB签名/关键词）
               2. 检索（retrieve_documents → ChromaDB 相似度 + HNSW 自动修复）
@@ -24,7 +29,7 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
               4. (可选) NLI 三向分类（entailment / neutral / contradiction）
               5. 构建上下文（build_context，含 NLI 标签渲染 + SM3 去重）
            → [SM3 国密去重合并] 按内容哈希去重
-           → [LLM 综合回答] 基于完整上下文 + 用户画像 + 3插槽 prompt 生成回答
+           → [LLM 综合回答] 基于上下文 + 用户画像 + 3插槽 prompt 生成回答
            → [引用门禁] 校验 LLM 回答中的 [n] 引用是否在资料段落范围内
 ```
 
@@ -33,9 +38,9 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 | 原则 | 说明 |
 |------|------|
 | **LLM 分词 > 规则分词** | 实体/属性由 LLM 基于语义标注，不依赖关键词规则 |
-| **穷举 > 猜测** | 所有 entities × attrs 组合都查一遍，不预判哪组最优。rel 时 entities 两两配对 |
+| **穷举 > 猜测** | 所有 entities × attrs 组合都查一遍（事实块），不预判哪组最优。rel 驱动两两无重复配对——≥2 entities 时 entity 配对，1 entity 时 attr 配对 |
 | **去重 > 冗余** | SM3 国密哈希按内容去重，避免重复上下文浪费 token |
-| **自修正 > 静默丢弃** | LLM 格式错误时反馈重试（v0.9.5: `chat()` 传 `max_retries=2`），不静默吞掉 |
+| **自修正 > 静默丢弃** | LLM 格式错误时反馈重试（v1.0.0: `chat()` 传 `max_retries=5`，2 阶段小循环），5 次失败后禁止 LLM 自由回答（防捏造引用） |
 | **技能完整走 > 绕路** | 每片独立走 route_query → retrieve_documents → reranker → NLI → build_context 全流程，不改造技能内部逻辑 |
 | **配置持久化 > 运行时内存** | 所有配置（LLM / 路由 / 重排序 / NLI / 切片 / prompt 插槽）写入 `rag_config.json`，刷新页面不丢 |
 | **历史隔离 > 上下文污染** | 第一轮 LLM 决策仅传压缩摘要（不传完整历史），避免上一轮 entities 泄漏到当前决策 |
@@ -102,8 +107,8 @@ rag-assistant/
 ├── .gitignore
 │
 ├── rag_assistant/                   # ★ 智能体核心层
-│   ├── __init__.py                  # 版本号: 0.9.5
-│   ├── agent.py                     # Agent 决策循环（~620 行）
+│   ├── __init__.py                  # 版本号: 1.0.0
+│   ├── agent.py                     # Agent 决策循环（~780 行）
 │   ├── web_ui.py                    # Web 界面（port 8765，~1300 行）
 │   ├── llm_client.py                # LLM 统一客户端
 │   ├── rag_wrapper.py               # RAG 封装桥接层
@@ -164,32 +169,47 @@ rag-assistant/
 
 ### 3.1 决策循环 — `agent.py`
 
-核心是 `_decide_with_retry()` 方法，实现 **LLM 决策 → 解析 → 校验 → 自修正** 闭环。
-第一轮决策（`_build_first_pass_messages`）**不传完整历史对话**，仅传压缩摘要作为 system context，避免上一轮查询 entities 泄漏到当前决策：
+核心是 `_decide_with_retry()` 方法，实现 **LLM 决策 → 解析 → 校验 → 自修正** 闭环。两阶段设计：
+
+**阶段 1（模式判定）**：单次 LLM 调用，确定 chat / action 模式。`_build_first_pass_messages` **不传完整历史对话**，仅传压缩摘要作为 system context，避免上一轮查询 entities 泄漏到当前决策。
+
+**阶段 2（动作校验小循环）**：仅 action 模式进入（query/search/import）。LLM 一旦进入 action 模式，**必须在重试中保持 action 模式**，不允许通过"不输出 <<ACTION>>"逃避校验。5 次校验均失败 → 返回结构化错误，**禁止 LLM 自由回答**（防止捏造引用）。
 
 ```
 用户输入
   ↓
 memory.append_short_term()           # 写入用户输入
   ↓
-_decide_with_retry(message, max_retries=2)
+_decide_with_retry(message, max_retries=5)
   ↓
 _build_first_pass_messages(message)
-  ├─ system prompt（含动作格式说明）
+  ├─ system prompt（含动作格式说明 + entities/attrs/rel 语义规则）
   ├─ 压缩摘要作为 System context（【历史对话，仅作参考】）
   ├─ 用户画像提示（prompt_manager.build_persona_context()）
   └─ 当前消息作为 user message
   ↓
-LLM 首次推理
+┌─ LLM 首次推理 ──────────────────────────────┐
+│  阶段 1（模式判定，单次调用）                    │
+│  ↓                                              │
+│  _parse_action(reply)                           │
+│   ├─ (None, None) → 直接聊天回复 ✅             │
+│   ├─ 聊天动作 → chat 模式 ✅                     │
+│   └─ 解析错误或有效 action → 进入阶段 2          │
+└────────────────────────────────────────────────┘
   ↓
-_parse_action(reply)                 # 状态机解析 <<ACTION ...>>
-  ├─ (None, None) → 直接聊天回复
-  ├─ (None, "错误原因") → 追加到 messages → LLM 修正重试（最多 2 次）
-  └─ ({...}, None) → _validate_action()
-       ↓ 拒绝同上 → LLM 修正重试
-       ↓ 通过 → 执行
-  ↓
-2 次重试耗尽 → 清上下文，全新 prompt 重新回答（不污染上下文）
+┌─ 阶段 2：_action_validation_loop ───────────┐
+│  （小循环，仅 action 模式）                      │
+│  ↓                                              │
+│  _validate_action(action, original_msg)         │
+│  ├─ ✅ 通过 → 执行                               │
+│  └─ ❌ 拒绝 → 反馈给 LLM 修正重试                │
+│                                                │
+│  重试中的守卫：                                   │
+│  - 不输出 <<ACTION>> → 认定为"逃逸"，强制回正    │
+│  - 解析错误 → 反馈格式要求                       │
+│  - 校验不通过 → 反馈具体原因（缺 evidence/参数） │
+│  - 5 次耗尽 → 拒绝自由回答，返回错误信息         │
+└────────────────────────────────────────────────┘
 ```
 
 #### _parse_action — 状态机解析器
@@ -208,29 +228,60 @@ _parse_action(reply)                 # 状态机解析 <<ACTION ...>>
 
 #### 组合查询 — 穷举展开
 
-当 LLM 输出 `type="query"` 时触发组合查询。v0.9.0 改进：rel 时 entities 两两配对（itertools.combinations）而非全拼，排除 attrs 中的比较意图词：
+当 LLM 输出 `type="query"` 时触发组合查询。v1.0.0 重构为三层泛化规则，不依赖 entity 数量做 if-else 特调：
 
 ```python
-# LLM 输出示例
+# 算法逻辑（通用，不限场景）：
+# 输入: entities=[e1, e2, ...], attrs=[a1, a2, ...], rel=x/""
+#
+# 第一层（始终执行）：entity × attr 笛卡尔积
+#   → 每个 (e, a) 一个切片，事实块检索
+#
+# 第二层（≥2 entities 时执行）：全实体联合 × attr
+#   → all_entities + " " + a，全实体交叉检索
+#
+# 第三层（rel 非空时执行）：rel 驱动两两无重复配对
+#   ≥2 entities: entity 两两配对 × attr × rel（itertools.combinations）
+#   1 entity:    attr 两两配对 × rel（itertools.combinations）
+```
+
+**多实体 + rel 示例**：
+```
 <<ACTION type="query" entities="三个代表重要思想,老子无为而治"
-                     attrs="核心观点,相同点,不同点"
+                     attrs="核心观点,不同点"
                      rel="思想渊源比较">>
 
-# 展开逻辑：
-# 1. 每个 entity × 每个 attr（单独）
-# 2. 所有 entities 联合 × 每个 attr（全拼，覆盖非对比场景）
-# 3. 如果有 rel: itertools.combinations 两两配对 × attrs × rel
-slices = [
-    "三个代表重要思想 核心观点",          # 单 entity × attr
-    "三个代表重要思想 不同点",
-    "老子无为而治 核心观点",
-    "老子无为而治 不同点",
-    "三个代表重要思想 老子无为而治 核心观点",  # 联合 × attr
-    "三个代表重要思想 老子无为而治 不同点",
-    "三个代表重要思想 老子无为而治 核心观点 思想渊源比较",  # 两两配对 × attr × rel
-    "三个代表重要思想 老子无为而治 不同点 思想渊源比较",
-    "三个代表重要思想 老子无为而治 思想渊源比较",  # 两两配对 × rel
-]
+# 展开切片：
+# 第一层（entity × attr）：
+"三个代表重要思想 核心观点"
+"三个代表重要思想 不同点"
+"老子无为而治 核心观点"
+"老子无为而治 不同点"
+
+# 第二层（全实体联合 × attr）：
+"三个代表重要思想 老子无为而治 核心观点"
+"三个代表重要思想 老子无为而治 不同点"
+
+# 第三层（entity 两两配对 × attr × rel，无重复）：
+"三个代表重要思想 老子无为而治 核心观点 思想渊源比较"
+"三个代表重要思想 老子无为而治 不同点 思想渊源比较"
+```
+
+**单实体 + rel 示例**（v1.0.0 新增支持）：
+```
+<<ACTION type="query" entities="AI"
+                     attrs="顺着倾向回答,独立思考"
+                     rel="对比">>
+
+# 展开切片：
+# 第一层（entity × attr，事实块检索）：
+"AI 顺着倾向回答"       # → RAG 检索"迎合"的事实块
+"AI 独立思考"           # → RAG 检索"独立思考"的事实块
+
+# 第三层（attr 两两配对 × rel，关系检索）：
+"AI 顺着倾向回答 独立思考 对比"   # → RAG 检索对比关系块
+
+# LLM 第二轮拿到 {事实块1, 事实块2, 关系块} 做推理整合
 ```
 
 组合切片展开后各片独立走 `rag.query()` 完整流程，结果按 SM3 内容哈希去重（`hashlib.new('sm3', ...)`）后合并为单一上下文，交给 LLM 生成最终回答。
@@ -312,9 +363,11 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
 |------|------|---------|
 | DuckDuckGo | `requests.get(html.duckduckgo.com/html/)` | 无需 Key |
 | Tavily | `POST api.tavily.com/search` | 需配置 Key |
-| urllib fallback | 纯 HTML 解析回退 | 无需 Key |
+| Google Custom Search | `GET customsearch.googleapis.com` | 需 API Key + CX |
+| Bing | `GET api.bing.microsoft.com/v7.0/search` | 需 API Key |
+| 自定义 API | 用户配置的任意 URL 端点 | 需配置 |
 
-通过 `web_search_enabled` + `web_search_api_key` + `web_search_engine` 配置。
+通过 `web_search_enabled` + `web_search_api_key` + `web_search_engine` 配置。搜索结果面板可选五种后端，独立 API Key 输入。
 
 ### 3.6 引用门禁 — `agent.py`
 
@@ -512,10 +565,10 @@ LLM 在回复中嵌入 `<<ACTION ...>>` 标记控制 Agent 行为：
 <<ACTION type="import" path="MANIFEST">        # 批量导入所有待入库文件
 ```
 
-**LLM 分词语义规则**（v0.9.0 重写）：
-- `entities`：取主体/名词。问题中涉及的核心事物、人物、概念
-- `attrs`：取目的。用户想查询的目标/用途/对象。注意排除比较意图词（异同、区别、对比等）
-- `rel`：取行为。实体间的动作/关系。当有多个 entities 且存在动作关系时填写
+**LLM 分词语义规则**（v0.9.0 重写，v1.0.0 修正算法实现）：
+- `entities`：取主体/名词。问题中涉及的核心事物、人物、概念，多个用逗号分隔
+- `attrs`：取目的。用户想查询的目标/用途/对象。**注意排除比较意图词**（异同、区别、对比等），那些归 rel
+- `rel`：取行为。实体间的动作/关系。填一个最贴切的词即可（如 rel="对比"）。**不在 evidence 校验范围内**（rel 是 LLM 推断值，非用户原文）
 
 ### 5.4 Prompt 3 插槽架构 + 自定义预设 — `prompt_manager.py`
 
@@ -739,6 +792,11 @@ numpy>=1.24                       # 向量余弦相似度计算
 | HuggingFace Direct | 模型下载源（最后兜底） | 外部 API |
 | DuckDuckGo | 联网搜索 | 免费 API，无需 Key |
 | Tavily | 联网搜索（备选） | 需配置 API Key |
+| Google Custom Search | 联网搜索（备选） | 需 API Key + CX |
+| Bing Search | 联网搜索（备选） | 需 API Key |
+| Google Custom Search | 联网搜索 | 需 API Key + CX |
+| Bing Search | 联网搜索 | 需 API Key |
+| 自定义 API | 联网搜索 | 用户配置的任意端点 |
 
 ### 8.3 存储依赖
 
@@ -783,6 +841,8 @@ numpy>=1.24                       # 向量余弦相似度计算
 
 | 版本 | 新增/变更要点 |
 |------|-------------|
+| **v1.0.0** | **穷举组合算法重构为三层泛化规则**：entity×attr 笛卡尔积 → 全实体联合 → rel 驱动两两无重复配对（单实体+多属性+rel 场景修复，rel 切片不再丢失）。**agent 循环架构明确化**：大循环三阶段（模式判定→动作校验小循环→执行）、小循环逃逸拦截、5 次失败拒答 |
+| v0.10.0 | 向量维度显示；本地模型扫描；联网搜索五种后端（DuckDuckGo/Tavily/Google/Bing/自定义 API）|
 | v0.9.5 | README 架构图补 NLI；NLI 模型探测遍历所有源修复 |
 | v0.9.0 | NLI 三向分类器；网络探测并行化；Config 自动修正模型路径；组合查询两两配对 + 中文逗号 |
 | v0.8.0 | KB 暂停写入；历史对话隔离；引用校验；OCR 触发条件修复 |
