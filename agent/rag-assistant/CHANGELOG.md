@@ -5,6 +5,10 @@
 
 ---
 
+## [1.1.1] - 2026-07-15
+### 修复
+- **web_ui.py 与 agent.py 的 BUILTIN_QUERY_TYPES 解除重复**：web_ui.py 改用 `from .agent import BUILTIN_QUERY_TYPES`，消除两份副本不一致问题。以后修改 agent.py 的类型描述会自动同步到 Web 配置页面
+
 ## [1.1.0] - 2026-07-15
 ### 改进
 - **query 类型参考全面重写**：4 个内置类型（fact/compare/opposition/analysis）的 entities/attrs 描述从模糊指南改为精确判定规则，明确"什么是主体""什么是维度"的区分标准。analysis 类型改为纯单主体分析示例，比较性分析归入 compare 类型
