@@ -5,7 +5,13 @@
 
 ---
 
-## [1.0.3] - 2026-07-14
+## [1.1.0] - 2026-07-15
+### 改进
+- **query 类型参考全面重写**：4 个内置类型（fact/compare/opposition/analysis）的 entities/attrs 描述从模糊指南改为精确判定规则，明确"什么是主体""什么是维度"的区分标准。analysis 类型改为纯单主体分析示例，比较性分析归入 compare 类型
+- **evidence 校验报错分两类反馈**：key 在原文有但 value 不是原句 → 指出 value 问题；key 在原文不存在 → 给出原文摘录供对照选择，LLM 不再盲猜
+- **prompt 新增两条防污染规则**：① 一个概念只放一边（不跨 entities/attrs）② 不要太细碎（不拆同义词 key）
+- **历史摘要标签强化**：标注"关键词不得用于当前问题的 entities/attrs"，配合 prompt 规则避免历史上下文污染
+- **analysis 示例替换为纯单主体**：从"AI如何模仿人类情感、有什么缺陷..."改为"新能源汽车的市场规模、政策环境和消费者态度"，避免 LLM 混淆成比较查询
 ### 里程碑
 - **PyPI 分类器升级为 5 - Production/Stable（正式版）**：pypi-build.py 构建脚本的 `Development Status` 从 `4 - Beta` 改为 `5 - Production/Stable`
 

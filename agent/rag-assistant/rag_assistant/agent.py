@@ -23,17 +23,17 @@ BUILTIN_QUERY_TYPES = {
         "label": "事实查询",
         "example": '"茅台的价格是多少？"',
         "rules": {
-            "entities": "主体/名词。问题涉及的核心事物",
-            "attrs": "目的/属性。用户想查询的维度",
+            "entities": "主体/名词。问题问的是「谁/什么」，能被替换为「关于XX」的 XX。例：茅台、AI。不要放「做什么」类的词",
+            "attrs": "目的/属性。用户想查的目标维度，是「查XX的什么」。例：价格、定义、原理。不要放「异同」「区别」等比较意图词",
             "rel": "留空（不触发两两配对）",
         }
     },
     "compare": {
         "label": "实体对比",
-        "example": '"茅台和五粮液酿造工艺异同" 或 "茅台和五粮液在口感、工艺、历史方面的对比"',
+        "example": '"茅台和五粮液酿造工艺异同" 或 "AI如何模仿人类情感、有什么缺陷、人类的独一无二性体现在哪里"',
         "rules": {
-            "entities": "被对比的多个实体，逗号分隔",
-            "attrs": "对比维度，多个用逗号分隔（例如 酿造工艺 或 酿造工艺,口感,历史）",
+            "entities": "被对比的多个实体，逗号分隔。例：茅台,五粮液 或 AI,人类。是「哪些东西在比」中的「哪些东西」",
+            "attrs": "对比维度，多个用逗号分隔。是「比它们的什么方面」。例：酿造工艺 或 酿造工艺,口感,历史 或 情感,缺陷,独特性",
             "rel": '"对比"',
         }
     },
@@ -41,18 +41,18 @@ BUILTIN_QUERY_TYPES = {
         "label": "二元对立",
         "example": '"AI是顺着倾向回答还是独立思考"',
         "rules": {
-            "entities": "只填主体（例如 AI），不要把对立面放进来",
-            "attrs": "两个对立面都放进来，逗号分隔（例如 迎合,独立思考）",
+            "entities": "只填主体，不要把对立面放进来。主体是「谁在面临对立」，例：AI",
+            "attrs": "两个对立面的表述，逗号分隔。例：迎合,独立思考",
             "rel": '"对比"',
         }
     },
     "analysis": {
         "label": "多维度分析",
-        "example": '"AI如何模仿人类情感、有什么缺陷、人类的独一无二性体现在哪里"',
+        "example": '"新能源汽车的市场规模、政策环境和消费者态度"',
         "rules": {
-            "entities": "分析主体",
-            "attrs": "分析维度A,分析维度B,分析维度C",
-            "rel": "对比分析",
+            "entities": "分析主体。被分析的核心对象，是「对XXX做多维分析」中的XXX，只填 1 个。例：新能源汽车",
+            "attrs": "分析维度A,分析维度B,分析维度C。从原文并列列举的方面提取，是「从哪些角度分析主体」。例：市场规模,政策环境,消费者态度",
+            "rel": "留空（仅在涉及两个主体对比时留，这种情况请改用 compare 类型）",
         }
     },
 }
@@ -90,7 +90,8 @@ class Agent:
 - attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel
 - rel：**取行为**。实体间的动作/关系。当存在比较、对比、对立关系时填写，填一个最贴切的词即可（如 rel="对比"）。
 - 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
-- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词在用户问题中的原文出处。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但 evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
+- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词在用户问题中的原文出处。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
+- **两条关键规则：① 一个概念只放一边。** 如果一个概念既是"事物"又是"目的"，优先放 entities，不要同时在 entities 和 attrs 中出现（例如"模仿"→只放 entities 即可）。**② 不要太细碎。** 同一来源的一个完整问题点，不需要拆成多个同义词 key（例如"通过怎样的技术方式或技术行为"→用"技术方式"一个 key 即可，不同时写"技术方式""行为特征""模拟技术"）。具体 entities/attrs 的填法见下方对应类型。
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
 
@@ -122,6 +123,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 - 下方消息列表中，最后一条 user 消息是用户的当前提问
 - 之前的消息是历史记录，不要重复执行或参考它们的内容来构造新的 <<ACTION>>
 - 只根据最新一条 user 消息的内容决定：直接回答 / 查知识库 / 搜网页 / 入库
+- **关键：entities、attrs、evidence 只从当前 user 消息中提取，不要使用历史对话摘要中的任何概念或关键词**
 - **用户说"入库"或"导入"时，表示要导入文件，用 type="import" path="MANIFEST"，不要查知识库**
 """
         return prompt
@@ -348,7 +350,15 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 return f"以下词缺少 evidence key（必须与 entities/attrs 中的写法精确一致，不可改词）: {', '.join(missing)}。请补充 evidence 中的对应条目"
             fakes = [f"「{k}」的出处「{v}」" for k, v in ev.items() if v not in original_msg]
             if fakes:
-                return f"以下出处不存在于用户问题中，必须使用原文原句: {'; '.join(fakes)}"
+                # 区分 key 在原文有 vs 无两种情形
+                details = []
+                for k, v in ev.items():
+                    if v not in original_msg:
+                        if k in original_msg:
+                            details.append(f"「{k}」的出处「{v}」不是原文原句。请从原文中复制完整原句作为出处")
+                        else:
+                            details.append(f"「{k}」原文中无此词。请对照下方原文找实际存在的词替换，不要自己造新词：\n【原文摘录】{original_msg[:200]}")
+                return f"以下证据需要修正: {'; '.join(details)}"
             # kb 校验
             qkb = action.get("kb", "")
             if qkb and qkb not in original_msg:
@@ -394,7 +404,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         # 压缩摘要作为 System context（历史脉络，不占轮次位置）
         compressed = self.memory.get_compressed(self.session_id)
         if compressed:
-            msgs.append({"role": "system", "content": f"【历史对话，仅作参考】\n{compressed}"})
+            msgs.append({"role": "system", "content": f"【历史对话摘要，仅供维持连贯性参考，其中的概念/关键词不得用于当前问题的 entities/attrs】\n{compressed}"})
 
         # 追加用户画像提示（方案 C：prompt_manager 模块）
         try:
