@@ -17,6 +17,37 @@ logger = logging.getLogger(__name__)
 
 _ACTION_STRIP = re.compile(r'<{1,2}\s*ACTION\s+.*?>{1,2}', re.DOTALL | re.IGNORECASE)
 
+# ═══════════════ 内置查询类型参考（可被 config 自定义覆盖） ═══════════════
+BUILTIN_QUERY_TYPES = {
+    "fact": {
+        "label": "事实查询",
+        "example": '"茅台的价格是多少？"',
+        "rules": {
+            "entities": "主体/名词。问题涉及的核心事物",
+            "attrs": "目的/属性。用户想查询的维度",
+            "rel": "留空（不触发两两配对）",
+        }
+    },
+    "compare": {
+        "label": "实体对比",
+        "example": '"茅台和五粮液酿造工艺异同"',
+        "rules": {
+            "entities": "被对比的多个实体，逗号分隔",
+            "attrs": "对比维度（例如 酿造工艺）",
+            "rel": '"对比"',
+        }
+    },
+    "opposition": {
+        "label": "二元对立",
+        "example": '"AI是顺着倾向回答还是独立思考"',
+        "rules": {
+            "entities": "只填主体（例如 AI），不要把对立面放进来",
+            "attrs": "两个对立面都放进来，逗号分隔（例如 迎合,独立思考）",
+            "rel": '"对比"',
+        }
+    },
+}
+
 
 class Agent:
     """智能体主循环"""
@@ -31,7 +62,8 @@ class Agent:
         self.search = WebSearch(self.config)
 
     def _system_prompt(self) -> str:
-        return """你是 RAG 知识库助手。你可以使用以下动作：
+        type_ref = self._build_type_reference()
+        prompt = f"""你是 RAG 知识库助手。你可以使用以下动作：
 
 ## 动作格式（必须严格遵守，不可变更）
 所有动作必须使用以下格式，**大小写、尖括号数量不可修改**：
@@ -47,10 +79,16 @@ class Agent:
 <<ACTION type="query" entities="名词1,名词2" attrs="目的" rel="行为" kb="知识库名（可选）">>
 - entities：**取主体/名词**。问题中涉及的核心事物、人物、概念，如"茅台"、"五粮液"、"神经网络"。多个用逗号分隔
 - attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel
-- rel：**取行为**。实体间的动作/关系。当有多个 entities 且它们之间存在动作关系（对比、区别、异同、差别、关系、比较等）时填写
+- rel：**取行为**。实体间的动作/关系。当存在比较、对比、对立关系时填写，填一个最贴切的词即可（如 rel="对比"）。
 - 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
+- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 是填的词，value 是这个词在用户问题中的原文出处。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **词可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但 value 必须使用原文原句，不能自己编造。
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
+
+## 查询类型参考（仅作填写指引，不需要声明类型）
+以下不同类型的问题，entities/attrs/rel 的填写方式不同。你不需要声明类型，只需参照最匹配的例子填写参数：
+
+{type_ref}
 
 ## 联网搜索
 <<ACTION type="search" query="搜索词">>
@@ -64,9 +102,12 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 - **绝对不要自己编造文件路径！不要写具体的文件路径，用 path="MANIFEST" 让系统处理**
 
 ## 规则
-- 闲聊/打招呼 → 直接回答
-- 知识库查询 → 用 entities+attrs 标注成分，不要自己创造
-- 入库 → 用户明确要求时才用
+- **闲聊/打招呼/不需要查资料/直接回答** → 使用 `<<ACTION type="chat">>` 显式声明，标记后直接输出回复文本
+- **需要查知识库** → 使用 `<<ACTION type="query" entities="..." attrs="..." rel="..." evidence='{...}'>>`
+- **需要联网搜索** → 使用 `<<ACTION type="search" query="...">>`
+- **入库/导入文件** → 用户明确要求时才用，使用 `<<ACTION type="import">>`
+
+**重要：所有回复都必须使用 `<<ACTION type="xxx">>` 显式声明你要做什么。包括纯聊天、问候、闲聊——都必须用 `<<ACTION type="chat">>` 标记。系统通过这个标记决定如何处理你的输出。**
 
 ## 关键：只对最新消息做决策
 - 下方消息列表中，最后一条 user 消息是用户的当前提问
@@ -74,13 +115,43 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 - 只根据最新一条 user 消息的内容决定：直接回答 / 查知识库 / 搜网页 / 入库
 - **用户说"入库"或"导入"时，表示要导入文件，用 type="import" path="MANIFEST"，不要查知识库**
 """
+        return prompt
+
+    def _get_all_query_types(self) -> dict:
+        """合并内置+自定义查询类型（自定义覆盖同 key 内置）"""
+        types = dict(BUILTIN_QUERY_TYPES)
+        try:
+            from .engine.config import load_config
+            cfg = load_config()
+            custom = cfg.get("query_types", {})
+            if isinstance(custom, dict):
+                types.update(custom)
+        except Exception:
+            pass
+        return types
+
+    def _build_type_reference(self) -> str:
+        """构建查询类型参考文本"""
+        all_types = self._get_all_query_types()
+        lines = []
+        for t in all_types.values():
+            label = t.get("label", "未知")
+            example = t.get("example", "")
+            rules = t.get("rules", {})
+            lines.append(
+                f"【{label}】{example}\n"
+                f"  entities → {rules.get('entities','')}\n"
+                f"  attrs → {rules.get('attrs','')}\n"
+                f"  rel → {rules.get('rel','')}"
+            )
+        return "\n\n".join(lines)
 
     def chat(self, message: str, stream: bool = False) -> dict:
         """处理一条用户消息（带 LLM 自修正循环）"""
         self.memory.append_short_term(self.session_id, "user", message)
 
         # 自修正循环：LLM 输出 → Agent 校验 → 不通过则反馈给 LLM 重试
-        decision, action = self._decide_with_retry(message, max_retries=2)
+        decision, action = self._decide_with_retry(message, max_retries=5)
 
         reply = decision.get("text", "")
         reasoning = decision.get("reasoning", "")
@@ -123,55 +194,126 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         return decision
 
     def _decide_with_retry(self, message: str, max_retries: int = 5) -> tuple:
-        """LLM 决策 + 自修正循环"""
+        """LLM 决策 + 自修正循环
+
+        两阶段设计：
+        阶段 1（模式判定）：单次 LLM 调用，确定 chat 模式 / action 模式
+        阶段 2（仅 action 模式）：小 loop，只在动作校验上循环
+            - LLM 一旦进入 action 模式，必须在重试中保持 action 模式
+            - 不允许通过"不输出 <<ACTION>>"逃避校验
+            - 5 次失败后不允许 LLM 自由回答（防止捏造引用）
+        """
         msgs = self._build_first_pass_messages(message)
 
-        for attempt in range(max_retries + 1):
+        # ═══════ 阶段 1：模式判定（单次 LLM 调用，不在 loop 内）═══════
+        resp = self.llm.chat(msgs, stream=False)
+        reply = resp.get("text", "")
+        action, parse_err = self._parse_action(reply)
+
+        # 完全无动作标记 → LLM 显式选择 chat 模式
+        if not action and not parse_err:
+            # 旧版 LLM 不会用 <<ACTION type="chat">>，但行为语义上"无动作"就是 chat
+            return resp, None
+
+        # chat 动作 → chat 模式
+        if action and action.get("type") == "chat":
+            return resp, action
+
+        # 解析错误或有效 action → 进入阶段 2
+        return self._action_validation_loop(
+            msgs, message, max_retries,
+            initial_resp=resp, initial_action=action, initial_parse_err=parse_err
+        )
+
+    def _action_validation_loop(self, msgs: list, message: str, max_retries: int,
+                                 initial_resp=None, initial_action=None,
+                                 initial_parse_err=None) -> tuple:
+        """阶段 2：动作校验小 loop
+
+        LLM 已选择 action 模式（query/search/import），必须保持 action 模式。
+        重试中如果 LLM 试图"不输出 <<ACTION>>"逃避，按"逃逸"处理并强制回正。
+        5 次都失败 → 返回结构化错误，禁止 LLM 自由回答。
+        """
+        # 把初始失败的结果作为第一次反馈加入
+        if initial_parse_err:
+            logger.info(f"LLM 动作解析失败 (attempt 1): {initial_parse_err}")
+            msgs.append({"role": "assistant", "content": initial_resp.get("text", "")})
+            msgs.append({"role": "user", "content":
+                f"【修正提醒】\n"
+                f"- 问题：{initial_parse_err}\n"
+                f"- 要求：修正后输出有效的 <<ACTION>> 标记\n"
+                f"- 注意：你必须输出动作（query/search/import/chat），不能跳出动作模式"})
+        elif initial_action:
+            rejection = self._validate_action(initial_action, message)
+            if rejection:
+                logger.info(f"LLM 动作被拒绝 (attempt 1): {rejection}")
+                msgs.append({"role": "assistant", "content": initial_resp.get("text", "")})
+                msgs.append({"role": "user", "content":
+                    f"【修正提醒】\n"
+                    f"- 问题：{rejection}\n"
+                    f"- 要求：修正后重新输出\n"
+                    f"- 注意：你已选择动作模式，必须保持动作模式"})
+            else:
+                # 初始 action 已经有效，直接返回，不进 loop
+                return initial_resp, initial_action
+
+        # 小 loop：从第 2 次 attempt 开始（attempt 1 已处理过）
+        for attempt in range(1, max_retries + 1):
             resp = self.llm.chat(msgs, stream=False)
             reply = resp.get("text", "")
             action, parse_err = self._parse_action(reply)
 
-            # 完全没动作（没有 <<ACTION 标记）→ 正常聊天
+            # LLM 试图逃出 action 模式（不输出 <<ACTION>>）
             if not action and not parse_err:
-                return resp, None
+                logger.info(f"LLM 尝试逃出 action 模式 (attempt {attempt+1})")
+                msgs.append({"role": "assistant", "content": reply})
+                msgs.append({"role": "user", "content":
+                    "【修正提醒】\n"
+                    "- 你已选择动作模式（query/search/import），必须输出有效的 <<ACTION>> 标记\n"
+                    "- 如要改为纯聊天，请使用 <<ACTION type=\"chat\">> 显式声明\n"
+                    "- 不允许通过不输出动作标记来逃避校验"})
+                continue
 
-            # 有动作但格式错误 → 反馈给 LLM 重试
+            # 解析错误 → 反馈
             if parse_err:
                 logger.info(f"LLM 动作解析失败 (attempt {attempt+1}): {parse_err}")
                 msgs.append({"role": "assistant", "content": reply})
-                msgs.append({"role": "user", "content": 
+                msgs.append({"role": "user", "content":
                     f"【修正提醒】\n"
                     f"- 问题：{parse_err}\n"
-                    f"- 要求：修正后再输出，或直接回答用户不要输出指令"})
+                    f"- 要求：修正后输出有效的 <<ACTION>> 标记"})
                 continue
 
-            # 校验动作合法性
+            # 校验
             rejection = self._validate_action(action, message)
             if not rejection:
                 return resp, action
 
-            # 动作被拒绝 → 结构化反馈给 LLM 重试
             logger.info(f"LLM 动作被拒绝 (attempt {attempt+1}): {rejection}")
             msgs.append({"role": "assistant", "content": reply})
-            msgs.append({"role": "user", "content": 
+            msgs.append({"role": "user", "content":
                 f"【修正提醒】\n"
                 f"- 问题：{rejection}\n"
-                f"- 要求：修正后重新输出，或直接回答用户\n"
-                f"- 注意：指令必须独占一行，不要和文字混在一起"})
+                f"- 要求：修正后重新输出\n"
+                f"- 注意：你已选择动作模式，必须保持动作模式"})
 
-        # 重试用完 → 清理上下文，给 LLM 最后一次机会
-        logger.warning("LLM 重试耗尽，清理上下文重新回答")
-        return self.llm.chat([
-            {"role": "system", "content": self._system_prompt()},
-            {"role": "user", "content": message},
-        ]), None
+        # 5 次重试都失败 → 禁止 LLM 自由回答
+        logger.warning("LLM 动作校验 5 次失败，拒绝 LLM 自由回答（防止捏造）")
+        return {
+            "text": "我无法正确解析你的请求为有效的动作（连续校验失败）。请重新表述你的问题。",
+            "reasoning": ""
+        }, None
 
     def _validate_action(self, action: dict, original_msg: str) -> Optional[str]:
         """校验动作是否合法，不合法返回明确的拒绝原因"""
         atype = action.get("type", "")
 
-        if atype not in ("query", "search", "import"):
-            return f"type 必须是 query / search / import 之一，收到: {atype}"
+        if atype not in ("query", "search", "import", "chat"):
+            return f"type 必须是 query / search / import / chat 之一，收到: {atype}"
+
+        # chat 动作不需要额外校验
+        if atype == "chat":
+            return None
 
         if atype == "query":
             if not action.get("entities") and not action.get("attrs"):
@@ -180,6 +322,24 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 return "query 缺少 entities（主体/名词），请标出问题中涉及的核心事物"
             if not action.get("attrs"):
                 return "query 缺少 attrs（目的），请标出用户想查询的目标"
+            # evidence 校验
+            raw_ev = action.get("evidence", "")
+            if not raw_ev:
+                return "query 缺少 evidence 参数。每个 entity 和 attr 都必须提供原文出处，格式：evidence='{\"词\":\"原文出处\"}'"
+            try:
+                ev = json.loads(raw_ev)
+            except (json.JSONDecodeError, TypeError):
+                return "evidence 不是合法 JSON。请检查格式，示例：evidence='{\"AI\":\"AI\"}'"
+            if not isinstance(ev, dict):
+                return "evidence 必须是一个 JSON 字典"
+            all_raw = (action.get("entities", "") + "," + action.get("attrs", ""))
+            all_terms = [t.strip() for t in re.split(r'[,，]', all_raw) if t.strip()]
+            missing = [t for t in all_terms if t not in ev]
+            if missing:
+                return f"以下词缺少原文出处: {', '.join(missing)}。请补充 evidence 中的对应条目"
+            fakes = [f"「{k}」的出处「{v}」" for k, v in ev.items() if v not in original_msg]
+            if fakes:
+                return f"以下出处不存在于用户问题中，必须使用原文原句: {'; '.join(fakes)}"
             # kb 校验
             qkb = action.get("kb", "")
             if qkb and qkb not in original_msg:
@@ -340,8 +500,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             params[key] = ''.join(val)
 
         action_type = params.get("type", "")
-        if action_type not in ("query", "search", "import"):
-            return None, f"未知动作类型: {action_type}，必须是 query/search/import"
+        if action_type not in ("query", "search", "import", "chat"):
+            return None, f"未知动作类型: {action_type}，必须是 query/search/import/chat"
 
         if action_type == "search" and not params.get("query"):
             return None, "search 动作缺少 query 参数"
@@ -373,23 +533,24 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         import re
         entity_list = [e.strip() for e in re.split(r'[,，]', entities) if e.strip()]
         attr_list = [a.strip() for a in re.split(r'[,，]', attrs) if a.strip()]
-        # 如果指定了 rel（比较关系），从 attrs 中排除比较意图关键词
+        # 如果指定的 rel 中包含比较意图关键词，从 attrs 中排除
         if rel:
             _compare_kw = {"异同", "区别", "差别", "对比", "共同点", "不同点", "异同点", "差异"}
             attr_list = [a for a in attr_list if a not in _compare_kw]
         _slices = set()
-        # 单实体 × 各属性
+        # 第一层：entity × attr — 每个实体的各属性切片（事实块检索用）
         for e in entity_list:
             for a in attr_list:
                 _slices.add(f"{e} {a}")
-        # 多实体组合（含 rel 时两两配对）
+        # 第二层：多实体全拼 × attr — 全实体联合检索
         if len(entity_list) >= 2:
             joined = ' '.join(entity_list)
-            # 组合实体 × 各属性（全拼，覆盖非对比场景）
             for a in attr_list:
                 _slices.add(f"{joined} {a}")
-            # 有比较意图时：两两配对 × attrs × rel，更精准
-            if rel:
+        # 第三层：rel 语义 — 追加一个关系切片（不是取代前两层）
+        #   LLM 拿到 {事实块1, 事实块2, 关系块} 做推理整合
+        if rel:
+            if len(entity_list) >= 2:
                 import itertools
                 for e1, e2 in itertools.combinations(entity_list, 2):
                     if attr_list:
@@ -397,6 +558,14 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                             _slices.add(f"{e1} {e2} {a} {rel}")
                     else:
                         _slices.add(f"{e1} {e2} {rel}")
+            else:
+                # 单实体 + N 属性 + rel → attrs 无重复两两配对 + rel
+                #   N=2: "AI 顺着我的倾向回答 独立思考 对比"
+                #   N=3: "AI a1 a2 对比", "AI a1 a3 对比", "AI a2 a3 对比"
+                import itertools
+                e = entity_list[0]
+                for a1, a2 in itertools.combinations(attr_list, 2):
+                    _slices.add(f"{e} {a1} {a2} {rel}")
         slices = list(_slices)
 
         logger.info(f"组合查询: entities={entity_list}, attrs={attr_list}, rel={rel}")
