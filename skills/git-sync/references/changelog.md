@@ -1,3 +1,13 @@
+## [2.28.0] - 2026-07-15
+
+### 新增
+- **Gitee 发行版创建**：`release_creator.py` 在创建 GitHub Release 后自动调用 Gitee API 创建发行版，token 从 `config.json` 的 `gitee_token` 字段读取
+- **GITEE_TOKEN 环境变量支持**：`_get_gitee_token()` 优先读取环境变量，其次读 config.json
+
+### 修复
+- **step_llm_file_filter 秒删扫描文件**：写入 `.file_filter_{name}.json` 后立即 `unlink()` 删除，LLM 来不及审查。改为保留扫描文件、输出审查指令（路径+格式），等 LLM 写入决策文件后下次运行继续
+- **release_creator.py 只发 GitHub 不发 Gitee**：全程只调用 GitHub API，Gitee 推送 tag 但不创建发行版。新增第 5 步：Gitee API 创建发行版
+
 ## [2.27.2] - 2026-07-13
 
 ### 修复
@@ -38,7 +48,7 @@
 ## [2.26.3] - 2026-07-09
 
 ### 修复
-- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `[local-path-redacted]/...` 未被扫描发现
+- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `/c/Users/sm001/...` 未被扫描发现
 - **LLM 决策逻辑修复**：`"路径"` 之前被纳入 public_labels 允许列表，导致公开文档中的真实路径被 keep。改为仅当没有 "本地绝对路径" / "家目录路径" 标签时才 keep
 
 ### 变更

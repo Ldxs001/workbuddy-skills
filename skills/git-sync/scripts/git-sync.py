@@ -929,9 +929,19 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
             log("3.7", 8, f"LLM 决策解析失败: {e}，默认保留所有文件", "warn")
             filter_scan.unlink(missing_ok=True)
             filter_decisions.unlink(missing_ok=True)
+            return set(rel for d in tree for rel in [d["path"]])
     else:
-        filter_scan.unlink(missing_ok=True)
-        return None  # 不破坏，等 LLM 审查后写决策文件再重跑
+        # 保留扫描文件，输出审查指令让 LLM 处理
+        print(f"\n{'='*60}")
+        print(f"  ⏳ LLM 文件审查待处理")
+        print(f"  📄 扫描文件: {filter_scan}")
+        print(f"  📋 请检查文件列表，结合蓝皮书规则判断哪些文件应发布")
+        print(f"  ✅ 审核后写入决策文件: {filter_decisions}")
+        print(f"  📝 决策格式: {{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}}")
+        print(f"  🔄 写入决策后重新运行 git-sync 继续同步")
+        print(f"{'='*60}\n")
+        log("3.7", 8, f"LLM 审查待处理 → 读取 {filter_scan.name} 后写入 {filter_decisions.name}", "warn")
+        return None
 
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
 
@@ -984,8 +994,8 @@ if os.path.exists(readme_p):
     with open(readme_p,encoding="utf-8") as f: LD=f.read()
 setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       long_description=LD,long_description_content_type="text/markdown",
-      author="Ldxs ([username-redacted])",author_email="[email-redacted]",
-      url="https://github.com/[username-redacted]/workbuddy-skills",
+      author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
+      url="https://github.com/Ldxs001/workbuddy-skills",
       packages=find_packages(),include_package_data=True,
       python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
@@ -1063,7 +1073,7 @@ def step_release_create(name: str, typ: str, version: str):
         b=json.dumps({"tag_name":tag,"name":f"{name} v{version}",
                       "body":f"## {name} v{version}\n\n由 git-sync 自动发布","draft":False,"prerelease":False})
         r=subprocess.run(["curl","-s","-X","POST",
-                         "https://api.github.com/repos/[username-redacted]/workbuddy-skills/releases",
+                         "https://api.github.com/repos/Ldxs001/workbuddy-skills/releases",
                          "-H",f"Authorization: token {token}","-H","Content-Type: application/json","-d",b],
                         capture_output=True,text=True)
         try:

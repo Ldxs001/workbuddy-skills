@@ -2,7 +2,7 @@
 name: git-sync
 slug: git-sync
 displayName: git-sync
-version: 2.27.2
+version: 2.28.0
 author: wUwproject
 license: MIT
 description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。

@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.27.2",
-  "description": "将 skill 代码规范化推送到码云、GitHub，并生成 ZIP 安装包。修复 step_llm_file_filter 决策缺失时 return set() 而非 sys.exit(1)，防止误删。",
+  "version": "2.28.0",
+  "description": "全平台发布工具。新增 Gitee 发行版创建，修复 step_llm_file_filter 秒删扫描文件导致 LLM 无法审查的问题。",
   "author": "wUwproject",
   "tags": [
     "sync",
