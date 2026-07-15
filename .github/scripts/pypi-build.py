@@ -93,10 +93,16 @@ setup(
     python_requires=">=3.10",
     install_requires=REQUIREMENTS,
     entry_points={{"console_scripts": ["{pypi_name}=main:main"]}},
-    # 版本含 b/alpha/beta/rc/dev → Beta，否则 Production/Stable
-    _is_beta = any(x in VERSION.lower() for x in ['b', 'alpha', 'beta', 'dev']) and 'rc' not in VERSION.lower()
+    # 根据版本号后缀自动选择开发阶段分类器
+    _v = VERSION.lower()
+    if any(x in _v for x in ['alpha']):
+        _status = "3 - Alpha"
+    elif any(x in _v for x in ['b', 'beta']):
+        _status = "4 - Beta"
+    else:
+        _status = "5 - Production/Stable"  # 含 rc 和无后缀
     classifiers=[
-        f"Development Status :: {'4 - Beta' if _is_beta else '5 - Production/Stable'}",
+        f"Development Status :: {_status}",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
