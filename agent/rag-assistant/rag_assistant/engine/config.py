@@ -70,6 +70,7 @@ DEFAULT_CONFIG = {
     "kb": {
         "active_kb": "default",
         "auto_classify": False,
+        "min_import_score": 0.4,
     },
     "prompt": {
         "template_file": "default_template.txt",

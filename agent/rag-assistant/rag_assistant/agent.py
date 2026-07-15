@@ -697,6 +697,10 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
     def _exec_import(self, action: dict, original_msg: str) -> dict:
         """执行导入操作"""
+        # 每批次开始前重置自动备份跟踪器，确保每个KB只备份一次
+        from knowledge_base_manager import reset_auto_backup_tracker
+        reset_auto_backup_tracker()
+
         path = action.get("path", "")
         content = action.get("content", "")
         kb = action.get("kb", "")
@@ -814,7 +818,9 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                             if sim > best_score:
                                 best_score, best_kb = sim, kb_name
                         if best_kb != "default":
-                            kb = best_kb
+                            min_score = cfg.get("kb", {}).get("min_import_score", 0.4)
+                            if best_score >= min_score:
+                                kb = best_kb
                 if not kb:
                     kb = "default"
             except Exception:

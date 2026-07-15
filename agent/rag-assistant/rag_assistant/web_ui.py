@@ -1025,14 +1025,20 @@ function hideModal() {{
         if not self.agent:
             self._send_json({"success": False})
             return
-        self._send_json({
+        cfg = {
             "backend": self.agent.llm.backend,
             "model": self.agent.llm.model,
             "max_tokens": self.agent.llm.max_tokens,
             "timeout": self.agent.llm.timeout,
-        })
-        ok = self.agent.llm.check_health()
-        self._send_json({"success": ok, "message": "连接正常" if ok else "无法连接，请检查服务是否启动"})
+        }
+        try:
+            ok = self.agent.llm.check_health()
+            cfg["health_ok"] = ok
+            cfg["health_message"] = "连接正常" if ok else "无法连接，请检查服务是否启动"
+        except Exception:
+            cfg["health_ok"] = False
+            cfg["health_message"] = "检查异常"
+        self._send_json(cfg)
 
     def _handle_agent_query(self, query_str: str):
         """GET /api/agent/query?q=xxx&kb=xxx"""

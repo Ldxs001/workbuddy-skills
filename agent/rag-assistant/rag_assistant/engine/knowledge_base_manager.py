@@ -17,8 +17,10 @@ def sm3(data: bytes) -> str:
     return hashlib.new('sm3', data).hexdigest()
 import shutil
 import time
+import zipfile
+from datetime import datetime
 
-from utils import KB_DIR, safe_json_load, safe_json_dump
+from utils import KB_DIR, DATA_ROOT, safe_json_load, safe_json_dump
 
 KB_INDEX_FILE = os.path.join(KB_DIR, "kb_index.json")
 AUTO_CLASSIFY_RULES_FILE = os.path.join(KB_DIR, "auto_classify_rules.json")
@@ -171,6 +173,7 @@ def get_kb_vectorstore(kb_name, embeddings):
 # ==================== 容灾备份 ====================
 
 _BACKUP_LOCK = set()
+_AUTO_BACKUP_DONE = set()  # 每批次已备份的 KB，避免单批次多次重复备份
 
 def _backup_kb(persist_dir: str) -> str | None:
     """备份完整 KB 目录（SQLite + HNSW 索引），返回备份路径"""
@@ -243,6 +246,331 @@ def _try_repair_kb(persist_dir: str) -> bool:
     return True
 
 
+# ==================== 多版本备份系统（手动/自动/恢复） ====================
+
+KB_BACKUP_DIR = os.path.join(DATA_ROOT, "kb_backups")
+
+# ── 自动备份配置读写 ─────────────────────────
+def _load_backup_cfg():
+    """从数据目录加载备份配置"""
+    cfg_file = os.path.join(DATA_ROOT, "kb_backup_config.json")
+    return safe_json_load(cfg_file, {"auto_enabled": False})
+
+def _save_backup_cfg(cfg):
+    cfg_file = os.path.join(DATA_ROOT, "kb_backup_config.json")
+    safe_json_dump(cfg, cfg_file)
+
+def get_auto_backup_enabled() -> bool:
+    cfg = _load_backup_cfg()
+    return cfg.get("auto_enabled", False)
+
+def set_auto_backup_enabled(enabled: bool):
+    cfg = _load_backup_cfg()
+    cfg["auto_enabled"] = enabled
+    _save_backup_cfg(cfg)
+
+def reset_auto_backup_tracker():
+    """每批次开始时调用，清空已备份记录"""
+    _AUTO_BACKUP_DONE.clear()
+
+# ── 单 KB 备份目录 ─────────────────────────
+def _kb_backup_dir(kb_name: str) -> str:
+    """获取某个知识库的备份子目录"""
+    d = os.path.join(KB_BACKUP_DIR, kb_name)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+# ── 压缩整个 KB 目录为 zip ──────────────────
+def _zip_kb(persist_dir: str, zip_path: str) -> bool:
+    """将 KB 目录（SQLite + HNSW）压缩为 zip"""
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, _, files in os.walk(persist_dir):
+                for fn in files:
+                    fp = os.path.join(root, fn)
+                    arcname = os.path.relpath(fp, os.path.dirname(persist_dir))
+                    zf.write(fp, arcname)
+        return True
+    except Exception as e:
+        print(f"  [backup error] 压缩失败: {e}")
+        return False
+
+def _unzip_kb(zip_path: str, target_dir: str) -> bool:
+    """将 zip 备份解压恢复到目标目录"""
+    try:
+        # 先删除目标目录（重建）
+        if os.path.exists(target_dir):
+            shutil.rmtree(target_dir, ignore_errors=True)
+        os.makedirs(target_dir, exist_ok=True)
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(os.path.dirname(target_dir))
+        return True
+    except Exception as e:
+        print(f"  [restore error] 解压恢复失败: {e}")
+        return False
+
+# ── 手动备份 ────────────────────────────────
+def manual_backup_kb(kb_name: str) -> tuple:
+    """手动备份指定知识库，返回 (ok, msg)"""
+    index = _load_index()
+    if kb_name not in index:
+        return False, f"知识库 '{kb_name}' 不存在"
+    persist_dir = index[kb_name]["path"]
+    if not os.path.isdir(persist_dir):
+        return False, f"知识库 '{kb_name}' 目录不存在"
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    bak_dir = _kb_backup_dir(kb_name)
+    zip_name = f"manual_{kb_name}_{ts}.zip"
+    zip_path = os.path.join(bak_dir, zip_name)
+
+    if _zip_kb(persist_dir, zip_path):
+        size = os.path.getsize(zip_path)
+        size_str = f"{size/1024/1024:.1f}MB" if size > 1024*1024 else f"{size/1024:.1f}KB"
+        return True, f"手动备份成功: {zip_name} ({size_str})"
+    return False, "手动备份失败，压缩出错"
+
+# ── 自动备份 ────────────────────────────────
+def auto_backup_kb(kb_name: str) -> tuple:
+    """自动备份指定知识库，保留最多 3 个自动版本，返回 (ok, msg)"""
+    index = _load_index()
+    if kb_name not in index:
+        return False, f"知识库 '{kb_name}' 不存在"
+    persist_dir = index[kb_name]["path"]
+    if not os.path.isdir(persist_dir):
+        return False, f"知识库 '{kb_name}' 目录不存在"
+
+    # 先清理旧的自动备份（最多保留 2 个，给新备份留位置）
+    bak_dir = _kb_backup_dir(kb_name)
+    auto_prefix = f"auto_{kb_name}_"
+    auto_files = sorted([
+        f for f in os.listdir(bak_dir)
+        if f.startswith(auto_prefix) and f.endswith(".zip")
+    ])
+    while len(auto_files) >= 3:
+        oldest = auto_files.pop(0)
+        try:
+            os.remove(os.path.join(bak_dir, oldest))
+        except OSError:
+            pass
+
+    # 创建新备份
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_name = f"auto_{kb_name}_{ts}.zip"
+    zip_path = os.path.join(bak_dir, zip_name)
+
+    if _zip_kb(persist_dir, zip_path):
+        size = os.path.getsize(zip_path)
+        size_str = f"{size/1024/1024:.1f}MB" if size > 1024*1024 else f"{size/1024:.1f}KB"
+        return True, f"自动备份成功: {zip_name} ({size_str})"
+    return False, "自动备份失败，压缩出错"
+
+# ── 列出备份 ────────────────────────────────
+def list_kb_backups(kb_name: str) -> list:
+    """列出知识库的所有备份，返回 [{name, type, time, size, size_str}, ...]"""
+    bak_dir = _kb_backup_dir(kb_name)
+    prefix_manual = f"manual_{kb_name}_"
+    prefix_auto = f"auto_{kb_name}_"
+    backups = []
+    if not os.path.isdir(bak_dir):
+        return backups
+    for fn in sorted(os.listdir(bak_dir), reverse=True):
+        if not fn.endswith(".zip"):
+            continue
+        if not (fn.startswith(prefix_manual) or fn.startswith(prefix_auto)):
+            continue
+        # 提取时间戳
+        ts_str = fn.replace(".zip", "").split("_")[-2] + "_" + fn.replace(".zip", "").split("_")[-1]
+        try:
+            ts_dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+            ts_display = ts_dt.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            ts_display = ts_str
+        btype = "manual" if fn.startswith("manual_") else "auto"
+        fp = os.path.join(bak_dir, fn)
+        size = os.path.getsize(fp) if os.path.exists(fp) else 0
+        size_str = f"{size/1024/1024:.1f}MB" if size > 1024*1024 else f"{size/1024:.1f}KB"
+        backups.append({
+            "name": fn,
+            "type": btype,
+            "time": ts_display,
+            "size": size,
+            "size_str": size_str,
+        })
+    return backups
+
+# ── 恢复备份 ────────────────────────────────
+def restore_kb_backup(kb_name: str, backup_name: str) -> tuple:
+    """从指定备份恢复知识库，返回 (ok, msg)"""
+    index = _load_index()
+    if kb_name not in index:
+        return False, f"知识库 '{kb_name}' 不存在"
+    persist_dir = index[kb_name]["path"]
+    bak_dir = _kb_backup_dir(kb_name)
+    zip_path = os.path.join(bak_dir, backup_name)
+    if not os.path.isfile(zip_path):
+        return False, f"备份文件不存在: {backup_name}"
+
+    if _unzip_kb(zip_path, persist_dir):
+        return True, f"已从 '{backup_name}' 恢复知识库 '{kb_name}'"
+    return False, "恢复失败，解压出错"
+
+# ── 删除备份 ────────────────────────────────
+def delete_kb_backup(kb_name: str, backup_name: str) -> tuple:
+    """删除指定备份文件，返回 (ok, msg)"""
+    bak_dir = _kb_backup_dir(kb_name)
+    zip_path = os.path.join(bak_dir, backup_name)
+    if not os.path.isfile(zip_path):
+        return False, f"备份文件不存在: {backup_name}"
+    try:
+        os.remove(zip_path)
+        return True, f"已删除备份: {backup_name}"
+    except OSError as e:
+        return False, f"删除失败: {e}"
+
+
+# ==================== KB 文档浏览与移动 ====================
+
+def list_kb_sources(kb_name: str) -> dict:
+    """列出知识库中所有文档的 source 来源及块数，返回 {source: count}"""
+    index = _load_index()
+    if kb_name not in index:
+        return {}
+    persist_dir = index[kb_name]["path"]
+    if not os.path.isdir(persist_dir):
+        return {}
+    try:
+        from langchain_chroma import Chroma
+        from rag_core import get_embeddings
+        emb = get_embeddings()
+        vs = Chroma(persist_directory=persist_dir, embedding_function=emb)
+        data = vs._collection.get(include=['metadatas'])
+        from collections import Counter
+        sources = Counter()
+        for m in data['metadatas']:
+            src = (m or {}).get('source', 'unknown')
+            sources[src] += 1
+        return dict(sources.most_common())
+    except Exception as e:
+        print(f"  [list_kb_sources error] {e}")
+        return {}
+
+
+def check_kb_model_compatible(kb1: str, kb2: str) -> bool:
+    """检查两个知识库的向量模型是否一致"""
+    m1 = get_kb_model(kb1)
+    m2 = get_kb_model(kb2)
+    if not m1 and not m2:
+        return True  # 都使用默认模型
+    if m1 == m2:
+        return True
+    return False
+
+
+def get_kb_source_preview(kb_name: str, source: str, max_chars: int = 300) -> str:
+    """获取某个来源文件的文档内容预览"""
+    index = _load_index()
+    if kb_name not in index:
+        return ""
+    persist_dir = index[kb_name]["path"]
+    if not os.path.isdir(persist_dir):
+        return ""
+    try:
+        from langchain_chroma import Chroma
+        from rag_core import get_embeddings
+        emb = get_embeddings()
+        vs = Chroma(persist_directory=persist_dir, embedding_function=emb)
+        data = vs._collection.get(include=['documents'], where={"source": source})
+        if data and data.get('documents'):
+            # 把所有块的内容拼接，取前 max_chars 个字符
+            full = "\n".join(data['documents'])[:max_chars]
+            return full
+        return ""
+    except Exception as e:
+        print(f"  [source_preview error] {e}")
+        return ""
+
+
+def move_kb_documents(src_kb: str, target_kb: str, sources: list) -> tuple:
+    """将 src_kb 中指定 source 的文档块移动到 target_kb
+    返回 (ok, msg)"""
+    index = _load_index()
+    if src_kb not in index:
+        return False, f"源知识库 '{src_kb}' 不存在"
+    if target_kb not in index:
+        return False, f"目标知识库 '{target_kb}' 不存在"
+    if src_kb == target_kb:
+        return False, "源和目标不能相同"
+
+    if not check_kb_model_compatible(src_kb, target_kb):
+        return False, "两个知识库的向量模型不一致，无法移动"
+
+    persist_src = index[src_kb]["path"]
+    persist_tgt = index[target_kb]["path"]
+
+    try:
+        from langchain_chroma import Chroma
+        from langchain_core.documents import Document
+        from rag_core import get_embeddings
+
+        emb = get_embeddings()
+        vs_src = Chroma(persist_directory=persist_src, embedding_function=emb)
+
+        # 读取源库所有文档
+        data = vs_src._collection.get(include=['documents', 'metadatas'])
+        all_ids = data['ids']
+        all_docs = data['documents']
+        all_metas = data['metadatas']
+
+        # 按 source 过滤
+        move_ids = []
+        move_docs = []
+        for doc_id, content, meta in zip(all_ids, all_docs, all_metas):
+            src = (meta or {}).get('source', '')
+            if any(s in src for s in sources):
+                move_ids.append(doc_id)
+                move_docs.append(Document(page_content=content, metadata=meta or {}))
+
+        if not move_docs:
+            return False, f"在 '{src_kb}' 中未找到匹配的文档"
+
+        # 导入到目标库
+        ok, msg = add_documents_to_kb(target_kb, move_docs, emb)
+        if not ok:
+            return False, f"导入到 '{target_kb}' 失败: {msg}"
+
+        # 从源库删除
+        try:
+            vs_src._collection.delete(ids=move_ids)
+        except Exception as e:
+            # 删除失败不阻塞，但发出警告
+            print(f"  [move] 从 '{src_kb}' 删除失败: {e}")
+
+        # 重建签名+反哺
+        try:
+            from router import build_kb_signature
+
+            # 目标库 — 取最新的文档重建
+            vs_tgt = Chroma(persist_directory=persist_tgt, embedding_function=emb)
+            tgt_data = vs_tgt._collection.get(include=['documents'])
+            if tgt_data and tgt_data.get('documents'):
+                tgt_objs = [Document(page_content=c[:2000]) for c in tgt_data['documents'][:100]]
+                build_kb_signature(target_kb, tgt_objs)
+
+            # 源库
+            src_remaining = vs_src._collection.get(include=['documents'])
+            if src_remaining and src_remaining.get('documents'):
+                src_objs = [Document(page_content=c[:2000]) for c in src_remaining['documents'][:100]]
+                build_kb_signature(src_kb, src_objs)
+        except Exception as e:
+            print(f"  [move] 签名重建异常: {e}")
+
+        return True, f"已从 '{src_kb}' 移动 {len(move_docs)} 个文档块到 '{target_kb}'"
+
+    except Exception as e:
+        return False, f"移动失败: {e}"
+
+
 def add_documents_to_kb(kb_name, documents, embeddings=None):
     """向知识库添加文档"""
     from config import load_config
@@ -262,6 +590,10 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     if embeddings is None:
         return False, "需要提供嵌入模型"
 
+    # 自动备份（开启时）：在入库前创建备份（每批次每个KB只备份一次）
+    if get_auto_backup_enabled() and kb_name not in _AUTO_BACKUP_DONE:
+        auto_backup_kb(kb_name)
+        _AUTO_BACKUP_DONE.add(kb_name)
     # 入库前自动备份（已有数据时）
     _backup_kb(persist_dir)
 

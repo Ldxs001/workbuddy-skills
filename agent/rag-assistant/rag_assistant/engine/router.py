@@ -106,6 +106,7 @@ def route_query(question: str) -> dict:
 
 SIGNATURE_MAX_WORDS = 12
 FEEDBACK_MAX_WORDS = 30
+MIN_FEEDBACK_SIMILARITY = 0.3  # 候选词与原始关键词的最低语义相似度阈值
 
 def _clean_text(t: str) -> str:
     t = t.replace('\u00a0', ' ').replace('\u200b', '').replace('\ufeff', '')
@@ -329,13 +330,37 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
             
             originals_set = set(entry["_originals"])
             
-            # 从头部的排序候选词中补充，直到满 FEEDBACK_MAX_WORDS
+            # 反哺新词：按语义相似度从高到低选取
+            # 原始词永久保留，新词必须 >= MIN_FEEDBACK_SIMILARITY 才考虑
+            # 不满30就加，满30后新词替换最低分旧反馈词
             result = list(originals_set)
-            for w in all_ranked:
-                if len(result) >= FEEDBACK_MAX_WORDS:
-                    break
-                if w not in result:
+            result_scores = {w: 1.0 for w in originals_set}  # 原始词满分，永不替换
+            
+            for w, score in scored:
+                if score < MIN_FEEDBACK_SIMILARITY:
+                    continue  # 低于阈值，直接跳过
+                if w in result:
+                    continue
+                
+                if len(result) < FEEDBACK_MAX_WORDS:
                     result.append(w)
+                    result_scores[w] = score
+                else:
+                    # 已满30：找到当前最低分的非原始反馈词
+                    min_idx = -1
+                    min_score = float('inf')
+                    for i in range(len(originals_set), len(result)):
+                        rw = result[i]
+                        rs = result_scores.get(rw, 0)
+                        if rs < min_score:
+                            min_idx = i
+                            min_score = rs
+                    
+                    if score > min_score:
+                        replaced = result[min_idx]
+                        result[min_idx] = w
+                        result_scores[w] = score
+                        del result_scores[replaced]
             
             if set(result) != set(existing):
                 entry["keywords"] = result

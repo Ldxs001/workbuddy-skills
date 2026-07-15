@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
 from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, get_all_presets, SECOND_PASS_TEMPLATE
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS, ALL_RECOMMENDED_MODELS, MODEL_DIMENSION_MAP, detect_local_embedding_models, download_model, probe_all_models, _AVAILABILITY_CACHE
-from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model
+from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model, get_auto_backup_enabled
 from router import list_kb_signatures, rebuild_all_signatures
 from rag_standalone import verify_llm_connection
 from text_splitter import STRATEGY_REGISTRY, GUARD_REGISTRY, get_all_strategies_info, SECONDARY_STRATEGIES
@@ -1160,12 +1160,189 @@ function pollEnvProgress() {
 
 // 页面加载后检测环境
 setTimeout(checkEnv, 300);
+
+// ── 知识库备份操作 ──────────────────────────
+function getBackupKbName() {
+  var sel = document.getElementById('backup-kb-select');
+  return sel ? sel.value : '';
+}
+
+function manualBackup() {
+  var kb = getBackupKbName();
+  if (!kb) { toast('请先选择知识库', 'error'); return; }
+  fetch('/api/kb/backup/manual', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kb})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast(d.message); refreshBackups(); }
+    else toast(d.message || '备份失败', 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function toggleAutoBackup(enabled) {
+  fetch('/api/kb/backup/auto-toggle', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({enabled: enabled})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) toast((enabled?'已启用':'已关闭') + '自动备份');
+    else toast(d.error, 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function refreshBackups() {
+  var kb = getBackupKbName();
+  if (!kb) { toast('请先选择知识库', 'error'); return; }
+  fetch('/api/kb/backup/list', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kb})
+  }).then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('backup-list');
+    if (!d.success) { el.innerHTML = '<span style="color:#c92a2a;">加载失败</span>'; return; }
+    var list = d.backups || [];
+    if (list.length === 0) {
+      el.innerHTML = '<em>暂无备份</em>';
+      return;
+    }
+    el.innerHTML = '<div style="font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">共 ' + list.length + ' 个备份</div>' +
+      list.map(function(b) {
+        var tag = b.type === 'auto' ? '<span style="display:inline-block;padding:1px 5px;font-size:10px;border-radius:3px;background:#e3f2fd;color:#1565c0;margin-left:4px;">自动</span>' : '<span style="display:inline-block;padding:1px 5px;font-size:10px;border-radius:3px;background:#fff3e0;color:#e65100;margin-left:4px;">手动</span>';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;">' +
+          '<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+          '<span title="' + b.name + '" style="font-size:13px;">' + b.name.replace(/\.[^/.]+$/, '').slice(0,30) + '…</span>' + tag +
+          '<br><span style="font-size:11px;color:#aaa;">' + b.time + ' | ' + b.size_str + '</span></div>' +
+          '<span style="display:flex;align-items:center;gap:4px;flex-shrink:0;">' +
+          '<button class="btn btn-success" style="padding:3px 10px;font-size:11px;" onclick="restoreBackup(\\'' + b.name.replace(/'/g,"\\'") + '\\')">↺ 恢复</button>' +
+          '<button class="btn btn-danger" style="padding:3px 10px;font-size:11px;" onclick="deleteBackup(\\'' + b.name.replace(/'/g,"\\'") + '\\')">✕ 删除</button>' +
+          '</span></div>';
+      }).join('');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function restoreBackup(name) {
+  var kb = getBackupKbName();
+  if (!kb) { toast('请先选择知识库', 'error'); return; }
+  if (!confirm('确定从「' + name + '」恢复知识库「' + kb + '」？当前数据将被覆盖！')) return;
+  fetch('/api/kb/backup/restore', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kb, backup_name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast(d.message); refreshBackups(); }
+    else toast(d.message || '恢复失败', 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+function deleteBackup(name) {
+  var kb = getBackupKbName();
+  if (!kb) { toast('请先选择知识库', 'error'); return; }
+  if (!confirm('确定删除备份「' + name + '」？')) return;
+  fetch('/api/kb/backup/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kb, backup_name: name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.success) { toast(d.message); refreshBackups(); }
+    else toast(d.message || '删除失败', 'error');
+  }).catch(function(e){toast('请求失败', 'error')});
+}
+
+// ── KB 文档浏览与移动 ──────────────────────────
+var _browserKbName = '';
+
+function openKbBrowser(kbName) {
+  _browserKbName = kbName;
+  document.getElementById('kb-browser-title').textContent = '📂 浏览: ' + kbName;
+  document.getElementById('kb-browser-content').innerHTML = '<em>加载中...</em>';
+  document.getElementById('kb-browser-actions').style.display = 'none';
+  document.getElementById('kb-browser-overlay').style.display = 'flex';
+  
+  fetch('/api/kb/sources', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kbName})
+  }).then(function(r){return r.json()}).then(function(d){
+    if (!d.success) { document.getElementById('kb-browser-content').innerHTML = '<span style="color:#c92a2a;">加载失败</span>'; return; }
+    var sources = d.sources || {};
+    var total = d.total || 0;
+    var names = Object.keys(sources);
+    if (names.length === 0) {
+      document.getElementById('kb-browser-content').innerHTML = '<em>该知识库暂无文档</em>';
+      return;
+    }
+    var html = '<div style="font-size:12px;color:#888;margin-bottom:6px;">共 ' + total + ' 个文档块，' + names.length + ' 个来源文件</div>';
+    html += '<div style="max-height:300px;overflow-y:auto;">';
+    names.sort().forEach(function(src) {
+      var display = src.replace(/\\\\/g, '/').split('/').pop();
+      if (!display) display = src;
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #eee;font-size:13px;">' +
+        '<input type="checkbox" class="kb-source-cb" value="' + src.replace(/"/g,'&quot;') + '">' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="点击预览" data-kb="' + kbName.replace(/'/g,'').replace(/"/g,'&quot;') + '" data-src="' + src.replace(/'/g,'').replace(/"/g,'&quot;') + '">' + display + '</span>' +
+        '<span style="color:#888;font-size:11px;">' + sources[src] + ' 块</span></div>';
+    });
+    html += '</div>';
+    html += '<div id="kb-preview-area" style="margin-top:8px;padding:8px;background:#f8f9fa;border-radius:6px;font-size:12px;color:#555;display:none;max-height:150px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></div>';
+    document.getElementById('kb-browser-content').innerHTML = html;
+    // 点击文件名预览内容（事件委托，避免转义地狱）
+    document.getElementById('kb-browser-content').onclick = function(e) {
+      var span = e.target;
+      while (span && !span.getAttribute('data-src')) span = span.parentElement;
+      if (span) showSourcePreview(span.getAttribute('data-kb'), span.getAttribute('data-src'));
+    };
+    document.getElementById('kb-browser-actions').style.display = 'block';
+  }).catch(function(e){toast('请求失败: ' + e.message, 'error')});
+}
+
+function showSourcePreview(kbName, source) {
+  var area = document.getElementById('kb-preview-area');
+  area.style.display = 'block';
+  area.textContent = '加载中...';
+  fetch('/api/kb/source-preview', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({kb_name: kbName, source: source})
+  }).then(function(r){return r.json()}).then(function(d){
+    if (d.success && d.preview) {
+      area.textContent = d.preview;
+    } else {
+      area.textContent = '（无内容预览）';
+    }
+  }).catch(function(e){
+    area.textContent = '预览加载失败';
+  });
+}
+
+function closeKbBrowser() {
+  document.getElementById('kb-browser-overlay').style.display = 'none';
+  _browserKbName = '';
+}
+
+function executeKbMove() {
+  var checked = document.querySelectorAll('.kb-source-cb:checked');
+  if (checked.length === 0) { toast('请至少勾选一个来源文件', 'error'); return; }
+  var sources = [];
+  checked.forEach(function(cb) { sources.push(cb.value); });
+  var target = document.getElementById('kb-browser-target').value;
+  if (!target) { toast('请选择目标知识库', 'error'); return; }
+  if (target === _browserKbName) { toast('源和目标不能相同', 'error'); return; }
+  
+  if (!confirm('确定将 ' + sources.length + ' 个来源文件的文档块从「' + _browserKbName + '」移动到「' + target + '」？')) return;
+  
+  var btn = document.getElementById('kb-browser-move-btn');
+  btn.disabled = true;
+  btn.textContent = '移动中...';
+  
+  fetch('/api/kb/move-docs', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({src_kb: _browserKbName, target_kb: target, sources: sources})
+  }).then(function(r){return r.json()}).then(function(d){
+    btn.disabled = false; btn.textContent = '🚚 移动选中项';
+    if (d.success) { toast(d.message); closeKbBrowser(); }
+    else toast(d.message || '移动失败', 'error');
+  }).catch(function(e){ btn.disabled = false; btn.textContent = '🚚 移动选中项'; toast('请求失败', 'error'); });
+}
 </script>"""
 
 def generate_html():
     """生成自包含 HTML 设置界面"""
     cfg = load_config()
     kbs = list_knowledge_bases()
+    _auto_backup_enabled = get_auto_backup_enabled()
     all_models = list_downloaded_models()
     from prompt_manager import load_slots, get_selected_preset, get_all_presets, SECOND_PASS_TEMPLATE, DEFAULT_SLOTS
     slots = load_slots()
@@ -1727,8 +1904,29 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
     <div id="kb-list" style="margin-bottom:8px;">
       {' '.join(f'''<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
         <div style="flex:1;"><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</div>
-        <div style="color:#888;font-size:11px;">模型编辑在下方「自动分类规则」中</div>
+        <span><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="openKbBrowser('{name}')">📂 浏览</button> <span style="color:#888;font-size:11px;">模型编辑在规则中</span></span>
       </div>''' for name, info in kbs.items())}
+    </div>
+    <!-- KB 浏览模态框 -->
+    <div id="kb-browser-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeKbBrowser()">
+      <div style="background:white;border-radius:16px;padding:24px;max-width:600px;width:92%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+        <h3 id="kb-browser-title" style="font-size:16px;color:#5a3e8a;margin-bottom:12px;">浏览知识库</h3>
+        <div id="kb-browser-content" style="font-size:13px;color:#555;">
+          <em>加载中...</em>
+        </div>
+        <div id="kb-browser-actions" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
+          <div class="form-group">
+            <label>移动到目标知识库</label>
+            <select id="kb-browser-target" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
+              {''.join(f'<option value="{name}">{name}</option>' for name in kbs)}
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeKbBrowser()">取消</button>
+            <button class="btn btn-success" id="kb-browser-move-btn" onclick="executeKbMove()">🚚 移动选中项</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
       <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">📋 自动分类规则 <span style="font-weight:400;color:#888;font-size:11px;">（关键词 + 扩展名匹配）</span></div>
@@ -1738,6 +1936,33 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
         <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" onclick="showRuleEditor()">➕ 添加规则</button>
         <button class="btn btn-danger" style="padding:6px 14px;font-size:12px;" onclick="if(confirm('重置所有分类规则为默认？'))resetRules()">↺ 重置默认</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 知识库备份管理 -->
+  <div class="card">
+    <h2>💾 知识库备份</h2>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label>选择知识库</label>
+      <select id="backup-kb-select" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;">
+        {''.join(f'<option value="{name}">{name}</option>' for name in kbs)}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-success" style="padding:8px 18px;" onclick="manualBackup()">📤 手动备份</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer;padding:8px 14px;border:1.5px solid #ddd;border-radius:8px;background:#fafafa;" onclick="event.stopPropagation()">
+        <input type="checkbox" id="auto-backup-toggle" onclick="toggleAutoBackup(this.checked)" {"checked" if _auto_backup_enabled else ""}>
+        <span>自动备份（入库前）</span>
+      </label>
+    </div>
+    <div id="backup-list" style="font-size:13px;color:#888;margin-top:6px;">
+      <em>选择知识库后点击「刷新」查看备份</em>
+    </div>
+    <div style="margin-top:8px;">
+      <button class="btn btn-secondary" style="padding:5px 12px;font-size:12px;" onclick="refreshBackups()">🔄 刷新备份列表</button>
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
+      手动备份前缀: <code>manual_</code> | 自动备份前缀: <code>auto_</code>（最多保留 3 个版本）
     </div>
   </div>
 
@@ -1778,7 +2003,12 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
           <span style="font-size:13px;color:#555;white-space:nowrap;">{"向量模型路由" if kb_cfg.get("auto_classify", False) else "纯关键词匹配"}</span>
         </div>
         <div style="font-size:12px;color:#888;margin-bottom:6px;">文档入库时自动分类到对应知识库（始终用嵌入模型）</div>
-        <div style="font-size:11px;color:#aaa;">嵌入模型：{cfg.get("embedding",{}).get("model_path","bce-embedding-base_v1")}</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:4px;">嵌入模型：{cfg.get("embedding",{}).get("model_path","bce-embedding-base_v1")}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:12px;color:#888;white-space:nowrap;">入库最低分
+            <input type="number" value="{kb_cfg.get('min_import_score', 0.4)}" min="0" max="1" step="0.05" onchange="updateConfig('kb','min_import_score',parseFloat(this.value))" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
+          </label>
+        </div>
       </div>
       <!-- 出库路由 -->
       <div class="form-group">
@@ -1792,7 +2022,7 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
         </div>
         <div style="font-size:12px;color:#888;margin-bottom:6px;">用户提问时路由到对应知识库检索（始终用嵌入模型，精排开时签名路由，关时关键词路由）</div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <label style="font-size:12px;color:#888;white-space:nowrap;">最低得分阈值
+          <label style="font-size:12px;color:#888;white-space:nowrap;">出库最低分
             <input type="number" value="{fb_cfg.get('min_score_threshold', 0.3)}" min="0" max="1" step="0.05" onchange="updateConfig('router','fallback_threshold',parseFloat(this.value))" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
           </label>
         </div>
@@ -2298,6 +2528,75 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 name = data.get("name", "")
                 ok = delete_template_config(name)
                 self._send_json({"success": ok})
+
+            # ── 知识库备份 API ───────────────────────────
+            elif path == "/api/kb/backup/manual":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                from knowledge_base_manager import manual_backup_kb
+                ok, msg = manual_backup_kb(kb_name)
+                self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb/backup/list":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                from knowledge_base_manager import list_kb_backups
+                backups = list_kb_backups(kb_name)
+                self._send_json({"success": True, "backups": backups})
+
+            elif path == "/api/kb/backup/restore":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                backup_name = data.get("backup_name", "")
+                from knowledge_base_manager import restore_kb_backup
+                ok, msg = restore_kb_backup(kb_name, backup_name)
+                self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb/backup/delete":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                backup_name = data.get("backup_name", "")
+                from knowledge_base_manager import delete_kb_backup
+                ok, msg = delete_kb_backup(kb_name, backup_name)
+                self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb/backup/auto-toggle":
+                data = self._read_body()
+                enabled = data.get("enabled", False)
+                from knowledge_base_manager import set_auto_backup_enabled
+                set_auto_backup_enabled(enabled)
+                self._send_json({"success": True, "enabled": enabled})
+
+            # ── KB 文档浏览与移动 API ──────────────────────
+            elif path == "/api/kb/sources":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                from knowledge_base_manager import list_kb_sources
+                sources = list_kb_sources(kb_name)
+                self._send_json({"success": True, "sources": sources, "total": sum(sources.values())})
+
+            elif path == "/api/kb/move-docs":
+                data = self._read_body()
+                src_kb = data.get("src_kb", "")
+                target_kb = data.get("target_kb", "")
+                sources = data.get("sources", [])
+                if not src_kb or not target_kb or not sources:
+                    self._send_json({"success": False, "error": "缺少参数 (src_kb, target_kb, sources)"})
+                    return
+                from knowledge_base_manager import move_kb_documents
+                ok, msg = move_kb_documents(src_kb, target_kb, sources)
+                self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb/source-preview":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                source = data.get("source", "")
+                if not kb_name or not source:
+                    self._send_json({"success": False, "error": "缺少参数"})
+                    return
+                from knowledge_base_manager import get_kb_source_preview
+                preview = get_kb_source_preview(kb_name, source)
+                self._send_json({"success": True, "preview": preview[:300]})
 
             # 知识库分类规则 API
             elif path == "/api/rules/list":
