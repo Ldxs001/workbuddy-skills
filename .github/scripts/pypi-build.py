@@ -94,7 +94,7 @@ setup(
     install_requires=REQUIREMENTS,
     entry_points={{"console_scripts": ["{pypi_name}=main:main"]}},
     # 版本含 b/alpha/beta/rc/dev → Beta，否则 Production/Stable
-    _is_beta = any(x in VERSION.lower() for x in ['b', 'alpha', 'beta', 'rc', 'dev'])
+    _is_beta = any(x in VERSION.lower() for x in ['b', 'alpha', 'beta', 'dev']) and 'rc' not in VERSION.lower()
     classifiers=[
         f"Development Status :: {'4 - Beta' if _is_beta else '5 - Production/Stable'}",
         "Intended Audience :: Developers",
