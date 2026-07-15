@@ -816,7 +816,7 @@ def _saslprep(password: str) -> str:
     password = "".join(mapped)
 
     # Normalization (RFC 4013 §2.2) — Unicode NFKC
-    password = [credential-redacted]("NFKC", password)
+    password = unicodedata.normalize("NFKC", password)
 
     for character in password:
         for check, description in _SASLPREP_PROHIBITED_CHECKS:
@@ -1074,7 +1074,7 @@ class Encryption:
     def verify(
         self, password: Union[bytes, str], *, strict: bool = False
     ) -> PasswordType:
-        pwd = [credential-redacted](password, strict=strict)
+        pwd = self._encode_password(password, strict=strict)
         key, rc = self.verify_v4(pwd) if self.V <= 4 else self.verify_v5(pwd)
         if rc != PasswordType.NOT_DECRYPTED:
             self._password_type = rc
@@ -1136,9 +1136,9 @@ class Encryption:
         *,
         strict: bool = False,
     ) -> DictionaryObject:
-        user_pwd = [credential-redacted](user_password, strict=strict)
+        user_pwd = self._encode_password(user_password, strict=strict)
         owner_pwd = (
-            [credential-redacted](owner_password, strict=strict)
+            self._encode_password(owner_password, strict=strict)
             if owner_password
             else None
         )

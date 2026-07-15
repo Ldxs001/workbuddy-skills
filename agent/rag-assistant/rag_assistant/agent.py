@@ -90,7 +90,7 @@ class Agent:
 - attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel
 - rel：**取行为**。实体间的动作/关系。当存在比较、对比、对立关系时填写，填一个最贴切的词即可（如 rel="对比"）。
 - 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
-- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词在用户问题中的原文出处。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
+- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词的原文出处（可以来自**当前消息、上一轮问题或上一轮回答**），优先选最精确的。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
 - **两条关键规则：① 一个概念只放一边。** 如果一个概念既是"事物"又是"目的"，优先放 entities，不要同时在 entities 和 attrs 中出现（例如"模仿"→只放 entities 即可）。**② 不要太细碎。** 同一来源的一个完整问题点，不需要拆成多个同义词 key（例如"通过怎样的技术方式或技术行为"→用"技术方式"一个 key 即可，不同时写"技术方式""行为特征""模拟技术"）。具体 entities/attrs 的填法见下方对应类型。
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
@@ -123,7 +123,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 - 下方消息列表中，最后一条 user 消息是用户的当前提问
 - 之前的消息是历史记录，不要重复执行或参考它们的内容来构造新的 <<ACTION>>
 - 只根据最新一条 user 消息的内容决定：直接回答 / 查知识库 / 搜网页 / 入库
-- **关键：entities、attrs、evidence 只从当前 user 消息中提取，不要使用历史对话摘要中的任何概念或关键词**
+- **关键：entities 只从问题原文中提取**（当前问题或上一轮问题均可），不允许从 AI 回答内容中取 entity。**attrs 可从问题或回答内容中提取**（当前和上一轮均可）。**evidence 的 key/value 可在当前消息、上一轮问题或上一轮回答中找到原文出处即可**。
 - **用户说"入库"或"导入"时，表示要导入文件，用 type="import" path="MANIFEST"，不要查知识库**
 """
         return prompt
@@ -157,12 +157,41 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             )
         return "\n\n".join(lines)
 
+    def _get_previous_turns(self) -> tuple:
+        """从短期记忆获取上一轮的问题和回答，用于追问时提取实体/证据"""
+        raw = self.memory.get_short_term(self.session_id)
+        if not raw.strip():
+            return ("", "")
+        lines = raw.strip().split("\n")
+        user_msgs = []
+        assistant_msgs = []
+        for line in reversed(lines):
+            m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] (\w+): (.+)', line)
+            if m:
+                role = m.group(1)
+                content = m.group(2)
+                if role == "user":
+                    user_msgs.append(content)
+                elif role == "assistant":
+                    assistant_msgs.append(content)
+        # user_msgs[0] = 当前消息（刚 append），user_msgs[1] = 上一轮问题
+        # assistant_msgs[0] = 最近一次 AI 回答
+        prev_question = user_msgs[1] if len(user_msgs) > 1 else ""
+        prev_reply = assistant_msgs[0] if assistant_msgs else ""
+        return (prev_question, prev_reply)
+
     def chat(self, message: str, stream: bool = False) -> dict:
         """处理一条用户消息（带 LLM 自修正循环）"""
         self.memory.append_short_term(self.session_id, "user", message)
 
+        # 获取上一轮对话供 entities/attrs/evidence 引用
+        prev_question, prev_reply = self._get_previous_turns()
+
         # 自修正循环：LLM 输出 → Agent 校验 → 不通过则反馈给 LLM 重试
-        decision, action = self._decide_with_retry(message, max_retries=5)
+        decision, action = self._decide_with_retry(
+            message, max_retries=5,
+            prev_question=prev_question, prev_reply=prev_reply
+        )
 
         reply = decision.get("text", "")
         reasoning = decision.get("reasoning", "")
@@ -204,7 +233,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         decision["success"] = True
         return decision
 
-    def _decide_with_retry(self, message: str, max_retries: int = 5) -> tuple:
+    def _decide_with_retry(self, message: str, max_retries: int = 5,
+                            prev_question: str = "", prev_reply: str = "") -> tuple:
         """LLM 决策 + 自修正循环
 
         两阶段设计：
@@ -214,7 +244,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             - 不允许通过"不输出 <<ACTION>>"逃避校验
             - 5 次失败后不允许 LLM 自由回答（防止捏造引用）
         """
-        msgs = self._build_first_pass_messages(message)
+        msgs = self._build_first_pass_messages(message, prev_question=prev_question, prev_reply=prev_reply)
 
         # ═══════ 阶段 1：模式判定（单次 LLM 调用，不在 loop 内）═══════
         resp = self.llm.chat(msgs, stream=False)
@@ -233,12 +263,14 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         # 解析错误或有效 action → 进入阶段 2
         return self._action_validation_loop(
             msgs, message, max_retries,
-            initial_resp=resp, initial_action=action, initial_parse_err=parse_err
+            initial_resp=resp, initial_action=action, initial_parse_err=parse_err,
+            prev_question=prev_question, prev_reply=prev_reply
         )
 
     def _action_validation_loop(self, msgs: list, message: str, max_retries: int,
                                  initial_resp=None, initial_action=None,
-                                 initial_parse_err=None) -> tuple:
+                                 initial_parse_err=None,
+                                 prev_question: str = "", prev_reply: str = "") -> tuple:
         """阶段 2：动作校验小 loop
 
         LLM 已选择 action 模式（query/search/import），必须保持 action 模式。
@@ -255,7 +287,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 f"- 要求：修正后输出有效的 <<ACTION>> 标记\n"
                 f"- 注意：你必须输出动作（query/search/import/chat），不能跳出动作模式"})
         elif initial_action:
-            rejection = self._validate_action(initial_action, message)
+            rejection = self._validate_action(initial_action, message, prev_question=prev_question, prev_reply=prev_reply)
             if rejection:
                 logger.info(f"LLM 动作被拒绝 (attempt 1): {rejection}")
                 msgs.append({"role": "assistant", "content": initial_resp.get("text", "")})
@@ -296,7 +328,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 continue
 
             # 校验
-            rejection = self._validate_action(action, message)
+            rejection = self._validate_action(action, message, prev_question=prev_question, prev_reply=prev_reply)
             if not rejection:
                 return resp, action
 
@@ -315,7 +347,8 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             "reasoning": ""
         }, None
 
-    def _validate_action(self, action: dict, original_msg: str) -> Optional[str]:
+    def _validate_action(self, action: dict, original_msg: str,
+                          prev_question: str = "", prev_reply: str = "") -> Optional[str]:
         """校验动作是否合法，不合法返回明确的拒绝原因"""
         atype = action.get("type", "")
 
@@ -348,16 +381,41 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             missing = [t for t in all_terms if t not in ev]
             if missing:
                 return f"以下词缺少 evidence key（必须与 entities/attrs 中的写法精确一致，不可改词）: {', '.join(missing)}。请补充 evidence 中的对应条目"
-            fakes = [f"「{k}」的出处「{v}」" for k, v in ev.items() if v not in original_msg]
-            if fakes:
-                # 区分 key 在原文有 vs 无两种情形
+            # evidence 校验（三源：当前消息 / 上一轮问题 / 上一轮回答）
+            valid_sources = [original_msg]
+            if prev_question:
+                valid_sources.append(prev_question)
+            if prev_reply:
+                valid_sources.append(prev_reply)
+            # 检查 evidence value 是否至少在一个有效来源中存在
+            bad_items = []
+            for k, v in ev.items():
+                if not any(v in src for src in valid_sources):
+                    bad_items.append((k, v))
+            if bad_items:
                 details = []
-                for k, v in ev.items():
-                    if v not in original_msg:
-                        if k in original_msg:
-                            details.append(f"「{k}」的出处「{v}」不是原文原句。请从原文中复制完整原句作为出处")
-                        else:
-                            details.append(f"「{k}」原文中无此词。请对照下方原文找实际存在的词替换，不要自己造新词：\n【原文摘录】{original_msg[:200]}")
+                source_labels = ["当前消息", "上一轮问题", "上一轮回答"]
+                for k, v in bad_items:
+                    # 找 key 在哪个源中存在
+                    found_sources = []
+                    found_texts = []
+                    for i, src in enumerate(valid_sources):
+                        if k in src:
+                            lbl = source_labels[i] if i < len(source_labels) else f"源{i}"
+                            found_sources.append(lbl)
+                            idx = src.index(k)
+                            start = max(0, idx - 30)
+                            end = min(len(src), idx + len(k) + 80)
+                            prefix = "…" if start > 0 else ""
+                            suffix = "…" if end < len(src) else ""
+                            found_texts.append(f"【{lbl}】{prefix}{src[start:end]}{suffix}")
+                    if found_sources:
+                        details.append(
+                            f"「{k}」的出处「{v}」不是原文原句（在{'、'.join(found_sources)}中存在）。"
+                            f"以下为定位参考（字符级切片），请对照系统提示中的原文复制完整原句：\n{chr(10).join(found_texts)}"
+                        )
+                    else:
+                        details.append(f"「{k}」在三个来源（当前消息/上一轮问题/上一轮回答）中都不存在，请换用原文实际存在的词")
                 return f"以下证据需要修正: {'; '.join(details)}"
             # kb 校验
             qkb = action.get("kb", "")
@@ -397,9 +455,18 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
         return None
 
-    def _build_first_pass_messages(self, message: str) -> list:
+    def _build_first_pass_messages(self, message: str, prev_question: str = "", prev_reply: str = "") -> list:
         """构建第一轮 LLM 消息：系统提示 → 当前提问（历史以压缩摘要形式传入，不传完整对话）"""
         msgs = [{"role": "system", "content": self._system_prompt()}]
+
+        # 上一轮对话原文（供追问时 entities/attrs/evidence 引用）
+        refs = []
+        if prev_question:
+            refs.append(f"【上一轮问题】{prev_question}")
+        if prev_reply:
+            refs.append(f"【上一轮回答】{prev_reply}")
+        if refs:
+            msgs.append({"role": "system", "content": "\n".join(refs)})
 
         # 压缩摘要作为 System context（历史脉络，不占轮次位置）
         compressed = self.memory.get_compressed(self.session_id)
