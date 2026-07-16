@@ -31,7 +31,7 @@ jobs:
           NAME=""
 
           # 格式1: v0.8.5 → agent, 在 agent/ 目录中查找匹配版本的项目
-          if echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
             VERSION="${TAG#v}"
             TYPE="agent"
             # 扫描 agent/ 目录，找版本号匹配的项目
@@ -39,7 +39,7 @@ jobs:
               init_file="${dir}rag_assistant/__init__.py"
               if [ -f "$init_file" ]; then
                 ver=$(grep '__version__' "$init_file" | sed 's/.*"\(.*\)".*/\1/')
-                if [ "$ver" = "$VERSION" ]; then
+                if [ "${ver%%-*}" = "$VERSION" ]; then
                   NAME=$(basename "$dir")
                   echo "Found agent: $NAME v$VERSION"
                   break
