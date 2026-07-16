@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # semantic-split 架构与规范体系文档
 
 > 完整解读 v3.1.1 版的架构设计、三管线递进调度（B 正则 → A 语义 → C 双视角推理）、10 道门禁钩子系统、自增强闭环与渐进加载决策树

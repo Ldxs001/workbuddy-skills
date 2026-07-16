@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # skill-function-test 架构与规范体系文档
 
 > 完整解读 v1.1.1 版的架构设计、双轨测试体系、流程钩子、计时系统与报告输出

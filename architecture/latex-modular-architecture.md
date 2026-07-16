@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # latex-modular 架构与规范体系文档
 
 > 完整解读 v1.3.0 版的架构设计、七种操作模式、四流程线引擎策略与流程守卫体系
