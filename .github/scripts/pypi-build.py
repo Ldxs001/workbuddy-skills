@@ -93,6 +93,17 @@ if os.path.exists(readme_path):
 else:
     LONG_DESC = "{name}: AI Agent"
 
+# 追加当前版本的 CHANGELOG 到 long_description
+import re as _re
+changelog_path = os.path.join(os.path.dirname(__file__), "CHANGELOG.md")
+if os.path.exists(changelog_path):
+    with open(changelog_path, encoding="utf-8") as f:
+        _changelog = f.read()
+    _v_esc = _re.escape("{version}")
+    _m = _re.search(r"##\s*\[" + _v_esc + r"\].*?(?=\n##\s*\[|\Z)", _changelog, _re.DOTALL)
+    if _m:
+        LONG_DESC += "\n\n---\n\n## 更新说明\n\n" + _m.group(0).strip()
+
 setup(
     name="{pypi_name}",
     version=VERSION,
