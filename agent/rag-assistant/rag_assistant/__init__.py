@@ -1,2 +1,2 @@
 """rag-assistant: 独立智能体，封装 local-rag-builder 技能"""
-__version__ = "1.3.0-beta"
+__version__ = "1.3.0b1"

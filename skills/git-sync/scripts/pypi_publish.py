@@ -26,15 +26,28 @@ if os.path.exists(readme_path):
 else:
     LONG_DESC = "{name}: AI Agent"
 
+# 追加当前版本的 CHANGELOG 到 long_description
+changelog_path = os.path.join(os.path.dirname(__file__), "CHANGELOG.md")
+if os.path.exists(changelog_path):
+    with open(changelog_path, encoding="utf-8") as f:
+        changelog_content = f.read()
+    # 提取当前版本号对应的 changelog 区块
+    import re
+    version_escaped = re.escape(VERSION)
+    m = re.search(r"##\s*\[" + version_escaped + r"\].*?(?=\n##\s*\[|\Z)", changelog_content, re.DOTALL)
+    if m:
+        version_changelog = m.group(0).strip()
+        LONG_DESC += "\n\n---\n\n## 更新说明\n\n" + version_changelog
+
 setup(
     name="{pypi_name}",
     version=VERSION,
     description="{name} — AI Agent",
     long_description=LONG_DESC,
     long_description_content_type="text/markdown",
-    author="Ldxs ([username-redacted])",
-    author_email="[email-redacted]",
-    url="https://github.com/[username-redacted]/workbuddy-skills",
+    author="Ldxs (wUwproject)",
+    author_email="wuwofc@yeah.net",
+    url="https://github.com/Ldxs001/workbuddy-skills",
     packages=find_packages(),
     include_package_data=True,
     python_requires=">=3.10",
@@ -94,10 +107,10 @@ def main():
     ).stdout.strip()
     token = ""
     if "//" in remote_url and "@" in remote_url:
-        # HTTPS: https://user:[email-redacted]/...
+        # HTTPS: https://user:token@github.com/...
         token_part = remote_url.split("//")[1].split("@")[0]
         if ":" in token_part:
-            token = [credential-redacted](":")[1]
+            token = token_part.split(":")[1]
 
     if not token:
         print("  ⚠️  无法获取 GitHub token，尝试 ~/.pypirc")
