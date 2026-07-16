@@ -1,7 +1,7 @@
 # Skills Repository
 
 > **用户技能仓库与智能体仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-07-13
+> 最后更新：2026-07-16
 
 本仓库托管 wUwproject 技能合集与智能体项目，码云（Gitee）和 GitHub 双平台同步。
 
@@ -50,14 +50,15 @@
 
 ```
 workbuddy-skills/
-├── Cogito_Scribit/
-├── LICENSE
-├── LICENSE-APACHE
+├── Cogito_Scribit/   （CC BY-SA 4.0）
+├── LICENSE           （MIT License）
+├── LICENSE-APACHE    （Apache License 2.0）
+├── LICENSE-CC-BY-SA-4.0
 ├── README.md
-├── agent/
-├── architecture/
+├── agent/            （Apache License 2.0）
+├── architecture/     （CC BY-SA 4.0）
 ├── dist/
-└── skills/
+└── skills/           （MIT License）
 ```
 
 ---
@@ -96,5 +97,6 @@ rm -rf temp-skills
 
 ## 许可证
 
-- MIT License（适用于 `skills/` 目录下的所有技能）
-- Apache License 2.0（适用于 `agent/` 目录下的智能体）
+    - MIT License（适用于 `skills/` 目录下的所有技能）
+    - Apache License 2.0（适用于 `agent/` 目录下的智能体）
+    - CC BY-SA 4.0（适用于 `Cogito_Scribit/` 和 `architecture/` 目录下的方法论与架构文档）
