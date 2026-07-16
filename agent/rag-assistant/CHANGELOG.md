@@ -5,6 +5,18 @@
 
 ---
 
+## [1.3.0b2] - 2026-07-16
+
+### 修复
+- **PyPI 包缺少 vendor/ 目录**：构建白名单遗漏 `vendor`，导致 beautifulsoup4、markdownify、pypdf 等内嵌依赖缺失。修复 pypi-build.py whitelist 并补充到仓库
+- **PyPI long_description 缺少更新说明**：`pypi-build.py` setup.py 模板未追加 CHANGELOG。改为在 build_agent() 中直接读取 CHANGELOG.md 拼入 LONG_DESC
+- **PyPI workflow 正则不识别 PEP 440 版本号**：tag `v1.3.0b1` 因正则 `(-[a-zA-Z0-9.]+)?$` 要求 `-` 前缀被拒。修复为 `([.-]?[a-zA-Z][a-zA-Z0-9]*)?$`
+- **PyPI build setup.py 语法错误**：`if/elif` 被错误嵌入 `setup()` 调用内部。提取 `_detect_status()` 独立函数，模板只输出常量
+- **PEP 440 版本命名合规化**：`1.3.0-beta` → `1.3.0b1`，classifier 自动为 "4 - Beta"
+
+### 变更
+- PyPI 发布 workflow 增加 `if: type == 'agent'` 条件，非 agent 项目不触发发布
+
 ## [1.3.0b1] - 2026-07-16
 ### 新增
 - **Evidence 语义验证系统**：出库路由第一步校验后增加 MiniCPM/Qwen 语义二次判断。硬编码 evidence 校验不通过时，若 toggle 开启且有模型，走 LLM 语义验证（支持"存在"/"不存在"二元输出），降低错误拒绝率
