@@ -40,7 +40,7 @@ def build_agent(name, version, pypi_name):
     pkg_dir_name = name.replace("-", "_")  # rag-assistant -> rag_assistant
 
     # 拷贝 main.py + 包目录 + key 文件
-    for item in ["main.py", pkg_dir_name, "requirements.txt", "README.md", "LICENSE", "CHANGELOG.md"]:
+    for item in ["main.py", pkg_dir_name, "vendor", "requirements.txt", "README.md", "LICENSE", "CHANGELOG.md"]:
         src = os.path.join(src_dir, item)
         if os.path.exists(src):
             dst = os.path.join(build_dir, item)
