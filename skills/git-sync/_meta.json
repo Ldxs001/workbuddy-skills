@@ -1,7 +1,7 @@
 {
   "name": "git-sync",
-  "version": "2.28.0",
-  "description": "全平台发布工具。新增 Gitee 发行版创建，修复 step_llm_file_filter 秒删扫描文件导致 LLM 无法审查的问题。",
+  "version": "2.28.2",
+  "description": "全平台发布工具。新增 Gitee 发行版创建，修复 step_llm_file_filter 秒删扫描文件导致 LLM 无法审查的问题。PyPI long_description 自动追加 CHANGELOG。",
   "author": "wUwproject",
   "tags": [
     "sync",

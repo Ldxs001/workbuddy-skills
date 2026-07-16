@@ -1,3 +1,14 @@
+## [2.28.2] - 2026-07-16
+
+### 修复
+- **PyPI 发布 long_description 缺少更新说明**：`pypi_publish.py` 的 setup.py 模板在构建时自动读取 CHANGELOG.md，提取当前版本对应的 changelog 区块追加到 long_description。PyPI 项目页现在会同时显示 README 和更新说明
+- **PEP 440 版本命名合规化**：`rag-assistant` 版本号 `1.3.0-beta` → `1.3.0b1`（PEP 440 要求 pre-release 标识符不带 `-`）
+
+## [2.28.1] - 2026-07-16
+
+### 新增
+- **update_readme.py 支持 CC BY-SA 4.0**：许可证章节新增 CC BY-SA 4.0 行；目录树自动添加许可证标注（Cogito_Scribit/ 和 architecture/ → CC BY-SA 4.0，skills/ → MIT，agent/ → Apache 2.0 等）
+
 ## [2.28.0] - 2026-07-15
 
 ### 新增
