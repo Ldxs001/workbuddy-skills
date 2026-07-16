@@ -76,8 +76,16 @@ RECOMMENDED_NLI_MODELS = [
     {"id": "cross-encoder/nli-distilroberta-base", "size_mb": 260, "desc": "英文 NLI 轻量，CPU 友好", "type": "nli"},
 ]
 
+# 推理用小模型（用于 evidence 语义验证，走 transformers + torch）
+RECOMMENDED_GGUF_MODELS = [
+    {"id": "Qwen/Qwen2.5-0.5B-Instruct", "size_mb": 1200,
+     "desc": "Qwen2.5 0.5B Instruct — evidence 语义验证（标准架构，零兼容问题）"},
+    {"id": "openbmb/MiniCPM5-1B", "size_mb": 2100,
+     "desc": "MiniCPM5 1B — evidence 语义验证（更高精度）"},
+]
+
 # 所有推荐模型的汇总列表（用于网络探测）
-ALL_RECOMMENDED_MODELS = RECOMMENDED_MODELS + RECOMMENDED_RERANK_MODELS + RECOMMENDED_NLI_MODELS
+ALL_RECOMMENDED_MODELS = RECOMMENDED_MODELS + RECOMMENDED_RERANK_MODELS + RECOMMENDED_NLI_MODELS + RECOMMENDED_GGUF_MODELS
 
 # 模型 ID → 向量维度映射表（仅嵌入模型，用于 UI 显示 + 入库校验）
 MODEL_DIMENSION_MAP = {
@@ -911,3 +919,20 @@ if __name__ == "__main__":
 
     else:
         parser.print_help()
+
+# ═══════════════════════════════════════════════
+# MiniCPM 模型检测函数
+# ═══════════════════════════════════════════════
+
+def is_gguf_downloaded(model_id: str) -> bool:
+    """检查模型是否已下载（复用 download_model 的 model_index.json）"""
+    index = _load_index()
+    info = index.get(model_id, {})
+    return info.get("status") == "ready"
+
+
+def get_gguf_model_path(model_id: str) -> str:
+    """获取已下载的模型路径"""
+    index = _load_index()
+    info = index.get(model_id, {})
+    return info.get("path", "")

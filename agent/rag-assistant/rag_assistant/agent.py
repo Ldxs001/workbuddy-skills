@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import json
+import traceback
 from typing import Optional
 
 from .llm_client import LLMClient
@@ -24,7 +25,7 @@ BUILTIN_QUERY_TYPES = {
         "example": '"茅台的价格是多少？"',
         "rules": {
             "entities": "主体/名词。问题问的是「谁/什么」，能被替换为「关于XX」的 XX。例：茅台、AI。不要放「做什么」类的词",
-            "attrs": "目的/属性。用户想查的目标维度，是「查XX的什么」。例：价格、定义、原理。不要放「异同」「区别」等比较意图词",
+            "attrs": "目的/属性。用户想查的目标维度，是「查XX的什么」。例：价格、定义、原理。不要放「异同」「区别」等比较意图词，也不要放「为什么」「怎么」「如何」等疑问词（它们不是搜索维度）",
             "rel": "留空（不触发两两配对）",
         }
     },
@@ -69,6 +70,7 @@ class Agent:
         self.llm = LLMClient(self.config)
         self.memory = Memory(self.data_dir)
         self.search = WebSearch(self.config)
+        self._minicpm_llm = None  # MiniCPM 模型缓存
 
     def _system_prompt(self) -> str:
         type_ref = self._build_type_reference()
@@ -347,6 +349,103 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             "reasoning": ""
         }, None
 
+    def _minicpm_evidence_enabled(self) -> bool:
+        """检查配置中 MiniCPM evidence 语义验证是否启用"""
+        try:
+            from .engine.config import load_config
+            cfg = load_config()
+            return cfg.get("nli", {}).get("minicpm_evidence_enabled", False)
+        except Exception:
+            return False
+
+    def _minicpm_check(self, value: str, sources: list) -> str:
+        """用证据模型（Qwen/MiniCPM）做语义级 evidence 存在性判断（transformers + torch）
+        返回: "exist" — 语义存在 / "not_exist" — 不存在
+        """
+        # 找模型路径
+        try:
+            from .engine.embedding_model_manager import RECOMMENDED_GGUF_MODELS, get_gguf_model_path
+            from .engine.config import load_config
+            _cfg = load_config()
+            model_id = _cfg.get("nli", {}).get("minicpm_model_id", RECOMMENDED_GGUF_MODELS[0]["id"])
+            model_path = get_gguf_model_path(model_id)
+            if not model_path or not os.path.isdir(model_path):
+                return "not_exist"
+        except Exception:
+            return "not_exist"
+
+        # 构建 prompt
+        context_text = "\n".join(sources)
+        prompt = (
+            f"请判断以下内容是否在原文中存在或可由原文合理推导得出。\n"
+            f"内容: {value}\n"
+            f"原文: {context_text}\n"
+            f"只回答「存在」或「不存在」"
+        )
+
+        try:
+            # transformers >= 5.x 移除了 is_torch_fx_available，但 MiniCPM remote code 还引用它
+            import transformers.utils.import_utils as _tfm_iu
+            if not hasattr(_tfm_iu, 'is_torch_fx_available'):
+                _tfm_iu.is_torch_fx_available = lambda: False
+
+            # transformers >= 5.x 的 get_expanded_tied_weights_keys 期望 dict，但 MiniCPM remote code 传的是 list
+            import transformers.modeling_utils as _tfm_mu
+            _orig_get_expanded = _tfm_mu.PreTrainedModel.get_expanded_tied_weights_keys
+            def _patched_get_expanded(self, all_submodels=False):
+                tm = getattr(self, '_tied_weights_keys', None)
+                if isinstance(tm, (list, tuple)):
+                    self._tied_weights_keys = {k: k for k in tm}
+                return _orig_get_expanded(self, all_submodels=all_submodels)
+            _tfm_mu.PreTrainedModel.get_expanded_tied_weights_keys = _patched_get_expanded
+
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            import torch
+
+            if self._minicpm_llm is None:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    model_path, trust_remote_code=True, local_files_only=True
+                )
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    torch_dtype=torch.bfloat16,
+                ).eval()
+                self._minicpm_llm = (tokenizer, model)
+            else:
+                tokenizer, model = self._minicpm_llm
+
+            # 不用 model.generate()——transformers 5.x 的 GenerationMixin 与 MiniCPM remote code 不兼容
+            # 改用原始 forward pass + argmax 逐token生成
+            # Qwen 等 instruct 模型需要 chat_template 才能正确理解指令
+            try:
+                _chat_input = [{"role": "user", "content": prompt}]
+                _chat_text = tokenizer.apply_chat_template(_chat_input, tokenize=False, add_generation_prompt=True)
+                inputs = tokenizer(_chat_text, return_tensors="pt", truncation=True, max_length=1024)
+            except Exception:
+                inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs.get("attention_mask")
+            with torch.no_grad():
+                for _ in range(16):
+                    out = model(input_ids, attention_mask=attention_mask)
+                    next_logit = out.logits[:, -1, :]  # (1, vocab_size)
+                    next_id = torch.argmax(next_logit, dim=-1, keepdim=True)  # (1, 1)
+                    input_ids = torch.cat([input_ids, next_id], dim=-1)
+                    if attention_mask is not None:
+                        attention_mask = torch.cat([attention_mask, torch.ones_like(next_id)], dim=-1)
+                    if next_id.item() == tokenizer.eos_token_id:
+                        break
+            text = tokenizer.decode(input_ids[0][len(inputs["input_ids"][0]):], skip_special_tokens=True).strip()
+            if "存在" in text and "不存在" not in text:
+                return "exist"
+            return "not_exist"
+
+        except Exception as e:
+            logger.warning(f"MiniCPM 推理失败: {e}\n{traceback.format_exc()}")
+            return "not_exist"
+
     def _validate_action(self, action: dict, original_msg: str,
                           prev_question: str = "", prev_reply: str = "") -> Optional[str]:
         """校验动作是否合法，不合法返回明确的拒绝原因"""
@@ -392,6 +491,17 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             for k, v in ev.items():
                 if not any(v in src for src in valid_sources):
                     bad_items.append((k, v))
+            # 证据语义二次判断（硬编码未通过时走 LLM 模型）
+            if bad_items and self._minicpm_evidence_enabled():
+                survived = []
+                for k, v in bad_items:
+                    result = self._minicpm_check(v, valid_sources)
+                    if result == "exist":
+                        logger.info(f"Evidence 语义通过: key={k}, value={v}")
+                    else:
+                        survived.append((k, v))
+                        logger.info(f"Evidence 语义拒绝: key={k}, value={v}")
+                bad_items = survived
             if bad_items:
                 details = []
                 source_labels = ["当前消息", "上一轮问题", "上一轮回答"]
@@ -624,6 +734,9 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         if rel:
             _compare_kw = {"异同", "区别", "差别", "对比", "共同点", "不同点", "异同点", "差异"}
             attr_list = [a for a in attr_list if a not in _compare_kw]
+        # 过滤attr中明显不是搜索维度的疑问词（不自动设rel，避免与prompt规则冲突）
+        _question_words = {"为什么", "怎么", "如何", "怎样", "怎么样", "是什么", "什么是"}
+        attr_list = [a for a in attr_list if a not in _question_words]
         _slices = set()
         # 第一层：entity × attr — 每个实体的各属性切片（事实块检索用）
         for e in entity_list:

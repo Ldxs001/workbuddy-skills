@@ -18,12 +18,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import load_config, save_config, reset_config, DEFAULT_CONFIG
 from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, get_all_presets, SECOND_PASS_TEMPLATE
-from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS, ALL_RECOMMENDED_MODELS, MODEL_DIMENSION_MAP, detect_local_embedding_models, download_model, probe_all_models, _AVAILABILITY_CACHE
+from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS, RECOMMENDED_GGUF_MODELS, ALL_RECOMMENDED_MODELS, MODEL_DIMENSION_MAP, detect_local_embedding_models, download_model, is_gguf_downloaded, get_gguf_model_path, probe_all_models, _AVAILABILITY_CACHE
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model, get_auto_backup_enabled
 from router import list_kb_signatures, rebuild_all_signatures
 from rag_standalone import verify_llm_connection
 from text_splitter import STRATEGY_REGISTRY, GUARD_REGISTRY, get_all_strategies_info, SECONDARY_STRATEGIES
-from utils import cfg_dir, run_command
+from utils import cfg_dir, run_command, cache_directory
+import os, threading, traceback
+import re as _re
 
 # 下载状态跟踪 {model_id: {"status":"downloading"|"done"|"failed"|"retrying", "source":"...", "attempt":1, "message":"..."}}
 _download_tasks = {}
@@ -651,6 +653,7 @@ function refreshRules() {
     }).join('');
   });
 }
+function techRecount(){fetch('/api/kb/tech-recount',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast(d.message);setTimeout(function(){location.reload()},500)}else toast(d.error||'技术更正失败','error')});}
 
 function showRuleEditor(editName) {
   document.getElementById('rule-editor-overlay').style.display = 'flex';
@@ -775,21 +778,30 @@ function resetAll() {
 }
 
 function downloadModel(id){
-  var el = document.createElement('div');
+  // 弹窗尽量放外层窗口，避免被 iframe 截断；跨端口被拦截则回退到当前窗口
+  var targetWin = window;
+  try { if (window.parent && window.parent !== window) { var _t = window.parent.document; targetWin = window.parent; } } catch(e) {}
+  var targetDoc = targetWin.document;
+  var isIframe = targetWin !== window;
+  // 防重复
+  var old = targetDoc.getElementById('dl-status');
+  if(old) old.remove();
+  var el = targetDoc.createElement('div');
   el.id = 'dl-status';
-  el.style.cssText = 'position:fixed;bottom:20px;left:20px;right:20px;max-width:500px;z-index:9999;background:white;border-radius:12px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:13px;border-left:4px solid #667eea;';
+  var pos = isIframe ? 'top:80px;right:20px' : 'top:10px;right:10px';
+  el.style.cssText = 'position:fixed;' + pos + ';max-width:420px;z-index:9999;background:white;border-radius:12px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.25);font-size:13px;border-left:4px solid #667eea;';
   el.innerHTML = '<div style=\"display:flex;align-items:center;gap:10px;\"><div style=\"width:20px;height:20px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;\"></div><div style=\"flex:1;\"><strong>下载 ' + id.split('/').pop() + '</strong><br><span id=\"dl-msg\" style=\"color:#888;font-size:12px;\">准备中...</span></div><button onclick=\"this.parentElement.parentElement.remove()\" style=\"background:none;border:none;font-size:18px;cursor:pointer;color:#aaa;\">x</button></div>';
-  document.body.appendChild(el);
+  targetDoc.body.appendChild(el);
   // 启动下载
   fetch('/api/download-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})});
   // 轮询状态
   var poll = setInterval(function(){
     fetch('/api/download-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id})})
     .then(function(r){return r.json()}).then(function(d){
-      var msg = document.getElementById('dl-msg');
+      var msg = targetDoc.getElementById('dl-msg');
       if(!msg){clearInterval(poll);return}
       if(d.status==='starting') msg.textContent = '准备中...';
-      else if(d.status==='downloading'){msg.innerHTML = (d.message||'下载中...') + '<br><span style=\"color:#aaa;font-size:11px;\">' + (d.size_mb||0) + ' MB | ' + (d.speed||'') + '</span>';}
+      else if(d.status==='downloading'){msg.innerHTML = (d.message||'下载中...') + '<br><span style=\"color:#aaa;font-size:11px;\">' + (d.size_mb||0) + ' MB</span>';}
       else if(d.status==='done'){msg.textContent = '完成';el.style.borderLeftColor='#3B6D11';clearInterval(poll);setTimeout(function(){el.remove();location.reload()},1000);}
       else if(d.status==='failed'){msg.textContent = '失败: ' + d.message;el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
       else if(!d.success && d.status==='unknown'){msg.textContent = '启动中...';}
@@ -797,8 +809,8 @@ function downloadModel(id){
   },2000);
   // 超过 60 秒无响应则显示超时
   setTimeout(function(){
-    var msg = document.getElementById('dl-msg');
-    if(msg && msg.textContent==='准备中...'||msg && msg.textContent==='启动中...'){msg.textContent='超时: 下载未响应';el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
+    var msg = targetDoc.getElementById('dl-msg');
+    if(msg && (msg.textContent==='准备中...' || msg.textContent==='启动中...')){msg.textContent='超时: 下载未响应';el.style.borderLeftColor='#ff6b6b';clearInterval(poll);}
   },60000);
 }
 function toggleKB(){fetch('/api/kb/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('多知识库路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
@@ -806,6 +818,8 @@ function toggleImportClassify(){fetch('/api/kb/auto-classify/toggle',{method:'PO
 function toggleRouter(){if(!hasEmbeddingModel){toast('未检测到已下载的嵌入模型，请先下载','error');return;}fetch('/api/router/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('路由:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleReranker(){if(!hasRerankerModel){toast('未检测到已下载的 Rerank 模型，请先下载','error');return;}fetch('/api/reranker/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('Rerank:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleNLI(){if(!hasNLIModel){toast('未检测到已下载的 NLI 模型，请先下载','error');return;}fetch('/api/nli/toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('NLI:'+(d.enabled?'启用':'禁用'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function toggleMiniCPM(){var cb=document.getElementById('minicpm-evidence');if(!cb.checked){fetch('/api/nli/minicpm-toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('证据语义验证:禁用');setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});return;}var sel=document.querySelector('input[name=\"minicpm-model\"]:checked');if(!sel){toast('请先选择一个 MiniCPM 模型','error');cb.checked=false;return;}if(!hasMiniCPMModel){toast('所选模型未下载，请先下载','error');cb.checked=false;return;}fetch('/api/nli/minicpm-toggle',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('证据语义验证:启用('+sel.value+')');setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+function selectMiniCPMModel(mid){fetch('/api/nli/minicpm-select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:mid})}).then(function(r){return r.json()}).then(function(d){toast(d.message);setTimeout(function(){location.reload()},200)});}
 function probeAvailability(){
   var indicators=document.querySelectorAll('#probe-indicator-embedding,#probe-indicator-rerank,#probe-indicator-nli');
   // 统计唯一模型ID数（排除 fb 列表的重复）
@@ -1391,10 +1405,17 @@ def generate_html():
     has_emb = dl and any(m["id"].lower() in dl_ids for m in RECOMMENDED_MODELS)
     has_rr = dl and any(m["id"].lower() in dl_ids for m in RECOMMENDED_RERANK_MODELS)
     has_nli = dl and any(m["id"].lower() in dl_ids for m in RECOMMENDED_NLI_MODELS)
+    has_minicpm = any(is_gguf_downloaded(m["id"]) for m in RECOMMENDED_GGUF_MODELS) if RECOMMENDED_GGUF_MODELS else False
     # 过滤掉重排序模型，只保留真正的嵌入模型（供 KB 嵌入模型选择器使用）
     reranker_ids = {m["id"].lower() for m in RECOMMENDED_RERANK_MODELS}
     nli_ids = {m["id"].lower() for m in RECOMMENDED_NLI_MODELS}
-    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids and m.get("model_id","").lower() not in nli_ids]
+    gguf_ids = {m["id"].lower() for m in RECOMMENDED_GGUF_MODELS}
+    models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids and m.get("model_id","").lower() not in nli_ids and m.get("model_id","").lower() not in gguf_ids]
+    # 各类型模型已下载数（按 ID 匹配，权威来源）
+    emb_count = sum(1 for m in all_models if m.get("model_id","").lower() in {m2["id"].lower() for m2 in RECOMMENDED_MODELS})
+    rr_count = sum(1 for m in all_models if m.get("model_id","").lower() in reranker_ids)
+    nli_count = sum(1 for m in all_models if m.get("model_id","").lower() in nli_ids)
+    gguf_count = sum(1 for m in all_models if m.get("model_id","").lower() in gguf_ids)
     # 扫描本地自定义嵌入模型（含索引中的 + 用户手动放置的）
     local_emb_models = detect_local_embedding_models()
     Q = "'"
@@ -1445,6 +1466,26 @@ def generate_html():
         emb_model_html += "\n".join(local_rows)
     rr_model_html = _mlist("rerank", RECOMMENDED_RERANK_MODELS, rerank_cfg.get("model_path",""))
     nli_model_html = _mlist("nli", RECOMMENDED_NLI_MODELS, cfg.get("nli",{}).get("model_path",""))
+    # MiniCPM 模型列表（evidence 语义验证用，两个模型互斥选择）
+    minicpm_models = RECOMMENDED_GGUF_MODELS
+    minicpm_model_id = cfg.get("nli", {}).get("minicpm_model_id", "")
+    # 如果配置中的模型 ID 不在推荐列表里（如旧版本升级），回退到第一个
+    if not any(m["id"] == minicpm_model_id for m in minicpm_models):
+        minicpm_model_id = minicpm_models[0]["id"]
+        cfg.setdefault("nli", {})["minicpm_model_id"] = minicpm_model_id
+    minicpm_model_html = ""
+    for m in minicpm_models:
+        mid = m["id"]
+        sz = m["size_mb"]
+        ok = is_gguf_downloaded(mid)
+        bt = "" if ok else f'<button class="btn btn-primary" style="padding:4px 10px;font-size:11px;white-space:nowrap;" onclick="downloadModel(\'{mid}\')">下载</button>'
+        st = "已下载" if ok else "未下载"
+        active = mid == minicpm_model_id
+        minicpm_model_html += f'<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
+        minicpm_model_html += f'<input type="radio" name="minicpm-model" value="{mid}" {"checked" if active else ""} {"disabled" if not ok else ""} onchange="selectMiniCPMModel(\'{mid}\')">'
+        minicpm_model_html += f'<span style="font-size:12px;color:#555;flex:1;">{m["desc"]} ({sz}MB)</span>'
+        minicpm_model_html += f'<span style="font-size:11px;color:{"#3B6D11" if ok else "#888"};flex-shrink:0;">{st}</span>'
+        minicpm_model_html += f'{bt}</div>'
     fb_model_html = "<!-- 路由已改用嵌入模型，fb 选择器已废弃 -->"
     guard_labels = {"mermaid": "🧜 Mermaid", "code": "💻 代码块", "math": "∑ LaTeX公式", "table": "📊 表格", "html": "🌐 HTML结构"}
     active_guards = cfg.get("splitting", {}).get("guards", ["code"])
@@ -1648,6 +1689,10 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans
 .status-warn {{ background: #fff3bf; color: #e67700; }}
 .status-err {{ background: #ffe3e3; color: #c92a2a; }}
 .grid-3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }}
+.grid-6 {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }}
+@media (max-width: 900px) {{
+  .grid-6 {{ grid-template-columns: repeat(3, 1fr); }}
+}}
 .stat-card {{ background: #f8f9fa; border-radius: 12px; padding: 16px; text-align: center; }}
 .stat-card .num {{ font-size: 28px; font-weight: 700; color: #5a3e8a; }}
 .stat-card .label {{ font-size: 12px; color: #888; margin-top: 4px; }}
@@ -1683,16 +1728,24 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
   <h1 style="color:white;margin-bottom:20px;font-weight:300;font-size:28px;">🛠️ RAG 系统设置面板</h1>
 
   <div class="card">
-    <div class="grid-3">
-      <div class="stat-card">
-        <div class="num">{len(models)}</div>
-        <div class="label">嵌入模型</div>
+    <div class="grid-3" style="align-items:stretch;">
+      <div class="stat-card" style="padding:12px 16px;">
+        <div style="display:grid;grid-template-columns:auto min-content;gap:4px 16px;align-items:center;">
+          <div style="font-size:12px;color:#888;text-align:left;">向量模型</div>
+          <div class="num" style="font-size:20px;text-align:right;">{emb_count}</div>
+          <div style="font-size:12px;color:#888;text-align:left;">Ranker 模型</div>
+          <div class="num" style="font-size:20px;text-align:right;">{rr_count}</div>
+          <div style="font-size:12px;color:#888;text-align:left;">NLI 模型</div>
+          <div class="num" style="font-size:20px;text-align:right;">{nli_count}</div>
+          <div style="font-size:12px;color:#888;text-align:left;">推理模型</div>
+          <div class="num" style="font-size:20px;text-align:right;">{gguf_count}</div>
+        </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
         <div class="num">{len(kbs)}</div>
         <div class="label">知识库</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
         <div class="num">{sum(k.get('doc_count',0) for k in kbs.values())}</div>
         <div class="label">文档块</div>
       </div>
@@ -1907,6 +1960,9 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
         <span><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="openKbBrowser('{name}')">📂 浏览</button> <span style="color:#888;font-size:11px;">模型编辑在规则中</span></span>
       </div>''' for name, info in kbs.items())}
     </div>
+    <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:4px;">
+      <button class="btn btn-secondary" style="padding:4px 12px;font-size:11px;" onclick="techRecount()">🔧 计数更正</button>
+    </div>
     <!-- KB 浏览模态框 -->
     <div id="kb-browser-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeKbBrowser()">
       <div style="background:white;border-radius:16px;padding:24px;max-width:600px;width:92%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
@@ -2027,7 +2083,17 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
           </label>
         </div>
         <div style="font-size:11px;color:#aaa;margin-top:4px;">精排开→嵌入模型×签名　精排关→嵌入模型×关键词</div>
+        <!-- evidence 验证行（出库路由的第一步校验） -->
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="minicpm-evidence" style="margin:0;cursor:pointer;flex-shrink:0;width:auto;" {"checked" if cfg.get("nli",{}).get("minicpm_evidence_enabled", False) else ""} onchange="toggleMiniCPM()">
+          <label for="minicpm-evidence" style="font-size:12px;color:#555;cursor:pointer;flex-shrink:0;">evidence 语义验证</label>
+        </div>
       </div>
+    </div>
+    <!-- evidence 验证模型选择（独立整行，不受路由列宽限制） -->
+    <div style="margin-top:8px;padding-top:10px;border-top:1px dashed #ddd;background:#fafafa;padding:10px 14px;border-radius:8px;">
+      <div style="font-size:12px;color:#888;margin-bottom:6px;">选择 evidence 验证所用的 MiniCPM 模型（已下载才可选）</div>
+      {minicpm_model_html}
     </div>
     <div class="collapsible" onclick="toggleAdvSig()" style="margin-top:8px;">
       <span>📋 KB 签名（入库时自动归纳）</span>
@@ -2216,7 +2282,7 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
   </div>
 </div>
 <script>
-var hasRerankerModel={"true" if has_rr else "false"};var hasNLIModel={"true" if has_nli else "false"};var hasEmbeddingModel={"true" if has_emb else "false"};
+var hasRerankerModel={"true" if has_rr else "false"};var hasNLIModel={"true" if has_nli else "false"};var hasMiniCPMModel={"true" if has_minicpm else "false"};var hasEmbeddingModel={"true" if has_emb else "false"};
 </script>
 </body>
 </html>
@@ -2587,6 +2653,31 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 ok, msg = move_kb_documents(src_kb, target_kb, sources)
                 self._send_json({"success": ok, "message": msg})
 
+            elif path == "/api/kb/tech-recount":
+                try:
+                    from knowledge_base_manager import _load_index, _save_index
+                    from langchain_chroma import Chroma
+                    from rag_core import get_embeddings
+                    emb = get_embeddings()
+                    index = _load_index()
+                    corrected = {}
+                    for name, info in index.items():
+                        persist_dir = info.get("path", "")
+                        if not persist_dir or not os.path.isdir(persist_dir):
+                            continue
+                        try:
+                            vs = Chroma(persist_directory=persist_dir, embedding_function=emb)
+                            real_count = vs._collection.count()
+                        except Exception:
+                            real_count = 0
+                        index[name]["doc_count"] = real_count
+                        corrected[name] = real_count
+                    _save_index(index)
+                    total = sum(corrected.values())
+                    self._send_json({"success": True, "message": f"已修正 {len(corrected)} 个知识库计数，总计 {total} 个文档块"})
+                except Exception as e:
+                    self._send_json({"success": False, "error": f"技术更正失败: {e}"})
+
             elif path == "/api/kb/source-preview":
                 data = self._read_body()
                 kb_name = data.get("kb_name", "")
@@ -2706,7 +2797,6 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
 """
                         raw = llm.invoke(prompt).strip()
                         # 提取 JSON
-                        import re as _re
                         json_match = _re.search(r'\{.*\}', raw, _re.DOTALL)
                         if json_match:
                             rec = json.loads(json_match.group(0))
@@ -2756,21 +2846,33 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 if not mid:
                     self._send_json({"success": False, "error": "empty"})
                     return
+                # 防止重复触发下载（已有活跃线程则拒绝）
+                existing = _download_tasks.get(mid, {})
+                if existing.get("status") in ("starting", "downloading"):
+                    self._send_json({"success": False, "error": "已有下载任务在进行中"})
+                    return
                 # 启动后台线程下载
-                from utils import cache_directory
-                import os, threading
-                _download_tasks[mid] = {"status": "starting", "message": "准备中", "size_mb": 0, "speed": ""}
+                # 断点续传：启动时不扣除缓存基线，直接用缓存大小做进度
+                _download_tasks[mid] = {"status": "starting", "message": "准备中", "size_mb": 0, "speed": "", "_start_time": time.time(), "_no_grow_cnt": 0}
                 def _dl_job(mid):
                     try:
-                        from embedding_model_manager import DOWNLOAD_SOURCES, download_model
-                        sources = [s["name"] for s in DOWNLOAD_SOURCES[:4] if s["name"] != "llm_find"]
-                        _download_tasks[mid]["status"] = "downloading"
-                        _download_tasks[mid]["message"] = f"正在从 {sources[0] if sources else '?'} 下载..."
-                        r = download_model(mid, sources=sources)
+                        from embedding_model_manager import DOWNLOAD_SOURCES, download_model, RECOMMENDED_GGUF_MODELS
+                        # GGUF 模型走 download_model（标准 transformers 模型，走 modelscope/hf_mirror）
+                        gguf_match = [m for m in RECOMMENDED_GGUF_MODELS if m["id"] == mid]
+                        if gguf_match:
+                            sources = [s["name"] for s in DOWNLOAD_SOURCES[:4] if s["name"] != "llm_find"]
+                            _download_tasks[mid]["status"] = "downloading"
+                            _download_tasks[mid]["message"] = f"下载 MiniCPM 模型..."
+                            r = download_model(mid, sources=sources)
+                        else:
+                            sources = [s["name"] for s in DOWNLOAD_SOURCES[:4] if s["name"] != "llm_find"]
+                            _download_tasks[mid]["status"] = "downloading"
+                            _download_tasks[mid]["message"] = f"正在从 {sources[0] if sources else '?'} 下载..."
+                            r = download_model(mid, sources=sources)
                         if r.get("success", False):
                             _download_tasks[mid] = {"status": "done", "message": "下载完成", "size_mb": 0, "speed": ""}
                         else:
-                            _download_tasks[mid] = {"status": "failed", "message": r.get("message","所有源均失败"), "size_mb": 0, "speed": ""}
+                            _download_tasks[mid] = {"status": "failed", "message": r.get("details","所有源均失败"), "size_mb": 0, "speed": ""}
                     except Exception as e:
                         _download_tasks[mid] = {"status": "failed", "message": str(e), "size_mb": 0, "speed": ""}
                 t = threading.Thread(target=_dl_job, args=(mid,), daemon=True)
@@ -2778,55 +2880,64 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"success": True})
 
             elif path == "/api/download-status":
-                d = self._read_body(); mid = d.get("model_id","")
-                task = _download_tasks.get(mid, {})
-                status = task.get("status", "unknown")
-                size_mb = task.get("size_mb", 0)
-                speed = task.get("speed", "")
-
-                # 已完成/失败 → 直接返回
-                if status in ("done", "failed"):
-                    self._send_json({"success": True, "status": status, "message": task.get("message",""),
-                                     "size_mb": size_mb, "speed": speed})
-                    return
-
-                # 查 model_index.json 是否有已完成记录
                 try:
-                    from embedding_model_manager import _load_index
-                    idx = _load_index()
-                    if mid in idx and idx[mid].get("status") == "ready":
-                        _download_tasks[mid] = {"status": "done", "message": "下载完成", "size_mb": 0, "speed": ""}
-                        self._send_json({"success": True, "status": "done", "message": "下载完成", "size_mb": 0, "speed": ""})
+                    d = self._read_body(); mid = d.get("model_id","")
+                    task = _download_tasks.get(mid, {})
+                    status = task.get("status", "unknown")
+                    size_mb = task.get("size_mb", 0)
+                    speed = task.get("speed", "")
+
+                    # 已完成/失败 → 直接返回
+                    if status in ("done", "failed"):
+                        self._send_json({"success": True, "status": status, "message": task.get("message",""),
+                                         "size_mb": size_mb, "speed": speed})
                         return
-                except Exception:
-                    pass
 
-                # 查缓存目录看文件大小（huggingface 缓存 + 本地 model_downloads）
-                hf_prefix = f"models--{mid.replace('/', '--')}"
-                size_now = 0
-                for dl_dir in [
-                    os.path.join(cache_directory, "model_downloads"),
-                    os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub"),
-                ]:
-                    if os.path.isdir(dl_dir):
-                        for root, _, fns in os.walk(dl_dir):
-                            if hf_prefix not in root and mid.replace("/", os.sep) not in root:
-                                continue
-                            for fn in fns:
-                                if fn.endswith(('.lock', '.incomplete')): continue
-                                try:
-                                    size_now += os.path.getsize(os.path.join(root, fn))
-                                except: pass
+                    # 查 model_index.json 是否有已完成记录
+                    try:
+                        from embedding_model_manager import _load_index
+                        idx = _load_index()
+                        if mid in idx and idx[mid].get("status") == "ready":
+                            _download_tasks[mid] = {"status": "done", "message": "下载完成", "size_mb": 0, "speed": ""}
+                            self._send_json({"success": True, "status": "done", "message": "下载完成", "size_mb": 0, "speed": ""})
+                            return
+                    except Exception:
+                        pass
 
-                size_mb = round(size_now / (1024*1024), 1)
-                prev = task.get("_last_size", 0)
-                spd = abs(size_now - prev) / 2 if prev > 0 else 0
-                spd_str = f"{spd/1024/1024:.1f} MB/s" if spd >= 1024*1024 else f"{spd/1024:.0f} KB/s" if spd >= 1024 else f"{spd:.0f} B/s"
-                _download_tasks[mid] = {"status": status, "message": task.get("message",""),
-                                        "size_mb": size_mb, "speed": spd_str, "_last_size": size_now}
+                    # 查缓存目录看文件大小（不扣除基线——断点续传就应该按缓存大小报告进度）
+                    size_now = _calc_cache_size(mid, cache_directory)
+                    size_mb = round(size_now / (1024*1024), 1)
 
-                self._send_json({"success": True, "status": status, "message": f"{'启动中...' if status=='starting' else '下载中...'}",
-                                 "size_mb": size_mb, "speed": spd_str})
+                    # 进展停滞检测：连续 3 轮（~6秒）大小未变 → 标记为 stalled
+                    last_size = task.get("_last_size", 0)
+                    no_grow = task.get("_no_grow_cnt", 0)
+                    if size_now <= last_size:
+                        no_grow += 1
+                    else:
+                        no_grow = 0
+                    if no_grow >= 3 and status not in ("done", "failed"):
+                        # 下载线程可能卡死了，标记失败
+                        _download_tasks[mid] = {"status": "failed", "message": "下载卡死（连续6秒无进展），请检查网络或重试", "size_mb": size_mb, "speed": "0 B/s"}
+                        self._send_json({"success": True, "status": "failed",
+                                         "message": "下载卡死（连续6秒无进展），请检查网络或重试",
+                                         "size_mb": size_mb, "speed": "0 B/s"})
+                        return
+
+                    # 用平均速度（从下载开始算），避免 .incomplete 文件被跳过导致瞬时速度=0
+                    elapsed = time.time() - task.get("_start_time", time.time())
+                    spd = size_now / elapsed if elapsed > 0 else 0
+                    spd_str = f"{spd/1024/1024:.1f} MB/s" if spd >= 1024*1024 else f"{spd/1024:.0f} KB/s" if spd >= 1024 else f"{spd:.0f} B/s"
+                    _download_tasks[mid] = {"status": status, "message": task.get("message",""),
+                                            "size_mb": size_mb, "speed": spd_str, "_last_size": size_now,
+                                            "_start_time": task.get("_start_time", time.time()), "_no_grow_cnt": no_grow}
+
+                    self._send_json({"success": True, "status": status, "message": f"{'启动中...' if status=='starting' else '下载中...'}",
+                                     "size_mb": size_mb, "speed": spd_str})
+                except Exception as e:
+                    # 捕获真实错误并输出
+                    err_msg = f"download-status error: {e}\n{traceback.format_exc()}"
+                    print(err_msg, flush=True)
+                    self._send_json({"success": False, "status": "failed", "message": err_msg})
             elif path == "/api/geekedit/toggle":
                 d = self._read_body()
                 on = d.get("enabled", False)
@@ -2867,9 +2978,20 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 cfg = load_config(); nli = cfg.setdefault("nli", {})
                 nli["enabled"] = not nli.get("enabled", False)
                 save_config(cfg); self._send_json({"success": True, "enabled": nli["enabled"]})
+            elif path == "/api/nli/minicpm-toggle":
+                cfg = load_config(); nli = cfg.setdefault("nli", {})
+                nli["minicpm_evidence_enabled"] = not nli.get("minicpm_evidence_enabled", False)
+                save_config(cfg); self._send_json({"success": True, "enabled": nli["minicpm_evidence_enabled"]})
+            elif path == "/api/nli/minicpm-select":
+                d = self._read_body(); mid = d.get("model_id", "")
+                if not mid:
+                    self._send_json({"success": False, "error": "缺少 model_id"})
+                    return
+                cfg = load_config(); cfg.setdefault("nli", {})["minicpm_model_id"] = mid
+                save_config(cfg)
+                self._send_json({"success": True, "message": f"已选择证据模型: {mid}"})
             elif path == "/api/probe-availability":
                 # 后台启动全量探测
-                import threading
                 t = threading.Thread(target=lambda: probe_all_models(), daemon=True)
                 t.start()
                 self._send_json({"success": True, "message": "探测已启动"})
@@ -2883,6 +3005,28 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         pass
+
+
+def _calc_cache_size(mid: str, cache_dir: str) -> int:
+    """计算指定模型在当前缓存目录下的累计文件大小（不含 .lock/.incomplete）"""
+    hf_prefix = f"models--{mid.replace('/', '--')}"
+    total = 0
+    for dl_dir in [
+        os.path.join(cache_dir, "model_downloads"),
+        os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub"),
+    ]:
+        if os.path.isdir(dl_dir):
+            for root, _, fns in os.walk(dl_dir):
+                if hf_prefix not in root and mid.replace("/", os.sep) not in root:
+                    continue
+                for fn in fns:
+                    if fn.endswith(('.lock', '.incomplete')):
+                        continue
+                    try:
+                        total += os.path.getsize(os.path.join(root, fn))
+                    except Exception:
+                        pass
+    return total
 
 
 def start_server(port=PORT):

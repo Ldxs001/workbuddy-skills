@@ -73,6 +73,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._compress_memory()
         elif path == "/api/memory/clear-context":
             self._clear_context()
+        elif path.startswith("/static/"):
+            self._serve_static(path)
         else:
             self.send_response(404)
             self.end_headers()
@@ -138,6 +140,24 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
 
     # ── 页面 ──────────────────────────────────────
 
+    def _serve_static(self, path):
+        """提供 /static/ 目录下的静态文件"""
+        import mimetypes
+        rel_path = path.lstrip("/")
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", rel_path)
+        if not os.path.isfile(file_path):
+            self.send_response(404)
+            self.end_headers()
+            return
+        ext = os.path.splitext(file_path)[1]
+        mime = mimetypes.types_map.get(ext, "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Cache-Control", "max-age=3600")
+        self.end_headers()
+        with open(file_path, "rb") as f:
+            self.wfile.write(f.read())
+
     def _serve_main_page(self):
         """主页面：Tab 切换（配置 + 对话）"""
         config_html = self._render_config_tab() if SKILL_AVAILABLE else "<p>技能模块未加载</p>"
@@ -151,10 +171,10 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>RAG 智能助手</title>
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="/static/marked.min.js"></script>
+<link rel="stylesheet" href="/static/katex.min.css">
+<script src="/static/katex.min.js"></script>
+<script src="/static/auto-render.min.js"></script>
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; color: #333; }}
@@ -222,6 +242,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 /* ── 公式 ── */
 .msg.assistant .katex {{ font-size: 1em; }}
 .msg.assistant .katex-display {{ margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }}
+/* ── 加载动画 ── */
+@keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
 </style>
 </head>
 <body>
@@ -656,7 +678,13 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {{
           }}
           </script>
         </div>
-        <iframe src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:calc(100vh - 100px);border:none;"></iframe>
+        <div id="rag-iframe-wrap" style="position:relative;width:100%;height:calc(100vh - 100px);">
+          <div id="rag-iframe-loader" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#fafafa;color:#888;font-size:13px;">
+            <div style="width:32px;height:32px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <div>配置页加载中…（首次启动需探测模型源，耗时约 5-15 秒）</div>
+          </div>
+          <iframe id="rag-iframe" src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:100%;border:none;" onload="document.getElementById('rag-iframe-loader').style.display='none';"></iframe>
+        </div>
         <script>
         function saveLLM() {{
           var savedModel = document.getElementById('llm-model').value;

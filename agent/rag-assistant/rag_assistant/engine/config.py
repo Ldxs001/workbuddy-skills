@@ -52,6 +52,8 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "model_path": "MoritzLaurer/mDeBERTa-v3-base-xnli",
         "top_k": 0,
+        "minicpm_evidence_enabled": False,
+        "minicpm_model_id": "Qwen/Qwen2.5-0.5B-Instruct",
     },
     "retrieval": {
         "k": 3,

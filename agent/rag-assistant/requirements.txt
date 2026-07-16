@@ -10,6 +10,16 @@ huggingface-hub>=0.20
 modelscope>=1.15
 openai>=1.0
 
+# ── 基础框架（RAG 引擎直接依赖） ──────────────
+torch>=2.0
+transformers>=4.30
+numpy>=1.24
+
+# ── LLM 直接推理（使用预编译 wheel，兼容 Python 3.14+） ──
+# llama-cpp-python @ https://abetlen.github.io/llama-cpp-python/whl/cpu/llama-cpp-python/llama_cpp_python-0.3.34-py3-none-win_amd64.whl
+# 注：abetlen.github.io 国内不可达，改用 transformers + 原始 safetensors 模型
+# 需要时手动安装: pip install llama-cpp-python (需 CMake + VS Build Tools)
+
 # ── 输入源 ───────────────────────────────────
 easyocr>=1.7        # OCR（扫描版 PDF）
 

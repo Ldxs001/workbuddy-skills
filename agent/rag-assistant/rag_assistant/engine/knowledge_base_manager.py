@@ -546,6 +546,15 @@ def move_kb_documents(src_kb: str, target_kb: str, sources: list) -> tuple:
             # 删除失败不阻塞，但发出警告
             print(f"  [move] 从 '{src_kb}' 删除失败: {e}")
 
+        # 更新源库计数——直接从 ChromaDB 读真实行数
+        try:
+            index = _load_index()
+            src_count = vs_src._collection.count()
+            index[src_kb]["doc_count"] = src_count
+            _save_index(index)
+        except Exception as e:
+            print(f"  [move] 更新 '{src_kb}' 计数失败: {e}")
+
         # 重建签名+反哺
         try:
             from router import build_kb_signature

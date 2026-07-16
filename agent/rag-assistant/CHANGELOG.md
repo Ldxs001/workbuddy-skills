@@ -5,6 +5,36 @@
 
 ---
 
+## [1.3.0-beta] - 2026-07-16
+### 新增
+- **Evidence 语义验证系统**：出库路由第一步校验后增加 MiniCPM/Qwen 语义二次判断。硬编码 evidence 校验不通过时，若 toggle 开启且有模型，走 LLM 语义验证（支持"存在"/"不存在"二元输出），降低错误拒绝率
+- **双模型选择**：evidence 验证面板支持两个模型互斥选择——Qwen2.5-0.5B-Instruct（默认，标准架构，1.2GB）和 MiniCPM5-1B（2.1GB，更高精度）。各模型独立下载按钮+状态显示，radio 互斥切换，未下载自动灰化
+- **KB 计数更正按钮**：KB 列表下方新增 `🔧 计数更正` 按钮，调用 `/api/kb/tech-recount` 后端 API 遍历每个 KB→ChromaDB `.count()` 读真实行数→写入 kb_index.json→自动 reload。兜底修复任何原因导致的计数偏差
+- **顶部 stat 卡片分类**：从单"嵌入模型"拆分为 4+2 共 6 卡片（向量模型 / Ranker 模型 / NLI 模型 / 推理模型 / 知识库 / 文档块），按 RECOMMENDED_*_MODELS ID 精确匹配计数
+- **GGUF 下载停滞检测**：`/api/download-status` 连续 3 轮轮询（~6秒）缓存大小无变化时自动标记 `status=failed` 并提示"下载卡死"，不再静默卡 450MB
+- **NOTICE.md 全量补全**：vendor/NOTICE.md "Pre-downloaded Model Weights" 从 11 个模型补全到 26 个，按嵌入/reranker/NLI/推理模型四类分表
+
+### 修复
+- **KB 移动计数不更新**：`move_kb_documents()` 从 ChromaDB 物理删除文档后未更新源 KB 的 `doc_count`，导致源库计数虚高、总计数偏离。修复为 delete 后立即 `vs_src._collection.count()` 读真实行数并写入索引
+- **GGUF 下载重复触发**：多次点击"下载"创建 N 个并行下载线程互相打架。修复为 `/api/download-model` 入口增加 `_download_tasks` 活跃检查，已有下载则拒绝
+- **GGUF 下载进度显示**：`/api/download-status` 轮询扫描缓存目录累计所有文件大小，断点续传场景下正确显示缓存总量（由 450MB 增长到 989MB），不扣除基线
+- **MiniCPM evidence transformers 5.x 兼容性**（三连洞）：
+  - `is_torch_fx_available` 被 transformers 5.x 移除 → monkey-patch `lambda: False`
+  - `get_expanded_tied_weights_keys` 期望 dict 但 MiniCPM remote code 传 list → monkey-patch 自动 list→dict 转换
+  - `GenerationMixin` 从 `PreTrainedModel` 剥离后 `model.generate()` 报 `'list' object has no attribute 'keys'` → 改用原始 forward pass + argmax 逐 token 生成，彻底绕过 `generate()`
+- **Evidence 模型切换**：MiniCPM4-0.5B 的 remote code 与 transformers 5.x 深度不兼容（remote code 依赖撤掉的老 API，修不完）。替换为 Qwen/Qwen2.5-0.5B-Instruct（标准 LlamaForCausalLM 架构，`trust_remote_code=False`，零兼容问题）
+- **Evidence 验证面板布局**：模型选择 radio 误塞进出库路由窄列导致 flex 竖排。拆为独立整行（浅灰底色，margin-top+padding+ronded），标签清晰
+- **Qwen instruct 模型纯文本失效**：Qwen2.5-0.5B-Instruct 是指令微调版，直接喂纯文本不识别指令，永远输出"不存在"。修复为优先走 `tokenizer.apply_chat_template()`，失败才降级纯文本
+
+### 变更
+- `RECOMMENDED_GGUF_MODELS`：`openbmb/MiniCPM4-0.5B` → `Qwen/Qwen2.5-0.5B-Instruct`（默认，1.2GB）
+- 默认 evidence 模型 ID：配置新增 `nli.minicpm_model_id`，默认 `Qwen/Qwen2.5-0.5B-Instruct`
+- `has_minicpm` 从只检查第一个模型改为 `any(is_gguf_downloaded(m["id"]) for m in RECOMMENDED_GGUF_MODELS)`
+- 旧配置残留模型 ID 不在推荐列表时自动回退到第一个模型并写回配置
+- Stat 卡片 label "推理模型 (MiniCPM)" → "推理模型"
+
+---
+
 ## [1.2.0] - 2026-07-15
 ### 新增
 - **知识库备份系统**：RAG 配置页新增备份卡片，支持手动备份/恢复/删除，及入库前自动备份（最多保留3个版本，按KB独立管理）

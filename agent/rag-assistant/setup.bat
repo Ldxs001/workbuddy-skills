@@ -57,9 +57,10 @@ python --version
 :INSTALL_DEPS
 echo.
 echo Installing dependencies (first time may take 5-10 min)...
-python -m pip install -r "%~dp0requirements.txt" 2>nul
+python -m pip install -r "%~dp0requirements.txt"
 if %errorlevel% neq 0 (
-    echo [WARN] Some packages failed. Runtime will retry automatically.
+    echo [WARN] 部分包安装失败 — 请手动执行: python -m pip install -r "%~dp0requirements.txt"
+    echo        错误详情请查看上方输出
 )
 
 echo.
