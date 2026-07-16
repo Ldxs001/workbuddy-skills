@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # novel-weaver 架构与规范体系文档
 
 > 完整解读 v1.35.3 版的架构设计、写作管线（Phase 1→2→3）、5 道流程门禁、六检系统与约 24 项钩子体系

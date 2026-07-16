@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # 编排智能体 (Orchestrator) 构建的方法论沉淀：链驱动 Pipeline 编排范式
 
 > 从"LLM 当大脑"到"链是主体"——用确定性 Pipeline 执行替代 ReAct 自由对话的架构范式。

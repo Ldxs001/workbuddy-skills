@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # analysis-toolkit 架构与规范体系文档
 
 > 完整解读 v2.0.0 版的架构设计、四层算子体系、Pipeline 数据流、标准管理与输出规范

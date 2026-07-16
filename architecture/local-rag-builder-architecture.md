@@ -1,4 +1,10 @@
 
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
 
 # local-rag-builder 架构与规范体系文档
 

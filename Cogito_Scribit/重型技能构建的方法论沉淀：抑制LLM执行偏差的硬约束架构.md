@@ -1,3 +1,10 @@
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+Copyright (c) 2026 wUwproject
+Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+See https://creativecommons.org/licenses/by-sa/4.0/ for details.
+-->
+
 # 重型技能构建的方法论沉淀：抑制LLM执行偏差的硬约束架构
 
 
