@@ -5,19 +5,32 @@
 
 ---
 
-## [1.3.0b2] - 2026-07-16
+## [1.5.0b1] - 2026-07-17
+### 重大变更
+- **删除 MiniCPM evidence 校验，统一 NLI**：移除 `_minicpm_check()`（~100行 + 2处 monkey patch）、`_minicpm_evidence_enabled` 配置、`minicpm_model_id` 配置、MiniCPM 模型选择器/checkbox/JS/API 路由。evidence 语义验证改为复用已有的 NLI cross-encoder 模型（mDeBERTa），`nli_classifier.py` 新增 `verify(key, value)` 方法 + `get_nli_classifier()` 单例供 agent 和 rag_core 共享
+- **NLI 配置拆分**：`nli.output_enabled` 独立控制输出证据校验，与输入 NLI（`nli.enabled`）互不依赖
+
+### 新增
+- **evidence value 格式校验**：禁止 `/`、`、`、`|`、`·` 等拼接分隔符，value 必须是原文单个连续子串
+- **entities/attrs 格式校验**：每个 entity/attr 必须是单个概念，禁止内部拼接分隔符
+- **evidence 额外 key 过滤**：只校验 entities/attrs 中出现的 key，LLM 多塞的额外 key 自动忽略
+- **value 尾缀清洗**：子串校验前自动去除 `...` 尾缀（LLM 常自己加）
+- **子串包含自动通过**：key in value 或 value in key → 直接通过，跳过 NLI 判断
+- **NLI 输入/输出双开关 HTML 面板**：左右分栏，同路由层风格
+- **sentencepiece 依赖**：加入 requirements.txt，NLI 模型 tokenizer 必需
 
 ### 修复
-- **PyPI 包缺少 vendor/ 目录**：构建白名单遗漏 `vendor`，导致 beautifulsoup4、markdownify、pypdf 等内嵌依赖缺失。修复 pypi-build.py whitelist 并补充到仓库
-- **PyPI long_description 缺少更新说明**：`pypi-build.py` setup.py 模板未追加 CHANGELOG。改为在 build_agent() 中直接读取 CHANGELOG.md 拼入 LONG_DESC
-- **PyPI workflow 正则不识别 PEP 440 版本号**：tag `v1.3.0b1` 因正则 `(-[a-zA-Z0-9.]+)?$` 要求 `-` 前缀被拒。修复为 `([.-]?[a-zA-Z][a-zA-Z0-9]*)?$`
-- **PyPI build setup.py 语法错误**：`if/elif` 被错误嵌入 `setup()` 调用内部。提取 `_detect_status()` 独立函数，模板只输出常量
-- **PEP 440 版本命名合规化**：`1.3.0-beta` → `1.3.0b1`，classifier 自动为 "4 - Beta"
+- **NoneType 崩溃**：evidence value 为 `null` 时 `v in src` 炸 `TypeError`，加 `v is None` 守卫
+- **拒绝提示词不分上下文**：`found_sources` 和 `else` 分支均按 MiniCPM/NLI 开启/关闭/None 三路分叉提示
+- **MiniCPM 语义判断方向错误**：原为 value 在 sources 中搜索，改为 key vs value 语义一致性判断
 
-### 变更
-- PyPI 发布 workflow 增加 `if: type == 'agent'` 条件，非 agent 项目不触发发布
+### 移除
+- `_minicpm_check()`、`_minicpm_evidence_enabled()`、`self._minicpm_llm`
+- 配置项 `minicpm_evidence_enabled`、`minicpm_model_id`
+- HTML 中 MiniCPM checkbox、模型选择器、toggle/select JS 函数、minicpm-toggle/minicpm-select API 路由
+- 顶栏 `gguf_count` 统计卡片
 
-## [1.3.0b1] - 2026-07-16
+## [1.3.0-beta] - 2026-07-16
 ### 新增
 - **Evidence 语义验证系统**：出库路由第一步校验后增加 MiniCPM/Qwen 语义二次判断。硬编码 evidence 校验不通过时，若 toggle 开启且有模型，走 LLM 语义验证（支持"存在"/"不存在"二元输出），降低错误拒绝率
 - **双模型选择**：evidence 验证面板支持两个模型互斥选择——Qwen2.5-0.5B-Instruct（默认，标准架构，1.2GB）和 MiniCPM5-1B（2.1GB，更高精度）。各模型独立下载按钮+状态显示，radio 互斥切换，未下载自动灰化

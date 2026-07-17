@@ -29,3 +29,4 @@ duckduckgo_search>=4.0  # 联网搜索（可选）
 
 # ── 分词 ──────────────────────────────────────
 jieba>=0.42        # 中文分词（KB 签名关键词提取）
+sentencepiece>=0.1  # DeBERTa tokenizer 后端（NLI 模型依赖）

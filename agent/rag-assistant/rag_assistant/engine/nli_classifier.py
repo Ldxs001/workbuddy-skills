@@ -137,6 +137,60 @@ class NLIClassifier:
             results.append(self.classify(query, docs, top_k))
         return results
 
+    def verify(self, key: str, value: str) -> dict:
+        """evidence 语义一致性验证 — 查询输出 NLI
+
+        用同一 NLI 模型判断 entity/attr key 和 evidence value 语义是否一致。
+        (premise=value, hypothesis=key)
+
+        参数:
+            key:   entity/attr，LLM 提炼的概念词（如"定义"、"引力波"）
+            value: evidence 值，原文出处子串（如"什么是"、"主涉引力波"）
+
+        返回:
+            {"is_valid": bool,
+             "entailment": float,    # 蕴含概率
+             "neutral": float,       # 中立概率
+             "contradiction": float} # 矛盾概率
+
+        判定标准：
+            entailment > max(neutral, contradiction) → is_valid=True
+            否则 → is_valid=False
+        """
+        self._load_model()
+        pairs = [[value, key]]  # [premise, hypothesis]
+        inputs = self._tokenizer(
+            pairs, padding=True, truncation=True,
+            max_length=512, return_tensors="pt",
+        ).to(self._model.device)
+
+        with torch.no_grad():
+            outputs = self._model(**inputs)
+            logits = outputs.logits
+            probs = F.softmax(logits, dim=-1)
+
+        prob = probs[0].tolist()
+        label_dict = {
+            self.LABEL_NAMES[j]: round(prob[j], 4) for j in range(3)
+        }
+        is_valid = (
+            label_dict["entailment"] > label_dict["neutral"] and
+            label_dict["entailment"] > label_dict["contradiction"]
+        )
+        return {"is_valid": is_valid, **label_dict}
+
+
+# ==================== 全局单例 ====================
+
+_NLI_INSTANCE = None
+
+def get_nli_classifier(model_path: str = None) -> NLIClassifier:
+    """获取 NLI 分类器单例（rag_core 和 agent 共享同一个模型实例）"""
+    global _NLI_INSTANCE
+    if _NLI_INSTANCE is None:
+        _NLI_INSTANCE = NLIClassifier(model_path)
+    return _NLI_INSTANCE
+
 
 # ==================== CLI ====================
 

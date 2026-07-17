@@ -2,7 +2,7 @@
 # RAG Assistant 架构文档
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
-> 作者：[username-redacted] | 许可证：Apache 2.0
+> 作者：wUwproject | 许可证：Apache 2.0
 > 更新：2026-07-12 (v0.9.0)
 
 ---

@@ -273,10 +273,10 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
     use_nli = cfg.get("nli", {}).get("enabled", False)
     if use_nli and reranked_docs:
         try:
-            from nli_classifier import NLIClassifier
+            from nli_classifier import get_nli_classifier
             nli_cfg = cfg.get("nli", {})
             nli_top_k = nli_cfg.get("top_k", 0)
-            classifier = NLIClassifier(nli_cfg.get("model_path", ""))
+            classifier = get_nli_classifier(nli_cfg.get("model_path", ""))
             nli_results = classifier.classify(question, reranked_docs, top_k=nli_top_k)
             # 将 NLI 标签写入每个 Document 的 metadata
             for nr in nli_results:

@@ -271,8 +271,8 @@ function switchTab(name) {{
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab')[map[name] || 0].classList.add('active');
-  [credential-redacted](name + '-content').classList.add('active');
-  if (name === 'chat') [credential-redacted]('chat-input').focus();
+  document.getElementById(name + '-content').classList.add('active');
+  if (name === 'chat') document.getElementById('chat-input').focus();
 }}
 
 // ── 对话 ──
@@ -280,36 +280,36 @@ let isStreaming = false;
 
 function sendMessage() {{
   if (isStreaming) return;
-  var input = [credential-redacted]('chat-input');
+  var input = document.getElementById('chat-input');
   var msg = input.value.trim();
   if (!msg) return;
   input.value = '';
   addMessage(msg, 'user');
   addMessage('思考中...', 'assistant', 'thinking');
   isStreaming = true;
-  [credential-redacted]('send-btn').disabled = true;
+  document.getElementById('send-btn').disabled = true;
 
   fetch('/api/chat', {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{message: msg}})
   }}).then(function(r){{return r.json()}}).then(function(d){{
-    var thinking = [credential-redacted]('thinking');
+    var thinking = document.getElementById('thinking');
     if (thinking) thinking.remove();
     if (d.success) {{
       addMessage(d.text, 'assistant', null, d.reasoning);
-      [credential-redacted]('kb-status').textContent = d.kb || '-';
+      document.getElementById('kb-status').textContent = d.kb || '-';
     }} else {{
       addMessage('抱歉，处理出错：' + (d.error || '未知错误'), 'system');
     }}
     isStreaming = false;
-    [credential-redacted]('send-btn').disabled = false;
+    document.getElementById('send-btn').disabled = false;
   }}).catch(function(e){{
-    var thinking = [credential-redacted]('thinking');
+    var thinking = document.getElementById('thinking');
     if (thinking) thinking.remove();
     addMessage('网络错误：' + e.message, 'system');
     isStreaming = false;
-    [credential-redacted]('send-btn').disabled = false;
+    document.getElementById('send-btn').disabled = false;
   }});
 }}
 
@@ -400,11 +400,11 @@ function addMessage(text, role, id, reasoning) {{
     div.appendChild(body);
   }}
 
-  [credential-redacted]('chat-messages').appendChild(div);
+  document.getElementById('chat-messages').appendChild(div);
   div.scrollIntoView({{behavior:'smooth', block:'end'}});
 }}
 
-[credential-redacted]('chat-input').addEventListener('keydown', function(e) {{
+document.getElementById('chat-input').addEventListener('keydown', function(e) {{
   if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
 }});
 </script>
@@ -487,7 +487,7 @@ function addMessage(text, role, id, reasoning) {{
           var queryTypes = {{}};
 
           function toggleQueryTypes() {{
-            var p = [credential-redacted]('query-type-panel');
+            var p = document.getElementById('query-type-panel');
             var h = p.previousElementSibling;
             p.style.display = p.style.display === 'none' ? 'block' : 'none';
             h.textContent = p.style.display === 'block' ? '📋 查询类型参考 ▾' : '📋 查询类型参考 ▸';
@@ -503,7 +503,7 @@ function addMessage(text, role, id, reasoning) {{
           }}
 
           function renderQueryTypes() {{
-            var list = [credential-redacted]('query-type-list');
+            var list = document.getElementById('query-type-list');
             list.innerHTML = '';
             Object.keys(queryTypes).forEach(function(key) {{
               var t = queryTypes[key];
@@ -568,11 +568,11 @@ function addMessage(text, role, id, reasoning) {{
           }}
 
           function showQueryTypeForm(existing, onSave) {{
-            var overlay = [credential-redacted]('modal-overlay');
-            var box = [credential-redacted]('modal-box');
+            var overlay = document.getElementById('modal-overlay');
+            var box = document.getElementById('modal-box');
             box.style.maxWidth = '560px';
-            [credential-redacted]('modal-title').textContent = existing ? '编辑查询类型' : '添加查询类型';
-            var msg = [credential-redacted]('modal-msg');
+            document.getElementById('modal-title').textContent = existing ? '编辑查询类型' : '添加查询类型';
+            var msg = document.getElementById('modal-msg');
             msg.innerHTML = '';
             msg.style.textAlign = 'left';
             msg.style.fontSize = '13px';
@@ -608,7 +608,7 @@ function addMessage(text, role, id, reasoning) {{
             var entitiesF = addField('entities 填写规则', '说明此类问题，entities 应该填什么。例如：取主体/名词，问题涉及的核心事物', existingRules.entities || '');
             var attrsF = addField('attrs 填写规则', '说明此类问题，attrs 应该填什么。例如：目的/属性，用户想查询的维度', existingRules.attrs || '');
             var relF = addField('rel 填写规则', '说明此类问题，rel 应该填什么。例如：留空 / 对比 / 因果', existingRules.rel || '');
-            var btns = [credential-redacted]('modal-buttons');
+            var btns = document.getElementById('modal-buttons');
             btns.innerHTML = '';
             var cancelBtn = document.createElement('button');
             cancelBtn.textContent = '取消';
@@ -683,26 +683,26 @@ function addMessage(text, role, id, reasoning) {{
             <div style="width:32px;height:32px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
             <div>配置页加载中…（首次启动需探测模型源，耗时约 5-15 秒）</div>
           </div>
-          <iframe id="rag-iframe" src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:100%;border:none;" onload="[credential-redacted]('rag-iframe-loader').style.display='none';"></iframe>
+          <iframe id="rag-iframe" src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:100%;border:none;" onload="document.getElementById('rag-iframe-loader').style.display='none';"></iframe>
         </div>
         <script>
         function saveLLM() {{
-          var savedModel = [credential-redacted]('llm-model').value;
+          var savedModel = document.getElementById('llm-model').value;
           fetch('/api/config/llm', {{
             method:'POST', headers:{{'Content-Type':'application/json'}},
             body:JSON.stringify({{
-              backend: [credential-redacted]('llm-backend').value,
-              model: [credential-redacted]('llm-model').value,
-              timeout: parseInt([credential-redacted]('llm-timeout').value) || 180,
-              maxtokens: parseInt([credential-redacted]('llm-maxtokens').value) || 4096
+              backend: document.getElementById('llm-backend').value,
+              model: document.getElementById('llm-model').value,
+              timeout: parseInt(document.getElementById('llm-timeout').value) || 180,
+              maxtokens: parseInt(document.getElementById('llm-maxtokens').value) || 4096
             }})
           }}).then(function(){{
-            if(savedModel) [credential-redacted]('llm-model').value = savedModel;
+            if(savedModel) document.getElementById('llm-model').value = savedModel;
           }});
         }}
         function loadModels() {{
-          var sel = [credential-redacted]('llm-model');
-          var backend = [credential-redacted]('llm-backend').value;
+          var sel = document.getElementById('llm-model');
+          var backend = document.getElementById('llm-backend').value;
           sel.innerHTML = '<option value="">加载中...</option>';
           fetch('/api/llm/models?backend=' + encodeURIComponent(backend))
             .then(function(r){{return r.json()}})
@@ -712,32 +712,32 @@ function addMessage(text, role, id, reasoning) {{
                 d.models.forEach(function(m){{
                   var o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
                 }});
-              [credential-redacted]('llm-status').textContent = (d.models||[]).length + ' 个模型';
-              [credential-redacted]('llm-config').textContent = (d.models||[]).length + ' 个模型';
+              document.getElementById('llm-status').textContent = (d.models||[]).length + ' 个模型';
+              document.getElementById('llm-config').textContent = (d.models||[]).length + ' 个模型';
             }});
         }}
         setTimeout(loadModels, 500);
         // 等模型加载完后恢复配置
         setTimeout(function check(){{
-          var sel = [credential-redacted]('llm-model');
+          var sel = document.getElementById('llm-model');
           if(sel.options.length <= 1) {{ setTimeout(check, 500); return; }}
           fetch('/api/config/llm').then(function(r){{return r.json()}}).then(function(cfg){{
             if(cfg.model) for(var i=0;i<sel.options.length;i++)
               if(sel.options[i].value === cfg.model) {{ sel.value = cfg.model; break; }}
-            [credential-redacted]('llm-config').textContent = (cfg.model || '-') + ' / ' + (cfg.max_tokens || '?') + ' tok';
+            document.getElementById('llm-config').textContent = (cfg.model || '-') + ' / ' + (cfg.max_tokens || '?') + ' tok';
           }});
         }}, 1000);
 
         function testLLM() {{
-          [credential-redacted]('llm-status').textContent = '测试中...';
+          document.getElementById('llm-status').textContent = '测试中...';
           fetch('/api/llm/test').then(function(r){{return r.json()}}).then(function(d){{
-            [credential-redacted]('llm-status').textContent = d.success ? '✓ 连接正常' : '✖ 连接失败';
+            document.getElementById('llm-status').textContent = d.success ? '✓ 连接正常' : '✖ 连接失败';
           }});
         }}
 
         function toggleWebSearch() {{
-          var enabled = [credential-redacted]('web-search-enabled').checked;
-          [credential-redacted]('search-config').style.display = enabled ? 'block' : 'none';
+          var enabled = document.getElementById('web-search-enabled').checked;
+          document.getElementById('search-config').style.display = enabled ? 'block' : 'none';
           fetch('/api/search/toggle', {{
             method:'POST', headers:{{'Content-Type':'application/json'}},
             body:JSON.stringify({{enabled: enabled}})
@@ -745,29 +745,29 @@ function addMessage(text, role, id, reasoning) {{
         }}
 
         function onSearchBackendChange() {{
-          var v = [credential-redacted]('search-backend').value;
-          [credential-redacted]('search-key-group').style.display = (v==='tavily' || v==='custom') ? 'inline-block' : 'none';
-          [credential-redacted]('search-google-group').style.display = (v==='google') ? 'inline-block' : 'none';
-          [credential-redacted]('search-bing-group').style.display = (v==='bing') ? 'inline-block' : 'none';
-          [credential-redacted]('search-custom-group').style.display = (v==='custom') ? 'inline-block' : 'none';
+          var v = document.getElementById('search-backend').value;
+          document.getElementById('search-key-group').style.display = (v==='tavily' || v==='custom') ? 'inline-block' : 'none';
+          document.getElementById('search-google-group').style.display = (v==='google') ? 'inline-block' : 'none';
+          document.getElementById('search-bing-group').style.display = (v==='bing') ? 'inline-block' : 'none';
+          document.getElementById('search-custom-group').style.display = (v==='custom') ? 'inline-block' : 'none';
           saveSearchConfig();
         }}
 
         function saveSearchConfig() {{
           var body = {{
-            enabled: [credential-redacted]('web-search-enabled').checked,
-            backend: [credential-redacted]('search-backend').value,
-            api_key: [credential-redacted]('search-api-key') ? [credential-redacted]('search-api-key').value : '',
-            google_key: [credential-redacted]('search-google-key') ? [credential-redacted]('search-google-key').value : '',
-            google_cx: [credential-redacted]('search-google-cx') ? [credential-redacted]('search-google-cx').value : '',
-            bing_key: [credential-redacted]('search-bing-key') ? [credential-redacted]('search-bing-key').value : '',
-            custom_url: [credential-redacted]('search-custom-url') ? [credential-redacted]('search-custom-url').value : '',
+            enabled: document.getElementById('web-search-enabled').checked,
+            backend: document.getElementById('search-backend').value,
+            api_key: document.getElementById('search-api-key') ? document.getElementById('search-api-key').value : '',
+            google_key: document.getElementById('search-google-key') ? document.getElementById('search-google-key').value : '',
+            google_cx: document.getElementById('search-google-cx') ? document.getElementById('search-google-cx').value : '',
+            bing_key: document.getElementById('search-bing-key') ? document.getElementById('search-bing-key').value : '',
+            custom_url: document.getElementById('search-custom-url') ? document.getElementById('search-custom-url').value : '',
           }};
           fetch('/api/config/search', {{
             method:'POST', headers:{{'Content-Type':'application/json'}},
             body:JSON.stringify(body)
           }}).then(function(r){{return r.json()}}).then(function(d){{
-            [credential-redacted]('search-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败';
+            document.getElementById('search-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败';
           }});
         }}
 
@@ -790,8 +790,8 @@ function addMessage(text, role, id, reasoning) {{
         <div class="chat-input">
           <input type="file" id="file-input" multiple style="display:none" onchange="onFileSelected(this.files)">
           <input type="file" id="folder-input" webkitdirectory style="display:none" onchange="onFolderSelected(this.files)">
-          <button onclick="[credential-redacted]('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
-          <button onclick="[credential-redacted]('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
+          <button onclick="document.getElementById('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
+          <button onclick="document.getElementById('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
           <div id="file-status" style="display:none;flex:0 0 auto;max-width:260px;padding:6px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:12px;color:#2e7d32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
           <textarea id="chat-input" rows="2" placeholder="输入问题或提问文件内容..."></textarea>
           <button id="send-btn" onclick="sendMessage()">发送</button>
@@ -807,11 +807,11 @@ function formatSize(bytes) {{
 
 // ── 模态弹窗 ──
 function showModal(title, msg, buttons) {{
-  var overlay = [credential-redacted]('modal-overlay');
-  var box = [credential-redacted]('modal-box');
-  [credential-redacted]('modal-title').textContent = title;
-  [credential-redacted]('modal-msg').textContent = msg;
-  var btns = [credential-redacted]('modal-buttons');
+  var overlay = document.getElementById('modal-overlay');
+  var box = document.getElementById('modal-box');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent = msg;
+  var btns = document.getElementById('modal-buttons');
   btns.innerHTML = '';
   (buttons || [{{text:'确定',primary:true,action:function(){{hideModal();}}}}]).forEach(function(b){{
     var btn = document.createElement('button');
@@ -823,7 +823,7 @@ function showModal(title, msg, buttons) {{
   overlay.style.display = 'flex';
 }}
 function hideModal() {{
-  [credential-redacted]('modal-overlay').style.display = 'none';
+  document.getElementById('modal-overlay').style.display = 'none';
 }}
 
         function onFileSelected(files) {{
@@ -843,7 +843,7 @@ function hideModal() {{
           var uploaded = [];
           function next(i) {{
             if (i >= files.length) {{
-              var el = [credential-redacted]('uploading');
+              var el = document.getElementById('uploading');
               if (el) el.remove();
               if (uploaded.length) {{
                 var msg = '📦 已上传 ' + uploaded.length + ' 个文件到服务器，可以说「入库」批量导入';
@@ -875,7 +875,7 @@ function hideModal() {{
         }}
 
         function updateFileStatus() {{
-          var el = [credential-redacted]('file-status');
+          var el = document.getElementById('file-status');
           if (!uploadedPaths.length) {{ el.style.display = 'none'; return; }}
           var names = uploadedPaths.map(function(p){{ return p.split('/').pop() || p.split('\\\\').pop(); }}).slice(0, 3).join(', ');
           el.textContent = '📦 已上传 ' + uploadedPaths.length + ' 个文件: ' + names;
@@ -886,7 +886,7 @@ function hideModal() {{
         function resetMemory() {{
           showModal('重置对话', '确定重置当前对话？所有历史消息将被清空。', [
             {{text:'取消',action:function(){{}}}},
-            {{text:'确定重置',primary:true,action:function(){{fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) [credential-redacted]('chat-messages').innerHTML = '<div class=\"msg assistant\">对话已重置。</div>';}});}}}}
+            {{text:'确定重置',primary:true,action:function(){{fetch('/api/memory/reset', {{method:'GET'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) document.getElementById('chat-messages').innerHTML = '<div class=\"msg assistant\">对话已重置。</div>';}});}}}}
           ]);
         }}
 
@@ -903,7 +903,7 @@ function hideModal() {{
         function clearContext() {{
           showModal('清除上下文', '确定清除上下文？后台会先保存当前对话摘要再清空。', [
             {{text:'取消',action:function(){{}}}},
-            {{text:'确定清除',primary:true,action:function(){{fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) [credential-redacted]('chat-messages').innerHTML = '<div class=\"msg assistant\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>'; else showModal('清除失败', d.error || '未知错误', [{{text:'知道了'}}]);}});}}}}
+            {{text:'确定清除',primary:true,action:function(){{fetch('/api/memory/clear-context', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{if(d.success) document.getElementById('chat-messages').innerHTML = '<div class=\"msg assistant\">上下文已清除。前面 ' + (d.saved_lines || 0) + ' 行已保存为摘要。</div>'; else showModal('清除失败', d.error || '未知错误', [{{text:'知道了'}}]);}});}}}}
           ]);
         }}
 
@@ -911,7 +911,7 @@ function hideModal() {{
         function loadChatHistory() {{
           fetch('/api/chat/history').then(function(r){{return r.json()}}).then(function(d){{
             if(d.success && d.messages && d.messages.length) {{
-              var container = [credential-redacted]('chat-messages');
+              var container = document.getElementById('chat-messages');
               container.innerHTML = '';
               d.messages.forEach(function(m){{
                 addMessage(m.content, m.role, null, m.reasoning || null);

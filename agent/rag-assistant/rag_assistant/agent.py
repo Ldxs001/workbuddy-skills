@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import json
-import traceback
 from typing import Optional
 
 from .llm_client import LLMClient
@@ -70,7 +69,6 @@ class Agent:
         self.llm = LLMClient(self.config)
         self.memory = Memory(self.data_dir)
         self.search = WebSearch(self.config)
-        self._minicpm_llm = None  # MiniCPM 模型缓存
 
     def _system_prompt(self) -> str:
         type_ref = self._build_type_reference()
@@ -88,11 +86,12 @@ class Agent:
 
 ## 知识库查询
 <<ACTION type="query" entities="名词1,名词2" attrs="目的" rel="行为" kb="知识库名（可选）">>
-- entities：**取主体/名词**。问题中涉及的核心事物、人物、概念，如"茅台"、"五粮液"、"神经网络"。多个用逗号分隔
-- attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel
+- entities：**取主体/名词**。问题中涉及的核心事物、人物、概念，如"茅台"、"五粮液"、"神经网络"。多个用逗号分隔。**每个 entity 必须是单个概念**，禁止在 entity 内部使用 `/`、`、`、`|` 等分隔符混合多个概念（如 `"引力波/星团动力学"` 非法，应拆为 `"引力波,星团动力学"` 两个 entity）
+- attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel。**每个 attr 必须是单个查询维度**，禁止使用 `/`、`、`、`|` 等分隔符拼接多个维度
 - rel：**取行为**。实体间的动作/关系。当存在比较、对比、对立关系时填写，填一个最贴切的词即可（如 rel="对比"）。
 - 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
-- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词的原文出处（可以来自**当前消息、上一轮问题或上一轮回答**），优先选最精确的。示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
+- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词的原文出处（可以来自**当前消息、上一轮问题或上一轮回答**），优先选最精确的。**evidence 的 key 只能来自 entities 和 attrs，不要额外添加不在 entities/attrs 中的词。** 示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
+- **evidence value 格式要求：** 每个 value 必须是原文中的**单个连续子串**，禁止使用 `/`、`、`、`|`、`·` 等分隔符拼接多个概念（如 `"主涉引力波/星团动力学"` 非法，应为 `"引力波"` 或 `"星团动力学"`）。每个 evidence 条目只对应一个概念。
 - **两条关键规则：① 一个概念只放一边。** 如果一个概念既是"事物"又是"目的"，优先放 entities，不要同时在 entities 和 attrs 中出现（例如"模仿"→只放 entities 即可）。**② 不要太细碎。** 同一来源的一个完整问题点，不需要拆成多个同义词 key（例如"通过怎样的技术方式或技术行为"→用"技术方式"一个 key 即可，不同时写"技术方式""行为特征""模拟技术"）。具体 entities/attrs 的填法见下方对应类型。
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
@@ -349,103 +348,6 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             "reasoning": ""
         }, None
 
-    def _minicpm_evidence_enabled(self) -> bool:
-        """检查配置中 MiniCPM evidence 语义验证是否启用"""
-        try:
-            from .engine.config import load_config
-            cfg = load_config()
-            return cfg.get("nli", {}).get("minicpm_evidence_enabled", False)
-        except Exception:
-            return False
-
-    def _minicpm_check(self, value: str, sources: list) -> str:
-        """用证据模型（Qwen/MiniCPM）做语义级 evidence 存在性判断（transformers + torch）
-        返回: "exist" — 语义存在 / "not_exist" — 不存在
-        """
-        # 找模型路径
-        try:
-            from .engine.embedding_model_manager import RECOMMENDED_GGUF_MODELS, get_gguf_model_path
-            from .engine.config import load_config
-            _cfg = load_config()
-            model_id = _cfg.get("nli", {}).get("minicpm_model_id", RECOMMENDED_GGUF_MODELS[0]["id"])
-            model_path = get_gguf_model_path(model_id)
-            if not model_path or not os.path.isdir(model_path):
-                return "not_exist"
-        except Exception:
-            return "not_exist"
-
-        # 构建 prompt
-        context_text = "\n".join(sources)
-        prompt = (
-            f"请判断以下内容是否在原文中存在或可由原文合理推导得出。\n"
-            f"内容: {value}\n"
-            f"原文: {context_text}\n"
-            f"只回答「存在」或「不存在」"
-        )
-
-        try:
-            # transformers >= 5.x 移除了 is_torch_fx_available，但 MiniCPM remote code 还引用它
-            import transformers.utils.import_utils as _tfm_iu
-            if not hasattr(_tfm_iu, 'is_torch_fx_available'):
-                _tfm_iu.is_torch_fx_available = lambda: False
-
-            # transformers >= 5.x 的 get_expanded_tied_weights_keys 期望 dict，但 MiniCPM remote code 传的是 list
-            import transformers.modeling_utils as _tfm_mu
-            _orig_get_expanded = _tfm_mu.PreTrainedModel.get_expanded_tied_weights_keys
-            def _patched_get_expanded(self, all_submodels=False):
-                tm = getattr(self, '_tied_weights_keys', None)
-                if isinstance(tm, (list, tuple)):
-                    self._tied_weights_keys = {k: k for k in tm}
-                return _orig_get_expanded(self, all_submodels=all_submodels)
-            _tfm_mu.PreTrainedModel.get_expanded_tied_weights_keys = _patched_get_expanded
-
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            import torch
-
-            if self._minicpm_llm is None:
-                tokenizer = AutoTokenizer.from_pretrained(
-                    model_path, trust_remote_code=True, local_files_only=True
-                )
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_path,
-                    trust_remote_code=True,
-                    local_files_only=True,
-                    torch_dtype=torch.bfloat16,
-                ).eval()
-                self._minicpm_llm = (tokenizer, model)
-            else:
-                tokenizer, model = self._minicpm_llm
-
-            # 不用 model.generate()——transformers 5.x 的 GenerationMixin 与 MiniCPM remote code 不兼容
-            # 改用原始 forward pass + argmax 逐token生成
-            # Qwen 等 instruct 模型需要 chat_template 才能正确理解指令
-            try:
-                _chat_input = [{"role": "user", "content": prompt}]
-                _chat_text = tokenizer.apply_chat_template(_chat_input, tokenize=False, add_generation_prompt=True)
-                inputs = tokenizer(_chat_text, return_tensors="pt", truncation=True, max_length=1024)
-            except Exception:
-                inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
-            input_ids = inputs["input_ids"]
-            attention_mask = inputs.get("attention_mask")
-            with torch.no_grad():
-                for _ in range(16):
-                    out = model(input_ids, attention_mask=attention_mask)
-                    next_logit = out.logits[:, -1, :]  # (1, vocab_size)
-                    next_id = torch.argmax(next_logit, dim=-1, keepdim=True)  # (1, 1)
-                    input_ids = torch.cat([input_ids, next_id], dim=-1)
-                    if attention_mask is not None:
-                        attention_mask = torch.cat([attention_mask, torch.ones_like(next_id)], dim=-1)
-                    if next_id.item() == tokenizer.eos_token_id:
-                        break
-            text = tokenizer.decode(input_ids[0][len(inputs["input_ids"][0]):], skip_special_tokens=True).strip()
-            if "存在" in text and "不存在" not in text:
-                return "exist"
-            return "not_exist"
-
-        except Exception as e:
-            logger.warning(f"MiniCPM 推理失败: {e}\n{traceback.format_exc()}")
-            return "not_exist"
-
     def _validate_action(self, action: dict, original_msg: str,
                           prev_question: str = "", prev_reply: str = "") -> Optional[str]:
         """校验动作是否合法，不合法返回明确的拒绝原因"""
@@ -475,8 +377,23 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 return "evidence 不是合法 JSON。请检查格式，示例：evidence='{\"AI\":\"AI\"}'"
             if not isinstance(ev, dict):
                 return "evidence 必须是一个 JSON 字典"
+            # evidence value 格式校验：禁止拼接类分隔符（/、|、、、· 等）
+            # 目的：防止 LLM 把多个概念拼进一个 value 里（如"主涉引力波/星团动力学"），
+            # 导致精确子串校验和语义判断都出错。每个 value 必须是单个连续词/短语。
+            _sep_pattern = re.compile(r'[/|、·]')
+            bad_sep = {}
+            for k, v in ev.items():
+                if v is not None and isinstance(v, str) and _sep_pattern.search(v):
+                    bad_sep[k] = v
+            if bad_sep:
+                details = '; '.join(f'「{k}」="{v}"' for k, v in bad_sep.items())
+                return f"以下 evidence value 包含非法拼接分隔符（/、|、、、·）：{details}。每个 value 必须是原文中的单个连续子串，禁止将多个概念拼接在一个 value 中"
             all_raw = (action.get("entities", "") + "," + action.get("attrs", ""))
             all_terms = [t.strip() for t in re.split(r'[,，]', all_raw) if t.strip()]
+            # entities/attrs 格式校验：每个词必须是单个概念，禁止内部拼接分隔符
+            bad_term_sep = [t for t in all_terms if _sep_pattern.search(t)]
+            if bad_term_sep:
+                return f"以下 entities/attrs 包含非法拼接分隔符（/、|、、、·）：{'、'.join(bad_term_sep)}。每个 entity/attr 必须是单个概念，逗号分隔多个条目"
             missing = [t for t in all_terms if t not in ev]
             if missing:
                 return f"以下词缺少 evidence key（必须与 entities/attrs 中的写法精确一致，不可改词）: {', '.join(missing)}。请补充 evidence 中的对应条目"
@@ -486,23 +403,43 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                 valid_sources.append(prev_question)
             if prev_reply:
                 valid_sources.append(prev_reply)
-            # 检查 evidence value 是否至少在一个有效来源中存在
+            # 检查 evidence value 是否至少在一个有效来源中存在（只检查 entities/attrs 里的 key，忽略 LLM 多塞的额外 key）
+            # 前置清洗：value 尾部的 ...（LLM 有时会自己加省略号）
+            ev_keys = set(ev.keys())
+            extra_keys = ev_keys - set(all_terms)
+            if extra_keys:
+                logger.info(f"evidence 忽略额外 key（不在 entities/attrs 中）: {extra_keys}")
             bad_items = []
-            for k, v in ev.items():
-                if not any(v in src for src in valid_sources):
+            for k in all_terms:
+                v = ev.get(k)
+                if v is None or not isinstance(v, str) or not any(v.rstrip('.…') in src for src in valid_sources):
                     bad_items.append((k, v))
-            # 证据语义二次判断（硬编码未通过时走 LLM 模型）
-            if bad_items and self._minicpm_evidence_enabled():
+            # 证据语义二次判断（硬编码未通过时走 NLI）
+            _output_nli = False
+            try:
+                from .engine.config import load_config as _lc
+                _output_nli = _lc().get("nli", {}).get("output_enabled", False)
+            except Exception:
+                pass
+            if bad_items and _output_nli:
+                from .engine.nli_classifier import get_nli_classifier
+                nli_clf = get_nli_classifier()
                 survived = []
                 for k, v in bad_items:
-                    result = self._minicpm_check(v, valid_sources)
-                    if result == "exist":
-                        logger.info(f"Evidence 语义通过: key={k}, value={v}")
+                    # 自动通过：key 和 value 互含子串 → 语义明确相关，不需模型判断
+                    if (v is not None and isinstance(v, str) and
+                            (k in v or v in k)):
+                        logger.info(f"Evidence 子串包含自动通过: key={k}, value={v}")
+                        continue
+                    nli_result = nli_clf.verify(k, v)
+                    if nli_result["is_valid"]:
+                        logger.info(f"Evidence NLI 通过: key={k}, value={v}, scores={nli_result}")
                     else:
                         survived.append((k, v))
-                        logger.info(f"Evidence 语义拒绝: key={k}, value={v}")
+                        logger.info(f"Evidence NLI 拒绝: key={k}, value={v}, scores={nli_result}")
                 bad_items = survived
             if bad_items:
+                has_semantic = _output_nli
                 details = []
                 source_labels = ["当前消息", "上一轮问题", "上一轮回答"]
                 for k, v in bad_items:
@@ -520,12 +457,25 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                             suffix = "…" if end < len(src) else ""
                             found_texts.append(f"【{lbl}】{prefix}{src[start:end]}{suffix}")
                     if found_sources:
-                        details.append(
-                            f"「{k}」的出处「{v}」不是原文原句（在{'、'.join(found_sources)}中存在）。"
-                            f"以下为定位参考（字符级切片），请对照系统提示中的原文复制完整原句：\n{chr(10).join(found_texts)}"
-                        )
+                        if v is None:
+                            details.append(f"「{k}」的 evidence value 为空（在{'、'.join(found_sources)}中存在此词但 value 为空）。请填入原文中实际存在的词")
+                        elif has_semantic:
+                            details.append(
+                                f"「{k}」的出处「{v}」不是原文原句，且语义判断 key 与 value 也不一致（在{'、'.join(found_sources)}中存在）。"
+                                f"请用原文实际存在的词作为 value，或确保 value 与 key 语义一致。定位参考：\n{chr(10).join(found_texts)}"
+                            )
+                        else:
+                            details.append(
+                                f"「{k}」的出处「{v}」不是原文原句（在{'、'.join(found_sources)}中存在）。"
+                                f"以下为定位参考（字符级切片），请对照系统提示中的原文复制完整原句：\n{chr(10).join(found_texts)}"
+                            )
                     else:
-                        details.append(f"「{k}」在三个来源（当前消息/上一轮问题/上一轮回答）中都不存在，请换用原文实际存在的词")
+                        if v is None:
+                            details.append(f"「{k}」的 evidence value 为空，请填入原文中实际存在的词")
+                        elif has_semantic:
+                            details.append(f"「{k}」在三个来源中不存在，且语义判断与 value「{v}」也不一致。请用原文实际存在的词作为 value，或确保 value 与 key 语义一致")
+                        else:
+                            details.append(f"「{k}」在三个来源（当前消息/上一轮问题/上一轮回答）中都不存在，请换用原文实际存在的词")
                 return f"以下证据需要修正: {'; '.join(details)}"
             # kb 校验
             qkb = action.get("kb", "")
