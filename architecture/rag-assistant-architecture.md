@@ -9,7 +9,7 @@ See https://creativecommons.org/licenses/by-sa/4.0/ for details.
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-13 (v0.9.5)
+> 更新：2026-07-17 (v1.6.0b1)
 
 ---
 
@@ -46,6 +46,7 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 | **配置持久化 > 运行时内存** | 所有配置（LLM / 路由 / 重排序 / NLI / 切片 / prompt 插槽）写入 `rag_config.json`，刷新页面不丢 |
 | **历史隔离 > 上下文污染** | 第一轮 LLM 决策仅传压缩摘要（不传完整历史），避免上一轮 entities 泄漏到当前决策 |
 | **用户画像自适应 > 固定 prompt** | 基于 OCEAN 五维人格 + 语言风格分析的画像系统，自动调整 LLM 交互风格 |
+| **多会话隔离 > 单会话耦合** | 每个会话独立文件、独立压缩记忆、支持新建/切换/归档/恢复，压缩触发阈值可配置 |
 
 ### 1.2 路由开关行为
 
@@ -86,16 +87,16 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 
 | 层 | 组件 | 职责 |
 |---|------|------|
-| **表现层** | `web_ui.py` (port 8765) / RAG 配置页 subprocess (port 8766) / CLI (stdin) | Web 界面、LLM 配置面板、聊天界面、模型管理、知识库配置、CLI 交互 |
-| **业务层** | `agent.py` / `rag_wrapper.py` / `engine/rag_core.py` / `engine/router.py` / `engine/reranker.py` | 决策循环、组合查询、路由/检索/重排序/NLI、记忆管理、用户画像 |
-| **基础设施** | `llm_client.py` / `engine/config.py` / `engine/utils.py` / `data/` / `vendor/` | LLM 通信、配置管理、数据持久化、内嵌第三方依赖 |
+| **表现层** | `web_ui.py` (port 8765) / RAG 配置页 subprocess (port 8766) / CLI (stdin) | Web 界面、LLM 配置面板、聊天界面、会话侧边栏、模型管理、知识库配置、CLI 交互 |
+| **业务层** | `agent.py` / `rag_wrapper.py` / `engine/rag_core.py` / `engine/router.py` / `engine/reranker.py` | 决策循环、组合查询、路由/检索/重排序/NLI、多会话管理、记忆管理、用户画像 |
+| **基础设施** | `llm_client.py` / `engine/config.py` / `engine/utils.py` / `data/` / `vendor/` / `static/` | LLM 通信、配置管理、数据持久化、内嵌第三方依赖、前端静态资源 |
 
 ### 2.1 完整文件结构
 
 ```
 rag-assistant/
 ├── main.py                          # ★ 入口（4 种模式：web / cli / batch / jsonl）
-├── setup.bat                        # Windows 一键启动 + 进程管理
+├── setup.bat                        # Windows 一键启动 + 进程管理（PowerShell 杀进程）
 ├── requirements.txt                 # 依赖清单
 ├── CHANGELOG.md                     # 版本更新日志
 ├── PROTOCOL.md                      # 外部接入协议规范（HTTP/CLI/文件交互）
@@ -108,13 +109,13 @@ rag-assistant/
 ├── .gitignore
 │
 ├── rag_assistant/                   # ★ 智能体核心层
-│   ├── __init__.py                  # 版本号: 0.9.5
-│   ├── agent.py                     # Agent 决策循环（~620 行）
-│   ├── web_ui.py                    # Web 界面（port 8765，~1300 行）
+│   ├── __init__.py                  # 版本号: 1.6.0b1
+│   ├── agent.py                     # Agent 决策循环（~650 行）+ 多会话管理
+│   ├── web_ui.py                    # Web 界面（port 8765，~1200 行）
 │   ├── llm_client.py                # LLM 统一客户端
 │   ├── rag_wrapper.py               # RAG 封装桥接层
 │   ├── search.py                    # 联网搜索
-│   ├── memory.py                    # 四层记忆 + 用户画像系统
+│   ├── memory.py                    # 四层记忆 + 用户画像 + 压缩比例配置
 │   ├── _fix_rag.py                  # 破损数据修复工具
 │   │
 │   └── engine/                      # ★ local-rag-builder 技能核心（独立副本）
@@ -124,16 +125,24 @@ rag-assistant/
 │       ├── reranker.py              # 三模式重排序 + FallbackRouter
 │       ├── nli_classifier.py        # NLI 三向分类器
 │       ├── knowledge_base_manager.py# 知识库 CRUD + 自动分类 + SM3 去重 + ChromaDB 容灾
-│       ├── config.py                # 配置加载/保存/自动修正模型路径
+│       ├── config.py                # 配置加载/保存/自动修正模型路径 + 记忆配置
 │       ├── embedding_model_manager.py# 5 源并行模型下载管理
 │       ├── prompt_manager.py        # 3 插槽 + 预设管理 + 用户画像扩展点
 │       ├── text_splitter.py         # 5 策略 + 5 守卫插件架构
 │       ├── rag_skill.py             # 技能接口
 │       ├── rag_standalone.py        # 独立模式
-│       ├── rag_web_ui.py            # RAG 配置页（完整前端）
+│       ├── rag_web_ui.py            # RAG 配置页（完整前端，port 8766）
 │       ├── rag_setup_orchestrator.py# 安装编排
 │       ├── rag_env_setup.py         # 环境检测
 │       └── utils.py                 # 工具函数 + 数据目录管理
+│
+├── static/                          # ★ 前端静态资源（替代 CDN，零外部依赖）
+│   ├── marked.min.js                # Markdown 渲染
+│   ├── katex.min.css                # KaTeX 样式
+│   ├── katex.min.js                 # KaTeX 渲染
+│   ├── auto-render.min.js           # KaTeX 自动渲染
+│   ├── NOTICE.md                    # KaTeX 字体许可证声明
+│   └── fonts/                       # KaTeX 字体文件（60 个 TTF/WOFF/WOFF2）
 │
 ├── vendor/                          # ★ 内嵌第三方库（零 pip 也可在受限环境中运行）
 │   ├── bs4/                         # BeautifulSoup4
@@ -142,20 +151,23 @@ rag-assistant/
 │   └── soupsieve/                   # CSS 选择器（bs4 依赖）
 │
 └── data/                            # 运行时数据
-    ├── config/rag_config.json       # 引擎全量配置（含 llm 子字典、prompt_slots 等）
+    ├── config/rag_config.json       # 引擎全量配置（含 llm 子字典、prompt_slots、memory）
     ├── kb/
     │   ├── kb_index.json            # 知识库索引
     │   ├── kb_signatures.json       # KB 签名关键词
     │   ├── auto_classify_rules.json # 自动分类规则
-    │   └── {name}/                  # 各知识库（13 个，ChromaDB SQLite + HNSW）
+    │   └── {name}/                  # 各知识库（ChromaDB SQLite + HNSW）
     ├── models/
     │   └── model_index.json         # 模型索引
-    ├── config/rag_config.json       # LLM 与检索配置
     ├── memory/
     │   ├── compressed_{id}.txt      # LLM 压缩摘要
     │   ├── kb_gaps.json             # 知识缺口（最多 200 条）
+    │   ├── archive_compressed_{id}.txt  # 归档会话的压缩记忆
     │   └── user_habits.json         # 用户习惯 + OCEAN 人格画像
     ├── sessions/{id}.txt            # 短期对话
+    ├── archives/
+    │   ├── sessions/{id}.txt        # 归档的短期对话
+    │   └── memory/compressed_{id}.txt # 归档的压缩记忆
     ├── prompts/
     │   ├── custom_presets.json      # 用户自定义 prompt 预设
     │   └── custom_prompt_template.txt
@@ -197,6 +209,18 @@ _parse_action(reply)                 # 状态机解析 <<ACTION ...>>
   ↓
 2 次重试耗尽 → 清上下文，全新 prompt 重新回答（不污染上下文）
 ```
+
+#### 会话管理（v1.6.0b1 新增）
+
+Agent 新增多会话管理方法：
+
+| 方法 | 功能 |
+|------|------|
+| `new_session()` | 生成唯一 session_id（`sess_YYYYMMDD_HHMMSS_随机hex`），超过 `max_sessions` 自动归档最旧非活跃会话 |
+| `list_sessions()` | 列出 `data/sessions/` 和 `data/archives/sessions/` 中所有会话，含最近消息预览、活跃/归档状态、创建时间 |
+| `archive_session(id)` | 将会话文件移入 `data/archives/sessions/`，压缩记忆移入 `data/archives/memory/`，不删除数据 |
+| `restore_session(id)` | 从 `archives/` 恢复会话到 `sessions/` |
+| `delete_session(id)` | 永久删除会话文件和压缩记忆 |
 
 #### _parse_action — 状态机解析器
 
@@ -258,20 +282,33 @@ slices = [
 
 ### 3.3 Web 界面 — `web_ui.py`
 
-基于 Python `http.server` 的单文件 Web 界面（~1300 行），无外部框架依赖。端口自动分配（`_find_ports()` 查找 2 个可用端口）。
+基于 Python `http.server` 的单文件 Web 界面（~1200 行），无外部框架依赖。端口自动分配（`_find_ports()` 查找 2 个可用端口）。
 
-**前端**：内嵌单页 HTML + JS，使用 marked CDN（cdn.jsdelivr.net/npm/marked/marked.min.js）渲染 Markdown。
+**前端**：内嵌单页 HTML + JS，静态资源（marked / KaTeX）从本地 `static/` 加载，不依赖外部 CDN。
+
+**Tab 切换**：v1.6.0b1 改为 JS 直接操作 `style.display`（不依赖 CSS class），消除 `.tab-content.active` 与 `#chat-content.active` 的 CSS 冲突引起的 8766 iframe 泄漏。CSS 中 `#config-content.tab-content { display: block }` 只作默认值，JS inline style 优先级更高，切换时绝对覆盖。
+
+**配置界面**：v1.6.0b1 改为两张独立卡片（LLM + 记忆），支持 `▾` 折叠，折叠状态存入 localStorage。
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/` 或 `/index.html` | GET | 主页面（配置 Tab + 对话 Tab） |
 | `/api/config` | GET | 获取完整配置 |
+| `/api/config/llm` | GET/POST | 获取/更新 LLM 配置（backend/model/timeout/maxtokens） |
+| `/api/config/search` | GET/POST | 获取/更新搜索配置（backend/api_key/google/bing/custom） |
+| `/api/config/query_types` | GET/POST | 查询类型 CRUD |
+| `/api/config/memory` | GET/POST | **v1.6.0b1** 压缩比例配置（compress_ratio/compress_remove_ratio/max_sessions） |
 | `/api/kbs` | GET | 知识库列表 |
 | `/api/llm/models?backend=xxx` | GET | 扫描模型列表 |
 | `/api/llm/test` | GET | 测试 LLM 连接 |
-| `/api/config/llm` | GET/POST | 获取/更新 LLM 配置（backend/model/timeout/maxtokens） |
 | `/api/chat` | GET/POST | Agent 决策循环聊天 |
-| `/api/chat/history` | GET | 聊天历史持久化（v0.8.4） |
+| `/api/chat/history` | GET | 聊天历史持久化 |
+| `/api/session/new` | GET/POST | **v1.6.0b1** 新建会话 |
+| `/api/session/list` | GET | **v1.6.0b1** 列出所有会话（含归档） |
+| `/api/session/switch` | POST | **v1.6.0b1** 切换会话 |
+| `/api/session/archive` | POST | **v1.6.0b1** 归档会话 |
+| `/api/session/restore` | POST | **v1.6.0b1** 恢复归档会话 |
+| `/api/session/delete` | GET/POST | **v1.6.0b1** 永久删除会话 |
 | `/api/agent/query` | GET/POST | 直接 RAG 查询（绕过 Agent 决策） |
 | `/api/agent/import` | POST | 导入文档（3 种模式：path/text/content） |
 | `/api/agent/upload-files` | POST | 浏览器上传文件到服务器临时目录 |
@@ -282,6 +319,7 @@ slices = [
 | `/api/memory/inject` | POST | 注入系统通知 |
 | `/api/search/toggle` | POST | 联网搜索开关 |
 | `/api/availability-status` | GET | 模型下载探测状态（v0.9.0） |
+| `/static/*` | GET | **v1.6.0b1** 静态文件服务（marked / KaTeX / 字体） |
 
 **关键交互细节**：
 - `loadModels()` 在页面加载后 500ms 触发，填充模型下拉框
@@ -289,6 +327,7 @@ slices = [
 - `llm_max_tokens` 和 `llm_timeout` 持久化到 `rag_config.json`
 - 路由/reranker/NLI toggle 无已下载模型时灰化 + 红色提示文字
 - 网络探测结果实时增量更新 🟢/🔴
+- 会话侧边栏加载后自动请求 `/api/session/list` 渲染
 
 **文件上传流程**：点击文件选择按钮 → 文件以 base64 二进制上传到服务器 `data/imports/` 目录并记录到 `import_manifest.json`，同时聊天框出现系统通知。用户输入"入库"后 LLM 发出 `path="MANIFEST"` 指令，系统读取清单逐个走完整导入管线。
 
@@ -318,9 +357,11 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
 |------|------|---------|
 | DuckDuckGo | `requests.get(html.duckduckgo.com/html/)` | 无需 Key |
 | Tavily | `POST api.tavily.com/search` | 需配置 Key |
-| urllib fallback | 纯 HTML 解析回退 | 无需 Key |
+| Google Custom Search | `GET customsearch.googleapis.com` | 需配置 Key + CX |
+| Bing Search | `GET api.bing.microsoft.com` | 需配置 Key |
+| 自定义 API | URL 模板（`{q}`/`{key}` 占位） | 需配置 Key |
 
-通过 `web_search_enabled` + `web_search_api_key` + `web_search_engine` 配置。
+通过 `web_search_enabled` + `search.backend` + `search.api_key` 配置。
 
 ### 3.6 引用门禁 — `agent.py`
 
@@ -343,7 +384,7 @@ v0.8.0 新增：配置页自动分类规则表格每行增加暂停/恢复按钮
 
 ### 3.8 重排序 — `engine/reranker.py`
 
-三模式重排序 + FallbackRouter（v0.7.0 从 router.py 迁入）：
+三模式重排序 + FallbackRouter：
 
 | 组件 | 职责 |
 |------|------|
@@ -383,9 +424,12 @@ v0.9.0 新增，cross-encoder 3-class 模型（contradiction / neutral / entailm
 | `append_short_term(session_id, role, content)` | 追加一条对话记录（超 2000 字符截断） | `data/sessions/{session_id}.txt` |
 | `get_short_term(session_id)` | 读取完整对话历史 | 返回 `str` |
 | `clear_short_term(session_id)` | 清空对话历史 | 删除文件 |
-| `pop_oldest_lines(session_id, n)` | 弹出最旧的 N 行（默认 40） | 返回被移除的文本 |
+| `pop_oldest_lines(session_id, ratio)` | 按比例弹出最旧行（默认 `COMPRESS_REMOVE_RATIO=0.4`，即移除 40%） | 返回被移除的文本 |
 | `short_term_line_count(session_id)` | 当前行数 | 返回 `int` |
-| `needs_compression(session_id)` | 行数 > 100 触发压缩开关 | 返回 `bool` |
+| `estimate_token_count(text)` | 估算文本 token 数（中文×2 + 英文×1.3 + 其他×0.5） | 返回 `int` |
+| `needs_compression(session_id, max_tokens, threshold_ratio)` | token 数 > `max_tokens × threshold_ratio` 触发 | 返回 `bool` |
+| `delete_compressed(session_id)` | **v1.6.0b1** 删除指定 session 的压缩记忆文件 | 无返回值 |
+| `archive_session(session_id)` | **v1.6.0b1** 归档压缩记忆到 `archive_` 前缀 | 无返回值 |
 
 ### 4.2 长时记忆（压缩摘要）
 
@@ -394,10 +438,18 @@ v0.9.0 新增，cross-encoder 3-class 模型（contradiction / neutral / entailm
 | `store_compressed(session_id, summary)` | 追加一条压缩摘要 | `data/memory/compressed_{session_id}.txt` |
 | `get_compressed(session_id, limit=3)` | 返回最近 N 条摘要 | 返回 `str`（多摘要拼接） |
 
-**压缩触发**（`_compress_if_needed()`）：当 `short_term_line_count() > 100`（约 50 轮对话）时触发：
-1. `pop_oldest_lines()` 取出最旧 40 行对话
+**压缩触发**（`_compress_if_needed()`）：当 `needs_compression()` 返回 true（token 数超过 `max_tokens × compress_ratio`）时触发：
+1. `pop_oldest_lines()` 按 `compress_remove_ratio` 比例取出最旧对话行
 2. 调 LLM 压缩为摘要（结构化指令要求保留核心需求、已得结论、追问方向、最近 3 条原文，200 字以内）
 3. `store_compressed()` 存入长时记忆
+
+配置项：
+
+| 配置键 | 默认值 | 说明 |
+|--------|--------|------|
+| `memory.compress_ratio` | 0.7 | 压缩触发比例（相对于 max_tokens） |
+| `memory.compress_remove_ratio` | 0.4 | 压缩时移除比例 |
+| `memory.max_sessions` | 20 | 非活跃会话上限，超出自动归档最旧的 |
 
 ### 4.3 知识缺口记录
 
@@ -446,7 +498,7 @@ personality[dim] = clamp(new_val, 0.0, 1.0)
 ```python
 chat(message)
   ↓
-append_short_term("default", message)    # 写入用户输入
+append_short_term(session_id, message)    # 写入用户输入（多 session_id）
   ↓
 _build_first_pass_messages(message)      # 第一轮决策：不传完整历史
   ├─ system prompt（含动作格式说明）
@@ -458,7 +510,7 @@ LLM 决策（query/search/import/直接回答）
   ↓
 执行动作 → _second_pass(message, context, action)  # 第二轮：带上下文 + 历史
   ↓
-append_short_term("default", reply)      # 写入助手回复（自动剥离 <<ACTION>> 标签）
+append_short_term(session_id, reply)      # 写入助手回复（自动剥离 <<ACTION>> 标签）
 record_habit(message, is_rag, ..., kb)   # 记录习惯 + 语言分析 + OCEAN 更新
 ↓ 如果检索结果为空
 record_gap(query, kb)                    # 记录知识缺口
@@ -467,6 +519,8 @@ record_gap(query, kb)                    # 记录知识缺口
 **历史隔离**（v0.8.0）：第一轮决策不传完整历史对话，仅传压缩摘要作为 system context。第二轮 `_second_pass()` 仍携带带 `[历史对话]` 前缀的历史消息，保证跨轮追问的上下文连贯性。
 
 **ACTION 剥离**（v0.8.0）：写入记忆时自动使用 `re.sub(r'<{1,2}\s*ACTION\s+.*?>{1,2}', '', content, flags=re.DOTALL|re.IGNORECASE)` 剥离内部指令标签。
+
+**多会话隔离**（v1.6.0b1）：每个会话使用独立 session_id，记忆读写均按 id 寻址，会话间完全隔离。
 
 ---
 
@@ -478,8 +532,17 @@ record_gap(query, kb)                    # 记录知识缺口
 |----|---------|---------|
 | `Agent` | `.chat(message) → dict` | `{"text", "success", "reasoning", "kb", ...}` |
 | | `.reset_session()` | 无返回值 |
+| | `.new_session() → str` | **v1.6.0b1** 返回新 session_id |
+| | `.list_sessions() → list[dict]` | **v1.6.0b1** `[{"id", "preview", "active", "archived", "created"}]` |
+| | `.archive_session(id) → bool` | **v1.6.0b1** 移入 `archives/` |
+| | `.delete_session(id) → bool` | **v1.6.0b1** 永久删除 |
 | `Memory` | `.get_short_term(id) → str` | 对话历史文本 |
 | | `.append_short_term(id, role, content)` | 无返回值 |
+| | `.pop_oldest_lines(id, ratio) → str` | 按比例取出最旧行 |
+| | `.estimate_token_count(text) → int` | **v1.6.0b1** token 估算 |
+| | `.needs_compression(id, max_tokens, ratio) → bool` | **v1.6.0b1** token 基压缩判断 |
+| | `.archive_session(id)` | **v1.6.0b1** 归档压缩记忆 |
+| | `.delete_compressed(id)` | **v1.6.0b1** 删除压缩记忆 |
 | | `.get_gaps(min_count) → list[dict]` | `[{"query", "kb", "count", ...}]` |
 | | `.get_habits() → dict` | `{"total_queries", "chat_ratio", "personality", ...}` |
 | | `.get_persona() → dict` | `{"linguistic_summary", "personality", "behavior"}` |
@@ -515,7 +578,7 @@ LLM 在回复中嵌入 `<<ACTION ...>>` 标记控制 Agent 行为：
 <<ACTION type="query" entities="实体1,实体2" attrs="属性A,属性B" rel="关系词" kb="知识库名">>
 <<ACTION type="search" query="搜索词">>
 <<ACTION type="import" content="入库的完整文本内容">
-<<ACTION type="import" path="MANIFEST">        # 批量导入所有待入库文件
+<<ACTION type="import" path="MANIFEST">>        # 批量导入所有待入库文件
 ```
 
 **LLM 分词语义规则**（v0.9.0 重写）：
@@ -673,17 +736,22 @@ setup.bat
   ↓
 1. 检测 Python 3.9+（缺失则自动下载安装 Python 3.11）
 2. pip install -r requirements.txt（首次装依赖）
-3. 通过 server.pid 杀掉旧进程
-4. 启动服务器（chcp 65001 修复中文乱码）
-5. 轮询端口等待就绪（自适应等待，非硬编码秒数）
-6. 自动打开浏览器 http://localhost:8765
+3. 通过 PowerShell Get-CimInstance Win32_Process 按命令行查杀旧进程（v1.6.0b1 修复）
+4. 再用 Get-NetTCPConnection 按端口 8765/8766 兜底杀进程（v1.6.0b1 修复）
+5. 启动服务器（chcp 65001 修复中文乱码）
+6. 轮询端口等待就绪（自适应等待，非硬编码秒数）
+7. 自动打开浏览器 http://localhost:8765
 ```
 
 ### 7.3 PyPI 发布
 
 - **蓝图文件**：`blueprint_rag.json` 定义发布时包含/排除的文件
 - **版本号**：`rag_assistant/__init__.py` 唯一源
-- **GitHub Actions**：`permissions.attestations: write` + `skip-existing: true`
+- **GitHub Actions**：`.github/workflows/publish-pypi.yml`，tag 事件触发
+  - tag 格式 `v1.6.0b1`（agent）或 `skill-name-v1.2.3`（skill）
+  - 自动扫描 `agent/*/rag_assistant/__init__.py` 匹配版本
+  - `permissions.attestations: write` + `skip-existing: true`
+  - PyPI 包名：`{name}-ldxs`
 
 ### 7.4 CLI 参数
 
@@ -729,7 +797,7 @@ openai>=1.0                       # OpenAI 兼容 API（LM Studio）
 easyocr>=1.7                      # OCR（扫描版 PDF）
 requests>=2.28                    # HTTP 客户端
 duckduckgo_search>=4.0            # 联网搜索（可选）
-jieba>=0.42                       # 中文分词（KB 签名关键词提取，v0.5.x 新增）
+jieba>=0.42                       # 中文分词（KB 签名关键词提取）
 numpy>=1.24                       # 向量余弦相似度计算
 ```
 
@@ -745,13 +813,15 @@ numpy>=1.24                       # 向量余弦相似度计算
 | HuggingFace Direct | 模型下载源（最后兜底） | 外部 API |
 | DuckDuckGo | 联网搜索 | 免费 API，无需 Key |
 | Tavily | 联网搜索（备选） | 需配置 API Key |
+| Google Custom Search | 联网搜索（备选） | 需配置 Key + CX |
+| Bing Search | 联网搜索（备选） | 需配置 Key |
 
 ### 8.3 存储依赖
 
 | 存储 | 路径 | 说明 |
 |------|------|------|
 | ChromaDB | `data/kb/{name}/` | 向量知识库（每库一个 SQLite + HNSW 索引） |
-| JSON 文件 | `data/config/rag_config.json` | 引擎配置（含 llm 子字典、prompt_slots、kb_paused） |
+| JSON 文件 | `data/config/rag_config.json` | 引擎配置（含 llm 子字典、prompt_slots、kb_paused、memory） |
 | JSON 文件 | `data/kb/kb_index.json` | 知识库索引 |
 | JSON 文件 | `data/kb/kb_signatures.json` | KB 签名关键词 |
 | JSON 文件 | `data/kb/auto_classify_rules.json` | 自动分类规则 |
@@ -760,7 +830,9 @@ numpy>=1.24                       # 向量余弦相似度计算
 | JSON 文件 | `data/memory/user_habits.json` | 用户习惯 + OCEAN 人格画像 |
 | JSON 文件 | `data/prompts/custom_presets.json` | 自定义 prompt 预设 |
 | TXT 文件 | `data/sessions/{id}.txt` | 短期对话 |
+| TXT 文件 | `data/sessions/archives/{id}.txt` | **v1.6.0b1** 归档会话 |
 | TXT 文件 | `data/memory/compressed_{id}.txt` | LLM 压缩摘要 |
+| TXT 文件 | `data/memory/archive_compressed_{id}.txt` | **v1.6.0b1** 归档压缩记忆 |
 
 ### 8.4 配置机制
 
@@ -771,7 +843,20 @@ numpy>=1.24                       # 向量余弦相似度计算
   2. `rag_config.json` 实际值（合并到默认上）
   3. 旧版 LLM key 自动迁移到 `llm` 子字典
   4. 模型路径自动修正（失效路径 → 第一个已下载的同类型模型）
+  5. `memory` 子字典自动填充（compress_ratio / compress_remove_ratio / max_sessions）
 - **极客模式**（v0.8.3）：8 区块分区编辑（Prompt / 嵌入模型&检索 / 重排序 / 切片 / 路由层 / 知识库 / LLM / 其他）
+
+### 8.5 前端静态资源
+
+v1.6.0b1 起，前端依赖（marked / KaTeX）从 CDN 改为本地加载，零外部依赖：
+
+| 资源 | 本地路径 | 替代 CDN |
+|------|---------|---------|
+| Marked.js | `static/marked.min.js` | `cdn.jsdelivr.net/npm/marked/marked.min.js` |
+| KaTeX CSS | `static/katex.min.css` | `cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css` |
+| KaTeX JS | `static/katex.min.js` | `cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js` |
+| KaTeX AutoRender | `static/auto-render.min.js` | `cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js` |
+| KaTeX 字体 | `static/fonts/*.ttf/.woff/.woff2` | CDN 字体文件（61 个） |
 
 ---
 
@@ -782,6 +867,7 @@ numpy>=1.24                       # 向量余弦相似度计算
 - **联网搜索可选**：默认关闭，需用户手动启用
 - **模型本地加载**：所有模型（嵌入/路由/reranker/NLI）通过本地磁盘加载，`local_files_only=True`
 - **自包含 vendor**：`vendor/` 嵌入 bs4 / pypdf / markdownify 等第三方库，零外部 pip 安装也可运行
+- **零外部 CDN**：v1.6.0b1 起前端资源全部本地加载，不请求外部域名
 
 ---
 
@@ -789,6 +875,8 @@ numpy>=1.24                       # 向量余弦相似度计算
 
 | 版本 | 新增/变更要点 |
 |------|-------------|
+| **v1.6.0b1** | **多会话管理**（new_session/list/archive/restore/delete）；**Tab 切换 8766 泄漏修复**（JS inline style 替代 CSS class）；**配置折叠**（LLM + 记忆两张独立卡片 + localStorage）；**压缩比例配置**（compress_ratio/compress_remove_ratio/max_sessions，token 估算替代行数阈值）；**删除 status-bar**；**本地静态资源**（移除 CDN，static/fonts/ KaTeX 字体）；**setup.bat PowerShell 杀进程**；**PyPI Trusted Publisher 工作流** |
+| v1.0.2 | 首次发布到 PyPI；`_serve_static()` 静态文件服务；marked/KaTeX 本地化 |
 | v0.9.5 | README 架构图补 NLI；NLI 模型探测遍历所有源修复 |
 | v0.9.0 | NLI 三向分类器；网络探测并行化；Config 自动修正模型路径；组合查询两两配对 + 中文逗号 |
 | v0.8.0 | KB 暂停写入；历史对话隔离；引用校验；OCR 触发条件修复 |
