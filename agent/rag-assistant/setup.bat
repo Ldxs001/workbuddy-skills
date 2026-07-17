@@ -68,15 +68,11 @@ echo ========================================
 echo   Ready. Launching RAG Assistant...
 echo ========================================
 
-:: Kill old instances
-if exist "%~dp0server.pid" (
-    set /p OLD_PID=<"%~dp0server.pid"
-    taskkill /f /pid !OLD_PID! >nul 2>&1
-    ping 127.0.0.1 -n 2 >nul
-    del "%~dp0server.pid" 2>nul
-)
-:: Kill orphaned RAG config subprocesses (port 8766)
-for /f "tokens=5" %%a in ('netstat -ano ^| find ":8766 " 2^>nul') do taskkill /f /pid %%a >nul 2>&1
+:: Kill old instances — 用 PowerShell 精准杀（命令行含 main.py 的 python.exe）
+powershell -NoProfile -Command "& {Get-CimInstance Win32_Process -Filter \"name='python.exe' and CommandLine like '%%main.py%%'\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }}" >nul 2>&1
+:: 再用端口杀一次（兜底）
+powershell -NoProfile -Command "& {Get-NetTCPConnection -LocalPort 8765,8766 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }}" >nul 2>&1
+timeout /t 2 /nobreak >nul
 
 :: Start server
 cd /d "%~dp0"

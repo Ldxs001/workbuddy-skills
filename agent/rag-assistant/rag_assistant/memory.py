@@ -14,11 +14,8 @@ logger = logging.getLogger(__name__)
 class Memory:
     """统一记忆管理"""
 
-    # 短期超过此行数触发压缩
-    # 每轮对话=2行(user+assistant)，100行=最近50轮
-    COMPRESS_THRESHOLD = 100
-    # 压缩时移除的最旧行数，保留最近行数=THRESHOLD - COMPRESS_REMOVE
-    COMPRESS_REMOVE = 40
+    # 压缩时移除的比例（默认移除 40% = 保留最近 60%）
+    COMPRESS_REMOVE_RATIO = 0.4
 
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
@@ -64,20 +61,31 @@ class Memory:
             logger.error(f"清空短期记忆失败: {e}")
 
     def short_term_line_count(self, session_id: str = "default") -> int:
-        """返回短期记忆行数（用于判断是否需要压缩）"""
+        """返回短期记忆行数"""
         content = self.get_short_term(session_id)
         return len([l for l in content.split("\n") if l.strip()])
 
-    def pop_oldest_lines(self, session_id: str, n: int = None) -> str:
-        """取最旧 n 行做压缩，保留剩余。n 默认 COMPRESS_REMOVE"""
-        if n is None:
-            n = self.COMPRESS_REMOVE
+    @staticmethod
+    def estimate_token_count(text: str) -> int:
+        """估算文本的 token 数
+        中文约 2 token/字，英文约 1.3 token/词，其他约 0.5 token/字符
         """
-        从短期记忆中取出最旧的 N 行，返回取出的文本
-        剩余部分写回文件
-        """
+        if not text:
+            return 0
+        cn_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+        en_words = len(re.findall(r'[a-zA-Z0-9]+', text))
+        other = len(re.sub(r'[\u4e00-\u9fff\w]', '', text))
+        return int(cn_chars * 2 + en_words * 1.3 + other * 0.5)
+
+    def pop_oldest_lines(self, session_id: str, ratio: float = None) -> str:
+        """按比例取最旧行做压缩，保留剩余。ratio 默认 COMPRESS_REMOVE_RATIO"""
+        if ratio is None:
+            ratio = self.COMPRESS_REMOVE_RATIO
         content = self.get_short_term(session_id)
-        lines = content.split("\n")
+        lines = [l for l in content.split("\n") if l.strip()]
+        if not lines:
+            return ""
+        n = max(1, int(len(lines) * ratio))
         kept = lines[n:]
         removed = "\n".join(lines[:n])
 
@@ -92,9 +100,13 @@ class Memory:
 
     # ═══════════════ 压缩记忆 ═══════════════
 
-    def needs_compression(self, session_id: str = "default") -> bool:
-        """短期记忆是否需要压缩"""
-        return self.short_term_line_count(session_id) > self.COMPRESS_THRESHOLD
+    def needs_compression(self, session_id: str = "default",
+                          max_tokens: int = 4096, threshold_ratio: float = 0.7) -> bool:
+        """当会话 token 数超过 max_tokens × threshold_ratio 时触发压缩"""
+        content = self.get_short_term(session_id)
+        tokens = self.estimate_token_count(content)
+        threshold = int(max_tokens * threshold_ratio)
+        return tokens > threshold
 
     def store_compressed(self, session_id: str, summary: str):
         """追加一条压缩摘要"""
@@ -120,6 +132,26 @@ class Memory:
         except OSError as e:
             logger.error(f"读取压缩记忆失败: {e}")
             return ""
+
+    def delete_compressed(self, session_id: str = "default"):
+        """删除指定 session 的压缩记忆文件"""
+        path = os.path.join(self.memory_dir, f"compressed_{session_id}.txt")
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError as e:
+            logger.error(f"删除压缩记忆失败: {e}")
+
+    def archive_session(self, session_id: str = "default"):
+        """归档 session：将压缩记忆重命名为 archive_ 前缀"""
+        src = os.path.join(self.memory_dir, f"compressed_{session_id}.txt")
+        if not os.path.exists(src):
+            return
+        dst = os.path.join(self.memory_dir, f"archive_compressed_{session_id}.txt")
+        try:
+            os.rename(src, dst)
+        except OSError as e:
+            logger.error(f"归档压缩记忆失败: {e}")
 
     # ═══════════════ 知识缺口 ═══════════════
 
