@@ -2,7 +2,7 @@
 name: git-sync
 slug: git-sync
 displayName: git-sync
-version: 2.28.2
+version: 2.29.0
 author: wUwproject
 license: MIT
 description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。
@@ -55,14 +55,15 @@ data_dir_compliance: true
 
 - **全平台发布** —— Gitee + GitHub + ClawHub + SkillHub + PyPI，一次同步全自动
 - **类型自动识别** —— skill（`_meta.json`）/ agent（`__init__.py`），版本号各自读取
+- **路径由 manifest 统一管理** —— 每个条目记录 `source_path`（源路径）+ `repo_path`（仓库内路径），skill 和 agent 统一走同一套逻辑
 - **`all` 批量模式** —— 遍历全部 skills 和 agents 逐个同步
-- **LLM 文件过滤** —— 同步前引导 LLM 审核文件清单，只复制允许的文件进仓库
-- **LLM 脱敏** —— 同步后引导 LLM 扫描敏感信息并自动决策脱敏
+- **LLM 文件过滤** —— 同步前扫描源文件 → 全量打印文件列表 + 规则 → 要求 WorkBuddy 输出决策 JSON → 只复制允许的文件
+- **LLM 脱敏** —— 同步后自动脱敏敏感信息（邮箱/token/路径），支持 `--skip-scan` 跳过或 `GIT_SYNC_SENSITIVE_MODE` 环境变量控制（`prompt`/`always-sanitize`/`keep-as-is`）
 - **版本号三方对比** —— `_meta.json` / `SKILL.md` frontmatter / changelog
 - **SKILL.md 规范审查** —— 内联审计（版本一致性 + R-23 脚本引用检查）
 - **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页
-- **PyPI 隔离构建** —— 拷贝源码到临时目录 → 生成 setup.py → build → twine 上传
-- **Release 创建** —— git tag + GitHub API Release（技能用 `{name}-v{ver}`，智能体用 `v{ver}`）
+- **PyPI 隔离构建** —— 拷贝源码到临时目录 → 生成 setup.py → build → twine 上传，版本号自动归一化 PEP 440，dev_status 自动判别
+- **Release 创建** —— git tag + GitHub/Gitee API Release（技能用 `{name}-v{ver}`，智能体用 `v{ver}`），源码包由平台自动生成
 
 ### 平台发布差异
 
@@ -149,12 +150,15 @@ bash ~/.workbuddy/skills/git-sync/scripts/git-sync.sh workday-calendar --push-on
 
 1. **触发判断** → 输入 用户请求文本 → 输出 触发决策（继续/拒绝） — 解析用户请求，判断是否为同步/推送/打包意图
 2. **安全校验** → 输入 目标路径 + skill 名称 → 输出 校验通过/拒绝 — 检查目标路径合法性、skill 名称白名单
-3. **清单检查** → 输入 本地 manifest.json → 输出 升级/跳过/冲突状态 — 读取 manifest.json，对比本地版本与仓库版本
-4. **文件同步** → 输入 源 skill 目录 → 输出 同步后的 workrepo 文件 — 复制源 skill 目录到 workrepo 仓库
-5. **敏感信息脱敏** → 输入 文件列表 → 输出 脱敏后的副本 — 扫描文件中的邮箱/token/IP 等敏感信息并替换
-6. **更新 README** → 输入 skills/ 目录 → 输出 更新后的 README.md — 全量扫描 workrepo/skills/，重新生成 README.md
-7. **提交推送** → 输入 提交信息 → 输出 推送状态（成功/失败） — git add/commit/push 到码云 + GitHub
-8. **打包索引** → 输入 技能目录 → 输出 .zip 文件 + index.html — 将 skill 目录打包为 .zip，更新 .dist/index.html
+3. **清单检查 + 路径解析** → 输入 manifest.json → 输出 同步状态 — 读取 manifest 条目获取 source_path/repo_path，无则按 type 走默认路径
+4. **版本号对比** → 输入 仓库版本 v.s. 本地源文件 → 输出 升级/跳过/冲突 — 读取 `_meta.json`（skill）或 `__init__.py`（agent），版本号自动归一化 PEP 440
+5. **LLM 文件过滤** → 输入 源目录 → 输出 允许文件列表 — 扫描源目录 → **全量打印文件列表到 stdout** → WorkBuddy 在回复中输出决策 JSON → 只复制允许的文件到 workrepo
+6. **敏感信息脱敏** → 输入 工作仓库文件 → 输出 脱敏后的副本 — 扫描邮箱/token/IP 并替换。默认提示交互，可用 `--skip-scan` 跳过或 `GIT_SYNC_SENSITIVE_MODE=always-sanitize` 自动脱敏
+7. **更新 README** → 输入 workrepo → 输出 更新后的 README.md — 全量扫描 workrepo/skills/ + agent/，重新生成 README.md（skills 表格 + 智能体表格）
+8. **提交推送** → 输入 提交信息 → 输出 推送状态 — git add/commit/push 到码云 + GitHub
+9. **ZIP 打包** → 输入 技能目录 → 输出 .zip 文件 + index.html — 将 skill 目录打包为 .zip（仅 skill，agent 跳过）
+10. **市场发布**（可选）→ ClawHub / SkillHub（skill）/ PyPI（agent + `--pypi`）
+11. **创建 Release**（`--release` 标志）→ 打 tag + 推双平台 + 创建 GitHub Release + Gitee 发行版，源码包由平台自动生成
 
 ## 数据目录说明
 

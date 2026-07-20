@@ -177,26 +177,42 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
 
 ---
 
+## git-sync.py CLI 参数
+
+```bash
+python git-sync.py <name> [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]
+```
+
+| 参数 | 说明 |
+|------|------|
+| `--skip-scan` | 跳过敏感信息扫描和脱敏 |
+| `--skip-market` | 跳过 ClawHub / SkillHub 市场发布 |
+| `--market-only` | 仅发布到市场，不执行同步 |
+| `--pypi` | 发布到 PyPI（仅 agent 有效） |
+| `--release` | 创建 Release：打 tag + 推双平台 + 建 GitHub/Gitee 发行版 |
+
 ## manifest.py 子命令速查
 
 `manifest.py` 是独立 CLI，管理维护清单（manifest.json），不污染 git-sync 主流程。
 
-### 清单条目结构（v1.7 更新）
+### 清单条目结构（v2.29.0 更新）
 
 ```json
 {
   "repos": {
     "workbuddy-skills": {
       "items": {
-        "git-sync": {
-          "type": "skill",
-          "added_at": "2026-05-22",
+        "rag-assistant": {
+          "type": "agent",
+          "source_path": "C:/Users/sm001/WorkBuddy/rag-assistant",
+          "repo_path": "agent/rag-assistant",
+          "added_at": "2026-07-21",
           "uploaded": true,
           "gitee_ok": true,
           "github_ok": true,
-          "version": "1.8.0",
-          "gitee_version": "1.8.0",
-          "github_version": "1.8.0",
+          "version": "1.7.0",
+          "gitee_version": "1.7.0",
+          "github_version": "1.7.0",
           "note": ""
         }
       }
@@ -204,6 +220,15 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
   }
 }
 ```
+
+| 字段 | 说明 | 自动填充 |
+|------|------|---------|
+| `type` | `skill` 或 `agent` | 必需 |
+| `source_path` | 源绝对路径（开发目录） | skill → `~/.workbuddy/skills/<name>/`，agent → `~/.workbuddy/agent/<name>/`，可用 `--source-path` 覆盖 |
+| `repo_path` | 仓库内相对路径 | skill → `skills/<name>/`，agent → `agent/<name>/`，可用 `--repo-path` 覆盖 |
+| `added_at` | 添加日期 | 自动 |
+| `uploaded` / `gitee_ok` / `github_ok` | 推送状态 | 自动更新 |
+| `version` / `gitee_version` / `github_version` | 版本号 | 自动更新 |
 
 ### 命令参考
 
@@ -215,17 +240,20 @@ python manifest.py check workbuddy-skills my-skill    # 是否在清单内（退
 python manifest.py version workbuddy-skills my-skill  # 查询版本号
 
 # ── 更新类 ──
-python manifest.py add workbuddy-skills my-skill --type skill              # 加入（默认 uploaded=false）
-python manifest.py add workbuddy-skills my-skill --type skill --uploaded   # 加入并标记已上传
-python manifest.py remove workbuddy-skills my-skill                       # 从清单删除
-python manifest.py version workbuddy-skills my-skill 1.9.0                # 更新版本号（双平台）
-python manifest.py version workbuddy-skills my-skill 1.9.0 --platform gitee  # 仅更新码云
-python manifest.py set-uploaded workbuddy-skills my-skill --platform gitee   # 标记平台已上传
-python manifest.py set-uploaded workbuddy-skills my-skill --platform both    # 标记双平台已上传
+python manifest.py add workbuddy-skills my-skill --type skill                 # 加入（默认路径自动填充）
+python manifest.py add workbuddy-skills my-skill --type agent                 # agent 类型
+python manifest.py add workbuddy-skills my-agent --type agent --source-path "C:/path/to/dev"  # 自定义源路径
+python manifest.py add workbuddy-skills my-agent --type agent --repo-path "agent/custom"      # 自定义仓库路径
+python manifest.py add workbuddy-skills my-skill --type skill --uploaded      # 加入并标记已上传
+python manifest.py remove workbuddy-skills my-skill                           # 从清单删除
+python manifest.py version workbuddy-skills my-skill 1.9.0                    # 更新版本号（双平台）
+python manifest.py version workbuddy-skills my-skill 1.9.0 --platform gitee   # 仅更新码云
+python manifest.py set-uploaded workbuddy-skills my-skill --platform gitee    # 标记平台已上传
+python manifest.py set-uploaded workbuddy-skills my-skill --platform both     # 标记双平台已上传
 
 # ── 同步类 ──
-python manifest.py diff workbuddy-skills            # 对比清单(uploaded=true) vs 仓库实际文件
-python manifest.py sync-readme workbuddy-skills      # 根据仓库实际文件全量重新生成 README.md
+python manifest.py diff workbuddy-skills              # 对比清单(uploaded=true) vs 仓库实际文件
+python manifest.py sync-readme workbuddy-skills        # 根据仓库实际文件全量重新生成 README.md
 ```
 
 ### 三单一致模型
@@ -352,12 +380,12 @@ LLM 接收扫描发现列表后，按以下原则自动判断：
 
 | 敏感类型 | LLM 决策倾向 | 示例 |
 |----------|-------------|------|
-| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `[email-redacted]` 在 LICENSE 中 → 保留 |
+| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `wuwofc@yeah.net` 在 LICENSE 中 → 保留 |
 | Token / API Key | 一律脱敏 | `api_key=sk-xxx` → 替换为 `<REDACTED>` |
 | 私钥内容 | 一律脱敏 | PEM 格式密钥 → 替换 |
-| 内网 IP | 脱敏 | `[internal-ip-redacted]` → `<REDACTED_IP>` |
+| 内网 IP | 脱敏 | `192.168.1.1` → `<REDACTED_IP>` |
 | 本地绝对路径 | public_docs 中的路径 → 保留；代码中硬编码 → 脱敏 | `C:\Users\sm001` 在文档中 → 保留 |
-| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `[username-redacted]` → 保留 |
+| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `wUwproject` → 保留 |
 
 ### 打包时行为
 

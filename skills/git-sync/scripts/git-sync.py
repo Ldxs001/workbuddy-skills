@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.27.2 - 完整 Python 版 git-sync
+git-sync.py v2.29.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [--skip-scan]
 """
 import os
 import sys
 import json
+import re
 import shutil
 import subprocess
 import argparse
@@ -166,11 +167,24 @@ def step_version_compare(skill_name: str, local_ver: str, work_repo_subdir: str 
     if repo_ver == local_ver:
         log(2, 8, f"版本相同 ({local_ver})，跳过文件同步", "skip")
         return "skip_sync"
-    # 简单版本比较
+    # 简单版本比较（支持 -beta、-rc 等预发布后缀）
     def ver_lt(a, b):
-        na = [int(x) for x in a.split(".")]
-        nb = [int(x) for x in b.split(".")]
-        return na < nb
+        def _strip(v):
+            # 支持 x.y.z, x.y.z-beta, x.y.zbN 等格式
+            base = v.split("-")[0]
+            parts = base.split(".")
+            nums = []
+            for p in parts:
+                # 剥离非数字后缀（如 0b1 → 0, 1b2 → 1）
+                digit = ""
+                for ch in p:
+                    if ch.isdigit():
+                        digit += ch
+                    else:
+                        break
+                nums.append(int(digit) if digit else 0)
+            return nums
+        return _strip(a) < _strip(b)
     if ver_lt(repo_ver, local_ver):
         log(2, 8, "仓库版本 < 本地版本，正常升级", "ok")
         return "normal"
@@ -861,9 +875,12 @@ def get_meta_desc(meta_file: Path) -> str:
     return ""
 
 # ── LLM 文件过滤器（替代硬编码黑名单）──────────────────────────────
-# 在同步前执行，LLM 审核源文件列表，只有通过审核的文件才被复制到仓库
+# 在同步前执行，由 WorkBuddy（LLM）审核源文件列表，
+# 只有通过审核的文件才被复制到仓库。
+# WorkBuddy 看到本函数的输出后，应读取扫描文件并写入决策文件，
+# 然后重新运行 git-sync 继续同步。
 def step_llm_file_filter(name: str, src_dir: Path) -> set:
-    """扫描源文件 → 引导 LLM 判断 → 返回允许复制的文件相对路径集合"""
+    """扫描源文件 → 写扫描文件 → 打印审查指令 → 等待 WorkBuddy 写入决策文件"""
     filter_scan = SCRIPT_DIR / f".file_filter_{name}.json"
     filter_decisions = filter_scan.with_suffix(".json.decisions.json")
 
@@ -931,16 +948,40 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
             filter_decisions.unlink(missing_ok=True)
             return set(rel for d in tree for rel in [d["path"]])
     else:
-        # 保留扫描文件，输出审查指令让 LLM 处理
+        # 输出完整文件列表 + 规则，要求 WorkBuddy（LLM）在回复中输出决策
         print(f"\n{'='*60}")
-        print(f"  ⏳ LLM 文件审查待处理")
-        print(f"  📄 扫描文件: {filter_scan}")
-        print(f"  📋 请检查文件列表，结合蓝皮书规则判断哪些文件应发布")
-        print(f"  ✅ 审核后写入决策文件: {filter_decisions}")
-        print(f"  📝 决策格式: {{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}}")
-        print(f"  🔄 写入决策后重新运行 git-sync 继续同步")
+        print(f"  ⏳ 需要您（WorkBuddy）完成文件筛除审核")
+        print(f"{'='*60}")
+        print(f"项目: {name}")
+        print(f"源路径: {src_dir}")
+        print(f"文件总数: {len(tree)}")
+        print()
+        print("## 项目规则")
+        print(rules_content[:2000] if rules_content else "（无）")
+        print()
+        print("## 文件列表")
+        for e in tree:
+            print(f"  {e['path']} ({e['size']}B)")
+        print()
+        print("## 通用排除规则")
+        print("- 缓存目录: __pycache__/, .cache/, .mypy_cache/, .pytest_cache/")
+        print("- 构建产物: dist/, build/, .egg-info/, *.pyc, *.pyo")
+        print("- 依赖目录: node_modules/, .venv/, .tox/")
+        print("- 大体积数据: *.pt, *.pth, *.gguf, data/models/, data/kb/, *.db, *.sqlite")
+        print("- 个人配置: config.json, .env, *.token, credentials*")
+        print("- IDE/系统: .vscode/, .idea/, .DS_Store, Thumbs.db")
+        print("- 日志/临时: *.log, *.tmp, *.bak")
+        print()
+        print("【您必须执行以下操作】")
+        print(f"1. 审核上述文件列表，结合项目规则和通用排除规则判断应保留哪些文件")
+        print(f"2. 将决策写入文件: {filter_decisions}")
+        print(f"3. **在您的回复中输出以下格式的JSON决策**:")
+        print(f"   {{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"],")
+        print(f"    \"exclude\": [\"path/to/excluded.py\"],")
+        print(f"    \"reason\": \"排除原因说明\"}}")
+        print(f"4. 重新运行 git-sync 继续同步")
         print(f"{'='*60}\n")
-        log("3.7", 8, f"LLM 审查待处理 → 读取 {filter_scan.name} 后写入 {filter_decisions.name}", "warn")
+        log("3.7", 8, f"需要 WorkBuddy 审核文件列表 → 输出决策JSON + 写入 {filter_decisions.name}", "warn")
         return None
 
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
@@ -974,11 +1015,73 @@ build-backend = "setuptools.build_meta"
 """), encoding="utf-8")
 
     # setup.py（动态读取版本号 + long_description）
+def _normalize_version(version: str) -> str:
+    """将版本号转为 PEP 440 格式（统一用于所有外部输出）
+    1.7.0       → 1.7.0
+    1.7.0b1     → 1.7.0b1 (已是 PEP 440)
+    1.7.0-beta  → 1.7.0b1
+    1.7.0-rc1   → 1.7.0rc1
+    1.7.0alpha2 → 1.7.0a2
+    """
+    v = version.lower().strip()
+    # 已经是 PEP 440 预发布格式：x.y.zbN / x.y.zrcN / x.y.zaN → 保持不变
+    if re.search(r'\.\d+[a-z]+\d+', v):
+        return version  # 原样返回（保持大小写等）
+    # 已经是标准 semver x.y.z → 保持不变
+    if re.search(r'^\d+\.\d+\.\d+$', v):
+        return version
+    # 连字符/下划线后缀转 PEP 440: x.y.z-beta → x.y.zb1, x.y.z-rc2 → x.y.zrc2
+    m = re.search(r'[-_.]?(alpha|a|beta|b|rc|dev)(\d*)$', v)
+    if m:
+        tag = m.group(1)
+        num = m.group(2) or '1'
+        base = v[:m.start()]
+        pep_tag = {'alpha': 'a', 'beta': 'b', 'a': 'a', 'b': 'b', 'rc': 'rc', 'dev': 'dev'}
+        return f"{base}{pep_tag.get(tag, tag)}{num}"
+    # 其他非标准后缀（非 . 分隔）→ 剥掉
+    # 只处理 - _ 分隔的后缀，不碰 . 分隔的标准 semver
+    v = re.sub(r'[-_].*$', '', v)
+    return v
+
+
+def step_pypi_publish(name: str, version: str, src_dir: Path):
+    """发布到 PyPI（隔离构建，包含 pyproject.toml + long_description 修复）"""
+    log(8, 8, f"发布 {name} 到 PyPI...")
+    pypi_name = f"{name}-ldxs"
+    # 标准化版本号为 PEP 440
+    pypi_ver = _normalize_version(version)
+    # 自动判别开发状态
+    is_prerelease = bool(re.search(r'\.(a|alpha|b|beta|rc|dev)\d+', pypi_ver, re.I))
+    dev_status = "4 - Beta" if is_prerelease else "5 - Production/Stable"
+    build_dir = Path(tempfile.gettempdir()) / f"pypi_build_{name}_{version}"
+    if build_dir.exists(): shutil.rmtree(build_dir)
+    shutil.copytree(src_dir, build_dir,
+                    ignore=shutil.ignore_patterns("__pycache__","*.pyc","dist","build","*.egg-info"))
+    from pathlib import Path as _P
+
+    # 检测包目录名
+    pkg_dir = None
+    for d in ["rag_assistant", name.replace("-", "_"), name]:
+        if (build_dir / d).is_dir() and (build_dir / d / "__init__.py").exists():
+            pkg_dir = d; break
+    if not pkg_dir:
+        for d in build_dir.iterdir():
+            if d.is_dir() and not d.name.startswith(".") and d.name not in ("scripts","references","data","__pycache__"):
+                if (d / "__init__.py").exists(): pkg_dir = d.name; break
+    pkg_dir = pkg_dir or "rag_assistant"
+
+    # pyproject.toml（防止 setuptools>=61 Dynamic description bug）
+    _P(str(build_dir / "pyproject.toml")).write_text(textwrap.dedent(f"""\
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+"""), encoding="utf-8")
+
+    # setup.py（动态读取版本号 + long_description）
     _P(str(build_dir / "setup.py")).write_text(textwrap.dedent(f'''\
-from setuptools import setup, find_packages
 import os
 init_p=os.path.join(os.path.dirname(__file__),"{pkg_dir}","__init__.py")
-V="{version}"
+V="{pypi_ver}"
 if os.path.exists(init_p):
     with open(init_p) as f:
         for l in f:
@@ -999,7 +1102,7 @@ setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       packages=find_packages(),include_package_data=True,
       python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
-      classifiers=["Development Status :: 4 - Beta","Intended Audience :: Developers",
+      classifiers=["Development Status :: {dev_status}","Intended Audience :: Developers",
                    "License :: OSI Approved :: Apache Software License",
                    "Programming Language :: Python :: 3",
                    "Topic :: Scientific/Engineering :: Artificial Intelligence"])
@@ -1023,7 +1126,7 @@ setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
     if not token:
         log(8,8,"未找到 PyPI token（.pypirc / PYPI_TOKEN）","err")
         shutil.rmtree(build_dir,ignore_errors=True); return
-    whl = build_dir / "dist" / f"{pypi_name.replace('-','_')}-{version}-py3-none-any.whl"
+    whl = build_dir / "dist" / f"{pypi_name.replace('-','_')}-{pypi_ver}-py3-none-any.whl"
     if whl.exists():
         r = subprocess.run([sys.executable,"-m","twine","upload","--disable-progress",str(whl),"-u","__token__","-p",token],
                           capture_output=True,text=True,cwd=str(build_dir))
@@ -1054,33 +1157,77 @@ def step_skillhub_publish(name: str, version: str):
     else: print(f"  ⚠️  SkillHub: {r.stderr[:250]}")
 
 def step_release_create(name: str, typ: str, version: str):
+    """创建 GitHub + Gitee Release，源码包由平台自动生成"""
     log(9,8,f"创建 Release: {name} v{version}...")
+
+    # 从 config.json 读仓库名
+    try:
+        _cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+        _g = _cfg.get("gitee", {})
+        _h = _cfg.get("github", {})
+        GITEE = f"{_g.get('user','wUwproject')}/{_g.get('repo','workbuddy-skills')}"
+        GITHUB = f"{_h.get('user','Ldxs001')}/{_h.get('repo','workbuddy-skills')}"
+    except:
+        GITEE = "wUwproject/workbuddy-skills"
+        GITHUB = "Ldxs001/workbuddy-skills"
+
     tag = f"v{version}" if typ=="agent" else f"{name}-v{version}"
     subprocess.run(["git","tag",tag],cwd=str(WORK_REPO),capture_output=True)
-    for rm in ["gitee","github","origin"]:
-        subprocess.run(["git","push",rm,tag],cwd=str(WORK_REPO),capture_output=True,timeout=30)
-    # 额外推 pypi trigger tag，触发 GitHub Actions Trusted Publisher 工作流
-    pypi_tag = f"pypi/{typ}s/{name}/v{version}"
+    # 推送 PyPI 触发 tag（GitHub Actions Trusted Publisher 用）
+    pypi_tag = f"pypi/{typ}/{name}/{version}"
     subprocess.run(["git","tag",pypi_tag],cwd=str(WORK_REPO),capture_output=True)
-    for rm in ["gitee","github","origin"]:
+    for rm in ["gitee","origin"]:
+        subprocess.run(["git","push",rm,tag],cwd=str(WORK_REPO),capture_output=True,timeout=30)
         subprocess.run(["git","push",rm,pypi_tag],cwd=str(WORK_REPO),capture_output=True,timeout=30)
-    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),capture_output=True,text=True).stdout.strip()
-    token=""
+    rmt = subprocess.run(["git","remote","get-url","origin"],cwd=str(WORK_REPO),
+                         capture_output=True,text=True).stdout.strip()
+    token = ""
     if ":" in rmt and "@" in rmt:
-        tp=rmt.split("//")[1].split("@")[0]
-        if ":" in tp: token=tp.split(":")[1]
+        tp = rmt.split("//")[1].split("@")[0]
+        if ":" in tp: token = tp.split(":")[1]
+    gitee_token = ""
+    try:
+        gitee_token = json.load(open(CONFIG_FILE)).get("gitee_token", "")
+    except: pass
+
+    # GitHub Release
     if token:
-        b=json.dumps({"tag_name":tag,"name":f"{name} v{version}",
-                      "body":f"## {name} v{version}\n\n由 git-sync 自动发布","draft":False,"prerelease":False})
-        r=subprocess.run(["curl","-s","-X","POST",
-                         "https://api.github.com/repos/Ldxs001/workbuddy-skills/releases",
+        b = json.dumps({"tag_name":tag,"name":f"{name} v{version}",
+                        "body":f"## {name} v{version}\n\n由 git-sync 自动发布",
+                        "draft":False,"prerelease":False})
+        r = subprocess.run(["curl","-s","-X","POST",
+                         f"https://api.github.com/repos/{GITHUB}/releases",
                          "-H",f"Authorization: token {token}","-H","Content-Type: application/json","-d",b],
                         capture_output=True,text=True)
         try:
-            u=json.loads(r.stdout).get("html_url","")
-            log(9,8,f"Release: {u}","ok")
-        except: log(9,8,"Release tag 已推送 (API 异常)","warn")
-    else: log(9,8,f"tag 已推送: {tag}","warn")
+            u = json.loads(r.stdout)
+            if "id" in u:
+                log(9,8,f"GitHub: {u.get('html_url','')}","ok")
+            else:
+                log(9,8,f"GitHub Release 已存在或跳过","info")
+        except:
+            log(9,8,f"GitHub Release tag 已推送","warn")
+    else:
+        log(9,8,f"tag 已推送: {tag}","warn")
+
+    # Gitee Release
+    if gitee_token:
+        b = json.dumps({"access_token":gitee_token,"tag_name":tag,
+                        "target_commitish":"main","name":f"{name} v{version}",
+                        "body":f"## {name} v{version}\n\n由 git-sync 自动发布",
+                        "prerelease":False})
+        r = subprocess.run(["curl","-s","-X","POST",
+                         f"https://gitee.com/api/v5/repos/{GITEE}/releases",
+                         "-H","Content-Type: application/json;charset=UTF-8","-d",b],
+                        capture_output=True,text=True)
+        try:
+            u = json.loads(r.stdout)
+            if "id" in u:
+                log(9,8,f"Gitee: https://gitee.com/{GITEE}/releases/{tag}","ok")
+            else:
+                log(9,8,f"Gitee 发行版已存在或跳过","info")
+        except:
+            log(9,8,f"Gitee 发行版 tag 已推送","warn")
 
 # ── 主流程 ────────────────────────────────────────────────────────────────────
 def main():
@@ -1149,23 +1296,45 @@ def main():
     is_skill = False
     is_agent = False
     override_dir = None
+    # ── 优先从 manifest 读取 source_path / repo_path ──────────
+    manifest_found = False
     try:
-        cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
-        overrides = cfg.get("source_overrides", {})
-        if name in overrides:
-            override_dir = Path(overrides[name])
-            if override_dir.is_dir():
-                if (override_dir / "_meta.json").exists():
-                    is_skill, typ, src_dir, work_repo_subdir = True, "skill", override_dir, f"skills/{name}"
-                elif (override_dir / "rag_assistant" / "__init__.py").exists():
-                    is_agent, typ, src_dir, work_repo_subdir = True, "agent", override_dir, f"agent/{name}"
-                else:
-                    print(f"❌ source_overrides 路径存在但无法识别类型: {override_dir}")
-                    sys.exit(1)
+        mf = json.load(open(MANIFEST_FILE, encoding="utf-8"))
+        for repo_name, repo_data in mf.get("repos", {}).items():
+            item = repo_data.get("items", {}).get(name)
+            if item and isinstance(item, dict):
+                mf_src = item.get("source_path", "")
+                mf_repo = item.get("repo_path", "")
+                if mf_src and Path(mf_src).is_dir():
+                    src_dir = Path(mf_src)
+                    work_repo_subdir = mf_repo or f"skills/{name}"
+                    is_skill = (src_dir / "_meta.json").exists()
+                    is_agent = (src_dir / "rag_assistant" / "__init__.py").exists()
+                    typ = "skill" if is_skill else ("agent" if is_agent else item.get("type", "unknown"))
+                    manifest_found = True
+                    break
     except Exception:
         pass
 
-    if not override_dir:
+    # ── 无 manifest 映射 → source_overrides → 硬编码回退 ──
+    if not manifest_found:
+        try:
+            cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+            overrides = cfg.get("source_overrides", {})
+            if name in overrides:
+                override_dir = Path(overrides[name])
+                if override_dir.is_dir():
+                    if (override_dir / "_meta.json").exists():
+                        is_skill, typ, src_dir, work_repo_subdir = True, "skill", override_dir, f"skills/{name}"
+                    elif (override_dir / "rag_assistant" / "__init__.py").exists():
+                        is_agent, typ, src_dir, work_repo_subdir = True, "agent", override_dir, f"agent/{name}"
+                    else:
+                        print(f"❌ source_overrides 路径存在但无法识别类型: {override_dir}")
+                        sys.exit(1)
+        except Exception:
+            pass
+
+    if not manifest_found and not override_dir:
         skill_dir = SKILLS_DIR / name
         agent_dir = SKILLS_DIR.parent / "agent" / name
         is_skill = (skill_dir / "_meta.json").exists()
@@ -1179,7 +1348,7 @@ def main():
             src_dir = agent_dir
             work_repo_subdir = f"agent/{name}"
         else:
-            print(f"❌ 未找到项目: {name}（不在 skills/、agent/ 也不在 source_overrides）")
+            print(f"❌ 未找到项目: {name}（不在 skills/、agent/、manifest 也不在 source_overrides）")
             sys.exit(1)
     print(f"  类型: {typ}")
 
@@ -1201,6 +1370,8 @@ def main():
     if not version:
         print("❌ 无法读取版本号")
         sys.exit(1)
+    # 全局归一化版本号为 PEP 440 格式（所有外部输出统一）
+    version = _normalize_version(version)
 
     # ── market-only 模式（直接输出，不走 LOG_BUFFER）───────────────
     if market_only:
@@ -1261,8 +1432,8 @@ def main():
                     log(4, 8, f"已同步 {count} 个文件", "ok")
 
             desensitized_files = step_sensitive_scan(name, repo_skill_dir, skip_scan)
-            if is_skill:
-                step_update_readme()
+            # README 更新：同时覆盖 skills 和 agents（update_readme.py 自身已支持）
+            step_update_readme()
 
             gitee_ok, github_ok = step_commit_and_push(name, version, work_repo_subdir)
             step_update_manifest_uploaded(name, version, gitee_ok, github_ok)
@@ -1291,6 +1462,7 @@ def main():
             step_skillhub_publish(name, version)
         if is_agent and do_pypi:
             step_pypi_publish(name, version, src_dir)
+    # ── Release（同步完成后）────────────────────────────────────────
     if do_release:
         step_release_create(name, typ, version)
 

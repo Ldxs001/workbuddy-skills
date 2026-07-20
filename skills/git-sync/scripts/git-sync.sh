@@ -6,7 +6,7 @@ SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
 _data_dir_abs="$SKILL_DIR/../.standardization/git-sync/data"
 
 
-# git-sync v2.7.0
+# git-sync v2.29.0
 # 将 skill/agent 代码规范化推送到码云/GitHub，支持 ClawHub/SkillHub/PyPI/Release
 # 用法: bash git-sync.sh <name> [version] [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]
 set -eo pipefail

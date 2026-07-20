@@ -37,9 +37,21 @@
 | 2 | `_meta.json` 标准化校验 | skill 仅 |
 | 3 | SKILL.md 规范审查（只读） | skill 仅 |
 
-### 步骤 3.7：LLM 文件过滤器（v2.26+，替换硬编码黑名单）
+### 步骤 3.7：LLM 文件过滤器（v2.29.0，替换硬编码黑名单）
 
-Python 扫描源目录文件树 + 自动查找规则文件（`blueprint*`, `*rules*`, `blueprints/`），生成 `.file_filter_{name}.json`。LLM 审核后返回允许列表，**只复制允许的文件**。
+Python 扫描源目录文件树 + 自动查找规则文件（`blueprint*`, `*rules*`, `blueprints/`），生成扫描报告后**全量打印文件列表 + 排除规则到 stdout**，要求 WorkBuddy 在回复中输出决策 JSON。决策写入 `.file_filter_{name}.json.decisions.json`，**重新运行 git-sync 后读取该文件继续同步**。
+
+交互流程：
+1. git-sync 扫描文件 → 打印完整文件列表 + 排除规则 → 退出（返回 None）
+2. WorkBuddy 看到输出后，审核文件列表，按规则决定保留/排除
+3. WorkBuddy 在回复中输出 `{"allow": ["path/to/file.py", ...]}`，**同时写入决策文件**
+4. 重新运行 git-sync → 读取决策文件 → 只复制允许的文件 → 继续后续步骤
+
+| 环境 | 行为 |
+|------|------|
+| 有决策文件 | 直接读取，跳过审核 |
+| 无决策文件 | 打印审核指令，等待 WorkBuddy 回复决策 |
+| 决策文件解析失败 | 默认保留所有文件 |
 
 ### 步骤 4：同步文件
 
@@ -49,7 +61,9 @@ Python 扫描源目录文件树 + 自动查找规则文件（`blueprint*`, `*rul
 
 扫描已同步文件中的敏感信息（邮箱/token/IP），LLM 自动决策 keep/sanitize，执行脱敏。
 
-### 步骤 5：更新 README.md（仅 skill）
+### 步骤 5：更新 README.md（skill + agent）
+
+全量扫描 workrepo/skills/ + agent/，生成技能表格 + 智能体表格。
 
 ### 步骤 6：提交并推送到双平台
 
@@ -71,16 +85,11 @@ Gitee + GitHub，失败自动 pull --rebase 重试。
 
 ### 步骤 9：创建 Release（--release 标志）
 
-git tag + GitHub API，skill tag=`{name}-v{ver}`，agent tag=`v{ver}`。
-
-| 对比结果 | 行为 |
-|---------|------|
-| 清单无此条目 | ✅ 正常执行，完后写入 version 到清单 |
-| 清单 version = 待更新 version | ❓ 询问是否跳过（默认跳过） |
-| 清单 version < 待更新 version | ✅ 正常升级，更新清单 |
-| 清单 version > 待更新 version | ❌ 版本异常，询问策略（覆盖/拉取/合并/中止） |
-
-> 注：以 manifest.json 记录的 version 为准，仓库 _meta.json 仅作参考。
+打 tag + 推双平台 + 创建 GitHub Release + Gitee 发行版。
+- tag 格式：skill=`{name}-v{ver}`，agent=`v{ver}`
+- 源码包由 GitHub/Gitee 自动从 tag 生成（Source code zip/tar.gz）
+- 同时推送 `pypi/{type}/{name}/{version}` 触发 tag，供 GitHub Actions Trusted Publisher 工作流使用
+- 仅 `--release` 标志时执行，平时同步不创建 Release
 
 ### 步骤 1：_meta.json 版本同步
 
@@ -212,9 +221,9 @@ git add → git commit → git pull --rebase → git push
 当 `rsync` 不可用时，脚本会 fallback 到 `sync_with_exclude.py`（Python 方案）。
 
 **问题根因：**
-- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`[local-path-redacted]` → `C:\Users\...`）
+- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`/c/Users/...` → `C:\Users\...`）
 - 如果 `python` 是 **Windows 原生 exe**（如 `.workbuddy\binaries\...`），路径不会被转换
-- Python 收到 `[local-path-redacted]` 会误解为 `C:\c\Users\...`，导致文件找不到
+- Python 收到 `/c/Users/...` 会误解为 `C:\c\Users\...`，导致文件找不到
 
 **症状：**
 ```

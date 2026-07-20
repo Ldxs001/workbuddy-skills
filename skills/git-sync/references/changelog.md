@@ -1,3 +1,16 @@
+## [2.29.0] - 2026-07-21
+
+### 变更
+- **LLM 文件筛除不再卡死**：`step_llm_file_filter()` 不再只写扫描文件后空等，改为全量打印文件列表 + 规则到 stdout，要求 WorkBuddy 在回复中输出决策 JSON。不再静默挂起
+- **路径映射从 manifest 统一管理**：manifest 条目新增 `source_path` / `repo_path` 字段，`manifest.py add` 自动按 type 填充默认路径。`git-sync.py` 优先读 manifest，无则回退硬编码。skill 和 agent 统一走同一套逻辑
+- **README 更新同时覆盖 skills + agents**：移除 `is_skill` 限制，agent 同步后也会触发 README 重新生成（`update_readme.py` 本身已支持扫描 agent/ 目录）
+- **Release 简化**：只打 tag + 建 Release 页面，不传 ZIP。源码包由 GitHub/Gitee 自动从 tag 生成
+- **仓库名从 config.json 读取**：`release_creator.py` 和 `step_release_create()` 不再硬编码，改为读 `config.json` 的 `gitee.user/repo` + `github.user/repo`
+- **版本号全局归一化 PEP 440**：新增 `_normalize_version()` 函数，入口统一转换版本格式（`1.7.0-beta` → `1.7.0b1`），所有外部输出用归一化版本，源文件不改
+- **dev_status 自动判别**：PEP 440 预发布后缀（`.bN`/`.rcN`/`.aN`/`.devN`）→ `4 - Beta`，纯 `x.y.z` → `5 - Production/Stable`
+- **PyPI trigger tag 通用化**：格式统一为 `pypi/{type}/{name}/{version}`，manifest 驱动，所有项目通用
+- **新增 GitHub Actions 模板**：`references/pypi-github-actions.yml`，监听 `pypi/*/*/*`，Trusted Publisher 配置指南
+
 ## [2.28.2] - 2026-07-16
 
 ### 修复
