@@ -69,10 +69,19 @@ def route_query(question: str) -> dict:
                     if sig_info.get("method") not in ("reranker", "word_freq"):
                         continue
                     sig_text = sig_info.get("signature", "")
-                    if not sig_text:
+                    sig_list = sig_info.get("signatures", [])
+                    if not sig_text and not sig_list:
                         continue
-                    sv = np.array(emb.embed_query(sig_text.replace(" · ", " ")[:200]))
-                    sim = float(np.dot(qv, sv) / (np.linalg.norm(qv) * np.linalg.norm(sv)))
+                    # 多向量路由：每个分象限做一次 cosine，取最高分
+                    if sig_list:
+                        scores = []
+                        for one_sig in sig_list:
+                            sv = np.array(emb.embed_query(one_sig.replace(" · ", " ")[:512]))
+                            scores.append(float(np.dot(qv, sv) / (np.linalg.norm(qv) * np.linalg.norm(sv))))
+                        sim = max(scores)
+                    else:
+                        sv = np.array(emb.embed_query(sig_text.replace(" · ", " ")[:512]))
+                        sim = float(np.dot(qv, sv) / (np.linalg.norm(qv) * np.linalg.norm(sv)))
                     if sim > best_score:
                         best_score = sim
                         best_kb = kb_name
@@ -104,7 +113,6 @@ def route_query(question: str) -> dict:
 
 # ==================== KB 签名自动归纳 ====================
 
-SIGNATURE_MAX_WORDS = 12
 FEEDBACK_MAX_WORDS = 30
 MIN_FEEDBACK_SIMILARITY = 0.3  # 候选词与原始关键词的最低语义相似度阈值
 
@@ -156,7 +164,7 @@ _STOP_WORDS = {
     "水平", "试验", "检测", "测试", "测量", "检验", "标准", "规则", "规程",
     "参加", "频次", "时间", "技术", "开发",
     "一方面", "另一方面", "此外", "同时", "目前", "当前",
-    "实施日期", "换页", "第页", "图例", "来源", "单位", "摘要", "关键词",
+    "实施日期", "换页", "第页", "接上", "转下页", "上一页", "下一页", "上页", "下页", "翻页", "第几页", "图例", "来源", "单位", "摘要", "关键词",
     "中图分类号", "文献标识码", "文章编号", "收稿日期", "修回日期",
     "基金项目", "作者简介", "通讯作者", "参考文献", "附录", "表格",
     "page", "abstract", "introduction", "conclusion", "reference",
@@ -184,12 +192,12 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     生成 KB 签名 + 反哺排序（完整流程）。
     
     流程：
-      所有 chunk → BCE 质心 → 近质心 chunk → jieba 提候选词
-      → 停用词过滤 → BCE 候选词 vs 原始关键词 → 排序
-      → 更新 kb_signatures.json (top-12)
-      → 更新 auto_classify_rules.json (top-30)
+      所有 chunk → 四分法采样 → 4象限各算质心 → 各取近20chunk
+      → 各象限 jieba 提候选词 → 停用词过滤 → BCE vs 原始关键词排序
+      → round-robin 合并 → 更新 kb_signatures.json (上限80词)
+      → 更新 auto_classify_rules.json (上限30词)
       
-    返回: 签名字符串（top-12 用 · 连接）
+    返回: 签名字符串（top-N 用 · 连接）
     """
     from rag_core import get_embeddings
     import numpy as np
@@ -233,8 +241,9 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     if not unique:
         return ""
     
-    # --- 1. BCE 语义质心：自适应采样 + 四分法（确保全域覆盖 + 随机防偏倚）---
+    # --- 1. 四分法采样：4象限各自独立 ---
     emb = get_embeddings()
+    import random
     try:
         N = len(unique)
         # 动态采样量
@@ -245,126 +254,144 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
         else:
             n_sample = min(N, max(400, int(N * 0.2)), 500)
 
-        import random
         if n_sample >= N:
-            sampled = unique  # 全量
+            quad_chunks = [unique]     # 全量：当作 1 个象限
         elif N < 500:
-            sampled = random.sample(unique, n_sample)  # 全域随机
+            sampled = random.sample(unique, n_sample)
+            quad_chunks = [sampled]    # 全域随机：1 个象限
         else:
             # 四分 + 每份随机
             quarter_size = N // 4
             base = n_sample // 4
             remainder = n_sample % 4
-            sampled = []
+            quad_chunks = []
             for q in range(4):
                 start = q * quarter_size
                 end = start + quarter_size if q < 3 else N
                 pool = unique[start:end]
                 take = base + (1 if q < remainder else 0)
-                sampled.extend(random.sample(pool, take))
-        chunk_vecs = np.array([emb.embed_query(t[:512]) for t in sampled])
-        centroid = chunk_vecs.mean(axis=0)
-        dists = np.linalg.norm(chunk_vecs - centroid, axis=1)
-        nearest_idx = np.argsort(dists)[:20]
-        top_texts = [unique[i] for i in nearest_idx]
+                quad_chunks.append([])
+                quad_chunks[-1] = random.sample(pool, take)
     except Exception:
-        top_texts = unique[:20]
+        quad_chunks = [unique]
     
-    # --- 2. jieba 提候选词 ---
-    combined = "\n".join(top_texts)
-    tokens = _tokenize(combined)
-    freq = _filter_candidates(tokens)
-    if not freq:
-        return ""
-    
-    # --- 3. BCE 比对原始关键词排序 ---
-    from knowledge_base_manager import _load_rules
+    # --- 加载原始关键词（所有象限共享）---
+    from knowledge_base_manager import _load_rules, _save_rules
     rules = _load_rules()
     rule = rules.get(kb_name, {})
     originals = rule.get("_originals", rule.get("keywords", [kb_name]))
     if not originals:
         originals = [kb_name]
-    # 确保 KB 名称始终作为原始关键词之一，防止领域词被其他词（如化学分析术语）挤出 top-12
     if kb_name not in originals:
         originals = [kb_name] + originals
     
     try:
-        # 每个原始关键词单独嵌入（vs 聚合为一个向量，通用中文词容易蹭相似度）
         orig_vecs = [np.array(emb.embed_query(o)) for o in originals if o.strip()]
-        scored = []
-        for w in freq:
-            wv = np.array(emb.embed_query(w))
-            # 取候选词与各个原始关键词的最大相似度
-            best = max(float(np.dot(wv, ov) / (np.linalg.norm(wv) * np.linalg.norm(ov) + 1e-10)) for ov in orig_vecs)
-            scored.append((w, best))
-        scored.sort(key=lambda x: -x[1])
     except Exception:
-        scored = sorted(freq.items(), key=lambda x: -x[1])
+        orig_vecs = []
     
-    all_ranked = [w for w, _ in scored]
+    # --- 2. 每象限独立：质心→近邻20→jieba→BCE排序 ---
+    all_quad_ranked = []  # 每象限各一个 [(word, score), ...]
+    for q_chunks in quad_chunks:
+        try:
+            q_vecs = np.array([emb.embed_query(t[:512]) for t in q_chunks])
+            q_centroid = q_vecs.mean(axis=0)
+            q_dists = np.linalg.norm(q_vecs - q_centroid, axis=1)
+            q_near = np.argsort(q_dists)[:min(20, len(q_chunks))]
+            q_top = [q_chunks[i] for i in q_near]
+        except Exception:
+            q_top = q_chunks[:min(20, len(q_chunks))]
+        
+        # jieba 提候选词 + 停用词过滤
+        q_text = "\n".join(q_top)
+        q_tokens = _tokenize(q_text)
+        q_freq = _filter_candidates(q_tokens)
+        if not q_freq:
+            all_quad_ranked.append([])
+            continue
+        
+        # BCE 比对原始关键词排序
+        if orig_vecs:
+            q_scored = []
+            for w in q_freq:
+                wv = np.array(emb.embed_query(w))
+                best = max(float(np.dot(wv, ov) / (np.linalg.norm(wv) * np.linalg.norm(ov) + 1e-10)) for ov in orig_vecs)
+                q_scored.append((w, best))
+            q_scored.sort(key=lambda x: -x[1])
+        else:
+            q_scored = sorted(q_freq.items(), key=lambda x: -x[1])
+        
+        all_quad_ranked.append(q_scored)
     
-    # --- 4. 签名：top-12 ---
-    sig_words = all_ranked[:SIGNATURE_MAX_WORDS]
+    # 无任何候选词 → 空签名
+    if not any(all_quad_ranked):
+        return ""
+    
+    # --- 3. 四段拼接：每象限取前 20 ---
+    merged = []
+    for q_scored in all_quad_ranked:
+        merged.extend(q_scored[:20])   # 最多20，少则取实际值
+    
+    all_ranked = [w for w, _ in merged]
+    
+    # --- 4. 签名：上限 80 词（取实际值，不强求）---
+    SIGNATURE_CAP = 80
+    sig_words = all_ranked[:min(SIGNATURE_CAP, len(all_ranked))]
     signature = " · ".join(sig_words)
     
-    # --- 5. 保存签名 ---
+    # --- 5. 保存签名（含分象限签名，用于多向量路由）---
+    # 每象限各自的 top-20 签名
+    quad_sigs = []
+    for q_scored in all_quad_ranked:
+        q_words = [w for w, _ in q_scored[:20]]
+        if q_words:
+            quad_sigs.append(" · ".join(q_words))
+    
     sigs = _load_signatures()
     sigs[kb_name] = {
         "signature": signature,
+        "signatures": quad_sigs if len(quad_sigs) > 1 else [],
         "updated_at": str(__import__("datetime").datetime.now()),
         "auto_updated": True,
         "method": "word_freq",
     }
     _save_signatures(sigs)
     
-    # --- 6. 反哺：保留原始关键词 + top-30 新词 ---
+    # --- 6. 反哺：四象限均分名额（30 - count(originals)）/ 4 ---
     if signature:
         try:
-            from knowledge_base_manager import _save_rules
             entry = rules.get(kb_name, {})
             existing = list(entry.get("keywords", []))
             
-            # 首次标记原始关键词
+            # 首次标记原始关键词（_save_rules 入口已兜底，这里保留作为内存级保障）
             if "_originals" not in entry:
                 entry["_originals"] = list(existing)
             
             originals_set = set(entry["_originals"])
+            orig_count = len(originals_set)
             
-            # 反哺新词：按语义相似度从高到低选取
-            # 原始词永久保留，新词必须 >= MIN_FEEDBACK_SIMILARITY 才考虑
-            # 不满30就加，满30后新词替换最低分旧反馈词
-            result = list(originals_set)
-            result_scores = {w: 1.0 for w in originals_set}  # 原始词满分，永不替换
-            
-            for w, score in scored:
-                if score < MIN_FEEDBACK_SIMILARITY:
-                    continue  # 低于阈值，直接跳过
-                if w in result:
-                    continue
+            # 可分配新词名额 = 30 - 原始关键词数
+            x = FEEDBACK_MAX_WORDS - orig_count
+            if x > 0:
+                y = x // 4  # 每象限上限，向下取整
                 
-                if len(result) < FEEDBACK_MAX_WORDS:
-                    result.append(w)
-                    result_scores[w] = score
-                else:
-                    # 已满30：找到当前最低分的非原始反馈词
-                    min_idx = -1
-                    min_score = float('inf')
-                    for i in range(len(originals_set), len(result)):
-                        rw = result[i]
-                        rs = result_scores.get(rw, 0)
-                        if rs < min_score:
-                            min_idx = i
-                            min_score = rs
-                    
-                    if score > min_score:
-                        replaced = result[min_idx]
-                        result[min_idx] = w
-                        result_scores[w] = score
-                        del result_scores[replaced]
-            
-            if set(result) != set(existing):
-                entry["keywords"] = result
-                _save_rules(rules)
+                result = list(originals_set)
+                for q_idx in range(len(all_quad_ranked)):
+                    q_scored = all_quad_ranked[q_idx]
+                    taken = 0
+                    for w, score in q_scored:
+                        if taken >= y:
+                            break
+                        if score < MIN_FEEDBACK_SIMILARITY:
+                            continue
+                        if w in result:
+                            continue
+                        result.append(w)
+                        taken += 1
+                
+                if set(result) != set(existing):
+                    entry["keywords"] = result
+                    _save_rules(rules)
         except Exception:
             pass
     

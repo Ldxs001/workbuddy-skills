@@ -39,6 +39,7 @@ DEFAULT_CONFIG = {
             "min_score_threshold": 0.3,
             "broadcast_on_fail": True,
             "auto_update_signatures": True,
+            "signature_auto_rebuild": False,
         },
     },
     "reranker": {
@@ -53,6 +54,11 @@ DEFAULT_CONFIG = {
         "output_enabled": False,
         "model_path": "MoritzLaurer/mDeBERTa-v3-base-xnli",
         "top_k": 0,
+    },
+    "memory": {
+        "compress_ratio": 0.7,
+        "compress_remove_ratio": 0.4,
+        "max_sessions": 20,
     },
     "retrieval": {
         "k": 3,

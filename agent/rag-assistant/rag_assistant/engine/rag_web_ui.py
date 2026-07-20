@@ -20,7 +20,7 @@ from config import load_config, save_config, reset_config, DEFAULT_CONFIG
 from prompt_manager import load_template, save_template, reset_template, get_system_prefix, get_full_prompt, get_all_presets, SECOND_PASS_TEMPLATE
 from embedding_model_manager import list_downloaded_models, RECOMMENDED_MODELS, RECOMMENDED_RERANK_MODELS, RECOMMENDED_NLI_MODELS, ALL_RECOMMENDED_MODELS, MODEL_DIMENSION_MAP, detect_local_embedding_models, download_model, probe_all_models, _AVAILABILITY_CACHE
 from knowledge_base_manager import list_knowledge_bases, get_kb_stats, get_kb_model, set_kb_model, get_auto_backup_enabled
-from router import list_kb_signatures, rebuild_all_signatures
+from router import list_kb_signatures, rebuild_all_signatures, build_kb_signature
 from rag_standalone import verify_llm_connection
 from text_splitter import STRATEGY_REGISTRY, GUARD_REGISTRY, get_all_strategies_info, SECONDARY_STRATEGIES
 from utils import cfg_dir, run_command, cache_directory
@@ -873,7 +873,10 @@ function updateAvailIndicators(results){
 // 页面加载后自动探测（直接 setTimeout，不依赖 load 事件）
 setTimeout(probeAvailability, 1200);
 function toggleAdvSig(){var e=document.getElementById('adv-sig-content'),a=document.getElementById('adv-sig-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';}
-function rebuildSigs(){fetch('/api/router/rebuild-signatures',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已重建');setTimeout(function(){location.reload()},500)}else toast(d.error,'error')});}
+var _rebuilding=false;
+function rebuildSigs(btn){if(_rebuilding)return;_rebuilding=true;if(btn){btn.disabled=true;btn.textContent='⏳ 重建中...';}toast('⏳ 正在重建所有 KB 签名...');fetch('/api/router/rebuild-signatures',{method:'POST'}).then(function(r){return r.json()}).then(function(d){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🔄 重建所有签名';}if(d.success){toast('已重建');location.reload()}else toast(d.error,'error')}).catch(function(e){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🔄 重建所有签名';}toast('请求失败','error')});}
+function rebuildOneSig(btn,n){if(_rebuilding)return;_rebuilding=true;if(btn){btn.disabled=true;btn.textContent='⏳ 重建中...';}toast('⏳ 正在重建「'+n+'」签名...');fetch('/api/router/rebuild-one',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kb_name:n})}).then(function(r){return r.json()}).then(function(d){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🏗️ 重建签名';}if(d.success){toast('「'+n+'」已重建');location.reload()}else toast(d.error,'error')}).catch(function(e){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🏗️ 重建签名';}toast('请求失败','error')});}
+function toggleAutoRebuild(){fetch('/api/router/toggle-auto-rebuild',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('入库全量重建:'+(d.enabled?'开':'关'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
 function toggleSortRules(){var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';if(!o)refreshSortRules();}
 function refreshSortRules(){fetch('/api/reranker/rules',{method:'POST'}).then(function(r){return r.json()}).then(function(d){var e=document.getElementById('sort-rules-list'),rules=d.rules||[];if(!rules.length){e.innerHTML='<span style=\"color:#aaa;\">暂无</span>';return}e.innerHTML=rules.map(function(r,i){return'<div style=\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;\"><div style=\"flex:1;font-size:12px;\">#'+(i+1)+' '+JSON.stringify(r)+'</div><button class=\"btn btn-danger\" style=\"padding:2px 8px;font-size:11px;\" onclick=\"deleteSortRule('+i+')\">x</button></div>'}).join('')});}
 function deleteSortRule(i){if(!confirm('删除规则 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已删除');refreshSortRules()}else toast(d.error,'error')});}
@@ -1933,7 +1936,7 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
     <div id="kb-list" style="margin-bottom:8px;">
       {' '.join(f'''<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
         <div style="flex:1;"><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</div>
-        <span><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="openKbBrowser('{name}')">📂 浏览</button> <span style="color:#888;font-size:11px;">模型编辑在规则中</span></span>
+        <span><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="openKbBrowser('{name}')">📂 浏览</button> <button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="rebuildOneSig(this,'{name}')">🏗️ 重建签名</button> <span style="color:#888;font-size:11px;">模型编辑在规则中</span></span>
       </div>''' for name, info in kbs.items())}
     </div>
     <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:4px;">
@@ -2068,9 +2071,29 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
     </div>
     <div class="collapsible-content" id="adv-sig-content">
       <div style="font-size:12px;color:#888;">
-        {"".join(f'<div style="padding:4px 0;border-bottom:1px solid #eee;"><strong>{name}</strong>: <span style="color:#aaa;">{(info.get("signature","") if isinstance(info, dict) else info)[:80]}...</span></div>' for name, info in kb_sigs.items()) if kb_sigs else '暂无签名'}
+        {''.join(
+          f'<div style="padding:4px 0;border-bottom:1px solid #eee;">'
+          f'<strong>{name}</strong>'
+          + (f' <span style="color:#888;font-size:11px;">({len(sigs)}象限)</span>'
+             + ''.join(
+               f'<div style="padding:2px 0 2px 16px;color:#aaa;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{s[:200]}">Q{i+1}: {s[:120]}</div>'
+               for i, s in enumerate(sigs)
+             )
+          if (isinstance(info, dict) and (sigs:=info.get("signatures",[]))) else
+          f'<span style="color:#aaa;">{(info.get("signature","") if isinstance(info, dict) else info)[:120]}...</span>'
+          )
+          + '</div>'
+          for name, info in kb_sigs.items()
+        ) if kb_sigs else '暂无签名'}
       </div>
-      <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;margin-top:8px;" onclick="rebuildSigs()">🔄 重建所有签名</button>
+      <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;margin-top:8px;" onclick="rebuildSigs(this)">🔄 重建所有签名</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#555;">
+        <label class="toggle-switch" onclick="toggleAutoRebuild()">
+          <input type="checkbox" onclick="event.stopPropagation();" {"checked" if fb_cfg.get('signature_auto_rebuild', False) else ""}><span class="toggle-slider"></span>
+        </label>
+        <span>入库全量重建（{"开" if fb_cfg.get('signature_auto_rebuild', False) else "关"}）</span>
+        <span style="color:#aaa;font-size:11px;">开=每次入库全量扫描chunk重建签名（耗时较久），关=仅基于新文档更新</span>
+      </div>
     </div>
   </div>
 
@@ -2920,6 +2943,18 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/router/rebuild-signatures":
                 try: rebuild_all_signatures(); self._send_json({"success": True})
                 except Exception as e: self._send_json({"success": False, "error": str(e)})
+            elif path == "/api/router/rebuild-one":
+                body = self._read_body()
+                kb_name = body.get("kb_name", "")
+                if not kb_name:
+                    self._send_json({"success": False, "error": "缺少 kb_name"})
+                else:
+                    try: build_kb_signature(kb_name); self._send_json({"success": True})
+                    except Exception as e: self._send_json({"success": False, "error": str(e)})
+            elif path == "/api/router/toggle-auto-rebuild":
+                cfg = load_config(); fb = cfg.setdefault("router", {}).setdefault("fallback", {})
+                fb["signature_auto_rebuild"] = not fb.get("signature_auto_rebuild", False)
+                save_config(cfg); self._send_json({"success": True, "enabled": fb["signature_auto_rebuild"]})
             elif path == "/api/reranker/toggle":
                 cfg = load_config(); rr = cfg.setdefault("reranker", {})
                 new_enabled = not rr.get("enabled", False)

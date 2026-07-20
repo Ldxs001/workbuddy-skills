@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import json
+from datetime import datetime
 from typing import Optional
 
 from .llm_client import LLMClient
@@ -64,11 +65,105 @@ class Agent:
     def __init__(self, config: dict = None):
         self.config = config or {}
         self.data_dir = self.config.get("data_dir", "data")
-        self.session_id = self.config.get("session_id", "default")
+        self.session_id = self.config.get("session_id") or self._generate_session_id()
         self.rag = RAGWrapper(self.config)
         self.llm = LLMClient(self.config)
         self.memory = Memory(self.data_dir)
         self.search = WebSearch(self.config)
+
+    @staticmethod
+    def _generate_session_id() -> str:
+        """生成唯一 session_id"""
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        rand = os.urandom(4).hex()
+        return f"sess_{ts}_{rand}"
+
+    def new_session(self) -> str:
+        """新建会话：生成新 ID，不清除旧会话内容"""
+        self.session_id = self._generate_session_id()
+        # 检查会话数量，超过 max_sessions 自动清理最旧的非活跃会话
+        try:
+            from .engine.config import load_config
+            _cfg = load_config()
+            _max = _cfg.get("memory", {}).get("max_sessions", 20)
+            sessions = self.list_sessions()
+            # 当前不活跃的会话数
+            inactive = [s for s in sessions if not s["active"]]
+            if len(inactive) >= _max:
+                # 归档最旧的（list_sessions 已按创建倒序，最后一个最旧）
+                oldest = inactive[-1]
+                self.archive_session(oldest["id"])
+        except Exception:
+            pass
+        return self.session_id
+
+    def list_sessions(self) -> list:
+        """列出所有活跃和已归档会话"""
+        import glob
+        sessions = []
+        sess_dir = os.path.join(self.data_dir, "sessions")
+        arch_dir = os.path.join(self.data_dir, "archives", "sessions")
+        os.makedirs(arch_dir, exist_ok=True)
+        for is_archived, base_dir in [(False, sess_dir), (True, arch_dir)]:
+            if not os.path.isdir(base_dir):
+                continue
+            for fpath in glob.glob(os.path.join(base_dir, "*.txt")):
+                sid = os.path.splitext(os.path.basename(fpath))[0]
+                preview = ""
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        for line in f:
+                            m = re.match(r'\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] user: (.+)', line)
+                            if m:
+                                preview = m.group(1)[:60]
+                                break
+                except Exception:
+                    pass
+                sessions.append({
+                    "id": sid,
+                    "preview": preview or "(空)",
+                    "active": sid == self.session_id and not is_archived,
+                    "archived": is_archived,
+                    "created": os.path.getctime(fpath),
+                })
+        sessions.sort(key=lambda s: s["created"], reverse=True)
+        return sessions
+
+    def archive_session(self, session_id: str) -> bool:
+        """归档指定会话：移入 archives/sessions/"""
+        try:
+            arch_dir = os.path.join(self.data_dir, "archives", "sessions")
+            os.makedirs(arch_dir, exist_ok=True)
+            src = os.path.join(self.data_dir, "sessions", f"{session_id}.txt")
+            if os.path.exists(src):
+                dst = os.path.join(arch_dir, f"{session_id}.txt")
+                os.rename(src, dst)
+            # 也归档压缩记忆
+            mem_src = os.path.join(self.data_dir, "memory", f"compressed_{session_id}.txt")
+            if os.path.exists(mem_src):
+                mem_arch = os.path.join(self.data_dir, "archives", "memory")
+                os.makedirs(mem_arch, exist_ok=True)
+                os.rename(mem_src, os.path.join(mem_arch, f"compressed_{session_id}.txt"))
+            return True
+        except Exception as e:
+            logger.error(f"归档会话失败: {e}")
+            return False
+
+    def delete_session(self, session_id: str) -> bool:
+        """永久删除指定会话"""
+        try:
+            for base in ["sessions", "archives/sessions"]:
+                p = os.path.join(self.data_dir, base, f"{session_id}.txt")
+                if os.path.exists(p):
+                    os.remove(p)
+            for base in ["memory", "archives/memory"]:
+                p = os.path.join(self.data_dir, base, f"compressed_{session_id}.txt")
+                if os.path.exists(p):
+                    os.remove(p)
+            return True
+        except Exception as e:
+            logger.error(f"删除会话失败: {e}")
+            return False
 
     def _system_prompt(self) -> str:
         type_ref = self._build_type_reference()
@@ -86,13 +181,13 @@ class Agent:
 
 ## 知识库查询
 <<ACTION type="query" entities="名词1,名词2" attrs="目的" rel="行为" kb="知识库名（可选）">>
-- entities：**取主体/名词**。问题中涉及的核心事物、人物、概念，如"茅台"、"五粮液"、"神经网络"。多个用逗号分隔。**每个 entity 必须是单个概念**，禁止在 entity 内部使用 `/`、`、`、`|` 等分隔符混合多个概念（如 `"引力波/星团动力学"` 非法，应拆为 `"引力波,星团动力学"` 两个 entity）
-- attrs：**取目的**。用户想查询的目标/用途/对象，如"酿造工艺"、"价格"、"原理"、"定义"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel。**每个 attr 必须是单个查询维度**，禁止使用 `/`、`、`、`|` 等分隔符拼接多个维度
+- entities：**取主体/名词**。问题中涉及的核心事物、人物、概念，如"茅台"、"五粮液"、"神经网络"。多个用逗号分隔。**每个 entity 必须是单个概念**，禁止在 entity 内部使用 `/`、`、`、`|` 等分隔符混合多个概念（如 `"引力波/星团动力学"` 非法，应拆为 `"引力波,星团动力学"` 两个 entity）。**不要将修饰域拆为独立 entity。** 如"习主席在环境治理方面的思想"——主体只有"习主席"，"环境治理方面的思想"整体归 attrs，"环境治理"不是独立 entity。
+- attrs：**取目的/限定域**。用户想查询的目标/用途/对象或域限定，如"酿造工艺"、"价格"、"原理"、"定义"、"环境治理方面的思想"。注意：不要把"异同"、"区别"、"对比"等比较意图词放这里，那些归 rel。**每个 attr 必须是单个查询维度**，禁止使用 `/`、`、`、`|` 等分隔符拼接多个维度。**attr 可以是复合短语**（如"环境治理方面的思想"整体是一个 attr），不宜再拆碎。
 - rel：**取行为**。实体间的动作/关系。当存在比较、对比、对立关系时填写，填一个最贴切的词即可（如 rel="对比"）。
 - 三者关系：entities=谁/什么，attrs=查什么，rel=怎么查
-- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词的原文出处（可以来自**当前消息、上一轮问题或上一轮回答**），优先选最精确的。**evidence 的 key 只能来自 entities 和 attrs，不要额外添加不在 entities/attrs 中的词。** 示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
+- evidence：**每个 entity 和 attr 都必须提供原文出处**。格式为 JSON 字典，key 必须与 entities/attrs 中的写法**精确一致**（不可改词、不可增减字），value 是这个词的原文出处（可以来自**当前消息、上一轮问题或上一轮回答**），优先选最精确的。**evidence 的 key 只能来自 entities 和 attrs，不要额外添加不在 entities/attrs 中的词。** 示例：evidence='{{"AI":"AI","迎合":"顺着倾向回答","独立思考":"独立思考"}}' **entity/attr 可以是对原文的提炼凝缩**（如"顺着我的倾向回答"→"迎合"；"环境治理方面的思想"→`attrs="环境治理思想"`，evidence 填原文"环境治理方面的思想"），但前提是提炼后的词在原文中有对应短语；如果提炼词本身在原文中根本找不到对应短语，说明这个 key 不应该存在，请换用原文实际存在的词。evidence 的 key 必须与 entities/attrs 中实际写出的词完全一样。value 必须使用原文原句，不能自己编造。
 - **evidence value 格式要求：** 每个 value 必须是原文中的**单个连续子串**，禁止使用 `/`、`、`、`|`、`·` 等分隔符拼接多个概念（如 `"主涉引力波/星团动力学"` 非法，应为 `"引力波"` 或 `"星团动力学"`）。每个 evidence 条目只对应一个概念。
-- **两条关键规则：① 一个概念只放一边。** 如果一个概念既是"事物"又是"目的"，优先放 entities，不要同时在 entities 和 attrs 中出现（例如"模仿"→只放 entities 即可）。**② 不要太细碎。** 同一来源的一个完整问题点，不需要拆成多个同义词 key（例如"通过怎样的技术方式或技术行为"→用"技术方式"一个 key 即可，不同时写"技术方式""行为特征""模拟技术"）。具体 entities/attrs 的填法见下方对应类型。
+- **两条关键规则：① 一个概念只放一边。** 如果一个概念既是"事物"又是"目的"，优先放 entities，不要同时在 entities 和 attrs 中出现（例如"模仿"→只放 entities 即可）。**② 不要太细碎。** 同一来源的一个完整问题点，不需要拆成多个同义词 key（例如"通过怎样的技术方式或技术行为"→用"技术方式"一个 key 即可，不同时写"技术方式""行为特征""模拟技术"）。**③ 凝缩而非泛化。** "在XX方面的XX"应凝缩为"XXXX"（如"环境治理方面的思想"→"环境治理思想"），而不是泛化为"生态文文明理念""绿色发展观"等原文不存在的新概念。
 Agent 会自动将 entities × attrs 穷举组合后查询。
 不要用 question 参数，不会生效。
 
@@ -412,7 +507,7 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             bad_items = []
             for k in all_terms:
                 v = ev.get(k)
-                if v is None or not isinstance(v, str) or not any(v.rstrip('.…') in src for src in valid_sources):
+                if v is None or not isinstance(v, str) or not v.strip() or not any(v.rstrip('.…') in src for src in valid_sources):
                     bad_items.append((k, v))
             # 证据语义二次判断（硬编码未通过时走 NLI）
             _output_nli = False
@@ -688,26 +783,22 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         _question_words = {"为什么", "怎么", "如何", "怎样", "怎么样", "是什么", "什么是"}
         attr_list = [a for a in attr_list if a not in _question_words]
         _slices = set()
-        # 第一层：entity × attr — 每个实体的各属性切片（事实块检索用）
+        # 第一层：entity 单独 — 实体本身的宽泛检索
+        for e in entity_list:
+            _slices.add(e)
+        # 第二层：entity × attr — 每个实体的各属性切片（事实块检索用）
         for e in entity_list:
             for a in attr_list:
                 _slices.add(f"{e} {a}")
-        # 第二层：多实体全拼 × attr — 全实体联合检索
-        if len(entity_list) >= 2:
-            joined = ' '.join(entity_list)
-            for a in attr_list:
-                _slices.add(f"{joined} {a}")
         # 第三层：rel 语义 — 追加一个关系切片（不是取代前两层）
         #   LLM 拿到 {事实块1, 事实块2, 关系块} 做推理整合
         if rel:
             if len(entity_list) >= 2:
                 import itertools
                 for e1, e2 in itertools.combinations(entity_list, 2):
-                    if attr_list:
-                        for a in attr_list:
-                            _slices.add(f"{e1} {e2} {a} {rel}")
-                    else:
-                        _slices.add(f"{e1} {e2} {rel}")
+                    _slices.add(f"{e1} {e2} {rel}")
+                    for a in attr_list:
+                        _slices.add(f"{e1} {e2} {a} {rel}")
             else:
                 # 单实体 + N 属性 + rel → attrs 无重复两两配对 + rel
                 #   N=2: "AI 顺着我的倾向回答 独立思考 对比"
@@ -922,9 +1013,18 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
     def _compress_if_needed(self):
         try:
-            if not self.memory.needs_compression(self.session_id):
+            from .engine.config import load_config
+            _cfg = load_config()
+            _mem_cfg = _cfg.get("memory", {})
+            _max_tokens = _cfg.get("llm", {}).get("max_tokens", 4096)
+            _threshold_ratio = _mem_cfg.get("compress_ratio", 0.7)
+            if not self.memory.needs_compression(
+                self.session_id, max_tokens=_max_tokens,
+                threshold_ratio=_threshold_ratio
+            ):
                 return
-            old = self.memory.pop_oldest_lines(self.session_id)
+            _remove_ratio = _mem_cfg.get("compress_remove_ratio", 0.4)
+            old = self.memory.pop_oldest_lines(self.session_id, ratio=_remove_ratio)
             if not old.strip():
                 return
             resp = self.llm.chat([
@@ -943,4 +1043,5 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             logger.warning(f"压缩失败: {e}")
 
     def reset_session(self):
-        self.memory.clear_short_term(self.session_id)
+        """重置会话 = 新建会话"""
+        self.new_session()

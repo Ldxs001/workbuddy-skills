@@ -5,6 +5,68 @@
 
 ---
 
+## [1.7.0b1] - 2026-07-20
+### 重大变更
+- **KB 签名生成机制重构**：四分法采样后 4 象限各算独立质心 → 各取近 20 个 chunk → 各象限独立 jieba + 停用词 + BCE 排序 → 四段拼接（每象限前 20 直接拼），签名上限 12→80 词。`router.py` `build_kb_signature()` 重写
+- **多向量路由**：`kb_signatures.json` 新增 `signatures` 字段存储各象限签名，`route_query()` 区分多向量（逐个 cosine 取最高分）与单向量（fallback），数据驱动不再硬编码
+- **反哺策略改为四象限均分**：`(30 - count(originals)) // 4` 每象限配额，取代全局 top-30 竞争，`router.py:343-377`
+
+### 新增
+- **签名重建控制**：`config.py` 新增 `signature_auto_rebuild: False` 配置项，`knowledge_base_manager.py:658-667` 入库时根据开关决定全量/增量更新
+- **Web UI 签名管理**：KB 签名区新增"入库全量重建"开关 toggle，KB 列表每行新增"重建签名"按钮，JS 添加 `rebuildOneSig()` + `toggleAutoRebuild()` API
+- **单 KB 重建 API**：`rag_web_ui.py` 新增 `POST /api/router/rebuild-one` 和 `POST /api/router/toggle-auto-rebuild`
+- **查询类型参考修复**：`web_ui.py` 补上 `setTimeout(loadQueryTypes, 500)` 页面初始化调用，4 个内置类型正常显示
+- **停用词扩展**：`router.py:167` 新增 `接上、转下页、上一页、下一页、上页、下页、翻页、第几页` 8 个 PDF 分页残留词
+
+### 修复
+- **`_originals` 持久化缺陷**：`_save_rules()` 入口自动补齐 `_originals`（`knowledge_base_manager.py:72-77`），不再依赖反哺阶段的条件保存
+- **`rag_core.py` 死代码**：删除第 505-513 行引用不存在的 `update_kb_signature` 的多余代码
+- **`update_kb_signature` 缺失导入**：`rag_web_ui.py:23` 补上 `build_kb_signature` 导入
+- **签名预览截断**：Web UI 签名行显示从 `[:80]` → `[:120]`，鼠标悬停看全文
+- **签名重建无反馈**：按钮重建过程禁用 + loading 态，完成后立即执行 `location.reload()`
+- **查询切片缺失 entity 单独层**：`agent.py` 补上 `_slices.add(e)`，对齐三层策略
+- **多实体 rel 切片缺失宽匹配**：`agent.py` 多实体时同时生成 `e1 e2 rel` 和 `e1 e2 attr rel` 两种
+- **空 evidence 值绕过校验**：`agent.py:510` 增加 `not v.strip()` 检查，空值不再因 Python 的 `"" in src` 特性放行
+- **LLM entities 拆碎修饰域**：system prompt 第 184 行加"不要将修饰域拆为独立 entity"，第 185 行 attrs 允许复合短语，第 190 行加"凝缩而非泛化"规则
+
+### 变更
+- 路由截断 `[:200]` → `[:512]`（适配长签名）
+- 清理死常量 `SIGNATURE_MAX_WORDS = 12`
+- 保留 `idf: dict = None` 参数兼容（TF-IDF 恢复待后续）
+
+---
+### 重大变更
+- **多会话管理**：替换"重置对话"为"新建会话"，侧边栏列出所有历史会话，支持切换/归档/恢复。`agent.py` 新增 `new_session()`、`list_sessions()`、`archive_session()`、`delete_session()`、`_generate_session_id()`
+- **压缩阈值改为 token 比例**：删除硬编码 100 行阈值，改为 `max_tokens × compress_ratio`（默认 4096×0.7=2867 token）。`memory.py` 新增 `estimate_token_count()`，可配置压缩触发比例和移出比例
+
+### 新增
+- **聊天侧边栏**：左栏 260px 宽，列出所有会话（含最近消息预览）。每个会话右侧 📦 归档按钮，归档会话灰显，点击 `↩` 可恢复。底部显示归档数量展开按钮
+- **会话归档系统**：归档将会话文件移入 `data/archives/sessions/`，压缩记忆移入 `data/archives/memory/`，不删除数据。`max_sessions` 配置（默认 20）控制非活跃会话上限，超出自动归档最旧的
+- **配置折叠**：配置 tab 的 LLM/记忆/搜索卡片可点击 `▾` 折叠，状态存入 localStorage
+- **`memory.compress_ratio`/`compress_remove_ratio`/`max_sessions` 配置**：在 8765 配置行中与 LLM 设置同排显示，支持实时修改
+- **KaTeX 字体文件**：复制 60 个字体文件到 `static/fonts/` + NOTICE.md 许可证声明
+- **PCR/CT值 路由到生物医疗**：`auto_classify_rules.json` 中生物医疗 `_originals` 新增 PCR、聚合酶链式反应、CT值、核酸、基因检测等 10 个关键词
+
+### 修复
+- **Tab 切换 8766 泄漏**：消除 `.tab-content.active { display: block }` 与 `#chat-content.active { display: flex }` 的 CSS 冲突，改 JS 直接设置 `style.display`（block/none/flex），不再依赖 CSS class 控制显隐。CSS 中 `#config-content.tab-content { display: block }` 只作默认值，JS inline style 优先级更高，切换时绝对覆盖
+- **`web_ui.py` 重建**：因 git checkout 误操作丢弃未提交改动，据 CHANGELOG + agent.py/memory.py API 重构 web_ui.py。侧边栏/会话管理/配置折叠/压缩比例全部恢复
+- **双滚动条**：chat-messages 与 chat-content 高度溢出导致 body 额外滚动，`#chat-panel` 加 `overflow: hidden` + flex 子项最小高度 0 修复
+- **`kb-status` / `llm-config` Null 报错**：删除 status-bar 后残留 JS 引用加 null 守卫
+- **Enter 键未绑定**：从 `addEventListener`（注册时机问题）改为 textarea `onkeydown` 内联属性
+- **setup.bat 杀不掉旧进程**：`netstat|find|tokens=5` 因 Windows 版本列偏移失效。改为 PowerShell `Get-CimInstance Win32_Process` 按命令行查杀 + `Get-NetTCPConnection` 按端口兜底
+- **MiniCPM 语义判断方向错误**：原为 value 在 sources 中搜索，改为 key vs value 语义一致性判断
+
+### 变更
+- `agent.py` 所有 Memory 方法从固定 `"default"` session_id 改为动态生成
+- 配置 tab 从原水平带状改为两张独立卡片（LLM + 记忆），统一 grid 布局 + border-radius:10px
+- 删除 `status-bar`（kb-status、llm-config、压缩/清除/重置按钮）
+- `memory.py` 删除 `COMPRESS_THRESHOLD`、`COMPRESS_REMOVE` 硬编码，新增 `COMPRESS_REMOVE_RATIO`
+- `pop_oldest_lines()` 参数从 `n=int` 改为 `ratio=float`
+
+### 移除
+- 重置对话按钮、清除上下文按钮（由新建会话 + 归档替代）
+- `status-bar` 相关元素及 JS 引用
+
 ## [1.5.0b1] - 2026-07-17
 ### 重大变更
 - **删除 MiniCPM evidence 校验，统一 NLI**：移除 `_minicpm_check()`（~100行 + 2处 monkey patch）、`_minicpm_evidence_enabled` 配置、`minicpm_model_id` 配置、MiniCPM 模型选择器/checkbox/JS/API 路由。evidence 语义验证改为复用已有的 NLI cross-encoder 模型（mDeBERTa），`nli_classifier.py` 新增 `verify(key, value)` 方法 + `get_nli_classifier()` 单例供 agent 和 rag_core 共享

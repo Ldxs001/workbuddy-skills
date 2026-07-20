@@ -70,6 +70,10 @@ def _load_rules():
 
 
 def _save_rules(rules):
+    """保存规则 + 自动补齐 _originals"""
+    for kb_name, entry in rules.items():
+        if isinstance(entry, dict) and "_originals" not in entry and entry.get("keywords"):
+            entry["_originals"] = list(entry["keywords"])
     safe_json_dump(rules, AUTO_CLASSIFY_RULES_FILE)
 
 
@@ -652,9 +656,16 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
     _save_index(index)
 
     # 更新 KB 签名（入库时自动归纳）
+    # 全量重建 or 增量更新 由 signature_auto_rebuild 控制
     try:
+        from config import load_config
+        _cfg = load_config()
+        _rebuild = _cfg.get("router", {}).get("fallback", {}).get("signature_auto_rebuild", False)
         from router import build_kb_signature
-        build_kb_signature(kb_name, documents)
+        if _rebuild:
+            build_kb_signature(kb_name)           # 全量：从 ChromaDB 读取所有 chunk
+        else:
+            build_kb_signature(kb_name, documents) # 增量：基于刚入库的文档
     except Exception:
         pass
 
