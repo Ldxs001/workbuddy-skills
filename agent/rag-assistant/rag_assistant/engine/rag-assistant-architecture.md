@@ -3,7 +3,7 @@
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-12 (v0.9.0)
+> 更新：2026-07-21 (v1.7.0)
 
 ---
 
@@ -34,8 +34,7 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 | **LLM 分词 > 规则分词** | 实体/属性由 LLM 基于语义标注，不依赖关键词规则 |
 | **穷举 > 猜测** | 所有 entities × attrs 组合都查一遍，不预判哪组最优 |
 | **去重 > 冗余** | SM3 国密哈希按内容去重，避免重复上下文浪费 token |
-| **自修正 > 静默丢弃** | LLM 格式错误时反馈重试（最多 5 次），不静默吞掉 |
-| **技能完整走 > 绕路** | 每片独立走 route_query → retrieve_documents → reranker → build_context 全流程，不改造技能内部逻辑 |
+| **自修正 > 静默丢弃** | LLM 格式错误时反馈重试（最多 5 次），不静默吞掉 || **技能完整走 > 绕路** | 每片独立走 route_query → retrieve_documents → reranker → build_context 全流程，不改造技能内部逻辑 |
 | **配置持久化 > 运行时内存** | 所有 LLM 配置（backend/model/timeout/max_tokens）写入 config.json，刷新页面不丢 |
 
 ### 1.2 路由开关行为
@@ -52,7 +51,7 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 
 | 层 | 组件 | 职责 |
 |---|------|------|
-| **表现层** | `web_ui.py` (port 8765) / RAG 配置页 subprocess (port 8766) | Web 界面、LLM 配置面板、聊天界面、模型管理、知识库配置 |
+| **表现层** | `web_ui.py` (port 8765) / `external_api.py` (port 8767) / RAG 配置页 subprocess (port 8766) | Web 界面、外部接入 API、RAG 配置页、聊天界面、模型管理 |
 | **业务层** | `agent.py` / `rag_wrapper.py` / `scripts/rag_core.py` / `scripts/router.py` | 决策循环、组合查询、路由/检索/重排序 |
 | **基础设施** | `llm_client.py` / `scripts/config.py` / `scripts/utils.py` / `data/` | LLM 通信、配置管理、数据持久化 |
 
@@ -64,13 +63,15 @@ agent/rag-assistant/
 ├── setup.bat                        # Windows 一键启动
 ├── requirements.txt                 # 依赖清单
 ├── CHANGELOG.md                     # 版本更新日志
-├── RAG_PROTOCOL.md                  # 外部接入协议规范（HTTP/CLI/文件交互）
+├── PROTOCOL.md                      # Web UI 接入协议规范（HTTP/CLI/文件交互，port 8765）
+├── EXTERNAL_API.md                  # 外部接入 API 协议（组件级能力调用，port 8767）
 ├── llms.txt                         # AI 可读的项目自描述文档（llmstxt.org）
 ├── .gitignore
 │
 ├── rag_assistant/                   # 智能体核心
-│   ├── agent.py                     # Agent 决策循环（~500 行）
+│   ├── agent.py                     # Agent 决策循环（~900 行）
 │   ├── web_ui.py                    # Web 界面（port 8765）
+│   ├── external_api.py              # 外部接入 API（port 8767）
 │   ├── llm_client.py                # LLM 统一客户端
 │   ├── rag_wrapper.py               # RAG 封装层
 │   ├── search.py                    # 联网搜索
@@ -235,7 +236,7 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
 
 ### 3.5 搜索模块 — `search.py`
 
-可选的联网搜索插件，通过 `web_search_enabled` 配置开关。使用 DuckDuckGo 等免费搜索 API，返回网页摘要作为补充上下文。
+可选的联网搜索插件，通过 `web_search_enabled` 配置开关。支持 5 种后端：DuckDuckGo（免费，默认）、Tavily、Google Custom Search、Bing Search、自定义 API。返回统一格式 `{"results": [{"title", "url", "snippet"}], "success"}`。
 
 ---
 
@@ -279,8 +280,8 @@ v0.8.0 新增：配置页自动分类规则表格每行增加暂停/恢复按钮
 | `short_term_line_count(session_id)` | 当前行数 | 返回 `int` |
 | `needs_compression(session_id)` | 行数 > 100 触发压缩开关 | 返回 `bool` |
 
-当 `short_term_line_count() > 100` 时触发压缩流程：
-- `pop_oldest_lines()` 取出最旧 40 行对话 → 调 LLM 压缩为摘要（压缩指令结构化要求保留核心需求、已得结论、追问方向、最近 3 条原文） → `store_compressed()` 存入长时记忆
+当 `needs_compression()` 返回 True 时触发压缩流程（阈值：token 数 > `max_tokens × threshold_ratio`，默认 4096 × 0.7 ≈ 2867 tokens）：
+- `pop_oldest_lines()` 按比例取出最旧 40% 对话 → 调 LLM 压缩为摘要（压缩指令结构化要求保留核心需求、已得结论、追问方向、最近 3 条原文） → `store_compressed()` 存入长时记忆
 
 ### 4.2 长时记忆（压缩摘要）
 
@@ -389,6 +390,10 @@ record_gap(query, kb)                    # 记录知识缺口
 | GET | `/api/llm/models?backend=xxx` | 扫描模型列表 |
 | GET | `/api/llm/test` | 测试 LLM 连接 |
 | GET | `/api/config/llm` | 读取 LLM 配置 |
+| GET | `/api/config/query_types` | 查询类型参考 |
+| GET | `/api/config/memory` | 读取记忆配置 |
+| GET | `/api/config/search` | 读取搜索配置 |
+| GET | `/api/chat/history` | 当前会话历史 |
 | GET | `/api/agent/gaps` | 知识缺口 |
 | GET | `/api/agent/query?q=&kb=` | 查询知识库 |
 | GET | `/api/chat?q=` | 对话（GET） |
@@ -398,10 +403,58 @@ record_gap(query, kb)                    # 记录知识缺口
 | POST | `/api/agent/import` | 导入 `{"path"}` 或 `{"content", "title", "kb"}` |
 | POST | `/api/agent/upload-files` | 上传文件到服务器临时目录 `{"name", "data(base64)"}` |
 | POST | `/api/memory/inject` | 注入系统通知 `{"text"}` |
+| POST | `/api/memory/compress` | 手动压缩记忆 |
+| POST | `/api/memory/clear-context` | 清除上下文 |
 | POST | `/api/config/llm` | 更新 LLM 配置 `{"backend", "model", "timeout", "maxtokens"}` |
+| POST | `/api/config/query_types` | 添加/编辑/删除查询类型 |
+| POST | `/api/config/memory` | 更新记忆配置 |
+| POST | `/api/config/search` | 更新搜索配置 |
 | POST | `/api/search/toggle` | 搜索开关 `{"enabled"}` |
+| GET/POST | `/api/session/new` | 新建会话 |
+| GET/POST | `/api/session/list` | 列出会话 |
+| GET/POST | `/api/session/switch` | 切换会话 |
+| GET/POST | `/api/session/archive` | 归档会话 |
+| GET/POST | `/api/session/restore` | 恢复归档 |
+| GET/POST | `/api/session/delete` | 永久删除会话 |
 
 所有 POST 接口接受 `Content-Type: application/json`，返回 `{"success": True/False, ...}`。
+
+### 5.2b 外部接入 API（external_api.py, port 8767）
+
+独立端口，专供外部系统作为组件调用。27 个端点覆盖：
+
+| 域 | 端点 | 说明 |
+|----|------|------|
+| 健康检查 | `GET /api/health` | 服务状态 |
+| 功能开关 | `GET /api/feature/status` | 查询开关状态 |
+| | `POST /api/feature/toggle` | 运行态切换路由/reranker/NLI/搜索 |
+| 模型调用 | `POST /api/model/embed` | 直接调用嵌入模型 |
+| | `POST /api/model/rerank` | 直接调用 Reranker |
+| | `POST /api/model/nli` | 直接调用 NLI 分类器 |
+| KB 管理 | `GET /api/kb/list` | 列出知识库 |
+| | `POST /api/kb/create` | 创建知识库 |
+| | `POST /api/kb/delete` | 删除知识库 |
+| | `GET /api/kb/sources?kb=` | 列出 KB 内文档来源 |
+| | `POST /api/kb/move` | 跨库移动文档 |
+| | `POST /api/kb/backup` | 手动备份 |
+| | `GET /api/kb/backups?kb=` | 列出备份 |
+| | `POST /api/kb/restore` | 恢复备份 |
+| KB 签名 | `GET /api/kb/signatures` | 列出所有签名 |
+| | `POST /api/kb/signature/build` | 构建单个 KB 签名 |
+| | `POST /api/kb/signature/rebuild-all` | 全量重建 |
+| 提示词 | `GET/POST /api/prompt/template` | 模板读写 |
+| | `POST /api/prompt/template/reset` | 重置模板 |
+| | `GET/POST /api/prompt/slots` | 插槽读写 |
+| | `GET /api/prompt/presets` | 预设列表 |
+| | `POST /api/prompt/preset` | 保存自定义预设 |
+| | `POST /api/prompt/preset/delete` | 删除预设 |
+| | `POST /api/prompt/preset/apply` | 应用预设 |
+| | `GET/POST /api/prompt/system-prefix` | 系统前缀读写 |
+| 输入管理 | `GET /api/input/strategies` | 切分策略列表 |
+| | `POST /api/input/split` | 文本切分 |
+| | `POST /api/input/query-slices` | 问题组合切片展开 |
+
+详见 `EXTERNAL_API.md`。
 
 ### 5.3 LLM 后端协议
 
@@ -432,6 +485,9 @@ LLM 在回复中嵌入 `<<ACTION ...>>` 标记控制 Agent 行为：
 |------|------|---------|
 | DuckDuckGo | `requests.get(html.duckduckgo.com/html/)` | 无需 Key |
 | Tavily | `POST api.tavily.com/search` | 需配置 Key |
+| Google Custom Search | `GET www.googleapis.com/customsearch/v1` | 需配置 Key + CX |
+| Bing Search | `GET api.bing.microsoft.com/v7.0/search` | 需配置 Key |
+| 自定义 | 用户自定义 URL | 可选 |
 
 ### 5.6 技能依赖接口
 

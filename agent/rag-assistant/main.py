@@ -254,6 +254,7 @@ def main():
     parser.add_argument("--config", type=str, default=None, help="配置文件路径")
     parser.add_argument("--no-web", action="store_true", help="不启动 Web 界面")
     parser.add_argument("--pidfile", type=str, default=None, help="PID 文件路径")
+    parser.add_argument("--api-port", type=int, default=None, help="外部 API 端口（默认不启动，指定端口即启动，如 8767）")
 
     # 批量/管道模式
     parser.add_argument("--batch", action="store_true", help="批量处理模式（需配合 --input/--query）")
@@ -359,6 +360,18 @@ def main():
     print()
 
     if not args.no_web:
+        # 外部 API（可选）
+        if args.api_port:
+            from rag_assistant.external_api import start_external_api
+            import threading
+            api_thread = threading.Thread(
+                target=start_external_api,
+                args=(agent, args.api_port),
+                daemon=True,
+            )
+            api_thread.start()
+            logger.info(f"外部 API 服务已启动 (port {args.api_port})")
+
         start_web_ui(agent, port=args.port, host=args.host)
     else:
         # CLI 交互模式

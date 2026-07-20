@@ -1,7 +1,10 @@
-# RAG Assistant 外部接入协议 v0.1
+# RAG Assistant 外部接入协议 v1.0
 
 > 本文档定义 RAG Assistant 对外暴露的全部接口契约。
 > 任何第三方系统（编排器、多智能体、定时脚本、文件交换程序）可据此接入，无需本系统提供适配代码。
+>
+> **本文档覆盖 Web UI API（port 8765）。**
+> **组件级外部 API（port 8767）详见 `EXTERNAL_API.md`。**
 
 ---
 
@@ -708,6 +711,7 @@ python scripts/embedding_model_manager.py --model BAAI/bge-small-zh-v1.5
 
 ---
 
-> 以上协议版本：v0.1
-> 对应 RAG Assistant 版本：v0.1
+> 以上协议版本：v1.0
+> 对应 RAG Assistant 版本：v1.7.0
+> 组件级外部 API 详见：`EXTERNAL_API.md`（port 8767，27 个端点）
 > 协议更新方式：修改此文件 + bump 版本号

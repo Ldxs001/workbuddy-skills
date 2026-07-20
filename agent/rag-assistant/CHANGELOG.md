@@ -5,7 +5,26 @@
 
 ---
 
-## [1.7.0b1] - 2026-07-20
+## [1.7.0] - 2026-07-21
+### 新增
+- **外部接入 API（port 8767）**：`rag_assistant/external_api.py` 独立服务，6 个能力域 27 个 REST 端点，与 Web UI 完全隔离
+- **功能开关运行态切换**：`POST /api/feature/toggle` + `GET /api/feature/status`，运行态切换 router/reranker/nli/web_search/auto_classify/geek_mode，持久化到 config.json，免重启
+- **模型直接调用**：`POST /api/model/embed` 嵌入、`/api/model/rerank` 重排序、`/api/model/nli` 三向分类，绕过完整 RAG 流程独立调模型
+- **KB 管理 API**：`POST /api/kb/create` / `/delete` / `/move` + `GET /api/kb/list` / `/sources` / `/backups` + `POST /api/kb/backup` / `/restore`
+- **KB 签名管理**：`GET /api/kb/signatures` + `POST /api/kb/signature/build` + `POST /api/kb/signature/rebuild-all`
+- **提示词管理 API**：模板读写/重置（`/api/prompt/template`）、插槽读写（`/api/prompt/slots`）、预设 CRUD+应用（`/api/prompt/presets` / `preset` / `preset/delete` / `preset/apply`）、系统前缀（`/api/prompt/system-prefix`）
+- **输入管理 API**：文本切分（`POST /api/input/split`，透传 5 种切分策略 + 5 种守卫）、问题组合切片展开（`POST /api/input/query-slices`，entities×attrs 穷举）、策略列表（`GET /api/input/strategies`）
+- **CLI 参数**：`--api-port` 指定端口启动外部 API（默认不启动，兼容旧用法）
+
+### 修复
+- **`llms.txt` 全面过时**：版本从 v0.1.0→v1.7.0，修复自修正重试次数（2→5）、压缩阈值（40行→token-based）、API端点数（13→30+）、路由模型角色混淆、文件名引用错误等全部过时信息
+- **`PROTOCOL.md` 版本滞后**：v0.1→v1.0，补充外部 API 交叉引用
+- **`rag-assistant-architecture.md` 多处过时**：版本 v0.9.0→v1.7.0b1→v1.7.0，修复 `RAG_PROTOCOL.md`→`PROTOCOL.md` 文件名错误、端点列表从 16 个补全到 32 个、新增 5.2b 外部 API 节、压缩阈值描述修正（行数→token比例）、搜索引擎列表从 2 种补全到 5 种
+
+### 变更
+- 版本从 `1.7.0b1` 升级为 `1.7.0`（正式版，去掉 beta 标记）
+- README.md 全面更新：文件结构对齐当前架构、新增外部 API 说明、新增协议文档导航
+- `main.py` +`--api-port` 参数，daemon 线程启动外部 API
 ### 重大变更
 - **KB 签名生成机制重构**：四分法采样后 4 象限各算独立质心 → 各取近 20 个 chunk → 各象限独立 jieba + 停用词 + BCE 排序 → 四段拼接（每象限前 20 直接拼），签名上限 12→80 词。`router.py` `build_kb_signature()` 重写
 - **多向量路由**：`kb_signatures.json` 新增 `signatures` 字段存储各象限签名，`route_query()` 区分多向量（逐个 cosine 取最高分）与单向量（fallback），数据驱动不再硬编码
