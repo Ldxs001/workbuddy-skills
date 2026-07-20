@@ -1,6 +1,6 @@
 {
   "name": "git-sync",
-  "version": "2.29.0",
+  "version": "2.30.0",
   "description": "全平台发布工具。LLM 文件筛除不卡死、路径由 manifest 统一管理、Release 只打 tag 不传 ZIP、PyPI 版本自动归一化 PEP 440。",
   "author": "wUwproject",
   "tags": [

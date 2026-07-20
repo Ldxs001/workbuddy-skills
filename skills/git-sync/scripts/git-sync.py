@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.29.0 - 完整 Python 版 git-sync
+git-sync.py v2.30.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name> [--skip-scan]
 """
