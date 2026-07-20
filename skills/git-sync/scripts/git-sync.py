@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.30.0 - 完整 Python 版 git-sync
+git-sync.py v2.31.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
-用法: python git-sync.py <skill-name> [--skip-scan]
+用法: python git-sync.py <skill-name>
 """
 import os
 import sys
@@ -376,17 +376,13 @@ def sync_files(skill_name: str, skills_dir: Path, work_repo: Path, allowed_files
     return dst
 
 # ── 步骤 4.5：敏感信息扫描 ────────────────────────────────────────────────
-def step_sensitive_scan(skill_name: str, repo_skill_dir: Path,
-                        skip_scan: bool = False):
+def step_sensitive_scan(skill_name: str, repo_skill_dir: Path):
     """
     扫描并脱敏敏感信息。
     返回 desensitized_files: set（脱敏涉及的文件相对路径集合）
     """
     desensitized_files = set()
     log("4.5", 8, "扫描敏感信息...")
-    if skip_scan:
-        log("4.5", 8, "已跳过敏感信息扫描（--skip-scan）", "skip")
-        return desensitized_files
     scan_py = SCRIPT_DIR / "sensitive_scan.py"
     if not scan_py.exists():
         log("4.5", 8, "sensitive_scan.py 不存在，跳过", "skip")
@@ -751,8 +747,7 @@ def step_update_manifest_uploaded(skill_name: str, version: str,
         log("6.7", 8, "GitHub 推送失败，保持 not-uploaded (github)", "warn")
 
 # ── 步骤 7：生成 ZIP 安装包 ───────────────────────────────────────────────
-def step_pack_zip(skill_name: str, version: str, skills_dir: Path,
-                   skip_scan: bool = False):
+def step_pack_zip(skill_name: str, version: str, skills_dir: Path):
     log(7, 8, "生成 ZIP 安装包...")
     DIST_DIR.mkdir(parents=True, exist_ok=True)
     # 防止 version 本身已带 v 前缀导致双 v
@@ -760,55 +755,52 @@ def step_pack_zip(skill_name: str, version: str, skills_dir: Path,
     zip_name = f"{skill_name}-v{safe_ver}.zip"
     zip_file = DIST_DIR / zip_name
 
-    # 打包前敏感扫描
-    log("7.5", 8, "打包前敏感信息扫描...")
+    # 打包前敏感扫描（强制，不可跳过）
+    log("7.5", 8, "打包前敏感信息扫描（强制）...")
     zip_source = skills_dir / skill_name
-    if not skip_scan:
-        scan_py = SCRIPT_DIR / "sensitive_scan.py"
-        if scan_py.exists():
-            scan_out_zip = SCRIPT_DIR / f".sensitive_scan_{skill_name}_zip.json"
-            run_python(scan_py, "scan", str(zip_source),
-                       "--output", str(scan_out_zip))
-            if scan_out_zip.exists() and scan_out_zip.stat().st_size > 0:
-                log("7.5", 8, "发现敏感信息，将在副本中脱敏...", "warn")
-                tmp_dir = Path(tempfile.gettempdir()) / f".tmp_zip_{os.getpid()}"
-                if tmp_dir.exists(): shutil.rmtree(tmp_dir)
-                tmp_dir.mkdir(parents=True)
-                dst_tmp = tmp_dir / skill_name
-                # 逐个复制（跳过 nul 等 Windows 保留设备名）
-                os.makedirs(dst_tmp, exist_ok=True)
-                for item in zip_source.rglob("*"):
-                    if item.name.lower() in ("nul", "nul "):
-                        continue
-                    if item.is_file():
-                        try:
-                            rel = item.relative_to(zip_source)
-                            dst_item = dst_tmp / rel
-                            dst_item.parent.mkdir(parents=True, exist_ok=True)
-                            shutil.copy2(item, dst_item)
-                        except (OSError, shutil.Error):
-                            pass
-                # 脱敏
-                decisions_zip = scan_out_zip.with_suffix(".json.decisions.json")
-                make_py = SCRIPT_DIR / "make_all_sanitize.py"
-                if make_py.exists():
-                    r = run_python(make_py, str(scan_out_zip), capture=True)
-                    if r and r.stdout:
-                        Path(decisions_zip).write_text(r.stdout, encoding="utf-8")
-                if decisions_zip.exists():
-                    run_python(scan_py, "apply", str(dst_tmp),
-                               "--decisions", str(decisions_zip),
-                               "--scan-result", str(scan_out_zip))
-                zip_source = dst_tmp
-                scan_out_zip.unlink(missing_ok=True)
-                decisions_zip.unlink(missing_ok=True)
-            else:
-                scan_out_zip.unlink(missing_ok=True)
-                log("7.5", 8, "未发现敏感信息", "ok")
+    scan_py = SCRIPT_DIR / "sensitive_scan.py"
+    if scan_py.exists():
+        scan_out_zip = SCRIPT_DIR / f".sensitive_scan_{skill_name}_zip.json"
+        run_python(scan_py, "scan", str(zip_source),
+                   "--output", str(scan_out_zip))
+        if scan_out_zip.exists() and scan_out_zip.stat().st_size > 0:
+            log("7.5", 8, "发现敏感信息，将在副本中脱敏...", "warn")
+            tmp_dir = Path(tempfile.gettempdir()) / f".tmp_zip_{os.getpid()}"
+            if tmp_dir.exists(): shutil.rmtree(tmp_dir)
+            tmp_dir.mkdir(parents=True)
+            dst_tmp = tmp_dir / skill_name
+            # 逐个复制（跳过 nul 等 Windows 保留设备名）
+            os.makedirs(dst_tmp, exist_ok=True)
+            for item in zip_source.rglob("*"):
+                if item.name.lower() in ("nul", "nul "):
+                    continue
+                if item.is_file():
+                    try:
+                        rel = item.relative_to(zip_source)
+                        dst_item = dst_tmp / rel
+                        dst_item.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(item, dst_item)
+                    except (OSError, shutil.Error):
+                        pass
+            # 脱敏
+            decisions_zip = scan_out_zip.with_suffix(".json.decisions.json")
+            make_py = SCRIPT_DIR / "make_all_sanitize.py"
+            if make_py.exists():
+                r = run_python(make_py, str(scan_out_zip), capture=True)
+                if r and r.stdout:
+                    Path(decisions_zip).write_text(r.stdout, encoding="utf-8")
+            if decisions_zip.exists():
+                run_python(scan_py, "apply", str(dst_tmp),
+                           "--decisions", str(decisions_zip),
+                           "--scan-result", str(scan_out_zip))
+            zip_source = dst_tmp
+            scan_out_zip.unlink(missing_ok=True)
+            decisions_zip.unlink(missing_ok=True)
         else:
-            log("7.5", 8, "sensitive_scan.py 不存在，跳过", "skip")
+            scan_out_zip.unlink(missing_ok=True)
+            log("7.5", 8, "未发现敏感信息", "ok")
     else:
-        log("7.5", 8, "已跳过（--skip-scan）", "skip")
+        log("7.5", 8, "sensitive_scan.py 不存在，跳过", "skip")
 
     # 清理 ZIP 源目录中的临时文件
     clean_py = SCRIPT_DIR / "clean_zip_source.py"
@@ -1097,8 +1089,8 @@ if os.path.exists(readme_p):
     with open(readme_p,encoding="utf-8") as f: LD=f.read()
 setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       long_description=LD,long_description_content_type="text/markdown",
-      author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
-      url="https://github.com/Ldxs001/workbuddy-skills",
+      author="Ldxs ([username-redacted])",author_email="[email-redacted]",
+      url="https://github.com/[username-redacted]/workbuddy-skills",
       packages=find_packages(),include_package_data=True,
       python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
@@ -1165,11 +1157,11 @@ def step_release_create(name: str, typ: str, version: str):
         _cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
         _g = _cfg.get("gitee", {})
         _h = _cfg.get("github", {})
-        GITEE = f"{_g.get('user','wUwproject')}/{_g.get('repo','workbuddy-skills')}"
-        GITHUB = f"{_h.get('user','Ldxs001')}/{_h.get('repo','workbuddy-skills')}"
+        GITEE = f"{_g.get('user','[username-redacted]')}/{_g.get('repo','workbuddy-skills')}"
+        GITHUB = f"{_h.get('user','[username-redacted]')}/{_h.get('repo','workbuddy-skills')}"
     except:
-        GITEE = "wUwproject/workbuddy-skills"
-        GITHUB = "Ldxs001/workbuddy-skills"
+        GITEE = "[username-redacted]/workbuddy-skills"
+        GITHUB = "[username-redacted]/workbuddy-skills"
 
     tag = f"v{version}" if typ=="agent" else f"{name}-v{version}"
     subprocess.run(["git","tag",tag],cwd=str(WORK_REPO),capture_output=True)
@@ -1261,7 +1253,6 @@ def main():
     parser = argparse.ArgumentParser(description="git-sync.py v2.12.0")
     parser.add_argument("name", nargs="?", default="",
                         help="项目名称（自动检测 skill/agent）")
-    parser.add_argument("--skip-scan", action="store_true", help="跳过敏感信息扫描")
     parser.add_argument("--skip-market", action="store_true", help="跳过市场/PyPI 发布")
     parser.add_argument("--market-only", action="store_true", help="只发市场/PyPI，不发 git")
     parser.add_argument("--pypi", action="store_true", help="发布到 PyPI（仅 agent）")
@@ -1269,7 +1260,6 @@ def main():
     args = parser.parse_args()
 
     name = args.name
-    skip_scan = args.skip_scan
     skip_market = args.skip_market
     market_only = args.market_only
     do_pypi = args.pypi
@@ -1288,7 +1278,7 @@ def main():
         return
 
     if not name:
-        print(f"用法: python {sys.argv[0]} <name> [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]")
+        print(f"用法: python {sys.argv[0]} <name> [--skip-market] [--market-only] [--pypi] [--release]")
         print("       python {sys.argv[0]} all")
         sys.exit(1)
 
@@ -1431,7 +1421,7 @@ def main():
                     repo_skill_dir = dst
                     log(4, 8, f"已同步 {count} 个文件", "ok")
 
-            desensitized_files = step_sensitive_scan(name, repo_skill_dir, skip_scan)
+            desensitized_files = step_sensitive_scan(name, repo_skill_dir)
             # README 更新：同时覆盖 skills 和 agents（update_readme.py 自身已支持）
             step_update_readme()
 
@@ -1450,7 +1440,7 @@ def main():
             # ZIP + index（仅 skill）
             zip_file = None
             if is_skill:
-                zip_file = step_pack_zip(name, version, SKILLS_DIR, skip_scan)
+                zip_file = step_pack_zip(name, version, SKILLS_DIR)
                 step_build_index()
 
     # ── 市场/PyPI 发布（同步完成后运行，直接输出）─────────────────────
@@ -1532,7 +1522,7 @@ def main():
         elif d_info.get("scanned"):
             print(f"  ⚠️  脱敏状态：未脱敏（发现 {d_info.get('findings_count', 0)} 处）")
         else:
-            print(f"  ✅ 脱敏状态：未扫描（--skip-scan）")
+            print(f"  ❌ 脱敏状态：未扫描（脱敏是强制安全门禁，不允许跳过）")
 
         # 4. 文件筛选状态（三档）
         f_info = audit_result.get("filter", {})

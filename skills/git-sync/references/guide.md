@@ -10,7 +10,7 @@
 
 | 操作 | 说明 |
 |------|------|
-| 参数解析 | `--skip-scan` / `--skip-market` / `--market-only` / `--pypi` / `--release` |
+| 参数解析 | `--skip-market` / `--market-only` / `--pypi` / `--release` |
 | `all` 模式 | `git-sync all` 遍历 `skills/` 和 `agent/` 全部项目 |
 | 类型检测 | 自动识别 skill（`_meta.json`）或 agent（`__init__.py`） |
 | 版本号读取 | skill→`_meta.json`，agent→`__init__.py` 中的 `__version__` |
@@ -221,9 +221,9 @@ git add → git commit → git pull --rebase → git push
 当 `rsync` 不可用时，脚本会 fallback 到 `sync_with_exclude.py`（Python 方案）。
 
 **问题根因：**
-- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`/c/Users/...` → `C:\Users\...`）
+- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`[local-path-redacted]` → `C:\Users\...`）
 - 如果 `python` 是 **Windows 原生 exe**（如 `.workbuddy\binaries\...`），路径不会被转换
-- Python 收到 `/c/Users/...` 会误解为 `C:\c\Users\...`，导致文件找不到
+- Python 收到 `[local-path-redacted]` 会误解为 `C:\c\Users\...`，导致文件找不到
 
 **症状：**
 ```
@@ -310,9 +310,6 @@ python git-sync.py <name>
 
 # 指定版本
 python git-sync.py <name> <version>
-
-# 跳过敏感扫描
-python git-sync.py <name> --skip-scan
 
 # 跳过市场发布
 python git-sync.py <name> --skip-market

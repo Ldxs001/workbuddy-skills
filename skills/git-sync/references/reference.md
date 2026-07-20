@@ -180,12 +180,11 @@ def _push_with_cred_url(remote_name: str, branch: str = "main") -> tuple:
 ## git-sync.py CLI 参数
 
 ```bash
-python git-sync.py <name> [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]
+python git-sync.py <name> [--skip-market] [--market-only] [--pypi] [--release]
 ```
 
 | 参数 | 说明 |
 |------|------|
-| `--skip-scan` | 跳过敏感信息扫描和脱敏 |
 | `--skip-market` | 跳过 ClawHub / SkillHub 市场发布 |
 | `--market-only` | 仅发布到市场，不执行同步 |
 | `--pypi` | 发布到 PyPI（仅 agent 有效） |
@@ -372,7 +371,6 @@ LLM 会在文件同步步骤前审核文件清单，保留核心代码文件（`
 |------|---------|------|
 | **自动 LLM 决策**（默认） | 不配置或 `prompt` | 扫描后 LLM 自动分类每项发现：public_docs 中的署名/path 保留；Token/私钥 自动脱敏；邮箱/路径 按 context 判断 |
 | **总是脱敏** | `GIT_SYNC_SENSITIVE_MODE=always-sanitize` | 自动全部脱敏（非交互，用于 ZIP 包） |
-| **保持不变** | `GIT_SYNC_SENSITIVE_MODE=keep-as-is` 或 `--skip-scan` | 跳过扫描，源文件不动 |
 
 ### LLM 自动决策规则
 
@@ -380,12 +378,12 @@ LLM 接收扫描发现列表后，按以下原则自动判断：
 
 | 敏感类型 | LLM 决策倾向 | 示例 |
 |----------|-------------|------|
-| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `wuwofc@yeah.net` 在 LICENSE 中 → 保留 |
+| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `[email-redacted]` 在 LICENSE 中 → 保留 |
 | Token / API Key | 一律脱敏 | `api_key=sk-xxx` → 替换为 `<REDACTED>` |
 | 私钥内容 | 一律脱敏 | PEM 格式密钥 → 替换 |
-| 内网 IP | 脱敏 | `192.168.1.1` → `<REDACTED_IP>` |
+| 内网 IP | 脱敏 | `[internal-ip-redacted]` → `<REDACTED_IP>` |
 | 本地绝对路径 | public_docs 中的路径 → 保留；代码中硬编码 → 脱敏 | `C:\Users\sm001` 在文档中 → 保留 |
-| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `wUwproject` → 保留 |
+| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `[username-redacted]` → 保留 |
 
 ### 打包时行为
 

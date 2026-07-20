@@ -15,14 +15,14 @@ def _get_repos() -> tuple:
         cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
         g = cfg.get("gitee", {})
         h = cfg.get("github", {})
-        gitee = f"{g.get('user','wUwproject')}/{g.get('repo','workbuddy-skills')}"
-        github = f"{h.get('user','Ldxs001')}/{h.get('repo','workbuddy-skills')}"
+        gitee = f"{g.get('user','[username-redacted]')}/{g.get('repo','workbuddy-skills')}"
+        github = f"{h.get('user','[username-redacted]')}/{h.get('repo','workbuddy-skills')}"
         return gitee, github
     except:
-        return "wUwproject/workbuddy-skills", "Ldxs001/workbuddy-skills"
+        return "[username-redacted]/workbuddy-skills", "[username-redacted]/workbuddy-skills"
 
 
-def _get_gitee_token() -> str:
+def [credential-redacted]() -> str:
     token = os.environ.get("GITEE_TOKEN", "")
     if token:
         return token
@@ -33,18 +33,18 @@ def _get_gitee_token() -> str:
         return ""
 
 
-def _get_github_token() -> str:
+def [credential-redacted]() -> str:
     remote_url = subprocess.run(
         ["git", "remote", "get-url", "origin"],
         cwd=WORK_REPO_STR, capture_output=True, text=True
     ).stdout.strip()
     token = ""
     if ":" in remote_url and "@" in remote_url:
-        token_part = remote_url.split("//")[1].split("@")[0]
+        token_part = [credential-redacted]("//")[1].split("@")[0]
         if ":" in token_part:
-            token = token_part.split(":")[1]
+            token = [credential-redacted](":")[1]
     elif "token" in remote_url:
-        token = remote_url.split("token=")[1].split("&")[0]
+        token = [credential-redacted]("token=")[1].split("&")[0]
     return token
 
 
@@ -65,7 +65,7 @@ def main():
         subprocess.run(["git", "push", rm, tag, "-f"], cwd=WORK_REPO_STR, capture_output=True)
 
     # 3. GitHub Release（源码包由平台自动生成）
-    gh_token = _get_github_token()
+    gh_token = [credential-redacted]()
     if gh_token:
         data = json.dumps({
             "tag_name": tag, "name": f"{name} v{version}",
@@ -89,7 +89,7 @@ def main():
         print("  ⚠️  无 GitHub token，已推送 tag")
 
     # 4. Gitee 发行版（源码包由平台自动生成）
-    gitee_token = _get_gitee_token()
+    gitee_token = [credential-redacted]()
     if gitee_token:
         data = json.dumps({
             "access_token": gitee_token, "tag_name": tag,
