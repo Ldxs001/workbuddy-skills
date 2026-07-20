@@ -1,0 +1,3709 @@
+{
+  "project": "rag-assistant",
+  "root": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
+  "total_files": 925,
+  "files": [
+    {
+      "path": ".git/COMMIT_EDITMSG",
+      "size": 60
+    },
+    {
+      "path": ".git/config",
+      "size": 473
+    },
+    {
+      "path": ".git/description",
+      "size": 73
+    },
+    {
+      "path": ".git/FETCH_HEAD",
+      "size": 0
+    },
+    {
+      "path": ".git/HEAD",
+      "size": 23
+    },
+    {
+      "path": ".git/hooks/applypatch-msg.sample",
+      "size": 478
+    },
+    {
+      "path": ".git/hooks/commit-msg.sample",
+      "size": 896
+    },
+    {
+      "path": ".git/hooks/fsmonitor-watchman.sample",
+      "size": 4726
+    },
+    {
+      "path": ".git/hooks/post-update.sample",
+      "size": 189
+    },
+    {
+      "path": ".git/hooks/pre-applypatch.sample",
+      "size": 424
+    },
+    {
+      "path": ".git/hooks/pre-commit.sample",
+      "size": 1649
+    },
+    {
+      "path": ".git/hooks/pre-merge-commit.sample",
+      "size": 416
+    },
+    {
+      "path": ".git/hooks/pre-push.sample",
+      "size": 1374
+    },
+    {
+      "path": ".git/hooks/pre-rebase.sample",
+      "size": 4898
+    },
+    {
+      "path": ".git/hooks/pre-receive.sample",
+      "size": 544
+    },
+    {
+      "path": ".git/hooks/prepare-commit-msg.sample",
+      "size": 1492
+    },
+    {
+      "path": ".git/hooks/push-to-checkout.sample",
+      "size": 2783
+    },
+    {
+      "path": ".git/hooks/sendemail-validate.sample",
+      "size": 2308
+    },
+    {
+      "path": ".git/hooks/update.sample",
+      "size": 3650
+    },
+    {
+      "path": ".git/index",
+      "size": 23966
+    },
+    {
+      "path": ".git/info/exclude",
+      "size": 240
+    },
+    {
+      "path": ".git/logs/HEAD",
+      "size": 938
+    },
+    {
+      "path": ".git/logs/refs/heads/master",
+      "size": 938
+    },
+    {
+      "path": ".git/logs/refs/remotes/github/master",
+      "size": 170
+    },
+    {
+      "path": ".git/logs/refs/remotes/origin/master",
+      "size": 170
+    },
+    {
+      "path": ".git/objects/00/bff3495fa9d2f98c1c9ce436add6a1bcfe87fb",
+      "size": 4380
+    },
+    {
+      "path": ".git/objects/01/43ad49a04b5971aa583fd6aece67fc83ae05c9",
+      "size": 331
+    },
+    {
+      "path": ".git/objects/01/9f03c02c4d26da65c4ca8195f668c990269cfa",
+      "size": 7862
+    },
+    {
+      "path": ".git/objects/03/120502cffe0a54d91150d5d0262542c2ba4882",
+      "size": 27162
+    },
+    {
+      "path": ".git/objects/04/9235e6fbd5fd1915870b23cc85ca11be15b609",
+      "size": 143
+    },
+    {
+      "path": ".git/objects/04/a40bf15d4c4d2d845ba71dc04233f063f676f6",
+      "size": 852
+    },
+    {
+      "path": ".git/objects/05/f447a91653cbe85d93fc10d2d03f7a03773d0d",
+      "size": 39
+    },
+    {
+      "path": ".git/objects/06/d32aaecc0ae8d7ab4783c33dca5ef6e51b3f66",
+      "size": 1481
+    },
+    {
+      "path": ".git/objects/08/94b382b54828cc705459ce8567a9c48a61163a",
+      "size": 19017
+    },
+    {
+      "path": ".git/objects/08/a71b3079e6ba53b1edf02c5f579d7131b0fe5d",
+      "size": 14492
+    },
+    {
+      "path": ".git/objects/08/c56458b9a48432c0f80c8805b83ca14343bc1d",
+      "size": 20488
+    },
+    {
+      "path": ".git/objects/08/e3a9cf8c7143d74a4c5716e8a4f00eb3caac41",
+      "size": 807
+    },
+    {
+      "path": ".git/objects/0a/7003baaef54d83b9b963b91ea7e1e74c02a480",
+      "size": 287
+    },
+    {
+      "path": ".git/objects/0a/b69df14360e9b344a1e165bab77eebffdb8eb6",
+      "size": 2766
+    },
+    {
+      "path": ".git/objects/0a/caaff03d4bb7606de02a827aeee338e5a86910",
+      "size": 28103
+    },
+    {
+      "path": ".git/objects/0a/e390d74c9f665cf8b1e5ea5483395da7513444",
+      "size": 18637
+    },
+    {
+      "path": ".git/objects/0b/001c215d217d339fbe6149dc68d592c03dfe99",
+      "size": 615
+    },
+    {
+      "path": ".git/objects/0c/b75257f508ee03edfbb592f75bb4bc44beb19c",
+      "size": 243
+    },
+    {
+      "path": ".git/objects/0d/5c9921299c99739c1173abaef52ca72eb10573",
+      "size": 158
+    },
+    {
+      "path": ".git/objects/0e/7da821eee0dd05a0a6f0b16c2c1345dc573a84",
+      "size": 10546
+    },
+    {
+      "path": ".git/objects/0e/9b0f354ad460202bba554359f5adcc8da666b7",
+      "size": 21112
+    },
+    {
+      "path": ".git/objects/0e/ea0b15bbd4012ac00883d88a60a32d7566fc5e",
+      "size": 8919
+    },
+    {
+      "path": ".git/objects/10/4f3874635f24f0d2918dfeaf6a59652274460c",
+      "size": 111
+    },
+    {
+      "path": ".git/objects/11/1edea92d7779aa9c123fc7aa78f5c95eaf5325",
+      "size": 7225
+    },
+    {
+      "path": ".git/objects/11/c2b7e08ee6cca49dca00b375e96fca276db26d",
+      "size": 34474
+    },
+    {
+      "path": ".git/objects/12/228d414b6cfed7c39d3781c85c63256a1d7fb5",
+      "size": 98
+    },
+    {
+      "path": ".git/objects/12/8c5342c81d4986cba6d118a41e402d7b676996",
+      "size": 677
+    },
+    {
+      "path": ".git/objects/13/74b96d6033e005fc5ebafa607e88dabd4809f4",
+      "size": 5343
+    },
+    {
+      "path": ".git/objects/15/e3917cb1c77633b3044db34c1062a418795955",
+      "size": 16196
+    },
+    {
+      "path": ".git/objects/16/cc781c143c5ec174a9b45a39c43339671c361a",
+      "size": 4420
+    },
+    {
+      "path": ".git/objects/16/e0c3add5f99db028e3d2b1ca77c05bfd8f0fe3",
+      "size": 7098
+    },
+    {
+      "path": ".git/objects/18/926c29de853ed7408b80d440fcf0821646ad1f",
+      "size": 1295
+    },
+    {
+      "path": ".git/objects/18/c62f7088a9c728fbefad69244ebf7189916b56",
+      "size": 91071
+    },
+    {
+      "path": ".git/objects/1a/705608c0d00069b882446a18f55cc7072fd109",
+      "size": 438
+    },
+    {
+      "path": ".git/objects/1b/aaef0cbcfc34b8bd3ad388cc123d871f16ea07",
+      "size": 60
+    },
+    {
+      "path": ".git/objects/1c/c22a5aa7679ebaa10934212f356823931bdc3e",
+      "size": 654
+    },
+    {
+      "path": ".git/objects/1d/1a8fb29c6e5c141cd282a8a723133b6f764be6",
+      "size": 462
+    },
+    {
+      "path": ".git/objects/1d/f5ee701af86bf85d0382b8de60240ef7057b25",
+      "size": 11655
+    },
+    {
+      "path": ".git/objects/1d/fe49a7ab5ecc83e1980a8c791492998e717553",
+      "size": 7698
+    },
+    {
+      "path": ".git/objects/20/6ca66e4f16f6535fa54e021db570152fa5ea18",
+      "size": 683
+    },
+    {
+      "path": ".git/objects/21/253f37b8cc5727cbe8dbc916ff360f313dcc2b",
+      "size": 7802
+    },
+    {
+      "path": ".git/objects/21/5c143fd7805a5c2b222bd7892a1a2b09610020",
+      "size": 16465
+    },
+    {
+      "path": ".git/objects/21/f5812968c42392a3eaea9b0c6320870b6b8b38",
+      "size": 30791
+    },
+    {
+      "path": ".git/objects/24/32419f28936aff53ddfa2a732d027e6a6648fd",
+      "size": 15997
+    },
+    {
+      "path": ".git/objects/24/6434bfe677f50947baa16556374eb0d29ba56e",
+      "size": 20393
+    },
+    {
+      "path": ".git/objects/24/94011242e4a0c1a33c32300ebcd34f732c04e6",
+      "size": 648
+    },
+    {
+      "path": ".git/objects/24/9a28662218a7a17ad8bd1fe072169ecb666a49",
+      "size": 3645
+    },
+    {
+      "path": ".git/objects/25/a78bce0a0a0cab6427432a7df2e1ce9249aad9",
+      "size": 2765
+    },
+    {
+      "path": ".git/objects/25/eb0dfc48cc776513d27ca38e0a9a5c42602281",
+      "size": 2909
+    },
+    {
+      "path": ".git/objects/26/347becdbc0651de51e762975971103305b87cf",
+      "size": 312
+    },
+    {
+      "path": ".git/objects/26/4d86147840ed583e3f6816fab3d47b58d814cc",
+      "size": 6418
+    },
+    {
+      "path": ".git/objects/26/b8c28c3c1dbda60aceeb6b67c832512aad10da",
+      "size": 6370
+    },
+    {
+      "path": ".git/objects/27/112911238b63ddde5071b173681361a4893b06",
+      "size": 501
+    },
+    {
+      "path": ".git/objects/27/42abacd8283f95681b8239f45bdba8aad5bbe6",
+      "size": 1616
+    },
+    {
+      "path": ".git/objects/28/7cf4efff6048e7ff4fa64264b431552a08ab06",
+      "size": 2052
+    },
+    {
+      "path": ".git/objects/28/cdaf61749ac665b7bdb076adf1597e441e76f4",
+      "size": 9069
+    },
+    {
+      "path": ".git/objects/29/3066ad37cbab19401312c41c6d070fdb6a7971",
+      "size": 1319
+    },
+    {
+      "path": ".git/objects/29/657023adc09956249f6295746c8ce4469b50d3",
+      "size": 16422
+    },
+    {
+      "path": ".git/objects/2b/7d3275fd6c0fce04de8df7a316087350a02373",
+      "size": 1372
+    },
+    {
+      "path": ".git/objects/2d/ee7ae91eacda65faaf2f66eb0144d5979e2465",
+      "size": 500
+    },
+    {
+      "path": ".git/objects/2f/65a8a3a6d3628d11ea9c26c9077cef672fe427",
+      "size": 15297
+    },
+    {
+      "path": ".git/objects/2f/f4613f2de87f964c22edeef4028bdeb28e50d8",
+      "size": 2768
+    },
+    {
+      "path": ".git/objects/30/6357a59c4d9a0fd846bb52e5b6774d82c6ae51",
+      "size": 1085
+    },
+    {
+      "path": ".git/objects/31/98a0fd54bf8a6422ca6828fd3607de276894b7",
+      "size": 109
+    },
+    {
+      "path": ".git/objects/31/b84829b42edae20d0148eeec0d922dad2108c4",
+      "size": 12287
+    },
+    {
+      "path": ".git/objects/34/9c06dc609f896392fd5bc8b364d3bc3efc9330",
+      "size": 12050
+    },
+    {
+      "path": ".git/objects/35/97cfea54a4fa996329776a3810d19671f5eb9a",
+      "size": 2879
+    },
+    {
+      "path": ".git/objects/36/52d45d7b121ed48597aa4897e21214f7f733d1",
+      "size": 171
+    },
+    {
+      "path": ".git/objects/36/93a5a87b8e212fe3919e9cef6700cfe71a1428",
+      "size": 533
+    },
+    {
+      "path": ".git/objects/36/9e575f855153d47cbe2a0f3ac06b31e09c0673",
+      "size": 1558
+    },
+    {
+      "path": ".git/objects/37/c6433e3bedca7a97e08fe35d98582a5f7bac0c",
+      "size": 679
+    },
+    {
+      "path": ".git/objects/37/d51d8c2bfa0059654a68ab9bb359225932b1cb",
+      "size": 1517
+    },
+    {
+      "path": ".git/objects/39/5f28beac23c7b0f7f3a1e714bd8dac253dd3bc",
+      "size": 11370
+    },
+    {
+      "path": ".git/objects/3b/d84e62faef9238c39f669e8328d181da390a4f",
+      "size": 687
+    },
+    {
+      "path": ".git/objects/3d/e5969b1ad3b973342e5e88ee1770fa7c798152",
+      "size": 9917
+    },
+    {
+      "path": ".git/objects/3f/6972c66d17db83b408527c3602c7196eeca33b",
+      "size": 314
+    },
+    {
+      "path": ".git/objects/3f/c4b8839d22c8f594bedbe625300b7f4046ac8c",
+      "size": 1667
+    },
+    {
+      "path": ".git/objects/40/286dced57725554961c892daf2ace38e404eb7",
+      "size": 5717
+    },
+    {
+      "path": ".git/objects/40/60e627dc341c1854260cbc3f7386e222a4d297",
+      "size": 32380
+    },
+    {
+      "path": ".git/objects/41/88b2d68d873f97b0d9eee250e9651ad0358ac4",
+      "size": 271
+    },
+    {
+      "path": ".git/objects/43/094730458541fd387595dfd61c483f477b95f0",
+      "size": 1822
+    },
+    {
+      "path": ".git/objects/43/c537f628976f6e71e524f27a0388b13199a08b",
+      "size": 1706
+    },
+    {
+      "path": ".git/objects/44/ed1dab5cacdfc7dbc9c07605e164e757a927b5",
+      "size": 491
+    },
+    {
+      "path": ".git/objects/45/cbd5e6d67a6d621749a8d68ea681643f6fcff1",
+      "size": 188
+    },
+    {
+      "path": ".git/objects/47/46cfc77853b054049059c2635760558d56d5a5",
+      "size": 17806
+    },
+    {
+      "path": ".git/objects/47/daf97386adef969f2eee41f1c05b1bbb83feb5",
+      "size": 442
+    },
+    {
+      "path": ".git/objects/48/1cb110ee91376fbf270128f37a60f5cbf14cbc",
+      "size": 54
+    },
+    {
+      "path": ".git/objects/48/7bc073c292f262515632240d214099d2d87aab",
+      "size": 381
+    },
+    {
+      "path": ".git/objects/49/24058e879183e40b75086396950c69e7c0ca52",
+      "size": 3697
+    },
+    {
+      "path": ".git/objects/49/6191136b710edc7bc929fc98b4bb503035d2b1",
+      "size": 9445
+    },
+    {
+      "path": ".git/objects/4a/ae4d330789cf01057918d25eea372f739d6e56",
+      "size": 10914
+    },
+    {
+      "path": ".git/objects/4b/bccba1a9a3bee27533fe89d687479a30cf0807",
+      "size": 6075
+    },
+    {
+      "path": ".git/objects/4c/0d680ff242a475d3f48916ad6b7998b30ff76a",
+      "size": 878
+    },
+    {
+      "path": ".git/objects/4d/11239c472c4d9cfc55abf985df15591a39048c",
+      "size": 2848
+    },
+    {
+      "path": ".git/objects/4e/6363820045bcaf323eaa2caf39ec0f0f434579",
+      "size": 10773
+    },
+    {
+      "path": ".git/objects/4e/98259c3b54076d684bf3459baeaeae8dbce97a",
+      "size": 13748
+    },
+    {
+      "path": ".git/objects/4f/dfbf012b09033182801a1a97d81fb28ca2de25",
+      "size": 3295
+    },
+    {
+      "path": ".git/objects/50/41c8b8b73fe78674f8776f20810b6e85a18a40",
+      "size": 19270
+    },
+    {
+      "path": ".git/objects/52/aea8806d583069038e0c177e0b4563a14331db",
+      "size": 11797
+    },
+    {
+      "path": ".git/objects/53/7279f6bd2184ed32f1a5168850609147d58ee6",
+      "size": 12795
+    },
+    {
+      "path": ".git/objects/53/d809c1ae181ea9cb1c7e5cb69bd86d9693f4a7",
+      "size": 46038
+    },
+    {
+      "path": ".git/objects/54/aff904e4cfd836e3ab31ce520e707827274016",
+      "size": 5086
+    },
+    {
+      "path": ".git/objects/55/2a7a0a90e0353ae9b8780be0fdd19d52773c96",
+      "size": 7456
+    },
+    {
+      "path": ".git/objects/56/05e5e532c156677619b3ba544bfee0cadd2060",
+      "size": 1825
+    },
+    {
+      "path": ".git/objects/56/3aa355feb7b8ab2b8a0c5d7f984be451a61262",
+      "size": 28
+    },
+    {
+      "path": ".git/objects/59/31794de4a2a485fa70099bf2659b145976d043",
+      "size": 16807
+    },
+    {
+      "path": ".git/objects/59/e253ef15bbed6b329b95c211757eab792f2a13",
+      "size": 55638
+    },
+    {
+      "path": ".git/objects/5b/41ee74e6657304d3257021d41f19862aecb191",
+      "size": 14572
+    },
+    {
+      "path": ".git/objects/5c/23561ffa8baf5980139e65eb21fed530c8204e",
+      "size": 220
+    },
+    {
+      "path": ".git/objects/5d/2a1011f5cac8c82c90da6933ddb2cb534ca977",
+      "size": 736
+    },
+    {
+      "path": ".git/objects/5d/a2ba10d8854074e422769981337328aa26a894",
+      "size": 3494
+    },
+    {
+      "path": ".git/objects/5e/0b665fc4ba4faf4c2f8d820fa7958bb5ebf36c",
+      "size": 21001
+    },
+    {
+      "path": ".git/objects/5e/5e1249ab43677df814173c232145d0587cd5f9",
+      "size": 2570
+    },
+    {
+      "path": ".git/objects/5e/738b3e5a9cfab66374775c41001c2609714225",
+      "size": 1600
+    },
+    {
+      "path": ".git/objects/60/d0754233eed6586a55fd23e3bbf83404b9a8e5",
+      "size": 3215
+    },
+    {
+      "path": ".git/objects/63/20d6e90c7e77f89955b90c5c4d99961e042caf",
+      "size": 18736
+    },
+    {
+      "path": ".git/objects/63/b6e9eb69f6814e7b5778e06d6b8a75a3c921f1",
+      "size": 15155
+    },
+    {
+      "path": ".git/objects/65/05f4bb6dcd0f654f51cdd4b86ad11e75f8a93d",
+      "size": 5651
+    },
+    {
+      "path": ".git/objects/65/295854216e806e02b7f9ba7f2292401102ded6",
+      "size": 15674
+    },
+    {
+      "path": ".git/objects/67/807b0bd4f867853271f5917fb3adf377f93f53",
+      "size": 19399
+    },
+    {
+      "path": ".git/objects/68/0c13085076a2f6c5a7e695935ec3f21cddb65f",
+      "size": 4949
+    },
+    {
+      "path": ".git/objects/6a/213a2f12f94a9f5e5beb63ddaf4632ecbd5db4",
+      "size": 7644
+    },
+    {
+      "path": ".git/objects/6c/e876d716cff9f26010ab33585f155db10e691b",
+      "size": 245
+    },
+    {
+      "path": ".git/objects/6e/4b33fee49f51857ee2f21e5e88b9fadcdba179",
+      "size": 619
+    },
+    {
+      "path": ".git/objects/6f/43b594b6c1d863a0e3f93b001f8dd503316464",
+      "size": 19665
+    },
+    {
+      "path": ".git/objects/70/d559b4e937ca1b805eb39f544cbebe3c58ca6f",
+      "size": 20198
+    },
+    {
+      "path": ".git/objects/72/40e35d66cf36be6c27248b37dac79007d07d37",
+      "size": 2306
+    },
+    {
+      "path": ".git/objects/72/8ce7a1e2cb689df32c3a6c26e1bd072dcf2acb",
+      "size": 19998
+    },
+    {
+      "path": ".git/objects/72/a6b34a5095345709741b23507897446eac77d6",
+      "size": 313
+    },
+    {
+      "path": ".git/objects/72/d5ed3247b24e4c6887bf2e51001906ee2a3ffb",
+      "size": 114809
+    },
+    {
+      "path": ".git/objects/73/5f6948d63c8cc7f8233735bb9c8d843c83d804",
+      "size": 11338
+    },
+    {
+      "path": ".git/objects/73/a1e3c89c778f7e5d23b4848413145607fc5362",
+      "size": 9673
+    },
+    {
+      "path": ".git/objects/73/a8c0a2fc51ba349e34adc4108d9611311b5a3c",
+      "size": 4063
+    },
+    {
+      "path": ".git/objects/73/b8612ae598ef2317e5ef5989e981c74b7d3498",
+      "size": 211
+    },
+    {
+      "path": ".git/objects/74/3f5c8c87b9af20566afc5777d1e7c30ad27c78",
+      "size": 37845
+    },
+    {
+      "path": ".git/objects/74/61b03e1b4b4a8f0f357163cd1e7eec24307249",
+      "size": 18900
+    },
+    {
+      "path": ".git/objects/74/f07c2f99bc40c895f9e9bc353b9377962d0723",
+      "size": 1601
+    },
+    {
+      "path": ".git/objects/74/f08921f00f71f413ca42c9d1c90202e672ef38",
+      "size": 6071
+    },
+    {
+      "path": ".git/objects/75/29ecb99da22d03ecf1cc1ba24d11e98b501891",
+      "size": 3338
+    },
+    {
+      "path": ".git/objects/75/344a1f98e37e2c631e178065854c3a81fb842f",
+      "size": 6929
+    },
+    {
+      "path": ".git/objects/75/ad998349af45e66a5fc2bbe1966960b7eab3ba",
+      "size": 2679
+    },
+    {
+      "path": ".git/objects/77/096babbb8946f8bb09ea0cae17aec88d0af78c",
+      "size": 11913
+    },
+    {
+      "path": ".git/objects/77/1f1af705f5cef5f578b3a1e7d8eff66f9b76b0",
+      "size": 13590
+    },
+    {
+      "path": ".git/objects/77/31b18682b898a4f5b312d69e07df7df3494100",
+      "size": 490
+    },
+    {
+      "path": ".git/objects/78/41c0b7764f6a603f760ae10c9232ea4686df5f",
+      "size": 2774
+    },
+    {
+      "path": ".git/objects/79/3d4f104b76736b4656aed98d50cd5a9dc0f948",
+      "size": 593
+    },
+    {
+      "path": ".git/objects/79/6ba7b01f0611a7be073b427fdd4c5f397b71c2",
+      "size": 491
+    },
+    {
+      "path": ".git/objects/79/9b58627da0fb88e283f389063da5a962a44a23",
+      "size": 212
+    },
+    {
+      "path": ".git/objects/7a/19a4704616c5b403821b22e7ff011e3fc2ce88",
+      "size": 7459
+    },
+    {
+      "path": ".git/objects/7a/212caf91c0007e826fee2d622bf48acbd30dde",
+      "size": 6277
+    },
+    {
+      "path": ".git/objects/7a/ceeb58e0e49988379e855970f3745ada94db09",
+      "size": 389
+    },
+    {
+      "path": ".git/objects/7b/69f928ccb9e7987b9d8c9008e4e1dd803f2225",
+      "size": 5062
+    },
+    {
+      "path": ".git/objects/7b/820a8ddd1e192db8400bfd26d0c1e9c32ef3f6",
+      "size": 83
+    },
+    {
+      "path": ".git/objects/7d/394910298ad67abb5c85cd015899a2b127407f",
+      "size": 40026
+    },
+    {
+      "path": ".git/objects/7e/02df963621a5e26d53d510f0b4992eebde1c60",
+      "size": 14077
+    },
+    {
+      "path": ".git/objects/7e/d599d9766f9b5525e5efb7fbe1603ab9d00536",
+      "size": 2302
+    },
+    {
+      "path": ".git/objects/7f/1a3919ebef53ad5c61d5a1c75a93a3479c270e",
+      "size": 188
+    },
+    {
+      "path": ".git/objects/7f/292d91184f257054ef77cc1cd3443db757c9cc",
+      "size": 6453
+    },
+    {
+      "path": ".git/objects/83/4c20f5fb7229356d6b8189682512fa57dd1967",
+      "size": 213
+    },
+    {
+      "path": ".git/objects/84/ef6f1ac41576fc2e1f70ec168cd71f899042a3",
+      "size": 6797
+    },
+    {
+      "path": ".git/objects/85/5913ed712cc4fc48ea05047073751694b2ba4d",
+      "size": 5537
+    },
+    {
+      "path": ".git/objects/86/2e7fd49b3da0ba95b39d122ea87214ceb54e2c",
+      "size": 4385
+    },
+    {
+      "path": ".git/objects/86/685e1887958437f92b2261438a0c351fdf6bed",
+      "size": 132
+    },
+    {
+      "path": ".git/objects/87/1fd7d19d8658f64d8696ed9cdfc82c821ed76d",
+      "size": 6598
+    },
+    {
+      "path": ".git/objects/89/76a375735f4c48c98883397ebd559cbbd22ce6",
+      "size": 52
+    },
+    {
+      "path": ".git/objects/8b/137891791fe96927ad78e64b0aad7bded08bdc",
+      "size": 16
+    },
+    {
+      "path": ".git/objects/8b/adee71266b1aaec8eb6acf7496e53829f7896a",
+      "size": 19884
+    },
+    {
+      "path": ".git/objects/8d/47c02d9408d34b2a9d566c0fe0d42bf82fb735",
+      "size": 14393
+    },
+    {
+      "path": ".git/objects/8f/ec6e13a279b9de013e41c91890d91873fbf1da",
+      "size": 783
+    },
+    {
+      "path": ".git/objects/90/2db2225f0a00cb3f970a7ff621f816d11b93b8",
+      "size": 181
+    },
+    {
+      "path": ".git/objects/92/b68d5ae6b7d2a02466d41a7d396e080801dfdb",
+      "size": 8331
+    },
+    {
+      "path": ".git/objects/95/b858a0c3c9366afda6bc9f9c7cd33067942dfd",
+      "size": 9257
+    },
+    {
+      "path": ".git/objects/97/59710d1d3e16eb10012d56babb73f2479ba9f0",
+      "size": 7673
+    },
+    {
+      "path": ".git/objects/97/fd818b909551186a659e13240c49c2187d0cdc",
+      "size": 1419
+    },
+    {
+      "path": ".git/objects/9b/2e64df22bd3c9259af5273b412d356d6d889c1",
+      "size": 1415
+    },
+    {
+      "path": ".git/objects/9b/6cdbcc0bca199f3eb8cca9e2cc7fe6001a34fb",
+      "size": 810
+    },
+    {
+      "path": ".git/objects/9b/c6b3e90943859f546ae9bcabd3d8458d27d5f9",
+      "size": 1112
+    },
+    {
+      "path": ".git/objects/9b/dd534fd2beb9b878f0219da9d63ffba56677e2",
+      "size": 7616
+    },
+    {
+      "path": ".git/objects/9c/3c23d242859684ff901cea6f8823878d92376d",
+      "size": 7766
+    },
+    {
+      "path": ".git/objects/9d/d26ce3a08b2126d1ebe22a64ea1fc5acae02de",
+      "size": 2312
+    },
+    {
+      "path": ".git/objects/9f/f4a5e04421e5107f74c28e27354e0b2a4e7ef8",
+      "size": 7984
+    },
+    {
+      "path": ".git/objects/9f/f6b17228a730b3b2654157dd65637c5d38d353",
+      "size": 804
+    },
+    {
+      "path": ".git/objects/a0/486e703f48c9da690c11629c4fd13f51cf2a69",
+      "size": 7308
+    },
+    {
+      "path": ".git/objects/a0/a09f349b093e0b3fc7a46fdc6d3e33d2316ca0",
+      "size": 6652
+    },
+    {
+      "path": ".git/objects/a1/b589e38a32041e49332e5e81c2d363dc418d68",
+      "size": 19
+    },
+    {
+      "path": ".git/objects/a1/c4e495a5710812ff122f13a4580599c380f8a3",
+      "size": 816
+    },
+    {
+      "path": ".git/objects/a2/dbd5095dfaa2a47c1d6eaa29ce2e0fa6879c77",
+      "size": 2890
+    },
+    {
+      "path": ".git/objects/a3/aada4546ca79d192604b3c6f6003320acdabd7",
+      "size": 2722
+    },
+    {
+      "path": ".git/objects/a3/b167c7a09a26f2c57a327bb9006f9881338032",
+      "size": 6470
+    },
+    {
+      "path": ".git/objects/a5/2109b78d105cfaed337a151fa39d576543011c",
+      "size": 327
+    },
+    {
+      "path": ".git/objects/a6/057ff3c7a90e9c31389d2bab1bd0f6058ad724",
+      "size": 699
+    },
+    {
+      "path": ".git/objects/a7/b5685b8ab8b40597e1f006e721ae2cc12c4b03",
+      "size": 834
+    },
+    {
+      "path": ".git/objects/a8/cbf165fcdd0005e67823d2bb4e053efd123bc3",
+      "size": 46831
+    },
+    {
+      "path": ".git/objects/a9/0eea85f6f7bded69ff5d40114447a6d8b48cfe",
+      "size": 10366
+    },
+    {
+      "path": ".git/objects/aa/7aa1d51ecdc9c45097dfff2013d483f244d5e9",
+      "size": 350
+    },
+    {
+      "path": ".git/objects/aa/80ad519b83a302b173043d7428de050c8f1541",
+      "size": 52
+    },
+    {
+      "path": ".git/objects/ab/2ad21da6fbe6c171bb869240954d0ead8f68fd",
+      "size": 25351
+    },
+    {
+      "path": ".git/objects/ab/327d0312875458ba74983867f1b2622b6de39d",
+      "size": 879
+    },
+    {
+      "path": ".git/objects/ac/24abbbe200c4ffd201d04d73196eb7a8c419bf",
+      "size": 709
+    },
+    {
+      "path": ".git/objects/ac/ab069f90b6fe6301a004e6f8beaf6a0db48bce",
+      "size": 13178
+    },
+    {
+      "path": ".git/objects/ac/d7b2582293cc8fa26e54ac51f5f055731ce5d6",
+      "size": 1569
+    },
+    {
+      "path": ".git/objects/ad/a037688c8a4e7924d4a8f7d6c7757afb3407f2",
+      "size": 149
+    },
+    {
+      "path": ".git/objects/ae/4564f94ab4cc92404ca334ec2b3aca75d90b09",
+      "size": 491
+    },
+    {
+      "path": ".git/objects/ae/c547b52e52bc190970c8855ab6011ad96ab22a",
+      "size": 2279
+    },
+    {
+      "path": ".git/objects/ae/f656086afebdb19373d425591d93b822893515",
+      "size": 19805
+    },
+    {
+      "path": ".git/objects/af/d6cd548a2a5e0b91161fb1a127b95144e2b7a8",
+      "size": 615
+    },
+    {
+      "path": ".git/objects/b0/cbb83fc41e66a5b80c1448a3e1eb311ce365c3",
+      "size": 212
+    },
+    {
+      "path": ".git/objects/b1/19c0406b047ad3b69cf40f26a414394b06ea1e",
+      "size": 384
+    },
+    {
+      "path": ".git/objects/b1/b94fd58e7e9ed0ef3449473bc48de68afcc3fe",
+      "size": 98
+    },
+    {
+      "path": ".git/objects/b1/dcdc2fc72a6becf5526f6fc7976e1783f1fde0",
+      "size": 3325
+    },
+    {
+      "path": ".git/objects/b3/048fc115681ee6c1bc86b0aa158cfbbf59daa3",
+      "size": 9665
+    },
+    {
+      "path": ".git/objects/b3/1ee21fbb92dc8ee9782f2fb161e9f66d53a8d6",
+      "size": 536
+    },
+    {
+      "path": ".git/objects/b4/1b5cb79e9cb20a6efb0f35a77c000386a3eb97",
+      "size": 20996
+    },
+    {
+      "path": ".git/objects/b4/6ccadf0a71bde9fad96f8e2cb9069fbf09817d",
+      "size": 11394
+    },
+    {
+      "path": ".git/objects/b4/90111dc3fccaf6373e559378735cacabfc5121",
+      "size": 11493
+    },
+    {
+      "path": ".git/objects/b4/e0d73b2bdc93af14ec56ed661ecff3c9f78a2f",
+      "size": 14113
+    },
+    {
+      "path": ".git/objects/b5/0920e138807f385d0b0359f4f0f09891f18406",
+      "size": 17015
+    },
+    {
+      "path": ".git/objects/b5/efba216bbf831f67c3eb3e790a472c074ba0bb",
+      "size": 1566
+    },
+    {
+      "path": ".git/objects/b6/7eca839f1de1032d434ac79ac5daf8f8ad4e44",
+      "size": 1708
+    },
+    {
+      "path": ".git/objects/b7/67f1eea27cd5991cceffd486f30e2e8ea5214a",
+      "size": 17086
+    },
+    {
+      "path": ".git/objects/b8/04d7b33a3fa5b2587d2d1d55006aed678e3eb2",
+      "size": 33537
+    },
+    {
+      "path": ".git/objects/b8/32ef03f60ccb9093d60049359f7c7c061edfa9",
+      "size": 909
+    },
+    {
+      "path": ".git/objects/b8/461b275fae76efd0d21fd0f1aaa696a5b10f9a",
+      "size": 13623
+    },
+    {
+      "path": ".git/objects/b8/99f0c3796900f8d3893a366229e6835aca73bd",
+      "size": 663
+    },
+    {
+      "path": ".git/objects/b8/e4344af807322283d988808e7570aee221a67e",
+      "size": 107
+    },
+    {
+      "path": ".git/objects/ba/706716afa2963dc343febe3488ac5e1852c1e2",
+      "size": 1490
+    },
+    {
+      "path": ".git/objects/bb/6b8d3b6f461d43ee4f0e6c86a32256836c9953",
+      "size": 349
+    },
+    {
+      "path": ".git/objects/bc/644ac33316104d9ee8aae128534fb34a9214d2",
+      "size": 58
+    },
+    {
+      "path": ".git/objects/bc/a8bc618d11199daeb3f5f0d9e20dbdcca85784",
+      "size": 615
+    },
+    {
+      "path": ".git/objects/bd/e1628fb7a02f9dab04666123c1f3d8bdeeb94b",
+      "size": 1488
+    },
+    {
+      "path": ".git/objects/c0/7d6bb1f42e90e01066055384c5aeea07d27a23",
+      "size": 973
+    },
+    {
+      "path": ".git/objects/c3/df51617aa6dcfba9b8f83e24241341280acd8e",
+      "size": 710
+    },
+    {
+      "path": ".git/objects/c4/c562e9e3704e0311ec57ba5a6c917ef9e184cf",
+      "size": 285
+    },
+    {
+      "path": ".git/objects/c5/a8462fbfe2c39a7c1857b9e296e62500a8a8a5",
+      "size": 5489
+    },
+    {
+      "path": ".git/objects/c5/d40023a36b8380c909970ec5c273b11da91a2e",
+      "size": 277
+    },
+    {
+      "path": ".git/objects/c6/289cf973fb04eace430018709bc0b7cf1f4dd7",
+      "size": 13116
+    },
+    {
+      "path": ".git/objects/c6/f9a5e7c03f9e64e9c7b4773a8e37ade8eaf406",
+      "size": 36793
+    },
+    {
+      "path": ".git/objects/c8/3252c5714c71a3e0ec62195884167339a0129b",
+      "size": 17079
+    },
+    {
+      "path": ".git/objects/c8/aa9f287c1b8bc55e8e250be3025932088f6946",
+      "size": 6782
+    },
+    {
+      "path": ".git/objects/c8/d69174c06b2103ce719462d7f984e2d5531303",
+      "size": 104
+    },
+    {
+      "path": ".git/objects/c9/0231f6c2014bbed02f320df8c970e9eedbe46a",
+      "size": 7615
+    },
+    {
+      "path": ".git/objects/cd/9c1aa3e71510c6737a76282a31b22c2404ddc9",
+      "size": 282
+    },
+    {
+      "path": ".git/objects/ce/d78373258ef307c9a94ef15286e6da359e7a80",
+      "size": 48210
+    },
+    {
+      "path": ".git/objects/cf/780961cf5b934e4b767ab8215990d3686a98ff",
+      "size": 436
+    },
+    {
+      "path": ".git/objects/cf/aa3bda59246b49e94298478d6de3b3208066c8",
+      "size": 12238
+    },
+    {
+      "path": ".git/objects/cf/de03c2631c5c1d5cdc0949d0ee3379e7110f0e",
+      "size": 803
+    },
+    {
+      "path": ".git/objects/d1/0b00393c2e698eccd0b26423c86169f3ce2014",
+      "size": 73
+    },
+    {
+      "path": ".git/objects/d2/27894b7d33fc7ad68a40dbc676aefe8f4a9eb8",
+      "size": 3236
+    },
+    {
+      "path": ".git/objects/d2/41d9be2d317f7b39b401d96c8b18836acea0fa",
+      "size": 6144
+    },
+    {
+      "path": ".git/objects/d3/03ec14126eb63faec5274f16edab66ec89e77b",
+      "size": 2439
+    },
+    {
+      "path": ".git/objects/d3/151600e9bc1029a6d85c2bc9e53e9e36fd07df",
+      "size": 188
+    },
+    {
+      "path": ".git/objects/d3/dcbac170c6b9a75a13292312824f985c404e06",
+      "size": 1421
+    },
+    {
+      "path": ".git/objects/d4/0009f9ab1812c7c6ba8d754c6c99e8c3a95f16",
+      "size": 4483
+    },
+    {
+      "path": ".git/objects/d4/264616fa95a6f288f9eef7d42d6a750a99d82b",
+      "size": 6409
+    },
+    {
+      "path": ".git/objects/d5/850df98ec19de2eee9ff922ef59586efe471d0",
+      "size": 14773
+    },
+    {
+      "path": ".git/objects/d5/d4bb132c412567fe69d75cb71c4c3da1d4bbfe",
+      "size": 445
+    },
+    {
+      "path": ".git/objects/d6/6dd4c2667723da4be677945388da7d1f07901f",
+      "size": 923
+    },
+    {
+      "path": ".git/objects/d8/b9936dad9ab2513fa6979f411560d3b6b57e37",
+      "size": 95
+    },
+    {
+      "path": ".git/objects/d9/9221db47da1563e48d4e9e2de2f45ccea50008",
+      "size": 2232
+    },
+    {
+      "path": ".git/objects/da/14a5570723098c92a0876ff7cd9f9a686fd2ac",
+      "size": 22753
+    },
+    {
+      "path": ".git/objects/dc/007977ee709a236d9e82719cf7d4e5577a81b9",
+      "size": 20844
+    },
+    {
+      "path": ".git/objects/dc/3d6648d0f8875504483bcf6ab18841960c4b13",
+      "size": 2859
+    },
+    {
+      "path": ".git/objects/dd/121f10a7cdd9622785efca8b800d5defc3c6b2",
+      "size": 3971
+    },
+    {
+      "path": ".git/objects/dd/45e1ed2e18b32c516d9b481ebed3cb8bffa711",
+      "size": 33374
+    },
+    {
+      "path": ".git/objects/e0/868e5fad2d3f604a5c9954647fb0624292f726",
+      "size": 2361
+    },
+    {
+      "path": ".git/objects/e0/a6cfb8f5e58fbb0ddf987023b3dae30baa4386",
+      "size": 1200
+    },
+    {
+      "path": ".git/objects/e1/1eecd8965f26498cf71f89f0af0b980d6c25a7",
+      "size": 1113
+    },
+    {
+      "path": ".git/objects/e1/70c71c5453fd3d19bf25499d8f177c101cb8af",
+      "size": 1556
+    },
+    {
+      "path": ".git/objects/e1/bccfe2403a4ed770c1697ae7c15b9e1cd9bc4e",
+      "size": 5229
+    },
+    {
+      "path": ".git/objects/e1/ec5457664f438ce5a1cc6dd8409bf60ca7804b",
+      "size": 5930
+    },
+    {
+      "path": ".git/objects/e6/9de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 15
+    },
+    {
+      "path": ".git/objects/e6/e9b658dcf1cd031ac82b6b8f312444c55d4fc0",
+      "size": 4375
+    },
+    {
+      "path": ".git/objects/e7/730f66275c87c28f26530d89264cffecf90be0",
+      "size": 13265
+    },
+    {
+      "path": ".git/objects/e8/b27d34ed50bbfaea679ad1829dbd7d3d17f070",
+      "size": 472
+    },
+    {
+      "path": ".git/objects/e9/ef58d887233107f0aabd3747e861d5880136d0",
+      "size": 17537
+    },
+    {
+      "path": ".git/objects/ea/6e0ada766dc49398c25cfced9203a81cd70051",
+      "size": 10311
+    },
+    {
+      "path": ".git/objects/eb/24a7ba282b03d830fa6c63ee897d92a5188736",
+      "size": 26299
+    },
+    {
+      "path": ".git/objects/eb/5159d4c1ca83fb92b3190223698427df0e010c",
+      "size": 18731
+    },
+    {
+      "path": ".git/objects/eb/87a974a962e643c131e4e2c5b8b54727794fb2",
+      "size": 109
+    },
+    {
+      "path": ".git/objects/ed/09f341f6a27e9805f0b49430bd09d4d24d70a3",
+      "size": 689
+    },
+    {
+      "path": ".git/objects/ed/8ffc34ed946dc287188d8808d1d42e6f27af1a",
+      "size": 2378
+    },
+    {
+      "path": ".git/objects/ef/7120e4015f685eb755a554219ebddfcebca599",
+      "size": 9021
+    },
+    {
+      "path": ".git/objects/f0/86ef7a5155332de371f9e97e4982cb5a5a21f9",
+      "size": 12968
+    },
+    {
+      "path": ".git/objects/f1/0e4d66cac6ee0539a07a9d74590a08f9f12ba1",
+      "size": 2253
+    },
+    {
+      "path": ".git/objects/f1/af46efed50fa26487e16df8e69895c9e6533aa",
+      "size": 2628
+    },
+    {
+      "path": ".git/objects/f2/6bcf4d2de6eb136e31006ca3ab447d5e488adf",
+      "size": 4901
+    },
+    {
+      "path": ".git/objects/f2/ff19ed351123d9fc63c9b79f78594d61721859",
+      "size": 7630
+    },
+    {
+      "path": ".git/objects/f3/8136ac1cc2dcdc9d9b10b8521487468b1f768c",
+      "size": 29939
+    },
+    {
+      "path": ".git/objects/f3/90922eceffe1f6dfb81a3dc086a92d98171b02",
+      "size": 6933
+    },
+    {
+      "path": ".git/objects/f3/c52f316fcc8b3b81a3c7c6449d0d8d89cae777",
+      "size": 386
+    },
+    {
+      "path": ".git/objects/f5/22294ff0f3f8c52dfdaef7ebfaa06ebfcfaabf",
+      "size": 7923
+    },
+    {
+      "path": ".git/objects/f6/89f177f8ee9e72d3d921db536d2a33b3a5b3e5",
+      "size": 4726
+    },
+    {
+      "path": ".git/objects/f7/bd2bd5a25502c3e86eb4e5390ddba8e8def0b1",
+      "size": 3696
+    },
+    {
+      "path": ".git/objects/fa/ece00718767bb34d92c356ad98f4a9ef8e495f",
+      "size": 2321
+    },
+    {
+      "path": ".git/objects/fc/dc11850e63f295e399b4cdd6fa95ef5408791d",
+      "size": 1894
+    },
+    {
+      "path": ".git/objects/fd/017a26a878779ca82c0d167854661bcb1f1261",
+      "size": 107
+    },
+    {
+      "path": ".git/objects/fd/679bf374af72f2a183b97b40c9c7e9e51fbe5e",
+      "size": 11083
+    },
+    {
+      "path": ".git/objects/fe/dcc8bcd8f0826a43a41a2df40aec586bc9b78b",
+      "size": 181
+    },
+    {
+      "path": ".git/objects/ff/e2fce498955b628014618b28c6bcf152466a4a",
+      "size": 19
+    },
+    {
+      "path": ".git/refs/heads/master",
+      "size": 41
+    },
+    {
+      "path": ".git/refs/remotes/github/master",
+      "size": 41
+    },
+    {
+      "path": ".git/refs/remotes/origin/master",
+      "size": 41
+    },
+    {
+      "path": ".git/refs/tags/v1.1.2",
+      "size": 41
+    },
+    {
+      "path": ".gitignore",
+      "size": 697
+    },
+    {
+      "path": "_copy_to_workrepo.py",
+      "size": 800
+    },
+    {
+      "path": "_test_router_score.py",
+      "size": 561
+    },
+    {
+      "path": "blueprint_rag.json",
+      "size": 359
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 47376
+    },
+    {
+      "path": "data/archives/sessions/sess_20260717_185219_c7029083.txt",
+      "size": 14503
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/BAAI/bge-small-zh-v1.5/model.safetensors",
+      "size": 34603008
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/BAAI/bge-small-zh-v1.5/pytorch_model.bin",
+      "size": 40894464
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/flax_model.msgpack",
+      "size": 20971520
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/model.safetensors",
+      "size": 44040192
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/onnx/model.onnx",
+      "size": 72351744
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/onnx/model_O1.onnx",
+      "size": 26214400
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/onnx/model_O2.onnx",
+      "size": 53477376
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/onnx/model_O3.onnx",
+      "size": 31457280
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/onnx/model_O4.onnx",
+      "size": 41943040
+    },
+    {
+      "path": "data/cache/model_downloads/._____temp/cross-encoder/nli-distilroberta-base/onnx/model_qint8_arm64.onnx",
+      "size": 80740352
+    },
+    {
+      "path": "data/cache/model_downloads/.lock/cross-encoder___nli-distilroberta-base",
+      "size": 0
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/.mdl",
+      "size": 47
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/.msc",
+      "size": 820
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/1_Pooling/config.json",
+      "size": 190
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/config.json",
+      "size": 776
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/config_sentence_transformers.json",
+      "size": 124
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/configuration.json",
+      "size": 76
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/modules.json",
+      "size": 349
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/README.md",
+      "size": 27670
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/sentence_bert_config.json",
+      "size": 52
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/special_tokens_map.json",
+      "size": 125
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/tokenizer.json",
+      "size": 439125
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/tokenizer_config.json",
+      "size": 367
+    },
+    {
+      "path": "data/cache/model_downloads/BAAI/bge-small-zh-v1___5/vocab.txt",
+      "size": 109540
+    },
+    {
+      "path": "data/cache/model_downloads/CACHEDIR.TAG",
+      "size": 195
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/.mdl",
+      "size": 56
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/.msc",
+      "size": 1517
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/added_tokens.json",
+      "size": 23
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/CESoftmaxAccuracyEvaluator_AllNLI-dev_results.csv",
+      "size": 657
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/config.json",
+      "size": 1052
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/configuration.json",
+      "size": 82
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/model.safetensors",
+      "size": 737726552
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model.onnx",
+      "size": 738574335
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_O1.onnx",
+      "size": 774416034
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_O2.onnx",
+      "size": 774331842
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_O3.onnx",
+      "size": 774331685
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_O4.onnx",
+      "size": 387514186
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_qint8_arm64.onnx",
+      "size": 244422413
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_qint8_avx512.onnx",
+      "size": 244422413
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_qint8_avx512_vnni.onnx",
+      "size": 244422413
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/onnx/model_quint8_avx2.onnx",
+      "size": 244422412
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/pytorch_model.bin",
+      "size": 737790098
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/README.md",
+      "size": 2856
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/special_tokens_map.json",
+      "size": 286
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/spm.model",
+      "size": 2464616
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/tokenizer.json",
+      "size": 8656624
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-deberta-v3-base/tokenizer_config.json",
+      "size": 1287
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-distilroberta-base/.mdl",
+      "size": 59
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-distilroberta-base/.msc",
+      "size": 334
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-distilroberta-base/CESoftmaxAccuracyEvaluator_AllNLI-dev_results.csv",
+      "size": 337
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-distilroberta-base/config.json",
+      "size": 701
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-distilroberta-base/configuration.json",
+      "size": 82
+    },
+    {
+      "path": "data/cache/model_downloads/cross-encoder/nli-distilroberta-base/merges.txt",
+      "size": 456318
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/refs/main",
+      "size": 40
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/.gitattributes",
+      "size": 1280
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/added_tokens.json",
+      "size": 23
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/config.json",
+      "size": 1066
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/model.safetensors",
+      "size": 557652046
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/onnx/model.onnx",
+      "size": 1116115065
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/onnx/model_quantized.onnx",
+      "size": 338679133
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/pytorch_model.bin",
+      "size": 557692715
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/README.md",
+      "size": 6514
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/special_tokens_map.json",
+      "size": 286
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/spm.model",
+      "size": 4305025
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/tokenizer.json",
+      "size": 16331396
+    },
+    {
+      "path": "data/cache/model_downloads/models--MoritzLaurer--mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/tokenizer_config.json",
+      "size": 1256
+    },
+    {
+      "path": "data/cache/model_downloads/MoritzLaurer/mDeBERTa-v3-base-mnli-xnli/.mdl",
+      "size": 62
+    },
+    {
+      "path": "data/cache/model_downloads/MoritzLaurer/mDeBERTa-v3-base-xnli/.mdl",
+      "size": 57
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/.mdl",
+      "size": 46
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/.msc",
+      "size": 902
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/added_tokens.json",
+      "size": 216
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/config.json",
+      "size": 2403
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/configuration.json",
+      "size": 48
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/configuration_minicpm.py",
+      "size": 9660
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/generation_config.json",
+      "size": 182
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/model.safetensors",
+      "size": 867772648
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/modeling_minicpm.py",
+      "size": 69994
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/README.md",
+      "size": 11590
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/special_tokens_map.json",
+      "size": 630
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/tokenizer.json",
+      "size": 6701371
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/tokenizer.model",
+      "size": 1181204
+    },
+    {
+      "path": "data/cache/model_downloads/openbmb/MiniCPM4-0___5B/tokenizer_config.json",
+      "size": 2835
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/.mdl",
+      "size": 53
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/.msc",
+      "size": 709
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/config.json",
+      "size": 659
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/configuration.json",
+      "size": 2
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/generation_config.json",
+      "size": 242
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/LICENSE",
+      "size": 11343
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/merges.txt",
+      "size": 1671839
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/model.safetensors",
+      "size": 988097824
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/README.md",
+      "size": 4917
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/tokenizer.json",
+      "size": 7031645
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/tokenizer_config.json",
+      "size": 7305
+    },
+    {
+      "path": "data/cache/model_downloads/Qwen/Qwen2___5-0___5B-Instruct/vocab.json",
+      "size": 2776833
+    },
+    {
+      "path": "data/config/rag_config.json",
+      "size": 5952
+    },
+    {
+      "path": "data/import_manifest.json",
+      "size": 2
+    },
+    {
+      "path": "data/imports/20260508171755260724.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_1.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_2.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_3.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_4.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_5.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_6.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_7.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/20260508171755260724_8.pdf",
+      "size": 951797
+    },
+    {
+      "path": "data/imports/2508.07050v3.pdf",
+      "size": 2799650
+    },
+    {
+      "path": "data/imports/2508.07050v3_1.pdf",
+      "size": 2799650
+    },
+    {
+      "path": "data/imports/2508.07050v3_2.pdf",
+      "size": 2799650
+    },
+    {
+      "path": "data/imports/2508.07050v3_3.pdf",
+      "size": 2799650
+    },
+    {
+      "path": "data/imports/2508.07050v3_4.pdf",
+      "size": 2799650
+    },
+    {
+      "path": "data/imports/2508.07050v3_5.pdf",
+      "size": 2799650
+    },
+    {
+      "path": "data/imports/52C965DAD570A49B24957A561BF_EA523B12_98C28.pdf",
+      "size": 625704
+    },
+    {
+      "path": "data/imports/52C965DAD570A49B24957A561BF_EA523B12_98C28_1.pdf",
+      "size": 625704
+    },
+    {
+      "path": "data/imports/52C965DAD570A49B24957A561BF_EA523B12_98C28_2.pdf",
+      "size": 625704
+    },
+    {
+      "path": "data/imports/52C965DAD570A49B24957A561BF_EA523B12_98C28_3.pdf",
+      "size": 625704
+    },
+    {
+      "path": "data/imports/52C965DAD570A49B24957A561BF_EA523B12_98C28_4.pdf",
+      "size": 625704
+    },
+    {
+      "path": "data/imports/52C965DAD570A49B24957A561BF_EA523B12_98C28_5.pdf",
+      "size": 625704
+    },
+    {
+      "path": "data/imports/datapdf.com_chemical-ionization-mass-spectrometry-i-general-in.pdf",
+      "size": 1135015
+    },
+    {
+      "path": "data/imports/test.txt",
+      "size": 5
+    },
+    {
+      "path": "data/imports/中华民族现代文明的历史政治学阐释——以周秦之变对中国国家治理模式的塑造为中心_黄 涛v1.pdf",
+      "size": 11664683
+    },
+    {
+      "path": "data/imports/中华民族现代文明的历史政治学阐释——以周秦之变对中国国家治理模式的塑造为中心_黄 涛v1_1.pdf",
+      "size": 11664683
+    },
+    {
+      "path": "data/imports/中华民族现代文明的历史政治学阐释——以周秦之变对中国国家治理模式的塑造为中心_黄 涛v1_2.pdf",
+      "size": 11664683
+    },
+    {
+      "path": "data/imports/中华民族现代文明的历史政治学阐释——以周秦之变对中国国家治理模式的塑造为中心_黄 涛v1_3.pdf",
+      "size": 11664683
+    },
+    {
+      "path": "data/imports/中华民族现代文明的历史政治学阐释——以周秦之变对中国国家治理模式的塑造为中心_黄 涛v1_4.pdf",
+      "size": 11664683
+    },
+    {
+      "path": "data/imports/中华民族现代文明的历史政治学阐释——以周秦之变对中国国家治理模式的塑造为中心_黄 涛v1_5.pdf",
+      "size": 11664683
+    },
+    {
+      "path": "data/imports/出土简牍所见秦汉时期的分期支付现象_苏俊林v1.pdf",
+      "size": 1650020
+    },
+    {
+      "path": "data/imports/出土简牍所见秦汉时期的分期支付现象_苏俊林v1_1.pdf",
+      "size": 1650020
+    },
+    {
+      "path": "data/imports/出土简牍所见秦汉时期的分期支付现象_苏俊林v1_2.pdf",
+      "size": 1650020
+    },
+    {
+      "path": "data/imports/出土简牍所见秦汉时期的分期支付现象_苏俊林v1_3.pdf",
+      "size": 1650020
+    },
+    {
+      "path": "data/imports/出土简牍所见秦汉时期的分期支付现象_苏俊林v1_4.pdf",
+      "size": 1650020
+    },
+    {
+      "path": "data/imports/出土简牍所见秦汉时期的分期支付现象_苏俊林v1_5.pdf",
+      "size": 1650020
+    },
+    {
+      "path": "data/imports/周秦之变视野下的老子新道德之建构_李友广v1.pdf",
+      "size": 1970041
+    },
+    {
+      "path": "data/imports/周秦之变视野下的老子新道德之建构_李友广v1_1.pdf",
+      "size": 1970041
+    },
+    {
+      "path": "data/imports/周秦之变视野下的老子新道德之建构_李友广v1_2.pdf",
+      "size": 1970041
+    },
+    {
+      "path": "data/imports/周秦之变视野下的老子新道德之建构_李友广v1_3.pdf",
+      "size": 1970041
+    },
+    {
+      "path": "data/imports/周秦之变视野下的老子新道德之建构_李友广v1_4.pdf",
+      "size": 1970041
+    },
+    {
+      "path": "data/imports/周秦之变视野下的老子新道德之建构_李友广v1_5.pdf",
+      "size": 1970041
+    },
+    {
+      "path": "data/imports/尊“礼”与崇“力”——中国古代政制之内在精神嬗变中的“周秦之变”_程霞v1.pdf",
+      "size": 5975748
+    },
+    {
+      "path": "data/imports/尊“礼”与崇“力”——中国古代政制之内在精神嬗变中的“周秦之变”_程霞v1_1.pdf",
+      "size": 5975748
+    },
+    {
+      "path": "data/imports/尊“礼”与崇“力”——中国古代政制之内在精神嬗变中的“周秦之变”_程霞v1_2.pdf",
+      "size": 5975748
+    },
+    {
+      "path": "data/imports/尊“礼”与崇“力”——中国古代政制之内在精神嬗变中的“周秦之变”_程霞v1_3.pdf",
+      "size": 5975748
+    },
+    {
+      "path": "data/imports/尊“礼”与崇“力”——中国古代政制之内在精神嬗变中的“周秦之变”_程霞v1_4.pdf",
+      "size": 5975748
+    },
+    {
+      "path": "data/imports/尊“礼”与崇“力”——中国古代政制之内在精神嬗变中的“周秦之变”_程霞v1_5.pdf",
+      "size": 5975748
+    },
+    {
+      "path": "data/imports/我国早期官吏管理制度的流变及特征_蒋波v1.pdf",
+      "size": 1433547
+    },
+    {
+      "path": "data/imports/我国早期官吏管理制度的流变及特征_蒋波v1_1.pdf",
+      "size": 1433547
+    },
+    {
+      "path": "data/imports/我国早期官吏管理制度的流变及特征_蒋波v1_2.pdf",
+      "size": 1433547
+    },
+    {
+      "path": "data/imports/我国早期官吏管理制度的流变及特征_蒋波v1_3.pdf",
+      "size": 1433547
+    },
+    {
+      "path": "data/imports/我国早期官吏管理制度的流变及特征_蒋波v1_4.pdf",
+      "size": 1433547
+    },
+    {
+      "path": "data/imports/我国早期官吏管理制度的流变及特征_蒋波v1_5.pdf",
+      "size": 1433547
+    },
+    {
+      "path": "data/kb/auto_classify_rules.json",
+      "size": 16879
+    },
+    {
+      "path": "data/kb/kb_index.json",
+      "size": 3712
+    },
+    {
+      "path": "data/kb/kb_index.json.bak",
+      "size": 1585
+    },
+    {
+      "path": "data/kb/kb_index.json.before_clean.bak",
+      "size": 3865
+    },
+    {
+      "path": "data/kb/kb_index.json.fix_bak",
+      "size": 3436
+    },
+    {
+      "path": "data/kb/kb_signatures.json",
+      "size": 30510
+    },
+    {
+      "path": "data/kb/LLM奠基理论/0496541b-22b6-402a-bb55-ae897282fee6.bak/index_metadata.pickle",
+      "size": 20668
+    },
+    {
+      "path": "data/kb/LLM奠基理论/chroma.sqlite3",
+      "size": 34992128
+    },
+    {
+      "path": "data/kb/LLM奠基理论/chroma.sqlite3.bak",
+      "size": 34992128
+    },
+    {
+      "path": "data/kb/LLM奠基理论/chroma.sqlite3.before_clean.bak",
+      "size": 3145728
+    },
+    {
+      "path": "data/kb/τ scaling/chroma.sqlite3",
+      "size": 17203200
+    },
+    {
+      "path": "data/kb/τ scaling/chroma.sqlite3.bak",
+      "size": 17203200
+    },
+    {
+      "path": "data/kb/其他酒/chroma.sqlite3",
+      "size": 1396736
+    },
+    {
+      "path": "data/kb/其他酒/chroma.sqlite3.bak",
+      "size": 1396736
+    },
+    {
+      "path": "data/kb/历史脉络/chroma.sqlite3",
+      "size": 7602176
+    },
+    {
+      "path": "data/kb/历史脉络/chroma.sqlite3.bak",
+      "size": 7061504
+    },
+    {
+      "path": "data/kb/啤酒/chroma.sqlite3",
+      "size": 3055616
+    },
+    {
+      "path": "data/kb/大模型万象/chroma.sqlite3",
+      "size": 63201280
+    },
+    {
+      "path": "data/kb/大模型万象/chroma.sqlite3.bak",
+      "size": 63201280
+    },
+    {
+      "path": "data/kb/天体物理与宇宙起源/chroma.sqlite3",
+      "size": 17666048
+    },
+    {
+      "path": "data/kb/天体物理与宇宙起源/chroma.sqlite3.bak",
+      "size": 17666048
+    },
+    {
+      "path": "data/kb/意识与神经科学/chroma.sqlite3",
+      "size": 36818944
+    },
+    {
+      "path": "data/kb/意识与神经科学/chroma.sqlite3.bak",
+      "size": 36818944
+    },
+    {
+      "path": "data/kb/政经文哲/chroma.sqlite3",
+      "size": 17809408
+    },
+    {
+      "path": "data/kb/政经文哲/chroma.sqlite3.bak",
+      "size": 17809408
+    },
+    {
+      "path": "data/kb/数字与建模/chroma.sqlite3",
+      "size": 36990976
+    },
+    {
+      "path": "data/kb/数字与建模/chroma.sqlite3.bak",
+      "size": 36990976
+    },
+    {
+      "path": "data/kb/数字与建模/chroma.sqlite3.bak.hnsw/index_metadata.pickle",
+      "size": 138360
+    },
+    {
+      "path": "data/kb/机动车/chroma.sqlite3",
+      "size": 15241216
+    },
+    {
+      "path": "data/kb/机动车/chroma.sqlite3.bak",
+      "size": 15241216
+    },
+    {
+      "path": "data/kb/检测技术/chroma.sqlite3",
+      "size": 16646144
+    },
+    {
+      "path": "data/kb/检测技术/chroma.sqlite3.bak",
+      "size": 16646144
+    },
+    {
+      "path": "data/kb/理化检测/8d75c3f6-2839-47ad-a37b-a541242f25ef/index_metadata.pickle",
+      "size": 124
+    },
+    {
+      "path": "data/kb/理化检测/8d75c3f6-2839-47ad-a37b-a541242f25ef.bak/index_metadata.pickle",
+      "size": 69356
+    },
+    {
+      "path": "data/kb/理化检测/chroma.sqlite3",
+      "size": 16150528
+    },
+    {
+      "path": "data/kb/理化检测/chroma.sqlite3.bak",
+      "size": 16150528
+    },
+    {
+      "path": "data/kb/生物医疗/chroma.sqlite3",
+      "size": 12189696
+    },
+    {
+      "path": "data/kb/生物医疗/chroma.sqlite3.bak",
+      "size": 12189696
+    },
+    {
+      "path": "data/kb/生物医疗/chroma.sqlite3.bak.hnsw/index_metadata.pickle",
+      "size": 205892
+    },
+    {
+      "path": "data/kb/白酒/24655535-ceca-450f-838d-abd0c0265a9a.bak/index_metadata.pickle",
+      "size": 93604
+    },
+    {
+      "path": "data/kb/白酒/chroma.sqlite3",
+      "size": 11042816
+    },
+    {
+      "path": "data/kb/白酒/chroma.sqlite3.bak",
+      "size": 11042816
+    },
+    {
+      "path": "data/kb/设备条件/chroma.sqlite3",
+      "size": 9502720
+    },
+    {
+      "path": "data/kb/设备条件/chroma.sqlite3.bak",
+      "size": 9502720
+    },
+    {
+      "path": "data/kb/诸子百家/chroma.sqlite3",
+      "size": 258048
+    },
+    {
+      "path": "data/kb/量子物理和弦/chroma.sqlite3",
+      "size": 30416896
+    },
+    {
+      "path": "data/kb/量子物理和弦/chroma.sqlite3.bak",
+      "size": 30416896
+    },
+    {
+      "path": "data/kb_backup_config.json",
+      "size": 28
+    },
+    {
+      "path": "data/kb_backups/τ scaling/auto_τ scaling_20260715_174256.zip",
+      "size": 22141773
+    },
+    {
+      "path": "data/kb_backups/τ scaling/auto_τ scaling_20260715_174405.zip",
+      "size": 21721844
+    },
+    {
+      "path": "data/kb_backups/τ scaling/auto_τ scaling_20260716_152127.zip",
+      "size": 21409252
+    },
+    {
+      "path": "data/kb_backups/历史脉络/auto_历史脉络_20260715_195122.zip",
+      "size": 9056552
+    },
+    {
+      "path": "data/kb_backups/政经文哲/auto_政经文哲_20260715_184626.zip",
+      "size": 21556482
+    },
+    {
+      "path": "data/kb_backups/政经文哲/auto_政经文哲_20260715_190220.zip",
+      "size": 21333100
+    },
+    {
+      "path": "data/kb_backups/政经文哲/auto_政经文哲_20260716_132237.zip",
+      "size": 21243772
+    },
+    {
+      "path": "data/kb_backups/数字与建模/auto_数字与建模_20260715_173711.zip",
+      "size": 46516243
+    },
+    {
+      "path": "data/kb_backups/数字与建模/auto_数字与建模_20260715_173743.zip",
+      "size": 46288972
+    },
+    {
+      "path": "data/kb_backups/数字与建模/auto_数字与建模_20260715_173815.zip",
+      "size": 46182169
+    },
+    {
+      "path": "data/kb_backups/机动车/auto_机动车_20260715_180827.zip",
+      "size": 16112395
+    },
+    {
+      "path": "data/kb_backups/机动车/auto_机动车_20260715_180924.zip",
+      "size": 16922114
+    },
+    {
+      "path": "data/kb_backups/机动车/auto_机动车_20260715_184433.zip",
+      "size": 17277823
+    },
+    {
+      "path": "data/kb_backups/检测技术/auto_检测技术_20260715_173409.zip",
+      "size": 20270451
+    },
+    {
+      "path": "data/kb_backups/检测技术/auto_检测技术_20260716_131625.zip",
+      "size": 20211431
+    },
+    {
+      "path": "data/kb_backups/理化检测/auto_理化检测_20260715_184942.zip",
+      "size": 18257761
+    },
+    {
+      "path": "data/kb_backups/生物医疗/auto_生物医疗_20260716_145529.zip",
+      "size": 3400213
+    },
+    {
+      "path": "data/kb_backups/白酒/auto_白酒_20260715_185304.zip",
+      "size": 12190803
+    },
+    {
+      "path": "data/kb_backups/白酒/auto_白酒_20260715_195449.zip",
+      "size": 12413951
+    },
+    {
+      "path": "data/kb_backups/白酒/auto_白酒_20260716_132612.zip",
+      "size": 12358996
+    },
+    {
+      "path": "data/kb_backups/设备条件/auto_设备条件_20260715_173144.zip",
+      "size": 9932177
+    },
+    {
+      "path": "data/kb_backups/设备条件/auto_设备条件_20260715_173238.zip",
+      "size": 10237114
+    },
+    {
+      "path": "data/kb_backups/设备条件/auto_设备条件_20260716_132741.zip",
+      "size": 10154769
+    },
+    {
+      "path": "data/memory/archive_compressed_default.txt",
+      "size": 119567
+    },
+    {
+      "path": "data/memory/kb_gaps.json",
+      "size": 1466
+    },
+    {
+      "path": "data/memory/user_habits.json",
+      "size": 1461
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/.mdl",
+      "size": 45
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/.msc",
+      "size": 738
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/config.json",
+      "size": 799
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/configuration.json",
+      "size": 77
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/model.safetensors",
+      "size": 1112206140
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/onnx/model.onnx",
+      "size": 1112459588
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/pytorch_model.bin",
+      "size": 1112251061
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/README.md",
+      "size": 34111
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/sentencepiece.bpe.model",
+      "size": 5069051
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/special_tokens_map.json",
+      "size": 279
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/tokenizer.json",
+      "size": 17098107
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-base/tokenizer_config.json",
+      "size": 443
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/.mdl",
+      "size": 46
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/.msc",
+      "size": 1005
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/assets/BEIR-bge-en-v1.5.png",
+      "size": 56374
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/assets/BEIR-e5-mistral.png",
+      "size": 40223
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/assets/CMTEB-retrieval-bge-zh-v1.5.png",
+      "size": 51484
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/assets/llama-index.png",
+      "size": 106473
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/assets/miracl-bge-m3.png",
+      "size": 52028
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/config.json",
+      "size": 795
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/configuration.json",
+      "size": 77
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/model.safetensors",
+      "size": 2271071852
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/README.md",
+      "size": 17229
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/sentencepiece.bpe.model",
+      "size": 5069051
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/special_tokens_map.json",
+      "size": 964
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/tokenizer.json",
+      "size": 17098273
+    },
+    {
+      "path": "data/models/BAAI_bge-reranker-v2-m3/tokenizer_config.json",
+      "size": 1173
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/.mdl",
+      "size": 56
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/.msc",
+      "size": 1517
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/added_tokens.json",
+      "size": 23
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/CESoftmaxAccuracyEvaluator_AllNLI-dev_results.csv",
+      "size": 657
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/config.json",
+      "size": 1052
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/configuration.json",
+      "size": 82
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/model.safetensors",
+      "size": 737726552
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model.onnx",
+      "size": 738574335
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_O1.onnx",
+      "size": 774416034
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_O2.onnx",
+      "size": 774331842
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_O3.onnx",
+      "size": 774331685
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_O4.onnx",
+      "size": 387514186
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_qint8_arm64.onnx",
+      "size": 244422413
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_qint8_avx512.onnx",
+      "size": 244422413
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_qint8_avx512_vnni.onnx",
+      "size": 244422413
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/onnx/model_quint8_avx2.onnx",
+      "size": 244422412
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/pytorch_model.bin",
+      "size": 737790098
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/README.md",
+      "size": 2856
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/special_tokens_map.json",
+      "size": 286
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/spm.model",
+      "size": 2464616
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/tokenizer.json",
+      "size": 8656624
+    },
+    {
+      "path": "data/models/cross-encoder_nli-deberta-v3-base/tokenizer_config.json",
+      "size": 1287
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/.mdl",
+      "size": 53
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/.msc",
+      "size": 969
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/1_Pooling/config.json",
+      "size": 190
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/config.json",
+      "size": 741
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/config_sentence_transformers.json",
+      "size": 117
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/configuration.json",
+      "size": 124
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/modules.json",
+      "size": 349
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/pytorch_model.bin",
+      "size": 1112239014
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/README.md",
+      "size": 925
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/sentence_bert_config.json",
+      "size": 54
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/sentencepiece.bpe.model",
+      "size": 5069051
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/special_tokens_map.json",
+      "size": 280
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/tokenizer.json",
+      "size": 17098108
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/tokenizer_config.json",
+      "size": 1172
+    },
+    {
+      "path": "data/models/maidalun1020_bce-embedding-base_v1/Wechat.jpg",
+      "size": 179968
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/.mdl",
+      "size": 57
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/.msc",
+      "size": 943
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/added_tokens.json",
+      "size": 23
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/config.json",
+      "size": 967
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/configuration.json",
+      "size": 77
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/LICENSE",
+      "size": 10762
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/model.safetensors",
+      "size": 368870370
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/onnx/model.onnx",
+      "size": 738560113
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/onnx/model_quantized.onnx",
+      "size": 244290378
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/onnx/quantize_config.json",
+      "size": 1193
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/README.md",
+      "size": 49533
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/special_tokens_map.json",
+      "size": 970
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/spm.model",
+      "size": 2464616
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/tokenizer.json",
+      "size": 8649139
+    },
+    {
+      "path": "data/models/mixedbread-ai_mxbai-rerank-base-v1/tokenizer_config.json",
+      "size": 1447
+    },
+    {
+      "path": "data/models/model_index.json",
+      "size": 1955
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/refs/main",
+      "size": 40
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/.gitattributes",
+      "size": 1280
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/added_tokens.json",
+      "size": 23
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/config.json",
+      "size": 1066
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/model.safetensors",
+      "size": 557652046
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/onnx/model.onnx",
+      "size": 1116115065
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/onnx/model_quantized.onnx",
+      "size": 338679133
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/pytorch_model.bin",
+      "size": 557692715
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/README.md",
+      "size": 6514
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/special_tokens_map.json",
+      "size": 286
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/spm.model",
+      "size": 4305025
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/tokenizer.json",
+      "size": 16331396
+    },
+    {
+      "path": "data/models/MoritzLaurer_mDeBERTa-v3-base-mnli-xnli/snapshots/8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c/tokenizer_config.json",
+      "size": 1256
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/.mdl",
+      "size": 53
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/.msc",
+      "size": 709
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/.mv",
+      "size": 36
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/config.json",
+      "size": 659
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/configuration.json",
+      "size": 2
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/generation_config.json",
+      "size": 242
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/LICENSE",
+      "size": 11343
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/merges.txt",
+      "size": 1671839
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/model.safetensors",
+      "size": 988097824
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/README.md",
+      "size": 4917
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/tokenizer.json",
+      "size": 7031645
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/tokenizer_config.json",
+      "size": 7305
+    },
+    {
+      "path": "data/models/Qwen_Qwen2.5-0.5B-Instruct/vocab.json",
+      "size": 2776833
+    },
+    {
+      "path": "data/prompts/custom_presets.json",
+      "size": 2726
+    },
+    {
+      "path": "data/prompts/custom_prompt_template.txt",
+      "size": 70
+    },
+    {
+      "path": "data/sessions/sess_20260717_184058_acc03919.txt",
+      "size": 6820
+    },
+    {
+      "path": "data/sessions/sess_20260717_201149_cc3338e8.txt",
+      "size": 1047
+    },
+    {
+      "path": "data/sessions/sess_20260720_104113_31c53e92.txt",
+      "size": 6751
+    },
+    {
+      "path": "data/sessions/sess_20260720_200412_774b84a1.txt",
+      "size": 6937
+    },
+    {
+      "path": "data/sessions/sess_20260720_202837_eb3cd7af.txt",
+      "size": 6909
+    },
+    {
+      "path": "EXTERNAL_API.md",
+      "size": 13953
+    },
+    {
+      "path": "git-sync-debug.log",
+      "size": 195
+    },
+    {
+      "path": "LICENSE",
+      "size": 590
+    },
+    {
+      "path": "llms.txt",
+      "size": 6469
+    },
+    {
+      "path": "main.py",
+      "size": 15432
+    },
+    {
+      "path": "PROTOCOL.md",
+      "size": 19776
+    },
+    {
+      "path": "rag_assistant/__init__.py",
+      "size": 95
+    },
+    {
+      "path": "rag_assistant/__pycache__/__init__.cpython-314.pyc",
+      "size": 276
+    },
+    {
+      "path": "rag_assistant/__pycache__/agent.cpython-314.pyc",
+      "size": 69674
+    },
+    {
+      "path": "rag_assistant/__pycache__/llm_client.cpython-314.pyc",
+      "size": 8905
+    },
+    {
+      "path": "rag_assistant/__pycache__/memory.cpython-314.pyc",
+      "size": 33731
+    },
+    {
+      "path": "rag_assistant/__pycache__/rag_wrapper.cpython-314.pyc",
+      "size": 8101
+    },
+    {
+      "path": "rag_assistant/__pycache__/search.cpython-314.pyc",
+      "size": 14072
+    },
+    {
+      "path": "rag_assistant/__pycache__/web_ui.cpython-314.pyc",
+      "size": 96309
+    },
+    {
+      "path": "rag_assistant/_fix_rag.py",
+      "size": 1429
+    },
+    {
+      "path": "rag_assistant/agent.py",
+      "size": 57080
+    },
+    {
+      "path": "rag_assistant/engine/__init__.py",
+      "size": 59
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/__init__.cpython-314.pyc",
+      "size": 240
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/config.cpython-314.pyc",
+      "size": 6599
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/embedding_model_manager.cpython-314.pyc",
+      "size": 44114
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/knowledge_base_manager.cpython-314.pyc",
+      "size": 52299
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/nli_classifier.cpython-314.pyc",
+      "size": 12883
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/prompt_manager.cpython-314.pyc",
+      "size": 14355
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/rag_core.cpython-314.pyc",
+      "size": 23118
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/rag_standalone.cpython-314.pyc",
+      "size": 18279
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/rag_web_ui.cpython-314.pyc",
+      "size": 193019
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/reranker.cpython-314.pyc",
+      "size": 26911
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/router.cpython-314.pyc",
+      "size": 28524
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/text_splitter.cpython-314.pyc",
+      "size": 34943
+    },
+    {
+      "path": "rag_assistant/engine/__pycache__/utils.cpython-314.pyc",
+      "size": 12055
+    },
+    {
+      "path": "rag_assistant/engine/config.py",
+      "size": 5997
+    },
+    {
+      "path": "rag_assistant/engine/embedding_model_manager.py",
+      "size": 37027
+    },
+    {
+      "path": "rag_assistant/engine/knowledge_base_manager.py",
+      "size": 37083
+    },
+    {
+      "path": "rag_assistant/engine/nli_classifier.py",
+      "size": 8470
+    },
+    {
+      "path": "rag_assistant/engine/prompt_manager.py",
+      "size": 10024
+    },
+    {
+      "path": "rag_assistant/engine/rag-assistant-architecture.md",
+      "size": 28667
+    },
+    {
+      "path": "rag_assistant/engine/rag_core.py",
+      "size": 20543
+    },
+    {
+      "path": "rag_assistant/engine/rag_env_setup.py",
+      "size": 21285
+    },
+    {
+      "path": "rag_assistant/engine/rag_setup_orchestrator.py",
+      "size": 22139
+    },
+    {
+      "path": "rag_assistant/engine/rag_skill.py",
+      "size": 10944
+    },
+    {
+      "path": "rag_assistant/engine/rag_standalone.py",
+      "size": 15066
+    },
+    {
+      "path": "rag_assistant/engine/rag_web_ui.py",
+      "size": 176454
+    },
+    {
+      "path": "rag_assistant/engine/reranker.py",
+      "size": 17023
+    },
+    {
+      "path": "rag_assistant/engine/router.py",
+      "size": 19299
+    },
+    {
+      "path": "rag_assistant/engine/text_splitter.py",
+      "size": 29457
+    },
+    {
+      "path": "rag_assistant/engine/utils.py",
+      "size": 7779
+    },
+    {
+      "path": "rag_assistant/external_api.py",
+      "size": 25264
+    },
+    {
+      "path": "rag_assistant/llm_client.py",
+      "size": 5573
+    },
+    {
+      "path": "rag_assistant/memory.py",
+      "size": 20553
+    },
+    {
+      "path": "rag_assistant/rag_wrapper.py",
+      "size": 4422
+    },
+    {
+      "path": "rag_assistant/search.py",
+      "size": 9080
+    },
+    {
+      "path": "rag_assistant/web_ui.py",
+      "size": 77546
+    },
+    {
+      "path": "README.md",
+      "size": 6027
+    },
+    {
+      "path": "requirements.txt",
+      "size": 1467
+    },
+    {
+      "path": "server.pid",
+      "size": 4
+    },
+    {
+      "path": "setup.bat",
+      "size": 3209
+    },
+    {
+      "path": "static/auto-render.min.js",
+      "size": 3478
+    },
+    {
+      "path": "static/fonts/KaTeX_AMS-Regular.ttf",
+      "size": 63632
+    },
+    {
+      "path": "static/fonts/KaTeX_AMS-Regular.woff",
+      "size": 33516
+    },
+    {
+      "path": "static/fonts/KaTeX_AMS-Regular.woff2",
+      "size": 28076
+    },
+    {
+      "path": "static/fonts/KaTeX_Caligraphic-Bold.ttf",
+      "size": 12368
+    },
+    {
+      "path": "static/fonts/KaTeX_Caligraphic-Bold.woff",
+      "size": 7716
+    },
+    {
+      "path": "static/fonts/KaTeX_Caligraphic-Bold.woff2",
+      "size": 6912
+    },
+    {
+      "path": "static/fonts/KaTeX_Caligraphic-Regular.ttf",
+      "size": 12344
+    },
+    {
+      "path": "static/fonts/KaTeX_Caligraphic-Regular.woff",
+      "size": 7656
+    },
+    {
+      "path": "static/fonts/KaTeX_Caligraphic-Regular.woff2",
+      "size": 6908
+    },
+    {
+      "path": "static/fonts/KaTeX_Fraktur-Bold.ttf",
+      "size": 19584
+    },
+    {
+      "path": "static/fonts/KaTeX_Fraktur-Bold.woff",
+      "size": 13296
+    },
+    {
+      "path": "static/fonts/KaTeX_Fraktur-Bold.woff2",
+      "size": 11348
+    },
+    {
+      "path": "static/fonts/KaTeX_Fraktur-Regular.ttf",
+      "size": 19572
+    },
+    {
+      "path": "static/fonts/KaTeX_Fraktur-Regular.woff",
+      "size": 13208
+    },
+    {
+      "path": "static/fonts/KaTeX_Fraktur-Regular.woff2",
+      "size": 11316
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Bold.ttf",
+      "size": 51336
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Bold.woff",
+      "size": 29912
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Bold.woff2",
+      "size": 25324
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-BoldItalic.ttf",
+      "size": 32968
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-BoldItalic.woff",
+      "size": 19412
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-BoldItalic.woff2",
+      "size": 16780
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Italic.ttf",
+      "size": 33580
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Italic.woff",
+      "size": 19676
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Italic.woff2",
+      "size": 16988
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Regular.ttf",
+      "size": 53580
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Regular.woff",
+      "size": 30772
+    },
+    {
+      "path": "static/fonts/KaTeX_Main-Regular.woff2",
+      "size": 26272
+    },
+    {
+      "path": "static/fonts/KaTeX_Math-BoldItalic.ttf",
+      "size": 31196
+    },
+    {
+      "path": "static/fonts/KaTeX_Math-BoldItalic.woff",
+      "size": 18668
+    },
+    {
+      "path": "static/fonts/KaTeX_Math-BoldItalic.woff2",
+      "size": 16400
+    },
+    {
+      "path": "static/fonts/KaTeX_Math-Italic.ttf",
+      "size": 31308
+    },
+    {
+      "path": "static/fonts/KaTeX_Math-Italic.woff",
+      "size": 18748
+    },
+    {
+      "path": "static/fonts/KaTeX_Math-Italic.woff2",
+      "size": 16440
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Bold.ttf",
+      "size": 24504
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Bold.woff",
+      "size": 14408
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Bold.woff2",
+      "size": 12216
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Italic.ttf",
+      "size": 22364
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Italic.woff",
+      "size": 14112
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Italic.woff2",
+      "size": 12028
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Regular.ttf",
+      "size": 19436
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Regular.woff",
+      "size": 12316
+    },
+    {
+      "path": "static/fonts/KaTeX_SansSerif-Regular.woff2",
+      "size": 10344
+    },
+    {
+      "path": "static/fonts/KaTeX_Script-Regular.ttf",
+      "size": 16648
+    },
+    {
+      "path": "static/fonts/KaTeX_Script-Regular.woff",
+      "size": 10588
+    },
+    {
+      "path": "static/fonts/KaTeX_Script-Regular.woff2",
+      "size": 9644
+    },
+    {
+      "path": "static/fonts/KaTeX_Size1-Regular.ttf",
+      "size": 12228
+    },
+    {
+      "path": "static/fonts/KaTeX_Size1-Regular.woff",
+      "size": 6496
+    },
+    {
+      "path": "static/fonts/KaTeX_Size1-Regular.woff2",
+      "size": 5468
+    },
+    {
+      "path": "static/fonts/KaTeX_Size2-Regular.ttf",
+      "size": 11508
+    },
+    {
+      "path": "static/fonts/KaTeX_Size2-Regular.woff",
+      "size": 6188
+    },
+    {
+      "path": "static/fonts/KaTeX_Size2-Regular.woff2",
+      "size": 5208
+    },
+    {
+      "path": "static/fonts/KaTeX_Size3-Regular.ttf",
+      "size": 7588
+    },
+    {
+      "path": "static/fonts/KaTeX_Size3-Regular.woff",
+      "size": 4420
+    },
+    {
+      "path": "static/fonts/KaTeX_Size3-Regular.woff2",
+      "size": 3624
+    },
+    {
+      "path": "static/fonts/KaTeX_Size4-Regular.ttf",
+      "size": 10364
+    },
+    {
+      "path": "static/fonts/KaTeX_Size4-Regular.woff",
+      "size": 5980
+    },
+    {
+      "path": "static/fonts/KaTeX_Size4-Regular.woff2",
+      "size": 4928
+    },
+    {
+      "path": "static/fonts/KaTeX_Typewriter-Regular.ttf",
+      "size": 27556
+    },
+    {
+      "path": "static/fonts/KaTeX_Typewriter-Regular.woff",
+      "size": 16028
+    },
+    {
+      "path": "static/fonts/KaTeX_Typewriter-Regular.woff2",
+      "size": 13568
+    },
+    {
+      "path": "static/fonts/LICENSE",
+      "size": 1107
+    },
+    {
+      "path": "static/katex.min.css",
+      "size": 23196
+    },
+    {
+      "path": "static/katex.min.js",
+      "size": 277038
+    },
+    {
+      "path": "static/marked.min.js",
+      "size": 39903
+    },
+    {
+      "path": "static/NOTICE.md",
+      "size": 1554
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/licenses/AUTHORS",
+      "size": 2201
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/licenses/LICENSE",
+      "size": 1441
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/METADATA",
+      "size": 3812
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/RECORD",
+      "size": 2529
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/REQUESTED",
+      "size": 0
+    },
+    {
+      "path": "vendor/beautifulsoup4-4.15.0.dist-info/WHEEL",
+      "size": 87
+    },
+    {
+      "path": "vendor/bin/markdownify.exe",
+      "size": 108364
+    },
+    {
+      "path": "vendor/bs4/__init__.py",
+      "size": 44562
+    },
+    {
+      "path": "vendor/bs4/_deprecation.py",
+      "size": 2408
+    },
+    {
+      "path": "vendor/bs4/_typing.py",
+      "size": 7549
+    },
+    {
+      "path": "vendor/bs4/_warnings.py",
+      "size": 4711
+    },
+    {
+      "path": "vendor/bs4/builder/__init__.py",
+      "size": 31194
+    },
+    {
+      "path": "vendor/bs4/builder/_html5lib.py",
+      "size": 23607
+    },
+    {
+      "path": "vendor/bs4/builder/_htmlparser.py",
+      "size": 19866
+    },
+    {
+      "path": "vendor/bs4/builder/_lxml.py",
+      "size": 18969
+    },
+    {
+      "path": "vendor/bs4/css.py",
+      "size": 12713
+    },
+    {
+      "path": "vendor/bs4/dammit.py",
+      "size": 57485
+    },
+    {
+      "path": "vendor/bs4/diagnose.py",
+      "size": 7846
+    },
+    {
+      "path": "vendor/bs4/element.py",
+      "size": 125805
+    },
+    {
+      "path": "vendor/bs4/exceptions.py",
+      "size": 951
+    },
+    {
+      "path": "vendor/bs4/filter.py",
+      "size": 29180
+    },
+    {
+      "path": "vendor/bs4/formatter.py",
+      "size": 10478
+    },
+    {
+      "path": "vendor/bs4/py.typed",
+      "size": 0
+    },
+    {
+      "path": "vendor/markdownify/__init__.py",
+      "size": 30403
+    },
+    {
+      "path": "vendor/markdownify/__init__.pyi",
+      "size": 2149
+    },
+    {
+      "path": "vendor/markdownify/main.py",
+      "size": 4530
+    },
+    {
+      "path": "vendor/markdownify/py.typed",
+      "size": 1
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/entry_points.txt",
+      "size": 54
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/LICENSE",
+      "size": 1083
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/METADATA",
+      "size": 9922
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/RECORD",
+      "size": 1196
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/REQUESTED",
+      "size": 0
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/top_level.txt",
+      "size": 12
+    },
+    {
+      "path": "vendor/markdownify-1.2.3.dist-info/WHEEL",
+      "size": 91
+    },
+    {
+      "path": "vendor/NOTICE.md",
+      "size": 6047
+    },
+    {
+      "path": "vendor/pypdf/__init__.py",
+      "size": 1283
+    },
+    {
+      "path": "vendor/pypdf/_cmap.py",
+      "size": 13508
+    },
+    {
+      "path": "vendor/pypdf/_codecs/__init__.py",
+      "size": 1373
+    },
+    {
+      "path": "vendor/pypdf/_codecs/_codecs.py",
+      "size": 10717
+    },
+    {
+      "path": "vendor/pypdf/_codecs/adobe_glyphs.py",
+      "size": 447213
+    },
+    {
+      "path": "vendor/pypdf/_codecs/core_font_metrics.py",
+      "size": 114968
+    },
+    {
+      "path": "vendor/pypdf/_codecs/pdfdoc.py",
+      "size": 4269
+    },
+    {
+      "path": "vendor/pypdf/_codecs/std.py",
+      "size": 2630
+    },
+    {
+      "path": "vendor/pypdf/_codecs/symbol.py",
+      "size": 3734
+    },
+    {
+      "path": "vendor/pypdf/_codecs/zapfding.py",
+      "size": 3742
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/__init__.py",
+      "size": 2770
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_base.py",
+      "size": 1735
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_cryptography.py",
+      "size": 5265
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_fallback.py",
+      "size": 3382
+    },
+    {
+      "path": "vendor/pypdf/_crypt_providers/_pycryptodome.py",
+      "size": 4020
+    },
+    {
+      "path": "vendor/pypdf/_doc_common.py",
+      "size": 55294
+    },
+    {
+      "path": "vendor/pypdf/_encryption.py",
+      "size": 53649
+    },
+    {
+      "path": "vendor/pypdf/_font.py",
+      "size": 32151
+    },
+    {
+      "path": "vendor/pypdf/_page.py",
+      "size": 96078
+    },
+    {
+      "path": "vendor/pypdf/_page_labels.py",
+      "size": 9929
+    },
+    {
+      "path": "vendor/pypdf/_protocols.py",
+      "size": 2123
+    },
+    {
+      "path": "vendor/pypdf/_reader.py",
+      "size": 66477
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/__init__.py",
+      "size": 8592
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/__init__.py",
+      "size": 340
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/_fixed_width_page.py",
+      "size": 17319
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/_text_state_manager.py",
+      "size": 7517
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_layout_mode/_text_state_params.py",
+      "size": 6513
+    },
+    {
+      "path": "vendor/pypdf/_text_extraction/_text_extractor.py",
+      "size": 14856
+    },
+    {
+      "path": "vendor/pypdf/_utils.py",
+      "size": 21513
+    },
+    {
+      "path": "vendor/pypdf/_version.py",
+      "size": 23
+    },
+    {
+      "path": "vendor/pypdf/_writer.py",
+      "size": 134780
+    },
+    {
+      "path": "vendor/pypdf/annotations/__init__.py",
+      "size": 990
+    },
+    {
+      "path": "vendor/pypdf/annotations/_base.py",
+      "size": 961
+    },
+    {
+      "path": "vendor/pypdf/annotations/_markup_annotations.py",
+      "size": 11862
+    },
+    {
+      "path": "vendor/pypdf/annotations/_non_markup_annotations.py",
+      "size": 3656
+    },
+    {
+      "path": "vendor/pypdf/constants.py",
+      "size": 23632
+    },
+    {
+      "path": "vendor/pypdf/errors.py",
+      "size": 1947
+    },
+    {
+      "path": "vendor/pypdf/filters.py",
+      "size": 32233
+    },
+    {
+      "path": "vendor/pypdf/generic/__init__.py",
+      "size": 3468
+    },
+    {
+      "path": "vendor/pypdf/generic/_appearance_stream.py",
+      "size": 30337
+    },
+    {
+      "path": "vendor/pypdf/generic/_base.py",
+      "size": 33427
+    },
+    {
+      "path": "vendor/pypdf/generic/_data_structures.py",
+      "size": 69487
+    },
+    {
+      "path": "vendor/pypdf/generic/_files.py",
+      "size": 16327
+    },
+    {
+      "path": "vendor/pypdf/generic/_fit.py",
+      "size": 5515
+    },
+    {
+      "path": "vendor/pypdf/generic/_image_inline.py",
+      "size": 13281
+    },
+    {
+      "path": "vendor/pypdf/generic/_image_xobject.py",
+      "size": 23739
+    },
+    {
+      "path": "vendor/pypdf/generic/_link.py",
+      "size": 6138
+    },
+    {
+      "path": "vendor/pypdf/generic/_outline.py",
+      "size": 1094
+    },
+    {
+      "path": "vendor/pypdf/generic/_rectangle.py",
+      "size": 3924
+    },
+    {
+      "path": "vendor/pypdf/generic/_utils.py",
+      "size": 7514
+    },
+    {
+      "path": "vendor/pypdf/generic/_viewerpref.py",
+      "size": 6835
+    },
+    {
+      "path": "vendor/pypdf/pagerange.py",
+      "size": 7108
+    },
+    {
+      "path": "vendor/pypdf/papersizes.py",
+      "size": 1413
+    },
+    {
+      "path": "vendor/pypdf/py.typed",
+      "size": 0
+    },
+    {
+      "path": "vendor/pypdf/types.py",
+      "size": 1915
+    },
+    {
+      "path": "vendor/pypdf/xmp.py",
+      "size": 31655
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/licenses/LICENSE",
+      "size": 1605
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/METADATA",
+      "size": 7229
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/RECORD",
+      "size": 8298
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/REQUESTED",
+      "size": 0
+    },
+    {
+      "path": "vendor/pypdf-6.14.2.dist-info/WHEEL",
+      "size": 82
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/LICENSE",
+      "size": 1066
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/METADATA",
+      "size": 1658
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/RECORD",
+      "size": 561
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/top_level.txt",
+      "size": 4
+    },
+    {
+      "path": "vendor/six-1.17.0.dist-info/WHEEL",
+      "size": 109
+    },
+    {
+      "path": "vendor/six.py",
+      "size": 34703
+    },
+    {
+      "path": "vendor/soupsieve/__init__.py",
+      "size": 4581
+    },
+    {
+      "path": "vendor/soupsieve/__meta__.py",
+      "size": 6766
+    },
+    {
+      "path": "vendor/soupsieve/css_match.py",
+      "size": 61404
+    },
+    {
+      "path": "vendor/soupsieve/css_parser.py",
+      "size": 49081
+    },
+    {
+      "path": "vendor/soupsieve/css_types.py",
+      "size": 10014
+    },
+    {
+      "path": "vendor/soupsieve/pretty.py",
+      "size": 4362
+    },
+    {
+      "path": "vendor/soupsieve/py.typed",
+      "size": 0
+    },
+    {
+      "path": "vendor/soupsieve/util.py",
+      "size": 3352
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/licenses/LICENSE.md",
+      "size": 1096
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/METADATA",
+      "size": 4635
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/RECORD",
+      "size": 1383
+    },
+    {
+      "path": "vendor/soupsieve-2.8.4.dist-info/WHEEL",
+      "size": 87
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/INSTALLER",
+      "size": 4
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/licenses/LICENSE",
+      "size": 13936
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/METADATA",
+      "size": 3310
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/RECORD",
+      "size": 580
+    },
+    {
+      "path": "vendor/typing_extensions-4.16.0.dist-info/WHEEL",
+      "size": 82
+    },
+    {
+      "path": "vendor/typing_extensions.py",
+      "size": 165012
+    }
+  ],
+  "project_rules": "\n--- blueprint_rag.json ---\n{\n  \"version\": \"1.0\",\n  \"description\": \"rag-assistant agent 同步蓝图\",\n  \"include\": [\n    \"rag_assistant/**/*.py\",\n    \"main.py\",\n    \"setup.bat\",\n    \"CHANGELOG.md\",\n    \"LICENSE\",\n    \"README.md\",\n    \"PROTOCOL.md\",\n    \"requirements.txt\",\n    \".github/**/*\"\n  ],\n  \"exclude\": [\n    \"__pycache__\",\n    \"*.pyc\",\n    \"dist\",\n    \"build\",\n    \".git\"\n  ]\n}\n\n\n--- data/kb/auto_classify_rules.json ---\n{\n  \"白酒\": {\n    \"description\": \"\",\n    \"keywords\": [\n      \"固态发酵\",\n      \"上头\",\n      \"主成分分析\",\n      \"杂醇\",\n      \"酒糟\",\n      \"粮食酒\",\n      \"中国白酒\",\n      \"乙醛\",\n      \"酒曲\",\n      \"乙醇\",\n      \"浓度\",\n      \"温度\",\n      \"时用\",\n      \"百分数\",\n      \"白酒\",\n      \"甲醛\",\n      \"酿酒\",\n      \"酒样\",\n      \"醇类\"\n    ],\n    \"_originals\": [\n      \"中国白酒\",\n      \"粮食酒\",\n      \"上头\",\n      \"主成分分析\",\n      \"乙醛\",\n      \"杂醇\",\n      \"酒糟\",\n      \"酒曲\",\n      \"固态发酵\"\n    ]\n  },\n  \"啤酒\": {\n    \"description\": \"\",\n    \"keywords\": [\n      \"精酿\",\n      \"酒花\",\n      \"芫荽籽\",\n      \"工坊啤酒\",\n      \"黑啤\",\n      \"白啤\",\n      \"黄啤\",\n      \"修道院啤酒\",\n      \"啤酒\",\n      \"浓酿\",\n      \"酿造\",\n      \"酿酒\",\n      \"beer\"\n    ],\n    \"_originals\": [\n      \"白啤\",\n      \"黑啤\",\n      \"黄啤\",\n      \"精酿\",\n      \"修道院啤酒\",\n      \"工坊啤酒\",\n      \"酒花\",\n      \"芫荽籽\"\n    ]\n  },\n  \"其他酒\": {\n    \"description\": \"\",\n    \"keywords\": [\n      \"黄酒\",\n      \"葡萄酒\",\n      \"白兰地\",\n      \"外国烈酒\",\n      \"果酒\",\n      \"洋酒\",\n      \"威士忌\",\n      \"红葡萄酒\",\n      \"白兰地酒\",\n      \"酿酒\",\n      \"酒类\",\n      \"wine\"\n    ],\n    \"_originals\": [\n      \"黄酒\",\n      \"葡萄酒\",\n      \"果酒\",\n      \"威士忌\",\n      \"白兰地\",\n      \"外国烈酒\",\n      \"洋酒\"\n    ]\n  },\n  \"理化检测\": {\n    \"description\": \"\",\n    \"keywords\": [\n      \"质谱\",\n      \"化学\",\n      \"保健食品\",\n      \"营养成分\",\n      \"物理\",\n      \"农残\",\n      \"光谱\",\n      \"水质检测\",\n      \"兽残\",\n      \"力学\",\n      \"色谱法\",\n      \"声学\",\n      \"法测定\",\n      \"学科\",\n      \"基质\",\n      \"添加物\",\n      \"化合物\",\n      \"分子\",\n      \"物质\",\n      \"分析化学\",\n      \"食品\",\n      \"食品安全\",\n      \"科学\",\n      \"用水\",\n      \"micronutrients\",\n      \"nutrition\",\n      \"biochemical\",\n      \"样品\",\n      \"sciences\"\n    ],\n    \"_originals\": [\n      \"物理\",\n      \"化学\",\n      \"光谱\",\n      \"质谱\",\n      \"农残\",\n      \"兽残\",\n      \"保健食品\",\n      \"营养成分\",\n      \"水质检测\"\n    ]\n  },\n  \"生物医疗\": {\n    \"description\": \"\",\n    \"keywords\": [\n      \"药物\",\n      \"竞争免疫\",\n      \"生化\",\n      \"基础代谢\",\n      \"医学\",\n      \"毒理学\",\n      \"核算\",\n      \"基因\",\n      \"分子诊断\",\n      \"扩增曲线\",\n      \"体液\",\n      \"生理病理\",\n      \"医学伦理\",\n      \"人体组织\",\n      \"金颗粒\",\n      \"biomedical\",\n     \n",
+  "guidelines": "请审查以上文件列表，结合 project_rules（项目自身规则文件）和以下通用规则，\n判断哪些文件应该一起发布到公开的代码仓库。\n\n项目类型：AI Agent\n\n通用排除参考：\n- 缓存目录（__pycache__/, .cache/, .mypy_cache/, .pytest_cache/）\n- 构建产物（dist/, build/, .egg-info/, *.pyc, *.pyo）\n- 依赖目录（node_modules/, .venv/, .tox/）\n- 大体积模型权重/data（*.pt, *.pth, *.gguf, data/models/, data/kb/, *.db, *.sqlite）\n- 个人配置/凭证（config.json, .env, *.token, credentials*）\n- IDE/系统文件（.vscode/, .idea/, .DS_Store, Thumbs.db）\n- 日志/临时文件（*.log, *.tmp, *.bak）\n- .git/ 排除，.gitignore 可保留\n\n确认以下核心文件被保留：\n- 所有 .py 代码文件\n- 文档（README.md, SKILL.md, references/ 下的文档）\n- 配置文件（_meta.json, requirements.txt, setup.py）\n- 许可证（LICENSE）\n\n请以 JSON 返回应保留的文件路径列表：\n{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}"
+}

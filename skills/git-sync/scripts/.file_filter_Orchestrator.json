@@ -1,0 +1,245 @@
+{
+  "project": "Orchestrator",
+  "root": "C:\\Users\\sm001\\.workbuddy\\agent\\Orchestrator",
+  "total_files": 59,
+  "files": [
+    {
+      "path": "__init__.py",
+      "size": 1819
+    },
+    {
+      "path": "__pycache__/__init__.cpython-311.pyc",
+      "size": 2249
+    },
+    {
+      "path": "__pycache__/__init__.cpython-314.pyc",
+      "size": 1920
+    },
+    {
+      "path": "__pycache__/agent_config.cpython-311.pyc",
+      "size": 9725
+    },
+    {
+      "path": "__pycache__/agent_config.cpython-314.pyc",
+      "size": 13060
+    },
+    {
+      "path": "__pycache__/agent_loop.cpython-311.pyc",
+      "size": 18632
+    },
+    {
+      "path": "__pycache__/agent_loop.cpython-314.pyc",
+      "size": 19743
+    },
+    {
+      "path": "__pycache__/chain_engine.cpython-311.pyc",
+      "size": 44130
+    },
+    {
+      "path": "__pycache__/chain_engine.cpython-314.pyc",
+      "size": 45426
+    },
+    {
+      "path": "__pycache__/chain_model.cpython-311.pyc",
+      "size": 9357
+    },
+    {
+      "path": "__pycache__/chain_model.cpython-314.pyc",
+      "size": 10825
+    },
+    {
+      "path": "__pycache__/direct_llm_client.cpython-311.pyc",
+      "size": 27591
+    },
+    {
+      "path": "__pycache__/direct_llm_client.cpython-314.pyc",
+      "size": 28027
+    },
+    {
+      "path": "__pycache__/llm_client.cpython-311.pyc",
+      "size": 11195
+    },
+    {
+      "path": "__pycache__/llm_client.cpython-314.pyc",
+      "size": 11749
+    },
+    {
+      "path": "__pycache__/memory.cpython-311.pyc",
+      "size": 10069
+    },
+    {
+      "path": "__pycache__/memory.cpython-314.pyc",
+      "size": 11027
+    },
+    {
+      "path": "__pycache__/model_manager.cpython-311.pyc",
+      "size": 31603
+    },
+    {
+      "path": "__pycache__/model_manager.cpython-314.pyc",
+      "size": 34326
+    },
+    {
+      "path": "__pycache__/skill_scanner.cpython-311.pyc",
+      "size": 7853
+    },
+    {
+      "path": "__pycache__/skill_scanner.cpython-314.pyc",
+      "size": 7648
+    },
+    {
+      "path": "__pycache__/tool_base.cpython-311.pyc",
+      "size": 4075
+    },
+    {
+      "path": "__pycache__/tool_base.cpython-314.pyc",
+      "size": 4921
+    },
+    {
+      "path": "__pycache__/web_ui.cpython-314.pyc",
+      "size": 82236
+    },
+    {
+      "path": "agent_config.py",
+      "size": 5641
+    },
+    {
+      "path": "agent_loop.py",
+      "size": 14396
+    },
+    {
+      "path": "chain_engine.py",
+      "size": 33204
+    },
+    {
+      "path": "chain_model.py",
+      "size": 5351
+    },
+    {
+      "path": "direct_llm_client.py",
+      "size": 22317
+    },
+    {
+      "path": "gui_agent.py",
+      "size": 42896
+    },
+    {
+      "path": "LICENSE",
+      "size": 11545
+    },
+    {
+      "path": "llm_client.py",
+      "size": 5835
+    },
+    {
+      "path": "main.py",
+      "size": 22274
+    },
+    {
+      "path": "memory.py",
+      "size": 4430
+    },
+    {
+      "path": "model_manager.py",
+      "size": 23841
+    },
+    {
+      "path": "orchestrator/__init__.py",
+      "size": 1819
+    },
+    {
+      "path": "PROTOCOL.md",
+      "size": 11877
+    },
+    {
+      "path": "rag_assistant/__init__.py",
+      "size": 1819
+    },
+    {
+      "path": "README.md",
+      "size": 2452
+    },
+    {
+      "path": "run_agent.py",
+      "size": 16391
+    },
+    {
+      "path": "setup.bat",
+      "size": 1843
+    },
+    {
+      "path": "skill_scanner.py",
+      "size": 4350
+    },
+    {
+      "path": "static/web_ui.js",
+      "size": 33813
+    },
+    {
+      "path": "tool_base.py",
+      "size": 2169
+    },
+    {
+      "path": "tools/__init__.py",
+      "size": 773
+    },
+    {
+      "path": "tools/__pycache__/__init__.cpython-311.pyc",
+      "size": 1015
+    },
+    {
+      "path": "tools/__pycache__/__init__.cpython-314.pyc",
+      "size": 928
+    },
+    {
+      "path": "tools/__pycache__/file_tool.cpython-311.pyc",
+      "size": 7789
+    },
+    {
+      "path": "tools/__pycache__/file_tool.cpython-314.pyc",
+      "size": 7904
+    },
+    {
+      "path": "tools/__pycache__/skill_loader.cpython-311.pyc",
+      "size": 12919
+    },
+    {
+      "path": "tools/__pycache__/skill_loader.cpython-314.pyc",
+      "size": 12913
+    },
+    {
+      "path": "tools/__pycache__/web_tool.cpython-311.pyc",
+      "size": 10432
+    },
+    {
+      "path": "tools/__pycache__/web_tool.cpython-314.pyc",
+      "size": 10483
+    },
+    {
+      "path": "tools/file_tool.py",
+      "size": 4628
+    },
+    {
+      "path": "tools/rag_tool.py",
+      "size": 5944
+    },
+    {
+      "path": "tools/skill_loader.py",
+      "size": 8617
+    },
+    {
+      "path": "tools/web_tool.py",
+      "size": 6752
+    },
+    {
+      "path": "web_ui.py",
+      "size": 67442
+    },
+    {
+      "path": "working_memory.json",
+      "size": 294
+    }
+  ],
+  "project_rules": "",
+  "guidelines": "请审查以上文件列表，结合 project_rules（项目自身规则文件）和以下通用规则，\n判断哪些文件应该一起发布到公开的代码仓库。\n\n项目类型：AI Agent\n\n通用排除参考：\n- 缓存目录（__pycache__/, .cache/, .mypy_cache/, .pytest_cache/）\n- 构建产物（dist/, build/, .egg-info/, *.pyc, *.pyo）\n- 依赖目录（node_modules/, .venv/, .tox/）\n- 大体积模型权重/data（*.pt, *.pth, *.gguf, data/models/, data/kb/, *.db, *.sqlite）\n- 个人配置/凭证（config.json, .env, *.token, credentials*）\n- IDE/系统文件（.vscode/, .idea/, .DS_Store, Thumbs.db）\n- 日志/临时文件（*.log, *.tmp, *.bak）\n- .git/ 排除，.gitignore 可保留\n\n确认以下核心文件被保留：\n- 所有 .py 代码文件\n- 文档（README.md, SKILL.md, references/ 下的文档）\n- 配置文件（_meta.json, requirements.txt, setup.py）\n- 许可证（LICENSE）\n\n请以 JSON 返回应保留的文件路径列表：\n{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}"
+}

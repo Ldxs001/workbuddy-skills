@@ -1,0 +1,353 @@
+{
+  "project": "skill-standardization",
+  "root": "C:\\Users\\sm001\\.workbuddy\\skills\\skill-standardization",
+  "total_files": 86,
+  "files": [
+    {
+      "path": ".standardization/scripts/data/hug-html/.manual_wait",
+      "size": 95
+    },
+    {
+      "path": "_meta.json",
+      "size": 833
+    },
+    {
+      "path": "references/antipatterns.md",
+      "size": 10516
+    },
+    {
+      "path": "references/architecture.md",
+      "size": 9436
+    },
+    {
+      "path": "references/blueprint_flow.md",
+      "size": 10602
+    },
+    {
+      "path": "references/changelog.md",
+      "size": 1792
+    },
+    {
+      "path": "references/data_dir_map.md",
+      "size": 3366
+    },
+    {
+      "path": "references/examples.md",
+      "size": 10716
+    },
+    {
+      "path": "references/faq.md",
+      "size": 15627
+    },
+    {
+      "path": "references/guide.md",
+      "size": 12363
+    },
+    {
+      "path": "references/LICENSE.md",
+      "size": 1097
+    },
+    {
+      "path": "references/permissions.md",
+      "size": 3069
+    },
+    {
+      "path": "references/reference.md",
+      "size": 15130
+    },
+    {
+      "path": "references/rules.md",
+      "size": 18797
+    },
+    {
+      "path": "references/scan_patterns.json",
+      "size": 1736
+    },
+    {
+      "path": "references/test-report.md",
+      "size": 192841
+    },
+    {
+      "path": "scripts/__init__.py",
+      "size": 0
+    },
+    {
+      "path": "scripts/__pycache__/__init__.cpython-313.pyc",
+      "size": 171
+    },
+    {
+      "path": "scripts/__pycache__/__init__.cpython-314.pyc",
+      "size": 173
+    },
+    {
+      "path": "scripts/__pycache__/cleanup_manager.cpython-313.pyc",
+      "size": 17487
+    },
+    {
+      "path": "scripts/__pycache__/cleanup_manager.cpython-314.pyc",
+      "size": 18263
+    },
+    {
+      "path": "scripts/__pycache__/permission_checker.cpython-313.pyc",
+      "size": 44558
+    },
+    {
+      "path": "scripts/__pycache__/permission_checker.cpython-314.pyc",
+      "size": 50789
+    },
+    {
+      "path": "scripts/__pycache__/safe_io.cpython-313.pyc",
+      "size": 20006
+    },
+    {
+      "path": "scripts/__pycache__/safe_io.cpython-314.pyc",
+      "size": 22193
+    },
+    {
+      "path": "scripts/__pycache__/skill_inspector.cpython-313.pyc",
+      "size": 25942
+    },
+    {
+      "path": "scripts/__pycache__/skill_inspector.cpython-314.pyc",
+      "size": 27112
+    },
+    {
+      "path": "scripts/cleanup_manager.py",
+      "size": 13505
+    },
+    {
+      "path": "scripts/permission_checker.py",
+      "size": 42694
+    },
+    {
+      "path": "scripts/safe_io.py",
+      "size": 15644
+    },
+    {
+      "path": "scripts/skill_audit/__init__.py",
+      "size": 182800
+    },
+    {
+      "path": "scripts/skill_audit/__main__.py",
+      "size": 188
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/__init__.cpython-314.pyc",
+      "size": 209712
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/__main__.cpython-314.pyc",
+      "size": 372
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/_path_detector.cpython-314.pyc",
+      "size": 8860
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/_tree_scanner.cpython-314.pyc",
+      "size": 4051
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/artifact_checker.cpython-314.pyc",
+      "size": 52218
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/data_dir_checker.cpython-314.pyc",
+      "size": 12825
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/fix.cpython-314.pyc",
+      "size": 188571
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/frontmatter_checker.cpython-314.pyc",
+      "size": 25486
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/permission_checks.cpython-314.pyc",
+      "size": 22564
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/structure_checker.cpython-314.pyc",
+      "size": 132787
+    },
+    {
+      "path": "scripts/skill_audit/__pycache__/utils.cpython-314.pyc",
+      "size": 27893
+    },
+    {
+      "path": "scripts/skill_audit/_path_detector.py",
+      "size": 6340
+    },
+    {
+      "path": "scripts/skill_audit/_tree_scanner.py",
+      "size": 3716
+    },
+    {
+      "path": "scripts/skill_audit/artifact_checker.py",
+      "size": 50616
+    },
+    {
+      "path": "scripts/skill_audit/consistency_checker.py",
+      "size": 34537
+    },
+    {
+      "path": "scripts/skill_audit/data_dir_checker.py",
+      "size": 9239
+    },
+    {
+      "path": "scripts/skill_audit/fix.py",
+      "size": 174022
+    },
+    {
+      "path": "scripts/skill_audit/frontmatter_checker.py",
+      "size": 22003
+    },
+    {
+      "path": "scripts/skill_audit/permission_checks.py",
+      "size": 23393
+    },
+    {
+      "path": "scripts/skill_audit/progress_manager.py",
+      "size": 11699
+    },
+    {
+      "path": "scripts/skill_audit/structure_checker.py",
+      "size": 135766
+    },
+    {
+      "path": "scripts/skill_audit/utils.py",
+      "size": 31590
+    },
+    {
+      "path": "scripts/skill_audit/utils_restored.py",
+      "size": 0
+    },
+    {
+      "path": "scripts/skill_builder/__init__.py",
+      "size": 6790
+    },
+    {
+      "path": "scripts/skill_builder/__main__.py",
+      "size": 165
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/__init__.cpython-313.pyc",
+      "size": 6959
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/__init__.cpython-314.pyc",
+      "size": 7224
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/creator.cpython-313.pyc",
+      "size": 34188
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/creator.cpython-314.pyc",
+      "size": 34898
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/migrator.cpython-313.pyc",
+      "size": 13490
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/migrator.cpython-314.pyc",
+      "size": 13910
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/refactor.cpython-313.pyc",
+      "size": 28975
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/refactor.cpython-314.pyc",
+      "size": 29914
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/updater.cpython-313.pyc",
+      "size": 27640
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/updater.cpython-314.pyc",
+      "size": 28854
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/utils.cpython-313.pyc",
+      "size": 6344
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/utils.cpython-314.pyc",
+      "size": 6557
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/version_manager.cpython-313.pyc",
+      "size": 8069
+    },
+    {
+      "path": "scripts/skill_builder/__pycache__/version_manager.cpython-314.pyc",
+      "size": 8436
+    },
+    {
+      "path": "scripts/skill_builder/creator.py",
+      "size": 31988
+    },
+    {
+      "path": "scripts/skill_builder/migrator.py",
+      "size": 12325
+    },
+    {
+      "path": "scripts/skill_builder/refactor.py",
+      "size": 24543
+    },
+    {
+      "path": "scripts/skill_builder/updater.py",
+      "size": 23506
+    },
+    {
+      "path": "scripts/skill_builder/utils.py",
+      "size": 4827
+    },
+    {
+      "path": "scripts/skill_builder/version_manager.py",
+      "size": 6526
+    },
+    {
+      "path": "scripts/skill_inspector.py",
+      "size": 18178
+    },
+    {
+      "path": "scripts/skill_rollback.py",
+      "size": 8568
+    },
+    {
+      "path": "scripts/spec/_index.json",
+      "size": 1021
+    },
+    {
+      "path": "scripts/spec/body.json",
+      "size": 26511
+    },
+    {
+      "path": "scripts/spec/frontmatter.json",
+      "size": 4666
+    },
+    {
+      "path": "scripts/spec/progressive_md.json",
+      "size": 5567
+    },
+    {
+      "path": "scripts/spec/rules.json",
+      "size": 15482
+    },
+    {
+      "path": "scripts/spec/structure.json",
+      "size": 5176
+    },
+    {
+      "path": "SKILL.md",
+      "size": 19320
+    }
+  ],
+  "project_rules": "\n--- references/blueprint_flow.md ---\n# 蓝皮书与审计流程规范\n\n> 定义蓝皮书（Blueprint）、审计（Audit）、修复循环（Fix Loop）三者的关系与流程。\n> 适用于 create / update / refactor 三种模式。\n\n---\n\n## 1. 蓝皮书的精确定义\n\n**蓝皮书 = `inspect_skill()` 输出的技能目录结构快照。**\n\n### 包含内容\n\n| 字段 | 说明 | 来源 |\n|------|------|------|\n| `structure_tree` | tree 命令格式的目录树 | 现场扫描 |\n| `root_files` | 根目录所有文件 | `os.listdir(skill_dir)` |\n| `root_dirs` | 根目录所有子目录 | `os.listdir(skill_dir)` |\n| `ref_files` | references/ 下 .md 文件 | `os.listdir(references/)` |\n| `script_files` | scripts/ 下所有文件 | `os.walk(scripts/)` |\n| `has_data_dir` | 是否存在 data/ | `os.path.isdir(data/)` |\n| `has_output_dir` | 是否存在 output/ | `os.path.isdir(output/)` |\n| `has_logs_dir` | 是否存在 logs/ | `os.path.isdir(logs/)` |\n| `has_temp_dir` | 是否存在 temp/ | `os.path.isdir(temp/)` |\n| SKILL.md 解析 | frontmatter + H2 章节 | 文件解析 |\n| `_meta.json` | 元数据 | 文件解析 |\n| `doc_code_gaps` | 文档与代码的函数签名差异 | 代码扫描 |\n\n### 蓝皮书的合法用途（仅此两条）\n\n1. **给 LLM 看** — 帮助 LLM 理解技能结构，确定更新范围\n2. **给审计提供路径地图** — 审计知道该扫哪些目录（不做判断依据）\n\n### 蓝皮书不参与审计判断\n\n- 检查器**不得**从 `kw.get(\"blueprint\")` 拿数据做审计判断（已删除）\n- 审计判断**必须**用实时磁盘数据（`os.listdir` / `os.walk` / 读文件内容）\n- `audit_skill()` 已删除 `blueprint` 参数（v2.75.0），`_audit_with_blueprint()` 简化为废弃别名\n\n---\n\n## 2. 三个模式的完整流程\n\n### 2.1 创建（create）\n\n```\n1. 生成骨架（SKILL.md + _meta.json + references/ + scripts/ .gitkeep）\n2. 全量审计（无蓝皮书——创建没有旧结构）\n3. 输出报告 + 建议（不修复，不循环）\n```\n\n**特征**：无蓝皮书、无备份、无修复循环。\n\n---\n\n### 2.2 更新（update）— 范围明确的更新\n\n```\n用户输入：\"给 xxx 技能增加/更新/更新某个功能或部分\"\n  ↓\n[步骤 1] 蓝皮书扫描\n  - inspect_skill(skill_dir) 输出文本版蓝皮书\n  - LLM 看蓝皮书理解技能结构\n  ↓\n[步骤 2] 更新声明（流程钩子 — 强制）\n  - LLM 必须输出更新声明 JSON：\n    {\"changed_files\": [\"scripts/foo.py\", \"references/bar.md\"], \"description\": \"增加 --format 参数\"}\n  - 无更新声明 → 流程拦住\n  ↓\n[步骤 3] 针对性审计\n  - 只跑跟 changed_files 相关的规则\n  - audit_skill(skill_dir, filter_files=changed_files)\n  - 爆出真问题列表（含 LLM 二次筛除）\n  ↓\n[步骤 4] 修复 + 细碎审计循环\n  ┌─────────────────────────────────────────────┐\n  │ LLM 修一批/一类/一个问题                      │\n  │   ↓                                          │\n  │ ★★★ 流程钩子（强制）★★★                       │\n  │ LLM 必须声明修了哪些规则：           \n\n--- references/rules.md ---\n# 改写/更新铁律（AI 执行前必须遵守）\n\n> 本文件为 skill-standardization v2.13.0 的铁律条款，AI 更新任何 skill 前必须严格遵守。\n\n---\n\n\n## 铁律 1：author 字段不可擅自替换\n\n- 技能是通用工具，author 默认值必须为 `your-name-here` 占位符\n- 已有 author 值（如 `\"由 config.json 的 author 字段决定\"`）保留原值不变\n- 只有用户明确指定时才写入真实署名\n- **本 skill 例外**：author 为 `[username-redacted]`（维护者署名，铁律1例外条款）\n\n---\n\n## 铁律 2：版本号更新规则（规范内有规定直接更新，无规定必须询问）\n\n**规范内明确定义的文件/字段 — 直接更新，无需询问：**\n\n| 文件 | 版本号位置 | 更新规则 |\n|------|-----------|----------|\n| `SKILL.md` | frontmatter `version:` | 按 SemVer 直接升级，无需询问 |\n| `_meta.json` | `\"version\"` | 与 SKILL.md 保持一致，直接升级 |\n| `scripts/spec/*.json` | `\"_version\"` 字段 | 对应模块更新时直接升级 |\n| `scripts/*.py` | 文件头版本字符串（如 `v2.3.0`） | 脚本逻辑更新时直接升级 |\n\n**SemVer 更新语义规则（R-03）：**\n\n| 级别 | 类型 | 适用场景 | 示例 |\n|------|------|---------|------|\n| **MAJOR (X)** | breaking | 架构级重构/核心引擎重写/破坏性API/数据格式不兼容 | 重写审计引擎、更新数据目录结构 |\n| **MINOR (Y)** | feature | 新功能/新算法/新模块/功能重构/新审计规则/大面积文档重写 | 新增CPM分析、新增合理性审查层、新R-26子检查 |\n| **PATCH (Z)** | fix",
+  "guidelines": "请审查以上文件列表，结合 project_rules（项目自身规则文件）和以下通用规则，\n判断哪些文件应该一起发布到公开的代码仓库。\n\n项目类型：AI Agent\n\n通用排除参考：\n- 缓存目录（__pycache__/, .cache/, .mypy_cache/, .pytest_cache/）\n- 构建产物（dist/, build/, .egg-info/, *.pyc, *.pyo）\n- 依赖目录（node_modules/, .venv/, .tox/）\n- 大体积模型权重/data（*.pt, *.pth, *.gguf, data/models/, data/kb/, *.db, *.sqlite）\n- 个人配置/凭证（config.json, .env, *.token, credentials*）\n- IDE/系统文件（.vscode/, .idea/, .DS_Store, Thumbs.db）\n- 日志/临时文件（*.log, *.tmp, *.bak）\n- .git/ 排除，.gitignore 可保留\n\n确认以下核心文件被保留：\n- 所有 .py 代码文件\n- 文档（README.md, SKILL.md, references/ 下的文档）\n- 配置文件（_meta.json, requirements.txt, setup.py）\n- 许可证（LICENSE）\n\n请以 JSON 返回应保留的文件路径列表：\n{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"]}"
+}
