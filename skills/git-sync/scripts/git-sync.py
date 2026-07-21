@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-git-sync.py v2.31.0 - 完整 Python 版 git-sync
+git-sync.py v2.32.0 - 完整 Python 版 git-sync
 跨平台兼容（Windows/Linux/macOS），不依赖 rsync
 用法: python git-sync.py <skill-name>
 """
@@ -866,11 +866,10 @@ def get_meta_desc(meta_file: Path) -> str:
         return r.stdout.strip()
     return ""
 
-# ── LLM 文件过滤器（替代硬编码黑名单）──────────────────────────────
-# 在同步前执行，由 WorkBuddy（LLM）审核源文件列表，
-# 只有通过审核的文件才被复制到仓库。
-# WorkBuddy 看到本函数的输出后，应读取扫描文件并写入决策文件，
-# 然后重新运行 git-sync 继续同步。
+# ── 文件筛除过滤器 ──────────────────────────────
+# 由执行者（LLM/Agent）审核源文件列表后写入 decision JSON。
+# 无 decision 文件时打印文件列表并阻断，不静默跳过。
+
 def step_llm_file_filter(name: str, src_dir: Path) -> set:
     """扫描源文件 → 写扫描文件 → 打印审查指令 → 等待 WorkBuddy 写入决策文件"""
     filter_scan = SCRIPT_DIR / f".file_filter_{name}.json"
@@ -940,9 +939,9 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
             filter_decisions.unlink(missing_ok=True)
             return set(rel for d in tree for rel in [d["path"]])
     else:
-        # 输出完整文件列表 + 规则，要求 WorkBuddy（LLM）在回复中输出决策
+        # ── 无决策文件 → 打印文件列表 + 引导 → 等 LLM 写 decision → 自动继续 ──
         print(f"\n{'='*60}")
-        print(f"  ⏳ 需要您（WorkBuddy）完成文件筛除审核")
+        print(f"  ⏳ 等待 LLM 完成文件筛除审核")
         print(f"{'='*60}")
         print(f"项目: {name}")
         print(f"源路径: {src_dir}")
@@ -955,7 +954,7 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
         for e in tree:
             print(f"  {e['path']} ({e['size']}B)")
         print()
-        print("## 通用排除规则")
+        print("## 文件筛除引导（LLM 参考）")
         print("- 缓存目录: __pycache__/, .cache/, .mypy_cache/, .pytest_cache/")
         print("- 构建产物: dist/, build/, .egg-info/, *.pyc, *.pyo")
         print("- 依赖目录: node_modules/, .venv/, .tox/")
@@ -964,17 +963,33 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
         print("- IDE/系统: .vscode/, .idea/, .DS_Store, Thumbs.db")
         print("- 日志/临时: *.log, *.tmp, *.bak")
         print()
-        print("【您必须执行以下操作】")
-        print(f"1. 审核上述文件列表，结合项目规则和通用排除规则判断应保留哪些文件")
-        print(f"2. 将决策写入文件: {filter_decisions}")
-        print(f"3. **在您的回复中输出以下格式的JSON决策**:")
-        print(f"   {{\"allow\": [\"path/to/file1.py\", \"path/to/file2.py\"],")
-        print(f"    \"exclude\": [\"path/to/excluded.py\"],")
-        print(f"    \"reason\": \"排除原因说明\"}}")
-        print(f"4. 重新运行 git-sync 继续同步")
+        print(f"LLM 请输出 decision JSON 并写入 {filter_decisions}")
+        print(f"  格式: {{\"allow\": [\"path/to/file1.py\"], \"exclude\": [], \"reason\": \"\"}}")
         print(f"{'='*60}\n")
-        log("3.7", 8, f"需要 WorkBuddy 审核文件列表 → 输出决策JSON + 写入 {filter_decisions.name}", "warn")
-        return None
+
+        # 等待 decision 文件出现（LLM 写入后自动继续）
+        import time as _t
+        waited = 0
+        while not filter_decisions.exists():
+            _t.sleep(2)
+            waited += 2
+            if waited > 0 and waited % 10 == 0:
+                log("3.7", 8, f"等待 decision 文件... ({waited}s)", "warn")
+
+        # 文件出现 → 读取并继续
+        try:
+            decisions = json.loads(filter_decisions.read_text(encoding="utf-8"))
+            allowed = set(decisions.get("allow", []))
+            cnt = len(allowed)
+            log("3.7", 8, f"文件筛除通过：{cnt}/{len(tree)} 个文件", "ok")
+            filter_scan.unlink(missing_ok=True)
+            filter_decisions.unlink(missing_ok=True)
+            return allowed
+        except Exception as e:
+            log("3.7", 8, f"决策解析失败: {e}，默认保留所有文件", "warn")
+            filter_scan.unlink(missing_ok=True)
+            filter_decisions.unlink(missing_ok=True)
+            return set(rel for d in tree for rel in [d["path"]])
 
 # ── 新步骤：PyPI / ClawHub / SkillHub / Release ──────────────────────────
 
@@ -1394,11 +1409,8 @@ def main():
                 repo_skill_dir = WORK_REPO / work_repo_subdir
             else:
                 log(4, 8, "同步文件到工作仓库...")
-                # LLM 文件过滤：在复制前决定哪些文件可以进仓库
+                # 文件筛除过滤器：LLM 审核 → 写 decision → 自动继续
                 allowed = step_llm_file_filter(name, src_dir)
-                if allowed is None:
-                    log(4, 8, "LLM 文件审查未完成，跳过本次同步", "skip")
-                    return
                 if is_skill:
                     repo_skill_dir = sync_files(name, SKILLS_DIR, WORK_REPO, allowed)
                 else:

@@ -1,3 +1,11 @@
+## [2.32.0] - 2026-07-21
+
+### 变更
+- **文件筛除管道封闭**：`step_llm_file_filter` 无 decision 文件时不再 `return None`，改为 **poll 等待** LLM 写入 decision 文件后自动继续，不需重跑 git-sync。门禁封闭，不允许任何方式 bypass
+
+### 修复
+- **`--skip-push` 不存在导致报错**：移除了代码中残留的 `--skip-push` 引用
+
 ## [2.31.0] - 2026-07-21
 
 ### 安全修复（重大）
