@@ -330,7 +330,7 @@ if __name__ == "__main__":
             print("  （未配置）")
 
     elif args.query and args.docs:
-        from langchain_core.documents import Document
+        from utils import Document
         docs = [Document(page_content=d) for d in args.docs]
 
         cfg = load_config()

@@ -951,9 +951,14 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                     ext = os.path.splitext(path)[1].lower()
                     content = ""
                     if ext == ".pdf":
-                        from langchain_community.document_loaders import PyPDFLoader
-                        pdf_docs = PyPDFLoader(path).load()
-                        content = "\n\n".join(d.page_content[:500] for d in pdf_docs[:4])
+                        from pypdf import PdfReader
+                        reader = PdfReader(path)
+                        snippets = []
+                        for p in reader.pages[:4]:
+                            text = (p.extract_text() or "")[:500]
+                            if text:
+                                snippets.append(text)
+                        content = "\n\n".join(snippets)
                     elif ext in (".txt", ".md", ".html"):
                         with open(path, "r", encoding="utf-8", errors="ignore") as f:
                             content = f.read(6000)

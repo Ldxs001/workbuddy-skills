@@ -43,16 +43,10 @@ _env_install_status = {
 }
 
 _CORE_DEP_MODULES = [
-    ("langchain", "langchain"),
-    ("langchain_community", "langchain-community"),
-    ("langchain_huggingface", "langchain-huggingface"),
-    ("langchain_chroma", "langchain-chroma"),
-    ("langchain_text_splitters", "langchain-text-splitters"),
     ("chromadb", "chromadb"),
     ("sentence_transformers", "sentence-transformers"),
     ("huggingface_hub", "huggingface-hub"),
     ("modelscope", "modelscope"),
-    ("openai", "openai"),
 ]
 
 
@@ -877,6 +871,10 @@ var _rebuilding=false;
 function rebuildSigs(btn){if(_rebuilding)return;_rebuilding=true;if(btn){btn.disabled=true;btn.textContent='⏳ 重建中...';}toast('⏳ 正在重建所有 KB 签名...');fetch('/api/router/rebuild-signatures',{method:'POST'}).then(function(r){return r.json()}).then(function(d){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🔄 重建所有签名';}if(d.success){toast('已重建');location.reload()}else toast(d.error,'error')}).catch(function(e){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🔄 重建所有签名';}toast('请求失败','error')});}
 function rebuildOneSig(btn,n){if(_rebuilding)return;_rebuilding=true;if(btn){btn.disabled=true;btn.textContent='⏳ 重建中...';}toast('⏳ 正在重建「'+n+'」签名...');fetch('/api/router/rebuild-one',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kb_name:n})}).then(function(r){return r.json()}).then(function(d){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🏗️ 重建签名';}if(d.success){toast('「'+n+'」已重建');location.reload()}else toast(d.error,'error')}).catch(function(e){_rebuilding=false;if(btn){btn.disabled=false;btn.textContent='🏗️ 重建签名';}toast('请求失败','error')});}
 function toggleAutoRebuild(){fetch('/api/router/toggle-auto-rebuild',{method:'POST'}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('入库全量重建:'+(d.enabled?'开':'关'));setTimeout(function(){location.reload()},200)}else toast(d.error,'error')});}
+var _rebuilding_hnsw=false;
+function rebuildHnsw(btn,n){if(_rebuilding_hnsw)return;_rebuilding_hnsw=true;if(btn){btn.disabled=true;btn.textContent='⏳ HNSW...';}toast('⏳ 正在重建「'+n+'」HNSW...');fetch('/api/kb/rebuild-hnsw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kb_name:n})}).then(function(r){return r.json()}).then(function(d){_rebuilding_hnsw=false;if(btn){btn.disabled=false;btn.textContent='🔨 HNSW';}if(d.success){toast('「'+n+'」HNSW 已重建: '+d.message);setTimeout(function(){location.reload()},500)}else toast(d.error||'未知错误','error')}).catch(function(e){_rebuilding_hnsw=false;if(btn){btn.disabled=false;btn.textContent='🔨 HNSW';}toast('请求失败','error')});}
+function updateHnswM(n){var v=document.getElementById('hnsw-m-'+n).value;if(!v||v<4||v>256)return;fetch('/api/kb/hnsw-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kb_name:n,hnsw_m:parseInt(v)})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast(n+': M='+v+(d.rebuilt?' (HNSW 已重建)':''));if(d.rebuilt)setTimeout(function(){location.reload()},500)}else toast(d.error,'error')});}
+function toggleHnswAuto(n){var v=document.getElementById('hnsw-auto-'+n).checked;fetch('/api/kb/hnsw-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kb_name:n,auto_rebuild_hnsw:v})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast(n+': 自动重建'+(v?'开':'关'));if(d.rebuilt)setTimeout(function(){location.reload()},500)}else toast(d.error,'error')});}
 function toggleSortRules(){var e=document.getElementById('adv-rules-content'),a=document.getElementById('adv-rules-arrow'),o=e.style.display==='block';e.style.display=o?'none':'block';a.textContent=o?'▶':'▼';if(!o)refreshSortRules();}
 function refreshSortRules(){fetch('/api/reranker/rules',{method:'POST'}).then(function(r){return r.json()}).then(function(d){var e=document.getElementById('sort-rules-list'),rules=d.rules||[];if(!rules.length){e.innerHTML='<span style=\"color:#aaa;\">暂无</span>';return}e.innerHTML=rules.map(function(r,i){return'<div style=\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #eee;\"><div style=\"flex:1;font-size:12px;\">#'+(i+1)+' '+JSON.stringify(r)+'</div><button class=\"btn btn-danger\" style=\"padding:2px 8px;font-size:11px;\" onclick=\"deleteSortRule('+i+')\">x</button></div>'}).join('')});}
 function deleteSortRule(i){if(!confirm('删除规则 #'+(i+1)+'?'))return;fetch('/api/reranker/rules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})}).then(function(r){return r.json()}).then(function(d){if(d.success){toast('已删除');refreshSortRules()}else toast(d.error,'error')});}
@@ -1936,7 +1934,16 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
     <div id="kb-list" style="margin-bottom:8px;">
       {' '.join(f'''<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;">
         <div style="flex:1;"><strong>{name}</strong> - {info.get("description","")} [{info.get("doc_count",0)} 文档]</div>
-        <span><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="openKbBrowser('{name}')">📂 浏览</button> <button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="rebuildOneSig(this,'{name}')">🏗️ 重建签名</button> <span style="color:#888;font-size:11px;">模型编辑在规则中</span></span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:11px;">
+          <label>M=<input type="number" id="hnsw-m-{name}" value="{info.get("hnsw_m",16)}" min="4" max="256" style="width:50px;padding:2px 4px;border:1px solid #ccc;border-radius:4px;font-size:11px;" onchange="updateHnswM('{name}')"></label>
+          <label class="toggle-switch" style="transform:scale(0.7);" title="自动重建 HNSW">
+            <input type="checkbox" id="hnsw-auto-{name}" {"checked" if info.get("auto_rebuild_hnsw",False) else ""} onchange="toggleHnswAuto('{name}')"><span class="toggle-slider"></span>
+          </label>
+          <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;" onclick="rebuildHnsw(this,'{name}')">🔨 HNSW</button>
+          <button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="openKbBrowser('{name}')">📂 浏览</button>
+          <button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;" onclick="rebuildOneSig(this,'{name}')">🏗️ 签名</button>
+          <span style="color:#888;font-size:11px;">模型在规则</span>
+        </span>
       </div>''' for name, info in kbs.items())}
     </div>
     <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:4px;">
@@ -2656,7 +2663,7 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/kb/tech-recount":
                 try:
                     from knowledge_base_manager import _load_index, _save_index
-                    from langchain_chroma import Chroma
+                    from chroma_adapter import Chroma
                     from rag_core import get_embeddings
                     emb = get_embeddings()
                     index = _load_index()
@@ -2771,6 +2778,34 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                 models = [m for m in all_models if m.get("model_id","").lower() not in reranker_ids and m.get("model_id","").lower() not in nli_ids]
                 self._send_json({"success": True, "kb_models": kb_models, "models": models})
 
+            elif path == "/api/kb/rebuild-hnsw":
+                data = self._read_body()
+                kb_name = data.get("kb_name", "")
+                if not kb_name:
+                    self._send_json({"success": False, "error": "kb_name 不能为空"})
+                    return
+                from knowledge_base_manager import rebuild_kb_hnsw
+                ok, msg = rebuild_kb_hnsw(kb_name)
+                self._send_json({"success": ok, "message": msg})
+
+            elif path == "/api/kb/hnsw-config":
+                data = self._read_body()
+                from knowledge_base_manager import get_kb_hnsw_config, set_kb_hnsw_config
+                # GET 模式：返回所有 KB 的 HNSW 配置
+                if data.get("kb_name") and "hnsw_m" not in data and "auto_rebuild_hnsw" not in data:
+                    cfg = get_kb_hnsw_config(data["kb_name"])
+                    self._send_json({"success": True, **cfg})
+                    return
+                # POST 模式：设置配置
+                kb_name = data.get("kb_name", "")
+                if not kb_name:
+                    self._send_json({"success": False, "error": "kb_name 不能为空"})
+                    return
+                hnsw_m = data.get("hnsw_m")
+                auto_rebuild = data.get("auto_rebuild_hnsw")
+                ok, msg, rebuilt = set_kb_hnsw_config(kb_name, hnsw_m=hnsw_m, auto_rebuild_hnsw=auto_rebuild)
+                self._send_json({"success": ok, "message": msg, "rebuilt": rebuilt})
+
             elif path == "/api/recommend":
                 data = self._read_body()
                 cfg = load_config()
@@ -2778,13 +2813,20 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
                     # LLM 模式：构造 prompt 调用外部 LLM
                     desc = data["description"]
                     try:
-                        from langchain_community.llms import OpenAI
-                        llm = OpenAI(
-                            base_url=cfg.get("llm", {}).get("base_url", "http://localhost:1234/v1"),
-                            api_key="not-needed",
-                            temperature=0.1,
-                            max_tokens=256,
+                        import requests as _req
+                        llm_url = cfg.get("llm", {}).get("base_url", "http://localhost:1234/v1").rstrip("/")
+                        llm_resp = _req.post(
+                            f"{llm_url}/chat/completions",
+                            json={
+                                "model": "gpt-3.5-turbo",
+                                "messages": [{"role": "user", "content": ""}],
+                                "temperature": 0.1,
+                                "max_tokens": 256,
+                            },
+                            headers={"Authorization": "Bearer not-needed"},
+                            timeout=30,
                         )
+                        llm_resp.raise_for_status()
                         prompt = f"""根据以下用户描述，推荐 RAG 切片配置。
 
 用户描述：{desc}
@@ -2795,7 +2837,20 @@ class RAGHandler(http.server.BaseHTTPRequestHandler):
 
 请返回 JSON 格式推荐，包含 strategy, guards(数组), secondary(或null), chunk_size(或null)：
 """
-                        raw = llm.invoke(prompt).strip()
+                        # 发送 prompt 到 LLM
+                        llm_resp = _req.post(
+                            f"{llm_url}/chat/completions",
+                            json={
+                                "model": "gpt-3.5-turbo",
+                                "messages": [{"role": "user", "content": prompt}],
+                                "temperature": 0.1,
+                                "max_tokens": 256,
+                            },
+                            headers={"Authorization": "Bearer not-needed"},
+                            timeout=30,
+                        )
+                        llm_resp.raise_for_status()
+                        raw = llm_resp.json()["choices"][0]["message"]["content"].strip()
                         # 提取 JSON
                         json_match = _re.search(r'\{.*\}', raw, _re.DOTALL)
                         if json_match:

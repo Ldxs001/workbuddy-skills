@@ -90,6 +90,10 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
             elif path == "/api/kb/signatures":
                 self._handle_signature_list()
 
+            elif path == "/api/kb/hnsw-config":
+                kb = qs.get("kb_name", [""])[0]
+                self._handle_hnsw_config(kb)
+
             elif path == "/api/prompt/template":
                 self._handle_prompt_template_get()
 
@@ -148,6 +152,12 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
 
             elif path == "/api/kb/signature/build":
                 self._handle_signature_build(body)
+
+            elif path == "/api/kb/hnsw-config":
+                self._handle_hnsw_update(body)
+
+            elif path == "/api/kb/rebuild-hnsw":
+                self._handle_hnsw_rebuild(body)
 
             elif path == "/api/kb/signature/rebuild-all":
                 self._handle_signature_rebuild_all()
@@ -288,7 +298,7 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
 
         from config import load_config
         from reranker import Reranker
-        from langchain_core.documents import Document
+        from utils import Document
 
         cfg = load_config()
         reranker = Reranker(cfg)
@@ -329,7 +339,7 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
             return
 
         from nli_classifier import get_nli_classifier
-        from langchain_core.documents import Document
+        from utils import Document
 
         classifier = get_nli_classifier()
         if classifier is None:
@@ -448,6 +458,45 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
         ok, msg = restore_kb_backup(kb, backup_name)
         if ok:
             self._ok(message=msg)
+        else:
+            self._err(msg)
+
+    # ── HNSW 管理 ─────────────────────────────────
+
+    def _handle_hnsw_config(self, kb: str):
+        """GET: 查询 KB 的 HNSW 配置"""
+        from knowledge_base_manager import get_kb_hnsw_config
+        if not kb:
+            self._err("缺少 kb 参数")
+            return
+        cfg = get_kb_hnsw_config(kb)
+        self._ok(kb=kb, **cfg)
+
+    def _handle_hnsw_update(self, body: dict):
+        """POST: 更新 HNSW 配置（M/自动重建）"""
+        from knowledge_base_manager import set_kb_hnsw_config
+        kb = body.get("kb_name", "")
+        if not kb:
+            self._err("缺少 kb_name 字段")
+            return
+        hnsw_m = body.get("hnsw_m")
+        auto_rebuild = body.get("auto_rebuild_hnsw")
+        ok, msg, rebuilt = set_kb_hnsw_config(kb, hnsw_m=hnsw_m, auto_rebuild_hnsw=auto_rebuild)
+        if ok:
+            self._ok(message=msg, rebuilt=rebuilt, kb=kb)
+        else:
+            self._err(msg)
+
+    def _handle_hnsw_rebuild(self, body: dict):
+        """POST: 手动触发 HNSW 重建"""
+        from knowledge_base_manager import rebuild_kb_hnsw
+        kb = body.get("kb_name", "")
+        if not kb:
+            self._err("缺少 kb_name 字段")
+            return
+        ok, msg = rebuild_kb_hnsw(kb)
+        if ok:
+            self._ok(message=msg, kb=kb)
         else:
             self._err(msg)
 

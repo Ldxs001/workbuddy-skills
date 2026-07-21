@@ -3,7 +3,7 @@ local-rag-builder 技能接口模块
 v0.2.0
 
 纯技能模式：只检索，不调用 LLM。
-- 无 LLM 依赖（不 import langchain_community.llms）
+- 无 LLM 依赖（不走 langchain_community.llms）
 - 无交互式 CLI
 - 所有输出为结构化 JSON，供任何智能体（xxxx 等）消费
 - prompt 模板在输出中被正确填充，智能体直接使用即可
@@ -75,10 +75,15 @@ def run_import(file_path, kb=None, json_output=False, auto_classify=False):
         # PDF 文件需要用解析器提取文本，不能当 UTF-8 文本读
         ext = os.path.splitext(file_path)[1].lower()
         if ext == ".pdf":
-            from langchain_community.document_loaders import PyPDFLoader
+            from pypdf import PdfReader
             try:
-                pdf_docs = PyPDFLoader(file_path).load()
-                content = "\n\n".join(d.page_content for d in pdf_docs)
+                pdf_reader = PdfReader(file_path)
+                page_texts = []
+                for p in pdf_reader.pages:
+                    t = p.extract_text() or ""
+                    if t:
+                        page_texts.append(t)
+                content = "\n\n".join(page_texts)
                 # 文本质量检测：CJK 占比过低 → OCR（无文本层或编码乱码）
                 total_chars = len(content)
                 cjk = sum(1 for c in content if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')

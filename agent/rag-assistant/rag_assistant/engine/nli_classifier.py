@@ -207,7 +207,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.query and args.docs:
-        from langchain_core.documents import Document
+        from utils import Document
         docs = [Document(page_content=d) for d in args.docs]
 
         clf = NLIClassifier(args.model or None)

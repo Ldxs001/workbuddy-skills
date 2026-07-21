@@ -115,9 +115,9 @@ def get_model_dimension(model_id: str) -> int | None:
     if dim is not None:
         return dim
     # 运行时检测
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from embeddings import SentenceTransformerEmbeddings
     try:
-        emb = HuggingFaceEmbeddings(model_name=model_id, model_kwargs={"local_files_only": True})
+        emb = SentenceTransformerEmbeddings(model_name=model_id, model_kwargs={"local_files_only": True})
         return len(emb.embed_query("测"))
     except Exception:
         return None
@@ -578,7 +578,7 @@ def download_model(model_id, sources=None, max_retries_per_source=3, max_sources
                         # 更新索引
                         index = _load_index()
                         index[model_id] = {
-                            "path": target_dir,
+                            "path": _resolve_actual_model_path(target_dir),
                             "source": source_name,
                             "size_mb": round(dir_size(target_dir), 1),
                             "status": "ready",
@@ -603,8 +603,32 @@ def download_model(model_id, sources=None, max_retries_per_source=3, max_sources
     return {"success": False, "path": "", "source": "", "details": "所有源均失败"}
 
 
+def _resolve_actual_model_path(model_dir):
+    """解析模型实际文件路径（处理 git-lfs snapshot 结构）
+
+    大多数模型（直接下载）：根目录就有 tokenizer.json / config.json → 直接用根目录
+    HuggingFace Git LFS 模型：根目录是空壳，文件在 snapshots/xxx/ → 指向 snapshot
+    """
+    for marker in ("tokenizer.json", "config.json",
+                   "pytorch_model.bin", "model.safetensors"):
+        if os.path.isfile(os.path.join(model_dir, marker)):
+            return model_dir
+
+    snap_dir = os.path.join(model_dir, "snapshots")
+    if os.path.isdir(snap_dir):
+        snaps = [d for d in os.listdir(snap_dir)
+                 if os.path.isdir(os.path.join(snap_dir, d))]
+        if snaps:
+            resolved = os.path.join(snap_dir, snaps[0])
+            for marker in ("tokenizer.json", "config.json",
+                           "pytorch_model.bin", "model.safetensors"):
+                if os.path.isfile(os.path.join(resolved, marker)):
+                    return resolved
+    return model_dir
+
+
 def verify_model(model_id_or_path):
-    """验证模型是否可用（尝试用 HuggingFaceEmbeddings 加载）"""
+    """验证模型是否可用（尝试加载）"""
     model_path = model_id_or_path
 
     # 如果是模型 ID，先查索引
@@ -715,8 +739,8 @@ def detect_local_embedding_models():
         # 试加载检测维度
         dim = None
         try:
-            from langchain_huggingface import HuggingFaceEmbeddings
-            emb = HuggingFaceEmbeddings(
+            from embeddings import SentenceTransformerEmbeddings
+            emb = SentenceTransformerEmbeddings(
                 model_name=entry_path,
                 model_kwargs={"local_files_only": True},
             )

@@ -26,16 +26,10 @@ import time
 import datetime
 
 REQUIRED_PACKAGES = [
-    "langchain",
-    "langchain-community",
-    "langchain-huggingface",
-    "langchain-chroma",
-    "langchain-text-splitters",
     "chromadb",
     "sentence-transformers",
     "huggingface-hub",
     "modelscope",
-    "openai",
 ]
 
 OPTIONAL_PACKAGES = {

@@ -5,6 +5,34 @@
 
 ---
 
+## [1.8.0b1] - 2026-07-21
+### 重大变更
+- **彻底脱 langchain**：移除全部 6 个 langchain 依赖（langchain, langchain-community, langchain-huggingface, langchain-chroma, langchain-text-splitters, openai），替换为原生调用
+- **自定 Document 数据类**（`utils.py`）：替代 `langchain_core.documents.Document`，全项目 12 处替换
+- **SentenceTransformer 嵌入包装器**（`embeddings.py`）：替代 `langchain_huggingface.HuggingFaceEmbeddings`，支持 embed_query/embed_documents 接口
+- **ChromaDB 原生适配器**（`chroma_adapter.py`）：替代 `langchain_chroma.Chroma`，直接在 chromadb PersistentClient 上封装 similarity_search/as_retriever/from_documents/add_documents 等接口
+- **手写切分器**（`text_splitter.py`）：5 种策略（fixed/recursive/headers/sentence/semantic）+ 3 种子切全部手写，零 langchain-text-splitters 依赖
+- **PyPDFLoader → pypdf.PdfReader**：`rag_core.py`, `agent.py`, `rag_skill.py` 三处 PDF 加载改用 vendor/pypdf
+- **TextLoader → open().read()**：全部文本文件读取改用原生文件操作
+- **OpenAI LLM → requests.post()**：`rag_standalone.py` 的 `get_llm()` 和 `rag_web_ui.py` 的 LLM 推荐改用 OpenAI 兼容 API 直调
+
+### 新增
+- **HNSW 管理系统**：M 值可调（4-256）、自动重建开关、手动重建按钮，每 KB 独立配置
+  - `knowledge_base_manager.py`: `get_kb_hnsw_config()`, `set_kb_hnsw_config()`, `rebuild_kb_hnsw()`
+  - `rag_web_ui.py`: KB 列表每行加入 M 输入框 + 自动重建开关 + 🔨 HNSW 按钮 + JS 处理函数 + API 端点
+  - `external_api.py`: `GET /api/kb/hnsw-config`, `POST /api/kb/hnsw-config`, `POST /api/kb/rebuild-hnsw`
+- **模型路径自动解析**（`embedding_model_manager.py`）：`_resolve_actual_model_path()` 处理 HuggingFace Git LFS 结构的 snapshot 目录发现，写入索引时自动指向真文件位置
+- **vendor 目录加入 sys.path**（`__init__.py`）：使 `from pypdf import PdfReader` 在所有子模块中可用
+
+### 修复
+- **NLI 模型加载失败**：`model_index.json` 中 `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` 路径指向 git-lfs root 而非 snapshot 子目录 → 修正为 snapshot 路径
+- **HNSW 自动重建后召回率异常**：多 KB 因 UUID 目录清理后 ChromaDB 自动重建的 HNSW 索引质量差 → 新增全量重建机制（删 collection + 重新 embed + 写入），召回率从 0/5 恢复至 3/5
+- **ChromaDB collection 命名不兼容**：新适配器用目录名作 collection 名 → 修正为 `"langchain"`（与原 langchain_chroma 默认一致）
+
+### 变更
+- **依赖精简**：`requirements.txt` 移除 `langchain`, `langchain-community`, `langchain-huggingface`, `langchain-chroma`, `langchain-text-splitters`, `openai`；保留 `chromadb`, `sentence-transformers`, `huggingface-hub`, `modelscope`
+- **版本号**：`1.7.0` → `1.8.0b1`
+
 ## [1.7.0] - 2026-07-21
 ### 新增
 - **外部接入 API（port 8767）**：`rag_assistant/external_api.py` 独立服务，6 个能力域 27 个 REST 端点，与 Web UI 完全隔离

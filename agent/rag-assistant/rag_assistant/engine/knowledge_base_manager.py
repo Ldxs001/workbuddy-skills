@@ -124,6 +124,147 @@ def get_kb_model(kb_name):
     return entry.get("embedding_model", "")
 
 
+# ── HNSW 配置管理 ─────────────────────────────
+
+DEFAULT_HNSW_M = 16
+MAX_HNSW_M = 256
+
+def get_kb_hnsw_config(kb_name: str) -> dict:
+    """获取 KB 的 HNSW 配置：{hnsw_m, auto_rebuild_hnsw}"""
+    index = _load_index()
+    entry = index.get(kb_name, {})
+    return {
+        "hnsw_m": entry.get("hnsw_m", DEFAULT_HNSW_M),
+        "auto_rebuild_hnsw": entry.get("auto_rebuild_hnsw", False),
+    }
+
+
+def set_kb_hnsw_config(kb_name: str, hnsw_m: int = None,
+                       auto_rebuild_hnsw: bool = None) -> tuple:
+    """设置 KB 的 HNSW 配置。M 值变化自动触重建，返回 (ok, msg, rebuilt)"""
+    index = _load_index()
+    if kb_name not in index:
+        return False, f"知识库 '{kb_name}' 不存在", False
+
+    entry = index[kb_name]
+    rebuilt = False
+
+    if hnsw_m is not None:
+        hnsw_m = max(4, min(int(hnsw_m), MAX_HNSW_M))
+        old_m = entry.get("hnsw_m", DEFAULT_HNSW_M)
+        entry["hnsw_m"] = hnsw_m
+        if hnsw_m != old_m:
+            rebuild_kb_hnsw(kb_name)
+            rebuilt = True
+
+    if auto_rebuild_hnsw is not None:
+        entry["auto_rebuild_hnsw"] = bool(auto_rebuild_hnsw)
+
+    _save_index(index)
+    return True, f"知识库 '{kb_name}' HNSW 配置已更新" + ("（M 值变化 → HNSW 已重建）" if rebuilt else ""), rebuilt
+
+
+def rebuild_kb_hnsw(kb_name: str) -> tuple:
+    """全量重建 KB 的 HNSW 索引：读所有 chunk → 删 collection → 重新 embed → 写入"""
+    from rag_core import get_embeddings
+    from chroma_adapter import Chroma
+    import chromadb, os, json, shutil, numpy as np, sqlite3
+
+    index = _load_index()
+    if kb_name not in index:
+        return False, f"知识库 '{kb_name}' 不存在"
+
+    persist_dir = index[kb_name]["path"]
+    hnsw_m = index[kb_name].get("hnsw_m", DEFAULT_HNSW_M)
+
+    if not os.path.isdir(persist_dir):
+        return False, f"知识库目录不存在: {persist_dir}"
+
+    db_path = os.path.join(persist_dir, "chroma.sqlite3")
+    if not os.path.isfile(db_path):
+        return False, f"知识库无数据库文件: {db_path}"
+
+    # 1. 从 SQLite 读所有 chunk 文本
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT id, string_value FROM embedding_metadata WHERE key='chroma:document' ORDER BY id")
+    rows = cur.fetchall()
+    conn.close()
+
+    if not rows:
+        return False, "知识库无文档数据"
+
+    # embedding_id 顺序列表
+    all_ids = [str(r[0]) for r in rows]
+    texts = [r[1] for r in rows]
+    print(f"  [HNSW 重建] {kb_name}: {len(texts)} 个 chunk")
+
+    # 2. 确定 embedding 模型
+    from knowledge_base_manager import get_kb_model as _gkm
+    model_id = _gkm(kb_name)
+    if not model_id:
+        model_id = ""  # 用全局默认
+
+    emb = get_embeddings(kb_name=kb_name)
+
+    # 3. 读所有 metadata
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    # 先拿所有文档的 metadata
+    cur.execute("""
+        SELECT e.embedding_id, em.key, em.string_value
+        FROM embeddings e
+        JOIN embedding_metadata em ON e.embedding_id = em.id
+        WHERE em.key != 'chroma:document'
+        ORDER BY e.embedding_id, em.id
+    """)
+    meta_rows = cur.fetchall()
+    conn.close()
+
+    # 按 embedding_id 分组
+    metas = {}
+    for eid, key, val in meta_rows:
+        if eid not in metas:
+            metas[eid] = {}
+        metas[eid][key] = val or ""
+
+    # 4. 删除旧 collection
+    client = chromadb.PersistentClient(path=persist_dir)
+    try:
+        client.delete_collection("langchain")
+    except Exception:
+        pass
+
+    # 5. 建新 collection（带 M 参数）
+    coll = client.create_collection(
+        "langchain",
+        metadata={"hnsw:space": "cosine", "hnsw:M": hnsw_m},
+    )
+
+    # 6. 分批重新 embedding 并写入
+    st_model = emb._model  # 从包装器获取底层 SentenceTransformer 模型
+
+    batch_size = 100
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+        batch_ids = all_ids[i:i+batch_size]
+        batch_metas = []
+        for eid in batch_ids:
+            m = metas.get(str(eid), {})
+            batch_metas.append(m if m else {"_": ""})  # ChromaDB 不接受空 dict
+
+        embs = st_model.encode(batch_texts, normalize_embeddings=True).tolist()
+        coll.add(ids=batch_ids, documents=batch_texts, embeddings=embs, metadatas=batch_metas)
+
+    # 7. 更新计数
+    cnt = coll.count()
+    index = _load_index()
+    index[kb_name]["doc_count"] = cnt
+    _save_index(index)
+
+    return True, f"HNSW 已重建: {kb_name} ({cnt} chunk, M={hnsw_m})"
+
+
 def delete_knowledge_base(name):
     """删除知识库"""
     index = _load_index()
@@ -157,7 +298,7 @@ def delete_knowledge_base(name):
 
 def get_kb_vectorstore(kb_name, embeddings):
     """获取知识库的向量存储对象"""
-    from langchain_chroma import Chroma
+    from chroma_adapter import Chroma
 
     index = _load_index()
     if kb_name not in index:
@@ -444,7 +585,7 @@ def list_kb_sources(kb_name: str) -> dict:
     if not os.path.isdir(persist_dir):
         return {}
     try:
-        from langchain_chroma import Chroma
+        from chroma_adapter import Chroma
         from rag_core import get_embeddings
         emb = get_embeddings()
         vs = Chroma(persist_directory=persist_dir, embedding_function=emb)
@@ -480,7 +621,7 @@ def get_kb_source_preview(kb_name: str, source: str, max_chars: int = 300) -> st
     if not os.path.isdir(persist_dir):
         return ""
     try:
-        from langchain_chroma import Chroma
+        from chroma_adapter import Chroma
         from rag_core import get_embeddings
         emb = get_embeddings()
         vs = Chroma(persist_directory=persist_dir, embedding_function=emb)
@@ -513,8 +654,8 @@ def move_kb_documents(src_kb: str, target_kb: str, sources: list) -> tuple:
     persist_tgt = index[target_kb]["path"]
 
     try:
-        from langchain_chroma import Chroma
-        from langchain_core.documents import Document
+        from chroma_adapter import Chroma
+        from utils import Document
         from rag_core import get_embeddings
 
         emb = get_embeddings()
@@ -587,7 +728,7 @@ def move_kb_documents(src_kb: str, target_kb: str, sources: list) -> tuple:
 def add_documents_to_kb(kb_name, documents, embeddings=None):
     """向知识库添加文档"""
     from config import load_config
-    from langchain_chroma import Chroma
+    from chroma_adapter import Chroma
 
     # 检查 KB 是否暂停写入
     if kb_name in load_config().get("kb_paused", []):
@@ -666,6 +807,14 @@ def add_documents_to_kb(kb_name, documents, embeddings=None):
             build_kb_signature(kb_name)           # 全量：从 ChromaDB 读取所有 chunk
         else:
             build_kb_signature(kb_name, documents) # 增量：基于刚入库的文档
+    except Exception:
+        pass
+
+    # 自动重建 HNSW（由 auto_rebuild_hnsw 开关控制）
+    try:
+        if index[kb_name].get("auto_rebuild_hnsw", False):
+            _rebuild_result = rebuild_kb_hnsw(kb_name)
+            print(f"  [HNSW auto-rebuild] {_rebuild_result[1]}")
     except Exception:
         pass
 
@@ -877,37 +1026,32 @@ def get_kb_stats():
 
 def load_documents_from_file(filepath):
     """从文件加载文档"""
-    from langchain_community.document_loaders import TextLoader
-    from langchain_core.documents import Document
+    from utils import Document
 
     ext = os.path.splitext(filepath)[1].lower()
 
     if ext in (".txt", ".md", ".py", ".json", ".yaml", ".yml"):
-        loader = TextLoader(filepath, encoding="utf-8")
-        return loader.load()
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        return [Document(page_content=content, metadata={"source": filepath})]
     else:
-        # 尝试 unstructured
-        try:
-            from langchain_community.document_loaders import UnstructuredFileLoader
-            loader = UnstructuredFileLoader(filepath)
-            return loader.load()
-        except Exception:
-            # 回退到基础文本读取
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-            return [Document(page_content=content, metadata={"source": filepath})]
+        # 回退到基础文本读取
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        return [Document(page_content=content, metadata={"source": filepath})]
 
 
 def load_documents_from_directory(dirpath):
     """从目录加载文档"""
-    from langchain_community.document_loaders import DirectoryLoader, TextLoader
-    from langchain_core.documents import Document
+    from utils import Document
 
     docs = []
     for ext in ("*.txt", "*.md"):
         for filepath in glob.glob(os.path.join(dirpath, "**", ext), recursive=True):
             try:
-                loader = TextLoader(filepath, encoding="utf-8")
+                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                docs.append(Document(page_content=content, metadata={"source": filepath}))
                 docs.extend(loader.load())
             except Exception:
                 pass

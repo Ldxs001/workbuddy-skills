@@ -62,7 +62,7 @@ _EMBEDDING_CACHE: dict = {}
 
 def get_embeddings(model_path=None, device="auto", kb_name=None):
     """获取嵌入模型实例（已缓存，同一路径只加载一次）"""
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from embeddings import SentenceTransformerEmbeddings
     import torch
 
     cfg = load_config()
@@ -121,7 +121,7 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
     if cache_key in _EMBEDDING_CACHE:
         return _EMBEDDING_CACHE[cache_key]
 
-    emb = HuggingFaceEmbeddings(
+    emb = SentenceTransformerEmbeddings(
         model_name=model_path,
         model_kwargs={"device": device, "local_files_only": True},
         encode_kwargs={"normalize_embeddings": emb_cfg.get("normalize_embeddings", True)},
@@ -132,7 +132,7 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
 
 def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, embeddings=None):
     """检索相关文档"""
-    from langchain_chroma import Chroma
+    from chroma_adapter import Chroma
 
     if embeddings is None:
         embeddings = get_embeddings(kb_name=kb_name)
@@ -409,9 +409,15 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     try:
         ext = os.path.splitext(file_path)[1].lower()
         if ext == ".pdf":
-            from langchain_community.document_loaders import PyPDFLoader
-            loader = PyPDFLoader(file_path)
-            docs = loader.load()
+            from pypdf import PdfReader
+            reader = PdfReader(file_path)
+            docs = []
+            for i, page in enumerate(reader.pages):
+                text = page.extract_text() or ""
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": os.path.basename(file_path), "page": i + 1}
+                ))
             # 扫描版 PDF 自动回退 OCR
             total_chars = sum(len(d.page_content) for d in docs)
             # 无文本层（0 字符或极少字符）→ 直接 OCR，与文件名无关
@@ -441,7 +447,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
                         arr = np.array(img)
                         result = reader.readtext(arr)
                         all_text.append("\n".join([r[1] for r in result]))
-                    from langchain_core.documents import Document
+                    from utils import Document
                     docs = [Document(
                         page_content="\n\n--- 换页 ---\n\n".join(all_text),
                         metadata={"source": os.path.basename(file_path), "ocr": True}
@@ -449,9 +455,12 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
                 except Exception as ocr_err:
                     raise RuntimeError(f"PDF 无文本且 OCR 失败: {ocr_err}")
         else:
-            from langchain_community.document_loaders import TextLoader
-            loader = TextLoader(file_path, encoding="utf-8")
-            docs = loader.load()
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            docs = [Document(
+                page_content=content,
+                metadata={"source": os.path.basename(file_path)}
+            )]
     except Exception as e:
         raise RuntimeError(f"文档加载失败: {e}")
 
