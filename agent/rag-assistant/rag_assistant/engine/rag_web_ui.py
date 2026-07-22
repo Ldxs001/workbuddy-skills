@@ -1851,7 +1851,7 @@ input:disabled + .toggle-slider {{ background: #ddd; cursor: not-allowed; }}
 
   <!-- Markdown 标题预处理 -->
   <div class="card">
-    <h2>🏷️ Markdown 标题预处理 <span style="font-weight:400;color:#888;font-size:12px;"> — 注入标题标记后使用层级切分</span></h2>
+    <h2>🏷️ Markdown 标题预处理 <span style="font-weight:400;color:#888;font-size:12px;"> — 对 PDF/OCR 提取的原始文本注入标题标记后使用层级切分</span></h2>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;background:#f5f5f5;border-radius:8px;">
       <label class="toggle-switch" onclick="togglePreproc(!this.querySelector('input').checked)">
         <input type="checkbox" id="preproc-enable" onclick="event.stopPropagation();togglePreproc(this.checked)" {'checked' if cfg.get('preprocess',{}).get('enabled') else ''}>
