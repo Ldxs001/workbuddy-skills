@@ -5,6 +5,52 @@
 
 ---
 
+## [2.0.0b1] - 2026-07-22
+### 重大变更 — 1.x → 2.x 迁移警告
+**HNSW 管理重构：ChromaDB 内置 HNSW → hnswlib 独立索引**
+- ChromaDB Rust 后端的 HNSW compactor 在 Windows 上存在持久化 bug，导致索引反复损坏
+- 2.x 将向量搜索改为 **hnswlib 独立管理**，ChromaDB 仅用于 metadata 存储
+- **从 1.x 升级到 2.x 必须重建 HNSW 索引**（启动时自动懒重建，或手动点击 🔨 HNSW）
+- hnswlib 索引文件存储位置：`data/_hnsw/{sm3_hash}/`（ASCII 路径，避免中文路径 bug）
+
+### 新增
+- **懒重建机制**：`retrieve_documents()` 检测到 hnswlib 为空但 ChromaDB SQLite 有数据时，自动触发 `rebuild_kb_hnsw()` 重建索引，用户不感知
+- **`estimate_rebuild_time.py`**：启动时加载嵌入模型 + 采样 10 条真实文档 chunk 测速，精确预估全库重建耗时。显示模型名称、每文档耗时 ms、预计分钟数
+- **`rebuild_all_hnsw.py`**：批量重建全部 KB 的 HNSW 索引，跳过已有有效索引的 KB 和空 KB，供 `setup.bat` 调用
+- **`setup.bat` Y/N/K 三选项**：Y 全量重建、N 跳过（后续懒重建或手动）、K 写入 `data/.no_hnsw_prompt` 永久跳过，再次部署 2.x 不再提示
+- **`kb_index.json` 启动对齐**：自动删除目录已不存在的残留条目
+- **懒重建控制台醒目标记**：重建开始/结束用 `===` 包围 + `⏳`/`✅` 标记，区分于普通输出
+- **导入后自动删除源文件**：`data/imports/` 下已入库文件自动 `os.unlink()`
+
+### 修复
+- **HNSW 重建 ID 映射错误（关键修复）**：`rebuild_kb_hnsw()` 原来用 SQLite `embedding_metadata.id` 行号作为 ChromaDB ID 存入 hnswlib 的 `_id_map`，但 ChromaDB 的文档 ID 是 SM3 哈希值（64 位十六进制串）。搜索时 hnswlib 返回 SQLite 行号，`chroma_coll.get(ids=[...])` 全部空命中。修复为 `JOIN embeddings` 表读取真实 `embedding_id`，重建后搜索正常返回结果
+- **`main.py` KB 扫描 `index` 未定义**：第 311 行 `index.get(entry, {})` 中 `index` 变量不存在导致 `NameError` → `except Exception: pass` 静默吞掉，输出"知识库: 无"。新增 `_load_index()` 导入 + `kb_index` 变量
+- **启动扫描触发全量懒重建**：`main.py` 扫描每个 KB 时调用 `retrieve_documents("test")`，内部检测到 hnswlib 为空触发 `rebuild_kb_hnsw()`，19 个 KB 全部重建，启动卡死数小时。改为只创建 Chroma adapter 验证可访问性，不触发重建
+- **`setup.bat` 括号内标签 + `else if` 语法**：`:ASK_HNSW` 标签位于 `if (...) { ... }` 块内 + `else if` 非标准 cmd.exe 语法，导致整个版本检测块被跳过，不弹交互、不启动浏览器。重写为纯 `goto` 流，无嵌套块
+- **`setup.bat` 杀进程静默失败**：`Get-CimInstance` + `Get-NetTCPConnection` PowerShell 命令用 `>nul 2>&1` 隐藏所有错误，权限不足时旧进程不杀、新进程起不来。改为 `server.pid` PID 文件精确杀 + 端口兜底
+- **`setup.bat` `[!]` 被延迟展开吃掉**：`setlocal enabledelayedexpansion` 下 `!` 触发变量展开，`[!]` 输出为 `[]`。改用 `***` 替代
+- **`__pycache__` 缓存旧 `_hnsw_storage_dir`**：`chroma_adapter.py` 代码已改但运行的 Python 进程加载旧 `.pyc`，`_hnsw_storage_dir` 仍返回 `data/kb/_hnsw/`，导致懒重建写到旧位置、Chroma adapter 从新位置读不到 → 反复触发懒重建。清除后解决
+- **`estimate_rebuild_time.py` 测速不准确**：用 `"测试文本" * 10` 测速（极短文本，12ms/条），实际文档 chunk 长 100-500 字（100ms+/条），预估偏差 8 倍。改为从 SQLite 随机取真实 chunk 测速
+- **`rebuild_kb_hnsw` 中 `encode()` 进度条被 `2>&1` 隐藏**：SentenceTransformer 默认 `show_progress_bar=True` 但 tqdm 在非 TTY 输出下自动隐藏。加显式 `show_progress_bar=True` 强制显示
+- **`kb_index.json` 残留已删除 KB 条目**：手动删 KB 目录后索引未更新显示旧 KB。启动时自动遍历索引检查目录是否存在，不存在则移除
+- **`default` 空 KB 每次启动报 `HNSW 损坏`**：扫描器跳过空 KB，不调用 `retrieve_documents`，无 warning 噪音
+- **导入后源文件未删除**：`agent.py` 第 895-901 行已有删除逻辑，但因之前 `UnboundLocalError` 导致导入函数抛异常退出，`success=True` 路径未走到。修复后导入成功自动 `os.unlink(pp)`
+
+### 变更
+- **彻底移除 langchain 依赖**：`langchain`, `langchain-community`, `langchain-huggingface`, `langchain-chroma`, `langchain-text-splitters`, `openai` 全部移除
+- **5 种切分策略手写替代**：fixed/recursive/headers/sentence/semantic，含 5 种守卫栈
+- **ChromaDB 降级为 metadata-only**：列式向量搜索走 hnswlib，ChromaDB 只存文本+键值对
+- **`count()` 改为 SQLite 实时查询**：不再依赖 hnswlib 或 ChromaDB API
+
+## [1.8.0] - 2026-07-21
+### 修复
+- **PDF 导入 UnboundLocalError**：`import_documents_to_kb()` 中 `from utils import Document` 位于 OCR 回退分支内导致 Python 局部变量提前引用崩溃，所有 PDF 入库均报"文档加载失败"。提升至函数顶层解决
+
+### 变更
+- **版本号**：`1.8.0b1` → `1.8.0`（正式版）
+
+---
+
 ## [1.8.0b1] - 2026-07-21
 ### 重大变更
 - **彻底脱 langchain**：移除全部 6 个 langchain 依赖（langchain, langchain-community, langchain-huggingface, langchain-chroma, langchain-text-splitters, openai），替换为原生调用

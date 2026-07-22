@@ -1,5 +1,6 @@
 # ── 核心 RAG 依赖 ────────────────────────────
 chromadb>=0.5
+hnswlib>=0.8
 sentence-transformers>=3.0
 huggingface-hub>=0.20
 modelscope>=1.15

@@ -298,20 +298,38 @@ def main():
     kb_ok = kb_bad = 0
     try:
         from rag_core import get_embeddings, retrieve_documents
+        from knowledge_base_manager import _load_index, _save_index
         emb = get_embeddings()
         kb_dir = os.path.join(data_dir, "kb")
+        kb_index = _load_index()
+        # 对齐索引：删除目录已不存在的条目
+        stale = [name for name, info in kb_index.items()
+                 if not os.path.isdir(info.get("path", ""))]
+        for name in stale:
+            del kb_index[name]
+        if stale:
+            _save_index(kb_index)
+            print(f"  清理索引: 移除 {len(stale)} 个已删除的 KB 条目")
         if os.path.isdir(kb_dir):
             for entry in sorted(os.listdir(kb_dir)):
                 kp = os.path.join(kb_dir, entry)
-                if not os.path.isdir(kp) or entry.startswith("."):
+                if not os.path.isdir(kp) or entry.startswith(".") or entry.startswith("_"):
                     continue
                 if not os.path.isfile(os.path.join(kp, "chroma.sqlite3")):
                     continue
+                # 跳过空 KB（如 default 兜底库），不报 HNSW 损坏噪点
+                entry_info = kb_index.get(entry, {})
+                if entry_info.get("doc_count", 0) == 0:
+                    kb_ok += 1
+                    continue
                 try:
-                    retrieve_documents("test", kb_name=entry, k=1, embeddings=emb)
+                    # 只验证 KB 可访问，不触发懒重建（启动扫描不做全量 embedding）
+                    from chroma_adapter import Chroma
+                    vs = Chroma(persist_directory=kp, embedding_function=emb)
+                    _cnt = vs._hnsw.count()
                     kb_ok += 1
                 except Exception:
-                    logger.warning(f"  知识库 [{entry}] HNSW 损坏，已清理")
+                    logger.warning(f"  知识库 [{entry}] 不可访问")
                     kb_bad += 1
     except Exception:
         pass

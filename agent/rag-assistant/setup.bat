@@ -8,6 +8,70 @@ echo    RAG Assistant - Environment Setup
 echo ========================================
 echo.
 
+:: ── 版本检测与 HNSW 迁移提示 ───────────────────────
+set INIT_FILE=%~dp0rag_assistant\__init__.py
+set KILL_FILE=%~dp0data\.no_hnsw_prompt
+
+:: 读取当前版本号
+set CURR_VER=
+for /f "tokens=2 delims=^= " %%a in ('type "%INIT_FILE%" 2^>nul ^| findstr /b "__version__"') do set CURR_VER=%%a
+set CURR_VER=%CURR_VER:"=%
+if "%CURR_VER%"=="" set CURR_VER=2.0.0b1
+
+:: 取主版本号
+for /f "tokens=1 delims=.b-" %%m in ("%CURR_VER%") do set CURR_MAJOR=%%m
+
+:: ≥2.x 且未永久跳过 → 弹交互（不要用 else if，不用括号内标签）
+if "%CURR_MAJOR%"=="1" goto SKIP_HNSW
+if exist "%KILL_FILE%" goto SKIP_HNSW
+
+echo.
+echo ============================================================
+echo  *** 检测到 2.x 及以上版本 - HNSW 索引引擎已更换
+echo.
+echo   当前版本: %CURR_VER%
+echo   从 1.x 升级到此版本需要重建全部知识库的 HNSW 索引。
+echo.
+python "%~dp0estimate_rebuild_time.py"
+echo.
+echo   选择 N 后可通过以下途径重建:
+echo     [1] 手动: 在 Web 配置页点击每个 KB 的 [HNSW] 按钮
+echo     [2] API: POST /api/kb/rebuild-hnsw {"kb_name": "xxx"}
+echo     [3] 自动: 首次搜索该 KB 时自动触发懒重建
+echo.
+echo   输入 K 则将当前版本写入标记，永久跳过此提示
+echo.
+
+:ASK_HNSW
+set /p REBUILD_CHOICE="是否自动重建全部 HNSW 索引？(Y/N/K): "
+if /i "!REBUILD_CHOICE!"=="Y" goto DO_REBUILD
+if /i "!REBUILD_CHOICE!"=="N" goto SKIP_REBUILD
+if /i "!REBUILD_CHOICE!"=="K" goto KILL_PROMPT
+echo 请输入 Y / N / K
+goto ASK_HNSW
+
+:DO_REBUILD
+echo.
+echo 正在重建全部 HNSW 索引，请耐心等待...
+python "%~dp0rebuild_all_hnsw.py" 2>&1
+echo.
+echo [OK] HNSW 重建完成
+goto SKIP_HNSW
+
+:SKIP_REBUILD
+echo.
+echo [i] 已跳过 HNSW 重建，将在首次搜索时自动触发懒重建。
+goto SKIP_HNSW
+
+:KILL_PROMPT
+echo %CURR_VER%>"%KILL_FILE%"
+echo.
+echo [i] 已标记永久跳过。如需重新启用，删除 %KILL_FILE%
+
+:SKIP_HNSW
+
+:: ── 安装依赖 ─────────────────────────────────────
+
 :: Check Python
 python --version >nul 2>&1
 if %errorlevel% equ 0 (
@@ -68,9 +132,15 @@ echo ========================================
 echo   Ready. Launching RAG Assistant...
 echo ========================================
 
-:: Kill old instances — 用 PowerShell 精准杀（命令行含 main.py 的 python.exe）
-powershell -NoProfile -Command "& {Get-CimInstance Win32_Process -Filter \"name='python.exe' and CommandLine like '%%main.py%%'\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }}" >nul 2>&1
-:: 再用端口杀一次（兜底）
+:: Kill old instances - kill old server process
+echo [*] cleaning old process...
+:: 方法1: 按 PID 文件杀（最精准）
+if exist "%~dp0server.pid" (
+    set /p OLD_PID=<"%~dp0server.pid"
+    taskkill /F /PID !OLD_PID! >nul 2>&1
+    ping 127.0.0.1 -n 2 >nul
+)
+:: 方法2: 按端口杀（兜底）
 powershell -NoProfile -Command "& {Get-NetTCPConnection -LocalPort 8765,8766 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }}" >nul 2>&1
 timeout /t 2 /nobreak >nul
 

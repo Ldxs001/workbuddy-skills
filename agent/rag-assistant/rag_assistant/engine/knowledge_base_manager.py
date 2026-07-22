@@ -153,6 +153,7 @@ def set_kb_hnsw_config(kb_name: str, hnsw_m: int = None,
         hnsw_m = max(4, min(int(hnsw_m), MAX_HNSW_M))
         old_m = entry.get("hnsw_m", DEFAULT_HNSW_M)
         entry["hnsw_m"] = hnsw_m
+        _save_index(index)  # 先存盘，让 rebuild_kb_hnsw 能从磁盘读到新 M 值
         if hnsw_m != old_m:
             rebuild_kb_hnsw(kb_name)
             rebuilt = True
@@ -165,10 +166,12 @@ def set_kb_hnsw_config(kb_name: str, hnsw_m: int = None,
 
 
 def rebuild_kb_hnsw(kb_name: str) -> tuple:
-    """全量重建 KB 的 HNSW 索引：读所有 chunk → 删 collection → 重新 embed → 写入"""
+    """全量重建 HNSW 索引：从 SQLite 读取文档 → 删 hnswlib → 重新 embed → 写回 hnswlib
+    不碰 ChromaDB collection 的 segment，HNSW 搜索全走 hnswlib。
+    """
     from rag_core import get_embeddings
-    from chroma_adapter import Chroma
-    import chromadb, os, json, shutil, numpy as np, sqlite3
+    from chroma_adapter import Chroma, INDEX_FILE
+    import os, numpy as np, sqlite3
 
     index = _load_index()
     if kb_name not in index:
@@ -184,80 +187,76 @@ def rebuild_kb_hnsw(kb_name: str) -> tuple:
     if not os.path.isfile(db_path):
         return False, f"知识库无数据库文件: {db_path}"
 
-    # 1. 从 SQLite 读所有 chunk 文本
+    # 1. 从 SQLite 直接读取文档和 metadata（绕过 ChromaDB Rust 后端）
     conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("SELECT id, string_value FROM embedding_metadata WHERE key='chroma:document' ORDER BY id")
-    rows = cur.fetchall()
-    conn.close()
 
+    # 1a. 读取文档文本（同时取 ChromaDB 的真实 embedding_id）
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT em.id, e.embedding_id, em.string_value
+        FROM embedding_metadata em
+        JOIN embeddings e ON em.id = e.id
+        WHERE em.key='chroma:document'
+        ORDER BY em.id
+    """)
+    rows = cur.fetchall()
     if not rows:
+        conn.close()
         return False, "知识库无文档数据"
 
-    # embedding_id 顺序列表
-    all_ids = [str(r[0]) for r in rows]
-    texts = [r[1] for r in rows]
-    print(f"  [HNSW 重建] {kb_name}: {len(texts)} 个 chunk")
+    all_chroma_ids = [r[1] for r in rows]  # ChromaDB 真实 ID（SHA256 串）
+    all_texts = [r[2] for r in rows]
+    sqlite_ids = [r[0] for r in rows]      # 仅用于 metadata 关联
 
-    # 2. 确定 embedding 模型
-    from knowledge_base_manager import get_kb_model as _gkm
-    model_id = _gkm(kb_name)
-    if not model_id:
-        model_id = ""  # 用全局默认
-
-    emb = get_embeddings(kb_name=kb_name)
-
-    # 3. 读所有 metadata
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    # 先拿所有文档的 metadata
+    # 1b. 读取所有 metadata（拼接为 {id: {key: val}}）
     cur.execute("""
         SELECT e.embedding_id, em.key, em.string_value
         FROM embeddings e
         JOIN embedding_metadata em ON e.embedding_id = em.id
-        WHERE em.key != 'chroma:document'
         ORDER BY e.embedding_id, em.id
     """)
     meta_rows = cur.fetchall()
     conn.close()
 
-    # 按 embedding_id 分组
-    metas = {}
+    all_metas = {}
     for eid, key, val in meta_rows:
-        if eid not in metas:
-            metas[eid] = {}
-        metas[eid][key] = val or ""
+        if eid not in all_metas:
+            all_metas[eid] = {}
+        all_metas[eid][key] = val or ""
 
-    # 4. 删除旧 collection
-    client = chromadb.PersistentClient(path=persist_dir)
-    try:
-        client.delete_collection("langchain")
-    except Exception:
-        pass
+    # 按 all_ids 顺序整理 metadata
+    meta_list = [all_metas.get(int(eid), {}) for eid in sqlite_ids]
 
-    # 5. 建新 collection（带 M 参数）
-    coll = client.create_collection(
-        "langchain",
-        metadata={"hnsw:space": "cosine", "hnsw:M": hnsw_m},
-    )
+    print(f"  [HNSW 重建] {kb_name}: {len(all_chroma_ids)} 个 chunk (M={hnsw_m})")
 
-    # 6. 分批重新 embedding 并写入
-    st_model = emb._model  # 从包装器获取底层 SentenceTransformer 模型
+    # 2. 获取 embedding 模型
+    emb = get_embeddings(kb_name=kb_name)
+    st_model = emb._model
+    if st_model is None:
+        return False, "嵌入模型不可用"
 
+    # 3. 删除旧的 hnswlib 索引文件（新旧位置都清理）
+    from chroma_adapter import INDEX_FILE, _hnsw_storage_dir
+    for location in [persist_dir, _hnsw_storage_dir(persist_dir)]:
+        for fn in [INDEX_FILE, "hnsw_meta.json"]:
+            p = os.path.join(location, fn)
+            if os.path.exists(p):
+                os.remove(p)
+
+    # 4. 创建 Chroma adapter → 自动初始化新 hnswlib 索引
+    vs = Chroma(persist_directory=persist_dir, embedding_function=emb)
+
+    # 5. 批量重新 embedding 并写入 hnswlib
     batch_size = 100
-    for i in range(0, len(texts), batch_size):
-        batch_texts = texts[i:i+batch_size]
-        batch_ids = all_ids[i:i+batch_size]
-        batch_metas = []
-        for eid in batch_ids:
-            m = metas.get(str(eid), {})
-            batch_metas.append(m if m else {"_": ""})  # ChromaDB 不接受空 dict
+    for i in range(0, len(all_chroma_ids), batch_size):
+        batch_ids = all_chroma_ids[i:i+batch_size]
+        batch_texts = all_texts[i:i+batch_size]
 
-        embs = st_model.encode(batch_texts, normalize_embeddings=True).tolist()
-        coll.add(ids=batch_ids, documents=batch_texts, embeddings=embs, metadatas=batch_metas)
+        embs = st_model.encode(batch_texts, normalize_embeddings=True, show_progress_bar=True).tolist()
+        vs._hnsw.add_items(embs, batch_ids)
 
-    # 7. 更新计数
-    cnt = coll.count()
+    # 6. 更新计数
+    cnt = vs._hnsw.count()
     index = _load_index()
     index[kb_name]["doc_count"] = cnt
     _save_index(index)
@@ -427,7 +426,7 @@ def _kb_backup_dir(kb_name: str) -> str:
 
 # ── 压缩整个 KB 目录为 zip ──────────────────
 def _zip_kb(persist_dir: str, zip_path: str) -> bool:
-    """将 KB 目录（SQLite + HNSW）压缩为 zip"""
+    """将 KB 目录（SQLite + HNSW）以及 hnswlib 索引压缩为 zip"""
     try:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
             for root, _, files in os.walk(persist_dir):
@@ -435,20 +434,43 @@ def _zip_kb(persist_dir: str, zip_path: str) -> bool:
                     fp = os.path.join(root, fn)
                     arcname = os.path.relpath(fp, os.path.dirname(persist_dir))
                     zf.write(fp, arcname)
+            # 额外打包 hnswlib 索引（存在 data/_hnsw/ 下）
+            try:
+                from chroma_adapter import _hnsw_storage_dir
+                hnsw_dir = _hnsw_storage_dir(persist_dir)
+                if os.path.isdir(hnsw_dir):
+                    hnsw_rel = os.path.basename(hnsw_dir)
+                    for root, _, files in os.walk(hnsw_dir):
+                        for fn in files:
+                            fp = os.path.join(root, fn)
+                            arcname = os.path.join("_hnsw_store", hnsw_rel, fn)
+                            zf.write(fp, arcname)
+            except Exception:
+                pass  # hnswlib 索引不存在时跳过
         return True
     except Exception as e:
         print(f"  [backup error] 压缩失败: {e}")
         return False
 
 def _unzip_kb(zip_path: str, target_dir: str) -> bool:
-    """将 zip 备份解压恢复到目标目录"""
+    """将 zip 备份解压恢复到目标目录（含 hnswlib 索引）"""
     try:
         # 先删除目标目录（重建）
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir, ignore_errors=True)
         os.makedirs(target_dir, exist_ok=True)
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall(os.path.dirname(target_dir))
+            for name in zf.namelist():
+                if name.startswith("_hnsw_store/"):
+                    # hnswlib 索引 → data/_hnsw/{hash}/
+                    data_root = os.path.normpath(os.path.join(target_dir, "..", ".."))
+                    rel = name[len("_hnsw_store/"):]  # {hash}/hnsw_index.bin
+                    dest = os.path.join(data_root, "_hnsw", rel)
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with open(dest, "wb") as f:
+                        f.write(zf.read(name))
+                else:
+                    zf.extract(name, os.path.dirname(target_dir))
         return True
     except Exception as e:
         print(f"  [restore error] 解压恢复失败: {e}")
