@@ -5,6 +5,36 @@
 
 ---
 
+## [2.1.0b1] - 2026-07-23
+### 重大新增 — 插件系统
+RAG Assistant 引入标准化插件系统，支持信息补充类（input_return）和外部输出类（input_output）两种插件类型。智能体完全掌握决策权，插件为纯执行者，不做判断不主动触发。
+
+### 新增
+- **插件框架**：`rag_assistant/plugins/base.py` — PluginBase 抽象基类，定义 `execute()` 和 `open_config_ui()` 接口
+- **插件管理器**：`rag_assistant/plugins/manager.py` — 插件发现/注册/生命周期/配置持久化/超时熔断/文件沙箱/输出校验
+- **内置联网搜索插件**：`rag_assistant/plugins/builtin/web_search/` — 首个内置插件，支持 DuckDuckGo/Tavily/Google/Bing/自定义 五种后端，含 Tkinter 配置界面。前 3 个搜索结果自动抓取页面正文（content 字段优先，snippet 兜底，不足 100 字自动 urllib 抓取），Tavily 的 `content` 字段正确映射
+- **插件 Web UI 管理面板**：Web 界面新增"🔌 插件"Tab，支持查看/启用/禁用/配置插件，刷新按钮重新扫描
+- **插件引用标注**：LLM 回答中引用插件信息时标注 `[插件名称]`（如 `[联网搜索]`），与知识库 `[n]` 编号引用共存
+- **SM3 签名工具**：`tools/sign_plugin.py` + `tools/verify_plugin.py`，对插件代码文件和 plugin.json 计算 SM3 国密哈希（已修复 plugin.json 自引用问题，签名时自动排除 sm3_hash 字段）
+- **SM3 校验修复**：`manager.py` 的 `_compute_hash()` 在读取 plugin.json 时先去除 sm3_hash 字段，与签名工具计算方式一致
+
+### 插件系统设计要点
+- **标准化接口**：6字段池（question/answer_draft/thinking/rag_context/session_id/plugin_dir）→ 插件按需声明 → 智能体裁剪传递
+- **标准化返回**：`{type, content, priority, execution_error}`，支持 markdown/json/csv/plain_text
+- **mandatory 机制**：mandatory=true 时智能体必须调用（适合输出类插件），false 时智能体自主判断（搜索类）
+- **错误分级**：无 execution_error → 只报"xxx调用失败"；有 execution_error → 报"xxx调用失败：原因"
+- **5 道安全防线**：信息隔离（只给声明字段）→ 文件沙箱（仅 data/plugins/<name>/）→ 超时熔断（连续 3 次失败自动禁用）→ 输出校验（schema 非法丢弃）→ SM3 签名（可选）
+- **最小入侵**：不修改 agent.py 决策循环/动作解析/RAG 检索核心，只在 chat() 返回链路插入 2 个钩子点（before_response + after_response）
+
+### 修复
+- **联网搜索字段映射错误**：Tavily 返回 `content`（全文）而非 `snippet`，插件 `execute()` 改为优先取 `content`，其次 `snippet`，不足 100 字自动抓取页面
+
+### 变更
+- **Agent 启动流程**：插件管理器从延迟加载（首次 chat() 时）改为 `Agent.__init__()` 立即初始化，确保 Web UI 在首次对话前即可展示插件列表
+- **配置页移除旧搜索 UI**：原 LLM 配置卡片的"联网搜索"checkbox 和搜索后端配置已移除（由插件系统接管），移除对应 3 个 JS 函数和 3 个 Python 模板变量
+
+---
+
 ## [2.0.0b1] - 2026-07-22
 ### 重大变更 — 1.x → 2.x 迁移警告
 **HNSW 管理重构：ChromaDB 内置 HNSW → hnswlib 独立索引**

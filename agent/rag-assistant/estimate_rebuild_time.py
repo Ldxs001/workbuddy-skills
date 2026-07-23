@@ -31,22 +31,14 @@ if kb_name and doc_cnt > 0:
         from rag_core import get_embeddings
         emb = get_embeddings(kb_name=kb_name)
         model = emb._model
-        # 获取模型名称
-        try:
-            model_name = model._modules["0"]._modules["0"].config.name_or_path
-        except Exception:
-            try:
-                model_name = model._first_module().auto_model.config._name_or_path
-            except Exception:
-                model_name = type(model).__name__
 
-        # 从 SQLite 读真实文档 chunk 做测速（不能用 "测试文本"，长度差太多）
-        import sqlite3
+        # 测速：用真实 chunk 编码
+        from sqlite3 import connect
         kb_path = kbs[kb_name].get("path", "")
         db_path = os.path.join(kb_path, "chroma.sqlite3")
         bench_texts = ["测试文本"] * bench_samples  # 兜底
         if os.path.isfile(db_path):
-            conn = sqlite3.connect(db_path)
+            conn = connect(db_path)
             cur = conn.cursor()
             cur.execute(
                 "SELECT string_value FROM embedding_metadata WHERE key='chroma:document' ORDER BY RANDOM() LIMIT ?",
@@ -55,14 +47,29 @@ if kb_name and doc_cnt > 0:
             rows = cur.fetchall()
             conn.close()
             if rows:
-                bench_texts = [r[0][:1024] for r in rows]  # 截断到 1024 字符，避免极端长文本
+                bench_texts = [r[0][:1024] for r in rows]
 
-        # 测速：用真实 chunk 编码
         t0 = time.time()
         model.encode(bench_texts, normalize_embeddings=True)
         t1 = time.time()
         elapsed = t1 - t0
         sec_per_doc = elapsed / len(bench_texts)
+    except Exception:
+        pass
+
+# 模型名：优先从 emb._model_path 取，否则正则扫描 rag_config.json
+model_name = "?"
+try:
+    model_name = emb._model_path or model_name
+except Exception:
+    pass
+if model_name == "?":
+    try:
+        import re, json
+        _raw = open(os.path.join(_script_dir, "data", "config", "rag_config.json"), "r", encoding="utf-8").read()
+        _m = re.search(r'"embedding"\s*:\s*\{[^}]*?"model_path"\s*:\s*"([^"]+)"', _raw)
+        if _m:
+            model_name = _m.group(1)
     except Exception:
         pass
 

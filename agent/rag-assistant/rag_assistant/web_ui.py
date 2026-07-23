@@ -87,6 +87,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._compress_memory()
         elif path == "/api/memory/clear-context":
             self._clear_context()
+        elif path == "/api/plugins":
+            self._serve_plugin_list()
         elif path.startswith("/static/"):
             self._serve_static(path)
         else:
@@ -132,6 +134,12 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._handle_session_restore()
         elif path == "/api/session/delete":
             self._handle_session_delete()
+        elif path == "/api/plugins/toggle":
+            self._handle_plugin_toggle()
+        elif path == "/api/plugins/config":
+            self._handle_plugin_config()
+        elif path == "/api/plugins/refresh":
+            self._handle_plugin_refresh()
         else:
             self.send_response(404)
             self.end_headers()
@@ -283,6 +291,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('config')">⚙️ 配置</div>
   <div class="tab" onclick="switchTab('chat')">💬 对话</div>
+  <div class="tab" onclick="switchTab('plugins')">🔌 插件</div>
 </div>
 <div id="config-content" class="tab-content" style="display:block;">
   {config_html}
@@ -307,12 +316,27 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
     <div class="chat-input">
       <input type="file" id="file-input" multiple style="display:none" onchange="onFileSelected(this.files)">
       <input type="file" id="folder-input" webkitdirectory style="display:none" onchange="onFolderSelected(this.files)">
-      <button onclick="[credential-redacted]('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
-      <button onclick="[credential-redacted]('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
+      <button onclick="document.getElementById('file-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📄</button>
+      <button onclick="document.getElementById('folder-input').click()" style="padding:8px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px;">📁</button>
       <div id="file-status" style="display:none;flex:0 0 auto;max-width:260px;padding:6px 10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:12px;color:#2e7d32;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
       <textarea id="chat-input" rows="2" placeholder="输入问题或提问文件内容..."></textarea>
       <button id="send-btn" onclick="sendMessage()">发送</button>
     </div>
+  </div>
+</div>
+
+<!-- ── 插件管理面板 ── -->
+<div id="plugin-content" class="tab-content" style="display:none;padding:16px;max-width:720px;margin:0 auto;">
+  <h2 style="font-size:18px;margin-bottom:16px;">🔌 插件管理</h2>
+  <p style="font-size:13px;color:#888;margin-bottom:16px;">
+    启用/禁用插件，变更将在下一轮对话生效。
+    内置插件随系统自带，用户安装的插件放入 <code>data/plugins/</code> 目录。
+  </p>
+  <div id="plugin-list"></div>
+  <div id="plugin-install" style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:8px;border:1px dashed #ddd;">
+    <h3 style="font-size:14px;margin-bottom:8px;">安装插件</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:8px;">将插件目录放入 <code>data/plugins/</code> 后刷新页面即可。</p>
+    <button onclick="refreshPlugins()" style="padding:6px 16px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">刷新插件列表</button>
   </div>
 </div>
 
@@ -329,17 +353,20 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 // ── Tab 切换：style.display 直接控制，不依赖 CSS class ──
 function switchTab(name) {{
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab')[name === 'config' ? 0 : 1].classList.add('active');
-  [credential-redacted]('config-content').style.display = name === 'config' ? 'block' : 'none';
-  [credential-redacted]('chat-content').style.display = name === 'chat' ? 'flex' : 'none';
-  if (name === 'chat') setTimeout(function(){{var el=[credential-redacted]('chat-input');if(el)el.focus();}},100);
+  var idx = name === 'config' ? 0 : (name === 'chat' ? 1 : 2);
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+  document.getElementById('config-content').style.display = name === 'config' ? 'block' : 'none';
+  document.getElementById('chat-content').style.display = name === 'chat' ? 'flex' : 'none';
+  document.getElementById('plugin-content').style.display = name === 'plugins' ? 'block' : 'none';
+  if (name === 'chat') setTimeout(function(){{var el=document.getElementById('chat-input');if(el)el.focus();}},100);
+  if (name === 'plugins') loadPluginList();
 }}
 
 // ── 会话管理 ──
 function newSession() {{
   fetch('/api/session/new', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
     if(d.success) {{
-      [credential-redacted]('chat-messages').innerHTML = '<div class="msg assistant">新建对话「' + d.id + '」</div>';
+      document.getElementById('chat-messages').innerHTML = '<div class="msg assistant">新建对话「' + d.id + '」</div>';
       loadSessions();
     }}
   }});
@@ -351,7 +378,7 @@ function switchSession(id) {{
     body:JSON.stringify({{id: id}})
   }}).then(function(r){{return r.json()}}).then(function(d){{
     if(d.success) {{
-      var container = [credential-redacted]('chat-messages');
+      var container = document.getElementById('chat-messages');
       container.innerHTML = '';
       if(d.messages && d.messages.length) {{
         d.messages.forEach(function(m){{ addMessage(m.content, m.role, null, m.reasoning || null); }});
@@ -389,8 +416,8 @@ function deleteSession(id) {{
 function loadSessions() {{
   fetch('/api/session/list').then(function(r){{return r.json()}}).then(function(d){{
     if(!d.success) return;
-    var list = [credential-redacted]('sidebar-list');
-    var archList = [credential-redacted]('sidebar-archived-list');
+    var list = document.getElementById('sidebar-list');
+    var archList = document.getElementById('sidebar-archived-list');
     list.innerHTML = '';
     archList.innerHTML = '';
     var active = 0, archived = 0;
@@ -422,17 +449,104 @@ function loadSessions() {{
         active++;
       }}
     }});
-    [credential-redacted]('archived-count').textContent = archived;
-    [credential-redacted]('sidebar-archived').style.display = archived > 0 ? 'block' : 'none';
+    document.getElementById('archived-count').textContent = archived;
+    document.getElementById('sidebar-archived').style.display = archived > 0 ? 'block' : 'none';
   }});
 }}
 
 function toggleArchived() {{
-  var list = [credential-redacted]('sidebar-archived-list');
-  var toggle = [credential-redacted]('archived-toggle');
+  var list = document.getElementById('sidebar-archived-list');
+  var toggle = document.getElementById('archived-toggle');
   var hidden = list.style.display === 'none' || list.style.display === '';
   list.style.display = hidden ? 'block' : 'none';
   toggle.textContent = hidden ? '▾' : '▸';
+}}
+
+// ── 插件管理 ──
+function loadPluginList() {{
+  fetch('/api/plugins').then(function(r){{return r.json()}}).then(function(d){{
+    var list = document.getElementById('plugin-list');
+    list.innerHTML = '';
+    if (!d.plugins || !d.plugins.length) {{
+      list.innerHTML = '<p style="color:#888;font-size:13px;">暂无插件。</p>';
+      return;
+    }}
+    d.plugins.forEach(function(p){{
+      var card = document.createElement('div');
+      card.style.cssText = 'display:flex;align-items:center;padding:12px 14px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:8px;';
+      
+      var info = document.createElement('div');
+      info.style.cssText = 'flex:1;';
+      
+      var nameRow = document.createElement('div');
+      nameRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;';
+      nameRow.innerHTML = (p.builtin ? '<span style="color:#667eea;font-size:11px;padding:1px 5px;background:#e8eaf6;border-radius:4px;">内置</span>' : '') +
+        '<span>' + p.display_name + '</span>' +
+        '<span style="color:#aaa;font-size:12px;font-weight:400;">v' + p.version + '</span>';
+      info.appendChild(nameRow);
+      
+      var desc = document.createElement('div');
+      desc.style.cssText = 'font-size:12px;color:#888;margin-top:2px;';
+      desc.textContent = (p.description || '') + (p.author ? ' — ' + p.author : '');
+      info.appendChild(desc);
+      
+      card.appendChild(info);
+      
+      // 配置按钮
+      if (p.has_config_ui) {{
+        var cfgBtn = document.createElement('button');
+        cfgBtn.textContent = '配置';
+        cfgBtn.style.cssText = 'padding:4px 12px;background:#f0f0f5;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:12px;margin-right:6px;';
+        cfgBtn.onclick = function(){{ openPluginConfig(p.name); }};
+        card.appendChild(cfgBtn);
+      }}
+      
+      // 启用/禁用开关
+      var toggle = document.createElement('label');
+      toggle.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:#555;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = p.enabled;
+      cb.onchange = function(){{ togglePlugin(p.name, cb.checked); }};
+      toggle.appendChild(cb);
+      toggle.appendChild(document.createTextNode('启用'));
+      card.appendChild(toggle);
+      
+      list.appendChild(card);
+    }});
+  }});
+}}
+
+function togglePlugin(name, enabled) {{
+  fetch('/api/plugins/toggle', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{name: name, enabled: enabled}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if (d.success) {{
+      loadPluginList();
+    }} else {{
+      alert('操作失败：' + (d.error || '未知错误'));
+    }}
+  }});
+}}
+
+function openPluginConfig(name) {{
+  fetch('/api/plugins/config', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{name: name}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if (!d.success) alert('打开配置失败：' + (d.error || '未知错误'));
+  }});
+}}
+
+function refreshPlugins() {{
+  fetch('/api/plugins/refresh', {{method:'POST'}}).then(function(r){{return r.json()}}).then(function(d){{
+    if (d.success) {{
+      loadPluginList();
+    }} else {{
+      alert('刷新失败：' + (d.error || '未知错误'));
+    }}
+  }});
 }}
 
 // ── 对话 ──
@@ -440,21 +554,21 @@ let isStreaming = false;
 
 function sendMessage() {{
   if (isStreaming) return;
-  var input = [credential-redacted]('chat-input');
+  var input = document.getElementById('chat-input');
   var msg = input.value.trim();
   if (!msg) return;
   input.value = '';
   addMessage(msg, 'user');
   addMessage('思考中...', 'assistant', 'thinking');
   isStreaming = true;
-  [credential-redacted]('send-btn').disabled = true;
+  document.getElementById('send-btn').disabled = true;
 
   fetch('/api/chat', {{
     method: 'POST',
     headers: {{'Content-Type':'application/json'}},
     body: JSON.stringify({{message: msg}})
   }}).then(function(r){{return r.json()}}).then(function(d){{
-    var thinking = [credential-redacted]('thinking');
+    var thinking = document.getElementById('thinking');
     if (thinking) thinking.remove();
     if (d.success) {{
       addMessage(d.text, 'assistant', null, d.reasoning);
@@ -462,14 +576,14 @@ function sendMessage() {{
       addMessage('抱歉，处理出错：' + (d.error || '未知错误'), 'system');
     }}
     isStreaming = false;
-    [credential-redacted]('send-btn').disabled = false;
+    document.getElementById('send-btn').disabled = false;
     loadSessions();
   }}).catch(function(e){{
-    var thinking = [credential-redacted]('thinking');
+    var thinking = document.getElementById('thinking');
     if (thinking) thinking.remove();
     addMessage('网络错误：' + e.message, 'system');
     isStreaming = false;
-    [credential-redacted]('send-btn').disabled = false;
+    document.getElementById('send-btn').disabled = false;
   }});
 }}
 
@@ -551,20 +665,20 @@ function addMessage(text, role, id, reasoning) {{
     div.appendChild(body);
   }}
 
-  [credential-redacted]('chat-messages').appendChild(div);
+  document.getElementById('chat-messages').appendChild(div);
   div.scrollIntoView({{behavior:'smooth', block:'end'}});
 }}
 
-[credential-redacted]('chat-input').addEventListener('keydown', function(e) {{
+document.getElementById('chat-input').addEventListener('keydown', function(e) {{
   if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
 }});
 
 // ── 模态弹窗 ──
 function showModal(title, msg, buttons) {{
-  var overlay = [credential-redacted]('modal-overlay');
-  [credential-redacted]('modal-title').textContent = title;
-  [credential-redacted]('modal-msg').textContent = msg;
-  var btns = [credential-redacted]('modal-buttons');
+  var overlay = document.getElementById('modal-overlay');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-msg').textContent = msg;
+  var btns = document.getElementById('modal-buttons');
   btns.innerHTML = '';
   (buttons || [{{text:'确定',primary:true,action:function(){{hideModal();}}}}]).forEach(function(b){{
     var btn = document.createElement('button');
@@ -576,7 +690,7 @@ function showModal(title, msg, buttons) {{
   overlay.style.display = 'flex';
 }}
 function hideModal() {{
-  [credential-redacted]('modal-overlay').style.display = 'none';
+  document.getElementById('modal-overlay').style.display = 'none';
 }}
 
 // ── 上传 ──
@@ -605,7 +719,7 @@ function uploadToServer(files) {{
   var uploaded = [];
   function next(i) {{
     if (i >= files.length) {{
-      var el = [credential-redacted]('uploading');
+      var el = document.getElementById('uploading');
       if (el) el.remove();
       if (uploaded.length) {{
         var msg = '📦 已上传 ' + uploaded.length + ' 个文件到服务器，可以说「入库」批量导入';
@@ -636,7 +750,7 @@ function uploadToServer(files) {{
 }}
 
 function updateFileStatus() {{
-  var el = [credential-redacted]('file-status');
+  var el = document.getElementById('file-status');
   if (!uploadedPaths.length) {{ el.style.display = 'none'; return; }}
   var names = uploadedPaths.map(function(p){{ return p.split('/').pop() || p.split('\\\\').pop(); }}).slice(0, 3).join(', ');
   el.textContent = '📦 已上传 ' + uploadedPaths.length + ' 个文件: ' + names;
@@ -649,7 +763,7 @@ loadSessions();
 (function loadChatHistory() {{
   fetch('/api/chat/history').then(function(r){{return r.json()}}).then(function(d){{
     if(d.success && d.messages && d.messages.length) {{
-      var container = [credential-redacted]('chat-messages');
+      var container = document.getElementById('chat-messages');
       container.innerHTML = '';
       d.messages.forEach(function(m){{ addMessage(m.content, m.role, null, m.reasoning || null); }});
     }}
@@ -670,9 +784,6 @@ loadSessions();
         llm_max_tokens = llm.get("max_tokens", 4096)
         llm_timeout = llm.get("timeout", 180)
         llm_model = llm.get("model", "")
-        web_search = cfg.get("web_search_enabled", False)
-        search = cfg.get("search", {})
-        search_backend = search.get("backend", "duckduckgo")
         mem_cfg = cfg.get("memory", {})
         compress_ratio = mem_cfg.get("compress_ratio", 0.7)
         compress_remove_ratio = mem_cfg.get("compress_remove_ratio", 0.4)
@@ -682,7 +793,7 @@ loadSessions();
           <!-- LLM 配置卡片 -->
           <div style="border:0.5px solid #e0e0e0;border-radius:10px;background:#fff;">
             <div onclick="togglePanel('llm-panel','llm-arrow')" style="padding:12px 16px;cursor:pointer;font-size:14px;font-weight:500;color:#444;user-select:none;display:flex;align-items:center;gap:6px;">
-              <span id="llm-arrow">▾</span> LLM / 联网搜索
+              <span id="llm-arrow">▾</span> LLM
             </div>
             <div id="llm-panel" style="padding:0 16px 12px;">
               <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
@@ -697,37 +808,7 @@ loadSessions();
                 <input type="number" id="llm-maxtokens" value="{llm_max_tokens}" min="512" max="131072" step="1024" onchange="saveLLM()" style="width:90px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;" title="最大输出token数">
                 <button onclick="loadModels()" style="padding:6px 12px;background:#f0f0f5;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:12px;">🔄</button>
                 <button onclick="testLLM()" style="padding:6px 12px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">测试</button>
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;">
-                  <input type="checkbox" id="web-search-enabled" onchange="toggleWebSearch()" {"checked" if web_search else ""} style="accent-color:#667eea;">
-                  联网搜索
-                </label>
                 <span id="llm-status" style="font-size:12px;color:#888;"></span>
-              </div>
-              <div id="search-config" style="display:{'block' if web_search else 'none'};margin-top:8px;padding:8px 12px;background:#f8f9fc;border:1px solid #e0e0e0;border-radius:8px;">
-                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                  <select id="search-backend" onchange="onSearchBackendChange()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
-                    <option value="duckduckgo" {"selected" if search_backend=='duckduckgo' else ""}>DuckDuckGo（免费）</option>
-                    <option value="tavily" {"selected" if search_backend=='tavily' else ""}>Tavily（需 API Key）</option>
-                    <option value="google" {"selected" if search_backend=='google' else ""}>Google Custom Search</option>
-                    <option value="bing" {"selected" if search_backend=='bing' else ""}>Bing Search</option>
-                    <option value="custom" {"selected" if search_backend=='custom' else ""}>自定义 API</option>
-                  </select>
-                  <div id="search-key-group" style="display:{'inline-block' if search_backend in ('tavily','custom') else 'none'};">
-                    <input type="password" id="search-api-key" placeholder="API Key" value="{search.get('api_key','')}" onchange="saveSearchConfig()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:200px;">
-                  </div>
-                  <div id="search-google-group" style="display:{'inline-block' if search_backend=='google' else 'none'};">
-                    <input type="password" id="search-google-key" placeholder="Google API Key" value="{search.get('google_key','')}" onchange="saveSearchConfig()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:160px;">
-                    <input type="text" id="search-google-cx" placeholder="Search CX" value="{search.get('google_cx','')}" onchange="saveSearchConfig()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:160px;">
-                  </div>
-                  <div id="search-bing-group" style="display:{'inline-block' if search_backend=='bing' else 'none'};">
-                    <input type="password" id="search-bing-key" placeholder="Bing API Key" value="{search.get('bing_key','')}" onchange="saveSearchConfig()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:200px;">
-                  </div>
-                  <div id="search-custom-group" style="display:{'inline-block' if search_backend=='custom' else 'none'};">
-                    <input type="text" id="search-custom-url" placeholder="URL，用 {{q}} {{key}} 占位" value="{search.get('custom_url','')}" onchange="saveSearchConfig()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:250px;">
-                    <input type="password" id="search-custom-key" placeholder="API Key（可选）" value="{search.get('api_key','')}" onchange="saveSearchConfig()" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;width:150px;">
-                  </div>
-                  <span id="search-status" style="font-size:11px;color:#888;"></span>
-                </div>
               </div>
             </div>
           </div>
@@ -764,12 +845,12 @@ loadSessions();
             <div style="width:32px;height:32px;border:3px solid #e0d4f5;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
             <div>配置页加载中…（首次启动需探测模型源，耗时约 5-15 秒）</div>
           </div>
-          <iframe id="rag-iframe" src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:100%;border:none;" onload="[credential-redacted]('rag-iframe-loader').style.display='none';"></iframe>
+          <iframe id="rag-iframe" src="http://localhost:{rag_port}/?_t={int(time.time())}" style="width:100%;height:100%;border:none;" onload="document.getElementById('rag-iframe-loader').style.display='none';"></iframe>
         </div>
         <script>
         function togglePanel(panelId, arrowId) {{
-          var panel = [credential-redacted](panelId);
-          var arrow = [credential-redacted](arrowId);
+          var panel = document.getElementById(panelId);
+          var arrow = document.getElementById(arrowId);
           if (!panel || !arrow) return;
           var hidden = panel.style.display === 'none';
           panel.style.display = hidden ? 'block' : 'none';
@@ -781,7 +862,7 @@ loadSessions();
             ['llm-panel','mem-panel','qt-panel'].forEach(function(pid) {{
               var val = localStorage.getItem('rag_cfg_' + pid);
               if (val === '1') {{
-                var panel = [credential-redacted](pid);
+                var panel = document.getElementById(pid);
                 var arrows = document.querySelectorAll('[onclick*="' + pid + '"]');
                 if (panel) panel.style.display = 'none';
                 arrows.forEach(function(a) {{ var sp = a.querySelector('span'); if(sp) sp.textContent = '▸'; }});
@@ -794,7 +875,7 @@ loadSessions();
           fetch('/api/config/query_types').then(function(r){{return r.json()}}).then(function(d){{ if(d.success) {{ queryTypes = d.types || {{}}; renderQueryTypes(); }} }});
         }}
         function renderQueryTypes() {{
-          var list = [credential-redacted]('query-type-list');
+          var list = document.getElementById('query-type-list');
           list.innerHTML = '';
           Object.keys(queryTypes).forEach(function(key) {{
             var t = queryTypes[key];
@@ -835,11 +916,11 @@ loadSessions();
           }});
         }}
         function showQueryTypeForm(existing, onSave) {{
-          var overlay = [credential-redacted]('modal-overlay');
-          var box = [credential-redacted]('modal-box');
+          var overlay = document.getElementById('modal-overlay');
+          var box = document.getElementById('modal-box');
           box.style.maxWidth = '560px';
-          [credential-redacted]('modal-title').textContent = existing ? '编辑查询类型' : '添加查询类型';
-          var msg = [credential-redacted]('modal-msg');
+          document.getElementById('modal-title').textContent = existing ? '编辑查询类型' : '添加查询类型';
+          var msg = document.getElementById('modal-msg');
           msg.innerHTML = ''; msg.style.textAlign = 'left'; msg.style.fontSize = '13px';
           msg.style.color = '#444'; msg.style.marginBottom = '16px'; msg.style.maxHeight = '60vh'; msg.style.overflowY = 'auto';
           var addField = function(lbl, help, value) {{
@@ -861,7 +942,7 @@ loadSessions();
           var entitiesF = addField('entities 填写规则', '说明此类问题，entities 应该填什么。例如：取主体/名词，问题涉及的核心事物', existingRules.entities || '');
           var attrsF = addField('attrs 填写规则', '说明此类问题，attrs 应该填什么。例如：目的/属性，用户想查询的维度', existingRules.attrs || '');
           var relF = addField('rel 填写规则', '说明此类问题，rel 应该填什么。例如：留空 / 对比 / 因果', existingRules.rel || '');
-          var btns = [credential-redacted]('modal-buttons'); btns.innerHTML = '';
+          var btns = document.getElementById('modal-buttons'); btns.innerHTML = '';
           var cancelBtn = document.createElement('button'); cancelBtn.textContent = '取消'; cancelBtn.className = 'modal-btn';
           cancelBtn.onclick = function() {{ hideModal(); }}; btns.appendChild(cancelBtn);
           var saveBtn = document.createElement('button'); saveBtn.textContent = '保存'; saveBtn.className = 'modal-btn-primary';
@@ -887,51 +968,29 @@ loadSessions();
           ]);
         }}
         function saveLLM() {{
-          fetch('/api/config/llm', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{backend: [credential-redacted]('llm-backend').value, model: [credential-redacted]('llm-model').value, timeout: parseInt([credential-redacted]('llm-timeout').value) || 180, maxtokens: parseInt([credential-redacted]('llm-maxtokens').value) || 4096}})}});
+          fetch('/api/config/llm', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{backend: document.getElementById('llm-backend').value, model: document.getElementById('llm-model').value, timeout: parseInt(document.getElementById('llm-timeout').value) || 180, maxtokens: parseInt(document.getElementById('llm-maxtokens').value) || 4096}})}});
         }}
         function saveMemoryConfig() {{
-          var body = {{compress_ratio: parseFloat([credential-redacted]('mem-compress-ratio').value) || 0.7, compress_remove_ratio: parseFloat([credential-redacted]('mem-remove-ratio').value) || 0.4, max_sessions: parseInt([credential-redacted]('mem-max-sessions').value) || 20}};
-          fetch('/api/config/memory', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(body)}}).then(function(r){{return r.json()}}).then(function(d){{ [credential-redacted]('mem-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败'; }});
+          var body = {{compress_ratio: parseFloat(document.getElementById('mem-compress-ratio').value) || 0.7, compress_remove_ratio: parseFloat(document.getElementById('mem-remove-ratio').value) || 0.4, max_sessions: parseInt(document.getElementById('mem-max-sessions').value) || 20}};
+          fetch('/api/config/memory', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(body)}}).then(function(r){{return r.json()}}).then(function(d){{ document.getElementById('mem-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败'; }});
         }}
         function loadModels() {{
-          var sel = [credential-redacted]('llm-model');
-          var backend = [credential-redacted]('llm-backend').value;
+          var sel = document.getElementById('llm-model');
+          var backend = document.getElementById('llm-backend').value;
           sel.innerHTML = '<option value="">加载中...</option>';
           fetch('/api/llm/models?backend=' + encodeURIComponent(backend)).then(function(r){{return r.json()}}).then(function(d){{
             sel.innerHTML = '<option value="">-- 模型 --</option>';
             if(d.models && d.models.length > 0) d.models.forEach(function(m){{ var o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); }});
-            [credential-redacted]('llm-status').textContent = (d.models||[]).length + ' 个模型';
+            document.getElementById('llm-status').textContent = (d.models||[]).length + ' 个模型';
           }});
         }}
         setTimeout(loadModels, 500);
         setTimeout(loadQueryTypes, 500);
-        setTimeout(function check(){{ var sel = [credential-redacted]('llm-model'); if(sel.options.length <= 1) {{ setTimeout(check, 500); return; }}
+        setTimeout(function check(){{ var sel = document.getElementById('llm-model'); if(sel.options.length <= 1) {{ setTimeout(check, 500); return; }}
           fetch('/api/config/llm').then(function(r){{return r.json()}}).then(function(cfg){{ if(cfg.model) for(var i=0;i<sel.options.length;i++) if(sel.options[i].value === cfg.model) {{ sel.value = cfg.model; break; }} }});
         }}, 1000);
-        function testLLM() {{ [credential-redacted]('llm-status').textContent = '测试中...';
-          fetch('/api/llm/test').then(function(r){{return r.json()}}).then(function(d){{ [credential-redacted]('llm-status').textContent = d.success ? '✓ 连接正常' : '✖ 连接失败'; }});
-        }}
-        function toggleWebSearch() {{
-          var enabled = [credential-redacted]('web-search-enabled').checked;
-          [credential-redacted]('search-config').style.display = enabled ? 'block' : 'none';
-          fetch('/api/search/toggle', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{enabled: enabled}})}});
-        }}
-        function onSearchBackendChange() {{
-          var v = [credential-redacted]('search-backend').value;
-          [credential-redacted]('search-key-group').style.display = (v==='tavily' || v==='custom') ? 'inline-block' : 'none';
-          [credential-redacted]('search-google-group').style.display = (v==='google') ? 'inline-block' : 'none';
-          [credential-redacted]('search-bing-group').style.display = (v==='bing') ? 'inline-block' : 'none';
-          [credential-redacted]('search-custom-group').style.display = (v==='custom') ? 'inline-block' : 'none';
-          saveSearchConfig();
-        }}
-        function saveSearchConfig() {{
-          var body = {{enabled: [credential-redacted]('web-search-enabled').checked, backend: [credential-redacted]('search-backend').value,
-            api_key: [credential-redacted]('search-api-key') ? [credential-redacted]('search-api-key').value : '',
-            google_key: [credential-redacted]('search-google-key') ? [credential-redacted]('search-google-key').value : '',
-            google_cx: [credential-redacted]('search-google-cx') ? [credential-redacted]('search-google-cx').value : '',
-            bing_key: [credential-redacted]('search-bing-key') ? [credential-redacted]('search-bing-key').value : '',
-            custom_url: [credential-redacted]('search-custom-url') ? [credential-redacted]('search-custom-url').value : ''}};
-          fetch('/api/config/search', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify(body)}}).then(function(r){{return r.json()}}).then(function(d){{ [credential-redacted]('search-status').textContent = d.success ? '✓ 已保存' : '✗ 保存失败'; }});
+        function testLLM() {{ document.getElementById('llm-status').textContent = '测试中...';
+          fetch('/api/llm/test').then(function(r){{return r.json()}}).then(function(d){{ document.getElementById('llm-status').textContent = d.success ? '✓ 连接正常' : '✖ 连接失败'; }});
         }}
         </script>
         """
@@ -1413,6 +1472,59 @@ loadSessions();
         mem.clear_short_term(sid)
         saved = len([l for l in content.split("\n") if l.strip()]) if content.strip() else 0
         self._send_json({"success": True, "saved_lines": saved})
+
+    # ═══════════════ 插件管理 ═══════════════
+
+    def _serve_plugin_list(self):
+        """GET /api/plugins — 返回插件列表"""
+        if not self.agent or not hasattr(self.agent, 'plugin_manager') or self.agent.plugin_manager is None:
+            self._send_json({"plugins": [], "success": True})
+            return
+        plugins = self.agent.plugin_manager.list_plugins()
+        self._send_json({"plugins": plugins, "success": True})
+
+    def _handle_plugin_toggle(self):
+        """POST /api/plugins/toggle — 启用/禁用插件"""
+        body = self._read_body()
+        name = body.get("name", "")
+        enabled = body.get("enabled", False)
+        if not self.agent or not hasattr(self.agent, 'plugin_manager') or self.agent.plugin_manager is None:
+            self._send_json({"success": False, "error": "插件系统未就绪"})
+            return
+        pm = self.agent.plugin_manager
+        if enabled:
+            ok = pm.enable_plugin(name)
+        else:
+            ok = pm.disable_plugin(name)
+        self._send_json({"success": ok})
+
+    def _handle_plugin_config(self):
+        """POST /api/plugins/config — 打开插件配置界面"""
+        body = self._read_body()
+        name = body.get("name", "")
+        if not self.agent or not hasattr(self.agent, 'plugin_manager') or self.agent.plugin_manager is None:
+            self._send_json({"success": False, "error": "插件系统未就绪"})
+            return
+        plugin = self.agent.plugin_manager.get_plugin(name)
+        if not plugin:
+            self._send_json({"success": False, "error": f"插件 {name} 不存在"})
+            return
+        try:
+            plugin.open_config_ui()
+            self._send_json({"success": True})
+        except Exception as e:
+            self._send_json({"success": False, "error": str(e)})
+
+    def _handle_plugin_refresh(self):
+        """POST /api/plugins/refresh — 重新扫描并注册插件"""
+        if not self.agent or not hasattr(self.agent, 'plugin_manager') or self.agent.plugin_manager is None:
+            self._send_json({"success": False, "error": "插件系统未就绪"})
+            return
+        try:
+            self.agent.plugin_manager.discover_and_register()
+            self._send_json({"success": True})
+        except Exception as e:
+            self._send_json({"success": False, "error": str(e)})
 
     def log_message(self, format, *args):
         logger.debug(f"HTTP: {format % args}")

@@ -1,0 +1,138 @@
+# RAG Assistant v1.7.0
+
+> 一个自包含的独立 RAG（检索增强生成）智能体应用。
+> 从 local-rag-builder 技能孵化，封装了完整技能能力，同时自带 Agent 决策循环、Web UI、CLI、批量处理模式和外部接入协议。
+
+---
+
+## 是什么
+
+RAG Assistant 是一个能"读懂文档知识库"的 AI 智能体。用户提问时 Agent 自动决策（直接回答/查知识库/搜网页/导入文件），知识库查询时 LLM 先对问题做 entities/attrs 分词，Agent 穷举组合切片，每片独立走完整 RAG 流程（路由→检索→Reranker→NLI），SM3 国密哈希去重合并后由 LLM 综合回答。
+
+**核心特质**：全自包含、零外部依赖（第三方库已嵌入 vendor/）、离线可运行。
+
+---
+
+## 启动方式
+
+```bash
+python main.py                           # Web 界面（默认 http://localhost:8765）
+python main.py --api-port 8767           # Web + 外部 API（8767）
+python main.py --no-web                  # CLI 交互模式
+python main.py --batch --input q.json --output r.json   # 批量处理
+cat queries.jsonl | python main.py --jsonl              # 管道模式
+python main.py migrate                   # 从 local-rag-builder 迁移数据
+```
+
+---
+
+## 架构总览
+
+```
+main.py ─── 入口（CLI / Web / Batch / External API 四模式）
+  │
+  ├── rag_assistant/                ← 智能体核心层
+  │   ├── agent.py                  ← LLM 自主决策循环（核心大脑）
+  │   ├── rag_wrapper.py            ← RAG 能力封装桥接层
+  │   ├── llm_client.py             ← Ollama / LM Studio 双后端统一客户端
+  │   ├── memory.py                 ← 三层记忆系统（短期/token压缩/知识缺口/习惯）
+  │   ├── search.py                 ← 联网搜索回退（DuckDuckGo/Tavily/Google/Bing/自定义）
+  │   ├── web_ui.py                 ← Web 界面服务器（port 8765）
+  │   ├── external_api.py           ← 外部接入 API（port 8767）
+  │   └── _fix_rag.py               ← 破损数据修复工具
+  │
+  ├── engine/                       ← local-rag-builder 技能引擎（独立副本）
+  │   ├── rag_core.py               ← 检索/路由/rerank/NLI 编排核心
+  │   ├── router.py                 ← 两级路由（硬编码关键词 + 语义签名回退）
+  │   ├── reranker.py               ← 重排序（model / rule / hybrid）
+  │   ├── nli_classifier.py         ← NLI 三向分类器（entailment/neutral/contradiction）
+  │   ├── knowledge_base_manager.py ← 知识库 CRUD + 自动分类 + 备份/恢复
+  │   ├── text_splitter.py          ← 5种切分策略 + 5种守卫
+  │   ├── embedding_model_manager.py← 嵌入模型多源下载管理
+  │   ├── prompt_manager.py         ← Prompt 管理（模板/插槽/预设）
+  │   └── ...
+  │
+  ├── vendor/                       ← 嵌入的第三方库（bs4 / pypdf / markdownify）
+  └── data/                         ← 运行时数据
+      ├── config/rag_config.json    ← 全量配置文件
+      ├── kb/                       ← ChromaDB 知识库
+      ├── models/                   ← 嵌入模型 + reranker 模型 + NLI 模型
+      └── memory/                   ← 对话记忆文件
+```
+
+---
+
+## 关键文件
+
+| 文件 | 作用 |
+|------|------|
+| `main.py` | 入口，四模式启动器 |
+| `PROTOCOL.md` | **Web UI 接入协议** — HTTP API 契约、配置 Schema、文件交互格式 |
+| `EXTERNAL_API.md` | **外部接入 API 协议** — 组件级能力调用（功能开关/模型调用/KB管理/提示词/切分） |
+| `data/config/rag_config.json` | 引擎全量配置（路由、rerank、NLI、切分、检索、LLM、嵌入） |
+| `setup.bat` | Windows 一键安装启动脚本 |
+| `requirements.txt` | Python 依赖 |
+
+---
+
+## 能力清单
+
+### 知识库管理
+- 多个向量知识库（ChromaDB），覆盖白酒/理化检测/生物医疗/量子物理/LLM理论等
+- 支持 PDF（含 OCR 回退）/ TXT / MD / HTML / DOCX / CSV 导入
+- 两级路由（硬编码关键词 + 嵌入模型×KB签名语义回退）
+- KB 签名自动归纳（四分法采样→jieba提词→BCE排序）
+- 跨库文档移动（向量模型兼容性检查）
+- 手动/自动备份恢复
+
+### Agent 决策循环
+LLM 自动判断：直接回答 / 查知识库 / 搜网页 / 导入文件
+自修正机制（最多 5 次重试，格式错误自动反馈修正）
+
+### 组合式查询
+LLM 标注 entities/attrs → Agent 穷举 entities×attrs 组合 → 每片独立走完整 RAG 流程 → SM3 去重合并 → LLM 综合回答
+
+### 记忆系统
+- 短期对话记忆（session 文件）
+- token 阈值压缩摘要（max_tokens×0.7 触发）
+- 知识缺口记录（统计用户问但没找到的问题）
+- 用户习惯学习（统计 RAG/聊天/导入频率）
+
+### 三层推理流水线
+检索 → Reranker 精排 → NLI 三向分类（entailment/neutral/contradiction）
+
+### 外部接入
+- **Web UI API（port 8765）**：30+ 端点，人机交互用。详见 `PROTOCOL.md`
+- **外部 API（port 8767）**：27 端点，系统间集成用。详见 `EXTERNAL_API.md`
+- CLI `--batch` / `--jsonl` 批量处理模式，结构化输入输出
+- Python 编程接口（Agent/RAGWrapper/LLMClient/Memory/WebSearch 类）
+
+---
+
+## 已配置的模型
+
+| 角色 | 模型 | 后端 |
+|------|------|------|
+| LLM | qwen/qwen3.5-35b-a3b | LM Studio（localhost:1234） |
+| 嵌入 | maidalun1020/bce-embedding-base_v1 | 本地已下载 |
+| Reranker | BAAI/bge-reranker-base | 本地已下载 |
+| 路由签名 | 嵌入模型 × KB签名关键词（余弦相似度） | 本地 |
+| NLI | MoritzLaurer/mDeBERTa-v3-base-mnli-xnli | 本地已下载 |
+
+---
+
+## 配置
+
+全量配置在 `data/config/rag_config.json`，覆盖：
+
+- 路由开关（`router.enabled` + `router.fallback`）
+- 重排序开关（`reranker.enabled` + `mode` + `top_k`）
+- NLI 开关（`nli.enabled`）
+- 联网搜索开关（`web_search_enabled`）
+- 切分策略（`splitting.strategy` + `guards`）
+- 检索参数（`retrieval.k` / `search_type`）
+- LLM 后端切换（`llm_backend` + `llm_model`）
+- 嵌入模型切换（`embedding.model_path`）
+- 记忆压缩（`memory.compress_ratio` / `max_sessions`）
+- KB 自动分类（`kb.auto_classify`）
+- KB 暂停写入（`kb_paused`）

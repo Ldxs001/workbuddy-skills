@@ -1,0 +1,23 @@
+{
+  "name": "web_search",
+  "display_name": "联网搜索",
+  "version": "1.0.0",
+  "type": "input_return",
+  "mandatory": false,
+  "description": "通过搜索引擎获取实时网络信息，补充知识库无法覆盖的内容",
+  "module": "plugin_web_search",
+  "class": "WebSearchPlugin",
+  "input_fields": [
+    "question"
+  ],
+  "output_types": [
+    "markdown"
+  ],
+  "has_config_ui": true,
+  "network": true,
+  "timeout": 30,
+  "author": "wUwproject",
+  "homepage": "",
+  "builtin": true,
+  "sm3_hash": "1423bc531ea448178434f5af58cd837efaacfca0b86060bccc9d685d60bff40b"
+}
