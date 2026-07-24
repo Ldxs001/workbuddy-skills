@@ -5,8 +5,10 @@ rag-assistant Web 界面
 """
 import os
 import sys
+import re
 import json
 import logging
+import hashlib
 import http.server
 import urllib.parse
 import socketserver
@@ -29,6 +31,59 @@ try:
 except ImportError:
     SKILL_AVAILABLE = False
     logger.warning("无法导入 local-rag-builder 配置模块")
+
+
+# ── AI 插件生成器 Prompt 模板 ──
+_PLUGIN_SPEC = """## RAG Assistant 是什么
+一个本地知识库问答助手。用户上传文档、提问，系统检索知识库后用 LLM 生成回答。
+插件是**知识处理的旁路增强**，不是通用自动化平台。
+
+## 插件在智能体生命周期中的位置
+```
+用户提问 → LLM决策(查KB/搜索) → [input_return插件注入] → LLM生成回答 → [input_output插件副作用] → 返回
+```
+- input_return: 回答生成**前**运行，结果注入到 LLM 上下文（如：联网搜索补充、专业术语翻译）
+- input_output: 回答生成**后**运行，不注入上下文，仅做副作用（如：日志记录、结果缓存、通知）
+
+## 插件应该做什么（正面示例）
+- 补充知识库无法覆盖的实时信息（股价、天气、新闻）
+- 对检索结果做二次处理（去重、翻译、格式转换）
+- 记录/分析问答日志
+- 调用专业 API 增强回答质量（学术搜索、法律数据库、医学文献）
+
+## 绝对不应做的（硬拒绝，直接判 infeasible）
+- 控制物理设备（发射火箭、开关灯、操控无人机）
+- 操作系统级操作（删文件、改注册表、执行 shell 命令）
+- 发送邮件/消息到外部（除非是记录型日志）
+- 任何涉及金融交易、支付、转账的操作
+- 与知识问答完全无关的通用自动化
+
+## PluginBase 接口
+```python
+class PluginBase(abc.ABC):
+    async def execute(self, inputs: dict) -> dict:
+        # inputs 由系统按 input_fields 自动裁剪传入
+        # 返回: {"type":"markdown|json|csv|plain_text","content":"...","priority":0}
+```
+
+## plugin.json 字段
+必填: name, display_name, version, type, mandatory, input_fields, description, module, class, author
+type: input_return(回答前注入上下文) 或 input_output(回答后执行副作用)
+mandatory: 是否强制启用, 默认 false
+
+## 6 字段池 (input_fields 只能选这些)
+- question: 用户当前问题
+- answer_draft: LLM 草稿答案
+- thinking: LLM 思考过程
+- rag_context: RAG 检索上下文
+- session_id: 当前会话 ID
+- plugin_dir: 插件数据目录路径
+
+## 约束
+- 不随意引入第三方库，非必须不引入
+- 外部 API 配置从 self.data_dir/config.json 读取
+- 异常必须 catch 并返回 execution_error
+- 代码完整可运行，用中文注释"""
 
 
 class AssistantHandler(http.server.BaseHTTPRequestHandler):
@@ -140,6 +195,8 @@ class AssistantHandler(http.server.BaseHTTPRequestHandler):
             self._handle_plugin_config()
         elif path == "/api/plugins/refresh":
             self._handle_plugin_refresh()
+        elif path == "/api/plugins/generate":
+            self._handle_plugin_generate()
         else:
             self.send_response(404)
             self.end_headers()
@@ -325,18 +382,37 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
   </div>
 </div>
 
-<!-- ── 插件管理面板 ── -->
-<div id="plugin-content" class="tab-content" style="display:none;padding:16px;max-width:720px;margin:0 auto;">
-  <h2 style="font-size:18px;margin-bottom:16px;">🔌 插件管理</h2>
-  <p style="font-size:13px;color:#888;margin-bottom:16px;">
-    启用/禁用插件，变更将在下一轮对话生效。
-    内置插件随系统自带，用户安装的插件放入 <code>data/plugins/</code> 目录。
-  </p>
-  <div id="plugin-list"></div>
-  <div id="plugin-install" style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:8px;border:1px dashed #ddd;">
-    <h3 style="font-size:14px;margin-bottom:8px;">安装插件</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:8px;">将插件目录放入 <code>data/plugins/</code> 后刷新页面即可。</p>
-    <button onclick="refreshPlugins()" style="padding:6px 16px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">刷新插件列表</button>
+<!-- ── 插件管理面板（左右分栏） ── -->
+<div id="plugin-content" class="tab-content" style="display:none;padding:16px;height:calc(100vh - 60px);overflow:hidden;">
+  <div style="display:flex;gap:16px;height:100%;">
+    <!-- 左侧：AI 插件生成器 -->
+    <div style="flex:1;min-width:360px;display:flex;flex-direction:column;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+      <div style="padding:10px 14px;background:#f8f9fa;border-bottom:1px solid #e0e0e0;font-size:14px;font-weight:600;">🤖 AI 插件生成器</div>
+      <div id="plugin-chat" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:13px;color:#888;text-align:center;padding:20px;line-height:1.6;">
+          描述你想创建的插件功能，AI 将评估可行性并生成代码。<br>
+          <span style="font-size:12px;">例如："查询股票实时价格"</span>
+        </div>
+      </div>
+      <div style="padding:8px;border-top:1px solid #e0e0e0;display:flex;gap:6px;">
+        <textarea id="plugin-input" rows="2" placeholder="描述插件需求..." style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;resize:none;font-size:13px;font-family:inherit;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){{event.preventDefault();sendPluginMessage();}}"></textarea>
+        <button id="plugin-send-btn" onclick="sendPluginMessage()" style="padding:8px 16px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">发送</button>
+      </div>
+    </div>
+    <!-- 右侧：插件管理（现有不变） -->
+    <div style="flex:1;min-width:360px;overflow-y:auto;">
+      <h2 style="font-size:18px;margin:0 0 12px;">🔌 插件管理</h2>
+      <p style="font-size:13px;color:#888;margin-bottom:16px;">
+        启用/禁用插件，变更将在下一轮对话生效。
+        内置插件随系统自带，用户安装的插件放入 <code>data/plugins/</code> 目录。
+      </p>
+      <div id="plugin-list"></div>
+      <div id="plugin-install" style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:8px;border:1px dashed #ddd;">
+        <h3 style="font-size:14px;margin-bottom:8px;">安装插件</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:8px;">将插件目录放入 <code>data/plugins/</code> 后刷新页面即可。</p>
+        <button onclick="refreshPlugins()" style="padding:6px 16px;background:#667eea;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">刷新插件列表</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -547,6 +623,84 @@ function refreshPlugins() {{
       alert('刷新失败：' + (d.error || '未知错误'));
     }}
   }});
+}}
+
+// ── AI 插件生成器 ──
+var pluginGenStep = 'idle';
+
+function sendPluginMessage() {{
+  if (pluginGenStep === 'loading') return;
+  var input = document.getElementById('plugin-input');
+  var desc = input.value.trim();
+  if (!desc) return;
+  addPluginMsg('user', desc);
+  input.value = '';
+  pluginGenStep = 'loading';
+  var loadDiv = addPluginMsg('assistant', '分析中...', 'loading');
+  fetch('/api/plugins/generate', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{description: desc}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if (loadDiv.parentNode) loadDiv.remove();
+    pluginGenStep = 'idle';
+    if (d.success && d.plan) {{
+      addPluginMsg('assistant', d.assessment);
+      pluginGenStep = d.plan;
+      // 确认/取消按钮
+      var btns = document.createElement('div');
+      btns.style.cssText = 'display:flex;gap:6px;align-self:flex-start;';
+      var ok = document.createElement('button');
+      ok.textContent = '✅ 确认生成';
+      ok.style.cssText = 'padding:5px 14px;background:#2b8a3e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;';
+      ok.onclick = function(){{ ok.disabled=true;confirmGen(); }};
+      var no = document.createElement('button');
+      no.textContent = '取消';
+      no.style.cssText = 'padding:5px 14px;background:#f0f0f5;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:12px;';
+      no.onclick = function(){{ pluginGenStep='idle';btns.remove(); }};
+      btns.appendChild(ok); btns.appendChild(no);
+      document.getElementById('plugin-chat').appendChild(btns);
+    }} else {{
+      addPluginMsg('assistant', (d.assessment || ('❌ '+(d.error||'失败'))));
+    }}
+  }}).catch(function(e){{
+    if (loadDiv.parentNode) loadDiv.remove();
+    pluginGenStep = 'idle';
+    addPluginMsg('assistant', '❌ 请求失败: '+e.message);
+  }});
+}}
+
+function confirmGen() {{
+  if (!pluginGenStep || pluginGenStep === 'idle' || pluginGenStep === 'loading') return;
+  var plan = pluginGenStep;
+  var loadDiv = addPluginMsg('assistant', '生成代码中...', 'loading');
+  fetch('/api/plugins/generate', {{
+    method:'POST', headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{description: plan.plugin_name, confirm: true, plan: plan}})
+  }}).then(function(r){{return r.json()}}).then(function(d){{
+    if (loadDiv.parentNode) loadDiv.remove();
+    if (d.success) {{
+      addPluginMsg('assistant', '✅ 插件已生成！\\n\\n' + (d.detail || ''));
+      loadPluginList();
+      pluginGenStep = 'idle';
+    }} else {{
+      addPluginMsg('assistant', '❌ ' + (d.error || '生成失败'));
+    }}
+  }}).catch(function(e){{
+    if (loadDiv.parentNode) loadDiv.remove();
+    addPluginMsg('assistant', '❌ 请求失败: '+e.message);
+  }});
+}}
+
+function addPluginMsg(role, text, id) {{
+  var chat = document.getElementById('plugin-chat');
+  var div = document.createElement('div');
+  div.style.cssText = 'padding:7px 12px;border-radius:8px;font-size:13px;line-height:1.5;max-width:88%;word-wrap:break-word;white-space:pre-wrap;' +
+    (role==='user' ? 'align-self:flex-end;background:#667eea;color:#fff;margin-left:auto;' : 'align-self:flex-start;background:#f0f0f5;color:#333;');
+  div.textContent = text;
+  if (id) div.id = id;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
 }}
 
 // ── 对话 ──
@@ -788,6 +942,10 @@ loadSessions();
         compress_ratio = mem_cfg.get("compress_ratio", 0.7)
         compress_remove_ratio = mem_cfg.get("compress_remove_ratio", 0.4)
         max_sessions = mem_cfg.get("max_sessions", 20)
+        # 检查 web_llm 插件状态
+        web_llm_enabled = False
+        if self.agent and hasattr(self.agent, 'plugin_manager') and self.agent.plugin_manager:
+            web_llm_enabled = self.agent.plugin_manager.is_enabled("web_llm")
         return f"""
         <div style="display:flex;flex-direction:column;gap:12px;">
           <!-- LLM 配置卡片 -->
@@ -800,6 +958,7 @@ loadSessions();
                 <select id="llm-backend" onchange="saveLLM();loadModels()" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
                   <option value="ollama" {"selected" if llm_backend=='ollama' else ""}>Ollama</option>
                   <option value="lmstudio" {"selected" if llm_backend=='lmstudio' else ""}>LM Studio</option>
+                  <option value="web_api" {"selected" if llm_backend=='web_api' else ""} {"style='display:none'" if not web_llm_enabled and llm_backend != 'web_api' else ""}>Web API</option>
                 </select>
                 <select id="llm-model" onchange="saveLLM()" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
                   <option value="">-- 模型 --</option>
@@ -1526,8 +1685,358 @@ loadSessions();
         except Exception as e:
             self._send_json({"success": False, "error": str(e)})
 
+    def _handle_plugin_generate(self):
+        """POST /api/plugins/generate — AI 辅助生成插件（二阶段）"""
+        body = self._read_body()
+        description = body.get("description", "")
+        confirm = body.get("confirm", False)
+
+        if not self.agent or not self.agent.llm:
+            self._send_json({"success": False, "error": "LLM 未就绪"})
+            return
+
+        # ── 阶段2：确认生成代码 ──
+        if confirm:
+            plan = body.get("plan", {})
+            return self._do_gen(description, plan)
+
+        # ── 阶段1：可行性评估 ──
+        if not description:
+            self._send_json({"success": False, "error": "缺少 description"})
+            return
+
+        spec = _PLUGIN_SPEC
+        prompt = f"""你是 RAG Assistant 插件系统专家。评估以下需求的可行性。
+
+{spec}
+
+## 用户需求
+{description}
+
+返回纯 JSON（不要 markdown 包裹）:
+{{"feasible":true,"reason":"","plugin_name":"xxx","display_name":"显示名","type":"input_return","input_fields":["question"],"description_text":"说明","workflow":"工作流程","dependencies":"none"}}
+
+type 选 input_return(回答前注入) 或 input_output(回答后执行)。
+input_fields 只能从 6 字段池选: question,answer_draft,thinking,rag_context,session_id,plugin_dir"""
+
+        try:
+            result = self.agent.llm.chat(
+                [{"role": "user", "content": prompt}],
+                temperature=0.3
+            )
+            text = result.get("text", "").strip()
+            if not text:
+                self._send_json({"success": False,
+                    "error": "LLM 返回空内容。请换用非推理模型"})
+                return
+            # 提取 JSON
+            m = re.search(r'\{[\s\S]*\}', text)
+            if not m:
+                self._send_json({"success": False, "error": "LLM 返回无法解析", "raw": text[:500]})
+                return
+            plan = json.loads(m.group(0))
+
+            if not plan.get("feasible"):
+                self._send_json({
+                    "success": True,
+                    "assessment": f"\u26a0\ufe0f 不可行\n\n{plan.get('reason', '')}",
+                    "plan": None
+                })
+                return
+
+            infos = plan.get("input_fields", [])
+            assessment = (
+                f"\U0001f4cb 可行性评估：可行\n\n"
+                f"名称: {plan.get('plugin_name','')}\n"
+                f"显示: {plan.get('display_name','')}\n"
+                f"类型: {plan.get('type','')}\n"
+                f"字段: {', '.join(infos) if infos else '无'}\n"
+                f"依赖: {plan.get('dependencies','none')}\n\n"
+                f"{plan.get('workflow','')}\n\n"
+                f"\u70b9\u51fb「确认生成」按钮开始生成代码。"
+            )
+            self._send_json({"success":True, "assessment":assessment, "plan":plan,
+                             "plugin_name":plan.get("plugin_name","")})
+        except Exception as e:
+            logger.exception("插件生成评估失败")
+            self._send_json({"success": False, "error": str(e)})
+
+    def _do_gen(self, name: str, plan: dict):
+        """执行插件代码生成 → 校验 → 原子写入 → 签名 → 注册"""
+        import tempfile, shutil, py_compile
+
+        loc = plan.get("location", "user")  # user / builtin，默认 user
+        if loc not in ("builtin", "user"):
+            loc = "builtin"
+
+        prompt = f"""你是 RAG Assistant 插件系统专家。根据计划生成完整插件代码。
+
+{_PLUGIN_SPEC}
+
+## 计划
+{json.dumps(plan, ensure_ascii=False, indent=2)}
+
+## 硬要求（违反则代码会被拒绝）
+1. **必须在文件顶部导入 PluginBase**：`from rag_assistant.plugins.base import PluginBase`
+2. **严禁在代码里重新定义 PluginBase 类**（直接 import 即可，不要重写）
+3. **严禁在代码里重新定义 FIELD_POOL 或任何系统常量**
+4. 插件类名用大驼峰(PascalCase)，类名必须以 Plugin 结尾（如 `StockPriceQueryPlugin`）
+5. 代码完整可运行；中文注释
+
+输出直接用代码，不要分析、不要解释、不要思考过程。直接给文件内容。
+
+用 ---FILE: 分隔（这是唯一的分隔符），格式:
+---FILE: plugin.json
+{{...JSON...}}
+---FILE: plugin_{name}.py
+...Python代码..."""
+
+        try:
+            result = self.agent.llm.chat(
+                [{"role": "user", "content": prompt}],
+                temperature=0.3
+            )
+            text = result.get("text", "").strip()
+            if not text:
+                self._send_json({"success": False,
+                    "error": "LLM 返回空内容。推理模型 (如 qwen3.5-35b-a3b) 会将输出放在 reasoning_content 而非 content，请换用非推理模型（如 qwen3.5-9b-deepseek-v4-flash）"})
+                return
+
+            # 解析生成文件
+            parts = re.split(r'---FILE:\s*', text)
+            gen = {}
+            for part in parts:
+                idx = part.find('\n')
+                if idx < 0: continue
+                fname = part[:idx].strip()
+                content = part[idx:].strip()
+                # 剥掉 markdown 代码块包裹
+                content = re.sub(r'^```\w*\n?', '', content)
+                content = re.sub(r'\n?```$', '', content)
+                content = content.strip()
+                if content.startswith('json\n'): content = content[5:]
+                gen[fname] = content
+
+            pj_key = 'plugin.json'
+            py_key = f'plugin_{name}.py'
+            if pj_key not in gen or py_key not in gen:
+                self._send_json({"success": False,
+                    "error": f"LLM 返回缺少文件。生成了: {list(gen.keys())}",
+                    "raw": text[:2000]})
+                return
+
+            # ── 阶段1: 校验 plugin.json ──
+            try:
+                meta = json.loads(gen[pj_key])
+            except json.JSONDecodeError as e:
+                self._send_json({"success": False, "error": f"plugin.json 非法 JSON: {e}"})
+                return
+
+            required = ["name", "type", "input_fields"]
+            missing_keys = [k for k in required if k not in meta]
+            if missing_keys:
+                self._send_json({"success": False,
+                    "error": f"plugin.json 缺少必填字段: {missing_keys}"})
+                return
+
+            if meta.get("type") not in ("input_return", "input_output"):
+                self._send_json({"success": False,
+                    "error": f"type 必须为 input_return 或 input_output: {meta.get('type')}"})
+                return
+
+            FIELD_POOL = {"question","answer_draft","thinking","rag_context","session_id","plugin_dir"}
+            bad_fields = [f for f in meta.get("input_fields", []) if f not in FIELD_POOL]
+            if bad_fields:
+                self._send_json({"success": False,
+                    "error": f"非法字段: {bad_fields}，可用: {sorted(FIELD_POOL)}"})
+                return
+
+            # 补齐缺省字段
+            meta.setdefault("module", py_key.replace('.py',''))
+            meta.setdefault("class", ''.join(w.capitalize() for w in name.split('_')) + 'Plugin')
+            meta.setdefault("version", "1.0.0")
+            meta.setdefault("mandatory", False)
+            meta.setdefault("author", "wUwproject")
+            meta.setdefault("builtin", False)
+            meta.setdefault("has_config_ui", False)
+            meta.setdefault("timeout", 15)
+            meta.setdefault("network", False)
+            meta.setdefault("display_name", plan.get("display_name", name))
+            meta.setdefault("description", plan.get("description_text", ""))
+
+            # ── 阶段2: 校验 Python 语法 ──
+            py_code = gen[py_key]
+            syntax_ok, syntax_error = _validate_python_syntax(py_code)
+            if not syntax_ok:
+                self._send_json({"success": False,
+                    "error": f"Python 语法错误: {syntax_error}",
+                    "py_first_500": py_code[:500]})
+                return
+
+            # ── 阶段2.5: AST 静态检查（防止 LLM 重新定义系统类）────
+            ast_ok, ast_err = _validate_plugin_code_structure(py_code, name)
+            if not ast_ok:
+                self._send_json({"success": False,
+                    "error": f"代码结构错误: {ast_err}",
+                    "py_first_500": py_code[:500]})
+                return
+
+            # ── 阶段3: 规划目录 ──
+            proj_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if loc == "builtin":
+                plugin_dir = os.path.join(proj_root, "rag_assistant", "plugins", "builtin", name)
+            else:
+                data_dir = self.agent.config.get("data_dir",
+                    os.path.join(proj_root, "data"))
+                plugin_dir = os.path.join(data_dir, "plugins", name)
+            os.makedirs(plugin_dir, exist_ok=True)
+
+            # ── 阶段4: 原子写入 ──
+            pj_path = os.path.join(plugin_dir, "plugin.json")
+            py_path = os.path.join(plugin_dir, py_key)
+
+            # 写入临时文件 → rename（原子操作）
+            fd, tmp = tempfile.mkstemp(dir=plugin_dir, suffix=".json", prefix=".tmp_")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, ensure_ascii=False, indent=2)
+                shutil.move(tmp, pj_path)
+            except Exception:
+                try: os.unlink(tmp)
+                except: pass
+                raise
+
+            fd, tmp = tempfile.mkstemp(dir=plugin_dir, suffix=".py", prefix=".tmp_")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(py_code)
+                shutil.move(tmp, py_path)
+            except Exception:
+                try: os.unlink(tmp)
+                except: pass
+                raise
+
+            # ── 阶段5: SM3 签名 ──
+            sign_ok = False
+            try:
+                files = sorted(p for p in os.listdir(plugin_dir)
+                               if p.endswith('.py') or p == 'plugin.json')
+                hasher = hashlib.new('sm3')
+                for fn in files:
+                    fp = os.path.join(plugin_dir, fn)
+                    if fn == 'plugin.json':
+                        jd = json.loads(open(fp, encoding='utf-8').read())
+                        jd.pop('sm3_hash', None)
+                        hasher.update(json.dumps(jd, ensure_ascii=False, sort_keys=True).encode('utf-8'))
+                    else:
+                        hasher.update(open(fp, 'rb').read())
+                h = hasher.hexdigest()
+                meta['sm3_hash'] = h
+                with open(pj_path, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, ensure_ascii=False, indent=2)
+                sign_ok = True
+            except Exception:
+                pass
+
+            # ── 阶段6: 刷新注册 ──
+            refresh_msg = ""
+            if self.agent.plugin_manager:
+                try:
+                    self.agent.plugin_manager.discover_and_register()
+                    refresh_msg = "已刷新"
+                except Exception as e:
+                    refresh_msg = f"刷新失败: {e}"
+
+            self._send_json({
+                "success": True,
+                "detail": (
+                    f"插件已生成: {plugin_dir}\n"
+                    f"文件: plugin.json ({len(gen[pj_key])}B), {py_key} ({len(py_code)}B)\n"
+                    f"校验: JSON OK, 语法 OK\n"
+                    f"签名: {'OK' if sign_ok else '跳过'}\n"
+                    f"注册: {refresh_msg}"
+                )
+            })
+        except Exception as e:
+            logger.exception("插件代码生成失败")
+            self._send_json({"success": False, "error": str(e)})
+
     def log_message(self, format, *args):
         logger.debug(f"HTTP: {format % args}")
+
+
+def _validate_python_syntax(code: str) -> tuple:
+    """验证 Python 代码语法，(ok, error_msg)"""
+    import ast
+    try:
+        ast.parse(code)
+        return True, ""
+    except SyntaxError as e:
+        return False, f"行{e.lineno}: {e.msg}"
+
+
+def _validate_plugin_code_structure(code: str, expected_plugin_name: str) -> tuple:
+    """AST 静态检查：防止 LLM 重新定义系统类、验证 import 关系
+
+    硬规则：
+    1. 不允许顶层定义名为 PluginBase 的 class（必须 import）
+    2. 不允许顶层定义 FIELD_POOL 等系统常量
+    3. 必须有 import PluginBase 的语句
+    4. 必须有以 Plugin 结尾的类继承 PluginBase
+    """
+    import ast
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return True, ""  # 已在前一步校验过语法
+
+    # ── 检查顶层禁止定义 ──
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "PluginBase":
+            return False, "禁止在代码里重新定义 PluginBase 类（必须用 `from rag_assistant.plugins.base import PluginBase`）"
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            # 检查赋值目标是系统常量
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if isinstance(t, ast.Name) and t.id in ("FIELD_POOL", "BUILTIN_DIR", "PluginManager"):
+                    return False, f"禁止重新定义系统常量 {t.id}"
+
+    # ── 检查是否导入 PluginBase ──
+    has_import = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name == "PluginBase":
+                    has_import = True
+                    break
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.endswith("PluginBase"):
+                    has_import = True
+                    break
+        if has_import:
+            break
+
+    if not has_import:
+        return False, "缺少 `from rag_assistant.plugins.base import PluginBase` 语句"
+
+    # ── 检查是否有以 Plugin 结尾的类继承 PluginBase ──
+    found_plugin_class = False
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name.endswith("Plugin"):
+            for base in node.bases:
+                if isinstance(base, ast.Name) and base.id == "PluginBase":
+                    found_plugin_class = True
+                    break
+            for base in node.bases:
+                if isinstance(base, ast.Attribute) and base.attr == "PluginBase":
+                    found_plugin_class = True
+                    break
+
+    if not found_plugin_class:
+        return False, "未找到以 Plugin 结尾且继承 PluginBase 的类"
+
+    return True, ""
 
 
 def _port_in_use(port: int) -> bool:

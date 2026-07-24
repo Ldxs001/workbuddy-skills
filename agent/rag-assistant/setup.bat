@@ -30,9 +30,7 @@ echo ============================================================
 echo  *** 检测到 2.x 及以上版本 - HNSW 索引引擎已更换
 echo.
 echo   当前版本: %CURR_VER%
-echo   从 1.x 升级到此版本需要重建全部知识库的 HNSW 索引。
-echo.
-python "%~dp0estimate_rebuild_time.py"
+echo   从 1.x 升级到此版本需要重建全部知识库的 HNSW 索引。初次使用的非升级用户建议直接跳过(N)。
 echo.
 echo   选择 N 后可通过以下途径重建:
 echo     [1] 手动: 在 Web 配置页点击每个 KB 的 [HNSW] 按钮
@@ -51,6 +49,9 @@ echo 请输入 Y / N / K
 goto ASK_HNSW
 
 :DO_REBUILD
+echo.
+echo 正在评估 HNSW 索引状态...
+python "%~dp0estimate_rebuild_time.py"
 echo.
 echo 正在重建全部 HNSW 索引，请耐心等待...
 python "%~dp0rebuild_all_hnsw.py" 2>&1

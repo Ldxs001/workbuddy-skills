@@ -1,0 +1,19 @@
+{
+  "name": "web_llm",
+  "display_name": "网络API大模型",
+  "version": "1.0.0",
+  "type": "input_return",
+  "mandatory": false,
+  "description": "通过 OpenAI 兼容 API 调用远程大模型（如 DeepSeek、通义千问、智谱等）",
+  "module": "plugin_web_llm",
+  "class": "WebLLMPlugin",
+  "input_fields": [],
+  "output_types": [],
+  "has_config_ui": true,
+  "network": true,
+  "timeout": 60,
+  "author": "wUwproject",
+  "homepage": "",
+  "builtin": true,
+  "sm3_hash": ""
+}

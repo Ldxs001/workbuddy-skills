@@ -5,6 +5,22 @@
 
 ---
 
+## [2.1.0b2] - 2026-07-24
+### 新增
+- **web_llm 插件多配置（profile）系统**：插件配置从单组改为多条目管理。Tkinter 配置界面支持添加/编辑/删除多个 API 配置条目，每条包含名称、服务商、API 地址、Key、模型名、温度、Top P、最大 Token。数据存为 `{"profiles": [...]}`，兼容旧格式自动包装
+- **LLMClient 按模型名匹配配置**：`_get_web_llm_config(model_name)` 查找对应 profile 的 base_url/api_key/参数，`list_models()` 返回所有已配置模型名，Web UI 模型下拉自动显示全部可选模型
+- **AI 插件生成器**（`web_ui.py` 插件 Tab）：左侧新增 AI 对话面板���支持自然语言描述需求 → LLM 二阶段评估可行性 → 确认后生成完整插件代码
+  - 评估阶段：LLM 根据 RAG Assistant 上下文（智能体生命周期、正面示例、硬拒绝清单）判断可行性，返回 plugin_name/type/input_fields/依赖等信息
+  - 生成阶段：LLM 生成 `plugin.json` + `plugin_xxx.py` → 6 阶段校验管道（JSON 合法性 → Python 语法 ast.parse → 目录规划 builtin/user → tempfile 原子写入 → SM3 签名 → discover_and_register 刷新注册）
+  - LLM 调用方式：`temperature=0.3`（确定性代码生成），其余参数（model/max_tokens/timeout）走主配置 `llm_config.json`
+  - 新增端点 `POST /api/plugins/generate`，新增 `_PLUGIN_SPEC` 规范常量（RAG Assistant 上下文 + PluginBase 接口 + 字段池 + 硬拒绝规则 + 约束）
+
+### 修复
+- **setup.bat HNSW 提示顺序**：将 `estimate_rebuild_time.py`（模型加载测速）从版本检测提示后移到 Y 确认后的 DO_REBUILD 内，避免未确认就加载模型
+- **setup.bat 加提示**：`从 1.x 升级到此版本需要重建全部知识库的 HNSW 索引。` 末尾追加 ` 初次使用的非升级用户建议直接跳过(N)。`（单行 echo，不引入新行，避免 chcp 65001 多行中文 CRLF 解析 bug）
+
+---
+
 ## [2.1.0b1] - 2026-07-23
 ### 重大新增 — 插件系统
 RAG Assistant 引入标准化插件系统，支持信息补充类（input_return）和外部输出类（input_output）两种插件类型。智能体完全掌握决策权，插件为纯执行者，不做判断不主动触发。

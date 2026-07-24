@@ -79,7 +79,7 @@ class Agent:
         self.data_dir = self.config.get("data_dir", "data")
         self.session_id = self.config.get("session_id") or self._generate_session_id()
         self.rag = RAGWrapper(self.config)
-        self.llm = LLMClient(self.config)
+        self.llm = LLMClient(self.config, data_dir=self.data_dir)
         self.memory = Memory(self.data_dir)
         self.search = WebSearch(self.config)
         # 插件管理器（立即初始化，失败时为 None 不阻塞）
