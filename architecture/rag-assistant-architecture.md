@@ -293,6 +293,11 @@ slices = [
 | `/api/memory/inject` | POST | 注入系统通知 |
 | `/api/search/toggle` | POST | 联网搜索开关 |
 | `/api/availability-status` | GET | 模型下载探测状态（v0.9.0） |
+| `/api/plugins` | GET | 插件列表（v2.1.0） |
+| `/api/plugins/toggle` | POST | 启用/禁用插件（v2.1.0） |
+| `/api/plugins/config` | POST | 打开插件配置界面（v2.1.0） |
+| `/api/plugins/refresh` | POST | 重新扫描插件目录（v2.1.0） |
+| `/api/plugins/generate` | POST | AI 插件生成器（v2.1.0） |
 
 **关键交互细节**：
 - `loadModels()` 在页面加载后 500ms 触发，填充模型下拉框
@@ -875,6 +880,16 @@ numpy>=1.24                       # 向量余弦相似度计算
 
 | 版本 | 新增/变更要点 |
 |------|-------------|
+| v2.1.0b2 | AI 插件生成器（二阶段 LLM + 7 阶段校验管道）；web_llm 多 profile 配置系统；setup.bat HNSW 修复 |
+| v2.1.0b1 | 智能体插件系统（PluginBase + PluginManager + 5 道防线）；内置联网搜索插件；插件 Web UI 管理面板 |
+| v2.0.0b1 | 1.x → 2.x HNSW 索引引擎更换；Chroma 适配器重构；setup.bat 全量重建提示 |
+| v1.8.0 | 外部 API 端口独立（8767）；引擎独立化（engine/ 副本自包含） |
+| v1.7.0 | PROTOCOL 协议升级；KB 签名多向量路由 |
+| v1.5.0b1 | Web 配置页面内嵌（iframe 模式）；双端口架构 |
+| v1.3.0-beta | 双面板 Web UI（配置 + 对话） |
+| v1.2.0 | 组合检索（LLM 分词 + entities × attrs 穷举展开） |
+| v1.1.0 | 四层记忆系统（短时/压缩/习惯/缺口） |
+| v1.0.0 | 从 local-rag-builder 仓库外项目独立为正式版 |
 | v0.9.5 | README 架构图补 NLI；NLI 模型探测遍历所有源修复 |
 | v0.9.0 | NLI 三向分类器；网络探测并行化；Config 自动修正模型路径；组合查询两两配对 + 中文逗号 |
 | v0.8.0 | KB 暂停写入；历史对话隔离；引用校验；OCR 触发条件修复 |
