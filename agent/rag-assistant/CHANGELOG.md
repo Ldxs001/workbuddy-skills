@@ -5,6 +5,132 @@
 
 ---
 
+## [2.2.8] - 2026-07-26
+### 新增
+- **外部 API 新增 `/api/kb/query` 端点**：支持外部系统（如 Structured Writer）直接调知识库检索，返回上下文和来源。接收 `query`（必填）、`kb`（可选，空=自动路由）、`top_k`、`score_threshold` 参数，调用 `agent.rag.query()` 完整检索管线（路由→检索→精排→NLI→build_context），不额外消耗 LLM token
+
+---
+
+## [2.1.0b2] - 2026-07-24
+### 新增
+- **web_llm 插件多配置（profile）系统**：插件配置从单组改为多条目管理。Tkinter 配置界面支持添加/编辑/删除多个 API 配置条目，每条包含名称、服务商、API 地址、Key、模型名、温度、Top P、最大 Token。数据存为 `{"profiles": [...]}`，兼容旧格式自动包装
+- **LLMClient 按模型名匹配配置**：`_get_web_llm_config(model_name)` 查找对应 profile 的 base_url/api_key/参数，`list_models()` 返回所有已配置模型名，Web UI 模型下拉自动显示全部可选模型
+- **AI 插件生成器**（`web_ui.py` 插件 Tab）：左侧新增 AI 对话面板���支持自然语言描述需求 → LLM 二阶段评估可行性 → 确认后生成完整插件代码
+  - 评估阶段：LLM 根据 RAG Assistant 上下文（智能体生命周期、正面示例、硬拒绝清单）判断可行性，返回 plugin_name/type/input_fields/依赖等信息
+  - 生成阶段：LLM 生成 `plugin.json` + `plugin_xxx.py` → 6 阶段校验管道（JSON 合法性 → Python 语法 ast.parse → 目录规划 builtin/user → tempfile 原子写入 → SM3 签名 → discover_and_register 刷新注册）
+  - LLM 调用方式：`temperature=0.3`（确定性代码生成），其余参数（model/max_tokens/timeout）走主配置 `llm_config.json`
+  - 新增端点 `POST /api/plugins/generate`，新增 `_PLUGIN_SPEC` 规范常量（RAG Assistant 上下文 + PluginBase 接口 + 字段池 + 硬拒绝规则 + 约束）
+
+### 修复
+- **setup.bat HNSW 提示顺序**：将 `estimate_rebuild_time.py`（模型加载测速）从版本检测提示后移到 Y 确认后的 DO_REBUILD 内，避免未确认就加载模型
+- **setup.bat 加提示**：`从 1.x 升级到此版本需要重建全部知识库的 HNSW 索引。` 末尾追加 ` 初次使用的非升级用户建议直接跳过(N)。`（单行 echo，不引入新行，避免 chcp 65001 多行中文 CRLF 解析 bug）
+
+---
+
+## [2.1.0b1] - 2026-07-23
+### 重大新增 — 插件系统
+RAG Assistant 引入标准化插件系统，支持信息补充类（input_return）和外部输出类（input_output）两种插件类型。智能体完全掌握决策权，插件为纯执行者，不做判断不主动触发。
+
+### 新增
+- **插件框架**：`rag_assistant/plugins/base.py` — PluginBase 抽象基类，定义 `execute()` 和 `open_config_ui()` 接口
+- **插件管理器**：`rag_assistant/plugins/manager.py` — 插件发现/注册/生命周期/配置持久化/超时熔断/文件沙箱/输出校验
+- **内置联网搜索插件**：`rag_assistant/plugins/builtin/web_search/` — 首个内置插件，支持 DuckDuckGo/Tavily/Google/Bing/自定义 五种后端，含 Tkinter 配置界面。前 3 个搜索结果自动抓取页面正文（content 字段优先，snippet 兜底，不足 100 字自动 urllib 抓取），Tavily 的 `content` 字段正确映射
+- **插件 Web UI 管理面板**：Web 界面新增"🔌 插件"Tab，支持查看/启用/禁用/配置插件，刷新按钮重新扫描
+- **插件引用标注**：LLM 回答中引用插件信息时标注 `[插件名称]`（如 `[联网搜索]`），与知识库 `[n]` 编号引用共存
+- **SM3 签名工具**：`tools/sign_plugin.py` + `tools/verify_plugin.py`，对插件代码文件和 plugin.json 计算 SM3 国密哈希（已修复 plugin.json 自引用问题，签名时自动排除 sm3_hash 字段）
+- **SM3 校验修复**：`manager.py` 的 `_compute_hash()` 在读取 plugin.json 时先去除 sm3_hash 字段，与签名工具计算方式一致
+
+### 插件系统设计要点
+- **标准化接口**：6字段池（question/answer_draft/thinking/rag_context/session_id/plugin_dir）→ 插件按需声明 → 智能体裁剪传递
+- **标准化返回**：`{type, content, priority, execution_error}`，支持 markdown/json/csv/plain_text
+- **mandatory 机制**：mandatory=true 时智能体必须调用（适合输出类插件），false 时智能体自主判断（搜索类）
+- **错误分级**：无 execution_error → 只报"xxx调用失败"；有 execution_error → 报"xxx调用失败：原因"
+- **5 道安全防线**：信息隔离（只给声明字段）→ 文件沙箱（仅 data/plugins/<name>/）→ 超时熔断（连续 3 次失败自动禁用）→ 输出校验（schema 非法丢弃）→ SM3 签名（可选）
+- **最小入侵**：不修改 agent.py 决策循环/动作解析/RAG 检索核心，只在 chat() 返回链路插入 2 个钩子点（before_response + after_response）
+
+### 修复
+- **联网搜索字段映射错误**：Tavily 返回 `content`（全文）而非 `snippet`，插件 `execute()` 改为优先取 `content`，其次 `snippet`，不足 100 字自动抓取页面
+
+### 变更
+- **Agent 启动流程**：插件管理器从延迟加载（首次 chat() 时）改为 `Agent.__init__()` 立即初始化，确保 Web UI 在首次对话前即可展示插件列表
+- **配置页移除旧搜索 UI**：原 LLM 配置卡片的"联网搜索"checkbox 和搜索后端配置已移除（由插件系统接管），移除对应 3 个 JS 函数和 3 个 Python 模板变量
+
+---
+
+## [2.0.0b1] - 2026-07-22
+### 重大变更 — 1.x → 2.x 迁移警告
+**HNSW 管理重构：ChromaDB 内置 HNSW → hnswlib 独立索引**
+- ChromaDB Rust 后端的 HNSW compactor 在 Windows 上存在持久化 bug，导致索引反复损坏
+- 2.x 将向量搜索改为 **hnswlib 独立管理**，ChromaDB 仅用于 metadata 存储
+- **从 1.x 升级到 2.x 必须重建 HNSW 索引**（启动时自动懒重建，或手动点击 🔨 HNSW）
+- hnswlib 索引文件存储位置：`data/_hnsw/{sm3_hash}/`（ASCII 路径，避免中文路径 bug）
+
+### 新增
+- **懒重建机制**：`retrieve_documents()` 检测到 hnswlib 为空但 ChromaDB SQLite 有数据时，自动触发 `rebuild_kb_hnsw()` 重建索引，用户不感知
+- **`estimate_rebuild_time.py`**：启动时加载嵌入模型 + 采样 10 条真实文档 chunk 测速，精确预估全库重建耗时。显示模型名称、每文档耗时 ms、预计分钟数
+- **`rebuild_all_hnsw.py`**：批量重建全部 KB 的 HNSW 索引，跳过已有有效索引的 KB 和空 KB，供 `setup.bat` 调用
+- **`setup.bat` Y/N/K 三选项**：Y 全量重建、N 跳过（后续懒重建或手动）、K 写入 `data/.no_hnsw_prompt` 永久跳过，再次部署 2.x 不再提示
+- **`kb_index.json` 启动对齐**：自动删除目录已不存在的残留条目
+- **懒重建控制台醒目标记**：重建开始/结束用 `===` 包围 + `⏳`/`✅` 标记，区分于普通输出
+- **导入后自动删除源文件**：`data/imports/` 下已入库文件自动 `os.unlink()`
+
+### 修复
+- **HNSW 重建 ID 映射错误（关键修复）**：`rebuild_kb_hnsw()` 原来用 SQLite `embedding_metadata.id` 行号作为 ChromaDB ID 存入 hnswlib 的 `_id_map`，但 ChromaDB 的文档 ID 是 SM3 哈希值（64 位十六进制串）。搜索时 hnswlib 返回 SQLite 行号，`chroma_coll.get(ids=[...])` 全部空命中。修复为 `JOIN embeddings` 表读取真实 `embedding_id`，重建后搜索正常返回结果
+- **`main.py` KB 扫描 `index` 未定义**：第 311 行 `index.get(entry, {})` 中 `index` 变量不存在导致 `NameError` → `except Exception: pass` 静默吞掉，输出"知识库: 无"。新增 `_load_index()` 导入 + `kb_index` 变量
+- **启动扫描触发全量懒重建**：`main.py` 扫描每个 KB 时调用 `retrieve_documents("test")`，内部检测到 hnswlib 为空触发 `rebuild_kb_hnsw()`，19 个 KB 全部重建，启动卡死数小时。改为只创建 Chroma adapter 验证可访问性，不触发重建
+- **`setup.bat` 括号内标签 + `else if` 语法**：`:ASK_HNSW` 标签位于 `if (...) { ... }` 块内 + `else if` 非标准 cmd.exe 语法，导致整个版本检测块被跳过，不弹交互、不启动浏览器。重写为纯 `goto` 流，无嵌套块
+- **`setup.bat` 杀进程静默失败**：`Get-CimInstance` + `Get-NetTCPConnection` PowerShell 命令用 `>nul 2>&1` 隐藏所有错误，权限不足时旧进程不杀、新进程起不来。改为 `server.pid` PID 文件精确杀 + 端口兜底
+- **`setup.bat` `[!]` 被延迟展开吃掉**：`setlocal enabledelayedexpansion` 下 `!` 触发变量展开，`[!]` 输出为 `[]`。改用 `***` 替代
+- **`__pycache__` 缓存旧 `_hnsw_storage_dir`**：`chroma_adapter.py` 代码已改但运行的 Python 进程加载旧 `.pyc`，`_hnsw_storage_dir` 仍返回 `data/kb/_hnsw/`，导致懒重建写到旧位置、Chroma adapter 从新位置读不到 → 反复触发懒重建。清除后解决
+- **`estimate_rebuild_time.py` 测速不准确**：用 `"测试文本" * 10` 测速（极短文本，12ms/条），实际文档 chunk 长 100-500 字（100ms+/条），预估偏差 8 倍。改为从 SQLite 随机取真实 chunk 测速
+- **`rebuild_kb_hnsw` 中 `encode()` 进度条被 `2>&1` 隐藏**：SentenceTransformer 默认 `show_progress_bar=True` 但 tqdm 在非 TTY 输出下自动隐藏。加显式 `show_progress_bar=True` 强制显示
+- **`kb_index.json` 残留已删除 KB 条目**：手动删 KB 目录后索引未更新显示旧 KB。启动时自动遍历索引检查目录是否存在，不存在则移除
+- **`default` 空 KB 每次启动报 `HNSW 损坏`**：扫描器跳过空 KB，不调用 `retrieve_documents`，无 warning 噪音
+- **导入后源文件未删除**：`agent.py` 第 895-901 行已有删除逻辑，但因之前 `UnboundLocalError` 导致导入函数抛异常退出，`success=True` 路径未走到。修复后导入成功自动 `os.unlink(pp)`
+
+### 变更
+- **彻底移除 langchain 依赖**：`langchain`, `langchain-community`, `langchain-huggingface`, `langchain-chroma`, `langchain-text-splitters`, `openai` 全部移除
+- **5 种切分策略手写替代**：fixed/recursive/headers/sentence/semantic，含 5 种守卫栈
+- **ChromaDB 降级为 metadata-only**：列式向量搜索走 hnswlib，ChromaDB 只存文本+键值对
+- **`count()` 改为 SQLite 实时查询**：不再依赖 hnswlib 或 ChromaDB API
+
+## [1.8.0] - 2026-07-21
+### 修复
+- **PDF 导入 UnboundLocalError**：`import_documents_to_kb()` 中 `from utils import Document` 位于 OCR 回退分支内导致 Python 局部变量提前引用崩溃，所有 PDF 入库均报"文档加载失败"。提升至函数顶层解决
+
+### 变更
+- **版本号**：`1.8.0b1` → `1.8.0`（正式版）
+
+---
+
+## [1.8.0b1] - 2026-07-21
+### 重大变更
+- **彻底脱 langchain**：移除全部 6 个 langchain 依赖（langchain, langchain-community, langchain-huggingface, langchain-chroma, langchain-text-splitters, openai），替换为原生调用
+- **自定 Document 数据类**（`utils.py`）：替代 `langchain_core.documents.Document`，全项目 12 处替换
+- **SentenceTransformer 嵌入包装器**（`embeddings.py`）：替代 `langchain_huggingface.HuggingFaceEmbeddings`，支持 embed_query/embed_documents 接口
+- **ChromaDB 原生适配器**（`chroma_adapter.py`）：替代 `langchain_chroma.Chroma`，直接在 chromadb PersistentClient 上封装 similarity_search/as_retriever/from_documents/add_documents 等接口
+- **手写切分器**（`text_splitter.py`）：5 种策略（fixed/recursive/headers/sentence/semantic）+ 3 种子切全部手写，零 langchain-text-splitters 依赖
+- **PyPDFLoader → pypdf.PdfReader**：`rag_core.py`, `agent.py`, `rag_skill.py` 三处 PDF 加载改用 vendor/pypdf
+- **TextLoader → open().read()**：全部文本文件读取改用原生文件操作
+- **OpenAI LLM → requests.post()**：`rag_standalone.py` 的 `get_llm()` 和 `rag_web_ui.py` 的 LLM 推荐改用 OpenAI 兼容 API 直调
+
+### 新增
+- **HNSW 管理系统**：M 值可调（4-256）、自动重建开关、手动重建按钮，每 KB 独立配置
+  - `knowledge_base_manager.py`: `get_kb_hnsw_config()`, `set_kb_hnsw_config()`, `rebuild_kb_hnsw()`
+  - `rag_web_ui.py`: KB 列表每行加入 M 输入框 + 自动重建开关 + 🔨 HNSW 按钮 + JS 处理函数 + API 端点
+  - `external_api.py`: `GET /api/kb/hnsw-config`, `POST /api/kb/hnsw-config`, `POST /api/kb/rebuild-hnsw`
+- **模型路径自动解析**（`embedding_model_manager.py`）：`_resolve_actual_model_path()` 处理 HuggingFace Git LFS 结构的 snapshot 目录发现，写入索引时自动指向真文件位置
+- **vendor 目录加入 sys.path**（`__init__.py`）：使 `from pypdf import PdfReader` 在所有子模块中可用
+
+### 修复
+- **NLI 模型加载失败**：`model_index.json` 中 `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` 路径指向 git-lfs root 而非 snapshot 子目录 → 修正为 snapshot 路径
+- **HNSW 自动重建后召回率异常**：多 KB 因 UUID 目录清理后 ChromaDB 自动重建的 HNSW 索引质量差 → 新增全量重建机制（删 collection + 重新 embed + 写入），召回率从 0/5 恢复至 3/5
+- **ChromaDB collection 命名不兼容**：新适配器用目录名作 collection 名 → 修正为 `"langchain"`（与原 langchain_chroma 默认一致）
+
+### 变更
+- **依赖精简**：`requirements.txt` 移除 `langchain`, `langchain-community`, `langchain-huggingface`, `langchain-chroma`, `langchain-text-splitters`, `openai`；保留 `chromadb`, `sentence-transformers`, `huggingface-hub`, `modelscope`
+- **版本号**：`1.7.0` → `1.8.0b1`
+
 ## [1.7.0] - 2026-07-21
 ### 新增
 - **外部接入 API（port 8767）**：`rag_assistant/external_api.py` 独立服务，6 个能力域 27 个 REST 端点，与 Web UI 完全隔离

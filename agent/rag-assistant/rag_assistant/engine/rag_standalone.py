@@ -47,16 +47,38 @@ HELP_TEXT = """
 
 def get_llm(base_url=None, temperature=None, max_tokens=None):
     """获取 LLM 实例（通过 OpenAI 兼容接口）"""
-    from langchain_community.llms import OpenAI
+
+    class _LLMWrapper:
+        """OpenAI 兼容 API 的简易包装，支持 .invoke()"""
+        def __init__(self, base_url, api_key, temperature, max_tokens):
+            self._base_url = base_url.rstrip("/")
+            self._api_key = api_key
+            self._temperature = temperature
+            self._max_tokens = max_tokens
+
+        def invoke(self, prompt: str) -> str:
+            import requests
+            resp = requests.post(
+                f"{self._base_url}/chat/completions",
+                json={
+                    "model": "gpt-3.5-turbo",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": self._temperature,
+                    "max_tokens": self._max_tokens,
+                },
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=180,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
 
     cfg = load_config()
     llm_cfg = cfg.get("llm", {})
-
-    return OpenAI(
-        base_url=base_url or llm_cfg.get("base_url", "http://localhost:1234/v1"),
-        api_key=llm_cfg.get("api_key", "not-needed"),
-        temperature=temperature if temperature is not None else llm_cfg.get("temperature", 0.1),
-        max_tokens=max_tokens or llm_cfg.get("max_tokens", 512),
+    return _LLMWrapper(
+        base_url or llm_cfg.get("base_url", "http://localhost:1234/v1"),
+        llm_cfg.get("api_key", "not-needed"),
+        temperature if temperature is not None else llm_cfg.get("temperature", 0.1),
+        max_tokens or llm_cfg.get("max_tokens", 512),
     )
 
 

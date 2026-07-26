@@ -205,7 +205,7 @@ def build_kb_signature(kb_name: str, chunks: list = None, idf: dict = None) -> s
     # --- 读取 KB 所有 chunk ---
     if chunks is None:
         try:
-            from langchain_chroma import Chroma
+            from chroma_adapter import Chroma
             from knowledge_base_manager import _load_index
             index = _load_index()
             if kb_name not in index:

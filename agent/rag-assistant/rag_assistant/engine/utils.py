@@ -34,6 +34,15 @@ LOGS_DIR = _logs_dir_abs
 cache_directory = _cache_dir_abs
 
 
+# ── 自定 Document 数据类（替代 langchain_core.documents.Document） ──
+
+class Document:
+    """通用的文档数据类，用于在流水线中传递文本块及其元数据"""
+    def __init__(self, page_content: str = "", metadata: dict = None):
+        self.page_content = page_content
+        self.metadata = metadata or {}
+
+
 def get_python_path():
     """获取当前 Python 解释器路径"""
     return sys.executable

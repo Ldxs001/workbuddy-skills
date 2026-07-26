@@ -90,6 +90,10 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
             elif path == "/api/kb/signatures":
                 self._handle_signature_list()
 
+            elif path == "/api/kb/hnsw-config":
+                kb = qs.get("kb_name", [""])[0]
+                self._handle_hnsw_config(kb)
+
             elif path == "/api/prompt/template":
                 self._handle_prompt_template_get()
 
@@ -149,6 +153,12 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
             elif path == "/api/kb/signature/build":
                 self._handle_signature_build(body)
 
+            elif path == "/api/kb/hnsw-config":
+                self._handle_hnsw_update(body)
+
+            elif path == "/api/kb/rebuild-hnsw":
+                self._handle_hnsw_rebuild(body)
+
             elif path == "/api/kb/signature/rebuild-all":
                 self._handle_signature_rebuild_all()
 
@@ -178,6 +188,10 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
 
             elif path == "/api/input/query-slices":
                 self._handle_query_slices(body)
+
+            # ── KB 查询（结构化写手用） ──
+            elif path == "/api/kb/query":
+                self._handle_kb_query(body)
 
             else:
                 self._err(f"未知 POST 路径: {path}", 404)
@@ -288,7 +302,7 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
 
         from config import load_config
         from reranker import Reranker
-        from langchain_core.documents import Document
+        from utils import Document
 
         cfg = load_config()
         reranker = Reranker(cfg)
@@ -329,7 +343,7 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
             return
 
         from nli_classifier import get_nli_classifier
-        from langchain_core.documents import Document
+        from utils import Document
 
         classifier = get_nli_classifier()
         if classifier is None:
@@ -451,6 +465,45 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
         else:
             self._err(msg)
 
+    # ── HNSW 管理 ─────────────────────────────────
+
+    def _handle_hnsw_config(self, kb: str):
+        """GET: 查询 KB 的 HNSW 配置"""
+        from knowledge_base_manager import get_kb_hnsw_config
+        if not kb:
+            self._err("缺少 kb 参数")
+            return
+        cfg = get_kb_hnsw_config(kb)
+        self._ok(kb=kb, **cfg)
+
+    def _handle_hnsw_update(self, body: dict):
+        """POST: 更新 HNSW 配置（M/自动重建）"""
+        from knowledge_base_manager import set_kb_hnsw_config
+        kb = body.get("kb_name", "")
+        if not kb:
+            self._err("缺少 kb_name 字段")
+            return
+        hnsw_m = body.get("hnsw_m")
+        auto_rebuild = body.get("auto_rebuild_hnsw")
+        ok, msg, rebuilt = set_kb_hnsw_config(kb, hnsw_m=hnsw_m, auto_rebuild_hnsw=auto_rebuild)
+        if ok:
+            self._ok(message=msg, rebuilt=rebuilt, kb=kb)
+        else:
+            self._err(msg)
+
+    def _handle_hnsw_rebuild(self, body: dict):
+        """POST: 手动触发 HNSW 重建"""
+        from knowledge_base_manager import rebuild_kb_hnsw
+        kb = body.get("kb_name", "")
+        if not kb:
+            self._err("缺少 kb_name 字段")
+            return
+        ok, msg = rebuild_kb_hnsw(kb)
+        if ok:
+            self._ok(message=msg, kb=kb)
+        else:
+            self._err(msg)
+
     # ═══════════════════════════════════════════════════
     # 4. KB 签名管理
     # ═══════════════════════════════════════════════════
@@ -560,6 +613,40 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
         prefix = body.get("prefix", "")
         set_system_prefix(prefix)
         self._ok(message="系统前缀已更新")
+
+    # ── KB 查询（结构化写手外部调用） ──
+
+    def _handle_kb_query(self, body: dict):
+        """检索知识库返回上下文，不调 LLM 生成回答"""
+        query = body.get("query", "")
+        kb = body.get("kb", "")        # 空=自动路由
+        top_k = body.get("top_k", 5)
+        score_threshold = body.get("score_threshold")
+
+        if not query:
+            self._err("缺少 query 字段")
+            return
+
+        if self.agent is None or not hasattr(self.agent, 'rag'):
+            self._err("RAG 模块未就绪", 500)
+            return
+
+        try:
+            result = self.agent.rag.query(
+                question=query,
+                kb_name=kb or None,    # None=交给路由器
+                k=top_k,
+                score_threshold=score_threshold,
+            )
+            self._ok(
+                context=result.get("context", ""),
+                sources=result.get("docs", []),
+                has_context=result.get("has_context", False),
+                kb=result.get("kb", kb),
+            )
+        except Exception as e:
+            logger.exception(f"/api/kb/query 异常")
+            self._err(str(e), 500)
 
     # ═══════════════════════════════════════════════════
     # 6. 输入管理（文本切分 + 问题切片）

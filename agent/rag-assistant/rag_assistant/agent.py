@@ -14,6 +14,18 @@ from .rag_wrapper import RAGWrapper
 from .memory import Memory
 from .search import WebSearch
 
+# ── 插件系统（可选加载） ──
+def _init_plugin_manager(data_dir: str):
+    """初始化插件管理器，失败时不阻塞"""
+    try:
+        from .plugins.manager import PluginManager
+        pm = PluginManager(data_dir=data_dir)
+        pm.discover_and_register()
+        return pm
+    except Exception as e:
+        logger.warning(f"插件系统初始化跳过（不影响核心功能）: {e}")
+        return None
+
 logger = logging.getLogger(__name__)
 
 _ACTION_STRIP = re.compile(r'<{1,2}\s*ACTION\s+.*?>{1,2}', re.DOTALL | re.IGNORECASE)
@@ -67,9 +79,11 @@ class Agent:
         self.data_dir = self.config.get("data_dir", "data")
         self.session_id = self.config.get("session_id") or self._generate_session_id()
         self.rag = RAGWrapper(self.config)
-        self.llm = LLMClient(self.config)
+        self.llm = LLMClient(self.config, data_dir=self.data_dir)
         self.memory = Memory(self.data_dir)
         self.search = WebSearch(self.config)
+        # 插件管理器（立即初始化，失败时为 None 不阻塞）
+        self.plugin_manager = _init_plugin_manager(self.data_dir)
 
     @staticmethod
     def _generate_session_id() -> str:
@@ -305,7 +319,45 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         # 查询/搜索动作（执行后第二轮 LLM 生成回答）
         if action and action["type"] in ("query", "search"):
             context = self._exec_query(action, message)
+
+            # ── [PLUGIN] before_response：调用 input_return 插件 ──
+            plugin_injected = ""
+            if self.plugin_manager is not None:
+                try:
+                    plug_inputs = {
+                        "question": message,
+                        "answer_draft": "",
+                        "thinking": reasoning,
+                        "rag_context": context.get("context", ""),
+                        "session_id": self.session_id,
+                    }
+                    plugin_injected = self.plugin_manager.run_before_response(plug_inputs)
+                except Exception as e:
+                    logger.warning(f"插件 before_response 执行异常: {e}")
+
+            # 如果有插件注入内容，合并到 context
+            if plugin_injected:
+                existing = context.get("context", "")
+                if existing:
+                    context["context"] = existing + "\n\n---\n\n## 插件补充信息\n\n" + plugin_injected
+                else:
+                    context["context"] = plugin_injected
+
             result = self._second_pass(message, context, action)
+
+            # ── [PLUGIN] after_response：调用 input_output 插件 ──
+            if self.plugin_manager is not None:
+                try:
+                    final_reply = result.get("text", "")
+                    after_inputs = {
+                        "question": message,
+                        "answer_draft": final_reply,
+                        "session_id": self.session_id,
+                    }
+                    self.plugin_manager.run_after_response(after_inputs)
+                except Exception as e:
+                    logger.warning(f"插件 after_response 执行异常: {e}")
+
             reply2 = result.get("text", "")
             reas2 = result.get("reasoning", "")
             if reply2:
@@ -326,6 +378,19 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
             self.memory.append_short_term(self.session_id, "reasoning", reasoning)
         self._compress_if_needed()
         self.memory.record_habit(message, is_rag=False, is_chat=True, is_import=False, kb="")
+
+        # ── [PLUGIN] after_response（仅 input_output，无 before_response 注入） ──
+        if self.plugin_manager is not None:
+            try:
+                after_inputs = {
+                    "question": message,
+                    "answer_draft": reply,
+                    "session_id": self.session_id,
+                }
+                self.plugin_manager.run_after_response(after_inputs)
+            except Exception as e:
+                logger.warning(f"插件 after_response 执行异常: {e}")
+
         decision["success"] = True
         return decision
 
@@ -655,6 +720,17 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
 
         msgs = [{"role": "system", "content": sys_msg}]
 
+        # 如果上下文中包含插件提供的信息，追加插件引用指令
+        if ctx_text and "【" in ctx_text and "】" in ctx_text:
+            cite_note = (
+                "\n\n【引用规则】\n"
+                "以上资料中，标注【联网搜索】等标记的内容来自外部插件。"
+                "如果引用了这些信息，请按以下格式标注来源：\n"
+                "  - 引用插件信息 → 在句末标注 [插件名称]，例如 [联网搜索]\n"
+                "  - 引用知识库信息 → 继续使用 [1][2] 段落编号"
+            )
+            msgs[0]["content"] += cite_note
+
         # 带上历史对话，保持上下文连贯（只带 user/assistant，跳过 reasoning 防止连续 role）
         raw = self.memory.get_short_term(self.session_id)
         if raw.strip():
@@ -951,9 +1027,14 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                     ext = os.path.splitext(path)[1].lower()
                     content = ""
                     if ext == ".pdf":
-                        from langchain_community.document_loaders import PyPDFLoader
-                        pdf_docs = PyPDFLoader(path).load()
-                        content = "\n\n".join(d.page_content[:500] for d in pdf_docs[:4])
+                        from pypdf import PdfReader
+                        reader = PdfReader(path)
+                        snippets = []
+                        for p in reader.pages[:4]:
+                            text = (p.extract_text() or "")[:500]
+                            if text:
+                                snippets.append(text)
+                        content = "\n\n".join(snippets)
                     elif ext in (".txt", ".md", ".html"):
                         with open(path, "r", encoding="utf-8", errors="ignore") as f:
                             content = f.read(6000)

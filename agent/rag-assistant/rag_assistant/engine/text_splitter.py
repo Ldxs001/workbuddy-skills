@@ -218,56 +218,154 @@ class GuardStack:
 
 def split_fixed_size(text, chunk_size=500, chunk_overlap=50):
     """策略1: 固定窗口切分"""
-    from langchain_text_splitters import CharacterTextSplitter
-    from langchain_core.documents import Document
+    from utils import Document
 
-    splitter = CharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separator="",
-    )
-    docs = [Document(page_content=text)]
-    return splitter.split_documents(docs)
+    if chunk_size < 1:
+        chunk_size = 500
+    if chunk_overlap < 0:
+        chunk_overlap = 0
+    if chunk_overlap >= chunk_size:
+        chunk_overlap = chunk_size // 4
+
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunks.append(Document(page_content=text[start:end]))
+        if end >= len(text):
+            break
+        start += chunk_size - chunk_overlap
+    return chunks if chunks else [Document(page_content=text)]
 
 
 def split_recursive(text, chunk_size=500, chunk_overlap=50, separators=None):
-    """策略2: 递归切分"""
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_core.documents import Document
+    """策略2: 递归切分（按分隔符优先级递归）"""
+    from utils import Document
 
     if separators is None:
         separators = ["\n\n", "\n", "。", "；", "，", " ", ""]
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=separators,
-    )
-    docs = [Document(page_content=text)]
-    return splitter.split_documents(docs)
+    def _join_chunks(chunks, overlap):
+        """合并过小的 chunks，加入重叠"""
+        if not chunks:
+            return chunks
+        merged = [chunks[0]]
+        for c in chunks[1:]:
+            if len(merged[-1].page_content) + len(c.page_content) < chunk_size * 0.8:
+                merged[-1].page_content += c.page_content
+                if hasattr(c, "metadata") and c.metadata:
+                    merged[-1].metadata.update(c.metadata)
+            else:
+                merged.append(c)
+
+        # 加重叠
+        if overlap > 0 and len(merged) > 1:
+            result = [merged[0]]
+            for i in range(1, len(merged)):
+                prev = merged[i - 1].page_content
+                overlap_text = prev[-overlap:] if len(prev) > overlap else prev
+                merged[i].page_content = overlap_text + merged[i].page_content
+                result.append(merged[i])
+            return result
+        return merged
+
+    def _split(text, seps, size, overlap):
+        if not seps or len(text) <= size:
+            return [Document(page_content=text)]
+        sep = seps[0]
+        if sep == "":
+            # 最后一个分隔符：逐字符切
+            result = []
+            start = 0
+            while start < len(text):
+                end = min(start + size, len(text))
+                result.append(Document(page_content=text[start:end]))
+                if end >= len(text):
+                    break
+                start += size - overlap
+            return result
+
+        parts = text.split(sep)
+        chunks = []
+        current = ""
+        for part in parts:
+            if not part:
+                continue
+            candidate = current + sep + part if current else part
+            if len(candidate) <= size:
+                current = candidate
+            else:
+                if current:
+                    chunks.append(Document(page_content=current))
+                # 单部分超长：递归到下一级分隔符
+                sub = _split(part, seps[1:], size, overlap)
+                chunks.extend(sub)
+                current = ""
+        if current:
+            chunks.append(Document(page_content=current))
+        return _join_chunks(chunks, overlap)
+
+    return _split(text, separators, chunk_size, chunk_overlap)
 
 
 def split_by_headers(text, headers_to_split_on=None, strip_headers=False):
     """策略3: 层级/标题切分"""
-    from langchain_text_splitters import MarkdownHeaderTextSplitter
+    from utils import Document
 
     if headers_to_split_on is None:
-        headers_to_split_on = [
-            ("#", "h1"),
-            ("##", "h2"),
-            ("###", "h3"),
-        ]
+        headers_to_split_on = [("#", "h1"), ("##", "h2"), ("###", "h3")]
 
-    splitter = MarkdownHeaderTextSplitter(
-        headers_to_split_on=headers_to_split_on,
-        strip_headers=strip_headers,
-    )
-    return splitter.split_text(text)
+    # 构建正则：匹配所有指定的标题级别
+    level_patterns = []
+    for marker, field in headers_to_split_on:
+        escaped = re.escape(marker)
+        level_patterns.append((marker, field, re.compile(rf'^{escaped}\s+(.+)$', re.MULTILINE)))
+
+    # 按行处理，跟踪当前标题层级
+    lines = text.split('\n')
+    chunks = []
+    current_section_lines = []
+    active_headers = {}  # {field: title}
+
+    def flush():
+        if not current_section_lines:
+            return
+        content = '\n'.join(current_section_lines).strip()
+        if content:
+            meta = dict(active_headers)
+            chunks.append(Document(page_content=content, metadata=meta))
+        current_section_lines.clear()
+
+    for line in lines:
+        matched = False
+        for marker, field, pattern in level_patterns:
+            m = pattern.match(line)
+            if m:
+                flush()
+                title = m.group(1).strip()
+                # 更新标题层级：清除比当前级别深的标题
+                found = False
+                for m2, f2 in headers_to_split_on:
+                    if m2 == marker:
+                        found = True
+                    if found:
+                        active_headers.pop(f2, None)
+                active_headers[field] = title
+
+                if not strip_headers:
+                    current_section_lines.append(line)
+                matched = True
+                break
+        if not matched:
+            current_section_lines.append(line)
+
+    flush()
+    return chunks if chunks else [Document(page_content=text)]
 
 
 def split_by_sentence(text, language="中文", delimiters=None):
     """策略4: 按句切分"""
-    from langchain_core.documents import Document
+    from utils import Document
 
     if delimiters is None:
         if language == "中文":
@@ -308,21 +406,91 @@ def split_by_sentence(text, language="中文", delimiters=None):
 
 
 def split_semantic(text, embeddings=None, breakpoint_type="percentile"):
-    """策略5: 语义切分（需 langchain-experimental）"""
-    try:
-        from langchain_experimental.text_splitter import SemanticChunker
-        from langchain_huggingface import HuggingFaceEmbeddings
-    except ImportError:
-        raise ImportError("语义切分需要 langchain-experimental: pip install langchain-experimental")
+    """策略5: 语义切分（余弦断点）"""
+    from utils import Document
+    import numpy as np
 
-    if embeddings is None:
-        embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
+    # 分句
+    sentences = re.split(r'(?<=[。！？.!?])\s*', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return [Document(page_content=text)]
 
-    splitter = SemanticChunker(
-        embeddings=embeddings,
-        breakpoint_threshold_type=breakpoint_type,
-    )
-    return splitter.split_text(text)
+    # 如果是中文，用中文标点作为主要分句依据
+    has_cjk = any('\u4e00' <= c <= '\u9fff' for c in text[:100])
+    if has_cjk:
+        # 中文分句：先用 。！？ 切，再用 .!? 补充
+        delim = r'(?<=[。！？])\s*'
+        sentences = [s.strip() for s in re.split(delim, text) if s.strip()]
+    else:
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
+
+    if len(sentences) < 2:
+        return [Document(page_content=text)]
+
+    # 获取句子嵌入
+    if embeddings is not None:
+        try:
+            emb_vectors = embeddings.embed_documents(sentences)
+        except Exception:
+            emb_vectors = [embeddings.embed_query(s) for s in sentences]
+    else:
+        # 无嵌入模型时回退到 recursive
+        return split_recursive(text)
+
+    emb_array = np.array(emb_vectors)
+    norms = np.linalg.norm(emb_array, axis=1, keepdims=True)
+    norms[norms == 0] = 1
+    emb_array = emb_array / norms
+
+    # 计算相邻余弦相似度
+    sims = np.sum(emb_array[:-1] * emb_array[1:], axis=1)
+    distances = 1 - sims  # 距离越大越可能是断点
+
+    # 断点检测
+    if breakpoint_type == "percentile":
+        threshold = np.percentile(distances, 95)
+    elif breakpoint_type == "stddev":
+        threshold = float(np.mean(distances) + np.std(distances))
+    elif breakpoint_type == "gradient":
+        grads = np.abs(np.diff(distances))
+        threshold = np.percentile(grads, 90)
+        # 用梯度峰值作为断点
+        break_indices = []
+        for i, g in enumerate(grads):
+            if g >= threshold and distances[i] > np.median(distances):
+                break_indices.append(i + 1)
+        # 按断点切分
+        chunks = []
+        start = 0
+        for bi in break_indices:
+            if bi > start:
+                chunk_text = "".join(sentences[start:bi])
+                chunks.append(Document(page_content=chunk_text))
+                start = bi
+        if start < len(sentences):
+            chunks.append(Document(page_content="".join(sentences[start:])))
+        return chunks if chunks else [Document(page_content=text)]
+    else:
+        threshold = np.percentile(distances, 95)
+
+    # 按阈值切分
+    chunks = []
+    current = []
+    for i, sent in enumerate(sentences):
+        current.append(sent)
+        if i < len(distances) and distances[i] >= threshold:
+            # 遇到断点：合并当前块
+            chunk_text = "".join(current).strip()
+            if chunk_text:
+                chunks.append(Document(page_content=chunk_text))
+            current = []
+    if current:
+        chunk_text = "".join(current).strip()
+        if chunk_text:
+            chunks.append(Document(page_content=chunk_text))
+
+    return chunks if chunks else [Document(page_content=text)]
 
 
 # ==================== 后处理（子切分）====================
@@ -334,37 +502,9 @@ def _run_secondary(chunks: list, secondary_strategy: str,
     对 chunks 执行二次切分，metadata 白名单继承。
     只有 chunks 内容长度超过 chunk_size 的才子切。
     """
-    from langchain_core.documents import Document
+    from utils import Document
 
     if not secondary_strategy or secondary_strategy == "none":
-        return chunks
-
-    if secondary_strategy == "recursive":
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-        )
-    elif secondary_strategy == "fixed":
-        from langchain_text_splitters import CharacterTextSplitter
-        splitter = CharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separator="",
-        )
-    elif secondary_strategy == "semantic":
-        try:
-            from langchain_experimental.text_splitter import SemanticChunker
-            if embeddings is None:
-                from langchain_huggingface import HuggingFaceEmbeddings
-                embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
-            splitter = SemanticChunker(
-                embeddings=embeddings,
-                breakpoint_threshold_type="percentile",
-            )
-        except ImportError:
-            raise ImportError("语义子切需要 langchain-experimental: pip install langchain-experimental")
-    else:
         return chunks
 
     result = []
@@ -376,21 +516,21 @@ def _run_secondary(chunks: list, secondary_strategy: str,
 
         parent_meta = filter_inheritable_meta(doc.metadata if hasattr(doc, "metadata") else {})
 
-        if secondary_strategy == "semantic":
-            sub_chunks = splitter.split_text(content)
-            for sub in sub_chunks:
-                if hasattr(sub, "metadata"):
-                    sub.metadata.update(parent_meta)
-                elif isinstance(sub, str):
-                    sub = Document(page_content=sub, metadata=parent_meta)
-                result.append(sub)
+        if secondary_strategy == "recursive":
+            sub_chunks = split_recursive(content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        elif secondary_strategy == "fixed":
+            sub_chunks = split_fixed_size(content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        elif secondary_strategy == "semantic":
+            sub_chunks = split_semantic(content, embeddings=embeddings)
+        else:
+            result.append(doc)
             continue
 
-        # recursive / fixed
-        sub_docs = splitter.split_documents([doc])
-        for sub in sub_docs:
+        for sub in sub_chunks:
             if hasattr(sub, "metadata") and parent_meta:
                 sub.metadata.update(parent_meta)
+            elif isinstance(sub, str):
+                sub = Document(page_content=sub, metadata=parent_meta)
             result.append(sub)
 
     return result
@@ -425,7 +565,7 @@ def split_pipeline(text, guards=None, primary="recursive", secondary=None,
         embeddings: 嵌入模型实例（供语义切分使用，不传则 fallback bge-small-zh-v1.5）
         **kwargs: 传递给主策略的额外参数（headers_to_split_on, strip_headers, separators, etc.）
     """
-    from langchain_core.documents import Document
+    from utils import Document
 
     # 1. 守卫栈（预处理）
     guard_stack = GuardStack(guards or [])
@@ -486,36 +626,24 @@ def _run_secondary_without_inherit(chunks, secondary_strategy, chunk_size, chunk
     if not secondary_strategy or secondary_strategy == "none":
         return chunks
 
-    if secondary_strategy == "recursive":
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
-        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    elif secondary_strategy == "fixed":
-        from langchain_text_splitters import CharacterTextSplitter
-        splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap, separator="")
-    elif secondary_strategy == "semantic":
-        try:
-            from langchain_experimental.text_splitter import SemanticChunker
-            if embeddings is None:
-                from langchain_huggingface import HuggingFaceEmbeddings
-                embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
-            splitter = SemanticChunker(
-                embeddings=embeddings,
-                breakpoint_threshold_type="percentile",
-            )
-        except ImportError:
-            return chunks
-    else:
-        return chunks
-
     result = []
     for doc in chunks:
         content = doc.page_content if hasattr(doc, "page_content") else str(doc)
         if len(content) <= chunk_size:
             result.append(doc)
             continue
-        # 子切但不继承 metadata（仅保留 source）
-        sub_docs = splitter.split_documents([doc])
-        for sub in sub_docs:
+
+        if secondary_strategy == "recursive":
+            sub_chunks = split_recursive(content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        elif secondary_strategy == "fixed":
+            sub_chunks = split_fixed_size(content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        elif secondary_strategy == "semantic":
+            sub_chunks = split_semantic(content, embeddings=embeddings)
+        else:
+            result.append(doc)
+            continue
+
+        for sub in sub_chunks:
             if hasattr(sub, "metadata") and "source" in (doc.metadata or {}):
                 sub.metadata["source"] = doc.metadata["source"]
             result.append(sub)

@@ -1,7 +1,17 @@
 # RAG Assistant
 
 > 本地知识库问答智能体 — LLM 驱动的组合式语义检索与多库路由。
-> 版本：1.7.0 | 作者：wUwproject | 许可证：Apache 2.0
+> 版本：2.0.0b1 | 作者：wUwproject | 许可证：Apache 2.0
+
+## ⚠️ 从 1.x 升级到 2.x 必须重建 HNSW 索引
+
+**2.x 将向量搜索引擎从 ChromaDB 内置 HNSW 替换为独立 hnswlib 索引，以解决 ChromaDB Rust 后端在 Windows 上的 HNSW 持久化 bug。**
+
+升级后首次搜索会自动触发懒重建（每个 KB 约 1-2 分钟），也可手动点击 🔨 HNSW 按钮，或通过 `POST /api/kb/rebuild-hnsw` API 触发。
+
+- **重建不可跳过**：ChromaDB HNSW 和 hnswlib 索引格式不兼容
+- **旧索引自动清理**：重建后 ChromaDB 的 HNSW 段文件会自动废弃
+- **数据不丢失**：文档文本和 metadata 全部保留，仅重新计算向量索引
 
 基于 local-rag-builder 技能构建的独立 RAG 智能体，支持 LM Studio / Ollama 双后端。
 

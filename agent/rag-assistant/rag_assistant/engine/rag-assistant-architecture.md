@@ -3,7 +3,7 @@
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-21 (v1.7.0)
+> 更新：2026-07-22 (v2.0.0b1)
 
 ---
 
@@ -19,7 +19,7 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
            → [组合展开器] 穷举 entities × attrs
            → [多切片检索] 每片独立走完整 RAG 流程
               1. 路由（route_query → 嵌入模型 × KB签名/关键词）
-              2. 检索（retrieve_documents → Chroma 相似度）
+              2. 检索（retrieve_documents → hnswlib 向量搜索 + ChromaDB 元数据读取）
               3. (可选) 重排序（reranker）
               4. (可选) NLI 三向分类（entailment/neutral/contradiction）
               5. 构建上下文（build_context，含 NLI 标签渲染）
@@ -52,17 +52,19 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
 | 层 | 组件 | 职责 |
 |---|------|------|
 | **表现层** | `web_ui.py` (port 8765) / `external_api.py` (port 8767) / RAG 配置页 subprocess (port 8766) | Web 界面、外部接入 API、RAG 配置页、聊天界面、模型管理 |
-| **业务层** | `agent.py` / `rag_wrapper.py` / `scripts/rag_core.py` / `scripts/router.py` | 决策循环、组合查询、路由/检索/重排序 |
-| **基础设施** | `llm_client.py` / `scripts/config.py` / `scripts/utils.py` / `data/` | LLM 通信、配置管理、数据持久化 |
+| **业务层** | `agent.py` / `rag_wrapper.py` / `engine/rag_core.py` / `engine/router.py` / `engine/chroma_adapter.py` / `engine/embeddings.py` | 决策循环、组合查询、路由/检索/重排序 |
+| **基础设施** | `llm_client.py` / `engine/config.py` / `engine/utils.py` / `data/` | LLM 通信、配置管理、数据持久化 |
 
 ### 2.1 文件结构
 
 ```
 agent/rag-assistant/
 ├── main.py                          # 入口
-├── setup.bat                        # Windows 一键启动
+├── setup.bat                        # Windows 启动器（含版本检测 + HNSW 重建交互）
 ├── requirements.txt                 # 依赖清单
 ├── CHANGELOG.md                     # 版本更新日志
+├── estimate_rebuild_time.py         # HNSW 重建耗时预估脚本
+├── rebuild_all_hnsw.py              # 批量 HNSW 重建脚本
 ├── PROTOCOL.md                      # Web UI 接入协议规范（HTTP/CLI/文件交互，port 8765）
 ├── EXTERNAL_API.md                  # 外部接入 API 协议（组件级能力调用，port 8767）
 ├── llms.txt                         # AI 可读的项目自描述文档（llmstxt.org）
@@ -76,9 +78,10 @@ agent/rag-assistant/
 │   ├── rag_wrapper.py               # RAG 封装层
 │   ├── search.py                    # 联网搜索
 │   ├── memory.py                    # 记忆管理
-│   └── _fix_rag.py                  # 破损数据修复工具
 │
 ├── rag_assistant/engine/            # local-rag-builder 技能核心（独立副本）
+│   ├── chroma_adapter.py            # ChromaDB + hnswlib 适配器（替代 langchain_chroma）
+│   ├── embeddings.py                # SentenceTransformer 嵌入包装器
 │   ├── rag_core.py                  # RAG 核心：检索/嵌入/导入
 │   ├── router.py                    # 路由层
 │   ├── reranker.py                  # 重排序
@@ -100,12 +103,13 @@ agent/rag-assistant/
 └── data/                            # 运行时数据
     ├── config/rag_config.json       # LLM 与检索配置
     ├── models/                      # 嵌入/路由/rerank 模型
-    ├── kb/                          # 知识库（Chroma 向量库）
+    ├── kb/                          # 知识库（ChromaDB 元数据存储）
+    ├── _hnsw/                       # hnswlib 向量索引文件（按 SM3 哈希分目录）
     ├── sessions/                    # 会话历史
     ├── memory/                      # 记忆数据
     ├── prompts/                     # 提示词模板
     ├── import_manifest.json          # 待入库文件清单
-    ├── imports/                      # 浏览器上传临时目录（入库后自动清理）
+    ├── imports/                      # 浏览器上传临时目录（入库成功自动删除）
     └── cache/                       # 缓存
 ```
 
@@ -213,9 +217,9 @@ slices = [
 - 配置保存后立即同步到 `self.agent.llm.*` 运行时实例
 - `llm_max_tokens` 和 `llm_timeout` 持久化到 `config.json`
 
-**文件上传流程**：点击 `📄` 或 `📁` 按钮选择文件后，文件以 base64 二进制上传到服务器 `data/imports/` 目录并记录到 `import_manifest.json`，同时聊天框出现系统通知。用户输入"入库"后 LLM 发出 `path="MANIFEST"` 指令，系统读取清单逐个走完整导入管线（PyPDFLoader → OCR 回退 → 自动路由 → 切片 → 嵌入）。
+**文件上传流程**：点击 `📄` 或 `📁` 按钮选择文件后，文件以 base64 二进制上传到服务器 `data/imports/` 目录并记录到 `import_manifest.json`，同时聊天框出现系统通知。用户输入"入库"后 LLM 发出 `path="MANIFEST"` 指令，系统读取清单逐个走完整导入管线（PyPDFLoader → OCR 回退 → 自动路由 → 切片 → 嵌入），导入成功自动删除 `data/imports/` 下的源文件。
 
-**PDF 导入**：多页 PDF 合并全部页内容后切分（`"\n\n".join(d.page_content for d in docs)`），不再仅取第 1 页。OCR 回退条件：`total_chars < 50`（扫描版 PDF 无文本层）无条件触发；`total_chars >= 50` + 中文文件名 + CJK 占比 < 10% 也触发（编码乱码检测）。英文正常 PDF 不走 OCR。
+**PDF 导入**：每页独立切分（而非全部页合并后切分），每页的 metadata（source + page）被子 chunk 完整继承。OCR 回退条件：`total_chars < 50`（扫描版 PDF 无文本层）无条件触发；`total_chars >= 50` + 中文文件名 + CJK 占比 < 10% 也触发（编码乱码检测）。英文正常 PDF 不走 OCR。
 
 ### 3.4 RAG 封装层 — `rag_wrapper.py`
 
@@ -232,7 +236,7 @@ rag.query(question, kb_name=None, k=5, score_threshold=0.0)
   → return {context, docs, kb, has_context}
 ```
 
-不改造技能内部的任何逻辑，完整走 `scripts/rag_core.py` → `router.py` → `reranker.py` 流程。
+不改造技能内部的任何逻辑，完整走 `engine/rag_core.py` → `router.py` → `reranker.py` 流程。
 
 ### 3.5 搜索模块 — `search.py`
 
@@ -497,11 +501,13 @@ RAG Assistant 通过 `rag_wrapper.py` 封装以下技能模块，不改造内部
 |---------|---------|------|
 | `rag_core` | `retrieve_context` | 检索主入口（路由→检索→reranker→build） |
 | `rag_core` | `get_embeddings` | 嵌入模型管理 |
+| `chroma_adapter` | `Chroma` | ChromaDB + hnswlib 适配器：ChromaDB 只存储元数据（SQLite），向量搜索走 hnswlib |
+| `embeddings` | `SentenceTransformerEmbeddings` | 嵌入模型包装器（替代 langchain_huggingface） |
 | `knowledge_base_manager` | `list_knowledge_bases` | 知识库枚举 |
-| `knowledge_base_manager` | `_load_rules` / `auto_classify` | 入库路由：`_load_rules` 列出各 KB 关键词做嵌入余弦相似度（`kb.auto_classify` 开时）；出库路由：`auto_classify` 做第一层硬编码匹配，未命中时走嵌入模型 × KB 签名关键词或规则关键词（`router.enabled` 开时，具体取决于精排开关）。`kb.enabled` 关时全部路由失效，全进 default
+| `knowledge_base_manager` | `_load_rules` / `auto_classify` | 入库路由 |
 | `config` | `load_config / save_config` | 配置持久化 |
 | `prompt_manager` | `get_full_prompt` | Prompt 模板 |
-| `nli_classifier` | `NLIClassifier.classify` | NLI 三向分类（v0.9.0 新增） |
+| `nli_classifier` | `NLIClassifier.classify` | NLI 三向分类 |
 
 ---
 
@@ -606,14 +612,22 @@ for doc in all_docs:
 setup.bat
   ↓
 1. python --version 检查
-2. pip install -r requirements.txt（首次装依赖）
+2. 版本检测：读取 __init__.py 版本号
+   ├─ ≥2.x 且未标记永久跳过 → 弹出 HNSW 重建交互
+   │   ├─ Y → 调用 rebuild_all_hnsw.py 逐 KB 重建 HNSW
+   │   ├─ N → 跳过（后续通过懒重建/手动按钮/API 重建）
+   │   └─ K → 写入 data/.no_hnsw_prompt 永久跳过
+   └─ 1.x 或已标记 → 静默继续
+3. pip install -r requirements.txt（首次装依赖）
   ↓
 python main.py
   ↓
 1. 初始化 Agent（创建 LLMClient + RAGWrapper）
-2. 启动 Web UI（port 8765）
-3. 启动 RAG 配置页 subprocess（port 8766）
-4. 打开浏览器 http://localhost:8765
+2. 扫描所有 KB 验证可访问性（跳过空 KB，不触发懒重建）
+3. 自动清理 kb_index.json 中已删除 KB 目录的残留条目
+4. 启动 Web UI（port 8765）
+5. 启动 RAG 配置页 subprocess（port 8766）
+6. 打开浏览器 http://localhost:8765
 ```
 
 ---
@@ -621,6 +635,6 @@ python main.py
 ## 九、安全与隐私
 
 - **无外部调用**：所有 LLM 请求发向本地 LM Studio / Ollama，不上传数据
-- **本地知识库**：Chroma 向量库存储在本地 `data/kb/`，不离开用户机器
+- **本地知识库**：ChromaDB 元数据（文本+属性）存储在 `data/kb/`，hnswlib 向量索引存储在 `data/_hnsw/`，两者均不离开用户机器
 - **联网搜索可选**：默认关闭，需用户手动启用
 - **模型本地加载**：嵌入模型/路由模型通过本地磁盘加载，不依赖外部 API

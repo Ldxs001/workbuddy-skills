@@ -62,7 +62,7 @@ _EMBEDDING_CACHE: dict = {}
 
 def get_embeddings(model_path=None, device="auto", kb_name=None):
     """获取嵌入模型实例（已缓存，同一路径只加载一次）"""
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from embeddings import SentenceTransformerEmbeddings
     import torch
 
     cfg = load_config()
@@ -121,7 +121,7 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
     if cache_key in _EMBEDDING_CACHE:
         return _EMBEDDING_CACHE[cache_key]
 
-    emb = HuggingFaceEmbeddings(
+    emb = SentenceTransformerEmbeddings(
         model_name=model_path,
         model_kwargs={"device": device, "local_files_only": True},
         encode_kwargs={"normalize_embeddings": emb_cfg.get("normalize_embeddings", True)},
@@ -132,7 +132,7 @@ def get_embeddings(model_path=None, device="auto", kb_name=None):
 
 def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, embeddings=None):
     """检索相关文档"""
-    from langchain_chroma import Chroma
+    from chroma_adapter import Chroma
 
     if embeddings is None:
         embeddings = get_embeddings(kb_name=kb_name)
@@ -149,6 +149,34 @@ def retrieve_documents(query, kb_name="default", k=None, score_threshold=None, e
                 persist_directory=kb_path,
                 embedding_function=embeddings,
             )
+
+            # 懒重建：hnswlib 为空但 ChromaDB SQLite 有数据时自动重建
+            if vectorstore._hnsw.count() == 0:
+                _hnsw_rebuild_done = False
+                try:
+                    import sqlite3 as _s3
+                    _db = _s3.connect(os.path.join(kb_path, "chroma.sqlite3"))
+                    _cnt = _db.execute(
+                        "SELECT COUNT(*) FROM embedding_metadata WHERE key='chroma:document'"
+                    ).fetchone()[0]
+                    _db.close()
+                    if _cnt > 0:
+                        from knowledge_base_manager import rebuild_kb_hnsw
+                        print(f"\n{'='*50}")
+                        print(f"  ⏳ 懒重建 HNSW: {kb_name} ({_cnt} 文档)")
+                        print(f"  重建期间该 KB 暂停服务，完成后自动恢复")
+                        print(f"{'='*50}")
+                        rebuild_kb_hnsw(kb_name)
+                        _hnsw_rebuild_done = True
+                        print(f"  ✅ 懒重建完成: {kb_name}")
+                except Exception as _e:
+                    print(f"  [lazy HNSW rebuild] {kb_name}: 跳过 ({_e})")
+                if _hnsw_rebuild_done:
+                    vectorstore = Chroma(
+                        persist_directory=kb_path,
+                        embedding_function=embeddings,
+                    )
+
             cfg = load_config()
             ret_cfg = cfg.get("retrieval", {})
             if k is None:
@@ -406,12 +434,20 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     if embeddings is None:
         embeddings = get_embeddings(kb_name=kb_name)
 
+    from utils import Document
+
     try:
         ext = os.path.splitext(file_path)[1].lower()
         if ext == ".pdf":
-            from langchain_community.document_loaders import PyPDFLoader
-            loader = PyPDFLoader(file_path)
-            docs = loader.load()
+            from pypdf import PdfReader
+            reader = PdfReader(file_path)
+            docs = []
+            for i, page in enumerate(reader.pages):
+                text = page.extract_text() or ""
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": os.path.basename(file_path), "page": i + 1}
+                ))
             # 扫描版 PDF 自动回退 OCR
             total_chars = sum(len(d.page_content) for d in docs)
             # 无文本层（0 字符或极少字符）→ 直接 OCR，与文件名无关
@@ -441,7 +477,6 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
                         arr = np.array(img)
                         result = reader.readtext(arr)
                         all_text.append("\n".join([r[1] for r in result]))
-                    from langchain_core.documents import Document
                     docs = [Document(
                         page_content="\n\n--- 换页 ---\n\n".join(all_text),
                         metadata={"source": os.path.basename(file_path), "ocr": True}
@@ -449,9 +484,12 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
                 except Exception as ocr_err:
                     raise RuntimeError(f"PDF 无文本且 OCR 失败: {ocr_err}")
         else:
-            from langchain_community.document_loaders import TextLoader
-            loader = TextLoader(file_path, encoding="utf-8")
-            docs = loader.load()
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            docs = [Document(
+                page_content=content,
+                metadata={"source": os.path.basename(file_path)}
+            )]
     except Exception as e:
         raise RuntimeError(f"文档加载失败: {e}")
 
@@ -485,7 +523,7 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
     # Markdown 标题预处理（守卫栈之后、切片之前）
     preprocess_cfg = cfg.get("preprocess", {})
     if preprocess_cfg.get("enabled"):
-        # 合并所有页的文本（PDF 多页时 PyPDFLoader 每页一个 Document）
+        # 合并所有页的文本（MD 预处理需要全文，page 无法精确追溯，只设 source）
         text = "\n\n".join(d.page_content for d in docs)
         docs[0].page_content = apply_markdown_preprocess(text, preprocess_cfg)
         primary = "headers"
@@ -494,11 +532,22 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
             pipeline_kwargs["headers_to_split_on"] = [
                 ("h1", "# "), ("h2", "## "), ("h3", "### "), ("h4", "#### ")
             ]
-
-    chunks = split_pipeline("\n\n".join(d.page_content for d in docs), **pipeline_kwargs)
-
-    for chunk in chunks:
-        chunk.metadata["source"] = os.path.basename(file_path)
+        # MD 预处理路径：将合并处理后的文本切分
+        merged = split_pipeline(docs[0].page_content, **pipeline_kwargs)
+        for c in merged:
+            c.metadata["source"] = os.path.basename(file_path)
+        chunks = merged
+    else:
+        # 逐页切分，继承每页的完整 metadata（source + page + 其他自定义字段）
+        chunks = []
+        for page_doc in docs:
+            page_text = page_doc.page_content
+            if not page_text.strip():
+                continue
+            page_chunks = split_pipeline(page_text, **pipeline_kwargs)
+            for c in page_chunks:
+                c.metadata = dict(page_doc.metadata) if page_doc.metadata else {}
+            chunks.extend(page_chunks)
 
     ok, msg = add_documents_to_kb(kb_name, chunks, embeddings)
 
