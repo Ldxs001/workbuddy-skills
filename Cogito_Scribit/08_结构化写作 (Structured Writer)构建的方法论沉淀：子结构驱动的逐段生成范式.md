@@ -5,7 +5,7 @@ Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-
 See https://creativecommons.org/licenses/by-sa/4.0/ for details.
 -->
 
-# 重型技能构建的方法论沉淀：子结构驱动的逐段生成范式
+# 结构化写作 (Structured Writer) 构建的方法论沉淀：子结构驱动的逐段生成范式
 
 > 从"让 LLM 一次写完整篇文章"到"让 LLM 每次只写 500 字的一段"——用子结构原子化取代整篇生成的架构范式。
 > 更新：2026-07-26（对齐 Structured Writer v0.2.5b4）
