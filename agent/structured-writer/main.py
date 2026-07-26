@@ -2,7 +2,7 @@
 """Structured Writer — 结构化写作智能体 入口"""
 import sys
 import argparse
-from app.web_ui import run_server
+from structured_writer.web_ui import run_server
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
 
 def get_version():
     try:
-        from app import __version__
+        from structured_writer import __version__
         return __version__
     except ImportError:
         return "dev"

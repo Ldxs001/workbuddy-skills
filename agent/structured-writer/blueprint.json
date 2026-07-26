@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "description": "structured-writer agent 同步蓝图",
+  "include": [
+    "app/**/*.py",
+    "main.py",
+    "setup.bat",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "SCHEMA.md",
+    "requirements.txt",
+    ".github/**/*"
+  ],
+  "exclude": [
+    "__pycache__",
+    "*.pyc",
+    "dist",
+    "build",
+    ".git"
+  ]
+}
