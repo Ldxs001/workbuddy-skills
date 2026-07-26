@@ -5,7 +5,7 @@ Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-
 See https://creativecommons.org/licenses/by-sa/4.0/ for details.
 -->
 
-# 重型技能构建的方法论沉淀：本地知识库智能体的自洽范式
+# 领域智能体 (Domain Agent) 构建的方法论沉淀：本地知识库智能体的自洽范式
 
 > 从"搜索靠猜"到"检索靠切片"——用 LLM 驱动的穷举组合取代单轮 RAG 的架构范式。
 > 更新：2026-07-20（对齐 v1.7.0b1 实际项目）
