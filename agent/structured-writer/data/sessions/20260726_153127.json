@@ -1,0 +1,29 @@
+{
+  "session_id": "20260726_153127",
+  "created_at": "2026-07-26T15:31:27.187214",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "",
+      "timeout": 180,
+      "max_tokens": 4096
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "",
+      "timeout": 300,
+      "max_tokens": 8192
+    },
+    "default_prompt": "test prompt"
+  },
+  "outline": {
+    "title": "",
+    "sections": []
+  },
+  "user_orders": {},
+  "output_file": "",
+  "phase": "config",
+  "fingerprint": ""
+}

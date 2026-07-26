@@ -1,0 +1,114 @@
+{
+  "session_id": "20260726_153904",
+  "created_at": "2026-07-26T15:41:30.336253",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 180,
+      "max_tokens": 4096
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 300,
+      "max_tokens": 8192
+    },
+    "default_prompt": "test prompt"
+  },
+  "outline": {
+    "title": "大型语言模型（LLM）的核心结构解析与演进路径",
+    "sections": [
+      {
+        "id": "s1",
+        "title": "引言：LLM架构的历史定位与技术价值",
+        "subtitle": "从规则系统到神经网络的范式转变",
+        "summary": "本文旨在阐明现代LLM结构的技术演进脉络，论证Transformer架构如何突破传统语言模型瓶颈，并为后续技术解析奠定认知基础。",
+        "word_count": 800,
+        "is_key": false,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s2",
+        "title": "Transformer架构的核心机制",
+        "subtitle": "自注意力与位置编码的协同作用",
+        "summary": "深度解析多头自注意力机制的计算逻辑，论证其如何实现全局依赖建模，并阐释相对/绝对位置编码对序列理解的关键影响。",
+        "word_count": 1200,
+        "is_key": true,
+        "status": "done",
+        "actual_word_count": 1429,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s3",
+        "title": "关键组件的功能解构",
+        "subtitle": "前馈网络与残差连接的协同效应",
+        "summary": "剖析层归一化、残差连接与前馈神经网络在特征传递中的动态平衡，论证其对梯度稳定性的保障机制。",
+        "word_count": 1000,
+        "is_key": true,
+        "status": "done",
+        "actual_word_count": 1379,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s4",
+        "title": "训练策略的技术挑战",
+        "subtitle": "数据效率与收敛速度的平衡艺术",
+        "summary": "探讨预训练-微调范式中的数据配比优化，分析梯度裁剪、学习率调度对模型泛化能力的量化影响。",
+        "word_count": 900,
+        "is_key": false,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s5",
+        "title": "推理效率优化技术",
+        "subtitle": "量化压缩与动态批处理的实践路径",
+        "summary": "论证INT8/FP4量化对显存占用的降低效果，解析KV Cache机制在长文本生成中的延迟削减原理。",
+        "word_count": 1000,
+        "is_key": true,
+        "status": "done",
+        "actual_word_count": 26,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s6",
+        "title": "未来架构演进方向",
+        "subtitle": "混合专家与神经符号系统的融合趋势",
+        "summary": "探讨MoE架构的稀疏激活机制，论证其与知识图谱结合在可解释性领域的突破潜力。",
+        "word_count": 800,
+        "is_key": false,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      }
+    ]
+  },
+  "user_orders": {},
+  "output_file": "C:\\Users\\sm001\\WorkBuddy\\structured-writer\\data\\outputs\\大型语言模型LLM的核心结构解析与演进路径_20260726_160350.md",
+  "phase": "done",
+  "fingerprint": "4141b7886f43e0db2fdfa51af35cd05f"
+}

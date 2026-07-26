@@ -122,8 +122,14 @@ class StateManager:
             "done_sections": done_sections,
             "total_words": total_words,
             "phase": self._state.get("phase"),
-            "title": self._state.get("outline", {}).get("title", "")
+            "title": self._state.get("outline", {}).get("title", ""),
+            "status_text": self._state.get("_status_text", "")
         }
+
+    def set_status_text(self, text: str):
+        """设置当前状态文本（显示在进度条下方）"""
+        self._state["_status_text"] = text
+        self.save()
 
     def get_state(self):
         return copy.deepcopy(self._state)

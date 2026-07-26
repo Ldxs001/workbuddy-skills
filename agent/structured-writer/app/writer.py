@@ -98,17 +98,46 @@ def generate_article(
                 "word_count": section.get("word_count", 800),
             }]
 
-        # 如果启用了 RAG，为整个节查询一次（用第一个子结构的摘要）
-        rag_context = None
+        # ── 两级 RAG 查询 ──
         rag_opt = (rag_options or {}).get(sid, {})
-        if rag_opt.get("enabled") and rag_client:
+        rag_enabled = rag_opt.get("enabled") and rag_client is not None
+        kb = rag_opt.get("kb", "")
+
+        section_rag_context = None
+        sub_rag_contexts = {}  # {sub_id: context_text}
+
+        if rag_enabled:
+            # 节级别 RAG（背景资料）
+            state_mgr.set_status_text(f"RAG查询: {kb or '自动'} → {section['title']}（整节背景）")
             try:
-                kb = rag_opt.get("kb", "")
-                query_text = f"{title} {section['title']} {section['summary']}"
-                result = rag_client.query(kb, query_text)
-                rag_context = result.get("context", "")
+                q = f"{title} {section['title']} {section['summary']}"
+                r = rag_client.query(kb, q)
+                ctx = r.get("context", "").strip()
+                if ctx:
+                    section_rag_context = ctx
+                    cnt = len(r.get("sources", []))
+                    state_mgr.set_status_text(f"RAG完成: {kb or '自动'} → {section['title']}（{cnt}条）")
+                else:
+                    state_mgr.set_status_text(f"RAG无结果: {kb or '自动'} → {section['title']}")
             except Exception as e:
-                rag_context = f"[RAG 查询失败: {e}]"
+                state_mgr.set_status_text(f"RAG超时: {kb or '自动'} → {section['title']}")
+
+            # 子结构级别 RAG（针对性资料）
+            for sub in subs:
+                ssid = sub["id"]
+                state_mgr.set_status_text(f"RAG查询: {kb or '自动'} → {sub['title']}")
+                try:
+                    q = f"{section['title']} {sub['title']} {sub.get('summary', '')}"
+                    r = rag_client.query(kb, q)
+                    ctx = r.get("context", "").strip()
+                    if ctx:
+                        sub_rag_contexts[ssid] = ctx
+                        cnt = len(r.get("sources", []))
+                        state_mgr.set_status_text(f"RAG完成: {kb or '自动'} → {sub['title']}（{cnt}条）")
+                    else:
+                        state_mgr.set_status_text(f"RAG无结果: {kb or '自动'} → {sub['title']}")
+                except Exception as e:
+                    state_mgr.set_status_text(f"RAG超时: {kb or '自动'} → {sub['title']}")
 
         # 写入节标题
         section_md = f"\n\n## {section['title']}\n\n"
@@ -120,10 +149,25 @@ def generate_article(
         for j, sub in enumerate(subs):
             ssid = sub["id"]
             state_mgr.update_section(ssid, {"status": "in_progress"})
+            state_mgr.set_status_text(f"写作中: {sub['title']}")
 
-            # 构建 context prompt
+            # 构建 context prompt（两级 RAG 上下文）
             max_context_len = 800
             ctx_buffer = context_buffer[-max_context_len:] if context_buffer else ""
+
+            # 拼装本子结构的 RAG 上下文
+            sub_rag = sub_rag_contexts.get(ssid, section_rag_context)
+            if sub_rag and section_rag_context and sub_rag != section_rag_context:
+                # 两个都有且不同 → 分背景+针对性
+                combined_rag = (
+                    f"【背景资料】（本节整体相关）\n{section_rag_context}\n\n"
+                    f"---\n\n"
+                    f"【针对性资料】（针对当前子结构）\n{sub_rag}"
+                )
+            elif sub_rag:
+                combined_rag = sub_rag
+            else:
+                combined_rag = section_rag_context  # 可能 None
 
             prompt = _build_context_section_prompt(
                 topic=title,
@@ -133,7 +177,7 @@ def generate_article(
                 word_count=sub.get("word_count", 400),
                 is_key=section.get("is_key", False),
                 context_buffer=ctx_buffer,
-                rag_context=rag_context
+                rag_context=combined_rag
             )
 
             messages = [

@@ -1,0 +1,123 @@
+{
+  "session_id": "20260726_171542",
+  "created_at": "2026-07-26T17:19:09.916957",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 1800,
+      "max_tokens": 40960
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 3000,
+      "max_tokens": 81920
+    },
+    "default_prompt": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+    "selected_template": "通用公文",
+    "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
+    "templates": {
+      "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+      "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
+      "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
+      "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
+      "自定义": ""
+    }
+  },
+  "outline": {
+    "title": "大型语言模型核心结构解析与演进路径分析报告",
+    "sections": [
+      {
+        "id": "s1",
+        "title": "前言：发展背景与解析目的",
+        "subtitle": "",
+        "summary": "本部分旨在阐明大语言模型兴起的技术背景与社会影响，明确本文解析其核心结构及演进路径的目的。重点在于确立分析框架，为后续深入探讨技术细节奠定理论基础与应用导向，确保内容逻辑严密且目标清晰。",
+        "word_count": 600,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s2",
+        "title": "核心架构：Transformer 模型的基础构成要素",
+        "subtitle": "",
+        "summary": "本节详细剖析 Transformer 架构的核心组件，包括自注意力机制、前馈神经网络及层归一化等技术要素。重点论证各模块如何协同工作以实现上下文理解与文本生成能力，揭示模型运行的底层逻辑与数学原理。",
+        "word_count": 1200,
+        "is_key": true,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s3",
+        "title": "演进路径：从 RNN 到 Transformer 的技术迭代历程",
+        "subtitle": "",
+        "summary": "本节梳理从循环神经网络到 Transformer 的技术迭代历程，列举 BERT、GPT 系列等关键里程碑事件。重点分析架构演进中的参数优化方向与计算效率提升策略，回答技术突破背后的核心驱动力问题。",
+        "word_count": 1200,
+        "is_key": true,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s4",
+        "title": "规模效应：参数增长与计算效率的平衡机制",
+        "subtitle": "",
+        "summary": "本节探讨模型规模扩张带来的性能变化及资源消耗矛盾，解析扩展定律的具体表现。重点论述混合专家模型等稀疏化技术的平衡机制，论证如何在保持性能增长的同时有效控制训练与推理成本。",
+        "word_count": 1000,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s5",
+        "title": "优化策略：微调技术与人类对齐的方法论",
+        "subtitle": "",
+        "summary": "本节阐述微调技术与人类对齐方法论，涵盖监督微调、强化学习从人类反馈等关键流程。重点回答如何确保模型输出符合安全规范与特定任务需求，解决通用能力向行业应用转化过程中的可控性问题。",
+        "word_count": 1200,
+        "is_key": true,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s6",
+        "title": "结语：未来趋势展望与行业应用执行要求",
+        "subtitle": "",
+        "summary": "本部分总结全文核心观点，展望多模态融合与智能体化发展趋势。提出企业采纳该技术的具体执行要求，强调在推进技术创新的同时必须兼顾伦理规范与风险管控，确保技术应用的可持续性与社会价值。",
+        "word_count": 800,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      }
+    ]
+  },
+  "user_orders": {},
+  "output_file": "",
+  "phase": "reviewing",
+  "fingerprint": "8e272aa69913cc5e1c060c342a355851"
+}

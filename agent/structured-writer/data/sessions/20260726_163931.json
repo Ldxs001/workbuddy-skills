@@ -1,0 +1,137 @@
+{
+  "session_id": "20260726_163931",
+  "created_at": "2026-07-26T16:53:16.760557",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 1800,
+      "max_tokens": 40960
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 3000,
+      "max_tokens": 81920
+    },
+    "default_prompt": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+    "selected_template": "通用公文",
+    "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
+    "templates": {
+      "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+      "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
+      "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
+      "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
+      "自定义": ""
+    }
+  },
+  "outline": {
+    "title": "大型语言模型核心结构解析与演进路径研究报告",
+    "sections": [
+      {
+        "id": "s1",
+        "title": "一、引言：研究背景与目的",
+        "subtitle": "宏观背景分析与目标确立",
+        "summary": "本节旨在阐述大型语言模型发展的宏观背景，明确本文的研究目的与意义。通过分析技术现状，确立后续结构解析的理论基础，为理解 LLM 演进逻辑提供必要的前置认知框架。",
+        "word_count": 300,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s2",
+        "title": "二、核心架构：Transformer 机制解析",
+        "subtitle": "自注意力与并行计算优势",
+        "summary": "本节核心论证 Transformer 架构作为 LLM 基石的必要性，重点剖析自注意力机制的工作原理及其在并行计算中的优势。需阐明该架构如何突破序列模型局限，奠定现代大模型基础。",
+        "word_count": 1200,
+        "is_key": true,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s3",
+        "title": "三、关键组件：功能协同与实现细节",
+        "subtitle": "位置编码与前馈网络分析",
+        "summary": "本节深入解析位置编码、前馈神经网络及层归一化的具体功能与协同作用。论证各组件如何共同构建语义理解能力，确保信息在深层网络中的有效传递与特征提取。",
+        "word_count": 1000,
+        "is_key": true,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s4",
+        "title": "四、演进路径：技术迭代脉络梳理",
+        "subtitle": "从 RNN 到 LLM 的发展阶段",
+        "summary": "本节梳理从循环神经网络到 Transformer 再到 LLM 的技术演进脉络。分析不同阶段架构改进的关键节点，回答技术迭代背后的驱动力与性能提升的具体路径问题。",
+        "word_count": 800,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s5",
+        "title": "五、现状评估：挑战与瓶颈分析",
+        "subtitle": "算力限制与生成可靠性问题",
+        "summary": "本节客观评估当前模型在算力消耗、推理延迟及生成幻觉方面存在的挑战。论证资源瓶颈对规模化部署的制约，并提出相应的优化方向与解决思路建议。",
+        "word_count": 600,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s6",
+        "title": "六、趋势展望：未来发展方向预测",
+        "subtitle": "多模态融合与轻量化部署",
+        "summary": "本节探讨未来技术发展趋势，包括多模态融合与端侧轻量化方向。论证模型能力边界拓展的可能性，明确下一阶段技术研发的重点领域与应用前景预期。",
+        "word_count": 1000,
+        "is_key": true,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s7",
+        "title": "七、结论与建议：总结与执行要求",
+        "subtitle": "核心观点重申与合规性强调",
+        "summary": "本节总结全文核心观点，重申 LLM 结构解析的重要性。提出后续研究与实践的执行要求，强调技术合规性与安全性在模型应用中的关键地位与落实措施。",
+        "word_count": 400,
+        "is_key": false,
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      }
+    ]
+  },
+  "user_orders": {},
+  "output_file": "",
+  "phase": "reviewing",
+  "fingerprint": "a0e39a90d94a9f44296b91f1801ddaa7"
+}

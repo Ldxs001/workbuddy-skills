@@ -1,0 +1,109 @@
+{
+  "session_id": "20260726_172243",
+  "created_at": "2026-07-26T17:24:58.117801",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 1800,
+      "max_tokens": 40960
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 3000,
+      "max_tokens": 81920
+    },
+    "default_prompt": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+    "selected_template": "通用公文",
+    "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
+    "templates": {
+      "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+      "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
+      "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
+      "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
+      "自定义": ""
+    }
+  },
+  "outline": {
+    "title": "大型语言模型核心结构解析与演进路径研究报告",
+    "sections": [
+      {
+        "id": "s1",
+        "title": "一、前言：研究背景与目的",
+        "subtitle": "",
+        "summary": "阐述大模型发展现状，明确本报告旨在解析其核心架构并梳理演进脉络，为后续技术决策提供依据。",
+        "word_count": 300,
+        "is_key": false,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s2",
+        "title": "二、Transformer 架构深度解析",
+        "subtitle": "核心组件与机制原理",
+        "summary": "深入剖析注意力机制、编码器与解码器结构，论证 Transformer 作为大模型基石的技术原理及性能优势。",
+        "word_count": 800,
+        "is_key": true,
+        "status": "done",
+        "actual_word_count": 945,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s3",
+        "title": "三、主流模型演进路径梳理",
+        "subtitle": "技术迭代与参数规模分析",
+        "summary": "回顾从 BERT 到 GPT-4 的迭代过程，分析参数规模与训练数据对模型能力的非线性影响规律。",
+        "word_count": 600,
+        "is_key": false,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s4",
+        "title": "四、当前技术瓶颈与挑战分析",
+        "subtitle": "算力成本与推理延迟评估",
+        "summary": "针对算力成本、推理延迟及幻觉问题展开论证，提出制约模型进一步发展的关键因素评估。",
+        "word_count": 700,
+        "is_key": true,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      },
+      {
+        "id": "s5",
+        "title": "五、未来发展趋势与执行建议",
+        "subtitle": "产业应用与安全合规要求",
+        "summary": "预测多模态融合与端侧部署方向，制定技术落地标准与安全合规要求，确保研究结论可执行。",
+        "word_count": 500,
+        "is_key": false,
+        "status": "done",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        }
+      }
+    ]
+  },
+  "user_orders": {},
+  "output_file": "C:\\Users\\sm001\\WorkBuddy\\structured-writer\\data\\outputs\\大型语言模型核心结构解析与演进路径研究报告_20260726_182536.md",
+  "phase": "done",
+  "fingerprint": "176b0d07d7be8b6ac899edd3e01a55e7"
+}

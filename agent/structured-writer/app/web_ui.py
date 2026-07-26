@@ -1535,12 +1535,15 @@ function buildOutlineHTML(outline, readOnly) {
       const romOpts = ['', ...Array.from({length: subCount}, (_, i) => toRoman(i+1))]
         .map(v => `<option value="${v}" ${ss.id.endsWith('_1') && v==='' ? 'selected' : ''}>${v || '自动'}</option>`).join('');
       subHTML += `
-        <div class="sub-card" data-sid="${ss.id}" style="margin-left:24px;padding:4px 8px;display:flex;align-items:center;gap:8px;border-left:2px solid var(--border);margin-bottom:2px;">
-          ${readOnly ? '' : `<input type="checkbox" class="sc-sub-cb" ${ss._checked !== false ? 'checked' : ''} onchange="onSubToggle(this, '${s.id}')">`}
-          ${readOnly ? '' : `<select class="sc-sub-order" style="width:48px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" onchange="collectOutlineData()">${romOpts}</select>`}
-          <span style="font-size:13px;flex:1;color:var(--text-dim)">${ss.title}</span>
-          <span style="font-size:11px;color:var(--text-dim)">${ss.word_count || ''}字</span>
-          ${ss.status === 'done' ? '<span style="font-size:11px;color:var(--green)">✓</span>' : ''}
+        <div class="sub-card" data-sid="${ss.id}" style="margin-left:24px;padding:4px 8px;border-left:2px solid var(--border);margin-bottom:4px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${readOnly ? '' : `<input type="checkbox" class="sc-sub-cb" ${ss._checked !== false ? 'checked' : ''} onchange="onSubToggle(this, '${s.id}')">`}
+            ${readOnly ? '' : `<select class="sc-sub-order" style="width:48px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" onchange="collectOutlineData()">${romOpts}</select>`}
+            <span style="font-size:13px;flex:1;color:var(--text-dim)">${ss.title}</span>
+            <span style="font-size:11px;color:var(--text-dim)">${ss.word_count || ''}字</span>
+            ${ss.status === 'done' ? '<span style="font-size:11px;color:var(--green)">✓</span>' : ''}
+          </div>
+          ${ss.summary ? `<div style="font-size:11px;color:var(--text-dim);margin-left:80px;margin-top:2px;line-height:1.3">${ss.summary}</div>` : ''}
         </div>`;
     });
 
@@ -1567,6 +1570,7 @@ function buildOutlineHTML(outline, readOnly) {
       <div class="outline-actions">
         <button class="btn btn-primary" onclick="startGeneration()">开始生成</button>
         <button class="btn btn-secondary" onclick="replanOutline()">重新规划</button>
+        <div id="rag-status-text" style="font-size:11px;color:var(--text-dim);margin-top:6px"></div>
       </div>`;
   } else {
     const allSubs = sections.flatMap(s => s.sub_sections || []);
@@ -1739,6 +1743,12 @@ function startProgressPolling(sid) {
         if (fill && p.total > 0) {
           const pct = Math.round(p.done / p.total * 100);
           fill.style.width = Math.min(pct, 100) + '%';
+        }
+
+        // 更新状态文本
+        const statusEl = document.getElementById('rag-status-text');
+        if (statusEl && p.status_text) {
+          statusEl.textContent = p.status_text;
         }
 
         // 更新卡片上的状态图标
