@@ -5,6 +5,19 @@
 
 ---
 
+## [0.2.5b4] - 2026-07-26
+### 修复
+- PyPI long_description 缺失更新日志（CHANGELOG.md 未同步到构建目录）
+
+## [0.2.5b3] - 2026-07-26
+### 新增
+- **PyPI 发布准备**：`app/` → `structured_writer/` 目录改名；新增 `LICENSE`（Apache 2.0）、`README.md`、`blueprint.json`
+- **GitHub Actions 检测支持**：`publish-pypi.yml` 新增 `structured_writer/__init__.py` 路径匹配
+
+### 变更
+- `app/` 目录重命名为 `structured_writer/`（PyPI 包名兼容）
+- 删除 `data/` 目录中输出文件和会话记录
+
 ## [0.2.5b2] - 2026-07-26
 ### 新增
 - **两级 RAG 查询**：节级别查一次（背景资料）+ 每个子结构再查一次（针对性资料），prompt 分【背景资料】和【针对性资料】两段注入
