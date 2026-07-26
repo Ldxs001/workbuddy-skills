@@ -51,3 +51,4 @@ skills/.dist/
 .venv*/
 
 # WorkBuddy workspace cache.workbuddy/
+nul
