@@ -1,0 +1,158 @@
+# Structured Writer 更新日志
+
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
+版本号遵循语义版本控制（`structured_writer/__init__.py` 唯一源）。
+
+---
+
+## [1.0.28] - 2026-07-27
+### 新增
+- **每子结构字数可编辑**：章节字数改为子结构字数之和（自动实时求和），子结构字数输入框直接可改；取消勾选的子结构不计入章节字数
+- **进度条按过滤后子结构总数计算**：取消勾选的子结构不再计入进度分母
+- **RAG 离线时复选框禁用**：8767 未上线时 RAG 复选框 disabled＋title 提示；上线后自动同步 KB 下拉框
+- **子结构辅助知识模态框**：每个子结构 "+" 按钮 → 弹窗支持文本输入 + .txt/.md 文件上传（FileReader 前端读取）
+- **RAG 与辅助知识 Prompt 分离注入**：`【RAG 参考资料】` 和 `【辅助知识】` 两段独立标注
+- **前文回顾字数可配置**：配置页 "写作参数" 新增输入框，`context_review_length` 写入 config.json
+- **配置项自动合并**：`config_manager.load()` 深层合并（嵌套 dict 中新 key 自动补上）；`update()` 支持写入新增键
+- **LLM 模型自动检测**：`_build_payload` 中 model 为空时自动调 `list_models()` 取第一个已加载模型
+- **批量自动撰写**：输入框写入多行（每行一个主题）→ 后端 `/api/batch_auto` 逐篇规划+RAG+生成 → 前端轮询批量进度
+- **单篇自动撰写**：输入框旁 "自动撰写" 按钮 → 前端 chain `plan→generate`，全量自动 RAG
+- **事实自检系统**：配置页 "事实自检" 开关 → 写作 prompt 末尾内嵌 `【事实待核查】` 标记 → LLM 在同一 response 中自检 → 解析标记收集 → 文章末尾编号列表汇总。**零额外 LLM 调用**
+- **无问题时也输出自检段落**：即使所有子结构都返回"无"，文章末尾也输出 `## 建议人工复审` + `未发现需标记的问题`
+- **会话归档/恢复/删除**：侧边栏每项 "🗂 归档" 按钮 → `data/archives/sessions/` 折叠区 → "↩ 恢复" + "✕ 删除"（`confirm()` 确认）
+- **自动会话限额**：`max_sessions`（默认 20）→ 新建会话超出时自动归档最旧非当前会话
+- **停止生成**：聊天区底部 "延时停止"（当前子结构写完停）+ "立即停止"（续写边界停）→ 保留已写内容输出 .md
+- **规划器优先遵循用户指令**：约束前加 "优先遵循用户明确指定的结构要求"，`sections 数量` 改为 "如用户未指定"
+- **规划/写作模型温度可配置**：配置页新增 "温度" 输入框（0-1，step=0.05），规划默认 0.6、写作默认 0.7，持久化到 config.json
+- **LLM 客户端 temperature 参数**：`LLMClient.__init__` 加 `temperature`，`chat`/`chat_detailed`/`_build_payload` 默认值改为 `None`（走 `self.temperature`）
+- **模型下拉框始终显示已保存的模型**：`refreshModels` 接受 `savedValue` 参数，配置模型不在 API 返回列表时追加 `xxx（已配置）` option
+- **RAG 停止按钮**：配置页新增 "停止 RAG" 按钮 → 后端 `_handle_rag_stop` → `taskkill /F /T` 杀进程树 + `netstat` 查 8767 + 等端口释放 + auto-restart 检测
+- **RAG 停止后不再显示"运行中"**：`_ragManuallyStopped` 标记阻止轮询跳回运行中状态，直到用户手动点击"冷启动 RAG"
+- **RAG 状态轮询加速**：cache-buster 防缓存，间隔 3s→1.5s，启动后立即查一次
+
+### 变更
+- **自检从额外 LLM 调用改为内嵌标记**：删除 `FACT_CHECK_PROMPT` 和独立 `SELF_CHECK_SYSTEM_PROMPT`，改为在写作 prompt 末尾追加 `【事实待核查】` 标注要求，response 里直接解析
+- **规划器 `max_tokens` 从配置读**：删除硬编码 4096，改用 `max(4096, llm_client.max_tokens)`
+- **写作器/规划器 LLM 客户端统一工厂**：`_create_writer_client()` / `_create_planner_client()` 传 `temperature`
+- **Planner/writer temperature 硬编码删除**：`planner.py` `temperature=0.6` → `None`；`writer.py` `temperature=0.7` → `None`（走客户端配置）
+- **`status_text` 仅 writing 阶段返回**：`get_progress()` 非 writing 阶段返回空字符串，防止加载旧会话显示脏数据
+- **状态文本生成时自动清空**：`_handle_generate` 入口调用 `set_status_text("")`
+- **配置页提示文案更新**：改为 "推理模型建议不低于 4096（默认最低值），长文建议 8192 以上"
+
+### 修复
+- `planner.py` 硬编码 `max_tokens=4096` 导致推理模型 thinking 吃掉全部 token → JSON 输出为空
+- `config_manager.py` `update()` 无法写入新增配置键 → `fact_check_enabled` 等不持久化
+- `config_manager.py` `load()` 不合并 DEFAULT_CONFIG 缺失项 → 旧 config.json 没有新字段
+- 自检 `max_tokens` 各值（2048/8192/512）导致推理模型 thinking 吃光 → 改为 `None`（走配置的 81920）
+- 自检使用独立 system prompt → LLM 混淆角色 → 改为共享 `WRITER_SYSTEM_PROMPT`
+- 自检额外 LLM 调用导致额外 token 消耗 → 改为内嵌标记法，零额外调用
+- 加载旧会话时 `_status_text` 脏数据被轮询读出并显示
+- 章节字数 input 可编辑但子结构字数不变 → 数据不一致
+- 子结构取消勾选后章节字数不减 → 重算函数忽略未勾选
+- 模型下拉框加载时显示"(请选择)"而非已保存模型 → `refreshModels` 接受 `savedValue` 回退
+- RAG 冷启动后无法关闭 → 新增停止按钮 + 后端进程树 kill + 端口释放等待
+- RAG 停止后轮询仍跳回"运行中" → `_ragManuallyStopped` 标记保护
+- RAG 状态检测被浏览器缓存 → 加 `?_=Date.now()` cache-buster
+
+---
+
+## [0.9.0] - 2026-07-27
+### 新增
+- **事实自检系统上线**：配置页开关 → 每子结构写后自检 → 文章末尾汇总置信度分级列表
+- **停止生成**：延时停止 / 立即停止，保留已写内容
+
+### 变更
+- 自检系统 Prompt 统一为 `WRITER_SYSTEM_PROMPT`
+
+---
+
+## [0.8.0] - 2026-07-27
+### 新增
+- **会话归档/恢复/删除**：侧边栏 UI + `/api/session/archive|restore|delete`
+- **自动会话限额**：`max_sessions=20`，超出自动归档最旧非活跃会话
+- **批量自动撰写**：后端 `/api/batch_auto` + 前端批量进度轮询
+- **单篇自动撰写**：前端 chain 按钮，全量自动 RAG
+
+### 变更
+- 写作器/规划器 LLM 客户端工厂抽取，消除重复代码
+- 配置项默认值系统：`load()` 合并 DEFAULT_CONFIG
+
+---
+
+## [0.7.0] - 2026-07-27
+### 新增
+- **子结构字数可编辑**：章节字数改为子结构实时的和
+- **RAG 离线禁用** + **辅助知识模态框**（文本/文件上传）
+- **前文回顾字数可配置**
+- **RAG／辅助知识 Prompt 分离注入**
+
+### 修复
+- `_status_text` 脏数据跨会话显示 → 仅 writing 阶段返回
+- 配置新增项不持久化 → `update()` 支持写新键
+- `planner.py` `max_tokens=4096` 硬编码 → 从配置读 + 保底 4096
+- LLM 模型名为空时调 `list_models()` 自动填充
+- 自检 `max_tokens=2048` → 512（子结构级）降低推理 thinking 挤压
+
+---
+
+## [0.6.0] - 2026-07-27
+### 新增
+- **子结构字数输入框** + **章节字数自动求和**
+- **RAG 复选框离线 disabled** + **在线同步 KB 下拉**
+- **辅助知识模态框**（文本 + .txt/.md 上传）
+- **前文回顾字数配置化**
+
+---
+
+## [0.5.0] - 2026-07-26
+### 新增
+- **会话归档/恢复/删除 UI**
+- **自动清理旧会话**（max_sessions 限制）
+- **大纲过滤同步进度**：取消勾选的子结构不计入进度分母
+
+---
+
+## [0.4.0] - 2026-07-26
+### 新增
+- **自动撰写入口**：发送区 "自动撰写" 按钮（单篇 chain / 批量提交）
+- **全量自动 RAG**：8767 在线时所有子结构自动启用
+
+---
+
+## [0.3.0] - 2026-07-26
+### 新增
+- **日志系统**：串行写作状态持久化 `_status_text`
+- **子结构写作要点显示**
+- **蓝图文档**：`blueprint.json`
+
+---
+
+## [0.2.5b4] - 2026-07-26
+### 修复
+- PyPI long_description 缺失更新日志
+
+## [0.2.5b3] - 2026-07-26
+### 新增
+- PyPI 发布准备：目录改名、LICENSE、README、blueprint.json
+- GitHub Actions 检测支持
+
+## [0.2.5b2] - 2026-07-26
+### 新增
+- 两级 RAG 查询、实时状态文本、子结构 summary 显示
+- `state_manager.set_status_text()`
+
+## [0.2.5b1] - 2026-07-26
+### 新增
+- RAG 知识库对接、冷启动、KB 下拉联动
+- 提示词模板系统（5 套模板）
+- 子结构系统、大纲勾选/取消、双级排序
+- 续写机制（finish_reason=length 自动续写）
+- LLM 客户端 `chat_detailed()`、max_tokens 从 config 传入
+
+### 变更
+- 端口 8770、LLMClient 存储 max_tokens
+
+## [0.1.0] - 2026-07-26
+### 新增
+- 项目骨架、LLM 统一客户端、会话管理、大纲规划器、串行写作器
+- 异步生成 + 进度轮询、会话恢复、setup.bat

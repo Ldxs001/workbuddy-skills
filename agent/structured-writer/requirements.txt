@@ -1,0 +1,3 @@
+# Structured Writer 依赖
+# Python 标准库（无第三方 Web 框架依赖）
+# 仅需要 LLM 后端服务（LM Studio / Ollama）在外部运行
