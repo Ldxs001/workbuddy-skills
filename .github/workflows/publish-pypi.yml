@@ -15,6 +15,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pypi  # 匹配 PyPI Trusted Publisher 的 Environment name
     permissions:
       id-token: write
       contents: read
