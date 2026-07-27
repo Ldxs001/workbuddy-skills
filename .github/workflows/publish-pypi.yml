@@ -45,6 +45,16 @@ jobs:
                   break
                 fi
               fi
+              # 也支持 structured_writer 模式的 app/__init__.py
+              alt_init="${dir}structured_writer/__init__.py"
+              if [ -f "$alt_init" ]; then
+                ver=$(grep '__version__' "$alt_init" | sed 's/.*"\(.*\)".*/\1/')
+                if [ "${ver%%-*}" = "$VERSION_CLEAN" ]; then
+                  NAME=$(basename "$dir")
+                  echo "Found agent: $NAME v$VERSION (structured_writer pattern)"
+                  break
+                fi
+              fi
             done
           else
             # 格式2: skill-name-v1.2.3 → skill
