@@ -189,6 +189,10 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
             elif path == "/api/input/query-slices":
                 self._handle_query_slices(body)
 
+            # ── KB 查询（结构化写手用） ──
+            elif path == "/api/kb/query":
+                self._handle_kb_query(body)
+
             else:
                 self._err(f"未知 POST 路径: {path}", 404)
 
@@ -609,6 +613,40 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
         prefix = body.get("prefix", "")
         set_system_prefix(prefix)
         self._ok(message="系统前缀已更新")
+
+    # ── KB 查询（结构化写手外部调用） ──
+
+    def _handle_kb_query(self, body: dict):
+        """检索知识库返回上下文，不调 LLM 生成回答"""
+        query = body.get("query", "")
+        kb = body.get("kb", "")        # 空=自动路由
+        top_k = body.get("top_k", 5)
+        score_threshold = body.get("score_threshold")
+
+        if not query:
+            self._err("缺少 query 字段")
+            return
+
+        if self.agent is None or not hasattr(self.agent, 'rag'):
+            self._err("RAG 模块未就绪", 500)
+            return
+
+        try:
+            result = self.agent.rag.query(
+                question=query,
+                kb_name=kb or None,    # None=交给路由器
+                k=top_k,
+                score_threshold=score_threshold,
+            )
+            self._ok(
+                context=result.get("context", ""),
+                sources=result.get("docs", []),
+                has_context=result.get("has_context", False),
+                kb=result.get("kb", kb),
+            )
+        except Exception as e:
+            logger.exception(f"/api/kb/query 异常")
+            self._err(str(e), 500)
 
     # ═══════════════════════════════════════════════════
     # 6. 输入管理（文本切分 + 问题切片）

@@ -5,6 +5,12 @@
 
 ---
 
+## [2.2.8] - 2026-07-26
+### 新增
+- **外部 API 新增 `/api/kb/query` 端点**：支持外部系统（如 Structured Writer）直接调知识库检索，返回上下文和来源。接收 `query`（必填）、`kb`（可选，空=自动路由）、`top_k`、`score_threshold` 参数，调用 `agent.rag.query()` 完整检索管线（路由→检索→精排→NLI→build_context），不额外消耗 LLM token
+
+---
+
 ## [2.1.0b2] - 2026-07-24
 ### 新增
 - **web_llm 插件多配置（profile）系统**：插件配置从单组改为多条目管理。Tkinter 配置界面支持添加/编辑/删除多个 API 配置条目，每条包含名称、服务商、API 地址、Key、模型名、温度、Top P、最大 Token。数据存为 `{"profiles": [...]}`，兼容旧格式自动包装

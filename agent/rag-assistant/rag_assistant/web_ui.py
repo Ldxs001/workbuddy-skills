@@ -1856,7 +1856,7 @@ input_fields 只能从 6 字段池选: question,answer_draft,thinking,rag_contex
             meta.setdefault("class", ''.join(w.capitalize() for w in name.split('_')) + 'Plugin')
             meta.setdefault("version", "1.0.0")
             meta.setdefault("mandatory", False)
-            meta.setdefault("author", "wUwproject")
+            meta.setdefault("author", "[username-redacted]")
             meta.setdefault("builtin", False)
             meta.setdefault("has_config_ui", False)
             meta.setdefault("timeout", 15)
