@@ -57,6 +57,55 @@ class ConfigManager:
                     for sk, sv in v.items():
                         if sk not in self._config[k]:
                             self._config[k][sk] = copy.deepcopy(sv)
+            # ── 硬保护：确保"自定义"模板始终存在 ──
+            templates = self._config.get("templates", {})
+            if "自定义" not in templates:
+                templates["自定义"] = {
+                    "structure": [
+                        {"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto", "type": "leaf"},
+                        {"name": "正文", "show_label": False, "desc": "文章主体内容", "source": "llm", "type": "section"},
+                        {"name": "结尾", "show_label": False, "desc": "总结收束", "source": "llm", "type": "section"}
+                    ],
+                    "style": ""
+                }
+                self._config["templates"] = templates
+                migrated = True
+            # ── 旧模板格式 → 新五元组格式迁移 ──
+            templates = self._config.get("templates", {})
+            migrated = False
+            for tname, tval in templates.items():
+                if isinstance(tval, str):  # 旧格式：纯字符串
+                    # 根据名称推断默认结构
+                    _default_structures = {
+                        "通用公文": [
+                            {"name": "标题", "show_label": False, "desc": "公文标题", "source": "auto", "type": "leaf"},
+                            {"name": "正文", "show_label": False, "desc": "正文分条列举", "source": "llm", "type": "section"},
+                            {"name": "结尾", "show_label": False, "desc": "提出执行要求", "source": "llm", "type": "section"},
+                        ],
+                        "论文综述": [
+                            {"name": "标题", "show_label": False, "desc": "论文标题简明准确", "source": "auto", "type": "leaf"},
+                            {"name": "作者", "show_label": True, "desc": "作者姓名", "source": "user", "type": "leaf"},
+                            {"name": "摘要", "show_label": False, "desc": "概括全文核心论点", "source": "llm", "type": "leaf"},
+                            {"name": "正文", "show_label": False, "desc": "分论点逐层论述", "source": "llm", "type": "section"},
+                            {"name": "参考文献", "show_label": False, "desc": "引用文献", "source": "llm", "type": "leaf"},
+                        ],
+                    }
+                    structure = _default_structures.get(tname, [
+                        {"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto", "type": "leaf"},
+                        {"name": "正文", "show_label": False, "desc": "文章主体", "source": "llm", "type": "section"},
+                    ])
+                    users_cfg = self._config.get("user_templates", {})
+                    if tname in users_cfg:
+                        structure = [
+                            {"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto", "type": "leaf"},
+                            {"name": "正文", "show_label": False, "desc": "文章主体", "source": "llm", "type": "section"},
+                        ]
+                    templates[tname] = {"structure": structure, "style": tval}
+                    migrated = True
+            if migrated:
+                self._config["templates"] = templates
+                self._config["new_template_format"] = True
+                self.save()
         else:
             self._config = copy.deepcopy(DEFAULT_CONFIG)
             self.save()

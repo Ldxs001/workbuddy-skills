@@ -6,7 +6,8 @@ import time
 import tempfile
 import subprocess
 import threading
-import http.server
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+import socketserver
 import urllib.parse
 import urllib.request
 import traceback
@@ -41,7 +42,7 @@ _stop_flags = {}
 _stop_lock = threading.Lock()
 
 
-class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
+class StructuredWriterHandler(BaseHTTPRequestHandler):
     """HTTP 请求处理器"""
 
     config_mgr = None
@@ -60,6 +61,7 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
             return
         cls.ROUTES["GET"] = {
             "/": cls._handle_index,
+            "/favicon.ico": cls._handle_favicon,
             "/api/config": cls._handle_get_config,
             "/api/llm/test": cls._handle_llm_test,
             "/api/llm/models": cls._handle_llm_models,
@@ -83,6 +85,7 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
             "/api/session/restore": cls._handle_session_restore,
             "/api/session/delete": cls._handle_session_delete,
             "/api/stop": cls._handle_stop,
+            "/api/gen-template": cls._handle_gen_template,
         }
 
     def do_GET(self):
@@ -150,6 +153,10 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
 
     def _handle_index(self):
         self._html_response(INDEX_HTML)
+
+    def _handle_favicon(self):
+        self.send_response(204)
+        self.end_headers()
 
     # ---- 配置 API ----
 
@@ -222,11 +229,25 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
         prompt = data.get("prompt", "") or self.config_mgr.get("default_prompt", "")
         session_id = data.get("session_id", "")
 
+        # 获取当前选中的模板
+        templates = self.config_mgr.get("templates", {})
+        selected = data.get("template_name", "") or self.config_mgr.get("selected_template", "")
+        template = templates.get(selected, {})
+
+        # 用户已填的字段值（标题、作者等）
+        user_meta = data.get("meta", {})
+
         # 获取规划模型配置
         client = self._create_planner_client()
 
         try:
-            outline = plan_outline(topic, prompt=prompt, llm_client=client)
+            # 兼容旧调用：如果有模板结构就走新方式，否则走旧方式
+            if isinstance(template, dict) and template.get("structure"):
+                outline = plan_outline(topic, template=template, user_meta=user_meta, llm_client=client)
+            else:
+                # 旧格式：template 是字符串
+                style = template if isinstance(template, str) else ""
+                outline = plan_outline(topic, template=style or prompt, llm_client=client)
         except (ValueError, LLMClientError) as e:
             self._json_response({"success": False, "error": str(e)}, 500)
             return
@@ -346,6 +367,13 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
         # 获取事实自检配置
         fact_check_enabled = self.config_mgr.get("fact_check_enabled", False)
 
+        # 获取当前模板（为 meta 渲染提供 structure）
+        templates = self.config_mgr.get("templates", {})
+        selected = self.config_mgr.get("selected_template", "")
+        current_template = templates.get(selected, {})
+        if not isinstance(current_template, dict):
+            current_template = {}
+
         # 如果 8767 在线，创建 RAG 客户端
         rag_client = None
         try:
@@ -357,7 +385,8 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
             pass
 
         # 在后台线程中运行生成
-        def _run_generation(sid, outline, orders, rag_opt, llm_cli, aux_kn, ctx_len, fc_enabled):
+        tmpl = current_template
+        def _run_generation(sid, outline, orders, rag_opt, llm_cli, aux_kn, ctx_len, fc_enabled, tmpl):
             result = {"done": True, "success": False, "output_file": "",
                       "content": "", "word_count": 0, "error": ""}
             try:
@@ -377,7 +406,8 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
                     aux_knowledge=aux_kn,
                     context_review_length=ctx_len,
                     fact_check_enabled=fc_enabled,
-                    stop_check=_stop_check
+                    stop_check=_stop_check,
+                    template=tmpl
                 )
                 result["success"] = True
                 result["output_file"] = output_path
@@ -404,7 +434,7 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
 
         thread = threading.Thread(
             target=_run_generation,
-            args=(session_id, outline, user_orders, rag_options, client, aux_knowledge, context_review_length, fact_check_enabled),
+            args=(session_id, outline, user_orders, rag_options, client, aux_knowledge, context_review_length, fact_check_enabled, current_template),
             daemon=True
         )
         with _gen_lock:
@@ -802,7 +832,11 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
                         _batch_tasks[task_id]["current_topic"] = topic
 
                 try:
-                    outline = plan_outline(topic, prompt=prompt_text, llm_client=planner_client)
+                    # 批量模式下使用当前选中模板
+                    if isinstance(template, dict) and template.get("structure"):
+                        outline = plan_outline(topic, template=template, user_meta={}, llm_client=planner_client)
+                    else:
+                        outline = plan_outline(topic, prompt=prompt_text, llm_client=planner_client)
                     # 全量RAG：所有节+子结构启用
                     rag_opts = {}
                     for s in outline.get("sections", []):
@@ -823,7 +857,8 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
                         rag_client=rag_client,
                         aux_knowledge=None,
                         context_review_length=ctx_len,
-                        fact_check_enabled=fc_enabled
+                        fact_check_enabled=fc_enabled,
+                        template=template if isinstance(template, dict) else None
                     )
 
                     results.append({
@@ -909,6 +944,121 @@ class StructuredWriterHandler(http.server.BaseHTTPRequestHandler):
                 "type": "chat",
                 "text": f"已收到消息。如需撰写结构化文章，请直接说明主题和写作要求。\n\n您说：{message[:100]}"
             })
+
+    # ---- LLM 模板生成 API ----
+
+    def _handle_gen_template(self):
+        try:
+            data = self._read_body()
+        except ValueError as e:
+            self._json_response({"success": False, "error": str(e)}, 400)
+            return
+        description = data.get("description", "").strip()
+        if not description:
+            self._json_response({"success": False, "error": "描述不能为空"}, 400)
+            return
+
+        GEN_TEMPLATE_SYSTEM_PROMPT = """你是一个文档模板规划助手。根据用户描述生成五元组字段列表、模板名称和风格提示词。
+
+输出 JSON：
+{
+  "name": "模板名称（由你生成）",
+  "structure": [
+    {"name": "字段名", "show_label": true/false, "desc": "内容描述（写作要点）", "source": "user/llm/auto", "type": "leaf/section"}
+  ],
+  "style": "写作风格提示词"
+}
+
+规则：
+1. leaf+短数据（标题、关键词等）可放入 sections 或 meta
+2. leaf+段落（摘要、参考文献等）放入 sections，sub_sections=[]
+3. section（正文、引言等）需要拆 2-4 个子结构
+4. source=user：身份信息，必须用户填（作者、文号、密级等）
+5. source=llm：正文内容由 LLM 生成
+6. source=auto：用户可填，留空 LLM 生成（标题等）
+7. show_label=true 输出时带 "字段名：" 前缀，false 不带
+8. 字段数量 4-15 个
+9. name 用中文，用户能看懂
+10. desc 写清楚写作要点
+11. name 字段：模板名称，简洁概括文档类型（如"技术报告""会议纪要"）。如果用户已提供名称则直接使用。"""
+
+        client = self._create_planner_client()
+        user_name = data.get("name", "").strip()
+        user_content = f"模板名称：{user_name}\n" if user_name else ""
+        user_content += description
+        messages = [
+            {"role": "system", "content": GEN_TEMPLATE_SYSTEM_PROMPT},
+            {"role": "user", "content": description}
+        ]
+
+        # 多轮重试 + 容错解析（仿 planner.py 的 parse_outline）
+        result = None
+        last_raw = ""
+        for attempt in range(3):
+            try:
+                raw = client.chat(messages, max_tokens=None, temperature=0.3)
+                last_raw = raw
+            except Exception as e:
+                if attempt < 2:
+                    # 重试
+                    continue
+                self._json_response({"success": False, "error": f"LLM 调用失败: {e}"}, 500)
+                return
+
+            # 尝试直接解析
+            try:
+                result = json.loads(raw.strip())
+                if result.get("structure"):
+                    break
+            except json.JSONDecodeError:
+                pass
+
+            # 尝试提取 ```json ... ``` 代码块
+            if "```" in raw:
+                start = raw.index("```")
+                end = raw.index("```", start + 3) if "```" in raw[start + 3:] else len(raw)
+                content = raw[start + 3:end].strip()
+                if content.startswith("json\n"):
+                    content = content[5:]
+                try:
+                    result = json.loads(content)
+                    if result.get("structure"):
+                        break
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+            # 尝试找到第一个 { 提取 JSON
+            brace = raw.find("{")
+            if brace >= 0:
+                try:
+                    result = json.loads(raw[brace:])
+                    if result.get("structure"):
+                        break
+                except json.JSONDecodeError:
+                    lines = raw[brace:].split("\n")
+                    for cut in range(len(lines), 0, -1):
+                        try:
+                            r = json.loads("\n".join(lines[:cut]))
+                            if r.get("structure"):
+                                result = r
+                                break
+                        except json.JSONDecodeError:
+                            continue
+                    if result:
+                        break
+
+            if attempt < 2:
+                error_feedback = (
+                    f"【格式错误】输出必须包含 JSON 格式的 structure 和 style 字段。\n"
+                    f"只输出 JSON，不要任何其他文字。\n重新生成："
+                )
+                messages.append({"role": "assistant", "content": raw[:500]})
+                messages.append({"role": "user", "content": error_feedback})
+
+        if result:
+            self._json_response({"success": True, "template": result})
+        else:
+            self._json_response({"success": False, "error": f"模板生成失败，LLM 3 次均未返回正确格式。最后输出：{last_raw[:300]}"}, 500)
 
     def log_message(self, format, *args):
         """抑制默认日志输出"""
@@ -1053,6 +1203,7 @@ body {
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-secondary { background: var(--bg-panel); color: var(--text); border: 1px solid var(--border); }
 .btn-success { background: var(--green); color: #fff; }
+.btn-danger { background: #c0392b; color: #fff; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 .status-msg {
   font-size: 12px;
@@ -1388,22 +1539,95 @@ body {
       </div>
 
       <div class="config-section">
-        <h3>📝 写作提示词模板</h3>
+        <h3>📝 模板管理</h3>
         <div class="form-row">
           <label>模板</label>
-          <select id="template-select" style="flex:1" onchange="onTemplateChange()">
-            <option value="通用公文">通用公文</option>
-            <option value="新闻报道">新闻报道</option>
-            <option value="论文综述">论文综述</option>
-            <option value="技术报告">技术报告</option>
-            <option value="自定义">自定义</option>
-          </select>
+          <div style="flex:1;display:flex;gap:4px;align-items:center">
+            <div style="position:relative;flex:1">
+              <select id="template-select" style="width:100%;padding:4px 6px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" onchange="onTemplateChange()" size="1">
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="saveTemplateAs()">另存为</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTemplate()" title="删除当前自定义模板">删除</button>
+          <button class="btn btn-success btn-sm" onclick="openGenTemplate()">从对话生成</button>
         </div>
         <div class="form-row">
-          <textarea id="template-content" rows="4"></textarea>
+          <label>结构字段</label>
+          <div style="flex:1;font-size:12px;color:var(--text-dim)">
+            五元组：名称 | 显示标签 | 字段意义 | 填写对象 | 子结构类型
+          </div>
+        </div>
+        <div id="structure-editor" style="overflow-x:auto;margin-bottom:8px">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--bg-input)">
+                <th style="padding:4px 6px;text-align:left;min-width:80px">名称</th>
+                <th style="padding:4px 6px;text-align:center;width:40px">显</th>
+                <th style="padding:4px 6px;text-align:left;min-width:120px">字段意义</th>
+                <th style="padding:4px 6px;text-align:center;width:65px">填写</th>
+                <th style="padding:4px 6px;text-align:center;width:75px">子结构</th>
+                <th style="padding:4px 6px;text-align:left;min-width:70px">渲染</th>
+                <th style="padding:4px 6px;text-align:center;width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="structure-rows">
+            </tbody>
+          </table>
+        </div>
+        <div class="form-row">
+          <button class="btn btn-secondary btn-sm" onclick="addStructureRow()">+ 添加行</button>
+          <span id="structure-status" style="font-size:11px;color:var(--text-dim);margin-left:8px"></span>
+        </div>
+        <div class="form-row">
+          <label>风格提示词</label>
+          <textarea id="template-style" rows="3" placeholder="写作风格说明，如：请以学术论文风格撰写..."></textarea>
         </div>
         <div class="form-row" style="font-size:12px;color:var(--text-dim)">
-          提示：切换模板后可在编辑框中修改。规划时将使用当前选中模板的内容指导大纲生成和写作。
+          结构字段定义文档大纲骨架，风格提示词控制文风和语气。切换模板后可在表格中编辑。
+        </div>
+      </div>
+
+      <!-- LLM 生成模板模态框 -->
+      <div class="modal-overlay" id="gen-template-modal">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>从对话生成模板</h3>
+            <button class="modal-close" onclick="closeGenTemplate()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">描述你需要的文档结构，例如：</p>
+            <p style="font-size:12px;color:#f39c12;margin-bottom:8px">"我要写技术报告，需要作者、版本号、背景、技术方案、风险评估、下一步计划"</p>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+              <input type="text" id="gen-template-name" style="flex:1;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" placeholder="模板名称（留空LLM自动生成）">
+            </div>
+            <textarea id="gen-template-desc" rows="4" placeholder="在这里描述你的文档结构需求..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <span id="gen-template-status" style="font-size:12px;color:var(--text-dim);flex:1"></span>
+            <button class="btn btn-secondary" onclick="closeGenTemplate()">取消</button>
+            <button class="btn btn-primary" onclick="generateTemplate()">生成并保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 字段意义编辑模态框 -->
+      <div class="modal-overlay" id="desc-modal" style="z-index:100">
+        <div class="modal-box" style="max-width:500px">
+          <div class="modal-header">
+            <h3>编辑字段意义</h3>
+            <button class="modal-close" onclick="closeDescModal()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">描述字段的写作要点或用途，将展示给 LLM 和用户参考。</p>
+            <p style="font-size:12px;color:#f39c12;margin-bottom:8px">如需多级子标题，在描述中写明即可，如："按 章→节→条→款 四级展开，子标题用 ####/#####"</p>
+            <textarea id="desc-editor" rows="6" placeholder="输入字段的详细意义..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <span id="desc-modal-status" style="font-size:12px;color:var(--text-dim);flex:1"></span>
+            <button class="btn btn-secondary" onclick="closeDescModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveDescModal()">确认</button>
+          </div>
         </div>
       </div>
 
@@ -1473,6 +1697,9 @@ body {
             <div class="msg-content">欢迎使用结构化写作助手。请在下方输入写作主题，我将为您生成大纲并协助完成文章。</div>
           </div>
         </div>
+        <div id="meta-inputs-bar" style="display:none;padding:8px 16px;border-top:1px solid var(--border);background:var(--bg-card);font-size:13px">
+          <div style="display:flex;flex-wrap:wrap;gap:8px" id="meta-inputs-container"></div>
+        </div>
         <div class="chat-input-area">
           <textarea id="chat-input" placeholder="输入写作主题...（多行=批量自动撰写）" rows="2"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
@@ -1503,6 +1730,12 @@ document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
   loadSessions();
   checkRagStatus();
+
+  // 配置加载完成后刷新 meta 输入框
+  setTimeout(() => {
+    const sel = document.getElementById('template-select');
+    if (sel) renderMetaInputs(sel.value);
+  }, 200);
 
   // Tab 切换
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1538,15 +1771,47 @@ function loadConfig() {
     document.getElementById('writer-temperature').value = wm.temperature != null ? wm.temperature : 0.7;
     // 加载模板
     const templates = c.templates || {};
-    const selectedTemplate = c.selected_template || '通用公文';
+    const selectedTemplate = c.selected_template || '日常写作';
     const sel = document.getElementById('template-select');
-    // 更新下拉选项（保留已有选项，确保与 config 一致）
     const tmplNames = Object.keys(templates);
+    // 字母排序，"自定义"永远最后
+    tmplNames.sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    const ziDingYiIdx = tmplNames.indexOf('自定义');
+    if (ziDingYiIdx >= 0) {
+      tmplNames.splice(ziDingYiIdx, 1);
+      tmplNames.push('自定义');
+    }
     if (tmplNames.length) {
       sel.innerHTML = tmplNames.map(t => `<option value="${t}">${t}</option>`).join('');
     }
     sel.value = selectedTemplate;
-    document.getElementById('template-content').value = templates[selectedTemplate] || '';
+    // 加载结构表格 + 风格提示词
+    const tmpl = templates[selectedTemplate] || {};
+    if (typeof tmpl === 'object' && tmpl.structure) {
+      renderStructureRows(tmpl.structure);
+      document.getElementById('template-style').value = tmpl.style || '';
+    } else if (typeof tmpl === 'string') {
+      // 旧格式兼容
+      renderStructureRows([]);
+      document.getElementById('template-style').value = tmpl;
+    } else {
+      renderStructureRows([]);
+      document.getElementById('template-style').value = '';
+    }
+    // 加载用户模板
+    if (c.user_templates) {
+      Object.keys(c.user_templates).forEach(k => {
+        if (!templates[k]) {
+          const opt = document.createElement('option');
+          opt.value = k; opt.textContent = k + ' ★';
+          sel.appendChild(opt);
+        }
+      });
+    }
+    // 确保选中值有效
+    if (!sel.querySelector(`option[value="${selectedTemplate}"]`)) {
+      sel.value = sel.options[0]?.value || '';
+    }
     // 加载 RAG 路径
     if (c.rag_path) document.getElementById('rag-path').value = c.rag_path;
     if (c.context_review_length) document.getElementById('context-review-length').value = c.context_review_length;
@@ -1579,14 +1844,53 @@ function saveConfig() {
     fact_check_enabled: document.getElementById('fact-check-enabled').checked,
     templates: {}  // 在下面通过 templData 更新
   };
-  // 先读取当前所有模板，更新当前选中模板的内容
-  fetch('/api/config').then(r => r.json()).then(cfg => {
-    if (!cfg.success) return;
-    const templates = Object.assign({}, cfg.config.templates || {});
+    // 读取结构表格数据
+    const rows = document.querySelectorAll('#structure-rows tr');
+    const structure = [];
+    rows.forEach(tr => {
+      const inputs = tr.querySelectorAll('input, select');
+      if (inputs.length < 5) return;
+      const name = inputs[0].value.trim();
+      if (!name) return;
+      structure.push({
+        name: name,
+        show_label: inputs[1].checked,
+        desc: inputs[2].value.trim(),
+        source: inputs[3].value,
+        type: inputs[4].value
+      });
+    });
+    const style = document.getElementById('template-style').value;
     const selTmpl = document.getElementById('template-select').value;
-    templates[selTmpl] = document.getElementById('template-content').value;
-    data.templates = templates;
-    data.default_prompt = templates[selTmpl] || '';
+    // 构建 new-style templates
+    const tmplObj = {};
+    if (structure.length) {
+      tmplObj[selTmpl] = {structure, style};
+    } else {
+      tmplObj[selTmpl] = style; // fallback 旧格式
+    }
+    // 保留其他模板
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      if (!cfg.success) return;
+      const existing = cfg.config.templates || {};
+      // 合并：保留未选中的模板，更新当前选中的
+      Object.keys(existing).forEach(k => {
+        if (k !== selTmpl) {
+          // 如果旧格式字符串，转为新格式
+          const v = existing[k];
+          if (typeof v === 'object' && v.structure) {
+            tmplObj[k] = v;
+          } else if (typeof v === 'string') {
+            // 尝试构建一个默认结构
+            tmplObj[k] = {
+              structure: [{name:'标题',show_label:false,desc:'文章标题',source:'auto',type:'leaf'},{name:'正文',show_label:false,desc:'文章主体',source:'llm',type:'section'}],
+              style: v
+            };
+          }
+        }
+      });
+      data.templates = tmplObj;
+      data.default_prompt = style || (tmplObj[selTmpl] && tmplObj[selTmpl].style) || '';
 
     fetch('/api/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) })
       .then(r => r.json()).then(d => {
@@ -1600,11 +1904,225 @@ function saveConfig() {
 function onTemplateChange() {
   const sel = document.getElementById('template-select');
   const tmplName = sel.value;
+  // 持久化选择的模板
+  fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({selected_template: tmplName})
+  }).catch(() => {});
   fetch('/api/config').then(r => r.json()).then(d => {
     if (!d.success) return;
     const templates = d.config.templates || {};
-    document.getElementById('template-content').value = templates[tmplName] || '';
+    const tmpl = templates[tmplName] || {};
+    if (typeof tmpl === 'object' && tmpl.structure) {
+      renderStructureRows(tmpl.structure);
+      document.getElementById('template-style').value = tmpl.style || '';
+    } else if (typeof tmpl === 'string') {
+      renderStructureRows([]);
+      document.getElementById('template-style').value = tmpl;
+    } else {
+      renderStructureRows([]);
+      document.getElementById('template-style').value = '';
+    }
   });
+}
+
+// ===== 结构表格编辑器 =====
+
+function renderStructureRows(structure) {
+  const tbody = document.getElementById('structure-rows');
+  tbody.innerHTML = '';
+  (structure || []).forEach(f => addStructureRow(f));
+  if (!structure || !structure.length) {
+    // 空表格加 3 行默认
+    addStructureRow({name:'标题',show_label:false,desc:'文章标题',source:'auto',type:'leaf'});
+    addStructureRow({name:'正文',show_label:false,desc:'文章主体',source:'llm',type:'section'});
+    addStructureRow({name:'结尾',show_label:false,desc:'总结收束',source:'llm',type:'section'});
+  }
+}
+
+function addStructureRow(field) {
+  field = field || {name:'',show_label:true,desc:'',source:'llm',type:'section'};
+  const tr = document.createElement('tr');
+  tr.style.borderBottom = '1px solid var(--border)';
+  tr.innerHTML = `
+    <td style="padding:3px 6px"><input type="text" value="${escHtml(field.name)}" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" placeholder="字段名"></td>
+    <td style="padding:3px 6px;text-align:center"><input type="checkbox" ${field.show_label?'checked':''} style="accent-color:var(--accent)"></td>
+    <td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="${escHtml(field.desc)}" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="${escHtml(field.desc) || '点击编辑字段意义'}">${escHtml(field.desc ? field.desc.substring(0,12)+(field.desc.length>12?'...':'') : '点击输入...')}</span></td>
+    <td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" onchange="updateRenderHint(this)">
+      <option value="user" ${field.source==='user'?'selected':''}>用户</option>
+      <option value="llm" ${field.source==='llm'?'selected':''}>LLM</option>
+      <option value="auto" ${field.source==='auto'?'selected':''}>自动</option>
+    </select></td>
+    <td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" onchange="updateRenderHint(this)">
+      <option value="leaf" ${field.type==='leaf'?'selected':''}>无</option>
+      <option value="section" ${field.type==='section'?'selected':''}>有</option>
+    </select></td>
+    <td style="padding:3px 6px;font-size:11px;color:var(--text-dim)" class="render-hint">${getRenderHint(field)}</td>
+    <td style="padding:3px 6px;text-align:center"><button onclick="this.closest('tr').remove()" title="删除此行" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:15px;line-height:1">&times;</button></td>
+  `;
+  document.getElementById('structure-rows').appendChild(tr);
+}
+
+function getRenderHint(field) {
+  if (field.source === 'user' || field.source === 'auto') return '☐ 输入框';
+  if (field.source === 'llm' && field.type === 'leaf') return '☰ 单段';
+  if (field.source === 'llm' && field.type === 'section') return '☰ 多段';
+  return '—';
+}
+
+function updateRenderHint(selectEl) {
+  const tr = selectEl.closest('tr');
+  if (!tr) return;
+  const sels = tr.querySelectorAll('select');
+  const source = sels[0]?.value || 'llm';
+  const type = sels[1]?.value || 'section';
+  tr.querySelector('.render-hint').textContent = getRenderHint({source, type});
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function saveTemplateAs() {
+  const name = prompt('请输入新模板名称：');
+  if (!name) return;
+  const rows = document.querySelectorAll('#structure-rows tr');
+  const structure = [];
+  rows.forEach(tr => {
+    const inputs = tr.querySelectorAll('input, select');
+    if (inputs.length < 5) return;
+    const n = inputs[0].value.trim();
+    if (!n) return;
+    const descSpan = tr.querySelector('.desc-preview');
+    const desc = descSpan ? (descSpan.dataset.fullDesc || '') : '';
+    structure.push({name:n, show_label:inputs[1].checked, desc:desc, source:inputs[3].value, type:inputs[4].value});
+  });
+  const style = document.getElementById('template-style').value;
+  fetch('/api/config').then(r => r.json()).then(cfg => {
+    if (!cfg.success) return;
+    const templates = Object.assign({}, cfg.config.templates || {});
+    templates[name] = {structure, style};
+    const userTemplates = Object.assign({}, cfg.config.user_templates || {});
+    userTemplates[name] = true;
+    fetch('/api/config', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({templates, user_templates: userTemplates})
+    }).then(r => r.json()).then(d => {
+      if (d.success) { loadConfig(); document.getElementById('template-select').value = name; onTemplateChange(); }
+    });
+  });
+}
+
+// ===== 删除自定义模板 =====
+function deleteTemplate() {
+  const sel = document.getElementById('template-select');
+  const name = sel.value;
+  // 内置模板不可删
+  fetch('/api/config').then(r => r.json()).then(cfg => {
+    if (!cfg.success) return;
+    const builtin = Object.keys(cfg.config.templates || {}).filter(k => {
+      const t = cfg.config.templates[k];
+      return !cfg.config.user_templates || !cfg.config.user_templates[k];
+    });
+    // 更准确的判断：看 user_templates 中有无此 name
+    const userTpls = cfg.config.user_templates || {};
+    if (!userTpls[name]) {
+      alert('内置模板不能删除');
+      return;
+    }
+    if (!confirm(`确认删除自定义模板「${name}」？`)) return;
+    const templates = Object.assign({}, cfg.config.templates || {});
+    delete templates[name];
+    const newUserTpls = Object.assign({}, userTpls);
+    delete newUserTpls[name];
+    // 如果删除的是当前选中的，切到第一个可用模板
+    fetch('/api/config', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({templates, user_templates: newUserTpls})
+    }).then(r => r.json()).then(d => {
+      if (d.success) { loadConfig(); }
+    });
+  });
+}
+
+// ===== LLM 模板生成 =====
+
+function openGenTemplate() {
+  document.getElementById('gen-template-modal').classList.add('show');
+  document.getElementById('gen-template-desc').value = '';
+  document.getElementById('gen-template-status').textContent = '';
+}
+
+function closeGenTemplate() {
+  document.getElementById('gen-template-modal').classList.remove('show');
+}
+
+function generateTemplate() {
+  const nameInput = document.getElementById('gen-template-name').value.trim();
+  const desc = document.getElementById('gen-template-desc').value.trim();
+  if (!desc) { document.getElementById('gen-template-status').textContent = '请输入描述'; return; }
+  const status = document.getElementById('gen-template-status');
+  status.textContent = '⏳ 生成中...';
+  fetch('/api/gen-template', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({description: desc, name: nameInput || undefined})
+  }).then(r => r.json()).then(d => {
+    if (d.success && d.template && d.template.structure) {
+      const templateName = d.template.name || nameInput || '自定义模板';
+      fetch('/api/config').then(r => r.json()).then(cfg => {
+        if (!cfg.success) return;
+        const templates = Object.assign({}, cfg.config.templates || {});
+        templates[templateName] = {structure: d.template.structure, style: d.template.style || ''};
+        const userTemplates = Object.assign({}, cfg.config.user_templates || {});
+        userTemplates[templateName] = true;
+        fetch('/api/config', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({templates, user_templates: userTemplates})
+        }).then(r2 => r2.json()).then(d2 => {
+          if (d2.success) {
+            loadConfig();
+            document.getElementById('template-select').value = templateName;
+            onTemplateChange();
+            status.textContent = `✓ 已创建模板「${templateName}」`;
+          } else {
+            status.textContent = '✗ 保存失败';
+          }
+        });
+        closeGenTemplate();
+      });
+    } else {
+      status.textContent = '✗ ' + (d.error || '生成失败');
+    }
+  }).catch(e => {
+    status.textContent = '✗ 请求失败';
+  });
+}
+
+// ===== 字段意义模态框 =====
+let _descModalTarget = null;
+
+function openDescModal(span) {
+  _descModalTarget = span;
+  const fullDesc = span.dataset.fullDesc || (span.textContent === '点击输入...' ? '' : span.textContent);
+  document.getElementById('desc-editor').value = fullDesc;
+  document.getElementById('desc-modal-status').textContent = '';
+  document.getElementById('desc-modal').classList.add('show');
+}
+
+function closeDescModal() {
+  document.getElementById('desc-modal').classList.remove('show');
+  _descModalTarget = null;
+}
+
+function saveDescModal() {
+  if (!_descModalTarget) return;
+  const value = document.getElementById('desc-editor').value.trim();
+  const display = value ? value.substring(0, 12) + (value.length > 12 ? '...' : '') : '点击输入...';
+  _descModalTarget.textContent = display;
+  _descModalTarget.dataset.fullDesc = value;
+  _descModalTarget.title = value || '点击编辑字段意义';
+  _descModalTarget.dataset.fullDesc = value;
+  closeDescModal();
 }
 
 // ===== RAG 状态管理 =====
@@ -1879,7 +2397,7 @@ function loadSessions() {
       item.className = 'session-item' + (s.id === currentSessionId && s.active ? ' active' : '') + (s.active ? '' : ' archived');
       const actions = s.active
         ? `<div class="s-actions"><button onclick="event.stopPropagation();archiveSession('${s.id}')" title="归档">🗂</button></div>`
-        : `<div class="s-actions"><button onclick="event.stopPropagation();restoreSession('${s.id}')" title="恢复">↩</button><button onclick="event.stopPropagation();deleteSession('${s.id}')" title="删除">✕</button></div>`;
+        : `<div class="s-actions"><button onclick="event.stopPropagation();restoreSession('${s.id}')" title="恢复">↩</button><button id="del-${s.id}" onclick="event.stopPropagation();deleteSession('${s.id}')" title="单击确认，再单击删除" style="transition:all 0.2s">✕</button></div>`;
       item.innerHTML = `<div style="display:flex;align-items:center;width:100%"><div style="flex:1;min-width:0"><div class="s-title">${s.title || '未命名'}</div><div class="s-meta">${s.phase} · ${s.created_at?.slice(0,10) || ''}</div></div>${actions}</div>`;
       item.onclick = () => { if (s.active) loadSession(s.id); };
       if (s.active) {
@@ -1918,10 +2436,34 @@ function restoreSession(id) {
     .then(r => r.json()).then(d => { if (d.success) loadSessions(); });
 }
 
+const _delPending = {};
+
 function deleteSession(id) {
-  if (!confirm('确定永久删除此会话？数据不可恢复。')) return;
-  fetch('/api/session/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: id}) })
-    .then(r => r.json()).then(d => { if (d.success) loadSessions(); });
+  // 清理其他待确认（避免多个按钮同时处于待确认状态）
+  for (const pid in _delPending) {
+    if (pid !== id) {
+      clearTimeout(_delPending[pid]);
+      delete _delPending[pid];
+      const oldBtn = document.getElementById('del-' + pid);
+      if (oldBtn) { oldBtn.textContent = '✕'; oldBtn.style.background = ''; oldBtn.style.color = ''; oldBtn.style.padding = ''; }
+    }
+  }
+  const btn = document.getElementById('del-' + id);
+  if (_delPending[id]) {
+    // 双击确认
+    clearTimeout(_delPending[id]);
+    delete _delPending[id];
+    if (btn) { btn.textContent = ''; btn.style.background = ''; btn.style.color = ''; btn.style.padding = ''; }
+    fetch('/api/session/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: id}) })
+      .then(r => r.json()).then(d => { if (d.success) loadSessions(); });
+  } else {
+    // 第一次单击：进入待确认状态
+    if (btn) { btn.textContent = '确认?'; btn.style.background = '#c0392b'; btn.style.color = '#fff'; btn.style.borderRadius = '3px'; btn.style.padding = '2px 6px'; }
+    _delPending[id] = setTimeout(() => {
+      delete _delPending[id];
+      if (btn) { btn.textContent = '✕'; btn.style.background = ''; btn.style.color = ''; btn.style.padding = ''; }
+    }, 2500);
+  }
 }
 
 function toggleArchived() {
@@ -1985,6 +2527,54 @@ function loadSession(sid) {
     });
 }
 
+// ===== 元数据输入框渲染 =====
+
+function renderMetaInputs(templateName) {
+  const bar = document.getElementById('meta-inputs-bar');
+  const container = document.getElementById('meta-inputs-container');
+  container.innerHTML = '';
+  fetch('/api/config').then(r => r.json()).then(d => {
+    if (!d.success) return;
+    const templates = d.config.templates || {};
+    const tmpl = templates[templateName] || {};
+    if (typeof tmpl !== 'object' || !tmpl.structure) {
+      bar.style.display = 'none';
+      return;
+    }
+    const userFields = tmpl.structure.filter(f => f.source === 'user' || f.source === 'auto');
+    if (!userFields.length) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    // 使用 grid 布局，每行最多 4 个
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(4, 1fr)';
+    container.style.gap = '8px';
+    userFields.forEach(f => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;align-items:center;gap:4px;min-width:0';
+      const label = document.createElement('label');
+      label.textContent = f.name + (f.source === 'auto' ? '(可选)' : '');
+      label.style.cssText = 'font-size:12px;color:var(--text-dim);white-space:nowrap;min-width:50px';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'meta-field-input';
+      input.dataset.fieldName = f.name;
+      input.placeholder = f.desc + (f.source === 'auto' ? '（留空LLM生成）' : '');
+      input.style.cssText = 'flex:1;padding:4px 6px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px';
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      container.appendChild(wrap);
+    });
+  });
+}
+
+// Also update onTemplateChange to refresh meta inputs
+const _origOnTemplateChange = onTemplateChange;
+onTemplateChange = function() {
+  if (_origOnTemplateChange) _origOnTemplateChange();
+  const sel = document.getElementById('template-select');
+  renderMetaInputs(sel.value);
+};
+
 // ===== 消息处理 =====
 function sendMessage() {
   const input = document.getElementById('chat-input');
@@ -2015,15 +2605,24 @@ function sendMessage() {
 
 function startPlanning(topic) {
   const statusEl = addAssistantMsg('⏳ 正在生成大纲...');
-  // 使用当前选中模板的内容作为 prompt
-  const promptText = document.getElementById('template-content')?.value || '';
+  // 收集 meta 字段（用户/auto 已填的值）
+  const meta = {};
+  document.querySelectorAll('#meta-inputs-container .meta-field-input').forEach(el => {
+    const val = el.value.trim();
+    if (val) meta[el.dataset.fieldName] = val;
+  });
+  // 如果 topic 有值但 meta 中无标题，补一个
+  if (topic && !meta['标题']) meta['标题'] = topic;
+  // 当前选中模板名
+  const templateName = document.getElementById('template-select').value;
   fetch('/api/plan', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
       topic: topic,
       session_id: currentSessionId,
-      prompt: promptText
+      template_name: templateName,
+      meta: meta
     })
   }).then(r => r.json()).then(d => {
     // 移除状态消息
@@ -2088,7 +2687,7 @@ function buildOutlineHTML(outline, readOnly) {
       <div class="section-card" data-sid="${s.id}">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">
           ${readOnly ? '' : `<input type="checkbox" class="sc-section-cb" ${s._checked !== false ? 'checked' : ''} onchange="onSectionToggle(this, '${s.id}')" style="flex-shrink:0">`}
-          <div class="sc-label" style="flex:1">${s.title}${readOnly ? (s.is_key ? ' <span class="sc-key">⭐重点</span>' : '') : ''} ${statusIcon}</div>
+          <div class="sc-label" style="flex:1">${s.title} ${s.type === 'leaf' ? '<span style="font-size:10px;color:#f39c12;background:rgba(243,156,18,0.15);padding:1px 5px;border-radius:3px;margin-left:4px">LEAF</span>' : '<span style="font-size:10px;color:#5dade2;background:rgba(93,173,226,0.15);padding:1px 5px;border-radius:3px;margin-left:4px">SEC</span>'}${readOnly ? (s.is_key ? ' <span class="sc-key">⭐重点</span>' : '') : ''} ${statusIcon}</div>
           <div class="sc-meta">${s.subtitle || ''}</div>
           ${readOnly ? `<span style="font-size:12px;color:var(--text-dim)">${s.status === 'done' ? s.actual_word_count + '字' : (s.status === 'in_progress' ? '写作中...' : '')}</span>` : ''}
           ${readOnly ? '' : `<label style="font-size:12px;color:var(--sc-key);cursor:pointer"><input type="checkbox" class="sc-key-cb" ${s.is_key ? 'checked' : ''} onchange="collectOutlineData()"> ⭐重点</label>`}
@@ -2394,11 +2993,17 @@ function startAutoGeneration() {
     input.value = '';
     const statusEl = addAssistantMsg('⏳ 自动撰写中（规划中...）');
     // 带 RAG 状态发 plan
-    const promptText = document.getElementById('template-content')?.value || '';
+    const meta = {};
+    document.querySelectorAll('#meta-inputs-container .meta-field-input').forEach(el => {
+      const val = el.value.trim();
+      if (val) meta[el.dataset.fieldName] = val;
+    });
+    if (text && !meta['标题']) meta['标题'] = text;
+    const templateName = document.getElementById('template-select').value;
     fetch('/api/plan', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({topic: text, session_id: currentSessionId, prompt: promptText})
+      body: JSON.stringify({topic: text, session_id: currentSessionId, template_name: templateName, meta: meta})
     }).then(r => r.json()).then(d => {
       if (!d.success) {
         statusEl.querySelector('.msg-content').innerHTML = '❌ 规划失败：' + (d.error || '');
@@ -2438,11 +3043,16 @@ function startAutoGeneration() {
     addAssistantMsg('⏳ 批量自动撰写已启动（共 ' + lines.length + ' 篇）...');
     document.getElementById('batch-progress').style.display = '';
     document.getElementById('batch-progress').innerHTML = '批量进度：0/' + lines.length;
-    const promptText = document.getElementById('template-content')?.value || '';
+    const templateName = document.getElementById('template-select').value;
+    const meta = {};
+    document.querySelectorAll('#meta-inputs-container .meta-field-input').forEach(el => {
+      const val = el.value.trim();
+      if (val) meta[el.dataset.fieldName] = val;
+    });
     fetch('/api/batch_auto', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({topics: lines, prompt: promptText})
+      body: JSON.stringify({topics: lines, prompt: '', template_name: templateName, meta: meta})
     }).then(r => r.json()).then(d => {
       if (d.success) {
         const batchId = d.task_id;
@@ -2656,7 +3266,7 @@ def run_server(host="0.0.0.0", port=8770):
     """启动 HTTP 服务器"""
     cfg = ConfigManager()
     StructuredWriterHandler.config_mgr = cfg
-    server = http.server.HTTPServer((host, port), StructuredWriterHandler)
+    server = ThreadingHTTPServer((host, port), StructuredWriterHandler)
     print(f"[Structured Writer] 服务启动: http://{host}:{port}")
     print(f"[Structured Writer] 配置面板: http://localhost:{port} (配置Tab)")
     print(f"[Structured Writer] 写作界面: http://localhost:{port} (对话Tab)")

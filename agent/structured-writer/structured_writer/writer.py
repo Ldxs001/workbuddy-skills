@@ -65,7 +65,8 @@ def generate_article(
     aux_knowledge: Optional[dict] = None,
     context_review_length: int = 800,
     fact_check_enabled: bool = False,
-    stop_check=None
+    stop_check=None,
+    template: Optional[dict] = None
 ) -> tuple[str, str]:
     """
     逐节串行写作，返回 (md_content, output_filepath)
@@ -77,9 +78,11 @@ def generate_article(
         llm_client: LLM 写作客户端
         state_mgr: 状态管理器
         rag_client: 可选的 RAG 客户端
+        template: {structure: [五元组], style: "..."} 用于 meta 渲染
     """
     sections = outline.get("sections", [])
     title = outline.get("title", "未命名文章")
+    structure = (template or {}).get("structure", [])
 
     # 按用户排序排列
     if user_orders:
@@ -93,13 +96,18 @@ def generate_article(
     all_parts = []
     sub_fact_notes = []  # 每个子结构的自检记录
 
+    # 标记是否已找到第一个 leaf（用于 # 标题渲染）
+    _first_leaf_rendered = False
+
     for i, section in enumerate(sections):
         sid = section["id"]
         state_mgr.update_section(sid, {"status": "in_progress"})
 
+        s_type = section.get("type", "section")
         subs = section.get("sub_sections", [])
-        if not subs:
-            # 无子结构时把整节当一段写
+
+        # leaf 类型不自动补子结构；section 类型 LLM 漏了则补一个
+        if not subs and s_type == "section":
             subs = [{
                 "id": f"{sid}_1",
                 "title": section.get("subtitle") or section["title"],
@@ -148,12 +156,61 @@ def generate_article(
                 except Exception as e:
                     state_mgr.set_status_text(f"RAG超时: {kb or '自动'} → {sub['title']}")
 
-        # 写入节标题
-        section_md = f"\n\n## {section['title']}\n\n"
+        # 写入节标题（第一个 leaf → #，其他 → ##）
+        wrote_any = False
+
+        if s_type == "leaf" and not _first_leaf_rendered:
+            _first_leaf_rendered = True
+            section_md = f"\n\n# {section['title']}\n\n"
+        else:
+            section_md = f"\n\n## {section['title']}\n\n"
         if section.get("subtitle"):
             section_md += f"*{section['subtitle']}*\n\n"
 
-        wrote_any = False
+        if s_type == "leaf":
+            # leaf 类型：无子结构，一个调用写全部内容
+            # 构建一个单次写作调用
+            prompt = _build_context_section_prompt(
+                topic=title,
+                section_title=section["title"],
+                section_subtitle=section.get("subtitle", ""),
+                section_summary=section.get("summary", ""),
+                word_count=section.get("word_count", 800),
+                is_key=section.get("is_key", False),
+                context_buffer=context_buffer[-context_review_length:] if context_buffer else "",
+                rag_context=None,
+                aux_text=None
+            )
+            messages = [
+                {"role": "system", "content": WRITER_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+            try:
+                accumulated = ""
+                cont_messages = messages.copy()
+                for attempt in range(6):
+                    if stop_check and stop_check() == "immediate":
+                        break
+                    result = llm_client.chat_detailed(cont_messages, max_tokens=None, temperature=None)
+                    chunk = result.get("content", "")
+                    finish_reason = result.get("finish_reason", "stop")
+                    accumulated += chunk
+                    if finish_reason != "length":
+                        break
+                    if not chunk.strip():
+                        break
+                    cont_messages.append({"role": "assistant", "content": chunk})
+                    cont_messages.append({"role": "user", "content": "请继续写，紧接着上一段的结尾，不要重复已写过的内容。"})
+            except LLMClientError as e:
+                accumulated = f"\n\n> **写作失败**: {e}\n\n"
+            content = accumulated.strip()
+            if content:
+                wrote_any = True
+                section_md += f"\n{content}\n\n"
+                context_buffer += content
+                actual_chars = len(content.replace(" ", "").replace("\n", ""))
+                state_mgr.update_section(sid, {"status": "done", "actual_word_count": actual_chars})
+            continue  # 跳过子结构循环
 
         for j, sub in enumerate(subs):
             # 停止检测：延时停止检查点（子结构边界）
@@ -299,8 +356,20 @@ def generate_article(
         })
 
     # 合并全文
-    article_title = f"# {title}\n\n"
-    article_md = article_title + "".join(all_parts)
+    # ── meta 块渲染（根据 structure 五元组的 show_label） ──
+    meta_lines = []
+    for field in structure:
+        fname = field["name"]
+        v = outline.get("meta", {}).get(fname)
+        if not v:
+            continue
+        if field.get("show_label", True):
+            meta_lines.append(f"> {fname}：{v}")
+        else:
+            meta_lines.append(f"> {v}")
+    meta_block = "\n".join(meta_lines) + "\n\n" if meta_lines else ""
+
+    article_md = f"# {title}\n{meta_block}" + "".join(all_parts)
 
     # 去掉开头的多余空行
     article_md = article_md.strip()

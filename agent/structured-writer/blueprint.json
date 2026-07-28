@@ -1,14 +1,15 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "description": "structured-writer agent 同步蓝图",
   "include": [
-    "app/**/*.py",
+    "structured_writer/**/*.py",
     "main.py",
     "setup.bat",
+    "config.json",
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
-    "SCHEMA.md",
+    "blueprint.json",
     "requirements.txt",
     ".github/**/*"
   ],
@@ -17,6 +18,7 @@
     "*.pyc",
     "dist",
     "build",
-    ".git"
+    ".git",
+    "data"
   ]
 }

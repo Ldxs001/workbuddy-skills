@@ -4,25 +4,470 @@
     "base_url": "http://localhost:1234",
     "model": "qwen/qwen3.5-35b-a3b",
     "timeout": 1800,
-    "max_tokens": 40960
+    "max_tokens": 40960,
+    "temperature": 0.6
   },
   "writer_model": {
     "backend": "lmstudio",
     "base_url": "http://localhost:1234",
     "model": "qwen/qwen3.5-35b-a3b",
     "timeout": 3000,
-    "max_tokens": 81920
+    "max_tokens": 81920,
+    "temperature": 0.7
   },
-  "default_prompt": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
-  "selected_template": "通用公文",
+  "selected_template": "日常写作",
+  "new_template_format": true,
   "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
   "templates": {
-    "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
-    "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
-    "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
-    "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
-    "自定义": ""
+    "日常写作": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "文章标题，简明扼要",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "文章主体内容，按逻辑拆分为多个子节展开",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "结尾",
+          "show_label": false,
+          "desc": "总结收束全文",
+          "source": "llm",
+          "type": "section"
+        }
+      ],
+      "style": "请以正式、客观、条理清晰的风格撰写。使用Markdown格式，各级标题用 #/##/###。"
+    },
+    "学术论文": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "文章标题简明准确",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "作者",
+          "show_label": true,
+          "desc": "作者真实姓名，多人用逗号分隔",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "单位",
+          "show_label": true,
+          "desc": "作者所属机构",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "关键词",
+          "show_label": true,
+          "desc": "3-5个反映主题的关键词",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "摘要",
+          "show_label": false,
+          "desc": "概括全文核心论点200-300字",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "引言",
+          "show_label": false,
+          "desc": "研究背景和问题提出",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "核心论述详细展开，可含多级子标题 ####/#####",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "结论",
+          "show_label": false,
+          "desc": "总结与展望",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "参考文献",
+          "show_label": false,
+          "desc": "以[1][2]格式单行列举引用文献",
+          "source": "llm",
+          "type": "leaf"
+        }
+      ],
+      "style": "请以学术论文风格撰写。要求逻辑严密，论证充分，引用规范，语言学术化。使用Markdown格式。"
+    },
+    "正式公文": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "公文标题",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "发文机关",
+          "show_label": true,
+          "desc": "发文单位名称",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "文号",
+          "show_label": true,
+          "desc": "公文编号如〔2026〕12号",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "密级",
+          "show_label": true,
+          "desc": "绝密/机密/秘密/内部",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "前言",
+          "show_label": false,
+          "desc": "说明背景和目的",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "主体",
+          "show_label": false,
+          "desc": "分条列举事项和要求，可含多级标题",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "执行要求",
+          "show_label": false,
+          "desc": "结尾提出执行要求",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "抄送",
+          "show_label": true,
+          "desc": "抄送单位列表",
+          "source": "user",
+          "type": "leaf"
+        }
+      ],
+      "style": "请以正式公文格式撰写。语言简洁庄重，条理清晰，使用Markdown格式。"
+    },
+    "新闻报道": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "新闻标题吸引眼球",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "作者",
+          "show_label": true,
+          "desc": "记者/通讯员姓名",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "导语",
+          "show_label": false,
+          "desc": "概括5W1H(时间地点人物事件原因方式)",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "按重要性递减展开细节",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "背景",
+          "show_label": false,
+          "desc": "补充背景信息",
+          "source": "llm",
+          "type": "leaf"
+        }
+      ],
+      "style": "请以新闻写作风格撰写。倒金字塔结构，语言客观中立，引用需注明来源。使用Markdown格式。"
+    },
+    "技术报告": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "技术报告标题",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "作者",
+          "show_label": true,
+          "desc": "报告撰写人姓名",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "版本号",
+          "show_label": true,
+          "desc": "当前版本号如 v1.0",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "背景",
+          "show_label": false,
+          "desc": "项目背景和问题说明",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "技术方案",
+          "show_label": false,
+          "desc": "详细技术方案和架构描述",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "关键数据",
+          "show_label": false,
+          "desc": "关键数据与指标分析",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "下一步计划",
+          "show_label": false,
+          "desc": "后续工作规划",
+          "source": "llm",
+          "type": "leaf"
+        }
+      ],
+      "style": "请以技术报告风格撰写。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。"
+    },
+    "通用公文": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "公文标题",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "正文分条列举",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "结尾",
+          "show_label": false,
+          "desc": "提出执行要求",
+          "source": "llm",
+          "type": "section"
+        }
+      ],
+      "style": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。"
+    },
+    "论文综述": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "论文标题简明准确",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "作者",
+          "show_label": true,
+          "desc": "作者姓名",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "摘要",
+          "show_label": false,
+          "desc": "概括全文核心论点",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "分论点逐层论述",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "参考文献",
+          "show_label": false,
+          "desc": "引用文献",
+          "source": "llm",
+          "type": "leaf"
+        }
+      ],
+      "style": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。"
+    },
+    "自定义": {
+      "structure": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "文章标题",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "文章主体",
+          "source": "llm",
+          "type": "section"
+        }
+      ],
+      "style": ""
+    },
+    "类法律文书": {
+      "structure": [
+        {
+          "name": "文书标题",
+          "show_label": true,
+          "desc": "文档的具体名称，如《民事判决书》、《法律意见书》，由 LLM 根据内容自动生成或用户指定。",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "案号/文号",
+          "show_label": true,
+          "desc": "官方发布的唯一标识编号，必须由用户填写以确保准确性。",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "当事人信息",
+          "show_label": true,
+          "desc": "案件相关方的身份信息，需包含原告与被告的详细资料。",
+          "source": "user",
+          "type": "section"
+        },
+        {
+          "name": "原告详情",
+          "show_label": true,
+          "desc": "填写原告的姓名/名称、身份证号/统一社会信用代码及联系方式。",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "被告详情",
+          "show_label": true,
+          "desc": "填写被告的姓名/名称、身份信息及送达地址等关键资料。",
+          "source": "user",
+          "type": "leaf"
+        },
+        {
+          "name": "引言背景",
+          "show_label": true,
+          "desc": "案件的基本起因与诉讼主张，用于开篇明确争议焦点。",
+          "source": "auto",
+          "type": "section"
+        },
+        {
+          "name": "案情背景",
+          "show_label": false,
+          "desc": "简述纠纷发生的时间、地点及基本经过，为后续分析铺垫。",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "诉讼请求",
+          "show_label": false,
+          "desc": "明确列出原告希望法院支持的具体请求事项（如赔偿金额）。",
+          "source": "auto",
+          "type": "leaf"
+        },
+        {
+          "name": "事实认定",
+          "show_label": true,
+          "desc": "基于证据对案件客观事实的确认，需逻辑严密、依据充分。",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "证据列举",
+          "show_label": false,
+          "desc": "列出支持事实认定的关键证据名称及证明目的。",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "关键事实",
+          "show_label": false,
+          "desc": "对争议焦点相关的具体事实进行详细的时间线与行为描述。",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "法律分析",
+          "show_label": true,
+          "desc": "结合法律规定与案件事实进行法理推演，论证责任归属。",
+          "source": "llm",
+          "type": "section"
+        },
+        {
+          "name": "引用法条",
+          "show_label": false,
+          "desc": "准确列出适用的法律、法规及司法解释的具体条款内容。",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "逻辑推演",
+          "show_label": false,
+          "desc": "阐述从事实到结论的推导过程，体现法律适用的合理性。",
+          "source": "llm",
+          "type": "leaf"
+        },
+        {
+          "name": "结论与签署",
+          "show_label": true,
+          "desc": "最终的处理结果或判决主文，以及落款日期与签名信息。",
+          "source": "llm",
+          "type": "section"
+        }
+      ],
+      "style": "请使用庄重、客观、严谨的法律文书风格。语言需规范，法言法语准确，逻辑层次分明，避免口语化表达。段落间过渡自然，论证过程严密，确保事实认定与法律适用的一致性。"
+    }
   },
+  "user_templates": {
+    "类法律文书": true
+  },
+  "default_prompt": "",
   "context_review_length": 800,
   "fact_check_enabled": true,
   "max_sessions": 20
