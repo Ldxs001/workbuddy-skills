@@ -425,6 +425,7 @@ generate_article(outline, user_orders, rag_options, llm_client, state_mgr, templ
   ├─ 渲染 meta_block（据 show_label 显示标签）
   ├─ 拼接 article_md → 写入 .md → phase="done"
   └─ 返回 (md_content, output_path)
+```
 
 ### 节级别 RAG 查询
 
