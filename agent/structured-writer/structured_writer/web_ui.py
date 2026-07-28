@@ -236,16 +236,18 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
 
         # 用户已填的字段值（标题、作者等）
         user_meta = data.get("meta", {})
+        plan_hints = data.get("plan_hints", "")
 
         # 获取规划模型配置
         client = self._create_planner_client()
 
         try:
-            # 兼容旧调用：如果有模板结构就走新方式，否则走旧方式
-            if isinstance(template, dict) and template.get("structure"):
-                outline = plan_outline(topic, template=template, user_meta=user_meta, llm_client=client)
+            # 兼容旧调用：如果有 meta/content 字段就走新方式
+            if isinstance(template, dict) and (template.get("meta") is not None or template.get("content") is not None):
+                outline = plan_outline(topic, template=template, user_meta=user_meta, llm_client=client, plan_hints=plan_hints)
+            elif isinstance(template, dict) and (template.get("meta") or template.get("content") or template.get("structure")):
+                outline = plan_outline(topic, template=template, user_meta=user_meta, llm_client=client, plan_hints=plan_hints)
             else:
-                # 旧格式：template 是字符串
                 style = template if isinstance(template, str) else ""
                 outline = plan_outline(topic, template=style or prompt, llm_client=client)
         except (ValueError, LLMClientError) as e:
@@ -324,15 +326,17 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
                 subs = s.get("sub_sections", [])
                 s["sub_sections"] = [ss for ss in subs if checked.get(ss["id"], True)]
 
-        # 应用子结构排序
+        # 应用子结构排序（阿拉伯数字）
         sub_orders = data.get("sub_orders", {})
         if sub_orders:
-            roman_to_int = {"i":1,"ii":2,"iii":3,"iv":4,"v":5,"vi":6,"vii":7,"viii":8,"ix":9,"x":10}
             for s in outline.get("sections", []):
                 subs = s.get("sub_sections", [])
                 def sub_sort_key(ss):
                     ro = sub_orders.get(ss["id"], "")
-                    return roman_to_int.get(ro, 999)
+                    try:
+                        return int(ro.lstrip("s"))
+                    except (ValueError, TypeError):
+                        return 999
                 subs.sort(key=sub_sort_key)
 
         # 应用子结构字数覆盖
@@ -344,6 +348,13 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
                         ss["word_count"] = sub_words[ss["id"]]
                 # 重新计算章节总字数
                 s["word_count"] = sum(ss.get("word_count", 0) for ss in s.get("sub_sections", []))
+
+        # 应用 leaf 节字数覆盖
+        sec_words = data.get("sec_words", {})
+        if sec_words:
+            for s in outline.get("sections", []):
+                if s["id"] in sec_words:
+                    s["word_count"] = sec_words[s["id"]]
 
         # 保存用户排序
         if user_orders:
@@ -404,14 +415,14 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
                     state_mgr=local_sm,
                     rag_client=rag_client,
                     aux_knowledge=aux_kn,
-                    context_review_length=ctx_len,
                     fact_check_enabled=fc_enabled,
+                    context_review_length=ctx_len,
                     stop_check=_stop_check,
                     template=tmpl
                 )
                 result["success"] = True
                 result["output_file"] = output_path
-                result["content"] = md_content[:2000] + ("..." if len(md_content) > 2000 else "")
+                result["content"] = md_content[:8000] + ("...(截断) 完整文件见" + output_path if len(md_content) > 8000 else "")
                 result["word_count"] = len(md_content.replace(" ", "").replace("\n", ""))
             except Exception as e:
                 result["error"] = f"{type(e).__name__}: {e}"
@@ -800,8 +811,13 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             self._json_response({"success": False, "error": "主题列表为空"}, 400)
             return
 
-        # 从配置获取 prompt
+        # 从配置获取 prompt 和模板
         prompt_text = data.get("prompt", "") or self.config_mgr.get("default_prompt", "")
+        template_name = data.get("template_name", "") or self.config_mgr.get("selected_template", "")
+        templates_dict = self.config_mgr.get("templates", {})
+        template = templates_dict.get(template_name, {})
+        if not isinstance(template, dict):
+            template = {}
 
         import threading as _thr
         task_id = f"batch_{int(time.time())}"
@@ -833,7 +849,7 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
 
                 try:
                     # 批量模式下使用当前选中模板
-                    if isinstance(template, dict) and template.get("structure"):
+                    if isinstance(template, dict) and (template.get("meta") or template.get("content") or template.get("structure")):
                         outline = plan_outline(topic, template=template, user_meta={}, llm_client=planner_client)
                     else:
                         outline = plan_outline(topic, prompt=prompt_text, llm_client=planner_client)
@@ -856,7 +872,6 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
                         state_mgr=local_sm,
                         rag_client=rag_client,
                         aux_knowledge=None,
-                        context_review_length=ctx_len,
                         fact_check_enabled=fc_enabled,
                         template=template if isinstance(template, dict) else None
                     )
@@ -958,29 +973,58 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             self._json_response({"success": False, "error": "描述不能为空"}, 400)
             return
 
-        GEN_TEMPLATE_SYSTEM_PROMPT = """你是一个文档模板规划助手。根据用户描述生成五元组字段列表、模板名称和风格提示词。
+        GEN_TEMPLATE_SYSTEM_PROMPT = """你是一个文档模板规划助手。根据用户描述生成模板定义。
 
 输出 JSON：
 {
-  "name": "模板名称（由你生成）",
-  "structure": [
-    {"name": "字段名", "show_label": true/false, "desc": "内容描述（写作要点）", "source": "user/llm/auto", "type": "leaf/section"}
+  "name": "模板名称",
+  "meta": [
+    {"name": "字段名", "show_label": true/false, "desc": "字段意义", "source": "user/llm/auto"}
   ],
-  "style": "写作风格提示词"
+  "content": [
+    {"name": "字段名", "show_label": true/false, "desc": "写作要点", "type": "leaf/section", "logical_order": 0}
+  ],
+  "style": "写作风格提示词",
+  "logic": "写作顺序提示词（控制LLM的认知流程顺序，不控制文章顺序）"
 }
 
 规则：
-1. leaf+短数据（标题、关键词等）可放入 sections 或 meta
-2. leaf+段落（摘要、参考文献等）放入 sections，sub_sections=[]
-3. section（正文、引言等）需要拆 2-4 个子结构
-4. source=user：身份信息，必须用户填（作者、文号、密级等）
-5. source=llm：正文内容由 LLM 生成
-6. source=auto：用户可填，留空 LLM 生成（标题等）
-7. show_label=true 输出时带 "字段名：" 前缀，false 不带
-8. 字段数量 4-15 个
-9. name 用中文，用户能看懂
-10. desc 写清楚写作要点
-11. name 字段：模板名称，简洁概括文档类型（如"技术报告""会议纪要"）。如果用户已提供名称则直接使用。"""
+
+一、元数据 vs 内容树 —— 严格的二分法：
+- 元数据：标识/管理信息（标题、作者、单位、文号、密级、日期等）。
+  特征：短（≤100字）、不参与大纲规划、不支持子结构、以键值对渲染。
+  位置：放入 meta 数组。
+- 内容树：文章正文构成（摘要、引言、正文、结论、参考文献等）。
+  特征：长（≥200字）、参与大纲规划、可拆子结构、构成文章主体。
+  位置：放入 content 数组。
+  互斥：同一个字段不能同时出现在 meta 和 content 中。
+
+二、元数据规则：
+- source=user：用户必须填写，LLM不碰（如作者、单位、文号）
+- source=auto：用户可填，留空LLM生成（如标题）
+- source=llm：由LLM生成（如关键词）——但关键词推荐放入 content 尾部
+- show_label=true 输出时带"字段名："前缀，false 不带
+- 元数据固定为 leaf（无子结构），不要输出 type 字段
+
+三、内容树规则：
+- source 固定为 llm（不输出 source 字段）
+- type=leaf：单段内容，不拆子结构（摘要、参考文献、关键词）
+- type=section：需要拆 2-4 个子结构（引言、正文各节、结论）
+- show_label=true 输出时带"字段名："前缀，false 不带
+- desc 写清楚写作要点
+- logical_order：可选。不设或留空=按 content[] 顺序写，不需特殊排序。
+  需要特殊排序时才设置：0=先写，1=其次，2=最后写（如摘要/关键词需在全文写完后提取）。
+  逻辑顺序只控制 LLM 写作时的认知流程，不影响文章最终排列
+
+四、逻辑提示词（logic）规则：
+- 控制 LLM 的认知流程顺序，而非文章最终顺序
+- 示例："引言和正文优先写，结论在正文完成后写，关键词和摘要在全文写完后从成品中提取"
+- 如果用户未指定，根据字段类型推断合理顺序
+
+五、其他规则：
+- 字段数量：元数据 0-8 个 + 内容树 3-12 个
+- name 用中文
+- style 描述文风和语气"""
 
         client = self._create_planner_client()
         user_name = data.get("name", "").strip()
@@ -1008,7 +1052,7 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             # 尝试直接解析
             try:
                 result = json.loads(raw.strip())
-                if result.get("structure"):
+                if result.get("meta") or result.get("content"):
                     break
             except json.JSONDecodeError:
                 pass
@@ -1022,7 +1066,7 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
                     content = content[5:]
                 try:
                     result = json.loads(content)
-                    if result.get("structure"):
+                    if result.get("meta") or result.get("content"):
                         break
                 except (json.JSONDecodeError, ValueError):
                     pass
@@ -1032,14 +1076,14 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             if brace >= 0:
                 try:
                     result = json.loads(raw[brace:])
-                    if result.get("structure"):
+                    if result.get("meta") or result.get("content"):
                         break
                 except json.JSONDecodeError:
                     lines = raw[brace:].split("\n")
                     for cut in range(len(lines), 0, -1):
                         try:
                             r = json.loads("\n".join(lines[:cut]))
-                            if r.get("structure"):
+                            if r.get("meta") or r.get("content"):
                                 result = r
                                 break
                         except json.JSONDecodeError:
@@ -1049,20 +1093,83 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
 
             if attempt < 2:
                 error_feedback = (
-                    f"【格式错误】输出必须包含 JSON 格式的 structure 和 style 字段。\n"
+                    f"【格式错误】输出必须包含非空的 meta 和 content 字段（至少一个有内容）。\n"
                     f"只输出 JSON，不要任何其他文字。\n重新生成："
                 )
                 messages.append({"role": "assistant", "content": raw[:500]})
                 messages.append({"role": "user", "content": error_feedback})
 
         if result:
-            self._json_response({"success": True, "template": result})
-        else:
-            self._json_response({"success": False, "error": f"模板生成失败，LLM 3 次均未返回正确格式。最后输出：{last_raw[:300]}"}, 500)
+            result = _normalize_template(result)
+            if result.get("meta") or result.get("content"):
+                self._json_response({"success": True, "template": result})
+                return
+        self._json_response({"success": False, "error": f"模板生成失败，LLM 3 次均未返回正确格式。最后输出：{last_raw[:300]}"}, 500)
 
     def log_message(self, format, *args):
         """抑制默认日志输出"""
         pass
+
+
+def _normalize_template(t: dict) -> dict:
+    """校验 + 补默认值，确保 gen-template 输出结构正确"""
+    # name 兜底
+    if not t.get("name"):
+        t["name"] = "自定义模板"
+
+    # meta 字段校验
+    meta = t.get("meta", [])
+    if not isinstance(meta, list):
+        meta = []
+    cleaned_meta = []
+    for f in meta:
+        if not isinstance(f, dict):
+            continue
+        name = str(f.get("name", "")).strip()
+        if not name:
+            continue
+        cleaned_meta.append({
+            "name": name,
+            "show_label": bool(f.get("show_label", True)),
+            "desc": str(f.get("desc", "")),
+            "source": f.get("source", "auto") if f.get("source") in ("user", "auto", "llm") else "auto"
+        })
+    t["meta"] = cleaned_meta
+
+    # content 字段校验
+    content = t.get("content", [])
+    if not isinstance(content, list):
+        content = []
+    cleaned_content = []
+    for f in content:
+        if not isinstance(f, dict):
+            continue
+        name = str(f.get("name", "")).strip()
+        if not name:
+            continue
+        entry = {
+            "name": name,
+            "show_label": bool(f.get("show_label", True)),
+            "desc": str(f.get("desc", "")),
+            "type": f.get("type", "leaf") if f.get("type") in ("leaf", "section") else "leaf"
+        }
+        lo = f.get("logical_order")
+        if lo is not None and lo in (0, 1, 2):
+            entry["logical_order"] = lo
+        cleaned_content.append(entry)
+    t["content"] = cleaned_content
+
+    # style / logic 字符串
+    t.setdefault("style", "")
+    t.setdefault("logic", "")
+
+    # 清理多余字段
+    allowed = {"name", "meta", "content", "style", "logic"}
+    for k in list(t.keys()):
+        if k not in allowed:
+            del t[k]
+
+    return t
 
 
 # ============================================================
@@ -1495,13 +1602,13 @@ body {
           <select id="planner-model" style="flex:2"><option value="">(请选择)</option></select>
           <button class="btn btn-secondary btn-sm" onclick="refreshModels('planner')">刷新</button>
         </div>
-        <div class="form-row">
-          <label>超时(s)</label>
-          <input type="number" id="planner-timeout" value="180" style="width:100px;">
-          <label>最大Token</label>
-          <input type="number" id="planner-max-tokens" value="4096" style="width:120px;">
-          <label>温度</label>
-          <input type="number" id="planner-temperature" value="0.6" min="0" max="1" step="0.05" style="width:70px;">
+        <div class="form-row" style="flex-wrap:nowrap">
+          <label style="min-width:auto;white-space:nowrap">超时(s)</label>
+          <input type="number" id="planner-timeout" value="180" style="width:100px;flex-shrink:0">
+          <label style="min-width:auto;white-space:nowrap">最大Token</label>
+          <input type="number" id="planner-max-tokens" value="4096" style="width:120px;flex-shrink:0">
+          <label style="min-width:auto;white-space:nowrap">温度</label>
+          <input type="number" id="planner-temperature" value="0.6" min="0" max="1" step="0.05" style="width:70px;flex-shrink:0">
         </div>
         <div class="form-row" style="font-size:11px;color:var(--text-dim)">
           <span></span>
@@ -1524,13 +1631,13 @@ body {
           <select id="writer-model" style="flex:2"><option value="">(请选择)</option></select>
           <button class="btn btn-secondary btn-sm" onclick="refreshModels('writer')">刷新</button>
         </div>
-        <div class="form-row">
-          <label>超时(s)</label>
-          <input type="number" id="writer-timeout" value="300" style="width:100px;">
-          <label>最大Token</label>
-          <input type="number" id="writer-max-tokens" value="8192" style="width:120px;">
-          <label>温度</label>
-          <input type="number" id="writer-temperature" value="0.7" min="0" max="1" step="0.05" style="width:70px;">
+        <div class="form-row" style="flex-wrap:nowrap">
+          <label style="min-width:auto;white-space:nowrap">超时(s)</label>
+          <input type="number" id="writer-timeout" value="300" style="width:100px;flex-shrink:0">
+          <label style="min-width:auto;white-space:nowrap">最大Token</label>
+          <input type="number" id="writer-max-tokens" value="8192" style="width:120px;flex-shrink:0">
+          <label style="min-width:auto;white-space:nowrap">温度</label>
+          <input type="number" id="writer-temperature" value="0.7" min="0" max="1" step="0.05" style="width:70px;flex-shrink:0">
         </div>
         <div class="form-row" style="font-size:11px;color:var(--text-dim)">
           <span></span>
@@ -1552,39 +1659,74 @@ body {
           <button class="btn btn-danger btn-sm" onclick="deleteTemplate()" title="删除当前自定义模板">删除</button>
           <button class="btn btn-success btn-sm" onclick="openGenTemplate()">从对话生成</button>
         </div>
+
         <div class="form-row">
-          <label>结构字段</label>
+          <label style="font-weight:600;color:#f39c12">元数据</label>
           <div style="flex:1;font-size:12px;color:var(--text-dim)">
-            五元组：名称 | 显示标签 | 字段意义 | 填写对象 | 子结构类型
+            标识/管理信息，短数据（≤100字），以键值对渲染，不参与大纲规划。每行：名称 | 显示标签 | 字段意义 | 填写者
           </div>
         </div>
-        <div id="structure-editor" style="overflow-x:auto;margin-bottom:8px">
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <div id="meta-editor" style="overflow-x:auto;margin-bottom:12px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
             <thead>
               <tr style="background:var(--bg-input)">
                 <th style="padding:4px 6px;text-align:left;min-width:80px">名称</th>
                 <th style="padding:4px 6px;text-align:center;width:40px">显</th>
                 <th style="padding:4px 6px;text-align:left;min-width:120px">字段意义</th>
                 <th style="padding:4px 6px;text-align:center;width:65px">填写</th>
-                <th style="padding:4px 6px;text-align:center;width:75px">子结构</th>
-                <th style="padding:4px 6px;text-align:left;min-width:70px">渲染</th>
                 <th style="padding:4px 6px;text-align:center;width:30px"></th>
               </tr>
             </thead>
-            <tbody id="structure-rows">
+            <tbody id="meta-rows">
             </tbody>
           </table>
         </div>
         <div class="form-row">
-          <button class="btn btn-secondary btn-sm" onclick="addStructureRow()">+ 添加行</button>
-          <span id="structure-status" style="font-size:11px;color:var(--text-dim);margin-left:8px"></span>
+          <button class="btn btn-secondary btn-sm" onclick="addMetaRow()">+ 添加元数据</button>
+        </div>
+
+        <div class="form-row" style="margin-top:4px">
+          <label style="font-weight:600;color:#5dade2">内容树</label>
+          <div style="flex:1;font-size:12px;color:var(--text-dim)">
+            文章主体，长文本（≥200字），参与大纲规划，可拆分子结构。每行：名称 | 显 | 字段意义 | 子结构 | 逻辑顺序 | source 固定为 llm
+          </div>
+        </div>
+        <div id="content-editor" style="overflow-x:auto;margin-bottom:8px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--bg-input)">
+                <th style="padding:4px 6px;text-align:left;min-width:80px">名称</th>
+                <th style="padding:4px 6px;text-align:center;width:40px">显</th>
+                <th style="padding:4px 6px;text-align:left;min-width:120px">字段意义</th>
+                <th style="padding:4px 6px;text-align:center;width:65px">子结构</th>
+                <th style="padding:4px 6px;text-align:center;width:65px">逻辑顺序</th>
+                <th style="padding:4px 6px;text-align:center;width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="content-rows">
+            </tbody>
+          </table>
         </div>
         <div class="form-row">
-          <label>风格提示词</label>
-          <textarea id="template-style" rows="3" placeholder="写作风格说明，如：请以学术论文风格撰写..."></textarea>
+          <button class="btn btn-secondary btn-sm" onclick="addContentRow()">+ 添加内容</button>
         </div>
-        <div class="form-row" style="font-size:12px;color:var(--text-dim)">
-          结构字段定义文档大纲骨架，风格提示词控制文风和语气。切换模板后可在表格中编辑。
+
+        <div class="form-row">
+          <label>风格提示词</label>
+          <div style="display:flex;flex-direction:column;flex:1;gap:4px">
+            <textarea id="template-style" rows="3" placeholder="写作风格说明，如：请以学术论文风格撰写..."></textarea>
+            <span style="font-size:11px;color:var(--text-dim)">控制文风和语气，注入每一步写作 prompt</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>逻辑提示词</label>
+          <div style="display:flex;flex-direction:column;flex:1;gap:4px">
+            <textarea id="template-logic" rows="2" placeholder="写作顺序说明，如：先写引言和正文，再写结论，最后提取关键词和摘要。留空则按文章顺序写。"></textarea>
+            <span style="font-size:11px;color:var(--text-dim)">控制 LLM 认知流程顺序（先写什么后写什么），不改变文章最终排列</span>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#e67e22;margin-top:8px;padding:6px 10px;background:rgba(230,126,34,0.1);border-radius:4px">
+          ⚠️ 修改表格后必须点「另存为」保存为新模板并重新选择，否则改动不生效。
         </div>
       </div>
 
@@ -1631,6 +1773,45 @@ body {
         </div>
       </div>
 
+      <!-- 另存为模板模态框 -->
+      <div class="modal-overlay" id="saveas-modal" style="z-index:100">
+        <div class="modal-box" style="max-width:400px">
+          <div class="modal-header">
+            <h3>另存为模板</h3>
+            <button class="modal-close" onclick="closeSaveAsModal()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">输入新模板名称：</p>
+            <input type="text" id="saveas-name" style="width:100%;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:14px" placeholder="模板名称" autofocus>
+          </div>
+          <div class="modal-footer">
+            <span id="saveas-modal-status" style="font-size:12px;color:var(--text-dim);flex:1"></span>
+            <button class="btn btn-secondary" onclick="closeSaveAsModal()">取消</button>
+            <button class="btn btn-primary" onclick="confirmSaveAs()">确认保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 重新规划输入模态框 -->
+      <div class="modal-overlay" id="replan-modal" style="z-index:100">
+        <div class="modal-box" style="max-width:500px">
+          <div class="modal-header">
+            <h3>调整规划</h3>
+            <button class="modal-close" onclick="closeReplanModal()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">输入对当前大纲的调整要求。留空则使用原有规划不变。</p>
+            <p style="font-size:12px;color:#f39c12;margin-bottom:8px">例如：第2节加3个子结构、结论改800字、正文分5个部分每部分600字、删除第4节</p>
+            <textarea id="replan-hints" rows="6" placeholder="输入调整要求（留空则按原规划重跑）..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <span id="replan-modal-status" style="font-size:12px;color:var(--text-dim);flex:1"></span>
+            <button class="btn btn-secondary" onclick="closeReplanModal()">取消</button>
+            <button class="btn btn-primary" onclick="confirmReplan()">确认重新规划</button>
+          </div>
+        </div>
+      </div>
+
       <div class="config-section">
         <h3>🔗 RAG 知识库</h3>
         <div class="form-row">
@@ -1658,7 +1839,7 @@ body {
         <h3>⚙️ 写作参数</h3>
         <div class="form-row">
           <label>前文回顾字数</label>
-          <input type="number" id="context-review-length" value="800" min="100" max="8000" style="width:100px;">
+          <input type="number" id="context-review-length" value="8000" min="100" max="32000" style="width:100px;">
           <span style="font-size:12px;color:var(--text-dim)">写作时注入前文上下文的最大字符数</span>
         </div>
         <div class="form-row">
@@ -1785,18 +1966,38 @@ function loadConfig() {
       sel.innerHTML = tmplNames.map(t => `<option value="${t}">${t}</option>`).join('');
     }
     sel.value = selectedTemplate;
-    // 加载结构表格 + 风格提示词
+    // 加载 meta/content/style/logic
     const tmpl = templates[selectedTemplate] || {};
-    if (typeof tmpl === 'object' && tmpl.structure) {
-      renderStructureRows(tmpl.structure);
+    if (typeof tmpl === 'object' && (tmpl.meta || tmpl.content)) {
+      renderMetaRows(tmpl.meta || []);
+      renderContentRows(tmpl.content || []);
       document.getElementById('template-style').value = tmpl.style || '';
+      document.getElementById('template-logic').value = tmpl.logic || '';
+    } else if (typeof tmpl === 'object' && tmpl.structure) {
+      // structure 旧格式 → 转为 meta+content
+      const m = [], c = [];
+      (tmpl.structure || []).forEach(f => {
+        const src = f.source || 'llm';
+        if (src === 'user' || src === 'auto') {
+          m.push({name: f.name, show_label: f.show_label, desc: f.desc, source: src});
+        } else {
+          c.push({name: f.name, show_label: f.show_label, desc: f.desc, type: f.type || 'section'});
+        }
+      });
+      renderMetaRows(m);
+      renderContentRows(c);
+      document.getElementById('template-style').value = tmpl.style || '';
+      document.getElementById('template-logic').value = '';
     } else if (typeof tmpl === 'string') {
-      // 旧格式兼容
-      renderStructureRows([]);
+      renderMetaRows([]);
+      renderContentRows([]);
       document.getElementById('template-style').value = tmpl;
+      document.getElementById('template-logic').value = '';
     } else {
-      renderStructureRows([]);
+      renderMetaRows([]);
+      renderContentRows([]);
       document.getElementById('template-style').value = '';
+      document.getElementById('template-logic').value = '';
     }
     // 加载用户模板
     if (c.user_templates) {
@@ -1840,56 +2041,63 @@ function saveConfig() {
       temperature: parseFloat(document.getElementById('writer-temperature').value) || 0.7
     },
     selected_template: document.getElementById('template-select').value,
-    context_review_length: parseInt(document.getElementById('context-review-length').value) || 800,
+    context_review_length: parseInt(document.getElementById('context-review-length').value) || 8000,
     fact_check_enabled: document.getElementById('fact-check-enabled').checked,
     templates: {}  // 在下面通过 templData 更新
   };
-    // 读取结构表格数据
-    const rows = document.querySelectorAll('#structure-rows tr');
-    const structure = [];
-    rows.forEach(tr => {
+    // 读取元数据表格
+    const metaRows = document.querySelectorAll('#meta-rows tr');
+    const meta = [];
+    metaRows.forEach(tr => {
       const inputs = tr.querySelectorAll('input, select');
-      if (inputs.length < 5) return;
+      if (inputs.length < 3) return;
       const name = inputs[0].value.trim();
       if (!name) return;
-      structure.push({
-        name: name,
-        show_label: inputs[1].checked,
-        desc: inputs[2].value.trim(),
-        source: inputs[3].value,
-        type: inputs[4].value
-      });
+      const descSpan = tr.querySelector('.desc-preview');
+      meta.push({name, show_label: inputs[1].checked, desc: descSpan ? (descSpan.dataset.fullDesc || '') : '', source: inputs[2].value});
+    });
+    // 读取内容树表格
+    const contentRows = document.querySelectorAll('#content-rows tr');
+    const content = [];
+    contentRows.forEach(tr => {
+      const inputs = tr.querySelectorAll('input, select');
+      if (inputs.length < 4) return;
+      const name = inputs[0].value.trim();
+      if (!name) return;
+      const descSpan = tr.querySelector('.desc-preview');
+      content.push({name, show_label: inputs[1].checked, desc: descSpan ? (descSpan.dataset.fullDesc || '') : '', type: inputs[2].value, logical_order: inputs[3].value !== '' ? parseInt(inputs[3].value) : null});
     });
     const style = document.getElementById('template-style').value;
+    const logic = document.getElementById('template-logic').value;
     const selTmpl = document.getElementById('template-select').value;
-    // 构建 new-style templates
     const tmplObj = {};
-    if (structure.length) {
-      tmplObj[selTmpl] = {structure, style};
-    } else {
-      tmplObj[selTmpl] = style; // fallback 旧格式
-    }
+    tmplObj[selTmpl] = {meta, content, style, logic};
     // 保留其他模板
-    fetch('/api/config').then(r => r.json()).then(cfg => {
-      if (!cfg.success) return;
-      const existing = cfg.config.templates || {};
-      // 合并：保留未选中的模板，更新当前选中的
-      Object.keys(existing).forEach(k => {
-        if (k !== selTmpl) {
-          // 如果旧格式字符串，转为新格式
-          const v = existing[k];
-          if (typeof v === 'object' && v.structure) {
-            tmplObj[k] = v;
-          } else if (typeof v === 'string') {
-            // 尝试构建一个默认结构
-            tmplObj[k] = {
-              structure: [{name:'标题',show_label:false,desc:'文章标题',source:'auto',type:'leaf'},{name:'正文',show_label:false,desc:'文章主体',source:'llm',type:'section'}],
-              style: v
-            };
+      fetch('/api/config').then(r => r.json()).then(cfg => {
+        if (!cfg.success) return;
+        const existing = cfg.config.templates || {};
+        // 合并：保留未选中的模板，更新当前选中的
+        Object.keys(existing).forEach(k => {
+          if (k !== selTmpl) {
+            const v = existing[k];
+            if (typeof v === 'object' && (v.meta || v.content)) {
+              tmplObj[k] = v;  // 新格式 meta+content
+            } else if (typeof v === 'object' && v.structure) {
+              // structure 旧格式 → 转为 meta+content
+              const m = [], c = [];
+              (v.structure || []).forEach(f => {
+                const src = f.source || 'llm';
+                if (src === 'user' || src === 'auto') {
+                  m.push({name: f.name, show_label: f.show_label, desc: f.desc, source: src});
+                } else {
+                  c.push({name: f.name, show_label: f.show_label, desc: f.desc, type: f.type || 'section'});
+                }
+              });
+              tmplObj[k] = {meta: m, content: c, style: v.style || '', logic: ''};
+            }
           }
-        }
-      });
-      data.templates = tmplObj;
+        });
+        data.templates = tmplObj;
       data.default_prompt = style || (tmplObj[selTmpl] && tmplObj[selTmpl].style) || '';
 
     fetch('/api/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) })
@@ -1904,7 +2112,6 @@ function saveConfig() {
 function onTemplateChange() {
   const sel = document.getElementById('template-select');
   const tmplName = sel.value;
-  // 持久化选择的模板
   fetch('/api/config', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({selected_template: tmplName})
@@ -1913,70 +2120,81 @@ function onTemplateChange() {
     if (!d.success) return;
     const templates = d.config.templates || {};
     const tmpl = templates[tmplName] || {};
-    if (typeof tmpl === 'object' && tmpl.structure) {
-      renderStructureRows(tmpl.structure);
+    if (typeof tmpl === 'object' && (tmpl.meta || tmpl.content)) {
+      renderMetaRows(tmpl.meta || []);
+      renderContentRows(tmpl.content || []);
       document.getElementById('template-style').value = tmpl.style || '';
+      document.getElementById('template-logic').value = tmpl.logic || '';
+    } else if (typeof tmpl === 'object' && tmpl.structure) {
+      const m = [], c = [];
+      (tmpl.structure || []).forEach(f => {
+        const src = f.source || 'llm';
+        if (src === 'user' || src === 'auto') { m.push({name: f.name, show_label: f.show_label, desc: f.desc, source: src}); }
+        else { c.push({name: f.name, show_label: f.show_label, desc: f.desc, type: f.type || 'section'}); }
+      });
+      renderMetaRows(m); renderContentRows(c);
+      document.getElementById('template-style').value = tmpl.style || '';
+      document.getElementById('template-logic').value = '';
     } else if (typeof tmpl === 'string') {
-      renderStructureRows([]);
+      renderMetaRows([]); renderContentRows([]);
       document.getElementById('template-style').value = tmpl;
+      document.getElementById('template-logic').value = '';
     } else {
-      renderStructureRows([]);
+      renderMetaRows([]); renderContentRows([]);
       document.getElementById('template-style').value = '';
+      document.getElementById('template-logic').value = '';
     }
   });
 }
 
-// ===== 结构表格编辑器 =====
+// ===== 结构表格编辑器（元数据 + 内容树） =====
 
-function renderStructureRows(structure) {
-  const tbody = document.getElementById('structure-rows');
+function renderMetaRows(meta) {
+  const tbody = document.getElementById('meta-rows');
   tbody.innerHTML = '';
-  (structure || []).forEach(f => addStructureRow(f));
-  if (!structure || !structure.length) {
-    // 空表格加 3 行默认
-    addStructureRow({name:'标题',show_label:false,desc:'文章标题',source:'auto',type:'leaf'});
-    addStructureRow({name:'正文',show_label:false,desc:'文章主体',source:'llm',type:'section'});
-    addStructureRow({name:'结尾',show_label:false,desc:'总结收束',source:'llm',type:'section'});
+  (meta || []).forEach(f => addMetaRow(f));
+  if (!meta || !meta.length) {
+    addMetaRow({name:'标题',show_label:false,desc:'文章标题',source:'auto'});
   }
 }
 
-function addStructureRow(field) {
-  field = field || {name:'',show_label:true,desc:'',source:'llm',type:'section'};
+function renderContentRows(content) {
+  const tbody = document.getElementById('content-rows');
+  tbody.innerHTML = '';
+  (content || []).forEach(f => addContentRow(f));
+  if (!content || !content.length) {
+    addContentRow({name:'正文',show_label:false,desc:'文章主体内容',type:'section'});
+  }
+}
+
+function addMetaRow(field) {
+  field = field || {name:'',show_label:true,desc:'',source:'auto'};
   const tr = document.createElement('tr');
   tr.style.borderBottom = '1px solid var(--border)';
-  tr.innerHTML = `
-    <td style="padding:3px 6px"><input type="text" value="${escHtml(field.name)}" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" placeholder="字段名"></td>
-    <td style="padding:3px 6px;text-align:center"><input type="checkbox" ${field.show_label?'checked':''} style="accent-color:var(--accent)"></td>
-    <td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="${escHtml(field.desc)}" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="${escHtml(field.desc) || '点击编辑字段意义'}">${escHtml(field.desc ? field.desc.substring(0,12)+(field.desc.length>12?'...':'') : '点击输入...')}</span></td>
-    <td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" onchange="updateRenderHint(this)">
-      <option value="user" ${field.source==='user'?'selected':''}>用户</option>
-      <option value="llm" ${field.source==='llm'?'selected':''}>LLM</option>
-      <option value="auto" ${field.source==='auto'?'selected':''}>自动</option>
-    </select></td>
-    <td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" onchange="updateRenderHint(this)">
-      <option value="leaf" ${field.type==='leaf'?'selected':''}>无</option>
-      <option value="section" ${field.type==='section'?'selected':''}>有</option>
-    </select></td>
-    <td style="padding:3px 6px;font-size:11px;color:var(--text-dim)" class="render-hint">${getRenderHint(field)}</td>
-    <td style="padding:3px 6px;text-align:center"><button onclick="this.closest('tr').remove()" title="删除此行" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:15px;line-height:1">&times;</button></td>
-  `;
-  document.getElementById('structure-rows').appendChild(tr);
+  tr.innerHTML = [
+    '<td style="padding:3px 6px"><input type="text" value="' + escHtml(field.name) + '" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" placeholder="字段名"></td>',
+    '<td style="padding:3px 6px;text-align:center"><input type="checkbox" ' + (field.show_label ? 'checked' : '') + ' style="accent-color:var(--accent)"></td>',
+    '<td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="' + escHtml(field.desc) + '" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="' + escHtml(field.desc) + '">' + escHtml(field.desc ? field.desc.substring(0,12)+(field.desc.length>12?'...':'') : '点击输入...') + '</span></td>',
+    '<td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px"><option value="user" ' + (field.source==='user'?'selected':'') + '>用户</option><option value="llm" ' + (field.source==='llm'?'selected':'') + '>LLM</option><option value="auto" ' + (field.source==='auto'?'selected':'') + '>自动</option></select></td>',
+    '<td style="padding:3px 6px;text-align:center"><button onclick="this.closest(\'tr\').remove()" title="删除此行" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:15px;line-height:1">&times;</button></td>'
+  ].join('');
+  document.getElementById('meta-rows').appendChild(tr);
 }
 
-function getRenderHint(field) {
-  if (field.source === 'user' || field.source === 'auto') return '☐ 输入框';
-  if (field.source === 'llm' && field.type === 'leaf') return '☰ 单段';
-  if (field.source === 'llm' && field.type === 'section') return '☰ 多段';
-  return '—';
-}
-
-function updateRenderHint(selectEl) {
-  const tr = selectEl.closest('tr');
-  if (!tr) return;
-  const sels = tr.querySelectorAll('select');
-  const source = sels[0]?.value || 'llm';
-  const type = sels[1]?.value || 'section';
-  tr.querySelector('.render-hint').textContent = getRenderHint({source, type});
+function addContentRow(field) {
+  field = field || {name:'',show_label:true,desc:'',type:'section',logical_order:0};
+  const lo = field.logical_order !== undefined ? field.logical_order : 0;
+  const tr = document.createElement('tr');
+  tr.style.borderBottom = '1px solid var(--border)';
+  tr.innerHTML = [
+    '<td style="padding:3px 6px"><input type="text" value="' + escHtml(field.name) + '" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" placeholder="字段名"></td>',
+    '<td style="padding:3px 6px;text-align:center"><input type="checkbox" ' + (field.show_label ? 'checked' : '') + ' style="accent-color:var(--accent)"></td>',
+    '<td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="' + escHtml(field.desc) + '" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="' + escHtml(field.desc) + '">' + escHtml(field.desc ? field.desc.substring(0,12)+(field.desc.length>12?'...':'') : '点击输入...') + '</span></td>',
+    '<td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px"><option value="leaf" ' + (field.type==='leaf'?'selected':'') + '>无</option><option value="section" ' + (field.type==='section'?'selected':'') + '>有</option></select></td>',
+    '<td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px"><option value="" ' + (!lo && lo!==0?'selected':'') + '>自动</option><option value="0" ' + (lo===0?'selected':'') + '>先写</option><option value="1" ' + (lo===1?'selected':'') + '>其次</option><option value="2" ' + (lo===2?'selected':'') + '>最后</option></select></td>',
+    '<td style="padding:3px 6px;text-align:center"><button onclick="this.closest(\'tr\').remove()" title="删除此行" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:15px;line-height:1">&times;</button></td>'
+  ].join('');
+  document.getElementById('content-rows').appendChild(tr);
 }
 
 function escHtml(s) {
@@ -1984,24 +2202,46 @@ function escHtml(s) {
 }
 
 function saveTemplateAs() {
-  const name = prompt('请输入新模板名称：');
-  if (!name) return;
-  const rows = document.querySelectorAll('#structure-rows tr');
-  const structure = [];
-  rows.forEach(tr => {
+  document.getElementById('saveas-name').value = '';
+  document.getElementById('saveas-modal-status').textContent = '';
+  document.getElementById('saveas-modal').classList.add('show');
+  setTimeout(() => document.getElementById('saveas-name').focus(), 100);
+}
+
+function closeSaveAsModal() {
+  document.getElementById('saveas-modal').classList.remove('show');
+}
+
+function confirmSaveAs() {
+  const name = document.getElementById('saveas-name').value.trim();
+  if (!name) { document.getElementById('saveas-modal-status').textContent = '名称不能为空'; return; }
+  closeSaveAsModal();
+  // 读元数据表
+  const meta = [];
+  document.querySelectorAll('#meta-rows tr').forEach(tr => {
     const inputs = tr.querySelectorAll('input, select');
-    if (inputs.length < 5) return;
+    if (inputs.length < 3) return;
     const n = inputs[0].value.trim();
     if (!n) return;
     const descSpan = tr.querySelector('.desc-preview');
-    const desc = descSpan ? (descSpan.dataset.fullDesc || '') : '';
-    structure.push({name:n, show_label:inputs[1].checked, desc:desc, source:inputs[3].value, type:inputs[4].value});
+    meta.push({name:n, show_label:inputs[1].checked, desc:descSpan ? (descSpan.dataset.fullDesc || '') : '', source:inputs[2].value});
+  });
+  // 读内容树表
+  const content = [];
+  document.querySelectorAll('#content-rows tr').forEach(tr => {
+    const inputs = tr.querySelectorAll('input, select');
+    if (inputs.length < 4) return;
+    const n = inputs[0].value.trim();
+    if (!n) return;
+    const descSpan = tr.querySelector('.desc-preview');
+    content.push({name:n, show_label:inputs[1].checked, desc:descSpan ? (descSpan.dataset.fullDesc || '') : '', type:inputs[2].value, logical_order: inputs[3].value !== '' ? parseInt(inputs[3].value) : null});
   });
   const style = document.getElementById('template-style').value;
+  const logic = document.getElementById('template-logic').value;
   fetch('/api/config').then(r => r.json()).then(cfg => {
     if (!cfg.success) return;
     const templates = Object.assign({}, cfg.config.templates || {});
-    templates[name] = {structure, style};
+    templates[name] = {meta, content, style, logic};
     const userTemplates = Object.assign({}, cfg.config.user_templates || {});
     userTemplates[name] = true;
     fetch('/api/config', {
@@ -2014,34 +2254,45 @@ function saveTemplateAs() {
 }
 
 // ===== 删除自定义模板 =====
+const _delTplPending = {pending: false, name: '', timer: null};
+
 function deleteTemplate() {
+  if (_delTplPending.pending) {
+    // 双击确认
+    const name = _delTplPending.name;
+    clearTimeout(_delTplPending.timer);
+    _delTplPending.pending = false;
+    const btn = document.querySelector('.btn-danger');
+    if (btn) { btn.textContent = '删除'; btn.style.background = '#c0392b'; }
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      if (!cfg.success) return;
+      const userTpls = cfg.config.user_templates || {};
+      if (!userTpls[name]) return;
+      const templates = Object.assign({}, cfg.config.templates || {});
+      delete templates[name];
+      const newUserTpls = Object.assign({}, userTpls);
+      delete newUserTpls[name];
+      fetch('/api/config', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({templates, user_templates: newUserTpls})
+      }).then(r => r.json()).then(d => { if (d.success) loadConfig(); });
+    });
+    return;
+  }
   const sel = document.getElementById('template-select');
   const name = sel.value;
-  // 内置模板不可删
   fetch('/api/config').then(r => r.json()).then(cfg => {
     if (!cfg.success) return;
-    const builtin = Object.keys(cfg.config.templates || {}).filter(k => {
-      const t = cfg.config.templates[k];
-      return !cfg.config.user_templates || !cfg.config.user_templates[k];
-    });
-    // 更准确的判断：看 user_templates 中有无此 name
     const userTpls = cfg.config.user_templates || {};
-    if (!userTpls[name]) {
-      alert('内置模板不能删除');
-      return;
-    }
-    if (!confirm(`确认删除自定义模板「${name}」？`)) return;
-    const templates = Object.assign({}, cfg.config.templates || {});
-    delete templates[name];
-    const newUserTpls = Object.assign({}, userTpls);
-    delete newUserTpls[name];
-    // 如果删除的是当前选中的，切到第一个可用模板
-    fetch('/api/config', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({templates, user_templates: newUserTpls})
-    }).then(r => r.json()).then(d => {
-      if (d.success) { loadConfig(); }
-    });
+    if (!userTpls[name]) return;
+    const btn = document.querySelector('.btn-danger');
+    if (btn) { btn.textContent = '确认?'; btn.style.background = '#e74c3c'; btn.style.color = '#fff'; }
+    _delTplPending.pending = true;
+    _delTplPending.name = name;
+    _delTplPending.timer = setTimeout(() => {
+      _delTplPending.pending = false;
+      if (btn) { btn.textContent = '删除'; btn.style.background = '#c0392b'; btn.style.color = '#fff'; }
+    }, 2500);
   });
 }
 
@@ -2067,12 +2318,12 @@ function generateTemplate() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({description: desc, name: nameInput || undefined})
   }).then(r => r.json()).then(d => {
-    if (d.success && d.template && d.template.structure) {
+    if (d.success && d.template && (d.template.meta || d.template.content)) {
       const templateName = d.template.name || nameInput || '自定义模板';
       fetch('/api/config').then(r => r.json()).then(cfg => {
         if (!cfg.success) return;
         const templates = Object.assign({}, cfg.config.templates || {});
-        templates[templateName] = {structure: d.template.structure, style: d.template.style || ''};
+        templates[templateName] = {meta: d.template.meta || [], content: d.template.content || [], style: d.template.style || '', logic: d.template.logic || ''};
         const userTemplates = Object.assign({}, cfg.config.user_templates || {});
         userTemplates[templateName] = true;
         fetch('/api/config', {
@@ -2537,11 +2788,12 @@ function renderMetaInputs(templateName) {
     if (!d.success) return;
     const templates = d.config.templates || {};
     const tmpl = templates[templateName] || {};
-    if (typeof tmpl !== 'object' || !tmpl.structure) {
+    const metaFields = tmpl.meta || [];
+    if (!metaFields.length) {
       bar.style.display = 'none';
       return;
     }
-    const userFields = tmpl.structure.filter(f => f.source === 'user' || f.source === 'auto');
+    const userFields = metaFields.filter(f => f.source === 'user' || f.source === 'auto');
     if (!userFields.length) { bar.style.display = 'none'; return; }
     bar.style.display = '';
     // 使用 grid 布局，每行最多 4 个
@@ -2611,8 +2863,8 @@ function startPlanning(topic) {
     const val = el.value.trim();
     if (val) meta[el.dataset.fieldName] = val;
   });
-  // 如果 topic 有值但 meta 中无标题，补一个
-  if (topic && !meta['标题']) meta['标题'] = topic;
+  // topic 不作为 meta 注入，让 LLM 根据主题自动生成 auto 字段
+  // 继续保留 topic 本身的上下文
   // 当前选中模板名
   const templateName = document.getElementById('template-select').value;
   fetch('/api/plan', {
@@ -2642,10 +2894,6 @@ function startPlanning(topic) {
 }
 
 // ===== 罗马数字转换 =====
-function toRoman(n) {
-  return ['i','ii','iii','iv','v','vi','vii','viii','ix','x'][n-1] || String(n);
-}
-
 // ===== 交互式大纲渲染 =====
 function renderOutline(outline, readOnly) {
   readOnly = readOnly || false;
@@ -2666,13 +2914,13 @@ function buildOutlineHTML(outline, readOnly) {
     const subCount = subs.length;
     let subHTML = '';
     subs.forEach(ss => {
-      const romOpts = ['', ...Array.from({length: subCount}, (_, i) => toRoman(i+1))]
-        .map(v => `<option value="${v}" ${ss.id.endsWith('_1') && v==='' ? 'selected' : ''}>${v || '自动'}</option>`).join('');
+      const subOpts = ['', ...Array.from({length: subCount}, (_, i) => `s${i+1}`)]
+        .map(v => `<option value="${v}" ${ss.id.endsWith('_1') && v==='' ? 'selected' : ''}>${v === '' ? '自动' : v}</option>`).join('');
       subHTML += `
         <div class="sub-card" data-sid="${ss.id}" style="margin-left:24px;padding:4px 8px;border-left:2px solid var(--border);margin-bottom:4px;">
           <div style="display:flex;align-items:center;gap:8px;">
             ${readOnly ? '' : `<input type="checkbox" class="sc-sub-cb" ${ss._checked !== false ? 'checked' : ''} onchange="onSubToggle(this, '${s.id}')">`}
-            ${readOnly ? '' : `<select class="sc-sub-order" style="width:48px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" onchange="collectOutlineData()">${romOpts}</select>`}
+            ${readOnly ? '' : `<select class="sc-sub-order" style="width:48px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" onchange="collectOutlineData()">${subOpts}</select>`}
             <span style="font-size:13px;flex:1;color:var(--text-dim)">${ss.title}</span>
             ${readOnly ? '' : `<input type="number" class="sub-words" value="${ss.word_count || 400}" style="width:58px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" min="100" max="2000" onchange="onSubWordChange(this, '${ss.id}', '${s.id}')"><span style="font-size:11px;color:var(--text-dim)">字</span>`}
             ${readOnly ? `<span style="font-size:11px;color:var(--text-dim)">${ss.word_count || ''}字</span>` : ''}
@@ -2692,7 +2940,9 @@ function buildOutlineHTML(outline, readOnly) {
           ${readOnly ? `<span style="font-size:12px;color:var(--text-dim)">${s.status === 'done' ? s.actual_word_count + '字' : (s.status === 'in_progress' ? '写作中...' : '')}</span>` : ''}
           ${readOnly ? '' : `<label style="font-size:12px;color:var(--sc-key);cursor:pointer"><input type="checkbox" class="sc-key-cb" ${s.is_key ? 'checked' : ''} onchange="collectOutlineData()"> ⭐重点</label>`}
           ${readOnly ? '' : `<select class="sc-order" onchange="collectOutlineData()">${orderOpts}</select>`}
-          ${readOnly ? '' : `<span class="sec-word-sum" data-sid="${s.id}" style="font-size:13px;color:var(--text-dim)">${s.word_count}</span><span style="font-size:13px;color:var(--text-dim)">字</span>`}
+          ${readOnly ? '' : (s.type === 'leaf'
+            ? `<input type="number" class="sec-word-input" data-sid="${s.id}" value="${s.word_count || 800}" style="width:58px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" min="50" max="5000" onchange="onLeafWordChange(this, '${s.id}')"><span style="font-size:13px;color:var(--text-dim)">字</span>`
+            : `<span class="sec-word-sum" data-sid="${s.id}" style="font-size:13px;color:var(--text-dim)">${s.word_count}</span><span style="font-size:13px;color:var(--text-dim)">字</span>`)}
           ${readOnly ? '' : `<label class="sc-rag"><input type="checkbox" class="sc-rag-cb" onchange="onRagToggle(this, '${s.id}')" ${!ragOnline ? 'disabled title="RAG未连接"' : ''}> RAG</label>` + (ragOnline && Array.isArray(ragKbs) ? `<select class="sc-kb" style="display:none;width:120px;font-size:12px" onchange="collectOutlineData()">${'<option value=\"\">自动KB</option>' + ragKbs.map(k => '<option value=\"' + k + '\">' + k + '</option>').join('')}</select>` : '')}
         </div>
         ${readOnly ? '' : subHTML}
@@ -2910,8 +3160,9 @@ function getOutlineData() {
   const rag = {};
   const keySections = {};
   const checked = {};  // {sectionId: bool, subId: bool}
-  const subOrders = {}; // {subId: roman_str}
+  const subOrders = {}; // {subId: int}
   const subWords = {}; // {subId: word_count}
+  const secWords = {}; // {sectionId: word_count} for leaf sections
   const auxKnowledge = currentOutline ? collectAuxKnowledge() : {};
   card.querySelectorAll('.section-card').forEach(sc => {
     const sid = sc.dataset.sid;
@@ -2935,8 +3186,11 @@ function getOutlineData() {
       const subWord = sub.querySelector('.sub-words')?.value;
       if (subWord) subWords[sub.dataset.sid] = parseInt(subWord) || 400;
     });
+    // leaf 节字数（允许 0 = 不做字数限制）
+    const secWord = sc.querySelector('.sec-word-input')?.value;
+    if (secWord !== undefined && secWord !== '') secWords[sid] = parseInt(secWord) || 0;
   });
-  return {orders, rag, keySections, checked, subOrders, subWords, auxKnowledge};
+  return {orders, rag, keySections, checked, subOrders, subWords, secWords, auxKnowledge};
 }
 
 function startGeneration() {
@@ -2961,6 +3215,7 @@ function startGeneration() {
       checked: data?.checked || {},
       sub_orders: data?.subOrders || {},
       sub_words: data?.subWords || {},
+      sec_words: data?.secWords || {},
       aux_knowledge: data?.auxKnowledge || {}
     })
   }).then(r => r.json()).then(d => {
@@ -2998,7 +3253,6 @@ function startAutoGeneration() {
       const val = el.value.trim();
       if (val) meta[el.dataset.fieldName] = val;
     });
-    if (text && !meta['标题']) meta['标题'] = text;
     const templateName = document.getElementById('template-select').value;
     fetch('/api/plan', {
       method: 'POST',
@@ -3105,8 +3359,51 @@ function startBatchPolling(batchId, totalCount) {
 }
 
 function replanOutline() {
+  document.getElementById('replan-hints').value = '';
+  document.getElementById('replan-modal-status').textContent = '';
+  document.getElementById('replan-modal').classList.add('show');
+}
+
+function onLeafWordChange(input, sid) {
+  const val = parseInt(input.value);
+  if (isNaN(val)) return;
+  if (!currentOutline) return;
+  const sec = (currentOutline.sections || []).find(s => s.id === sid);
+  if (sec) { sec.word_count = val; }
+  collectOutlineData();
+}
+
+function closeReplanModal() {
+  document.getElementById('replan-modal').classList.remove('show');
+}
+
+function confirmReplan() {
+  const hints = document.getElementById('replan-hints').value.trim();
+  closeReplanModal();
   const topic = currentOutline?.title || '';
-  if (topic) startPlanning(topic);
+  if (!topic) return;
+  addAssistantMsg(hints ? '⏳ 正在按新要求重新规划...' : '⏳ 正在重新规划...');
+  const meta = {};
+  document.querySelectorAll('#meta-inputs-container .meta-field-input').forEach(el => {
+    const val = el.value.trim();
+    if (val) meta[el.dataset.fieldName] = val;
+  });
+  const templateName = document.getElementById('template-select').value;
+  fetch('/api/plan', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({topic, session_id: currentSessionId, template_name: templateName, meta, plan_hints: hints})
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      currentSessionId = d.session_id;
+      currentOutline = d.outline;
+      renderOutline(d.outline);
+      loadSessions();
+    } else {
+      addAssistantMsg('❌ 重新规划失败：' + (d.error || ''));
+    }
+  }).catch(err => {
+    addAssistantMsg('❌ 请求失败：' + err.message);
+  });
 }
 
 function showFileContent(filepath) {

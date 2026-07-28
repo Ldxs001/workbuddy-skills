@@ -1,17 +1,25 @@
 """串行写作器 — 逐节写作 + context_loader + .md 输出"""
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from .llm_client import LLMClient, LLMClientError
 from .state_manager import StateManager, OUTPUTS_DIR
 
+# 写入异常日志到 writer_error.log
+_logger = logging.getLogger("writer")
+_logger.setLevel(logging.ERROR)
+_fh = logging.FileHandler("writer_error.log", mode="a", encoding="utf-8")
+_fh.setFormatter(logging.Formatter("%(asctime)s [ERROR] %(message)s"))
+_logger.addHandler(_fh)
+
 WRITER_SYSTEM_PROMPT = """你是一个结构化文章写作助手。
 请根据提供的主题、大纲、前文上下文和参考资料，写出指定节的内容。
 
 要求：
 - 只输出正文（Markdown 格式），不要额外说明、不要元数据
-- 语言风格：客观、专业、逻辑清晰
+- ��言风格：客观、专业、逻辑清晰
 - 字数要求：尽量接近指定的字数
 - 与前文保持逻辑连贯
 """
@@ -26,7 +34,9 @@ def _build_context_section_prompt(
     is_key: bool,
     context_buffer: str,
     rag_context: Optional[str],
-    aux_text: Optional[str] = None
+    aux_text: Optional[str] = None,
+    logic_hint: str = "",
+    style_hint: str = ""
 ) -> str:
     """构建单节写作 prompt"""
     blocks = []
@@ -34,10 +44,19 @@ def _build_context_section_prompt(
     blocks.append(f"# 文章主题\n\n{topic}")
     blocks.append(f"# 正写作的子结构\n\n### {section_title}\n{subtitle if (subtitle := section_subtitle) else ''}")
 
-    word_note = f"字数要求：约 {word_count} 字"
-    if is_key:
-        word_note += "（重点节，可上浮 50%）"
-    blocks.append(word_note)
+    if logic_hint:
+        blocks.append(f"写作阶段提示：{logic_hint}")
+
+    if style_hint:
+        blocks.append(f"写作风格要求：{style_hint}")
+
+    if word_count > 0:
+        word_note = f"字数要求：约 {word_count} 字"
+        if is_key:
+            word_note += "（重点节，可上浮 50%）"
+        blocks.append(word_note)
+    else:
+        blocks.append("字数不限：根据写作要点自由发挥，该节必须输出有效内容，不得留空")
 
     blocks.append(f"写作要点：\n{section_summary}")
 
@@ -63,8 +82,8 @@ def generate_article(
     state_mgr: StateManager,
     rag_client=None,
     aux_knowledge: Optional[dict] = None,
-    context_review_length: int = 800,
     fact_check_enabled: bool = False,
+    context_review_length: int = 0,
     stop_check=None,
     template: Optional[dict] = None
 ) -> tuple[str, str]:
@@ -72,32 +91,43 @@ def generate_article(
     逐节串行写作，返回 (md_content, output_filepath)
 
     参数:
-        outline: 大纲字典 {title, sections: [...]}
+        outline: 大纲字典 {title, meta, sections: [...]}
         user_orders: {section_id: order_number}
         rag_options: {section_id: {enabled: bool, kb: str}}
         llm_client: LLM 写作客户端
         state_mgr: 状态管理器
         rag_client: 可选的 RAG 客户端
-        template: {structure: [五元组], style: "..."} 用于 meta 渲染
+        template: {meta: [...], content: [...], style: "...", logic: "..."}
     """
     sections = outline.get("sections", [])
     title = outline.get("title", "未命名文章")
-    structure = (template or {}).get("structure", [])
+    meta_fields = (template or {}).get("meta", [])
+    logic_prompt = (template or {}).get("logic", "")
+    style_prompt = (template or {}).get("style", "")
 
-    # 按用户排序排列
+    # ── 写作顺序 vs 输出顺序 ──
+    # 写作按逻辑顺序，不设_logical_order 的节按 content[] 顺序
+    # 输出按 content[]/用户调整后的顺序重排
     if user_orders:
-        def sort_key(s):
-            return user_orders.get(s["id"], 999)
-        sections = sorted(sections, key=sort_key)
+        output_order = sorted(sections, key=lambda s: user_orders.get(s["id"], 999))
+    else:
+        content_fields = (template or {}).get("content", [])
+        content_order = {cf["name"]: i for i, cf in enumerate(content_fields)}
+        output_order = sorted(sections, key=lambda s: content_order.get(s.get("title", ""), 999))
+
+    # 只有模板设置了 logical_order 时才重排写入顺序
+    has_logic = any(s.get("_logical_order") is not None for s in sections)
+    if has_logic:
+        sections = sorted(sections, key=lambda s: s.get("_logical_order") or 0)
+    else:
+        # 按输出顺序写（没设逻辑顺序时写=输出）
+        sections = list(output_order)
 
     state_mgr.set_phase("writing")
 
     context_buffer = ""
-    all_parts = []
-    sub_fact_notes = []  # 每个子结构的自检记录
-
-    # 标记是否已找到第一个 leaf（用于 # 标题渲染）
-    _first_leaf_rendered = False
+    parts_by_sid = {}
+    sub_fact_notes = []
 
     for i, section in enumerate(sections):
         sid = section["id"]
@@ -121,10 +151,9 @@ def generate_article(
         kb = rag_opt.get("kb", "")
 
         section_rag_context = None
-        sub_rag_contexts = {}  # {sub_id: context_text}
+        sub_rag_contexts = {}
 
         if rag_enabled:
-            # 节级别 RAG（背景资料）
             state_mgr.set_status_text(f"RAG查询: {kb or '自动'} → {section['title']}（整节背景）")
             try:
                 q = f"{title} {section['title']} {section['summary']}"
@@ -139,7 +168,6 @@ def generate_article(
             except Exception as e:
                 state_mgr.set_status_text(f"RAG超时: {kb or '自动'} → {section['title']}")
 
-            # 子结构级别 RAG（针对性资料）
             for sub in subs:
                 ssid = sub["id"]
                 state_mgr.set_status_text(f"RAG查询: {kb or '自动'} → {sub['title']}")
@@ -156,20 +184,21 @@ def generate_article(
                 except Exception as e:
                     state_mgr.set_status_text(f"RAG超时: {kb or '自动'} → {sub['title']}")
 
-        # 写入节标题（第一个 leaf → #，其他 → ##）
+        # 写入节标题
+        # 所有内容树节统一用 ## 级别（# 已用于文章标题）
+        # show_label 控制是否显示标题行，false 且有内容时纯内容，false 且空时跳过
+        sec_show_label = section["show_label"]
         wrote_any = False
 
-        if s_type == "leaf" and not _first_leaf_rendered:
-            _first_leaf_rendered = True
-            section_md = f"\n\n# {section['title']}\n\n"
-        else:
+        if sec_show_label:
             section_md = f"\n\n## {section['title']}\n\n"
-        if section.get("subtitle"):
-            section_md += f"*{section['subtitle']}*\n\n"
+            if section.get("subtitle"):
+                section_md += f"*{section['subtitle']}*\n\n"
+        else:
+            section_md = ""
 
         if s_type == "leaf":
-            # leaf 类型：无子结构，一个调用写全部内容
-            # 构建一个单次写作调用
+            # leaf 节：直接写
             prompt = _build_context_section_prompt(
                 topic=title,
                 section_title=section["title"],
@@ -177,9 +206,11 @@ def generate_article(
                 section_summary=section.get("summary", ""),
                 word_count=section.get("word_count", 800),
                 is_key=section.get("is_key", False),
-                context_buffer=context_buffer[-context_review_length:] if context_buffer else "",
+                context_buffer=(context_buffer or "") if section.get("_logical_order") == 2 else (context_buffer[-context_review_length:] if context_buffer and context_review_length else (context_buffer or "")),
                 rag_context=None,
-                aux_text=None
+                aux_text=None,
+                logic_hint=logic_prompt,
+                style_hint=style_prompt
             )
             messages = [
                 {"role": "system", "content": WRITER_SYSTEM_PROMPT},
@@ -210,14 +241,22 @@ def generate_article(
                 context_buffer += content
                 actual_chars = len(content.replace(" ", "").replace("\n", ""))
                 state_mgr.update_section(sid, {"status": "done", "actual_word_count": actual_chars})
-            continue  # 跳过子结构循环
+            # 同步设置 parts_by_sid：leaf 走特殊路径，必须在这里处理
+            if wrote_any:
+                parts_by_sid[sid] = section_md
+            elif section["show_label"]:
+                parts_by_sid[sid] = f"\n\n## {section['title']}\n\n"
+            # show_label=false + 空 → 不写入
+            state_mgr.update_section(sid, {
+                "status": "done" if wrote_any else "pending",
+                "actual_word_count": len(section_md.replace(" ", "").replace("\n", "")) if wrote_any else 0
+            })
+            continue
 
         for j, sub in enumerate(subs):
-            # 停止检测：延时停止检查点（子结构边界）
             if stop_check:
                 st = stop_check()
                 if st == "immediate":
-                    # 立即停止：跳过当前及后续子结构
                     state_mgr.set_status_text(f"已停止: {sub['title']}（立即停止）")
                     break
                 elif st == "delay":
@@ -226,13 +265,10 @@ def generate_article(
             state_mgr.update_section(ssid, {"status": "in_progress"})
             state_mgr.set_status_text(f"写作中: {sub['title']}")
 
-            # 构建 context prompt（两级 RAG 上下文）
-            ctx_buffer = context_buffer[-context_review_length:] if context_buffer else ""
+            ctx_buffer = context_buffer[-context_review_length:] if context_buffer and context_review_length > 0 else (context_buffer or "")
 
-            # 拼装本子结构的 RAG 上下文
             sub_rag = sub_rag_contexts.get(ssid, section_rag_context)
             if sub_rag and section_rag_context and sub_rag != section_rag_context:
-                # 两个都有且不同 → 分背景+针对性
                 combined_rag = (
                     f"【背景资料】（本节整体相关）\n{section_rag_context}\n\n"
                     f"---\n\n"
@@ -241,9 +277,8 @@ def generate_article(
             elif sub_rag:
                 combined_rag = sub_rag
             else:
-                combined_rag = section_rag_context  # 可能 None
+                combined_rag = section_rag_context
 
-            # 提取当前子结构的辅助知识文本
             sub_aux = None
             if aux_knowledge:
                 ak = aux_knowledge.get(ssid, {}) or {}
@@ -266,14 +301,15 @@ def generate_article(
                 is_key=section.get("is_key", False),
                 context_buffer=ctx_buffer,
                 rag_context=combined_rag,
-                aux_text=sub_aux
+                aux_text=sub_aux,
+                logic_hint=logic_prompt,
+                style_hint=style_prompt
             )
 
             messages = [
                 {"role": "system", "content": WRITER_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ]
-            # 启用自检时，在写作指令末尾追加标记要求
             if fact_check_enabled:
                 messages[1]["content"] += (
                     "\n\n写完后，在末尾另起一行用「【事实待核查】」标注本节中你"
@@ -284,8 +320,7 @@ def generate_article(
             try:
                 accumulated = ""
                 cont_messages = messages.copy()
-                for attempt in range(6):  # 首次 + 最多 5 次续写
-                    # 停止检测：立即停止检查点（续写边界）
+                for attempt in range(6):
                     if stop_check and stop_check() == "immediate":
                         state_mgr.set_status_text("已停止（立即停止）")
                         break
@@ -299,14 +334,9 @@ def generate_article(
                     accumulated += chunk
 
                     if finish_reason != "length":
-                        break  # 写完了
-
-                    # content 为空却被截断 → 推理吃光了 token，没有可续的内容
-                    # 续写也救不了，直接放弃
+                        break
                     if not chunk.strip():
                         break
-
-                    # token 用完被截断 → 追加续写指令
                     cont_messages.append({
                         "role": "assistant",
                         "content": chunk
@@ -320,11 +350,9 @@ def generate_article(
 
             content = accumulated.strip()
 
-            # 跳过空内容（推理模型吃光 token 导致 content=""）
             if not content:
                 continue
 
-            # 解析自检标记：将「【事实待核查】」后的内容提取到 sub_fact_notes
             if fact_check_enabled and "【事实待核查】" in content:
                 parts = content.split("【事实待核查】", 1)
                 content = parts[0].strip()
@@ -333,8 +361,6 @@ def generate_article(
                     sub_fact_notes.append(f"{sub['title']}: {marker[:200]}")
 
             wrote_any = True
-
-            # 子结构标题
             sub_md = f"### {sub['title']}\n\n{content}\n"
 
             section_md += sub_md
@@ -346,8 +372,12 @@ def generate_article(
                 "actual_word_count": actual_chars
             })
 
+        # show_label 控制空节处理：true=保留标题，false=彻底跳过
         if wrote_any:
-            all_parts.append(section_md)
+            parts_by_sid[sid] = section_md
+        elif sec_show_label:
+            parts_by_sid[sid] = f"\n\n## {section['title']}\n\n"
+        # show_label=false + 空 → 不加入 parts_by_sid，输出时跳过
 
         actual_chars = len(section_md.replace(" ", "").replace("\n", "")) if wrote_any else 0
         state_mgr.update_section(sid, {
@@ -355,21 +385,22 @@ def generate_article(
             "actual_word_count": actual_chars
         })
 
-    # 合并全文
-    # ── meta 块渲染（根据 structure 五元组的 show_label） ──
+    # ── meta 块渲染 ──
+    # show_label=true → 显示标签（无论是否有值）
+    # show_label=false → 无标签，有值才渲染，没值跳过
     meta_lines = []
-    for field in structure:
+    for field in meta_fields:
         fname = field["name"]
-        v = outline.get("meta", {}).get(fname)
-        if not v:
-            continue
-        if field.get("show_label", True):
-            meta_lines.append(f"> {fname}：{v}")
-        else:
+        v = outline.get("meta", {}).get(fname, "")
+        show = field.get("show_label", True)
+        if show:
+            meta_lines.append(f"> {fname}：{v}" if v else f"> {fname}：")
+        elif v:
             meta_lines.append(f"> {v}")
     meta_block = "\n".join(meta_lines) + "\n\n" if meta_lines else ""
 
-    article_md = f"# {title}\n{meta_block}" + "".join(all_parts)
+    # 按输出顺序重排（逻辑写完了，按 content[]/用户顺序输出）
+    article_md = f"# {title}\n{meta_block}" + "".join(parts_by_sid[s["id"]] for s in output_order if s["id"] in parts_by_sid)
 
     # 去掉开头的多余空行
     article_md = article_md.strip()

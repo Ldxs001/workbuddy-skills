@@ -15,457 +15,480 @@
     "max_tokens": 81920,
     "temperature": 0.7
   },
-  "selected_template": "日常写作",
-  "new_template_format": true,
+  "selected_template": "test",
+  "new_template_format": false,
   "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
   "templates": {
     "日常写作": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "文章标题，简明扼要",
-          "source": "auto",
-          "type": "leaf"
-        },
+          "source": "auto"
+        }
+      ],
+      "content": [
         {
           "name": "正文",
           "show_label": false,
           "desc": "文章主体内容，按逻辑拆分为多个子节展开",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "结尾",
           "show_label": false,
           "desc": "总结收束全文",
-          "source": "llm",
-          "type": "section"
+          "type": "section",
+          "logical_order": 1
         }
       ],
-      "style": "请以正式、客观、条理清晰的风格撰写。使用Markdown格式，各级标题用 #/##/###。"
+      "style": "请以正式、客观、条理清晰的风格撰写。使用Markdown格式，各级标题用 #/##/###。",
+      "logic": "直接按正文→结尾的顺序依次写作。"
     },
     "学术论文": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "文章标题简明准确",
-          "source": "auto",
-          "type": "leaf"
+          "source": "auto"
         },
         {
           "name": "作者",
           "show_label": true,
           "desc": "作者真实姓名，多人用逗号分隔",
-          "source": "user",
-          "type": "leaf"
+          "source": "user"
         },
         {
           "name": "单位",
           "show_label": true,
           "desc": "作者所属机构",
-          "source": "user",
-          "type": "leaf"
-        },
+          "source": "user"
+        }
+      ],
+      "content": [
         {
           "name": "关键词",
           "show_label": true,
           "desc": "3-5个反映主题的关键词",
-          "source": "llm",
-          "type": "leaf"
+          "type": "leaf",
+          "logical_order": 2
         },
         {
           "name": "摘要",
-          "show_label": false,
+          "show_label": true,
           "desc": "概括全文核心论点200-300字",
-          "source": "llm",
-          "type": "leaf"
+          "type": "leaf",
+          "logical_order": 2
         },
         {
           "name": "引言",
-          "show_label": false,
+          "show_label": true,
           "desc": "研究背景和问题提出",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "正文",
           "show_label": false,
           "desc": "核心论述详细展开，可含多级子标题 ####/#####",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "结论",
-          "show_label": false,
+          "show_label": true,
           "desc": "总结与展望",
-          "source": "llm",
-          "type": "section"
+          "type": "section",
+          "logical_order": 1
         },
         {
           "name": "参考文献",
-          "show_label": false,
-          "desc": "以[1][2]格式单行列举引用文献",
-          "source": "llm",
-          "type": "leaf"
+          "show_label": true,
+          "desc": "按引用顺序列出正文中实际引用的文献，每篇对应一个正文引用编号[1][2]...只列出已被引用的文献。\n每条约式：作者. 标题[J]. 期刊名, 年, 卷(期): 起止页码. 未在正文出现的编号不要列出。",
+          "type": "leaf",
+          "logical_order": 2
         }
       ],
-      "style": "请以学术论文风格撰写。要求逻辑严密，论证充分，引用规范，语言学术化。使用Markdown格式。"
+      "style": "请以学术论文风格撰写。要求逻辑严密，论证充分，语言学术化，使用Markdown格式。\n\n【引用规则】\n1. 正文引用：在正文中以 [1][2] 格式标注引用编号\n2. 参考文献格式：作者. 标题[J]. 期刊名, 年, 卷(期): 起止页码.\n3. 仅在有 RAG 提供资料时进行引用标注；RAG 未开启或无相关文献时，正文不做引用标注，参考文献节留空\n4. 引用一致性：文末参考文献必须与正文引用编号一一对应。正文未出现的文献编号不得出现在参考文献节中。",
+      "logic": "先写引言和正文各节，再写结论，最后提取关键词和摘要。参考文献在写作过程中交叉引用，最后统一格式化。"
     },
     "正式公文": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "公文标题",
-          "source": "auto",
-          "type": "leaf"
+          "source": "auto"
         },
         {
           "name": "发文机关",
           "show_label": true,
           "desc": "发文单位名称",
-          "source": "user",
-          "type": "leaf"
+          "source": "user"
         },
         {
           "name": "文号",
           "show_label": true,
           "desc": "公文编号如〔2026〕12号",
-          "source": "user",
-          "type": "leaf"
+          "source": "user"
         },
         {
           "name": "密级",
           "show_label": true,
           "desc": "绝密/机密/秘密/内部",
-          "source": "user",
-          "type": "leaf"
+          "source": "user"
         },
+        {
+          "name": "抄送",
+          "show_label": true,
+          "desc": "抄送单位列表",
+          "source": "user"
+        }
+      ],
+      "content": [
         {
           "name": "前言",
           "show_label": false,
           "desc": "说明背景和目的",
-          "source": "llm",
           "type": "leaf"
         },
         {
           "name": "主体",
           "show_label": false,
           "desc": "分条列举事项和要求，可含多级标题",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "执行要求",
           "show_label": false,
           "desc": "结尾提出执行要求",
-          "source": "llm",
-          "type": "leaf"
-        },
-        {
-          "name": "抄送",
-          "show_label": true,
-          "desc": "抄送单位列表",
-          "source": "user",
-          "type": "leaf"
+          "type": "leaf",
+          "logical_order": 1
         }
       ],
-      "style": "请以正式公文格式撰写。语言简洁庄重，条理清晰，使用Markdown格式。"
+      "style": "请以正式公文格式撰写。语言简洁庄重，条理清晰，使用Markdown格式。",
+      "logic": "先写前言和主体条款，再写执行要求，最后确认文号、密级、抄送等元数据。"
     },
     "新闻报道": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "新闻标题吸引眼球",
-          "source": "auto",
-          "type": "leaf"
+          "source": "auto"
         },
         {
           "name": "作者",
           "show_label": true,
           "desc": "记者/通讯员姓名",
-          "source": "user",
-          "type": "leaf"
-        },
+          "source": "user"
+        }
+      ],
+      "content": [
         {
           "name": "导语",
           "show_label": false,
           "desc": "概括5W1H(时间地点人物事件原因方式)",
-          "source": "llm",
           "type": "leaf"
         },
         {
           "name": "正文",
           "show_label": false,
           "desc": "按重要性递减展开细节",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "背景",
           "show_label": false,
           "desc": "补充背景信息",
-          "source": "llm",
-          "type": "leaf"
+          "type": "leaf",
+          "logical_order": 1
         }
       ],
-      "style": "请以新闻写作风格撰写。倒金字塔结构，语言客观中立，引用需注明来源。使用Markdown格式。"
+      "style": "请以新闻写作风格撰写。倒金字塔结构，语言客观中立，引用需注明来源。使用Markdown格式。",
+      "logic": "按导语→正文→背景的顺序逐节写作，正文部分按重要性递减展开。"
     },
     "技术报告": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "技术报告标题",
-          "source": "auto",
-          "type": "leaf"
+          "source": "auto"
         },
         {
           "name": "作者",
           "show_label": true,
           "desc": "报告撰写人姓名",
-          "source": "user",
-          "type": "leaf"
+          "source": "user"
         },
         {
           "name": "版本号",
           "show_label": true,
           "desc": "当前版本号如 v1.0",
-          "source": "user",
-          "type": "leaf"
-        },
+          "source": "user"
+        }
+      ],
+      "content": [
         {
           "name": "背景",
           "show_label": false,
           "desc": "项目背景和问题说明",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "技术方案",
           "show_label": false,
           "desc": "详细技术方案和架构描述",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "关键数据",
           "show_label": false,
           "desc": "关键数据与指标分析",
-          "source": "llm",
-          "type": "section"
+          "type": "section",
+          "logical_order": 1
         },
         {
           "name": "下一步计划",
           "show_label": false,
           "desc": "后续工作规划",
-          "source": "llm",
-          "type": "leaf"
+          "type": "leaf",
+          "logical_order": 2
         }
       ],
-      "style": "请以技术报告风格撰写。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。"
+      "style": "请以技术报告风格撰写。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
+      "logic": "先写背景和技术方案，再写关键数据和对比分析，最后写结论和下一步计划。"
     },
     "通用公文": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "公文标题",
-          "source": "auto",
-          "type": "leaf"
-        },
+          "source": "auto"
+        }
+      ],
+      "content": [
         {
           "name": "正文",
           "show_label": false,
           "desc": "正文分条列举",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "结尾",
           "show_label": false,
           "desc": "提出执行要求",
-          "source": "llm",
-          "type": "section"
+          "type": "section",
+          "logical_order": 1
         }
       ],
-      "style": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。"
+      "style": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+      "logic": "按正文→结尾的顺序依次写作，正文中分条列举事项和要求。"
     },
     "论文综述": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "论文标题简明准确",
-          "source": "auto",
-          "type": "leaf"
+          "source": "auto"
         },
         {
           "name": "作者",
           "show_label": true,
           "desc": "作者姓名",
-          "source": "user",
-          "type": "leaf"
-        },
+          "source": "user"
+        }
+      ],
+      "content": [
         {
           "name": "摘要",
-          "show_label": false,
+          "show_label": true,
           "desc": "概括全文核心论点",
-          "source": "llm",
-          "type": "leaf"
+          "type": "leaf",
+          "logical_order": 2
         },
         {
           "name": "正文",
           "show_label": false,
           "desc": "分论点逐层论述",
-          "source": "llm",
           "type": "section"
         },
         {
           "name": "参考文献",
-          "show_label": false,
-          "desc": "引用文献",
-          "source": "llm",
-          "type": "leaf"
+          "show_label": true,
+          "desc": "按引用顺序列出正文中实际引用的文献，每篇对应一个正文引用编号[1][2]...只列出已被引用的文献。\n每条约式：作者. 标题[J]. 期刊名, 年, 卷(期): 起止页码. 未在正文出现的编号不要列出。",
+          "type": "leaf",
+          "logical_order": 2
         }
       ],
-      "style": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。"
+      "style": "请以学术论文风格撰写。要求逻辑严密，论证充分，语言学术化，使用Markdown格式。\n\n【引用规则】\n1. 正文引用：在正文中以 [1][2] 格式标注引用编号\n2. 参考文献格式：作者. 标题[J]. 期刊名, 年, 卷(期): 起止页码.\n3. 仅在有 RAG 提供资料时进行引用标注；RAG 未开启或无相关文献时，正文不做引用标注，参考文献节留空\n4. 引用一致性：文末参考文献必须与正文引用编号一一对应。正文未出现的文献编号不得出现在参考文献节中。",
+      "logic": "先写正文各节分论点论述，再写摘要和参考文献。"
     },
     "自定义": {
-      "structure": [
+      "meta": [
         {
           "name": "标题",
           "show_label": false,
           "desc": "文章标题",
-          "source": "auto",
-          "type": "leaf"
-        },
+          "source": "auto"
+        }
+      ],
+      "content": [
         {
           "name": "正文",
           "show_label": false,
           "desc": "文章主体",
-          "source": "llm",
           "type": "section"
         }
       ],
-      "style": ""
+      "style": "",
+      "logic": ""
     },
-    "类法律文书": {
-      "structure": [
+    "法律文书模板": {
+      "meta": [
         {
-          "name": "文书标题",
+          "name": "标题",
           "show_label": true,
-          "desc": "文档的具体名称，如《民事判决书》、《法律意见书》，由 LLM 根据内容自动生成或用户指定。",
-          "source": "auto",
-          "type": "leaf"
+          "desc": "案件或文书名称",
+          "source": "auto"
         },
         {
           "name": "案号/文号",
           "show_label": true,
-          "desc": "官方发布的唯一标识编号，必须由用户填写以确保准确性。",
-          "source": "user",
-          "type": "leaf"
+          "desc": "官方编号标识",
+          "source": "user"
         },
         {
           "name": "当事人信息",
           "show_label": true,
-          "desc": "案件相关方的身份信息，需包含原告与被告的详细资料。",
-          "source": "user",
+          "desc": "原告、被告或其他当事人基本信息",
+          "source": "user"
+        },
+        {
+          "name": "文书日期",
+          "show_label": true,
+          "desc": "签发或作出日期",
+          "source": "auto"
+        }
+      ],
+      "content": [
+        {
+          "name": "摘要/概要",
+          "show_label": true,
+          "desc": "全文核心结论与要点的精炼概括，200-300字",
+          "type": "leaf",
+          "logical_order": 2
+        },
+        {
+          "name": "引言/前言",
+          "show_label": true,
+          "desc": "案件背景、争议焦点、文书目的说明",
           "type": "section"
-        },
-        {
-          "name": "原告详情",
-          "show_label": true,
-          "desc": "填写原告的姓名/名称、身份证号/统一社会信用代码及联系方式。",
-          "source": "user",
-          "type": "leaf"
-        },
-        {
-          "name": "被告详情",
-          "show_label": true,
-          "desc": "填写被告的姓名/名称、身份信息及送达地址等关键资料。",
-          "source": "user",
-          "type": "leaf"
-        },
-        {
-          "name": "引言背景",
-          "show_label": true,
-          "desc": "案件的基本起因与诉讼主张，用于开篇明确争议焦点。",
-          "source": "auto",
-          "type": "section"
-        },
-        {
-          "name": "案情背景",
-          "show_label": false,
-          "desc": "简述纠纷发生的时间、地点及基本经过，为后续分析铺垫。",
-          "source": "auto",
-          "type": "leaf"
-        },
-        {
-          "name": "诉讼请求",
-          "show_label": false,
-          "desc": "明确列出原告希望法院支持的具体请求事项（如赔偿金额）。",
-          "source": "auto",
-          "type": "leaf"
         },
         {
           "name": "事实认定",
           "show_label": true,
-          "desc": "基于证据对案件客观事实的确认，需逻辑严密、依据充分。",
-          "source": "llm",
+          "desc": "经审理查明的事实，按时间或逻辑顺序陈述证据与认定结果",
           "type": "section"
         },
         {
-          "name": "证据列举",
-          "show_label": false,
-          "desc": "列出支持事实认定的关键证据名称及证明目的。",
-          "source": "llm",
-          "type": "leaf"
-        },
-        {
-          "name": "关键事实",
-          "show_label": false,
-          "desc": "对争议焦点相关的具体事实进行详细的时间线与行为描述。",
-          "source": "llm",
-          "type": "leaf"
-        },
-        {
-          "name": "法律分析",
+          "name": "法律适用",
           "show_label": true,
-          "desc": "结合法律规定与案件事实进行法理推演，论证责任归属。",
-          "source": "llm",
+          "desc": "引用相关法律法规、司法解释，分析法律要件与案件匹配",
           "type": "section"
         },
         {
-          "name": "引用法条",
-          "show_label": false,
-          "desc": "准确列出适用的法律、法规及司法解释的具体条款内容。",
-          "source": "llm",
-          "type": "leaf"
-        },
-        {
-          "name": "逻辑推演",
-          "show_label": false,
-          "desc": "阐述从事实到结论的推导过程，体现法律适用的合理性。",
-          "source": "llm",
-          "type": "leaf"
-        },
-        {
-          "name": "结论与签署",
+          "name": "结论/裁决",
           "show_label": true,
-          "desc": "最终的处理结果或判决主文，以及落款日期与签名信息。",
-          "source": "llm",
+          "desc": "最终处理意见或判决结果，明确权利义务",
           "type": "section"
+        },
+        {
+          "name": "关键词",
+          "show_label": false,
+          "desc": "3-5个核心法律概念标签，便于检索分类",
+          "type": "leaf",
+          "logical_order": 2
         }
       ],
-      "style": "请使用庄重、客观、严谨的法律文书风格。语言需规范，法言法语准确，逻辑层次分明，避免口语化表达。段落间过渡自然，论证过程严密，确保事实认定与法律适用的一致性。"
+      "style": "正式、严谨、客观的法律文书风格。用语规范准确，避免口语化表达；逻辑严密，因果关系清晰；立场中立，以事实和法律为依据；使用法言法语，引用法律条文需完整准确。",
+      "logic": "引言和正文优先写（事实认定→法律适用→结论），摘要和关键词在全文完成后从成品中提取"
+    },
+    "test": {
+      "meta": [
+        {
+          "name": "标题",
+          "show_label": false,
+          "desc": "文章标题简明准确",
+          "source": "auto"
+        },
+        {
+          "name": "作者",
+          "show_label": true,
+          "desc": "作者真实姓名，多人用逗号分隔",
+          "source": "user"
+        },
+        {
+          "name": "单位",
+          "show_label": true,
+          "desc": "作者所属机构",
+          "source": "user"
+        }
+      ],
+      "content": [
+        {
+          "name": "关键词",
+          "show_label": true,
+          "desc": "3-5个反映主题的关键词",
+          "type": "leaf",
+          "logical_order": 2
+        },
+        {
+          "name": "摘要",
+          "show_label": false,
+          "desc": "概括全文核心论点200-300字",
+          "type": "leaf",
+          "logical_order": 2
+        },
+        {
+          "name": "引言",
+          "show_label": false,
+          "desc": "研究背景和问题提出",
+          "type": "section",
+          "logical_order": 0
+        },
+        {
+          "name": "正文",
+          "show_label": false,
+          "desc": "核心论述详细展开，可含多级子标题 ####/#####",
+          "type": "section",
+          "logical_order": 0
+        },
+        {
+          "name": "结论",
+          "show_label": false,
+          "desc": "总结与展望",
+          "type": "section",
+          "logical_order": 1
+        },
+        {
+          "name": "参考文献",
+          "show_label": false,
+          "desc": "列出正文中引用的文献，按引用顺序编号[1][2]...\n每条约式：作者. 标题[J]. 期刊名, 年, 卷(期): 起止页码.",
+          "type": "leaf",
+          "logical_order": 2
+        }
+      ],
+      "style": "请以学术论文风格撰写。要求逻辑严密，论证充分，语言学术化，使用Markdown格式。\n\n【引用规则】\n1. 正文引用：在正文中以 [1][2] 格式标注引用编号\n2. 参考文献格式：作者. 标题[J]. 期刊名, 年, 卷(期): 起止页码.\n3. 仅在有 RAG 提供资料时进行引用标注；RAG 未开启或无相关文献时，正文不做引用标注，参考文献节留空",
+      "logic": "先写引言和正文各节，再写结论，最后提取关键词和摘要。参考文献在写作过程中交叉引用，最后统一格式化。"
     }
   },
   "user_templates": {
-    "类法律文书": true
+    "法律文书模板": true,
+    "test": true
   },
   "default_prompt": "",
   "context_review_length": 800,

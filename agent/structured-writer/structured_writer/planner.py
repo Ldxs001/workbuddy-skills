@@ -1,21 +1,18 @@
-"""大纲规划器 — 调用 LLM ��成结构化文章大纲"""
+"""大纲规划器 — 调用 LLM 生成结构化文章大纲"""
 import json
 from typing import Optional
 from .llm_client import LLMClient, LLMClientError
 
 
-def _build_planner_prompt(structure: list, user_meta: dict) -> str:
+def _build_planner_prompt(meta: list, content: list, user_meta: dict,
+                          plan_hints: str = "") -> str:
     """
-    根据五元组结构和用户已填信息动态构建 planner system prompt。
-    """
-    # 按 source 分组
-    user_fields = [f for f in structure if f["source"] == "user"]
-    auto_filled = [f for f in structure
-                   if f["source"] == "auto" and user_meta.get(f["name"])]
-    llm_fields = [f for f in structure
-                  if f["source"] == "llm" or
-                  (f["source"] == "auto" and not user_meta.get(f["name"]))]
+    根据 meta+content 结构和用户已填信息动态构建 planner system prompt。
 
+    meta 字段 → 进入 meta{} 对象（短数据，不拆子结构）
+    content 字段 → 进入 sections[] 数组（长文本，leaf/section）
+    plan_hints → 用户对规划的额外要求（章节数、子结构数、字数等）
+    """
     parts = [
         "你是结构化写作规划助手。严格执行以下命令：",
         "",
@@ -24,52 +21,82 @@ def _build_planner_prompt(structure: list, user_meta: dict) -> str:
         "- 禁止 markdown 代码块标记（不要 ```json）。",
         "- 直接以 { 开头，以 } 结尾。",
         "",
-        "【字段列表】（共 {} 个）：".format(len(structure)),
+        "【优先级规则】",
+        "- 用户明确指定的结构要求（章节数、子结构数、字数等）优先于默认值",
+        "- 2-4 个子结构、200-800 字/子结构 这些只是默认值，用户说了就不遵守",
+        "",
+        "【层级边界规则】",
+        "- 内容树只支持 2 级结构：## 章节(section) 和 ### 子节(sub_section)",
+        "- ####/##### 及更深的层次不作为独立结构条目",
+        "- 深层次内容（####+）直接在 ### 子节的正文中作为 Markdown 标题输出",
+        "",
+        "【数据分类】",
+        "- 元数据（短数据：标题、作者、关键词等）→ 放入 meta 对象",
+        "- 内容树（长文本：摘要、引言、正文、结论等）→ 放入 sections 数组",
         "",
     ]
 
-    # 按填写对象分类展示
-    if llm_fields:
-        parts.append("以下字段**必须由你生成**（llm/auto未填）：")
-        parts.append(json.dumps(llm_fields, ensure_ascii=False, indent=2))
-        parts.append("")
-    if auto_filled:
-        parts.append("以下 auto 字段用户已提供，直接抄入 meta（无需生成）：")
-        parts.append(json.dumps(auto_filled, ensure_ascii=False, indent=2))
-        parts.append("")
-    if user_fields:
-        parts.append("以下 user 字段由用户填写，有值则抄入 meta，没值则 meta 中不出现（切勿生成）：")
-        parts.append(json.dumps(user_fields, ensure_ascii=False, indent=2))
+    # 用户规划要求
+    if plan_hints:
+        parts.append("【用户对本次规划的明确要求】")
+        parts.append(plan_hints)
+        parts.append("——以上要求优先于所有默认值，必须严格遵守。")
         parts.append("")
 
-    # user_meta 展示
-    if user_meta:
-        parts.append("用户已提供的值：")
-        parts.append(json.dumps(user_meta, ensure_ascii=False, indent=2))
+    # meta 字段
+    if meta:
+        parts.append(f"【元数据字段（共 {len(meta)} 个）】")
+        parts.append(json.dumps(meta, ensure_ascii=False, indent=2))
+        parts.append("")
+        # 分类展示
+        user_filled = [f for f in meta if f.get("source") == "user"]
+        auto_filled = [f for f in meta if f.get("source") == "auto" and user_meta.get(f["name"])]
+        llm_fields = [f for f in meta if f.get("source") == "llm"]
+        auto_empty = [f for f in meta if f.get("source") == "auto" and not user_meta.get(f["name"])]
+        if user_filled:
+            parts.append("source=user 字段（用户填写，直接抄入 meta，不要修改）：" + json.dumps([f["name"] for f in user_filled], ensure_ascii=False))
+        if auto_filled:
+            parts.append("source=auto 已填（用户提供了值，直接抄入 meta）：" + json.dumps([f["name"] for f in auto_filled], ensure_ascii=False))
+        if auto_empty:
+            parts.append("source=auto 未填（用户未提供，由你生成）：" + json.dumps([f["name"] for f in auto_empty], ensure_ascii=False))
+        if llm_fields:
+            parts.append("source=llm 元数据（必须由你生成）：" + json.dumps([f["name"] for f in llm_fields], ensure_ascii=False))
+        parts.append("")
+        if user_meta:
+            parts.append("用户已提供的值：")
+            parts.append(json.dumps(user_meta, ensure_ascii=False, indent=2))
+            parts.append("")
+
+    # content 字段
+    if content:
+        parts.append(f"【内容树字段（共 {len(content)} 个）】")
+        parts.append(json.dumps(content, ensure_ascii=False, indent=2))
+        parts.append("")
+        parts.append("类型规则：")
+        parts.append('- type="leaf"：无子结构 sub_sections=[]，直接写全部内容')
+        parts.append('- type="section"：默认拆 2-4 个子结构，用户明确指定数量时按用户要求')
+        parts.append('- 每子结构默认 200-800 字，用户指定则按用户要求')
+        parts.append("")
+        parts.append("- is_key: true = 该节为重点节，写作字数可上浮 50%；false = 普通节")
+
+        parts.append("【硬性要求】所有内容树字段**必须全部**在 sections 数组中输出，一条对应一个 sections 元素。")
+        parts.append(f"内容树字段清单（共 {len(content)} 个，不准少）：{', '.join(cf['name'] for cf in content)}")
+        parts.append("少输出任何一条，系统解析失败，文章将缺失该章节。")
         parts.append("")
 
     parts.extend([
-        "【类型规则】",
-        '- type:"leaf"：无子结构 sub_sections=[]，直接写全部内容在该节下',
-        '- type:"section"：拆 2-4 个子结构，每子结构 200-800 字',
-        "",
-        "【元数据规则】",
-        "- 短数据（标题、关键词等）放入 meta 对象",
-        "- 段落内容（摘要、参考文献等）放入 sections 数组",
-        "- user 字段：有值就原样抄入 meta，没值不出现",
-        "- 第一个 leaf 字段自动作为文章标题，同时在 title 字段和 meta 中各放一份",
-        "",
-        "【后果】如果输出包含 JSON 以外的任何文字，系统将无法解析，整个流程会失败。",
-        "",
         "【JSON 格式】",
         '{',
         '  "title": "标题值",',
-        '  "meta": {"关键词": "xxx; yyy"},',
+        '  "meta": {"作者": "（待填写）", "文号": "〔2026〕12号"},',
         '  "sections": [',
-        '    {"title": "摘要", "sub_sections": [], "type": "leaf"},',
-        '    {"title": "正文", "sub_sections": [{"title":"子1","summary":"要点","word_count":400}, {...}], "type": "section"}',
+        '    {"title": "关键词", "sub_sections": [], "type": "leaf", "is_key": false},',
+        '    {"title": "摘要", "sub_sections": [], "type": "leaf", "is_key": false},',
+        '    {"title": "引言", "sub_sections": [{"title":"子1","summary":"要点","word_count":400}], "type": "section", "is_key": true},',
         '  ]',
         '}',
+        "",
+        "【后果】如果输出包含 JSON 以外的任何文字，系统将无法解析，整个流程会失败。",
     ])
 
     return "\n".join(parts)
@@ -125,33 +152,42 @@ def parse_outline(text: str) -> Optional[dict]:
     return None
 
 
-def _normalize_outline(outline: dict, structure: list, user_meta: dict) -> dict:
+def _normalize_outline(outline: dict, content_fields: list) -> dict:
     """
-    规范化大纲：补默认值、填充 user_meta、标记 type。
+    规范化大纲：补默认值、填充 meta。
     """
-    # 填充 user 字段到 meta
-    meta = outline.get("meta", {})
-    for f in structure:
-        if f["source"] == "user" and user_meta.get(f["name"]):
-            meta[f["name"]] = user_meta[f["name"]]
-    outline["meta"] = meta
-
     # 确保 title 存在
     if not outline.get("title"):
-        # 从 meta 中取第一个 leaf
-        for f in structure:
-            if f["type"] == "leaf" and meta.get(f["name"]):
-                outline["title"] = meta[f["name"]]
-                break
-        if not outline.get("title"):
-            outline["title"] = "未命名文章"
+        meta = outline.get("meta", {})
+        # 从 meta 或 content 字段中找标题
+        outline["title"] = meta.get("标题", meta.get("文章标题", "未命名文章"))
 
     # 确保 sections 存在
-    if not outline.get("sections"):
-        outline["sections"] = []
+    sections = outline.get("sections", [])
+    if not sections:
+        sections = []
+    # 补充缺失的 content 字段（LLM 可能跳过某些字段）
+    existing_titles = {s.get("title", "") for s in sections}
+    for cf in content_fields:
+        if cf["name"] not in existing_titles:
+            sections.append({
+                "id": f"s{len(sections)+1}",
+                "title": cf["name"],
+                "subtitle": "",
+                "summary": cf.get("desc", ""),
+                "word_count": 800,
+                "is_key": False,
+                "status": "pending",
+                "actual_word_count": 0,
+                "rag": {"enabled": False, "kb": ""},
+                "_checked": True,
+                "type": cf.get("type", "section"),
+                "show_label": cf["show_label"],
+                "sub_sections": []
+            })
+    outline["sections"] = sections
 
-    # 为每个 section 补 type 和默认值
-    for i, s in enumerate(outline["sections"]):
+    for i, s in enumerate(sections):
         if "id" not in s:
             s["id"] = f"s{i+1}"
         s.setdefault("subtitle", "")
@@ -164,12 +200,20 @@ def _normalize_outline(outline: dict, structure: list, user_meta: dict) -> dict:
         s.setdefault("_checked", True)
         s.setdefault("type", "section")
 
-        # 子结构规范化
+        # ── 逻辑顺序（从模板 content[].logical_order 读取，不设/0 表示按 content[] 顺序） ──
+        stitle = s.get("title", "")
+        matched = [cf for cf in content_fields if cf.get("name") == stitle]
+        lo = matched[0].get("logical_order") if matched else None
+        s["_logical_order"] = lo if lo is not None else None
+
+        # 从模板 content_fields 补充 show_label
+        if matched:
+            s["show_label"] = matched[0]["show_label"]
+
         subs = s.get("sub_sections", [])
         s_type = s.get("type", "section")
 
         if not subs and s_type == "section":
-            # section 类型但 LLM 没给子结构时，自动补一个
             subs = [{
                 "id": f"{s['id']}_1",
                 "title": s.get("subtitle") or s["title"],
@@ -188,7 +232,6 @@ def _normalize_outline(outline: dict, structure: list, user_meta: dict) -> dict:
             ss.setdefault("_checked", True)
             ss.setdefault("aux_knowledge", None)
 
-        # 纠正 section 级 word_count（叶子节用自己的 word_count，section 节用子结构求和）
         if not subs:
             s.setdefault("word_count", 800)
         else:
@@ -199,16 +242,17 @@ def _normalize_outline(outline: dict, structure: list, user_meta: dict) -> dict:
 
 def plan_outline(topic: str, template: dict = None,
                  user_meta: dict = None, llm_client: LLMClient = None,
-                 prompt: str = "") -> dict:
+                 prompt: str = "", plan_hints: str = "") -> dict:
     """
     生成结构化大纲。
 
     参数:
         topic: 写作主题
-        template: {structure: [五元组], style: "..."}
-        user_meta: 用户已填的字段值 {"标题": "xxx", "作者": "吴王思淼"}
+        template: {meta: [...], content: [...], style: "...", logic: "..."}
+        user_meta: 用户已填的字段值 {"标题": "xxx", "作者": "（待填写）"}
         llm_client: LLM 客户端
         prompt: 旧兼容参数 — 作为风格提示词覆盖
+        plan_hints: 用户对规划的额外要求（章节数、子结构数、字数等）
 
     返回:
         dict: 大纲 JSON {title, meta, sections}
@@ -216,19 +260,14 @@ def plan_outline(topic: str, template: dict = None,
     if llm_client is None:
         raise ValueError("需要提供 llm_client")
 
-    # 处理旧接口兼容：如果 template 是字符串，当作旧 style prompt
+    # 旧接口兼容
     if isinstance(template, str) or template is None:
-        # 老式调用 plan_outline(topic, prompt="xxx", llm_client=cli)
-        # 构建一个最小 fallback 模板
         style = template or prompt or ""
         template = {
-            "structure": [
-                {"name": "标题", "show_label": False, "desc": "文章标题",
-                 "source": "auto" if not topic else "user", "type": "leaf"},
-                {"name": "正文", "show_label": False, "desc": "文章主体按逻辑拆子节",
-                 "source": "llm", "type": "section"},
-            ],
-            "style": style
+            "meta": [{"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto"}],
+            "content": [{"name": "正文", "show_label": False, "desc": "文章主体", "type": "section"}],
+            "style": style,
+            "logic": ""
         }
         if not user_meta:
             user_meta = {"标题": topic} if topic else {}
@@ -236,11 +275,12 @@ def plan_outline(topic: str, template: dict = None,
     if user_meta is None:
         user_meta = {}
 
-    structure = template.get("structure", [])
+    meta_fields = template.get("meta", [])
+    content_fields = template.get("content", [])
     style = template.get("style", prompt or "")
 
-    # 构建 system prompt
-    system_prompt = _build_planner_prompt(structure, user_meta)
+    # 构建 system prompt（含 plan_hints）
+    system_prompt = _build_planner_prompt(meta_fields, content_fields, user_meta, plan_hints)
 
     # 构建 user message
     user_msg_lines = [f"主题：{topic}"]
@@ -280,6 +320,6 @@ def plan_outline(topic: str, template: dict = None,
         )
 
     # 规范化
-    outline = _normalize_outline(outline, structure, user_meta)
+    outline = _normalize_outline(outline, content_fields)
 
     return outline

@@ -5,7 +5,63 @@
 
 ---
 
-## [1.1.0b0] - 2026-07-28
+## [1.1.0b4] - 2026-07-29
+### 修复
+- **leaf 节 continue 跳过 parts_by_sid**：leaf 路径末尾的 `continue` 使得 `parts_by_sid[sid]` 赋值永远不执行，leaf 节（关键词/摘要/参考文献）有字数记录但内容不进 .md 文件 → 在 `continue` 前补充 parts_by_sid 写入
+- **show_label if/else 嵌套导致 LLM 调用错位**：sec_show_label 的 if/else 把 `if s_type == "leaf":`（LLM 调用）包进了 else 分支，导致 show_label=true 的节完全不调 LLM → 将 LLM 调用移出 if/else
+- **section["show_label"] 无 fallback**：从模板直读 `section["show_label"]`，LLM 输出的节不包含该字段 → planner _normalize_outline 传播 show_label 到所有 section
+- **gen-template 验收逻辑过松**：`result.get("meta") is not None` 通过 `[]`（空数组非 None）→ 改为 `if result.get("meta") or result.get("content")`（truthiness 判断）
+- **saveConfig/confirmSaveAs 表格索引错位**：meta 行 querySelectorAll 返回 3 个元素但代码读 inputs[3]；content 行预期 5 个元素实际 4 个（button 非 input/select）
+- **planner JSON 示例硬编码用户名**：示例值改为通用占位符
+
+### 新增
+- **style_hint 注入**：`_build_context_section_prompt` 加 `style_hint` 参数，将模板 `style` 注入每节 prompt 作为"写作风格要求"
+- **学术论文 引用规则**：style + 参考文献 desc 分开放（行为规则在 style，格式规则在 desc），含正文[1][2]标注、RAG 条件引用、引用一致性
+- **_normalize_outline 兜底补缺**：对比 content_fields 所有 name 和现有 sections title，缺失的自动补入
+- **is_key 自动标记恢复**：planner prompt 加 `is_key: true = 重点节，字数上浮50%`，JSON 示例每个 section 恢复 is_key 字段
+- **_normalize_template 校验**：gen-template 后端校验，清理非法类型、补默认值、删多余字段
+- **另存为模态框**：替换 `prompt()` 浏览器弹窗
+
+### 变更
+- **logical_order 语义修正**：0=先写（存模板），自动=不设（不参与逻辑排序）。UI 四选项一一对应：自动/先写(0)/其次(1)/最后(2)
+- **context 传递策略**：leaf 节 `_logical_order=2` 传全文，其他节（含所有子结构）截取 `context_review_length` 字（默认 800，可调，0=不截断）
+- **所有章节统一 `##` 级别**：去掉 `_first_leaf_rendered → #` 的 H1 污染
+- **学术论文/论文综述 show_label**：摘要/引言/结论打勾显示标题，正文不打勾
+- **关键词 desc**：改为"3-5个关键词，以分号分隔，不要成段描述"
+- **默认 context_review_length**：800→8000→恢复为 800（子结构只用尾巴），leaf order=2 传全文
+- **样式规则**：要求只在 RAG 开启时才引用，RAG 关闭时不标注
+### 修复
+- topic 注入 meta 导致 auto 标题被覆盖 → 彻底删除两处注入，LLM 自主生成标题
+- meta 块 show_label=true 空值整行跳过 → 改为显示标签占位" > 名称："
+- ConfigManager.update 对 templates 用合并而非替换 → 改为全量替换，删除后生效
+
+### 新增
+- plan_hints 模态框：重新规划时可输入章节/字数要求，留空按默认
+- planner 层级规则 + 用户要求优先规则注入 prompt
+- 8 个内置模板 logic 字段（写作顺序提示词）
+
+### 变更
+- 配置 tab 拆 meta[] + content[] + style + logic 四区，去掉"渲染为"列
+### 架构变更
+- **模板格式重大重构**：从平面五元组拆分为 meta[] + content[] + style + logic 四部分
+  - 元数据（meta）：标识/管理信息，短数据（≤100字），source=user/auto/llm，固定 leaf
+  - 内容树（content）：文章主体，长文本（≥200字），source 固定 llm，type=leaf/section
+  - 逻辑提示词（logic）：控制 LLM 认知流程顺序，不改变文章最终排列
+- **GEN_TEMPLATE_SYSTEM_PROMPT 重写**：明确定义元数据 vs 内容树的严格二分法
+
+### 新增
+- 8 个内置模板全部配置逻辑提示词
+- 两个表格列描述 + 逻辑/风格提示词说明文字
+
+### 修复
+- renderMetaInputs 读旧格式 tmpl.structure → grid 消失
+- deleteTemplate 删不掉（ConfigManager.update 浅合并问题）
+- batch_auto template 未定义变量
+- _handle_plan 未识别新格式 template
+- 温度行因 min-width 溢出
+
+### 变更
+- 配置 tab 拆元数据 4列表 + 内容树 4列表 + 逻辑 textarea，去掉"渲染为"列
 ### 新增
 - **五元组结构化模板系统**：模板从纯文本提示词升级为 `{name, show_label, desc, source, type}` 五元组结构，一份数据结构同时定义元数据（标题/作者/单位等）和内容树（引言/正文/结论/参考文献等），覆盖日常写作/学术论文/正式公文/新闻报道/技术报告全部类型
 - **动态 Planner prompt 生成**：`plan_outline()` 根据五元组按 `source=user/llm/auto` 分类处理，user 字段不碰、llm 字段必生成、auto 字段用户可填留空 LLM 兜底

@@ -25,16 +25,10 @@ DEFAULT_CONFIG = {
     "default_prompt": "请以专业、客观、结构清晰的风格撰写。注重逻辑递进和数据支撑。使用Markdown格式。",
     "selected_template": "通用公文",
     "rag_path": "",
-    "context_review_length": 800,
+    "context_review_length": 8000,
     "fact_check_enabled": False,
     "max_sessions": 20,
-    "templates": {
-        "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
-        "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
-        "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
-        "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
-        "自定义": ""
-    }
+    "templates": {}
 }
 
 
@@ -61,51 +55,32 @@ class ConfigManager:
             templates = self._config.get("templates", {})
             if "自定义" not in templates:
                 templates["自定义"] = {
-                    "structure": [
-                        {"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto", "type": "leaf"},
-                        {"name": "正文", "show_label": False, "desc": "文章主体内容", "source": "llm", "type": "section"},
-                        {"name": "结尾", "show_label": False, "desc": "总结收束", "source": "llm", "type": "section"}
-                    ],
-                    "style": ""
+                    "meta": [{"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto"}],
+                    "content": [{"name": "正文", "show_label": False, "desc": "文章主体内容", "source": "llm", "type": "section"}],
+                    "style": "",
+                    "logic": ""
                 }
                 self._config["templates"] = templates
                 migrated = True
-            # ── 旧模板格式 → 新五元组格式迁移 ──
+            # ── 旧格式迁移 ──
             templates = self._config.get("templates", {})
             migrated = False
-            for tname, tval in templates.items():
-                if isinstance(tval, str):  # 旧格式：纯字符串
-                    # 根据名称推断默认结构
-                    _default_structures = {
-                        "通用公文": [
-                            {"name": "标题", "show_label": False, "desc": "公文标题", "source": "auto", "type": "leaf"},
-                            {"name": "正文", "show_label": False, "desc": "正文分条列举", "source": "llm", "type": "section"},
-                            {"name": "结尾", "show_label": False, "desc": "提出执行要求", "source": "llm", "type": "section"},
-                        ],
-                        "论文综述": [
-                            {"name": "标题", "show_label": False, "desc": "论文标题简明准确", "source": "auto", "type": "leaf"},
-                            {"name": "作者", "show_label": True, "desc": "作者姓名", "source": "user", "type": "leaf"},
-                            {"name": "摘要", "show_label": False, "desc": "概括全文核心论点", "source": "llm", "type": "leaf"},
-                            {"name": "正文", "show_label": False, "desc": "分论点逐层论述", "source": "llm", "type": "section"},
-                            {"name": "参考文献", "show_label": False, "desc": "引用文献", "source": "llm", "type": "leaf"},
-                        ],
-                    }
-                    structure = _default_structures.get(tname, [
+            for tname, tval in list(templates.items()):
+                if isinstance(tval, str):  # 最旧格式：纯字符串 → structure → meta+content
+                    structure = [
                         {"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto", "type": "leaf"},
                         {"name": "正文", "show_label": False, "desc": "文章主体", "source": "llm", "type": "section"},
-                    ])
-                    users_cfg = self._config.get("user_templates", {})
-                    if tname in users_cfg:
-                        structure = [
-                            {"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto", "type": "leaf"},
-                            {"name": "正文", "show_label": False, "desc": "文章主体", "source": "llm", "type": "section"},
-                        ]
-                    templates[tname] = {"structure": structure, "style": tval}
+                    ]
+                    templates[tname] = _convert_structure_to_mc(structure, tval)
+                    migrated = True
+                elif isinstance(tval, dict) and "structure" in tval:  # structure 格式 → meta+content
+                    style = tval.get("style", "")
+                    templates[tname] = _convert_structure_to_mc(tval["structure"], style)
                     migrated = True
             if migrated:
                 self._config["templates"] = templates
-                self._config["new_template_format"] = True
                 self.save()
+
         else:
             self._config = copy.deepcopy(DEFAULT_CONFIG)
             self.save()
@@ -128,11 +103,15 @@ class ConfigManager:
         return copy.deepcopy(self._config)
 
     def update(self, data: dict):
-        """批量更新配置，支持新增键"""
+        """批量更新配置，支持新增键。templates 和 user_templates 做全量替换。"""
         for key in self._config:
             if key in data:
                 if isinstance(data[key], dict) and isinstance(self._config[key], dict):
-                    self._config[key].update(data[key])
+                    # templates 和 user_templates 全量替换（支持删除）
+                    if key in ("templates", "user_templates"):
+                        self._config[key] = copy.deepcopy(data[key])
+                    else:
+                        self._config[key].update(data[key])
                 else:
                     self._config[key] = data[key]
         # 处理 data 中的新增键（不在 self._config 中）
@@ -140,3 +119,19 @@ class ConfigManager:
             if key not in self._config:
                 self._config[key] = data[key]
         self.save()
+
+
+def _convert_structure_to_mc(structure: list, style: str = "") -> dict:
+    """将旧 flat structure 转换为 meta+content+logic"""
+    meta = []
+    content = []
+    for f in structure:
+        entry = {"name": f["name"], "show_label": f.get("show_label", False), "desc": f.get("desc", "")}
+        source = f.get("source", "llm")
+        if source in ("user", "auto"):
+            entry["source"] = source
+            meta.append(entry)
+        else:
+            entry["type"] = f.get("type", "section")
+            content.append(entry)
+    return {"meta": meta, "content": content, "style": style, "logic": ""}
