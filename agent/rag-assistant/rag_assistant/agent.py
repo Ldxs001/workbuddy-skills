@@ -892,13 +892,19 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
         from knowledge_base_manager import sm3
         seen_hashes = set()
         all_docs = []
+        all_headers = {}  # source → [header_texts]
         routed_kb = ""
         for sq in slices:
             try:
-                r = self.rag.query(sq, kb_name=kb if kb else None)
+                r = self.rag.query(sq, kb_name=kb if kb else None, include_header=True)
                 # 捕获路由实际 KB（取第一个有返回值的）
                 if not routed_kb:
                     routed_kb = r.get("kb", "")
+                # 收集头部块
+                hdrs = r.get("headers", {})
+                for src, texts in hdrs.items():
+                    if src not in all_headers:
+                        all_headers[src] = texts
                 for d in r.get("docs", []):
                     content = d.get("content") if isinstance(d, dict) else (
                         d.page_content if hasattr(d, "page_content") else ""
@@ -923,6 +929,15 @@ Agent 会自动将 entities × attrs 穷举组合后查询。
                     d.page_content[:500] if hasattr(d, "page_content") else str(d)[:500]
                 ) for d in all_docs[:5]
             )
+
+        # ── 合并头部块到 context ──
+        if all_headers:
+            header_parts = []
+            for src, texts in sorted(all_headers.items()):
+                header_parts.append(f"【文档: {src}】\n" + "\n".join(texts))
+            combined = "\n\n---\n\n".join(header_parts)
+            context = combined + "\n\n=== 以下为语义检索结果 ===\n\n" + context
+
         return {"context": context, "kb": kb, "routed_kb": routed_kb, "success": True, "has_context": True}
 
     def _exec_import(self, action: dict, original_msg: str) -> dict:

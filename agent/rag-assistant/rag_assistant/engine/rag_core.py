@@ -16,6 +16,82 @@ from config import load_config
 from utils import KB_DIR, MODELS_DIR, find_model_dirs
 
 
+# ── 头部块标记（is_header） ──
+
+def _looks_like_header(text: str) -> bool:
+    """轻量探测：检查文本是否包含头部区域常见模式
+
+    仅用于辅助扩展 is_header 边界（+1），不追求精确覆盖。
+    位置兜底(块0-3)才是主力。
+    """
+    t = text[:300]
+    if not t.strip():
+        return False
+    # 作者名：连续中文名 + 逗号/上标（如"张三1，李四2*"）
+    if re.search(r'[\u4e00-\u9fff]{2,4}\s*\d?\s*[,，]\s*[\u4e00-\u9fff]{2,4}', t):
+        return True
+    # 机构/发布方
+    if re.search(r'(大学|学院|研究所|研究院|实验室|有限公司|集团|医院|'
+                 r'中心[，。\s\n]|局[，。\s\n]|部[，。\s\n]|委员会)', t):
+        return True
+    # 论文/SOP/标准头标记
+    if re.search(r'(摘要|关键词|Keywords|中图分类号|CLC|DOI|文章编号|'
+                 r'文献标识码|基金项目|收稿日期|修回日期|录用日期|'
+                 r'文件编号|起草单位|发布单位|编制|审核|批准|代替|归口)', t[:100]):
+        return True
+    # 期刊/出版信息（第XX卷 第XX期、学报、通报等）
+    if re.search(r'(第\d+卷\s*第\d+期|Vol\.\s*\d+\s*No\.\s*\d+|'
+                 r'学报\b|通报\b|研究\b|杂志\b|期刊\b|出版社\b)', t[:200]):
+        return True
+    # 文章类型（论著/综述/研究报告等）
+    if re.search(r'^(论著|综述|研究报告|研究论文|简报|简讯|信函|'
+                 r'经验交流|病例报告|技术报告|方法|标准|规范|指南)', t.strip()[:20]):
+        return True
+    return False
+
+
+def mark_header_chunks(chunks: list):
+    """给分块打 is_header 标记：位置兜底(0-3) + 逐块内容探测
+
+    策略：
+    - 块0-3无条件标记（位置兜底）
+    - 逐块内容探测：标题/作者/单位/期刊名/文章编码等任何头部信息
+    - 每命中一块，下一块也标记（边界安全，防止切分截断）
+    - 不连续延长：两个命中块之间不自动填充
+    """
+    if not chunks:
+        return
+
+    # 全部初始化为 False
+    for c in chunks:
+        c.metadata["is_header"] = False
+
+    max_seq = max(c.metadata.get("chunk_seq", 0) for c in chunks)
+
+    # 位置兜底：块0-3
+    for c in chunks:
+        seq = c.metadata.get("chunk_seq", 999)
+        if seq <= 3:
+            c.metadata["is_header"] = True
+
+    # 内容探测：逐块检查，命中则标记本块+下一块
+    def _set_seq(seq, val=True):
+        for nc in chunks:
+            if nc.metadata.get("chunk_seq", 999) == seq:
+                nc.metadata["is_header"] = val
+                return
+
+    for c in chunks:
+        seq = c.metadata.get("chunk_seq", 999)
+        if c.metadata["is_header"]:
+            continue  # 已被位置兜底覆盖，不重复检查
+        text = c.page_content if hasattr(c, "page_content") else ""
+        if text and _looks_like_header(text):
+            _set_seq(seq, True)
+            if seq + 1 <= max_seq:
+                _set_seq(seq + 1, True)
+
+
 def apply_markdown_preprocess(text: str, preprocess_cfg: dict) -> str:
     """Markdown 标题预处理：根据正则匹配行，注入 Markdown 标题标记"""
     if not preprocess_cfg or not preprocess_cfg.get("enabled"):
@@ -236,7 +312,7 @@ def build_context(docs):
 
 
 def retrieve_context(question, kb_name="default", k=None, score_threshold=None, embeddings=None,
-                     use_router=True, use_reranker=True):
+                     use_router=True, use_reranker=True, include_header=False):
     """
     纯检索接口：只检索和构建 context，不调用 LLM。
 
@@ -349,7 +425,41 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
             "_kb": source_kb,
         })
 
-    return {
+    # ── include_header：对每个 unique source 回取头部块 ──
+    headers_dict = {}
+    if include_header and reranked_docs:
+        seen_sources = {}
+        for d in reranked_docs:
+            meta = d.metadata if hasattr(d, "metadata") else {}
+            src = meta.get("source", "")
+            kb = source_kb_map.get(id(d), kb_name)
+            if src and (src, kb) not in seen_sources:
+                seen_sources[(src, kb)] = True
+        for (src, kb_src), _ in seen_sources.items():
+            try:
+                from chroma_adapter import Chroma
+                emb = get_embeddings(kb_name=kb_src)
+                vs = Chroma(persist_directory=os.path.join(KB_DIR, kb_src), embedding_function=emb)
+                raw = vs.get(
+                    include=['documents', 'metadatas'],
+                    where={"$and": [
+                        {"source": {"$eq": src}},
+                        {"is_header": True},
+                    ]},
+                )
+                if raw.get("documents"):
+                    texts = raw["documents"]
+                    metas = raw.get("metadatas", [{}] * len(texts))
+                    # 按 chunk_seq 排序（is_header 可能跳过中间块）
+                    paired = sorted(
+                        [(m.get("chunk_seq", 99), t) for m, t in zip(metas, texts)],
+                        key=lambda x: x[0],
+                    )
+                    headers_dict[src] = [t for _, t in paired]
+            except Exception:
+                continue
+
+    result = {
         "context": context,
         "source_docs": serialized,
         "source_count": len(reranked_docs),
@@ -360,6 +470,9 @@ def retrieve_context(question, kb_name="default", k=None, score_threshold=None, 
             "kb_count": len(kb_names),
         },
     }
+    if include_header:
+        result["headers"] = headers_dict
+    return result
 
 
 def format_skill_output(question, kb_name="default", k=None, score_threshold=None,
@@ -534,12 +647,15 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
             ]
         # MD 预处理路径：将合并处理后的文本切分
         merged = split_pipeline(docs[0].page_content, **pipeline_kwargs)
-        for c in merged:
+        for i, c in enumerate(merged):
             c.metadata["source"] = os.path.basename(file_path)
+            c.metadata["chunk_seq"] = i
         chunks = merged
+        mark_header_chunks(chunks)
     else:
         # 逐页切分，继承每页的完整 metadata（source + page + 其他自定义字段）
         chunks = []
+        chunk_seq = 0
         for page_doc in docs:
             page_text = page_doc.page_content
             if not page_text.strip():
@@ -547,7 +663,10 @@ def import_documents_to_kb(file_path, kb_name="default", embeddings=None, splitt
             page_chunks = split_pipeline(page_text, **pipeline_kwargs)
             for c in page_chunks:
                 c.metadata = dict(page_doc.metadata) if page_doc.metadata else {}
+                c.metadata["chunk_seq"] = chunk_seq
+                chunk_seq += 1
             chunks.extend(page_chunks)
+        mark_header_chunks(chunks)
 
     ok, msg = add_documents_to_kb(kb_name, chunks, embeddings)
 

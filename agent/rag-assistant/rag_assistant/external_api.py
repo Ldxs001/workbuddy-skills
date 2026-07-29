@@ -622,6 +622,7 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
         kb = body.get("kb", "")        # 空=自动路由
         top_k = body.get("top_k", 5)
         score_threshold = body.get("score_threshold")
+        include_header = body.get("include_header", False)
 
         if not query:
             self._err("缺少 query 字段")
@@ -637,13 +638,17 @@ class ExternalAPIHandler(BaseHTTPRequestHandler):
                 kb_name=kb or None,    # None=交给路由器
                 k=top_k,
                 score_threshold=score_threshold,
+                include_header=include_header,
             )
-            self._ok(
-                context=result.get("context", ""),
-                sources=result.get("docs", []),
-                has_context=result.get("has_context", False),
-                kb=result.get("kb", kb),
-            )
+            resp = {
+                "context": result.get("context", ""),
+                "sources": result.get("docs", []),
+                "has_context": result.get("has_context", False),
+                "kb": result.get("kb", kb),
+            }
+            if include_header and result.get("headers"):
+                resp["headers"] = result["headers"]
+            self._ok(**resp)
         except Exception as e:
             logger.exception(f"/api/kb/query 异常")
             self._err(str(e), 500)
