@@ -7,6 +7,7 @@ from datetime import datetime
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SESSIONS_DIR = DATA_DIR / "sessions"
+ARCHIVES_DIR = DATA_DIR / "archives" / "sessions"
 OUTPUTS_DIR = DATA_DIR / "outputs"
 
 # 不可变规划字段（修改触发指纹校验）
@@ -123,7 +124,7 @@ class StateManager:
             "total_words": total_words,
             "phase": self._state.get("phase"),
             "title": self._state.get("outline", {}).get("title", ""),
-            "status_text": self._state.get("_status_text", "")
+            "status_text": self._state.get("_status_text", "") if self._state.get("phase") in ("writing",) else ""
         }
 
     def set_status_text(self, text: str):
@@ -152,17 +153,70 @@ class StateManager:
         tmp.replace(self.path)
 
     def list_sessions(self) -> list[dict]:
+        """列出所有活跃和已归档会话"""
         sessions = []
-        for p in sorted(SESSIONS_DIR.glob("*.json"), reverse=True):
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    s = json.load(f)
-                sessions.append({
-                    "id": s.get("session_id", p.stem),
-                    "title": s.get("outline", {}).get("title", "未命名"),
-                    "phase": s.get("phase", "unknown"),
-                    "created_at": s.get("created_at", "")
-                })
-            except Exception:
-                pass
+        for is_archived, base_dir in [(False, SESSIONS_DIR), (True, ARCHIVES_DIR)]:
+            if not base_dir.is_dir():
+                continue
+            for p in sorted(base_dir.glob("*.json"), reverse=True):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        s = json.load(f)
+                    sessions.append({
+                        "id": s.get("session_id", p.stem),
+                        "title": s.get("outline", {}).get("title", "未命名"),
+                        "phase": s.get("phase", "unknown"),
+                        "created_at": s.get("created_at", ""),
+                        "active": not is_archived
+                    })
+                except Exception:
+                    pass
+        # 按活跃优先、再按时间倒序
+        sessions.sort(key=lambda x: (not x["active"], x.get("created_at", "")), reverse=True)
         return sessions
+
+    def archive_session(self, session_id: str) -> bool:
+        """归档指定会话：移入 archives/sessions/"""
+        try:
+            ARCHIVES_DIR.mkdir(parents=True, exist_ok=True)
+            src = SESSIONS_DIR / f"{session_id}.json"
+            if src.exists():
+                dst = ARCHIVES_DIR / f"{session_id}.json"
+                src.replace(dst)
+            return True
+        except Exception:
+            return False
+
+    def restore_session(self, session_id: str) -> bool:
+        """恢复归档会话：移回 sessions/"""
+        try:
+            SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+            src = ARCHIVES_DIR / f"{session_id}.json"
+            if src.exists():
+                dst = SESSIONS_DIR / f"{session_id}.json"
+                src.replace(dst)
+            return True
+        except Exception:
+            return False
+
+    def delete_session(self, session_id: str) -> bool:
+        """永久删除会话（从两种目录中都删除）"""
+        try:
+            for base_dir in [SESSIONS_DIR, ARCHIVES_DIR]:
+                p = base_dir / f"{session_id}.json"
+                if p.exists():
+                    p.unlink()
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def check_session_limit(cls, max_sessions: int = 20):
+        """检查活跃会话数，超过则归档最旧的非当前会话"""
+        sm = cls()
+        sessions = sm.list_sessions()
+        active = [s for s in sessions if s.get("active")]
+        if len(active) > max_sessions:
+            # 最旧的（排序已按时间倒序，最后一个最旧）
+            oldest = active[-1]
+            sm.archive_session(oldest["id"])

@@ -7,9 +7,9 @@ See https://creativecommons.org/licenses/by-sa/4.0/ for details.
 
 # Structured Writer 架构文档
 
-> 结构化写作智能体 — LLM 驱动的子结构级逐段写作与 RAG 增强生成。
+> 结构化写作智能体 — LLM 驱动的子结构级逐段写作与自检。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-26 (v0.2.5b4)
+> 更新：2026-07-27 (v1.0.28)
 
 ---
 
@@ -70,8 +70,8 @@ structured-writer/
 ├── config.json                        # 默认配置
 │
 ├── structured_writer/                 # ★ 智能体核心
-│   ├── __init__.py                    # 版本号: 0.2.5b4
-│   ├── web_ui.py                      # HTTP 服务器 + 前端（~1700 行）
+│   ├── __init__.py                    # 版本号: 1.0.28
+│   ├── web_ui.py                      # HTTP 服务器 + 前端（~1900 行）
 │   ├── planner.py                     # 大纲规划器（LLM 生成 JSON 大纲）
 │   ├── writer.py                      # 串行写作器（两级 RAG + 续写）
 │   ├── rag_client.py                  # RAG 客户端（调 rag-assistant :8767）
@@ -82,6 +82,7 @@ structured-writer/
 └── data/                              # 运行时数据（不出库）
     ├── config.json                    # 运行时配置
     ├── sessions/{id}.json             # 对话状态
+    ├── archives/sessions/             # 归档会话
     └── outputs/{name}.md              # 生成结果
 ```
 
@@ -200,7 +201,7 @@ finish_reason == "length" → token 耗尽:
 
 **`chat_detailed()`** 方法返回 `{content, finish_reason}`，用于续写检测。
 
-**max_tokens 配置**：从 config.json 读取 `writer_model.max_tokens` / `planner_model.max_tokens`，存储为 LLMClient 实例属性。writer.py 不再自行计算覆盖。
+**max_tokens 与 temperature**：从 config.json 读取 `writer_model.max_tokens` / `planner_model.max_tokens` 及 `temperature`，存储为 LLMClient 实例属性。各调用点传 `temperature=None` 走实例属性，无需每处硬编码。
 
 ### 3.5 状态管理器 — `state_manager.py`
 
@@ -235,6 +236,11 @@ finish_reason == "length" → token 耗尽:
 | `/api/session/load` | GET | 加载会话 |
 | `/api/rag/status` | GET | RAG 连接状态 |
 | `/api/rag/start` | POST | 冷启动 RAG |
+| `/api/rag/stop` | POST | 停止 RAG（kill 进程树 + 等端口释放） |
+| `/api/batch_auto` | POST | 批量自动撰写（多行输入，逐篇执行） |
+| `/api/session/archive` | POST | 归档会话 |
+| `/api/session/restore` | POST | 恢复会话 |
+| `/api/session/delete` | POST | 删除会话 |
 
 ### 4.2 RAG 外部依赖
 
@@ -249,10 +255,13 @@ finish_reason == "length" → token 耗尽:
 
 ```json
 {
-  "planner_model": {"backend": "lmstudio", "model": "qwen/qwen3.5-35b-a3b", "max_tokens": 4096},
-  "writer_model": {"backend": "lmstudio", "model": "qwen/qwen3.5-35b-a3b", "max_tokens": 81920, "timeout": 300},
+  "planner_model": {"backend": "lmstudio", "model": "qwen/qwen3.5-35b-a3b", "max_tokens": 4096, "temperature": 0.6},
+  "writer_model": {"backend": "lmstudio", "model": "qwen/qwen3.5-35b-a3b", "max_tokens": 81920, "timeout": 300, "temperature": 0.7},
   "rag_path": "C:/Users/sm001/WorkBuddy/rag-assistant",
-  "prompt_template": "通用公文"
+  "prompt_template": "通用公文",
+  "context_review_length": 800,
+  "fact_check_enabled": true,
+  "max_sessions": 20
 }
 ```
 
@@ -283,7 +292,7 @@ finish_reason == "length" → token 耗尽:
 
 ### 5.1 客户端状态轮询
 
-`startProgressPolling(sid)` 每 3 秒 polling `/api/progress`：
+`startProgressPolling(sid)` 每 1.5 秒 polling `/api/progress`（RAG 状态轮询同样 1.5s + cache-buster）：
 
 ```
 GET /api/progress?session_id=xxx
@@ -321,11 +330,12 @@ generate_article(outline, rag_options, llm_client, state_mgr, rag_client)
   │   ├─ 写入 ## 节标题
   │   └─ 逐子结构:
   │       ├─ 子结构级别 RAG 查询（如果启用）
-  │       ├─ 构建 prompt（节RAG + 子结构RAG + 前文）
-  │       ├─ call LLM → 检测 finish_reason → 续写循环
-  │       ├─ 写入 ### 子标题 + 正文
-  │       └─ 更新状态（progress + status_text）
-  └─ 合并全文 → 写入 .md → 更新 phase="done"
+  │       ├─ 构建 prompt（节RAG + 子结构RAG + 前文 + 【事实待核查】标注）
+      │       ├─ call LLM → 检测 finish_reason → 续写循环
+      │       ├─ 解析 【事实待核查】标记 → 收集到 sub_fact_notes
+      │       ├─ 写入 ### 子标题 + 正文（不含标记）
+      │       └─ 更新状态（progress + status_text）
+      └─ 合并全文 → 追加事实自检汇总表 → 写入 .md → 更新 phase="done"
 ```
 
 ### 节级别 RAG 查询
@@ -373,6 +383,8 @@ rag_client.query(kb, query_text)
 {sub_rag_context}
 
 请写出该节正文（Markdown 格式）。只输出正文，不输出标题行。
+
+写完后，在末尾另起一行用「【事实待核查】」标注本节中你不确定准确性的数据、前沿信息或案例。如果没有需标注的内容，写「【事实待核查】无」。
 ```
 
 ---
@@ -381,6 +393,7 @@ rag_client.query(kb, query_text)
 
 | 版本 | 新增/变更要点 |
 |------|-------------|
+| v1.0.28 | 事实自检内嵌标记法（零额外 LLM 调用）、temperature 可配置、RAG 停止、模型下拉框修复、子结构字数联动、大纲过滤同步进度、批量自动撰写、会话归档、深层合并 DEFAULT_CONFIG |
 | v0.2.5b4 | PyPI long_description 修复（同步 CHANGELOG） |
 | v0.2.5b3 | PyPI 发布准备：`app/`→`structured_writer/` + LICENSE + README + blueprint + Actions 检测 |
 | v0.2.5b2 | 两级 RAG、实时状态显示、子结构摘要 UI、错误不注入 prompt |
@@ -389,4 +402,4 @@ rag_client.query(kb, query_text)
 
 ---
 
-*最后更新：2026-07-26*
+*最后更新：2026-07-27*

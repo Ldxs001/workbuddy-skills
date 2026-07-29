@@ -11,12 +11,13 @@ class LLMClientError(Exception):
 
 class LLMClient:
     def __init__(self, backend="lmstudio", base_url="http://localhost:1234",
-                 timeout=180, model="", max_tokens=4096):
+                 timeout=180, model="", max_tokens=4096, temperature=0.7):
         self.backend = backend
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.model = model
         self.max_tokens = max_tokens
+        self.temperature = temperature
 
     def _get_api_url(self):
         if self.backend == "ollama":
@@ -24,10 +25,27 @@ class LLMClient:
         else:
             return f"{self.base_url}/v1/chat/completions"
 
-    def _build_payload(self, messages, max_tokens=4096, temperature=0.7):
+    def _get_api_url(self):
+        if self.backend == "ollama":
+            return f"{self.base_url}/api/chat"
+        else:
+            return f"{self.base_url}/v1/chat/completions"
+
+    def _build_payload(self, messages, max_tokens=4096, temperature=None):
+        if temperature is None:
+            temperature = self.temperature
+        # 如果 model 为空，自动获取已加载的模型
+        model_name = self.model
+        if not model_name:
+            try:
+                models = self.list_models()
+                if models:
+                    model_name = models[0]
+            except Exception:
+                pass
         if self.backend == "ollama":
             return json.dumps({
-                "model": self.model,
+                "model": model_name,
                 "messages": messages,
                 "options": {
                     "num_predict": max_tokens,
@@ -35,12 +53,14 @@ class LLMClient:
                 }
             }).encode("utf-8")
         else:
-            return json.dumps({
-                "model": self.model,
+            payload = {
                 "messages": messages,
                 "max_tokens": max_tokens,
                 "temperature": temperature
-            }).encode("utf-8")
+            }
+            if model_name:
+                payload["model"] = model_name
+            return json.dumps(payload).encode("utf-8")
 
     def _parse_response(self, body: bytes) -> str:
         data = json.loads(body)
@@ -60,7 +80,7 @@ class LLMClient:
         except Exception:
             return "stop"
 
-    def chat(self, messages, max_tokens=None, temperature=0.7,
+    def chat(self, messages, max_tokens=None, temperature=None,
              timeout=None) -> str:
         url = self._get_api_url()
         mt = max_tokens if max_tokens is not None else self.max_tokens
@@ -83,7 +103,7 @@ class LLMClient:
         except Exception as e:
             raise LLMClientError(f"LLM 调用异常: {e}")
 
-    def chat_detailed(self, messages, max_tokens=None, temperature=0.7,
+    def chat_detailed(self, messages, max_tokens=None, temperature=None,
                       timeout=None) -> dict:
         """调用 LLM 并返回 {content, finish_reason}，用于检测截断续写"""
         url = self._get_api_url()
