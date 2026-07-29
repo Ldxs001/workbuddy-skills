@@ -5,13 +5,18 @@
 
 ---
 
+## [2.2.10] - 2026-07-29
+### 新增
+- **自动回填检测 + backfill_headers.py 脚本**：`main.py` 启动时自动扫描所有 KB，若缺少 `chunk_seq`/`is_header` 则自动执行回填；支持单独调用 `python backfill_headers.py` 手动执行或 `--dry-run` 预览
+
+---
+
 ## [2.2.9] - 2026-07-29
 ### 新增
 - **chunk_seq 溯源链 + is_header 头部块标记**：摄入时每块分配全局递增序号 + 位置兜底(块0-3) + 逐块内容探测标记(作者/单位/期刊/标准头等信息)，检索时 `include_header=True` 回取头部块，合并到 context 供 LLM 直接回答文档元信息（标题/作者/单位等），无需结构化提取
 - **对外 API `POST /api/kb/query` 增加 `include_header` 参数**：默认 false 行为不变，true 时返回 `headers` 字段 + context 含 `[文档元数据]===[检索内容]` 分区域格式
 ### 变更
 - `agent.py _exec_query()` 硬编码 `include_header=True`，Web UI 对话可直接问"作者是谁""标题是什么"
-- **启动时自动检测并回填**：`main.py` 启动时扫描所有 KB，若缺少 `chunk_seq`/`is_header` 则自动执行回填（支持单独调用 `python backfill_headers.py` 手动执行）
 
 ---
 
