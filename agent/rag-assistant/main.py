@@ -341,6 +341,29 @@ def main():
     else:
         print("  知识库: 无")
 
+    # ── 存量数据回填检测（chunk_seq + is_header） ──
+    try:
+        from backfill_headers import needs_backfill, backfill_kb
+        kb_dir_path = os.path.join(data_dir, "kb")
+        if os.path.isdir(kb_dir_path):
+            pending = []
+            for entry in sorted(os.listdir(kb_dir_path)):
+                kp = os.path.join(kb_dir_path, entry)
+                if not os.path.isdir(kp):
+                    continue
+                if needs_backfill(kp):
+                    pending.append(entry)
+            if pending:
+                print(f"  检测到 {len(pending)} 个 KB 缺少 chunk_seq/is_header，自动回填...")
+                for name in pending:
+                    try:
+                        c, m = backfill_kb(name, os.path.join(kb_dir_path, name))
+                        print(f"    [{name}] 完成: {c} 块, {m} 条")
+                    except Exception as e:
+                        print(f"    [{name}] 失败: {e}")
+    except Exception:
+        pass
+
     if not agent.rag.ready:
         logger.warning("RAG 模块未就绪 - 请确保 data/ 目录下有知识库和模型")
     if args.command != "migrate":

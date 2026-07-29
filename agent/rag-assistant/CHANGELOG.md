@@ -5,6 +5,16 @@
 
 ---
 
+## [2.2.9] - 2026-07-29
+### 新增
+- **chunk_seq 溯源链 + is_header 头部块标记**：摄入时每块分配全局递增序号 + 位置兜底(块0-3) + 逐块内容探测标记(作者/单位/期刊/标准头等信息)，检索时 `include_header=True` 回取头部块，合并到 context 供 LLM 直接回答文档元信息（标题/作者/单位等），无需结构化提取
+- **对外 API `POST /api/kb/query` 增加 `include_header` 参数**：默认 false 行为不变，true 时返回 `headers` 字段 + context 含 `[文档元数据]===[检索内容]` 分区域格式
+### 变更
+- `agent.py _exec_query()` 硬编码 `include_header=True`，Web UI 对话可直接问"作者是谁""标题是什么"
+- **启动时自动检测并回填**：`main.py` 启动时扫描所有 KB，若缺少 `chunk_seq`/`is_header` 则自动执行回填（支持单独调用 `python backfill_headers.py` 手动执行）
+
+---
+
 ## [2.2.8] - 2026-07-26
 ### 新增
 - **外部 API 新增 `/api/kb/query` 端点**：支持外部系统（如 Structured Writer）直接调知识库检索，返回上下文和来源。接收 `query`（必填）、`kb`（可选，空=自动路由）、`top_k`、`score_threshold` 参数，调用 `agent.rag.query()` 完整检索管线（路由→检索→精排→NLI→build_context），不额外消耗 LLM token
