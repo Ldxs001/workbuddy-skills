@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload to PyPI (Trusted Publisher)
         if: steps.info.outputs.type == 'agent'
-        uses: pypa/gh-action-pypi-publish@v1
+        uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
           packages-dir: dist/
           print-hash: true
