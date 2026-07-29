@@ -1,3 +1,51 @@
+## [2.33.0] - 2026-07-27
+
+### 新增
+- **路径统一管理**：所有临时文件迁移到 `_paths.py` 的 `TEMP_DIR`（`~/.workbuddy/skills/.standardization/git-sync/temp/`），`_paths.py` 新增 `temp_scan_path()` / `temp_filter_scan_path()` 等统一路径函数
+- **Agent 类型自动检测**：不再硬编码 `rag_assistant/__init__.py`，改为 `rglob("__init__.py")` 扫描含 `__version__` 的文件，兼容 `structured_writer/__init__.py` 等任意命名
+- **文件筛除决策助手脚本**：`step_llm_file_filter` 生成 `write_filter_decision_{name}.py` 脚本，LLM 通过 Bash 执行写入决策文件，不再依赖 Write tool
+- **`WORK_REPO` 路径归一化**：`git-sync.sh` 使用 `.as_posix()` 统一为正斜杠，避免反斜杠在 Python 字符串中被转义
+
+### 变更
+- **`manifest.json` 路径同步 `_paths.py`**：`repos.workbuddy-skills.path` 改为 `.workbuddy/workbuddy-skills`，`manifest.py` `get_repo_path()` 回退到 `from _paths import WORK_REPO`
+- **`git-sync.py` 版本对比**：agent 仓库版本来用 `rglob` 而非硬编码路径
+- **参考文档修正**：`reference.md` 路径描述同步为 `.workbuddy`，移除错误的 `WorkBuddy` 引用
+
+### 修复
+- agent 版本号读取失败（硬编码 `rag_assistant/__init__.py`） → 改为 `rglob` 查找
+- `git-sync.sh` 版本号读取中反斜杠导致 Python 字符串转义错误
+- `clean_zip_source.py` / `sync_with_exclude.py` 未排除 `.standardization/git-sync/temp/` 目录
+
+## [2.32.0] - 2026-07-21
+
+### 变更
+- **文件筛除管道封闭**：`step_llm_file_filter` 无 decision 文件时不再 `return None`，改为 **poll 等待** LLM 写入 decision 文件后自动继续，不需重跑 git-sync。门禁封闭，不允许任何方式 bypass
+
+### 修复
+- **`--skip-push` 不存在导致报错**：移除了代码中残留的 `--skip-push` 引用
+
+## [2.31.0] - 2026-07-21
+
+### 安全修复（重大）
+- **【安全】移除 `--skip-scan` 参数**：`--skip-scan` 允许跳过敏感信息脱敏流程，导致邮箱/Token/本地路径等敏感信息可能被推送到公开仓库。已彻底移除该参数和所有相关逻辑（git-sync.py / git-sync.sh）
+- **【安全】移除 `GIT_SYNC_SENSITIVE_MODE=keep-as-is`**：该环境变量模式允许保留敏感信息不做脱敏。已彻底移除，同 `--skip-scan`
+- **【安全】敏感信息脱敏改为强制流程**：代码同步前和工作仓库同步后两处脱敏均为强制执行，无任何跳过选项
+- **【安全】审计报告标记修正**：之前跳过脱敏后审计报告显示"✅ 脱敏状态：未扫描"，现改为"❌ 脱敏状态：未扫描（脱敏是强制安全门禁，不允许跳过）"
+- **文档清理**：SKILL.md、reference.md、faq.md、guide.md 移除所有 `--skip-scan` 和 `keep-as-is` 相关引用
+
+## [2.30.0] - 2026-07-21
+
+### 变更
+- **LLM 文件筛除不再卡死**：`step_llm_file_filter()` 不再只写扫描文件后空等，改为全量打印文件列表 + 规则到 stdout，要求 WorkBuddy 在回复中输出决策 JSON。不再静默挂起
+- **路径映射从 manifest 统一管理**：manifest 条目新增 `source_path` / `repo_path` 字段，`manifest.py add` 自动按 type 填充默认路径。`git-sync.py` 优先读 manifest，无则回退硬编码。skill 和 agent 统一走同一套逻辑
+- **README 更新同时覆盖 skills + agents**：移除 `is_skill` 限制，agent 同步后也会触发 README 重新生成（`update_readme.py` 本身已支持扫描 agent/ 目录）
+- **Release 简化**：只打 tag + 建 Release 页面，不传 ZIP。源码包由 GitHub/Gitee 自动从 tag 生成
+- **仓库名从 config.json 读取**：`release_creator.py` 和 `step_release_create()` 不再硬编码，改为读 `config.json` 的 `gitee.user/repo` + `github.user/repo`
+- **版本号全局归一化 PEP 440**：新增 `_normalize_version()` 函数，入口统一转换版本格式（`1.7.0-beta` → `1.7.0b1`），所有外部输出用归一化版本，源文件不改
+- **dev_status 自动判别**：PEP 440 预发布后缀（`.bN`/`.rcN`/`.aN`/`.devN`）→ `4 - Beta`，纯 `x.y.z` → `5 - Production/Stable`
+- **PyPI trigger tag 通用化**：格式统一为 `pypi/{type}/{name}/{version}`，manifest 驱动，所有项目通用
+- **新增 GitHub Actions 模板**：`references/pypi-github-actions.yml`，监听 `pypi/*/*/*`，Trusted Publisher 配置指南
+
 ## [2.28.2] - 2026-07-16
 
 ### 修复
@@ -59,7 +107,7 @@
 ## [2.26.3] - 2026-07-09
 
 ### 修复
-- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `/c/Users/sm001/...` 未被扫描发现
+- **Git Bash 格式本地路径漏脱敏**：sensitive_scan.py 的本地路径正则只匹配 `C:\Users\` 反斜杠格式，未匹配 `/c/Users/` Git Bash 格式。导致 git-sync.sh 中的硬编码路径 `[LOCAL_PATH]/...` 未被扫描发现
 - **LLM 决策逻辑修复**：`"路径"` 之前被纳入 public_labels 允许列表，导致公开文档中的真实路径被 keep。改为仅当没有 "本地绝对路径" / "家目录路径" 标签时才 keep
 
 ### 变更

@@ -9,7 +9,7 @@ See https://creativecommons.org/licenses/by-sa/4.0/ for details.
 
 > 独立 RAG 智能体 — LLM 驱动的组合式语义检索与多库路由。
 > 作者：wUwproject | 许可证：Apache 2.0
-> 更新：2026-07-20 (v1.7.0b1)
+> 更新：2026-07-24 (v2.1.0b2) — 新增智能体插件系统 + AI 插件生成器
 
 ---
 
@@ -30,7 +30,9 @@ RAG Assistant 是一个**本地知识库问答智能体**，基于 local-rag-bui
               4. (可选) NLI 三向分类（entailment / neutral / contradiction）
               5. 构建上下文（build_context，含 NLI 标签渲染 + SM3 去重）
            → [SM3 国密去重合并] 按内容哈希去重
+           → [插件注入] input_return 插件结果注入上下文（如联网搜索补充）
            → [LLM 综合回答] 基于完整上下文 + 用户画像 + 3插槽 prompt 生成回答
+           → [插件副作用] input_output 插件执行（如日志记录）
            → [引用门禁] 校验 LLM 回答中的 [n] 引用是否在资料段落范围内
 ```
 
@@ -291,6 +293,11 @@ slices = [
 | `/api/memory/inject` | POST | 注入系统通知 |
 | `/api/search/toggle` | POST | 联网搜索开关 |
 | `/api/availability-status` | GET | 模型下载探测状态（v0.9.0） |
+| `/api/plugins` | GET | 插件列表（v2.1.0） |
+| `/api/plugins/toggle` | POST | 启用/禁用插件（v2.1.0） |
+| `/api/plugins/config` | POST | 打开插件配置界面（v2.1.0） |
+| `/api/plugins/refresh` | POST | 重新扫描插件目录（v2.1.0） |
+| `/api/plugins/generate` | POST | AI 插件生成器（v2.1.0） |
 
 **关键交互细节**：
 - `loadModels()` 在页面加载后 500ms 触发，填充模型下拉框
@@ -581,10 +588,12 @@ _parse_action(reply)
                   → retrieve_context(slice, ...)
                     → route_query → retrieve_documents → reranker → NLI → build_context
            → SM3 去重合并
+           → [插件] pm.run_before_response() — input_return 插件注入上下文
            → return {context, docs, kb}
          → _second_pass(message, context, action)
            → build_second_pass_prompt(context, question, kb)  # 3 插槽
            → LLM 基于上下文生成回答
+           → [插件] pm.run_after_response() — input_output 插件副作用
            → 引用门禁校验
            → 记忆写入 → record_habit() → record_gap()
        → type == "search"
@@ -595,7 +604,7 @@ _parse_action(reply)
          → path == 具体路径 → import_file()
          → 含 content → import_text()
        ↓
-回答返回前端
+回答返回前端（含插件注入内容）
 ```
 
 ### 6.2 导入生命周期 — 完整管道
@@ -660,6 +669,79 @@ chunks 输出
 ```
 
 通过 `register_strategy()` / `register_guard()` 扩展自定义策略。
+
+### 6.6 智能体插件系统 — `plugins/`（v2.1.0+）
+
+针对应答链路的**可扩展旁路增强**，不侵入核心决策循环。
+
+**插件在智能体生命周期中的位置：**
+
+```
+用户提问 → LLM 决策 → RAG 检索 → [input_return 插件注入] → LLM 生成回答 → [input_output 插件副作用] → 返回
+                                  ↑ 回答前注入上下文                        ↑ 回答后执行副作用
+```
+
+**两种插件类型：**
+
+| 类型 | 时机 | 用途 | 示例 |
+|------|------|------|------|
+| `input_return` | 回答生成**前** | 结果注入 LLM 上下文 | 联网搜索补充、股票行情查询 |
+| `input_output` | 回答生成**后** | 副作用（不注入上下文） | 日志记录、结果缓存 |
+
+**6 字段池（智能体裁剪传递）：**
+`question` / `answer_draft` / `thinking` / `rag_context` / `session_id` / `plugin_dir`
+
+**安全层级（5 道防线）：**
+
+| 防线 | 机制 |
+|------|------|
+| 信息隔离 | 只传插件声明的 `input_fields`，其余字段不可见 |
+| 文件沙箱 | 运行时数据仅限 `data/plugins/<name>/` |
+| 超时熔断 | 每个插件独立 timeout，连续 3 次失败自动禁用 |
+| 输出校验 | 返回 `type` 非 `markdown/json/csv/plain_text` 则丢弃 |
+| SM3 签名 | 可选国密哈希校验插件代码完整性 |
+
+**标准化接口：**
+
+```python
+class PluginBase(abc.ABC):
+    async def execute(self, inputs: dict) -> dict:
+        # 返回: {"type":"markdown|json|csv|plain_text","content":"...","priority":0}
+```
+
+**目录结构：**
+
+```
+rag_assistant/plugins/              ← 插件框架代码
+├── base.py                         ← PluginBase 基类
+├── manager.py                      ← 发现/注册/生命周期/熔断
+└── builtin/                        ← 内置插件（随系统发布）
+    ├── web_search/                 ← 联网搜索
+    └── web_llm/                    ← 远程大模型调用
+
+data/plugins/                       ← 运行时数据目录
+├── <builtin_plugin>/config.json    ← 内置插件运行时配置
+└── <user_plugin>/                  ← 用户安装插件（代码 + 数据）
+    ├── plugin.json
+    ├── plugin_xxx.py
+    └── config.json
+```
+
+**AI 插件生成器（Web UI 插件 Tab）：**
+
+插件 Tab 采用左右分栏布局——左侧 LLM 对话面板生成插件，右侧插件管理面板（启用/禁用/配置）。生成流程为二阶段 + 7 步校验：
+
+```
+用户描述需求 → 阶段1: LLM 评估可行性 → 确认 → 阶段2: LLM 生成代码
+→ ① plugin.json 合法性 → ② Python 语法 (ast.parse)
+→ ③ AST 结构检查（防 PluginBase 重定义）
+→ ④ 目录规划（user→data/plugins/）→ ⑤ 原子写入 (tempfile+rename)
+→ ⑥ SM3 签名 → ⑦ discover_and_register 刷新注册
+```
+
+**配置项（`llm_config.json`）：**
+
+插件生成调用与主智能体共享 LLM 配置（model / max_tokens / timeout），仅 `temperature=0.3` 固定用于代码生成确定性。
 
 ---
 
@@ -798,6 +880,16 @@ numpy>=1.24                       # 向量余弦相似度计算
 
 | 版本 | 新增/变更要点 |
 |------|-------------|
+| v2.1.0b2 | AI 插件生成器（二阶段 LLM + 7 阶段校验管道）；web_llm 多 profile 配置系统；setup.bat HNSW 修复 |
+| v2.1.0b1 | 智能体插件系统（PluginBase + PluginManager + 5 道防线）；内置联网搜索插件；插件 Web UI 管理面板 |
+| v2.0.0b1 | 1.x → 2.x HNSW 索引引擎更换；Chroma 适配器重构；setup.bat 全量重建提示 |
+| v1.8.0 | 外部 API 端口独立（8767）；引擎独立化（engine/ 副本自包含） |
+| v1.7.0 | PROTOCOL 协议升级；KB 签名多向量路由 |
+| v1.5.0b1 | Web 配置页面内嵌（iframe 模式）；双端口架构 |
+| v1.3.0-beta | 双面板 Web UI（配置 + 对话） |
+| v1.2.0 | 组合检索（LLM 分词 + entities × attrs 穷举展开） |
+| v1.1.0 | 四层记忆系统（短时/压缩/习惯/缺口） |
+| v1.0.0 | 从 local-rag-builder 仓库外项目独立为正式版 |
 | v0.9.5 | README 架构图补 NLI；NLI 模型探测遍历所有源修复 |
 | v0.9.0 | NLI 三向分类器；网络探测并行化；Config 自动修正模型路径；组合查询两两配对 + 中文逗号 |
 | v0.8.0 | KB 暂停写入；历史对话隔离；引用校验；OCR 触发条件修复 |

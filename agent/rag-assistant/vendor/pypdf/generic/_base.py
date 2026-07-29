@@ -58,7 +58,7 @@ from .._utils import (
 from ..errors import STREAM_TRUNCATED_PREMATURELY, PdfReadError, PdfStreamError
 
 __author__ = "Mathieu Fenniak"
-__author_email__ = "biziqe@mathieu.fenniak.net"
+__author_email__ = "[email-redacted]"
 
 
 class PdfObject(PdfObjectProtocol):

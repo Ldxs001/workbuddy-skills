@@ -36,7 +36,7 @@ class RAGWrapper:
     def ready(self) -> bool:
         return self._ready
 
-    def query(self, question: str, kb_name: str = None, **kwargs) -> dict:
+    def query(self, question: str, kb_name: str = None, include_header: bool = False, **kwargs) -> dict:
         """直接调 retrieve_context，完整走技能自身流程"""
         if not self._ready:
             return {"context": "", "has_context": False, "success": False,
@@ -48,6 +48,7 @@ class RAGWrapper:
                 kb_name=kb_name or "default",
                 k=kwargs.get("k", 5),
                 score_threshold=kwargs.get("score_threshold", 0.0),
+                include_header=include_header,
             )
             context = result.get("context", "")
             docs = result.get("source_docs", result.get("documents", []))
@@ -63,6 +64,7 @@ class RAGWrapper:
                 "kb": actual_kb or kb_name or "",
                 "success": True,
                 "has_context": bool(context.strip()),
+                "headers": result.get("headers", {}),
             }
         except Exception as e:
             logger.exception(f"RAG 检索失败: {e}")

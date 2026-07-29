@@ -6,9 +6,9 @@ SKILL_DIR="$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
 _data_dir_abs="$SKILL_DIR/../.standardization/git-sync/data"
 
 
-# git-sync v2.7.0
+# git-sync v2.32.0
 # 将 skill/agent 代码规范化推送到码云/GitHub，支持 ClawHub/SkillHub/PyPI/Release
-# 用法: bash git-sync.sh <name> [version] [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]
+# 用法: bash git-sync.sh <name> [version] [--skip-market] [--market-only] [--pypi] [--release]
 set -eo pipefail
 
 # ── 0. 参数解析 ─────────────────────────────
@@ -17,18 +17,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -W)"
 SKILLS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd -W)"
 WORKSPACE_ROOT="$(cd "$SKILLS_DIR/.." && pwd -W)"
 # 从 _paths.py 读取统一管理的仓库路径
-WORK_REPO="$(python -c "import sys; sys.path.insert(0,'$SCRIPT_DIR'); from _paths import WORK_REPO; print(WORK_REPO)" 2>/dev/null || echo "$HOME/.workbuddy/workbuddy-skills")"
+WORK_REPO="$(python -c "import sys; sys.path.insert(0,'$SCRIPT_DIR'); from _paths import WORK_REPO; print(WORK_REPO.as_posix())" 2>/dev/null || echo "$HOME/.workbuddy/workbuddy-skills")"
 NAME="${1:-}"
 VERSION="${2:-}"
-SKIP_SCAN=false
 SKIP_MARKET=false
 MARKET_ONLY=false
 DO_PYPI=false
 DO_RELEASE=false
 for arg in "$@"; do
-    [ "$arg" = "--skip-scan" ] && SKIP_SCAN=true
     [ "$arg" = "--skip-market" ] && SKIP_MARKET=true
-    [ "$arg" = "--market-only" ] && MARKET_ONLY=true && SKIP_SCAN=true
+    [ "$arg" = "--market-only" ] && MARKET_ONLY=true
     [ "$arg" = "--pypi" ] && DO_PYPI=true
     [ "$arg" = "--release" ] && DO_RELEASE=true
 done
@@ -72,7 +70,7 @@ if [ "$NAME" = "all" ]; then
 fi
 
 if [ -z "$NAME" ]; then
-    echo "用法: bash git-sync.sh <name> [version] [--skip-scan] [--skip-market] [--market-only] [--pypi] [--release]"
+    echo "用法: bash git-sync.sh <name> [version] [--skip-market] [--market-only] [--pypi] [--release]"
     exit 1
 fi
 
@@ -91,11 +89,12 @@ if [ "$TYPE" = "skill" ]; then
 elif [ "$TYPE" = "agent" ]; then
     SRC_DIR="$SKILLS_DIR/../agent/$NAME"
     WORK_REPO_DIR="agent/$NAME"
-    META_FILE="$SRC_DIR/rag_assistant/__init__.py"
     # 兼容：如果 ~/.workbuddy/agent/ 不存在，从 $WORK_REPO 直接读取
     if [ ! -d "$SRC_DIR" ]; then
         SRC_DIR="$WORK_REPO/$WORK_REPO_DIR"
     fi
+    # 自动检测 __init__.py（不硬编码 rag_assistant/）
+    META_FILE=$(python -c "import sys; sys.path.insert(0,'$SCRIPT_DIR'); from pathlib import Path; d=Path('$SRC_DIR'); fs=sorted(d.rglob('__init__.py')); [print(str(f)) for f in fs if f.parent!=d and '__version__' in f.read_text(errors='ignore')]" 2>/dev/null | head -1)
 fi
 
 SKILL_NAME="$NAME"
@@ -106,8 +105,18 @@ if [ -z "$VERSION" ]; then
         META_FILE_WIN=$(cygpath -w "$META_FILE" 2>/dev/null || echo "$META_FILE")
         VERSION=$(python -c "import json; f=open(r'$META_FILE_WIN', encoding='utf-8'); meta=json.load(f); print(meta.get('version',''))" 2>/dev/null || echo "")
     elif [ "$TYPE" = "agent" ]; then
-        META_FILE_WIN=$(cygpath -w "$META_FILE" 2>/dev/null || echo "$META_FILE")
-        VERSION=$(python -c "import re; f=open(r'$META_FILE_WIN'); c=f.read(); m=re.search(r'__version__\s*=\s*\"([^\"]+)\"',c); print(m.group(1) if m else '')" 2>/dev/null || echo "")
+        VERSION=$(python -c "
+import re, sys; sys.path.insert(0,'$SCRIPT_DIR')
+from pathlib import Path
+d=Path('$SRC_DIR')
+for f in sorted(d.rglob('__init__.py')):
+    if f.parent==d: continue
+    try:
+        t=f.read_text(encoding='utf-8')
+        m=re.search(r'__version__\s*=\s*\"([^\"]+)\"',t)
+        if m: print(m.group(1)); break
+    except: pass
+" 2>/dev/null || echo "")
     fi
     if [ -z "$VERSION" ]; then
         echo "❌ 无法读取版本号，请手动指定"; exit 1
@@ -164,6 +173,10 @@ ZIP_FILE="$DIST_DIR/$ZIP_NAME"
 MANIFEST_FILE="$HOME/.workbuddy/skills/.standardization/git-sync/data/manifest.json"
 README_FILE="$WORK_REPO/README.md"
 
+# 统一临时文件目录（与 _paths.py TEMP_DIR 一致）
+TEMP_DIR="$SCRIPT_DIR/../../.standardization/git-sync/temp"
+mkdir -p "$TEMP_DIR" 2>/dev/null || true
+
 # 读取 description（仅 skill 有 meta.json）
 if [ "$TYPE" = "skill" ] && [ -f "$META_FILE" ]; then
     SKILL_DESC=$(python "$SCRIPT_DIR/get_meta_desc.py" "$META_FILE" 2>/dev/null || echo "")
@@ -194,11 +207,20 @@ echo "[2/8] 版本号对比（仓库 vs 本地源文件）..."
 REPO_VER=""
 LOCAL_VER="$VERSION"
 REPO_META_FILE="$WORK_REPO/$WORK_REPO_DIR/_meta.json"
-REPO_INIT_FILE="$WORK_REPO/$WORK_REPO_DIR/rag_assistant/__init__.py"
 if [ -f "$REPO_META_FILE" ]; then
     REPO_VER=$(python "$SCRIPT_DIR/get_meta_version.py" "$REPO_META_FILE" 2>/dev/null || echo "")
-elif [ -f "$REPO_INIT_FILE" ]; then
-    REPO_VER=$(python -c "import re; f=open(r'$REPO_INIT_FILE'); c=f.read(); m=re.search(r'__version__\s*=\s*\"([^\"]+)\"',c); print(m.group(1) if m else '')" 2>/dev/null || echo "")
+else
+    REPO_VER=$(python -c "
+import re; from pathlib import Path
+d=Path('$WORK_REPO/$WORK_REPO_DIR')
+for f in sorted(d.rglob('__init__.py')):
+    if f.parent==d: continue
+    try:
+        t=f.read_text(encoding='utf-8')
+        m=re.search(r'__version__\s*=\s*\"([^\"]+)\"',t)
+        if m: print(m.group(1)); break
+    except: pass
+" 2>/dev/null || echo "")
 fi
 echo "  仓库版本: ${REPO_VER:-（无）}"
 echo "  本地源文件版本: $LOCAL_VER"
@@ -290,6 +312,7 @@ RSYNC_OPTS=(
     --exclude="._*"
     --exclude=".decisions.json"
     --exclude=".sensitive_scan_*.json"
+    --exclude=".standardization/git-sync/temp/*"
     --exclude="zip_out"
     --exclude="preview_server.py"
 )
@@ -316,42 +339,27 @@ find "$DST" -type f | sed "s|$DST/|  - |" | head -20
 
 # ── 4.5 敏感信息扫描（同步到仓库后、提交前）──────────────────────
 echo ""
-echo "[4.5/8] 扫描敏感信息..."
-SENSITIVE_MODE="${GIT_SYNC_SENSITIVE_MODE:-prompt}"
-SCAN_OUTPUT="$SCRIPT_DIR/.sensitive_scan_${SKILL_NAME}.json"
-DECISION_FILE="${SCAN_OUTPUT}.decisions.json"
-if [ "$SKIP_SCAN" = true ]; then
-    echo "  ⏭️  已跳过敏感信息扫描（--skip-scan）"
-else
-    python "$SCRIPT_DIR/sensitive_scan.py" scan "$DST" \
-        --output "$SCAN_OUTPUT" 2>/dev/null || true
-    if [ -s "$SCAN_OUTPUT" ]; then
-        echo "  ⚠️  发现敏感信息："
-        python -c "import json; data=json.load(open('$SCAN_OUTPUT')); [print(f'  - {e[\"file\"]}: {len(e[\"findings\"])} 处') for e in data[:5]]" 2>/dev/null || true
-        rm -f "$DECISION_FILE"
-        if [ "$SENSITIVE_MODE" = "always-sanitize" ]; then
-            echo "  🔒  已配置为 always-sanitize，自动全部脱敏..."
-            python "$SCRIPT_DIR/make_all_sanitize.py" "$SCAN_OUTPUT" > "$DECISION_FILE"
-        elif [ "$SENSITIVE_MODE" = "keep-as-is" ]; then
-            echo "  ⏭️  已配置为 keep-as-is，跳过脱敏"
-        else
-            python "$SCRIPT_DIR/sensitive_scan.py" interactive "$SCAN_OUTPUT" \
-                --output "$DECISION_FILE" || {
-                echo "  ⚠️  交互失败，默认全部脱敏"
-                python "$SCRIPT_DIR/make_all_sanitize.py" "$SCAN_OUTPUT" > "$DECISION_FILE"
-            }
-        fi
-        if [ -s "$DECISION_FILE" ]; then
-            echo "  → 对工作仓库中的文件执行脱敏..."
-            python "$SCRIPT_DIR/sensitive_scan.py" apply "$DST" \
-                --decisions "$DECISION_FILE" \
-                --scan-result "$SCAN_OUTPUT"
-        fi
-        rm -f "$SCAN_OUTPUT" "$DECISION_FILE" 2>/dev/null || true
-    else
-        echo "  ✅ 未发现敏感信息"
-        rm -f "$SCAN_OUTPUT" 2>/dev/null || true
+echo "[4.5/8] 扫描敏感信息（强制，不可跳过）..."
+SCAN_OUTPUT="$TEMP_DIR/sensitive_scan_${SKILL_NAME}.json"
+DECISION_FILE="$TEMP_DIR/sensitive_scan_${SKILL_NAME}.decisions.json"
+python "$SCRIPT_DIR/sensitive_scan.py" scan "$DST" \
+    --output "$SCAN_OUTPUT" 2>/dev/null || true
+if [ -s "$SCAN_OUTPUT" ]; then
+    echo "  ⚠️  发现敏感信息："
+    python -c "import json; data=json.load(open('$SCAN_OUTPUT')); [print(f'  - {e[\"file\"]}: {len(e[\"findings\"])} 处') for e in data[:5]]" 2>/dev/null || true
+    rm -f "$DECISION_FILE"
+    echo "  🔒  自动全部脱敏..."
+    python "$SCRIPT_DIR/make_all_sanitize.py" "$SCAN_OUTPUT" > "$DECISION_FILE"
+    if [ -s "$DECISION_FILE" ]; then
+        echo "  → 对工作仓库中的文件执行脱敏..."
+        python "$SCRIPT_DIR/sensitive_scan.py" apply "$DST" \
+            --decisions "$DECISION_FILE" \
+            --scan-result "$SCAN_OUTPUT"
     fi
+    rm -f "$SCAN_OUTPUT" "$DECISION_FILE" 2>/dev/null || true
+else
+    echo "  ✅ 未发现敏感信息"
+    rm -f "$SCAN_OUTPUT" 2>/dev/null || true
 fi
 
 # ── 5. 更新 README.md（仅 skill）─────────────────────
@@ -449,43 +457,30 @@ echo "[7.5/8] 打包前敏感信息扫描..."
 ZIP_SOURCE="$SRC_DIR"  # 默认用源目录
 ZIP_TMP=""
 
-if [ "$SKIP_SCAN" = true ]; then
-    echo "  ⏭️  已跳过（--skip-scan）"
-else
-    SCAN_OUTPUT_ZIP="$SCRIPT_DIR/.sensitive_scan_${SKILL_NAME}_zip.json"
-    DECISION_FILE_ZIP="${SCAN_OUTPUT_ZIP}.decisions.json"
-    python "$SCRIPT_DIR/sensitive_scan.py" scan "$SKILLS_DIR/$SKILL_NAME" \
-        --output "$SCAN_OUTPUT_ZIP" 2>/dev/null || true
-    if [ -s "$SCAN_OUTPUT_ZIP" ]; then
-        echo "  ⚠️  发现敏感信息，将在副本中脱敏..."
-        rm -f "$DECISION_FILE_ZIP"
-        if [ "$SENSITIVE_MODE" = "always-sanitize" ]; then
-            python "$SCRIPT_DIR/make_all_sanitize.py" "$SCAN_OUTPUT_ZIP" > "$DECISION_FILE_ZIP"
-        elif [ "$SENSITIVE_MODE" = "keep-as-is" ]; then
-            echo "  ⏭️  已配置为 keep-as-is，跳过脱敏"
-        else
-            python "$SCRIPT_DIR/sensitive_scan.py" interactive "$SCAN_OUTPUT_ZIP" \
-                --output "$DECISION_FILE_ZIP" || {
-                python "$SCRIPT_DIR/make_all_sanitize.py" "$SCAN_OUTPUT_ZIP" > "$DECISION_FILE_ZIP"
-            }
-        fi
-        if [ -s "$DECISION_FILE_ZIP" ]; then
-            ZIP_TMP_BASE=$(python -c "import tempfile, os; print(os.path.normpath(tempfile.gettempdir()))" 2>/dev/null || echo "/tmp")
-            ZIP_TMP="$ZIP_TMP_BASE/.tmp_zip_$$"
-            rm -rf "$ZIP_TMP" 2>/dev/null || true
-            mkdir -p "$ZIP_TMP"
-            cp -r "$SKILLS_DIR/$SKILL_NAME" "$ZIP_TMP/" 2>/dev/null || true
-            echo "  打包: $ZIP_TMP/$SKILL_NAME"
-            python "$SCRIPT_DIR/sensitive_scan.py" apply "$ZIP_TMP/$SKILL_NAME" \
-                --decisions "$DECISION_FILE_ZIP" \
-                --scan-result "$SCAN_OUTPUT_ZIP"
-            ZIP_SOURCE="$ZIP_TMP/$SKILL_NAME"
-        fi
-        rm -f "$SCAN_OUTPUT_ZIP" "$DECISION_FILE_ZIP" 2>/dev/null || true
-    else
-        echo "  ✅ 未发现敏感信息"
-        rm -f "$SCAN_OUTPUT_ZIP" 2>/dev/null || true
+SCAN_OUTPUT_ZIP="$TEMP_DIR/sensitive_scan_${SKILL_NAME}_zip.json"
+DECISION_FILE_ZIP="$TEMP_DIR/sensitive_scan_${SKILL_NAME}_zip.decisions.json"
+python "$SCRIPT_DIR/sensitive_scan.py" scan "$SKILLS_DIR/$SKILL_NAME" \
+    --output "$SCAN_OUTPUT_ZIP" 2>/dev/null || true
+if [ -s "$SCAN_OUTPUT_ZIP" ]; then
+    echo "  ⚠️  发现敏感信息，将在副本中脱敏..."
+    rm -f "$DECISION_FILE_ZIP"
+    python "$SCRIPT_DIR/make_all_sanitize.py" "$SCAN_OUTPUT_ZIP" > "$DECISION_FILE_ZIP"
+    if [ -s "$DECISION_FILE_ZIP" ]; then
+        ZIP_TMP_BASE=$(python -c "import tempfile, os; print(os.path.normpath(tempfile.gettempdir()))" 2>/dev/null || echo "/tmp")
+        ZIP_TMP="$ZIP_TMP_BASE/.tmp_zip_$$"
+        rm -rf "$ZIP_TMP" 2>/dev/null || true
+        mkdir -p "$ZIP_TMP"
+        cp -r "$SKILLS_DIR/$SKILL_NAME" "$ZIP_TMP/" 2>/dev/null || true
+        echo "  打包: $ZIP_TMP/$SKILL_NAME"
+        python "$SCRIPT_DIR/sensitive_scan.py" apply "$ZIP_TMP/$SKILL_NAME" \
+            --decisions "$DECISION_FILE_ZIP" \
+            --scan-result "$SCAN_OUTPUT_ZIP"
+        ZIP_SOURCE="$ZIP_TMP/$SKILL_NAME"
     fi
+    rm -f "$SCAN_OUTPUT_ZIP" "$DECISION_FILE_ZIP" 2>/dev/null || true
+else
+    echo "  ✅ 未发现敏感信息"
+    rm -f "$SCAN_OUTPUT_ZIP" 2>/dev/null || true
 fi
 
 # 清理 ZIP 源目录中的临时文件

@@ -1,7 +1,7 @@
 """
 Representation and utils for ranges of PDF file pages.
 
-Copyright (c) 2014, Steve Witham <switham_github@mac-guyver.com>.
+Copyright (c) 2014, Steve Witham <[email-redacted]>.
 All rights reserved. This software is available under a BSD license;
 see https://github.com/py-pdf/pypdf/blob/main/LICENSE
 """

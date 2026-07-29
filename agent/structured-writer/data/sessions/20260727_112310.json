@@ -1,0 +1,260 @@
+{
+  "session_id": "20260727_112310",
+  "created_at": "2026-07-27T11:23:10.868006",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 1800,
+      "max_tokens": 40960
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 3000,
+      "max_tokens": 81920
+    },
+    "default_prompt": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+    "selected_template": "通用公文",
+    "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
+    "templates": {
+      "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+      "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
+      "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
+      "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
+      "自定义": ""
+    }
+  },
+  "outline": {
+    "title": "关于机器人嗅觉在具身智能发展中地位的分析",
+    "sections": [
+      {
+        "id": "s1",
+        "title": "具身智能的核心范式与定义解析",
+        "subtitle": "",
+        "summary": "本节旨在明确具身智能的基本定义，论证其核心在于智能体通过物理身体与环境进行动态交互。重点阐述身体、大脑和环境的三位一体耦合关系，以及感知行动闭环的重要性，区别于单纯 LLM 推理的离身智能模式。",
+        "word_count": 1200,
+        "is_key": true,
+        "sub_sections": [
+          {
+            "id": "s1_1",
+            "title": "具身智能的基本定义与核心要素",
+            "summary": "解析智能体、物理身体与环境三要素的协同关系，强调身体形态参与计算的特性。",
+            "word_count": 400,
+            "status": "done",
+            "actual_word_count": 572,
+            "_checked": true
+          },
+          {
+            "id": "s1_2",
+            "title": "感知 - 行动闭环的运行机制",
+            "summary": "阐述从感知获取信息到决策行动再到反馈优化的持续循环过程，说明智能行为的产生逻辑。",
+            "word_count": 400,
+            "status": "done",
+            "actual_word_count": 478,
+            "_checked": true
+          },
+          {
+            "id": "s1_3",
+            "title": "具身智能与离散 LLM 推理的区别",
+            "summary": "对比传统符号处理与物理交互的差异，论证为何真正的智能必须在真实物理世界中实现。",
+            "word_count": 400,
+            "status": "done",
+            "actual_word_count": 561,
+            "_checked": true
+          }
+        ],
+        "status": "done",
+        "actual_word_count": 1677,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s2",
+        "title": "多模态感知在具身系统中的地位",
+        "subtitle": "",
+        "summary": "本节探讨当前主流感知模态的局限性，论证单一视觉或触觉不足以支撑复杂环境下的智能决策。重点分析嗅觉作为补充模态的独特价值及其对环境信息的丰富作用。",
+        "word_count": 900,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s2_1",
+            "title": "视觉与触觉在复杂环境中的局限",
+            "summary": "分析光线依赖、遮挡问题及接触式感知的滞后性，说明现有模态的不足。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 342,
+            "_checked": true
+          },
+          {
+            "id": "s2_2",
+            "title": "嗅觉作为环境信息的重要补充",
+            "summary": "探讨嗅觉在远距离探测、危险识别及非接触感知方面的独特优势与潜力。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 372,
+            "_checked": true
+          },
+          {
+            "id": "s2_3",
+            "title": "多模态融合对鲁棒性的提升",
+            "summary": "论述引入嗅觉如何增加感知冗余，从而在单一传感器失效时保障系统安全性。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 366,
+            "_checked": true
+          }
+        ],
+        "status": "done",
+        "actual_word_count": 1144,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s3",
+        "title": "嗅觉感知的经验主义特性解析",
+        "subtitle": "",
+        "summary": "本节深入剖析嗅觉的本质，强调其作为经验主义的特征。论证嗅觉识别与闻见是弱相关步骤，且主观体验的差异性需通过标签共识达成交互理解，为后续讨论机器人如何实现此类共识奠定基础。",
+        "word_count": 900,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s3_1",
+            "title": "嗅觉经验的个体差异性分析",
+            "summary": "解释不同主体对同一气味的主观感知差异，说明‘我的玫瑰香’与‘你的玫瑰香’的不可通约性。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 299,
+            "_checked": true
+          },
+          {
+            "id": "s3_2",
+            "title": "基于标签定义的共识机制",
+            "summary": "阐述如何通过共同定义将主观气味转化为可交互的信息，解决感知对齐问题。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 356,
+            "_checked": true
+          },
+          {
+            "id": "s3_3",
+            "title": "识得与闻见的弱相关性本质",
+            "summary": "辨析直接感官体验与认知识别之间的逻辑断层，说明单纯嗅觉数据不足以构成完整语义。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 318,
+            "_checked": true
+          }
+        ],
+        "status": "done",
+        "actual_word_count": 1032,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s4",
+        "title": "嗅觉融入具身智能闭环的必要性论证",
+        "subtitle": "",
+        "summary": "本节为核心论证环节，重点回答嗅觉是否属于重要一环。结合具身闭环要求，论述嗅觉如何增强环境认知维度与决策适应性，从而建立物理世界的深层关联，确认其关键地位。",
+        "word_count": 1200,
+        "is_key": true,
+        "sub_sections": [
+          {
+            "id": "s4_1",
+            "title": "增强环境认知的维度与深度",
+            "summary": "论证嗅觉如何提供视觉无法获取的化学信息，丰富智能体对环境的立体认知。",
+            "word_count": 400,
+            "status": "done",
+            "actual_word_count": 589,
+            "_checked": true
+          },
+          {
+            "id": "s4_2",
+            "title": "提升决策系统的适应性与安全性",
+            "summary": "分析嗅觉在危险预警（如火灾、泄漏）及导航辅助中的关键作用，体现具身智能的适应性。",
+            "word_count": 400,
+            "status": "done",
+            "actual_word_count": 475,
+            "_checked": true
+          },
+          {
+            "id": "s4_3",
+            "title": "建立物理世界的深层关联机制",
+            "summary": "探讨嗅觉数据如何与行动反馈结合，形成更完整的感知 - 学习循环，实现真正的具身智能。",
+            "word_count": 400,
+            "status": "done",
+            "actual_word_count": 589,
+            "_checked": true
+          }
+        ],
+        "status": "done",
+        "actual_word_count": 1719,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s5",
+        "title": "结论与发展建议",
+        "subtitle": "",
+        "summary": "本节总结全文观点，明确机器人嗅觉是具身智能发展的重要一环。同时指出当前技术面临的挑战，并提出未来在传感器融合与共识机制建立方面的演进路径与建议。",
+        "word_count": 600,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s5_1",
+            "title": "关于重要环节的最终判定",
+            "summary": "总结嗅觉在具身智能系统中的战略地位，确认其不可或缺性。",
+            "word_count": 200,
+            "status": "done",
+            "actual_word_count": 219,
+            "_checked": true
+          },
+          {
+            "id": "s5_2",
+            "title": "当前技术瓶颈与实施难点",
+            "summary": "客观分析传感器精度、数据标注及计算资源等方面的现存障碍。",
+            "word_count": 200,
+            "status": "done",
+            "actual_word_count": 214,
+            "_checked": true
+          },
+          {
+            "id": "s5_3",
+            "title": "未来演进路径规划建议",
+            "summary": "提出加强跨模态学习及标准化嗅觉协议的具体发展方向与执行要求。",
+            "word_count": 200,
+            "status": "done",
+            "actual_word_count": 224,
+            "_checked": true
+          }
+        ],
+        "status": "done",
+        "actual_word_count": 707,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      }
+    ]
+  },
+  "user_orders": {},
+  "output_file": "C:\\Users\\sm001\\WorkBuddy\\structured-writer\\data\\outputs\\关于机器人嗅觉在具身智能发展中地位的分析_20260727_125741.md",
+  "phase": "done",
+  "fingerprint": "b7b333d0f9d619737f33d26d73ed7802",
+  "_status_text": "写作中: 未来演进路径规划建议"
+}

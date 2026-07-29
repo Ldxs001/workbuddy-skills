@@ -40,3 +40,21 @@ GIT_CREDENTIALS = Path.home() / ".git-credentials"
 
 # ── 脚本临时文件前缀 ────────────────────────────────
 SCAN_OUT_PREFIX = ".sensitive_scan_"
+TEMP_FILE_PREFIX = "git_sync_tmp_"
+
+# ── 临时文件路径生成函数 ────────────────────────────
+def temp_scan_path(name: str) -> Path:
+    """敏感扫描结果：TEMP_DIR / sensitive_scan_{name}.json"""
+    return TEMP_DIR / f"sensitive_scan_{name}.json"
+
+def temp_scan_decisions_path(name: str) -> Path:
+    """敏感扫描 LLM 判定：TEMP_DIR / sensitive_scan_{name}.decisions.json"""
+    return TEMP_DIR / f"sensitive_scan_{name}.decisions.json"
+
+def temp_filter_scan_path(name: str) -> Path:
+    """文件过滤器扫描结果：TEMP_DIR / file_filter_{name}.json"""
+    return TEMP_DIR / f"file_filter_{name}.json"
+
+def temp_filter_decisions_path(name: str) -> Path:
+    """文件过滤器 LLM 判定：TEMP_DIR / file_filter_{name}.decisions.json"""
+    return TEMP_DIR / f"file_filter_{name}.decisions.json"

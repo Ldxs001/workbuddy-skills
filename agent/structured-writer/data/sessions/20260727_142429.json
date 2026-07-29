@@ -1,0 +1,238 @@
+{
+  "session_id": "20260727_142429",
+  "created_at": "2026-07-27T14:28:47.568685",
+  "config": {
+    "planner_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 1800,
+      "max_tokens": 40960
+    },
+    "writer_model": {
+      "backend": "lmstudio",
+      "base_url": "http://localhost:1234",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "timeout": 3000,
+      "max_tokens": 81920
+    },
+    "default_prompt": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+    "selected_template": "通用公文",
+    "rag_path": "C:\\Users\\sm001\\WorkBuddy\\rag-assistant",
+    "templates": {
+      "通用公文": "请以正式、客观、条理清晰的公文风格撰写。结构要求：前言说明背景和目的，正文分条列举事项和要求，结尾总结或提出执行要求。语言简洁庄重，不使用口语化表达。使用Markdown格式，各级标题用 #/##/###。",
+      "新闻报道": "请以新闻写作风格撰写。采用倒金字塔结构：导语概括5W1H（时间、地点、人物、事件、原因、方式），正文按重要性递减展开细节。语言客观中立，引用需注明来源。使用Markdown格式。",
+      "论文综述": "请以学术论文风格撰写。结构建议：摘要概括全文→引言说明研究背景和问题→分论点逐层论述→结论总结发现。要求逻辑严密，论证充分，引用规范，语言学术化。每节应有明确论点。使用Markdown格式。",
+      "技术报告": "请以技术报告风格撰写。结构建议：背景与问题→技术方案与架构→关键数据与指标→对比分析→结论与建议。要求数据驱动，结论有据可循，可使用列表和表格。使用Markdown格式。",
+      "自定义": ""
+    },
+    "context_review_length": 800,
+    "fact_check_enabled": true,
+    "max_sessions": 20
+  },
+  "outline": {
+    "title": "语言大模型技术路径拓展历史综述",
+    "sections": [
+      {
+        "id": "s1",
+        "title": "前言：发展背景与综述目的",
+        "subtitle": "",
+        "summary": "阐述大模型发展背景与综述目的，界定技术演进的时间跨度与研究范围，明确本文旨在梳理关键节点与技术范式转变。",
+        "word_count": 600,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s1_1",
+            "title": "人工智能发展背景概述",
+            "summary": "简述人工智能从感知智能到认知智能的跨越，说明大模型成为技术演进核心驱动力的宏观环境。",
+            "word_count": 300,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          },
+          {
+            "id": "s1_2",
+            "title": "综述研究范围与目标界定",
+            "summary": "明确本文聚焦于自然语言处理领域，梳理从早期统计方法到生成式大模型的技术路径演变。",
+            "word_count": 300,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          }
+        ],
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s2",
+        "title": "技术积累：前 Transformer 时代",
+        "subtitle": "",
+        "summary": "回顾预 Transformer 时代的技术积累，分析 RNN、CNN 及注意力机制的早期应用，探讨数据规模对性能的影响。",
+        "word_count": 800,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s2_1",
+            "title": "循环神经网络与序列建模局限",
+            "summary": "分析 RNN 及其变体 LSTM、GRU 在语言建模中的早期应用，指出其在长距离依赖捕捉上的梯度消失问题。",
+            "word_count": 400,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          },
+          {
+            "id": "s2_2",
+            "title": "卷积神经网络与注意力萌芽",
+            "summary": "探讨 CNN 在文本分类中的贡献，以及早期自注意力机制在机器翻译任务中的初步尝试与效果评估。",
+            "word_count": 400,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          }
+        ],
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s3",
+        "title": "范式革命：Transformer 架构突破",
+        "subtitle": "",
+        "summary": "重点论述 Transformer 架构的提出及其革命性意义，解析自注意力机制如何重塑序列建模范式，确立当前技术基石。",
+        "word_count": 1500,
+        "is_key": true,
+        "sub_sections": [
+          {
+            "id": "s3_1",
+            "title": "Attention Is All You Need 发布",
+            "summary": "详细解读 Transformer 论文核心内容，分析其摒弃循环与卷积、完全基于注意力机制的设计思想。",
+            "word_count": 500,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          },
+          {
+            "id": "s3_2",
+            "title": "自注意力机制原理深入解析",
+            "summary": "剖析多头自注意力机制的工作原理，阐述其如何实现并行计算及长距离特征的高效捕获能力。",
+            "word_count": 500,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          },
+          {
+            "id": "s3_3",
+            "title": "架构标准化与生态建立",
+            "summary": "论述 Transformer 如何成为后续所有大模型的基础架构，推动开源社区形成统一的技术标准与生态。",
+            "word_count": 500,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          }
+        ],
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s4",
+        "title": "规模效应：扩展法则与优化技术",
+        "subtitle": "",
+        "summary": "探讨大模型时代的扩展法则与架构优化，涵盖模型缩放定律、混合专家系统及长上下文处理技术的演进路径。",
+        "word_count": 800,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s4_1",
+            "title": "大模型缩放定律的发现与应用",
+            "summary": "阐述 Chinchilla 等研究提出的算力与数据最优配比原则，说明规模扩大带来的涌现能力及其边际效应。",
+            "word_count": 400,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          },
+          {
+            "id": "s4_2",
+            "title": "架构优化与效率提升策略",
+            "summary": "介绍混合专家模型、稀疏注意力及量化压缩等技术，分析如何在保持性能的同时降低推理成本。",
+            "word_count": 400,
+            "status": "pending",
+            "actual_word_count": 0,
+            "_checked": true,
+            "aux_knowledge": null
+          }
+        ],
+        "status": "pending",
+        "actual_word_count": 0,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      },
+      {
+        "id": "s5",
+        "title": "总结与展望：挑战与未来方向",
+        "subtitle": "",
+        "summary": "总结技术发展历程中的经验教训，分析当前面临的算力与伦理挑战，提出未来研究方向与标准化建设要求。",
+        "word_count": 600,
+        "is_key": false,
+        "sub_sections": [
+          {
+            "id": "s5_1",
+            "title": "现有技术瓶颈与安全伦理风险",
+            "summary": "总结幻觉问题、数据隐私及算力能耗等当前主要挑战，强调负责任的 AI 发展与安全对齐的重要性。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 221,
+            "_checked": true,
+            "aux_knowledge": null
+          },
+          {
+            "id": "s5_2",
+            "title": "未来技术演进路径与标准化建议",
+            "summary": "提出向多模态、具身智能及推理能力增强的发展方向，呼吁建立行业通用的评估标准与安全规范。",
+            "word_count": 300,
+            "status": "done",
+            "actual_word_count": 221,
+            "_checked": true,
+            "aux_knowledge": null
+          }
+        ],
+        "status": "done",
+        "actual_word_count": 490,
+        "rag": {
+          "enabled": false,
+          "kb": ""
+        },
+        "_checked": true
+      }
+    ]
+  },
+  "user_orders": {},
+  "output_file": "C:\\Users\\sm001\\WorkBuddy\\structured-writer\\data\\outputs\\语言大模型技术路径拓展历史综述_20260727_144506.md",
+  "phase": "done",
+  "fingerprint": "fa47a57dfe5f5449bf6796a610adc5e1",
+  "_status_text": "自检中..."
+}
