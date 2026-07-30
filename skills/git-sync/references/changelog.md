@@ -1,3 +1,13 @@
+## [2.34.0] - 2026-07-31
+
+### 修复
+- **LLM 交互步骤被 QUIET_MODE 吞掉导致后台死锁** — `main()` 中的 `step_llm_file_filter`（文件筛除）和 `step_sensitive_scan`（敏感脱敏）在静默模式下 stdout 被重定向到 `/dev/null`，WorkBuddy 看不到输出也就无法写入决策文件，死循环挂起。修复：LLM 交互步骤临时恢复 `sys.stdout` 到 `sys.__stdout__`，确保 WorkBuddy 在前台能看到引导提示
+- **`step_sensitive_scan` 假 LLM 决策** — 声称"自动生成 LLM 决策"但实际上是一组硬编码的 if/else 规则（`public_docs` × `public_labels` 匹配），既不调用模型也不按用户指引推理。修复：改为真正的 LLM 交互模式，打印发现详情 + 脱敏引导 → 等待 WorkBuddy 写决策文件 → 超时 120s 后全部脱敏保安全
+- **`step_llm_file_filter` 无限等待** — 无超时回退，决策文件不来就永远挂起。修复：加 120s 超时 → 超时后全量保留所有文件
+
+### 变更
+- **SKILL.md 约束更新** — 明确标注"仅前台运行"，禁止在后台/Bash 任务中运行 git-sync，因为 LLM 交互步骤需要 WorkBuddy 在前台读取输出并写决策文件
+
 ## [2.33.0] - 2026-07-27
 
 ### 新增

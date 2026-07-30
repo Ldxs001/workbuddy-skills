@@ -2,7 +2,7 @@
 name: git-sync
 slug: git-sync
 displayName: git-sync
-version: 2.33.0
+version: 2.34.0
 author: wUwproject
 license: MIT
 description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。
@@ -26,6 +26,7 @@ data_dir_compliance: true
 
 ## 约束
 
+- **仅前台运行** — git-sync 包含 LLM 交互步骤（文件筛除、敏感脱敏），WorkBuddy 必须在前台会话中读取输出并写入决策文件。**禁止在后台/Bash 任务中运行**，否则 LLM 交互输出被吞会导致死锁
 - **自动检测类型** — 自动识别 skill（`_meta.json`）或 agent（`rag_assistant/__init__.py`），分别走不同发布流程
 - **`all` 模式** — `git-sync all` 遍历 `skills/` 和 `agent/` 全部项目
 - **网络依赖** — 推送 Gitee/GitHub/ClawHub/SkillHub/PyPI 需要可用网络连接，超时阈值 60 秒
@@ -58,7 +59,7 @@ data_dir_compliance: true
 - **路径由 manifest 统一管理** —— 每个条目记录 `source_path`（源路径）+ `repo_path`（仓库内路径），skill 和 agent 统一走同一套逻辑
 - **`all` 批量模式** —— 遍历全部 skills 和 agents 逐个同步
 - **LLM 文件过滤** —— 同步前扫描源文件 → 全量打印文件列表 + 规则 → 要求 WorkBuddy 输出决策 JSON → 只复制允许的文件
-- **LLM 脱敏（强制）** —— 同步后强制脱敏敏感信息（邮箱/token/路径/本地路径），无跳过选项。全自动 LLM 决策：公开署名保留，Token/私钥自动替换
+- **LLM 脱敏（强制）** —— 同步后强制脱敏敏感信息（邮箱/token/路径/本地路径），无跳过选项。WorkBuddy 根据扫描发现 + 脱敏引导规则逐文件判断保留或脱敏
 - **版本号三方对比** —— `_meta.json` / `SKILL.md` frontmatter / changelog
 - **SKILL.md 规范审查** —— 内联审计（版本一致性 + R-23 脚本引用检查）
 - **ZIP 打包 + HTML 索引** —— 生成安装包 + 可视化索引页

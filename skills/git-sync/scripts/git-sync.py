@@ -468,32 +468,72 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path):
         decisions.unlink(missing_ok=True)
         return desensitized_files
 
-    # ── 无决策文件 → LLM 自动判断并生成决策 ────────────────────────────
-    log("4.5", 8, "自动生成 LLM 决策...")
-    decisions_data = {}
+    # ── 无决策文件 → 打印发现 + 引导 → 等 LLM 写 decision → 自动继续 ──
+    print(f"\n{'='*60}")
+    print(f"  ⏳ 等待 LLM 完成敏感信息脱敏决策")
+    print(f"{'='*60}")
+    print(f"项目: {skill_name}")
+    print(f"目标路径: {repo_skill_dir}")
+    print(f"发现敏感信息：共 {len(d)} 个文件，{total_findings} 处")
+    print()
+    print("## 敏感信息发现详情")
     for e in d:
         file_rel = e["file"]
-        fname = file_rel.split("/")[-1]
-        findings = e.get("findings", [])
-        labels = {f.get("label", "") for f in findings}
+        finds = e.get("findings", [])
+        if not finds:
+            continue
+        print(f"  📄 {file_rel}（{len(finds)} 处）")
+        for f in finds[:5]:
+            label = f.get("label", "敏感信息")
+            severity = f.get("severity", "")
+            line = f.get("line", "?")
+            replace = f.get("replace", "[redacted]")
+            print(f"      [{severity}] 第 {line} 行 {label} → 替换为：{replace}")
+        if len(finds) > 5:
+            print(f"      ... 还有 {len(finds) - 5} 处未显示")
+    print()
+    print("#" * 60)
+    print("## 脱敏决策引导")
+    print("逐文件判断是否应脱敏。以下类型建议脱敏：")
+    print("- 个人邮箱、手机号、身份证号")
+    print("- API Token、密钥、密码")
+    print("- 内网 IP、本地绝对路径（含用户名）")
+    print("- 私钥内容（PEM 格式）")
+    print()
+    print("以下情况可保留（keep）：")
+    print("- 公开署名（如 LICENSE/README 中的 wUwproject）")
+    print("- 开源项目的公开联系邮箱")
+    print("- 文档中的示例路径或占位信息")
+    print()
+    print("## 写入决策文件")
+    print(f"决策文件路径: {decisions}")
+    print('JSON 格式：{"相对路径": "keep"|"sanitize"}')
+    print('示例：{"README.md": "keep", "config.json": "sanitize"}')
+    print(f"等待决策文件写入后自动继续...")
+    print("#" * 60)
 
-        # 在公开文档（LICENSE/README/changelog 等）中的署名/代名/路径 → keep
-        public_docs = {"LICENSE.md", "README.md", "changelog.md", "SKILL.md",
-                       "REFERENCE.md", "CONTRIBUTING.md", "antipatterns.md",
-                       "faq.md", "guide.md", "permissions.md", "blueprint_rules.md"}
-        public_labels = {"用户名（来自配置）", "项目名（来自配置）", "路径"}
-        if labels.issubset(public_labels) and fname in public_docs:
-            decisions_data[file_rel] = "keep"
-        else:
-            # 其他情况（含邮箱/token/IP等）默认脱敏保安全
-            decisions_data[file_rel] = "sanitize"
+    # 等待 decision 文件出现（超时 120s 后全部脱敏保安全）
+    import time as _t
+    waited = 0
+    timeout = 120
+    while not decisions.exists() and waited < timeout:
+        _t.sleep(2)
+        waited += 2
+        if waited % 10 == 0:
+            log("4.5", 8, f"等待敏感决策文件... ({waited}s)", "warn")
 
-    with open(decisions, "w", encoding="utf-8") as f:
-        json.dump(decisions_data, f, ensure_ascii=False)
-
-    ok_count = sum(1 for v in decisions_data.values() if v == "keep")
-    sanitize_count = sum(1 for v in decisions_data.values() if v == "sanitize")
-    print(f"  🤖 LLM 决策：{ok_count} 处保留 / {sanitize_count} 处脱敏")
+    if decisions.exists():
+        try:
+            decisions_data = json.loads(decisions.read_text(encoding="utf-8"))
+            ok_count = sum(1 for v in decisions_data.values() if v == "keep")
+            sanitize_count = sum(1 for v in decisions_data.values() if v == "sanitize")
+            print(f"  ✅ LLM 决策：{ok_count} 处保留 / {sanitize_count} 处脱敏")
+        except Exception as e:
+            log("4.5", 8, f"决策解析失败: {e}，默认全部脱敏", "warn")
+            decisions_data = {e["file"]: "sanitize" for e in d}
+    else:
+        log("4.5", 8, f"LLM 决策超时 ({timeout}s)，默认全部脱敏保安全", "warn")
+        decisions_data = {e["file"]: "sanitize" for e in d}
 
     # 执行脱敏
     desensitized_files = set()
@@ -1026,14 +1066,20 @@ def step_llm_file_filter(name: str, src_dir: Path) -> set:
         print(f"等待决策文件写入后自动继续...")
 
 
-        # 等待 decision 文件出现（LLM 运行 helper 脚本写入后继续）
+        # 等待 decision 文件出现（超时 120s 后全量保留）
         import time as _t
         waited = 0
-        while not filter_decisions.exists():
+        timeout = 120
+        while not filter_decisions.exists() and waited < timeout:
             _t.sleep(2)
             waited += 2
             if waited > 0 and waited % 10 == 0:
                 log("3.7", 8, f"等待 decision 文件... ({waited}s)", "warn")
+
+        if not filter_decisions.exists():
+            log("3.7", 8, f"LLM 决策超时 ({timeout}s)，全量保留所有文件", "warn")
+            filter_scan.unlink(missing_ok=True)
+            return set(rel for d in tree for rel in [d["path"]])
 
         # 文件出现 → 读取并继续
         try:
@@ -1480,8 +1526,13 @@ def main():
                 repo_skill_dir = WORK_REPO / work_repo_subdir
             else:
                 log(4, 8, "同步文件到工作仓库...")
-                # 文件筛除过滤器：LLM 审核 → 写 decision → 自动继续
-                allowed = step_llm_file_filter(name, src_dir)
+                # ── LLM 交互：恢复 stdout 以便 WorkBuddy 看到输出并写决策文件 ──
+                _saved_out = sys.stdout
+                sys.stdout = sys.__stdout__ if sys.__stdout__ else _saved_out
+                try:
+                    allowed = step_llm_file_filter(name, src_dir)
+                finally:
+                    sys.stdout = _saved_out
                 if is_skill:
                     repo_skill_dir = sync_files(name, SKILLS_DIR, WORK_REPO, allowed)
                 else:
@@ -1504,7 +1555,13 @@ def main():
                     repo_skill_dir = dst
                     log(4, 8, f"已同步 {count} 个文件", "ok")
 
-            desensitized_files = step_sensitive_scan(name, repo_skill_dir)
+            # ── LLM 交互：敏感扫描同样恢复 stdout ──
+            _saved_out = sys.stdout
+            sys.stdout = sys.__stdout__ if sys.__stdout__ else _saved_out
+            try:
+                desensitized_files = step_sensitive_scan(name, repo_skill_dir)
+            finally:
+                sys.stdout = _saved_out
             # README 更新：同时覆盖 skills 和 agents（update_readme.py 自身已支持）
             step_update_readme()
 
