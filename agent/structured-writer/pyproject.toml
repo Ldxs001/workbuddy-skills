@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "structured-writer"
+name = "structured-writer-ldxs"
 version = "1.1.0b12"
 description = "Structured Writer — 结构化写作智能体。模板驱动的多节文章串行生成，支持大纲规划、RAG 引用、逻辑顺序编排。"
 readme = "README.md"
