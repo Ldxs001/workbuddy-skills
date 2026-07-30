@@ -509,6 +509,34 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path):
     print(f"决策文件路径: {decisions}")
     print('JSON 格式：{"相对路径": "keep"|"sanitize"}')
     print('示例：{"README.md": "keep", "config.json": "sanitize"}')
+    print('⚠️  Write 工具可能写文件不落地，建议用 Bash: echo \'{"README.md":"keep"}\' > file')
+    print()
+    # 生成辅助决策脚本
+    helper_script = TEMP_DIR / f"write_sensitive_decision_{skill_name}.py"
+    scan_json = json.dumps(d, ensure_ascii=False)
+    helper_content = (
+        f'"""\ngit-sync 敏感扫描决策写入器\n'
+        f'决策输出：{decisions}\n'
+        f'"""\n'
+        f'import json, sys\n'
+        f'scan = json.loads("""{scan_json}""")\n'
+        f'keep_list = json.loads(sys.argv[1]) if len(sys.argv) > 1 else []\n'
+        f'decisions = {{e["file"]: ("keep" if e["file"] in keep_list else "sanitize") for e in scan}}\n'
+        f'with open(r"{decisions}", "w", encoding="utf-8") as f:\n'
+        f'    json.dump(decisions, f, indent=2, ensure_ascii=False)\n'
+        f'ok = sum(1 for v in decisions.values() if v == "keep")\n'
+        f'san = sum(1 for v in decisions.values() if v == "sanitize")\n'
+        f'print(f"决策已写入 ({{ok}} 保留 / {{san}} 脱敏)")'
+    )
+    helper_script.parent.mkdir(parents=True, exist_ok=True)
+    helper_script.write_text(helper_content, encoding="utf-8")
+    print(f"辅助脚本已生成：")
+    print(f"  # 全部脱敏（默认）：")
+    print(f"  python {helper_script}")
+    print(f"  # 保留指定文件，其余脱敏：")
+    print(f"  python {helper_script} '[\"README.md\"]'")
+    print(f"  # 保留多个文件：")
+    print(f"  python {helper_script} '[\"README.md\",\"LICENSE\"]'")
     print(f"等待决策文件写入后自动继续...")
     print("#" * 60)
 
@@ -534,6 +562,10 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path):
     else:
         log("4.5", 8, f"LLM 决策超时 ({timeout}s)，默认全部脱敏保安全", "warn")
         decisions_data = {e["file"]: "sanitize" for e in d}
+
+    # 将决策写入文件（超时/异常回退路径也需要写，apply 靠这个文件读）
+    with open(decisions, "w", encoding="utf-8") as f:
+        json.dump(decisions_data, f, ensure_ascii=False)
 
     # 执行脱敏
     desensitized_files = set()
