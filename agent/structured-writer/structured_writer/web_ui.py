@@ -402,8 +402,7 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             if cf.get("citation_check"):
                 citation_config[cf["name"]] = {
                     "enabled": True,
-                    "format": cf.get("citation_format", "[x]=1."),
-                    "desc": cf.get("desc", ""),
+                    "format": cf.get("citation_format", "[x]=1.")
                 }
 
         # 如果 8767 在线，创建 RAG 客户端

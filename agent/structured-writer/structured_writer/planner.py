@@ -1,6 +1,5 @@
 """大纲规划器 — 调用 LLM 生成结构化文章大纲"""
 import json
-import re
 from typing import Optional
 from .llm_client import LLMClient, LLMClientError
 
@@ -171,22 +170,12 @@ def _normalize_outline(outline: dict, content_fields: list) -> dict:
     existing_titles = {s.get("title", "") for s in sections}
     for cf in content_fields:
         if cf["name"] not in existing_titles:
-            # 从 desc 提取字数描述，支持 "200-300字" "约500字" 等格式
-            _wc = 0 if cf.get("type") == "leaf" else 800
-            _desc = cf.get("desc", "")
-            _m = re.search(r"(\d+)\s*[-~至到]\s*(\d+)\s*字", _desc)
-            if _m:
-                _wc = (int(_m.group(1)) + int(_m.group(2))) // 2
-            else:
-                _m = re.search(r"(\d+)\s*字", _desc)
-                if _m:
-                    _wc = int(_m.group(1))
             sections.append({
                 "id": f"s{len(sections)+1}",
                 "title": cf["name"],
                 "subtitle": "",
                 "summary": cf.get("desc", ""),
-                "word_count": _wc,
+                "word_count": 800,
                 "is_key": False,
                 "status": "pending",
                 "actual_word_count": 0,

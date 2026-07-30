@@ -1,16 +1,10 @@
-"""引用系统 — 后处理 + 验证
-
-后处理：提取引用自{文件名}→去重编号→正文替换→构建参考文献元信息列表→LLM格式化
-验证：格式/一致性/来源三项验证
+"""引用验证器 — 对生成的文章做格式/一致性/来源三项验证
 
 支持双格式映射：如 "[x]=1." 表示正文用 [x]，参考文献条目用 1.
 """
 
 import re
-import logging
 from typing import Optional
-
-_logger = logging.getLogger("citation")
 
 
 def _parse_citation_format(fmt: str) -> str:
@@ -410,101 +404,3 @@ def format_report(report: dict) -> str:
             lines.append(f"\n{c['message']}")
 
     return "\n".join(lines)
-
-
-def post_process(article_md: str, citation_config: dict,
-                 all_rag_headers: dict, llm_client=None) -> str:
-    """引用后处理：提取引用→编号→替换正文→LLM格式化参考文献节
-
-    管线：
-    Python 建带编号的元信息
-      → LLM 收到 desc + 元信息列表 → 输出格式化文本
-      → Python 直接替换参考文献节内容
-
-    参数:
-        article_md: 完整文章 markdown
-        citation_config: {节名: {enabled, format, desc}}
-        all_rag_headers: RAG 累积的文档元数据
-        llm_client: LLM 客户端（用于格式化参考文献）
-
-    返回:
-        处理后的 article_md
-    """
-    if not citation_config or not all_rag_headers:
-        return article_md
-
-    # 从模板 citation_config 解析
-    _cite_fmt = "[x]=1."
-    _cite_desc = ""
-    _cite_name = ""
-    for _cc_name, _cc_val in citation_config.items():
-        if _cc_val.get("enabled"):
-            _cite_fmt = _cc_val.get("format", "[x]=1.")
-            _cite_desc = _cc_val.get("desc", "")
-            _cite_name = _cc_name
-            break
-    _eq = _cite_fmt.find("=")
-    _inline_template = _cite_fmt[:_eq].strip() if _eq >= 0 else "[x]"
-
-    # 1. 扫描全文提取所有引用自{文件名} → 按首次出现顺序编号
-    # 文件名由字母数字中文点下划线连字符组成，hyphen在末尾避免range歧义
-    _cited = re.findall(r"引用自\s?([a-zA-Z0-9_.\u4e00-\u9fff-]+)", article_md)
-    _seen = {}
-    _order = []
-    for _src in _cited:
-        _src = _src.rstrip("。，,.;:；：）)】」'\"")
-        if _src not in _seen and _src in all_rag_headers:
-            _seen[_src] = len(_order) + 1
-            _order.append(_src)
-
-    if not _order:
-        return article_md
-
-    # 2. 替换正文：引用自{文件名} → 用户配置的行内格式
-    # 同时处理有空格和无空格两种格式
-    for _src, _num in _seen.items():
-        if "x" in _inline_template:
-            _repl = _inline_template.replace("x", str(_num))
-        else:
-            _repl = _inline_template + str(_num)
-        article_md = article_md.replace(f"引用自{_src}", _repl)
-        article_md = article_md.replace(f"引用自 {_src}", _repl)
-    article_md = re.sub(r'[\u4e00-\u9fff]{2,}[\s：:]*\[(\d+)\]', r'[\1]', article_md)
-
-    # 3. 排序 headers 匹配引用顺序 + 构建带编号的元信息列表
-    _ordered_headers = {s: all_rag_headers[s] for s in _order if s in all_rag_headers}
-    _ref_lines = []
-    for _i, _src in enumerate(_order, 1):
-        _meta = " / ".join(t.strip() for t in _ordered_headers[_src][:3] if t.strip())
-        _ref_lines.append(f"{_i}. {_meta}")
-
-    # 4. 调 LLM 格式化参考文献（Python 建数据 → LLM 格式化 → Python 写文件）
-    _ref_new_content = "\n".join(_ref_lines)
-    if llm_client and _cite_desc and _ref_lines:
-        try:
-            _prompt = f"{_cite_desc}\n\n以下是引用元信息，请按上述格式规范化为参考文献条目，保持编号不变：\n\n" + "\n".join(_ref_lines)
-            _result = llm_client.chat(
-                [{"role": "user", "content": _prompt}],
-                max_tokens=2048, temperature=0.3
-            )
-            if _result and _result.strip():
-                _clean = _result.strip()
-                if "## " in _clean:
-                    _clean = _clean.split("## ", 1)[-1]
-                    _clean = _clean.split("\n", 1)[-1] if "\n" in _clean else _clean
-                _clean_lines = [l for l in _clean.split("\n") if l.strip()]
-                if _clean_lines:
-                    _ref_new_content = "\n".join(_clean_lines)
-        except Exception:
-            _logger.exception("参考文献LLM格式化失败")
-
-    # 5. Python 直接替换参考文献节内容
-    _search = f"## {_cite_name}"
-    _ref_start = article_md.find(_search)
-    if _ref_start >= 0:
-        _ref_end = article_md.find("\n## ", _ref_start + 2)
-        if _ref_end < 0:
-            _ref_end = len(article_md)
-        article_md = article_md[:_ref_start] + f"## {_cite_name}\n" + _ref_new_content + article_md[_ref_end:]
-
-    return article_md
