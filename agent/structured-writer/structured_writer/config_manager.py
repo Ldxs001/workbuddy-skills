@@ -45,16 +45,16 @@ DEFAULT_TEMPLATES = {
         "meta": [{"name": "标题", "show_label": True, "desc": "论文标题，应准确反映研究内容", "source": "auto"}, {"name": "作者", "show_label": True, "desc": "作者姓名及单位", "source": "user"}, {"name": "单位", "show_label": True, "desc": "通讯地址和邮箱", "source": "user"}],
         "content": [
             {"name": "关键词", "show_label": False, "desc": "仅输出3-5个关键词（用逗号分隔），不要段落，不要多余文字", "type": "leaf", "logical_order": 2},
-            {"name": "摘要", "show_label": True, "desc": "论文核心内容概括，200-300字", "type": "leaf", "logical_order": 2},
+            {"name": "摘要", "show_label": True, "desc": "论文核心内容概括，200-300字，不使用引用标记", "type": "leaf", "logical_order": 2},
             {"name": "引言", "show_label": True, "desc": "研究背景、问题提出、文献综述、研究意义", "type": "section"},
             {"name": "方法", "show_label": True, "desc": "研究设计、实验方法、数据采集与分析方法", "type": "section"},
             {"name": "结果", "show_label": True, "desc": "实验结果与数据分析，图表支撑", "type": "section"},
             {"name": "讨论", "show_label": True, "desc": "结果解读、与前人工作对比、研究局限", "type": "section"},
-            {"name": "结论", "show_label": True, "desc": "主要发现总结、研究贡献、未来方向", "type": "section"},
-            {"name": "参考文献", "show_label": True, "desc": "引用文献完整列表，每篇标注引用来源", "type": "leaf", "logical_order": 2, "citation_check": True, "citation_format": "[x]=1."}
+            {"name": "结论", "show_label": True, "desc": "主要发现总结、研究贡献、未来方向，不使用引用标记", "type": "section"},
+            {"name": "参考文献", "show_label": True, "desc": "按GB/T 7714格式输出参考文献。保持编号不变，每条格式：作者. 题名[文献类型]. 期刊/来源, 出版年, 卷(期): 页码.", "type": "leaf", "logical_order": 2, "citation_check": True, "citation_format": "[x]=1."}
         ],
         "style": "学术严谨风格，客观中立，措辞精准，论据充分，引用规范。使用第三人称和被动语态。段落逻辑严密，数据支撑充分。",
-        "logic": "按 IMRaD 顺序撰写：引言→方法→结果→讨论→结论；摘要、关键词、参考文献在正文完成后最后产出。注意引用标记的对应关系，引用来源标注为目标文件名。"
+        "logic": "按顺序撰写：引言→方法→结果→讨论→结论；摘要、关键词、参考文献在正文完成后最后产出。"
     },
     "正式公文": {
         "meta": [{"name": "标题", "show_label": True, "desc": "公文标题，应准确概括文件主旨", "source": "auto"}, {"name": "发文机关", "show_label": True, "desc": "发文单位全称或规范简称", "source": "user"}, {"name": "文号", "show_label": True, "desc": "公文编号如'X发〔2024〕XX号'", "source": "user"}, {"name": "密级", "show_label": True, "desc": "秘密/机密/绝密/普通", "source": "user"}, {"name": "抄送", "show_label": True, "desc": "抄送机关名称", "source": "user"}],
@@ -83,14 +83,14 @@ DEFAULT_TEMPLATES = {
     "论文综述": {
         "meta": [{"name": "标题", "show_label": True, "desc": "综述标题", "source": "auto"}, {"name": "作者", "show_label": True, "desc": "作者姓名", "source": "user"}],
         "content": [
-            {"name": "摘要", "show_label": True, "desc": "综述核心内容概括，200-300字", "type": "leaf", "logical_order": 2},
+            {"name": "摘要", "show_label": True, "desc": "综述核心内容概括，200-300字，不使用引用标记", "type": "leaf", "logical_order": 2},
             {"name": "引言", "show_label": True, "desc": "研究背景、综述范围与目的、文献检索策略", "type": "section"},
             {"name": "分主题评述", "show_label": True, "desc": "按主题聚类组织文献，每个主题独立成节，包含核心发现、进展与争议", "type": "section"},
             {"name": "研究空白与展望", "show_label": True, "desc": "现有研究不足、未解决问题、未来研究方向", "type": "section"},
-            {"name": "参考文献", "show_label": True, "desc": "引用文献完整列表，每篇标注引用来源", "type": "leaf", "logical_order": 2, "citation_check": True, "citation_format": "[x]=1."}
+            {"name": "参考文献", "show_label": True, "desc": "按GB/T 7714格式输出参考文献。保持编号不变，每条格式：作者. 题名[文献类型]. 期刊/来源, 出版年, 卷(期): 页码.", "type": "leaf", "logical_order": 2, "citation_check": True, "citation_format": "[x]=1."}
         ],
         "style": "学术综述风格。对现有文献进行系统梳理和批判性评价；按主题聚类而非简单罗列；指出研究空白和争议点；客观公正，不偏颇。",
-        "logic": "正文优先撰写（引言→分主题评述→研究空白与展望），摘要和参考文献最后完成。注意引用标记的对应关系，引用来源标注为目标文件名。"
+        "logic": "正文优先撰写（引言→分主题评述→研究空白与展望），摘要和参考文献最后完成。"
     },
     "自定义": {
         "meta": [{"name": "标题", "show_label": False, "desc": "文章标题", "source": "auto"}],

@@ -402,7 +402,8 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             if cf.get("citation_check"):
                 citation_config[cf["name"]] = {
                     "enabled": True,
-                    "format": cf.get("citation_format", "[x]=1.")
+                    "format": cf.get("citation_format", "[x]=1."),
+                    "desc": cf.get("desc", ""),
                 }
 
         # 如果 8767 在线，创建 RAG 客户端
@@ -1506,6 +1507,8 @@ body {
   opacity: 0.5;
 }
 .output-item .del-btn:hover { opacity: 1; }
+.output-item .del-cancel { font-size:11px;cursor:pointer;color:var(--text-dim);padding:2px 4px;margin-left:2px; }
+.output-item .del-cancel:hover { color:#e74c3c; }
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -3159,7 +3162,9 @@ function buildOutlineHTML(outline, readOnly) {
           ${readOnly ? '' : `<label style="font-size:12px;color:var(--sc-key);cursor:pointer"><input type="checkbox" class="sc-key-cb" ${s.is_key ? 'checked' : ''} onchange="collectOutlineData()"> ⭐重点</label>`}
           ${readOnly ? '' : `<select class="sc-order" onchange="collectOutlineData()">${orderOpts}</select>`}
           ${readOnly ? '' : (s.type === 'leaf'
-            ? `<input type="number" class="sec-word-input" data-sid="${s.id}" value="${s.word_count || 800}" style="width:58px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" min="50" max="5000" onchange="onLeafWordChange(this, '${s.id}')"><span style="font-size:13px;color:var(--text-dim)">字</span>`
+            ? (s.word_count === 0
+              ? `<span style="font-size:12px;color:var(--text-dim)">自由</span>`
+              : `<input type="number" class="sec-word-input" data-sid="${s.id}" value="${s.word_count || 800}" style="width:58px;font-size:11px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px" min="50" max="5000" onchange="onLeafWordChange(this, '${s.id}')"><span style="font-size:13px;color:var(--text-dim)">字</span>`)
             : `<span class="sec-word-sum" data-sid="${s.id}" style="font-size:13px;color:var(--text-dim)">${s.word_count}</span><span style="font-size:13px;color:var(--text-dim)">字</span>`)}
           ${readOnly ? '' : `<label class="sc-rag"><input type="checkbox" class="sc-rag-cb" onchange="onRagToggle(this, '${s.id}')" ${!ragOnline ? 'disabled title="RAG未连接"' : ''}> RAG</label>` + (ragOnline && Array.isArray(ragKbs) ? `<select class="sc-kb" style="display:none;width:120px;font-size:12px" onchange="collectOutlineData()">${'<option value=\"\">自动KB</option>' + ragKbs.map(k => '<option value=\"' + k + '\">' + k + '</option>').join('')}</select>` : '')}
         </div>
@@ -3763,7 +3768,7 @@ function loadOutputs() {
       return '<div class="output-item" onclick="openOutput(\'' + name + '\')">' +
         '<span class="name" title="' + name + '">' + name + '</span>' +
         '<span class="date">' + dateStr + '</span>' +
-        '<span class="del-btn" onclick="event.stopPropagation();deleteOutput(\'' + name + '\')" title="删除">✕</span>' +
+        '<span class="del-btn" onclick="event.stopPropagation();deleteOutput(this,\'' + name + '\')" title="删除">✕</span>' +
         '</div>';
     }).join('');
     // 自动刷新
@@ -3801,8 +3806,29 @@ function createOutputModal() {
   return div;
 }
 
-function deleteOutput(name) {
-  if (!confirm('确认删除「' + name + '」？')) return;
+function deleteOutput(btn, name) {
+  // 二次确认：第一次点击变为确认态
+  if (btn.dataset.confirming !== 'true') {
+    btn.dataset.confirming = 'true';
+    btn.textContent = '确认?';
+    btn.style.background = '#e74c3c';
+    btn.style.color = '#fff';
+    // 添加取消按钮
+    const cancel = document.createElement('span');
+    cancel.className = 'del-cancel';
+    cancel.textContent = '取消';
+    cancel.onclick = function(e) {
+      e.stopPropagation();
+      btn.dataset.confirming = 'false';
+      btn.textContent = '✕';
+      btn.style.background = '';
+      btn.style.color = '';
+      cancel.remove();
+    };
+    btn.parentNode.insertBefore(cancel, btn.nextSibling);
+    return;
+  }
+  // 第二次点击：执行删除
   fetch('/api/outputs/delete', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({file: name})

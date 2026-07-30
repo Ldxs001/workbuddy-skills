@@ -1,5 +1,6 @@
 """大纲规划器 — 调用 LLM 生成结构化文章大纲"""
 import json
+import re
 from typing import Optional
 from .llm_client import LLMClient, LLMClientError
 
@@ -24,6 +25,7 @@ def _build_planner_prompt(meta: list, content: list, user_meta: dict,
         "【优先级规则】",
         "- 用户明确指定的结构要求（章节数、子结构数、字数等）优先于默认值",
         "- 2-4 个子结构、200-800 字/子结构 这些只是默认值，用户说了就不遵守",
+        "- 每个内容树字段的 desc 字段中可能包含字数要求（如200-300字），以此为准设置 word_count",
         "",
         "【层级边界规则】",
         "- 内容树只支持 2 级结构：## 章节(section) 和 ### 子节(sub_section)",
@@ -170,12 +172,22 @@ def _normalize_outline(outline: dict, content_fields: list) -> dict:
     existing_titles = {s.get("title", "") for s in sections}
     for cf in content_fields:
         if cf["name"] not in existing_titles:
+            # 从 desc 提取字数描述，支持 "200-300字" "约500字" 等格式
+            _wc = 0 if cf.get("type") == "leaf" else 800
+            _desc = cf.get("desc", "")
+            _m = re.search(r"(\d+)\s*[-~至到]\s*(\d+)\s*字", _desc)
+            if _m:
+                _wc = (int(_m.group(1)) + int(_m.group(2))) // 2
+            else:
+                _m = re.search(r"(\d+)\s*字", _desc)
+                if _m:
+                    _wc = int(_m.group(1))
             sections.append({
                 "id": f"s{len(sections)+1}",
                 "title": cf["name"],
                 "subtitle": "",
                 "summary": cf.get("desc", ""),
-                "word_count": 800,
+                "word_count": _wc,
                 "is_key": False,
                 "status": "pending",
                 "actual_word_count": 0,
@@ -209,6 +221,9 @@ def _normalize_outline(outline: dict, content_fields: list) -> dict:
         # 从模板 content_fields 补充 show_label
         if matched:
             s["show_label"] = matched[0]["show_label"]
+            # 引用校验节：字数强制为 0（不走 LLM 写作，由后处理接管）
+            if matched[0].get("citation_check"):
+                s["word_count"] = 0
 
         subs = s.get("sub_sections", [])
         s_type = s.get("type", "section")

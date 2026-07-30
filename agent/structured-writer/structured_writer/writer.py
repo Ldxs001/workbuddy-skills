@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 from .llm_client import LLMClient, LLMClientError
 from .state_manager import StateManager, OUTPUTS_DIR
-from .citation_validator import validate as citation_validate, format_report as citation_format_report
+from .citation_validator import post_process as citation_post_process
 
 # 写入异常日志到 writer_error.log
 _logger = logging.getLogger("writer")
@@ -47,7 +47,7 @@ def _build_headers_text(all_rag_headers: dict) -> Optional[str]:
     for i, (src, header_texts) in enumerate(all_rag_headers.items(), 1):
         # 取前几个 header 块拼接（标题+作者就够了）
         meta_info = " / ".join(t.strip() for t in header_texts[:3] if t.strip())
-        lines.append(f"来源{i} ({src}): {meta_info}")
+        lines.append(f"来源{i}: {meta_info}")
     return "\n".join(lines) if lines else None
 
 
@@ -94,7 +94,7 @@ def _build_context_section_prompt(
 
     # ── 引用来源 ──
     if headers_text:
-        blocks.append("【引用来源】（正文引用时使用「引用自{文件名}」格式标注，如「引用自paper1.pdf」）：\n\n" + headers_text)
+        blocks.append("【引用来源】（正文引用时使用「引用自来源N」或「引自来源N」格式标注，如「引用自来源1」，不要直接使用编号格式）：\n\n" + headers_text)
 
     if rag_context:
         blocks.append(f"【RAG 参考资料】（来自知识库检索，结合主题选择性参考）：\n\n{rag_context}")
@@ -248,7 +248,14 @@ def generate_article(
             section_md = ""
 
         if s_type == "leaf":
-            # leaf 节：直接写
+            # 如果节启用了引用校验，完全跳过 LLM 写作，由后处理接管
+            if citation_config and section["title"] in citation_config:
+                _cc = citation_config[section["title"]]
+                if _cc.get("enabled"):
+                    # 只留标题行，内容由 citation_post_process 填充
+                    parts_by_sid[sid] = f"\n\n## {section['title']}\n\n" if section.get("show_label", True) else ""
+                    state_mgr.update_section(sid, {"status": "done", "actual_word_count": 0})
+                    continue
             leaf_headers_text = _build_headers_text(all_rag_headers)
             prompt = _build_context_section_prompt(
                 topic=title,
@@ -345,6 +352,13 @@ def generate_article(
                     sub_aux = "\n\n---\n\n".join(aux_parts)
 
             sub_headers_text = _build_headers_text(all_rag_headers)
+
+            # 将 RAG 参考资料中的 【文档: filename】 替换为 【来源N】
+            if combined_rag and all_rag_headers:
+                _rag_keys = list(all_rag_headers.keys())
+                for _ri, _rk in enumerate(_rag_keys, 1):
+                    combined_rag = combined_rag.replace(f"【文档: {_rk}】", f"【来源{_ri}】")
+
             prompt = _build_context_section_prompt(
                 topic=title,
                 section_title=sub["title"],
@@ -460,61 +474,7 @@ def generate_article(
     article_md = article_md.strip()
 
     # ── 引用后处理：打勾时才执行 ──
-    if citation_config and all_rag_headers:
-        # 1. 扫描全文提取所有引用自{文件名} → 按首次出现顺序编号
-        # \S+ 匹配非空白字符序列，支持中文文件名；末尾标点在后续 strip 处理
-        _cited = re.findall(r"引用自\s?(\S+)", article_md)
-        _seen = {}
-        _order = []
-        for _src in _cited:
-            _src = _src.rstrip("。，,.;:；：）)】」'\"")
-            if _src not in _seen and _src in all_rag_headers:
-                _seen[_src] = len(_order) + 1
-                _order.append(_src)
-
-        if _order:
-            # 2. 替换正文：引用自{文件名} → [N]
-            for _src, _num in _seen.items():
-                article_md = article_md.replace(f"引用自{_src}", f"[{_num}]")
-            article_md = re.sub(r'[\u4e00-\u9fff]{2,}[\s：:]*\[(\d+)\]', r'[\1]', article_md)
-
-            # 3. 构建参考文献节内容：排好编号的元数据列表
-            _ref_lines = []
-            for _i, _src in enumerate(_order, 1):
-                _meta = " / ".join(t.strip() for t in all_rag_headers[_src][:3] if t.strip())
-                _ref_lines.append(f"{_i}. {_meta}")
-
-            _ref_start = article_md.find("## 参考文献")
-            if _ref_start >= 0:
-                _ref_end = article_md.find("\n## ", _ref_start + 2)
-                if _ref_end < 0:
-                    _ref_end = len(article_md)
-                _new_ref = "## 参考文献\n" + "\n".join(_ref_lines)
-                # 用 LLM 规范化参考文献格式（将原始元信息转为标准引文）
-                try:
-                    _norm_prompt = (
-                        "以下是一篇学术文章的参考文献列表，每条包含原始元信息（来源文件名和文档片段）。"
-                        "请根据这些信息，为每条写出规范化的参考文献条目（作者、标题、来源等），"
-                        "保持编号不变，每条一行。只输出参考文献正文，不要额外说明。\n\n"
-                        + "\n".join(_ref_lines)
-                    )
-                    _norm_result = llm_client.chat(
-                        [{"role": "user", "content": _norm_prompt}],
-                        max_tokens=2048, temperature=0.3
-                    )
-                    if _norm_result and _norm_result.strip():
-                        _new_norm = _norm_result.strip()
-                        # 提取实际内容（可能包含 "## 参考文献" 标题）
-                        if "## 参考文献" in _new_norm:
-                            _new_norm = _new_norm.split("## 参考文献", 1)[-1].strip()
-                        _new_ref = "## 参考文献\n" + _new_norm
-                except Exception:
-                    pass  # LLM 规范化失败时保留原始元信息
-                            _new_norm = _new_norm.split("## 参考文献", 1)[-1].strip()
-                        _new_ref = "## 参考文献\n" + _new_norm
-                except Exception:
-                    pass  # LLM 规范化失败时保留原始元信息
-                article_md = article_md[:_ref_start] + _new_ref + article_md[_ref_end:]
+    article_md = citation_post_process(article_md, citation_config, all_rag_headers, llm_client)
 
     # ── 事实自检汇总 ──
     if fact_check_enabled:
@@ -530,16 +490,6 @@ def generate_article(
         else:
             review_lines.append("未发现需标记的问题。")
         article_md += "\n\n---\n\n" + "\n".join(review_lines)
-
-    # ── 引用验证 ──
-    if citation_config and any(c.get("enabled") for c in citation_config.values()):
-        try:
-            cit_result = citation_validate(article_md, all_rag_headers, citation_config)
-            cit_report = citation_format_report(cit_result)
-            if cit_report:
-                article_md += cit_report
-        except Exception as e:
-            _logger.exception("引用验证异常")
 
     # 写入文件
     safe_title = "".join(c for c in title if c.isalnum() or c in " _-")
