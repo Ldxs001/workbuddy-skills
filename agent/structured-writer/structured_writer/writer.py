@@ -462,7 +462,8 @@ def generate_article(
     # ── 引用后处理：打勾时才执行 ──
     if citation_config and all_rag_headers:
         # 1. 扫描全文提取所有引用自{文件名} → 按首次出现顺序编号
-        _cited = re.findall(r"引用自([a-zA-Z0-9_.\-]+)", article_md)
+        # \S+ 匹配非空白字符序列，支持中文文件名；末尾标点在后续 strip 处理
+        _cited = re.findall(r"引用自\s?(\S+)", article_md)
         _seen = {}
         _order = []
         for _src in _cited:
@@ -489,6 +490,30 @@ def generate_article(
                 if _ref_end < 0:
                     _ref_end = len(article_md)
                 _new_ref = "## 参考文献\n" + "\n".join(_ref_lines)
+                # 用 LLM 规范化参考文献格式（将原始元信息转为标准引文）
+                try:
+                    _norm_prompt = (
+                        "以下是一篇学术文章的参考文献列表，每条包含原始元信息（来源文件名和文档片段）。"
+                        "请根据这些信息，为每条写出规范化的参考文献条目（作者、标题、来源等），"
+                        "保持编号不变，每条一行。只输出参考文献正文，不要额外说明。\n\n"
+                        + "\n".join(_ref_lines)
+                    )
+                    _norm_result = llm_client.chat(
+                        [{"role": "user", "content": _norm_prompt}],
+                        max_tokens=2048, temperature=0.3
+                    )
+                    if _norm_result and _norm_result.strip():
+                        _new_norm = _norm_result.strip()
+                        # 提取实际内容（可能包含 "## 参考文献" 标题）
+                        if "## 参考文献" in _new_norm:
+                            _new_norm = _new_norm.split("## 参考文献", 1)[-1].strip()
+                        _new_ref = "## 参考文献\n" + _new_norm
+                except Exception:
+                    pass  # LLM 规范化失败时保留原始元信息
+                            _new_norm = _new_norm.split("## 参考文献", 1)[-1].strip()
+                        _new_ref = "## 参考文献\n" + _new_norm
+                except Exception:
+                    pass  # LLM 规范化失败时保留原始元信息
                 article_md = article_md[:_ref_start] + _new_ref + article_md[_ref_end:]
 
     # ── 事实自检汇总 ──

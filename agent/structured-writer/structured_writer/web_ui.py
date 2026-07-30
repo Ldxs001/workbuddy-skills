@@ -15,7 +15,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from .config_manager import ConfigManager
+from .config_manager import ConfigManager, BUILTIN_TEMPLATE_NAMES
 from .llm_client import LLMClient, LLMClientError
 from .state_manager import StateManager
 from .planner import plan_outline
@@ -71,9 +71,12 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             "/api/session/load": cls._handle_session_load,
             "/api/rag/status": cls._handle_rag_status,
             "/api/batch_progress": cls._handle_batch_progress,
+            "/api/outputs": cls._handle_outputs_list,
+            "/api/outputs/read": cls._handle_outputs_read,
         }
         cls.ROUTES["POST"] = {
             "/api/config": cls._handle_update_config,
+            "/api/outputs/delete": cls._handle_outputs_delete,
             "/api/plan": cls._handle_plan,
             "/api/generate": cls._handle_generate,
             "/api/session/new": cls._handle_new_session,
@@ -166,6 +169,14 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
 
     def _handle_update_config(self):
         data = self._read_body()
+        # 处理模板删除（透传给 config_manager）
+        if "_delete_template" in data:
+            name = data.pop("_delete_template")
+            if name and name not in BUILTIN_TEMPLATE_NAMES:
+                user_tpls = self.config_mgr._load_user_templates()
+                if name in user_tpls:
+                    del user_tpls[name]
+                    self.config_mgr._save_user_templates(user_tpls)
         self.config_mgr.update(data)
         self._json_response({"success": True})
 
@@ -514,6 +525,54 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
         with _stop_lock:
             _stop_flags[session_id] = stop_type
         self._json_response({"success": True, "type": stop_type})
+
+    # ---- 已完成文章列表 ----
+
+    def _handle_outputs_list(self):
+        """列出 data/outputs/ 下所有 .md 文件"""
+        from .state_manager import OUTPUTS_DIR
+        files = []
+        if OUTPUTS_DIR.exists():
+            for f in sorted(OUTPUTS_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+                if f.suffix == ".md" and f.stat().st_size > 0:
+                    files.append({
+                        "name": f.name,
+                        "size": f.stat().st_size,
+                        "mtime": f.stat().st_mtime,
+                    })
+        self._json_response({"success": True, "files": files})
+
+    def _handle_outputs_read(self):
+        """读取单个 .md 文件内容"""
+        from .state_manager import OUTPUTS_DIR
+        params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        name = params.get("file", [""])[0]
+        if not name:
+            self._json_response({"success": False, "error": "缺少 file 参数"}, 400)
+            return
+        fpath = OUTPUTS_DIR / name
+        if not fpath.exists() or fpath.suffix != ".md":
+            self._json_response({"success": False, "error": "文件不存在"}, 404)
+            return
+        content = fpath.read_text(encoding="utf-8")
+        # 安全过滤不可见字符
+        safe = "".join(c if c.isprintable() or c in "\n\r\t" else " " for c in content)
+        self._json_response({"success": True, "content": safe, "name": name})
+
+    def _handle_outputs_delete(self):
+        """删除单个 .md 文件"""
+        from .state_manager import OUTPUTS_DIR
+        data = self._read_body()
+        name = data.get("file", "")
+        if not name:
+            self._json_response({"success": False, "error": "缺少 file 参数"}, 400)
+            return
+        fpath = OUTPUTS_DIR / name
+        if not fpath.exists() or fpath.suffix != ".md":
+            self._json_response({"success": False, "error": "文件不存在"}, 404)
+            return
+        fpath.unlink()
+        self._json_response({"success": True})
 
     # ---- 进度 API ----
 
@@ -1025,6 +1084,7 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
 - logical_order：可选。不设或留空=按 content[] 顺序写，不需特殊排序。
   需要特殊排序时才设置：0=先写，1=其次，2=最后写（如摘要/关键词需在全文写完后提取）。
   逻辑顺序只控制 LLM 写作时的认知流程，不影响文章最终排列
+- **citation_check（引用校验）**：如果字段是引用列表/参考文献，必须设置 `"citation_check": true` 并在 `"citation_format"` 中指定行内引用标记格式和参考文献列表前缀格式，如 `"citation_format": "[x]=1."` 表示正文中用 `[文件名]` 标记引用，参考文献用 `1.` 前缀
 
 四、逻辑提示词（logic）规则：
 - 控制 LLM 的认知流程顺序，而非文章最终顺序
@@ -1166,6 +1226,10 @@ def _normalize_template(t: dict) -> dict:
         lo = f.get("logical_order")
         if lo is not None and lo in (0, 1, 2):
             entry["logical_order"] = lo
+        # 引用校验：字段名含"参考文献"或已有 citation_check=true 时自动开启
+        if f.get("citation_check") or "参考文献" in name or "引用" in name:
+            entry["citation_check"] = True
+            entry["citation_format"] = str(f.get("citation_format", "[x]=1."))
         cleaned_content.append(entry)
     t["content"] = cleaned_content
 
@@ -1174,7 +1238,7 @@ def _normalize_template(t: dict) -> dict:
     t.setdefault("logic", "")
 
     # 清理多余字段
-    allowed = {"name", "meta", "content", "style", "logic"}
+    allowed = {"name", "meta", "content", "style", "logic", "citation_check", "citation_format"}
     for k in list(t.keys()):
         if k not in allowed:
             del t[k]
@@ -1385,6 +1449,63 @@ body {
   flex-direction: column;
   min-width: 0;
 }
+
+/* ===== 输出列表侧栏 ===== */
+.outputs-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.outputs-sidebar .sidebar-header {
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.outputs-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.output-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.output-item:hover { background: var(--bg-hover); }
+.output-item .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.output-item .date {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.output-item .del-btn {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0 2px;
+  opacity: 0.5;
+}
+.output-item .del-btn:hover { opacity: 1; }
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -1664,6 +1785,7 @@ body {
               <select id="template-select" style="width:100%;padding:4px 6px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" onchange="onTemplateChange()" size="1">
               </select>
             </div>
+            <span id="template-type-badge" style="font-size:11px;padding:2px 6px;border-radius:3px;white-space:nowrap"></span>
           </div>
           <button class="btn btn-primary btn-sm" onclick="saveCurrentTemplate()" id="save-current-template-btn" title="直接保存当前模板的修改">保存</button>
           <button class="btn btn-secondary btn-sm" onclick="saveTemplateAs()">另存为</button>
@@ -1905,6 +2027,10 @@ body {
           <button class="btn btn-sm btn-secondary" style="background:var(--accent);color:#fff" onclick="stopGeneration('immediate')">立即停止</button>
         </div>
       </div>
+      <div class="outputs-sidebar" id="outputs-sidebar">
+        <div class="sidebar-header">已完成文章</div>
+        <div class="outputs-list" id="outputs-list"></div>
+      </div>
     </div>
   </div>
 
@@ -1923,12 +2049,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
   loadSessions();
   checkRagStatus();
-
-  // 配置加载完成后刷新 meta 输入框
-  setTimeout(() => {
-    const sel = document.getElementById('template-select');
-    if (sel) renderMetaInputs(sel.value);
-  }, 200);
+  loadOutputs();
 
   // Tab 切换
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1957,6 +2078,9 @@ function loadConfig() {
     document.getElementById('planner-timeout').value = pm.timeout || 180;
     document.getElementById('planner-max-tokens').value = pm.max_tokens || 4096;
     document.getElementById('planner-temperature').value = pm.temperature != null ? pm.temperature : 0.6;
+    // 缓存模板数据供只读控制
+    window._lastTemplates = c.templates || {};
+    window._lastBuiltins = c.builtin_templates || [];
     document.getElementById('writer-backend').value = wm.backend || 'lmstudio';
     document.getElementById('writer-base-url').value = wm.base_url || 'http://localhost:1234';
     document.getElementById('writer-timeout').value = wm.timeout || 300;
@@ -1975,9 +2099,15 @@ function loadConfig() {
       tmplNames.push('自定义');
     }
     if (tmplNames.length) {
-      sel.innerHTML = tmplNames.map(t => `<option value="${t}">${t}</option>`).join('');
+      sel.innerHTML = tmplNames.map(t => {
+        const isBuiltin = c.builtin_templates && c.builtin_templates.includes(t);
+        const label = isBuiltin ? `${t}` : `${t} ★`;
+        return `<option value="${t}">${label}</option>`;
+      }).join('');
     }
     sel.value = selectedTemplate;
+    // 更新保存按钮状态
+    updateSaveButtonState();
     // 加载 meta/content/style/logic
     const tmpl = templates[selectedTemplate] || {};
     if (typeof tmpl === 'object' && (tmpl.meta || tmpl.content)) {
@@ -2011,16 +2141,6 @@ function loadConfig() {
       document.getElementById('template-style').value = '';
       document.getElementById('template-logic').value = '';
     }
-    // 加载用户模板
-    if (c.user_templates) {
-      Object.keys(c.user_templates).forEach(k => {
-        if (!templates[k]) {
-          const opt = document.createElement('option');
-          opt.value = k; opt.textContent = k + ' ★';
-          sel.appendChild(opt);
-        }
-      });
-    }
     // 确保选中值有效
     if (!sel.querySelector(`option[value="${selectedTemplate}"]`)) {
       sel.value = sel.options[0]?.value || '';
@@ -2031,6 +2151,8 @@ function loadConfig() {
     if (c.fact_check_enabled) document.getElementById('fact-check-enabled').checked = true;
     refreshModels('planner', pm.model);
     refreshModels('writer', wm.model);
+    // 加载完成后渲染对话区的 meta 输入框
+    renderMetaInputs(selectedTemplate);
   });
 }
 
@@ -2120,10 +2242,46 @@ function saveConfig() {
   });
 }
 
+// ===== 内置模板只读控制 =====
+function updateSaveButtonState() {
+  const sel = document.getElementById('template-select');
+  const name = sel ? sel.value : '';
+  const templates = window._lastTemplates || {};
+  const builtins = window._lastBuiltins || [];
+  const isBuiltin = builtins.includes(name);
+  const btn = document.getElementById('save-current-template-btn');
+  const delBtn = document.querySelector('.btn-danger');
+  if (btn) {
+    btn.disabled = isBuiltin;
+    btn.title = isBuiltin ? '内置模板只读，修改请使用"另存为"' : '直接保存当前模板的修改';
+    btn.style.opacity = isBuiltin ? '0.5' : '1';
+    btn.style.cursor = isBuiltin ? 'not-allowed' : 'pointer';
+  }
+  if (delBtn) {
+    delBtn.disabled = isBuiltin;
+    delBtn.title = isBuiltin ? '内置模板只读，不可删除' : '删除当前自定义模板';
+    delBtn.style.opacity = isBuiltin ? '0.5' : '1';
+    delBtn.style.cursor = isBuiltin ? 'not-allowed' : 'pointer';
+  }
+  const badge = document.getElementById('template-type-badge');
+  if (badge) {
+    if (isBuiltin) {
+      badge.textContent = '[内置]';
+      badge.style.background = '#5dade2';
+      badge.style.color = '#fff';
+    } else {
+      badge.textContent = '[用户]';
+      badge.style.background = '#f39c12';
+      badge.style.color = '#fff';
+    }
+  }
+}
+
 // ===== 模板切换 =====
 function onTemplateChange() {
   const sel = document.getElementById('template-select');
   const tmplName = sel.value;
+  updateSaveButtonState();
   fetch('/api/config', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({selected_template: tmplName})
@@ -2259,6 +2417,8 @@ function collectTemplateData() {
 function saveCurrentTemplate() {
   const name = document.getElementById('template-select').value;
   if (!name) { alert('未选择模板'); return; }
+  const builtins = window._lastBuiltins || [];
+  if (builtins.includes(name)) { alert('内置模板只读，请使用"另存为"创建副本修改'); return; }
   const data = collectTemplateData();
   const btn = document.getElementById('save-current-template-btn');
   const origText = btn ? btn.textContent : '';
@@ -2267,11 +2427,9 @@ function saveCurrentTemplate() {
     if (!cfg.success) { if (btn) { btn.textContent = origText; btn.disabled = false; } return; }
     const templates = Object.assign({}, cfg.config.templates || {});
     templates[name] = data;
-    const userTemplates = Object.assign({}, cfg.config.user_templates || {});
-    if (!userTemplates[name]) userTemplates[name] = true;
     fetch('/api/config', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({templates, user_templates: userTemplates})
+      body: JSON.stringify({templates})
     }).then(r => r.json()).then(d => {
       if (btn) {
         if (d.success) {
@@ -2305,15 +2463,18 @@ function confirmSaveAs() {
   if (!name) { document.getElementById('saveas-modal-status').textContent = '名称不能为空'; return; }
   closeSaveAsModal();
   const data = collectTemplateData();
+  const builtins = window._lastBuiltins || [];
+  if (builtins.includes(name)) {
+    document.getElementById('saveas-modal-status').textContent = '名称与内置模板重复，请换一个';
+    return;
+  }
   fetch('/api/config').then(r => r.json()).then(cfg => {
     if (!cfg.success) return;
     const templates = Object.assign({}, cfg.config.templates || {});
     templates[name] = data;
-    const userTemplates = Object.assign({}, cfg.config.user_templates || {});
-    userTemplates[name] = true;
     fetch('/api/config', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({templates, user_templates: userTemplates})
+      body: JSON.stringify({templates})
     }).then(r => r.json()).then(d => {
       if (d.success) { loadConfig(); document.getElementById('template-select').value = name; onTemplateChange(); }
     });
@@ -2325,42 +2486,34 @@ const _delTplPending = {pending: false, name: '', timer: null};
 
 function deleteTemplate() {
   if (_delTplPending.pending) {
-    // 双击确认
     const name = _delTplPending.name;
     clearTimeout(_delTplPending.timer);
     _delTplPending.pending = false;
     const btn = document.querySelector('.btn-danger');
     if (btn) { btn.textContent = '删除'; btn.style.background = '#c0392b'; }
-    fetch('/api/config').then(r => r.json()).then(cfg => {
-      if (!cfg.success) return;
-      const userTpls = cfg.config.user_templates || {};
-      if (!userTpls[name]) return;
-      const templates = Object.assign({}, cfg.config.templates || {});
-      delete templates[name];
-      const newUserTpls = Object.assign({}, userTpls);
-      delete newUserTpls[name];
-      fetch('/api/config', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({templates, user_templates: newUserTpls})
-      }).then(r => r.json()).then(d => { if (d.success) loadConfig(); });
-    });
+    const builtins = window._lastBuiltins || [];
+    if (builtins.includes(name)) return;
+    const templates = {};
+    templates[name] = null;
+    // 发送 null 标记删除用户模板
+    fetch('/api/config', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({_delete_template: name})
+    }).then(r => r.json()).then(d => { if (d.success) loadConfig(); });
     return;
   }
   const sel = document.getElementById('template-select');
   const name = sel.value;
-  fetch('/api/config').then(r => r.json()).then(cfg => {
-    if (!cfg.success) return;
-    const userTpls = cfg.config.user_templates || {};
-    if (!userTpls[name]) return;
-    const btn = document.querySelector('.btn-danger');
-    if (btn) { btn.textContent = '确认?'; btn.style.background = '#e74c3c'; btn.style.color = '#fff'; }
-    _delTplPending.pending = true;
-    _delTplPending.name = name;
-    _delTplPending.timer = setTimeout(() => {
-      _delTplPending.pending = false;
+  const builtins = window._lastBuiltins || [];
+  if (builtins.includes(name)) return;
+  const btn = document.querySelector('.btn-danger');
+  if (btn) { btn.textContent = '确认?'; btn.style.background = '#e74c3c'; btn.style.color = '#fff'; }
+  _delTplPending.pending = true;
+  _delTplPending.name = name;
+  _delTplPending.timer = setTimeout(() => {
+    _delTplPending.pending = false;
       if (btn) { btn.textContent = '删除'; btn.style.background = '#c0392b'; btn.style.color = '#fff'; }
     }, 2500);
-  });
 }
 
 // ===== LLM 模板生成 =====
@@ -2391,11 +2544,9 @@ function generateTemplate() {
         if (!cfg.success) return;
         const templates = Object.assign({}, cfg.config.templates || {});
         templates[templateName] = {meta: d.template.meta || [], content: d.template.content || [], style: d.template.style || '', logic: d.template.logic || ''};
-        const userTemplates = Object.assign({}, cfg.config.user_templates || {});
-        userTemplates[templateName] = true;
         fetch('/api/config', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({templates, user_templates: userTemplates})
+          body: JSON.stringify({templates})
         }).then(r2 => r2.json()).then(d2 => {
           if (d2.success) {
             loadConfig();
@@ -3596,6 +3747,68 @@ function fetchResult(sessionId) {
       isGenerating = false;
       loadSessions();
     });
+}
+
+// ===== 右侧已完成文章列表 =====
+
+function loadOutputs() {
+  fetch('/api/outputs').then(r => r.json()).then(d => {
+    if (!d.success) return;
+    const list = document.getElementById('outputs-list');
+    if (!list) return;
+    list.innerHTML = (d.files || []).map(f => {
+      const date = new Date(f.mtime * 1000);
+      const dateStr = `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+      const name = escapeHtml(f.name);
+      return '<div class="output-item" onclick="openOutput(\'' + name + '\')">' +
+        '<span class="name" title="' + name + '">' + name + '</span>' +
+        '<span class="date">' + dateStr + '</span>' +
+        '<span class="del-btn" onclick="event.stopPropagation();deleteOutput(\'' + name + '\')" title="删除">✕</span>' +
+        '</div>';
+    }).join('');
+    // 自动刷新
+    setTimeout(loadOutputs, 30000);
+  }).catch(() => setTimeout(loadOutputs, 30000));
+}
+
+function openOutput(name) {
+  fetch('/api/outputs/read?file=' + encodeURIComponent(name))
+    .then(r => r.json()).then(d => {
+      if (!d.success) return;
+      // 用模态框展示
+      const modal = document.getElementById('output-modal') || createOutputModal();
+      modal.querySelector('.modal-header h3').textContent = d.name;
+      const body = modal.querySelector('.modal-body');
+      body.innerHTML = '';  // 清空
+      body.style.whiteSpace = 'pre-wrap';
+      body.style.fontSize = '13px';
+      body.style.lineHeight = '1.6';
+      body.style.maxHeight = '70vh';
+      body.style.overflowY = 'auto';
+      body.textContent = d.content;
+      modal.classList.add('show');
+    });
+}
+
+function createOutputModal() {
+  const div = document.createElement('div');
+  div.className = 'modal-overlay';
+  div.id = 'output-modal';
+  div.innerHTML = '<div class="modal-box" style="width:80%;max-width:900px">' +
+    '<div class="modal-header"><h3></h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').classList.remove(\'show\')">&times;</button></div>' +
+    '<div class="modal-body"></div></div>';
+  document.body.appendChild(div);
+  return div;
+}
+
+function deleteOutput(name) {
+  if (!confirm('确认删除「' + name + '」？')) return;
+  fetch('/api/outputs/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({file: name})
+  }).then(r => r.json()).then(d => {
+    if (d.success) loadOutputs();
+  });
 }
 </script>
 
