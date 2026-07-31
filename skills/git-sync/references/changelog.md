@@ -1,3 +1,14 @@
+## [2.35.0] - 2026-07-31
+
+### 修复
+- **PyPI 发布器特化残留（`pypi_publish.py`）** — setup.py 模板硬编码 `rag_assistant/__init__.py` 读取版本号，导致 structured-writer 等任意包目录名的 agent 发布时版本号回退到命令行参数。修复：改为 `rglob("__init__.py")` 扫描含 `__version__` 的文件，与主脚本 `git-sync.py` 的自动检测逻辑一致，不再特化
+- **README 更新器特化残留（`update_readme.py`）** — 硬编码 `rag_assistant/__init__.py` 读取 agent 描述，非 rag-assistant 目录名的 agent 描述永远读不到（回退"智能体"默认值）。修复：`os.walk` 自动检测含 `__init__.py` 的包目录
+- **setup.py 模板无效转义（SyntaxWarning）** — 模板内 `\s`/`\[`/`\n` 未转义触发 Python 3.12+ SyntaxWarning。修复：改为 `\\s`/`\\[`/`\\n`，生成的 setup.py 保持字面正则
+- **PyPI dev_status 写死 Beta（未兑现"自动判别"声明）** — SKILL.md 宣称 "dev_status 自动判别" 但代码硬编码 `4 - Beta`。修复：按版本号自动判别——含 `b`/`a`/`rc`（PEP 440 预发布）→ `4 - Beta`，否则 `5 - Production/Stable`（如 structured-writer 1.1.0 正式版发布时为 Production/Stable）
+
+### 变更
+- `SKILL.md` 约束更新 — "自动检测类型"描述由 `rag_assistant/__init__.py` 改为 rglob 扫描说明，明确不硬编码任何包目录名
+
 ## [2.34.0] - 2026-07-31
 
 ### 修复

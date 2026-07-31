@@ -41,9 +41,9 @@
 
 | 智能体名 | 描述 |
 |----------|------|
-| `Orchestrator` | 智能体 |
+| `Orchestrator` | Orchestrator v2 — 链驱动智能体系统 |
 | `rag-assistant` | rag-assistant: 独立智能体，封装 local-rag-builder 技能 |
-| `structured-writer` | 智能体 |
+| `structured-writer` | Structured Writer — 结构化写作智能体 |
 
 ---
 

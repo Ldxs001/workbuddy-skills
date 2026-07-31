@@ -116,10 +116,15 @@ def generate_readme(repo_path, readme_path):
         for entry in sorted(os.listdir(agent_dir)):
             full = os.path.join(agent_dir, entry)
             if os.path.isdir(full):
-                # 从 __init__.py 读取描述
-                init_py = os.path.join(full, "rag_assistant", "__init__.py")
+                # 自动检测包目录（rglob 找含 __init__.py 的目录，不硬编码 rag_assistant/）
+                init_py = None
+                for root, dirs, files in os.walk(full):
+                    dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git")]
+                    if "__init__.py" in files:
+                        init_py = os.path.join(root, "__init__.py")
+                        break
                 desc = "智能体"
-                if os.path.exists(init_py):
+                if init_py and os.path.exists(init_py):
                     try:
                         with open(init_py, "r", encoding="utf-8") as f:
                             content = f.read()

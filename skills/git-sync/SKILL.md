@@ -2,7 +2,7 @@
 name: git-sync
 slug: git-sync
 displayName: git-sync
-version: 2.34.0
+version: 2.35.0
 author: wUwproject
 license: MIT
 description: 全平台统一发布工具。支持 skills 和 agents 的 Gitee/GitHub/ClawHub/SkillHub/PyPI 同步与 Release 创建，LLM 驱动的文件过滤与脱敏。
@@ -27,7 +27,7 @@ data_dir_compliance: true
 ## 约束
 
 - **仅前台运行** — git-sync 包含 LLM 交互步骤（文件筛除、敏感脱敏），WorkBuddy 必须在前台会话中读取输出并写入决策文件。**禁止在后台/Bash 任务中运行**，否则 LLM 交互输出被吞会导致死锁
-- **自动检测类型** — 自动识别 skill（`_meta.json`）或 agent（`rag_assistant/__init__.py`），分别走不同发布流程
+- **自动检测类型** — 自动识别 skill（`_meta.json`）或 agent（rglob 扫描含 `__version__` 的 `__init__.py`，任意包目录名均可，不硬编码），分别走不同发布流程
 - **`all` 模式** — `git-sync all` 遍历 `skills/` 和 `agent/` 全部项目
 - **网络依赖** — 推送 Gitee/GitHub/ClawHub/SkillHub/PyPI 需要可用网络连接，超时阈值 60 秒
 - **冲突不自动合并** — git merge 冲突需人工介入

@@ -501,7 +501,7 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path):
     print("- 私钥内容（PEM 格式）")
     print()
     print("以下情况可保留（keep）：")
-    print("- 公开署名（如 LICENSE/README 中的 wUwproject）")
+    print("- 公开署名（如 LICENSE/README 中的 [username-redacted]）")
     print("- 开源项目的公开联系邮箱")
     print("- 文档中的示例路径或占位信息")
     print()
@@ -1241,8 +1241,8 @@ if os.path.exists(readme_p):
     with open(readme_p,encoding="utf-8") as f: LD=f.read()
 setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       long_description=LD,long_description_content_type="text/markdown",
-      author="Ldxs (wUwproject)",author_email="wuwofc@yeah.net",
-      url="https://github.com/Ldxs001/workbuddy-skills",
+      author="Ldxs ([username-redacted])",author_email="[email-redacted]",
+      url="https://github.com/[username-redacted]/workbuddy-skills",
       packages=find_packages(),include_package_data=True,
       python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
@@ -1309,11 +1309,11 @@ def step_release_create(name: str, typ: str, version: str):
         _cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
         _g = _cfg.get("gitee", {})
         _h = _cfg.get("github", {})
-        GITEE = f"{_g.get('user','wUwproject')}/{_g.get('repo','workbuddy-skills')}"
-        GITHUB = f"{_h.get('user','Ldxs001')}/{_h.get('repo','workbuddy-skills')}"
+        GITEE = f"{_g.get('user','[username-redacted]')}/{_g.get('repo','workbuddy-skills')}"
+        GITHUB = f"{_h.get('user','[username-redacted]')}/{_h.get('repo','workbuddy-skills')}"
     except:
-        GITEE = "wUwproject/workbuddy-skills"
-        GITHUB = "Ldxs001/workbuddy-skills"
+        GITEE = "[username-redacted]/workbuddy-skills"
+        GITHUB = "[username-redacted]/workbuddy-skills"
 
     tag = f"v{version}" if typ=="agent" else f"{name}-v{version}"
     subprocess.run(["git","tag",tag],cwd=str(WORK_REPO),capture_output=True)
