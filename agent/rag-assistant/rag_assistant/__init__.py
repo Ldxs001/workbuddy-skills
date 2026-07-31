@@ -1,5 +1,5 @@
 """rag-assistant: 独立智能体，封装 local-rag-builder 技能"""
-__version__ = "2.2.10"
+__version__ = "2.2.11"
 
 # 确保 vendor/ 在 sys.path（使 pypdf 等本地包可导入）
 import os
