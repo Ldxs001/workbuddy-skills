@@ -309,12 +309,33 @@ def plan_outline(topic: str, template: dict = None,
         {"role": "user", "content": user_msg}
     ]
 
-    # 最多重试 3 次
+    # 最多重试 3 次（格式错误重试）
     outline = None
     last_raw = ""
     for attempt in range(3):
-        plan_max_tokens = max(4096, llm_client.max_tokens)
-        raw = llm_client.chat(messages, max_tokens=plan_max_tokens, temperature=None)
+        # 下限 2048：保证推理模型能完成推理并输出大纲主体；
+        # 仍被截断时由续接循环补全。低于 2048 推理吃光 token
+        # 输出为空，续接无法挽救（空内容直接断）。
+        plan_max_tokens = max(2048, llm_client.max_tokens)
+        # 续接循环：检测 finish_reason=length 时追加"继续输出"，
+        # 拼装完整 JSON 后再解析（与写作引擎机制一致）
+        raw = ""
+        cont_messages = messages.copy()
+        for _cont in range(4):
+            result = llm_client.chat_detailed(cont_messages, max_tokens=plan_max_tokens, temperature=None)
+            chunk = result.get("content", "")
+            finish_reason = result.get("finish_reason", "stop")
+            raw += chunk
+            if finish_reason != "length":
+                break
+            if not chunk.strip():
+                break
+            cont_messages.append({"role": "assistant", "content": chunk})
+            cont_messages.append({
+                "role": "user",
+                "content": "大纲 JSON 输出被截断，请直接从截断处继续输出 JSON 内容，"
+                           "不要重复已输出的内容，不要任何解释文字。"
+            })
         last_raw = raw
         outline = parse_outline(raw)
 

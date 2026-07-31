@@ -896,6 +896,17 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
             fc_enabled = self.config_mgr.get("fact_check_enabled", False)
             ctx_len = self.config_mgr.get("context_review_length", 800)
 
+            # 从模板 content 项构建引用验证配置（与单篇生成一致）
+            citation_config = {}
+            if isinstance(template, dict):
+                for cf in (template.get("content") or []):
+                    if cf.get("citation_check"):
+                        citation_config[cf["name"]] = {
+                            "enabled": True,
+                            "format": cf.get("citation_format", "[x]=1."),
+                            "desc": cf.get("desc", ""),
+                        }
+
             writer_client = self._create_writer_client()
             planner_client = self._create_planner_client()
 
@@ -943,7 +954,9 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
                         rag_client=rag_client,
                         aux_knowledge=None,
                         fact_check_enabled=fc_enabled,
-                        template=template if isinstance(template, dict) else None
+                        context_review_length=ctx_len,
+                        template=template if isinstance(template, dict) else None,
+                        citation_config=citation_config
                     )
 
                     results.append({

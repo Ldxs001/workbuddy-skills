@@ -137,6 +137,7 @@ def generate_article(
     sections = outline.get("sections", [])
     title = outline.get("title", "未命名文章")
     meta_fields = (template or {}).get("meta", [])
+    content_fields = (template or {}).get("content", [])
     logic_prompt = (template or {}).get("logic", "")
     style_prompt = (template or {}).get("style", "")
 
@@ -155,7 +156,6 @@ def generate_article(
     if user_orders:
         output_order = sorted(sections, key=lambda s: user_orders.get(s["id"], 999))
     else:
-        content_fields = (template or {}).get("content", [])
         content_order = {cf["name"]: i for i, cf in enumerate(content_fields)}
         output_order = sorted(sections, key=lambda s: content_order.get(s.get("title", ""), 999))
 
@@ -265,7 +265,7 @@ def generate_article(
                 word_count=section.get("word_count", 800),
                 is_key=section.get("is_key", False),
                 context_buffer=(context_buffer or "") if section.get("_logical_order") == 2 else (context_buffer[-context_review_length:] if context_buffer and context_review_length else (context_buffer or "")),
-                rag_context=None,
+                rag_context=section_rag_context,
                 aux_text=None,
                 logic_hint=logic_prompt,
                 style_hint=style_prompt,
