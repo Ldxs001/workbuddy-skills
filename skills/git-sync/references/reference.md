@@ -203,7 +203,7 @@ python git-sync.py <name> [--skip-market] [--market-only] [--pypi] [--release]
       "items": {
         "rag-assistant": {
           "type": "agent",
-          "source_path": "C:/Users/sm001/WorkBuddy/rag-assistant",
+          "source_path": "C:/Users/USERNAME/WorkBuddy/rag-assistant",
           "repo_path": "agent/rag-assistant",
           "added_at": "2026-07-21",
           "uploaded": true,
@@ -378,12 +378,12 @@ LLM 接收扫描发现列表后，按以下原则自动判断：
 
 | 敏感类型 | LLM 决策倾向 | 示例 |
 |----------|-------------|------|
-| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `[email-redacted]` 在 LICENSE 中 → 保留 |
+| 邮箱地址 | 公开文档中的署名邮箱 → 保留；代码中的测试邮箱 → 保留；疑似个人邮箱 → 脱敏 | `user@example.com` 在 LICENSE 中 → 保留 |
 | Token / API Key | 一律脱敏 | `api_key=sk-xxx` → 替换为 `<REDACTED>` |
 | 私钥内容 | 一律脱敏 | PEM 格式密钥 → 替换 |
-| 内网 IP | 脱敏 | `[internal-ip-redacted]` → `<REDACTED_IP>` |
-| 本地绝对路径 | public_docs 中的路径 → 保留；代码中硬编码 → 脱敏 | `C:\Users\sm001` 在文档中 → 保留 |
-| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `[username-redacted]` → 保留 |
+| 内网 IP | 脱敏 | `192.168.1.1` → `<REDACTED_IP>` |
+| 本地绝对路径 | public_docs 中的路径 → 保留；代码中硬编码 → 脱敏 | `C:\Users\USERNAME` 在文档中 → 保留 |
+| 配置用户名 | 保留（来自 config.json 的 author/gitee.user） | `wUwproject` → 保留 |
 
 ### 打包时行为
 

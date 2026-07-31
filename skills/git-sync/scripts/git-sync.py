@@ -501,7 +501,7 @@ def step_sensitive_scan(skill_name: str, repo_skill_dir: Path):
     print("- 私钥内容（PEM 格式）")
     print()
     print("以下情况可保留（keep）：")
-    print("- 公开署名（如 LICENSE/README 中的 [username-redacted]）")
+    print("- 公开署名（如 LICENSE/README 中的 wUwproject）")
     print("- 开源项目的公开联系邮箱")
     print("- 文档中的示例路径或占位信息")
     print()
@@ -1224,6 +1224,7 @@ build-backend = "setuptools.build_meta"
     # setup.py（动态读取版本号 + long_description）
     _P(str(build_dir / "setup.py")).write_text(textwrap.dedent(f'''\
 import os
+from setuptools import setup
 init_p=os.path.join(os.path.dirname(__file__),"{pkg_dir}","__init__.py")
 V="{pypi_ver}"
 if os.path.exists(init_p):
@@ -1241,9 +1242,9 @@ if os.path.exists(readme_p):
     with open(readme_p,encoding="utf-8") as f: LD=f.read()
 setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
       long_description=LD,long_description_content_type="text/markdown",
-      author="Ldxs ([username-redacted])",author_email="[email-redacted]",
-      url="https://github.com/[username-redacted]/workbuddy-skills",
-      packages=find_packages(),include_package_data=True,
+      author="Ldxs (wUwproject)",author_email="contact@example.com",
+      url="https://github.com/Ldxs001/workbuddy-skills",
+      packages=["{pkg_dir}"],include_package_data=True,
       python_requires=">=3.10",install_requires=REQ,
       entry_points={{"console_scripts":["{pypi_name}=main:main"]}},
       classifiers=["Development Status :: {dev_status}","Intended Audience :: Developers",
@@ -1254,10 +1255,11 @@ setup(name="{pypi_name}",version=V,description="{name} — AI Agent",
     _P(str(build_dir / "MANIFEST.in")).write_text(
         f"include requirements.txt\ninclude README.md\ninclude LICENSE\ninclude setup.py\ninclude main.py\n"
         f"graft {pkg_dir}/\nprune __pycache__\nprune *.pyc\n", encoding="utf-8")
-    r = subprocess.run([sys.executable, "-m", "build"], cwd=str(build_dir), capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-m", "build", "--wheel", "--no-isolation"],
+                       cwd=str(build_dir), capture_output=True, text=True)
     if r.returncode != 0:
-        log(8,8,f"PyPI 构建失败: {r.stderr[:200]}","err")
-        shutil.rmtree(build_dir,ignore_errors=True); return
+        log(8, 8, f"PyPI 构建失败: {r.stderr[:2000]}", "err")
+        shutil.rmtree(build_dir, ignore_errors=True); return
     # 从 .pypirc 取 token
     token = ""
     pypirc = Path.home() / ".pypirc"
@@ -1309,11 +1311,11 @@ def step_release_create(name: str, typ: str, version: str):
         _cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
         _g = _cfg.get("gitee", {})
         _h = _cfg.get("github", {})
-        GITEE = f"{_g.get('user','[username-redacted]')}/{_g.get('repo','workbuddy-skills')}"
-        GITHUB = f"{_h.get('user','[username-redacted]')}/{_h.get('repo','workbuddy-skills')}"
+        GITEE = f"{_g.get('user','wUwproject')}/{_g.get('repo','workbuddy-skills')}"
+        GITHUB = f"{_h.get('user','Ldxs001')}/{_h.get('repo','workbuddy-skills')}"
     except:
-        GITEE = "[username-redacted]/workbuddy-skills"
-        GITHUB = "[username-redacted]/workbuddy-skills"
+        GITEE = "wUwproject/workbuddy-skills"
+        GITHUB = "Ldxs001/workbuddy-skills"
 
     tag = f"v{version}" if typ=="agent" else f"{name}-v{version}"
     subprocess.run(["git","tag",tag],cwd=str(WORK_REPO),capture_output=True)
@@ -1538,6 +1540,9 @@ def main():
             step_pypi_publish(name, version, src_dir)
         if do_release:
             step_release_create(name, typ, version)
+        # log() 只写 LOG_BUFFER 不打印，此处必须显式输出，否则 market-only 全程静默
+        for line in LOG_BUFFER:
+            print(line)
         return
 
     # 静默执行各步骤，收集日志
@@ -1616,14 +1621,15 @@ def main():
                 step_build_index()
 
     # ── 市场/PyPI 发布（同步完成后运行，直接输出）─────────────────────
+    # PyPI（agent）只受 --pypi 控制，不受 --skip-market 影响（skip-market 仅跳过 ClawHub/SkillHub）
     if not skip_market:
         if is_skill:
             print(f"\n  发布 {name} 到 ClawHub...")
             step_clawhub_publish(name, version)
             print(f"  发布 {name} 到 SkillHub...")
             step_skillhub_publish(name, version)
-        if is_agent and do_pypi:
-            step_pypi_publish(name, version, src_dir)
+    if is_agent and do_pypi:
+        step_pypi_publish(name, version, src_dir)
     # ── Release（同步完成后）────────────────────────────────────────
     if do_release:
         step_release_create(name, typ, version)

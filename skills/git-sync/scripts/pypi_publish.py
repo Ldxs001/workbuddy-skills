@@ -54,9 +54,9 @@ setup(
     description="{name} — AI Agent",
     long_description=LONG_DESC,
     long_description_content_type="text/markdown",
-    author="Ldxs ([username-redacted])",
-    author_email="[email-redacted]",
-    url="https://github.com/[username-redacted]/workbuddy-skills",
+    author="Ldxs (wUwproject)",
+    author_email="contact@example.com",
+    url="https://github.com/Ldxs001/workbuddy-skills",
     packages=find_packages(),
     include_package_data=True,
     python_requires=">=3.10",
@@ -116,10 +116,10 @@ def main():
     ).stdout.strip()
     token = ""
     if "//" in remote_url and "@" in remote_url:
-        # HTTPS: https://user:[email-redacted]/...
+        # HTTPS: https://user:token@github.com/...
         token_part = remote_url.split("//")[1].split("@")[0]
         if ":" in token_part:
-            token = [credential-redacted](":")[1]
+            token = token_part.split(":")[1]
 
     if not token:
         print("  ⚠️  无法获取 GitHub token，尝试 ~/.pypirc")

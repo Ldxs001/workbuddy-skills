@@ -221,9 +221,9 @@ git add → git commit → git pull --rebase → git push
 当 `rsync` 不可用时，脚本会 fallback 到 `sync_with_exclude.py`（Python 方案）。
 
 **问题根因：**
-- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`[local-path-redacted]` → `C:\Users\...`）
+- Git Bash 只对 **MSYS2 编译的程序** 自动转换 Unix 路径（`/c/Users/...` → `C:\Users\...`）
 - 如果 `python` 是 **Windows 原生 exe**（如 `.workbuddy\binaries\...`），路径不会被转换
-- Python 收到 `[local-path-redacted]` 会误解为 `C:\c\Users\...`，导致文件找不到
+- Python 收到 `/c/Users/...` 会误解为 `C:\c\Users\...`，导致文件找不到
 
 **症状：**
 ```

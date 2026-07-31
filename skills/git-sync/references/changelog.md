@@ -1,3 +1,13 @@
+## [2.36.0] - 2026-07-31
+
+### 修复（PyPI 发布链路 6 连 bug，structured-writer 1.1.0 发布时暴露）
+- **`--skip-market` 连带跳过 PyPI** — PyPI 发布被包在 `if not skip_market` 内，agent 走 `--skip-market --pypi` 时 PyPI 被误跳。修复：PyPI 只受 `--pypi` 控制
+- **market-only 模式全程静默** — `log()` 只写 LOG_BUFFER 从不打印，market-only 分支提前 return 跳过 LOG_BUFFER 输出，PyPI 成败完全不可见。修复：market-only 分支 return 前显式打印 LOG_BUFFER
+- **`python -m build` 隔离环境创建失败** — Windows/Python 3.14 下 venv+pip 隔离环境失败。修复：加 `--no-isolation`（用当前环境）
+- **sdist 构建失败** — setuptools 81 的 flat-layout 检测到 `data/` 与 `structured_writer` 两个顶层目录拒绝构建。修复：`packages=[pkg_dir]` 明确指定 + 只构建 wheel（`--wheel` 跳过 sdist）
+- **setup.py 模板缺 `from setuptools import setup`** — 模板直接调用 setup() 抛 NameError。修复：补导入
+- **（沿用 2.35.0）dev_status 自动判别 + 特化清除**
+
 ## [2.35.0] - 2026-07-31
 
 ### 修复
