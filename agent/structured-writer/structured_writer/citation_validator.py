@@ -1,9 +1,9 @@
 """引用后处理 — 确定性替换正文引用 + 构建参考文献节
 
 管线：
-Python 建带编号的元信息
+Python 扫描正文真实引用 → 按首次出现顺序重编号（未用来源不参与、不存在的来源标记删除）
   → LLM 收到 desc + 元信息列表 → 输出格式化文本
-  → Python 直接替换参考文献节内容
+  → Python 直接替换参考文献节内容（无真实引用则整节删除）
 
 引用格式由模板 `citation_format` 声明（如 "[x]=1." = 正文 [N] + 条目 N.）。
 引用检查（validate）已于 1.1.0b14 移除——引用在生成时由后处理确定性完成，
@@ -49,23 +49,39 @@ def post_process(article_md: str, citation_config: dict,
     _inline_template = _cite_fmt[:_eq].strip() if _eq >= 0 else "[x]"
     _ref_prefix = _cite_fmt[_eq + 1:].strip() if _eq >= 0 else "1."
 
-    # 1. 替换正文：引用自来源N → 用户配置的行内格式（默认 [N]）
+    # 1. 扫描正文真实引用 → 按首次出现顺序去重 → 构建旧→新编号映射
+    #    （同一来源多处引用全局映射到同一新编号；全集未用到的来源不参与编号）
     _all_keys = list(all_rag_headers.keys())
-    for _i in range(1, len(_all_keys) + 1):
-        if "x" in _inline_template:
-            _repl = _inline_template.replace("x", str(_i))
-        else:
-            _repl = _inline_template + str(_i)
-        article_md = article_md.replace(f"引用自来源{_i}", _repl)
-        article_md = article_md.replace(f"引用自来源 {_i}", _repl)
-        article_md = article_md.replace(f"引自来源{_i}", _repl)
-        article_md = article_md.replace(f"引自来源 {_i}", _repl)
-    article_md = re.sub(r'[\u4e00-\u9fff]{2,}[\s：:]*\[(\d+)\]', r'[\1]', article_md)
 
-    # 2. 构建参考文献节：user 配置前缀 + 元信息 + LLM 格式化
+    # 1a. 归一化连续列举："引用自来源1、来源2、来源4" → 每个来源补上引用标记
+    def _norm_cont(_m):
+        return re.sub(r'([、,，])\s*来源\s*(\d+)', r'\1引用自来源\2', _m.group(0))
+    article_md = re.sub(r'(?:引用自|引自)\s*来源\s*\d+(?:[、,，]\s*来源\s*\d+)+', _norm_cont, article_md)
+
+    _cite_pat = re.compile(r'(?:引用自|引自)\s*来源\s*(\d+)')
+    _cited_old = []
+    for _m in _cite_pat.finditer(article_md):
+        _n = int(_m.group(1))
+        if 1 <= _n <= len(_all_keys) and _n not in _cited_old:
+            _cited_old.append(_n)
+    _map = {_old: _i for _i, _old in enumerate(_cited_old, 1)}
+
+    # 2. 正文替换：真实引用 → 新编号格式；不存在的来源 → 引用标记直接删除
+    def _repl_cite(_m):
+        _n = int(_m.group(1))
+        _new = _map.get(_n)
+        if _new is None:
+            return ""  # 不存在的来源，标记直接删除
+        if "x" in _inline_template:
+            return _inline_template.replace("x", str(_new))
+        return _inline_template + str(_new)
+
+    article_md = _cite_pat.sub(_repl_cite, article_md)
+
+    # 3. 构建参考文献节：只用真实引用的来源，按新编号顺序（悬空条目消失）
     _ref_lines = []
-    for _i, _src in enumerate(_all_keys, 1):
-        _meta = " / ".join(t.strip() for t in all_rag_headers[_src][:3] if t.strip())
+    for _i, _old in enumerate(_cited_old, 1):
+        _meta = " / ".join(t.strip() for t in all_rag_headers[_all_keys[_old - 1]][:3] if t.strip())
         if "x" in _ref_prefix or "1" in _ref_prefix:
             _prefix = _ref_prefix.replace("1", str(_i))
         else:
@@ -92,13 +108,16 @@ def post_process(article_md: str, citation_config: dict,
         except Exception:
             pass
 
-    # 4. Python 直接替换参考文献节内容
+    # 5. Python 直接替换参考文献节内容；无任何真实引用时整节删除
     _search = f"## {_cite_name}"
     _ref_start = article_md.find(_search)
     if _ref_start >= 0:
         _ref_end = article_md.find("\n## ", _ref_start + 2)
         if _ref_end < 0:
             _ref_end = len(article_md)
-        article_md = article_md[:_ref_start] + f"## {_cite_name}\n" + _ref_new + article_md[_ref_end:]
+        if _ref_lines:
+            article_md = article_md[:_ref_start] + f"## {_cite_name}\n" + _ref_new + article_md[_ref_end:]
+        else:
+            article_md = article_md[:_ref_start] + article_md[_ref_end:]
 
     return article_md

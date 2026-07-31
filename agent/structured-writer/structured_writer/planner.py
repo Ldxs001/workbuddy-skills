@@ -154,6 +154,25 @@ def parse_outline(text: str) -> Optional[dict]:
     return None
 
 
+def _strip_word_desc(desc: str) -> str:
+    """清洗模板 desc 中的独立字数描述（如"约200-300字"、"300字左右"）。
+
+    字数已由规划器解析进大纲 word_count、由写作提示「字数要求」行确定，
+    desc 注入【当前章节要求】时不应再携带字数，避免与用户在大纲中改过的
+    字数（如 50）冲突（desc 原文"200-300字"会误导 LLM）。
+
+    只删"独立成段的字数短语"（数字+字，前面是开头/分隔符/空白），
+    不删嵌在语义中的（如"每个小标题不少于50字"——"50字"前是"于"，
+    删了会导致语义残废）。与 _parse_word_count 匹配形态一致（数字[-数字]字）。
+    """
+    if not desc:
+        return desc
+    d = re.sub(r'(^|[，,。；;、\s（(：:])(?:约|大概)?\s*\d+\s*[-~至到]\s*\d+\s*字\s*(?:左右|上下)?', r'\1 ', desc)
+    d = re.sub(r'(^|[，,。；;、\s（(：:])(?:约|大概)?\s*\d+\s*字\s*(?:左右|上下)?', r'\1 ', d)
+    d = re.sub(r'\s+', ' ', d)
+    return d.strip(' ，,。；;、的')
+
+
 def _parse_word_count(cf: dict) -> int:
     """从模板 content 字段解析字数要求：
     desc 含 "200-300字" → 取中值；含 "300字" → 取该值；

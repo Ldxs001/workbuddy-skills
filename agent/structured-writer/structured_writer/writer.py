@@ -8,6 +8,7 @@ from typing import Optional
 from .llm_client import LLMClient, LLMClientError
 from .state_manager import StateManager, OUTPUTS_DIR
 from .citation_validator import post_process as citation_post_process
+from .planner import _strip_word_desc
 
 # 写入异常日志到 writer_error.log
 _logger = logging.getLogger("writer")
@@ -91,9 +92,9 @@ def _build_context_section_prompt(
     else:
         sec_reqs.append("字数不限：根据写作要点自由发挥，该节必须输出有效内容，不得留空")
     sec_reqs.append(f"写作要点：\n{section_summary}")
-    # 模板 desc 权威指令：确定性注入，不依赖规划器转述
+    # 模板 desc 权威指令：确定性注入，不依赖规划器转述（清洗掉独立字数描述，字数由上方「字数要求」行唯一确定）
     if section_desc:
-        sec_reqs.append(f"本节要求：\n{section_desc}")
+        sec_reqs.append(f"本节要求：\n{_strip_word_desc(section_desc)}")
     blocks.append(f"【当前章节要求】\n" + "\n".join(sec_reqs))
 
     # ── 引用来源 ──
@@ -481,7 +482,9 @@ def generate_article(
     # 去掉开头的多余空行
     article_md = article_md.strip()
 
-    # ── 引用后处理：打勾时才执行 ──
+    # ── 引用后处理：打勾时才执行（可能调 LLM 格式化参考文献，需提示用户仍在工作）──
+    if citation_config:
+        state_mgr.set_status_text("正在格式化参考文献…")
     article_md = citation_post_process(article_md, citation_config, all_rag_headers, llm_client)
 
     # ── 事实自检汇总 ──
@@ -505,6 +508,7 @@ def generate_article(
     now = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{safe_title}_{now}.md"
     output_path = OUTPUTS_DIR / filename
+    state_mgr.set_status_text("正在保存文章…")
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(article_md)

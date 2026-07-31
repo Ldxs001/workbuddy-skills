@@ -1062,7 +1062,7 @@ class StructuredWriterHandler(BaseHTTPRequestHandler):
 {
   "name": "模板名称",
   "meta": [
-    {"name": "字段名", "show_label": true/false, "desc": "字段意义", "source": "user/llm/auto"}
+    {"name": "字段名", "show_label": true/false, "desc": "字段要求", "source": "user/llm/auto"}
   ],
   "content": [
     {"name": "字段名", "show_label": true/false, "desc": "写作要点", "type": "leaf/section", "logical_order": 0}
@@ -1812,7 +1812,10 @@ body {
         <div class="form-row">
           <label style="font-weight:600;color:#f39c12">元数据</label>
           <div style="flex:1;font-size:12px;color:var(--text-dim)">
-            标识/管理信息，短数据（≤100字），以键值对渲染，不参与大纲规划。每行：名称 | 显示标签 | 字段意义 | 填写者
+            标识/管理信息，短数据（≤100字），以键值对渲染，不参与大纲规划。每行：名称 | 显 | 字段要求 | 填写者<br>
+            <span style="color:var(--text-dim)">显：控制该字段的标签名称是否在文章中显示（如"作者：张三"是否带"作者："前缀）</span><br>
+            <span style="color:var(--text-dim)">字段要求：该字段的写作提示词，作为元数据确定性注入写作 prompt</span><br>
+            <span style="color:var(--text-dim)">填写者：<b>用户</b>（你手动填写的值）| <b>LLM</b>（由 AI 在规划时自动填写）| <b>自动</b>（你填了就保留，没填则 LLM 自动补）</span>
           </div>
         </div>
         <div id="meta-editor" style="overflow-x:auto;margin-bottom:12px">
@@ -1821,7 +1824,7 @@ body {
               <tr style="background:var(--bg-input)">
                 <th style="padding:4px 6px;text-align:left;min-width:80px">名称</th>
                 <th style="padding:4px 6px;text-align:center;width:40px">显</th>
-                <th style="padding:4px 6px;text-align:left;min-width:120px">字段意义</th>
+                <th style="padding:4px 6px;text-align:left;min-width:120px">字段要求</th>
                 <th style="padding:4px 6px;text-align:center;width:65px">填写</th>
                 <th style="padding:4px 6px;text-align:center;width:30px"></th>
               </tr>
@@ -1837,7 +1840,12 @@ body {
         <div class="form-row" style="margin-top:4px">
           <label style="font-weight:600;color:#5dade2">内容树</label>
           <div style="flex:1;font-size:12px;color:var(--text-dim)">
-            文章主体，长文本（≥200字），参与大纲规划，可拆分子结构。每行：名称 | 显 | 字段意义 | 子结构 | 逻辑顺序 | source 固定为 llm
+            文章主体，长文本（≥200字），参与大纲规划，可拆分子结构。每行：名称 | 显 | 字段要求 | 子结构 | 逻辑顺序 | 引用列表<br>
+            <span style="color:var(--text-dim)">显：控制该节的标题名称是否在文章中显示（如"关键词"节关闭"显"后只输出关键词列表，不带"关键词"标题）</span><br>
+            <span style="color:var(--text-dim)">字段要求：该节的写作提示词，指导 LLM 如何撰写此节内容</span><br>
+            <span style="color:var(--text-dim)">引用列表：☐ [x] = 1.（勾选框 + 正文引用标记 + 参考文献编号格式）——☐ 勾选后该节跳过 LLM 写作，由系统根据 RAG 文档自动生成规范化参考文献（需配合 RAG 使用）；[x] 为正文引用标记格式，1. 为参考文献条目编号前缀格式</span><br>
+            <span style="color:var(--text-dim)">子结构：该节是否可拆分为多个子段落分别撰写</span><br>
+            <span style="color:var(--text-dim)">逻辑顺序：控制写作先后（先写/其次/最后），不影响文章最终排列</span>
           </div>
         </div>
         <div id="content-editor" style="overflow-x:auto;margin-bottom:8px">
@@ -1846,10 +1854,10 @@ body {
               <tr style="background:var(--bg-input)">
                 <th style="padding:4px 6px;text-align:left;min-width:80px">名称</th>
                 <th style="padding:4px 6px;text-align:center;width:40px">显</th>
-                <th style="padding:4px 6px;text-align:left;min-width:120px">字段意义</th>
+                <th style="padding:4px 6px;text-align:left;min-width:120px">字段要求</th>
                 <th style="padding:4px 6px;text-align:center;width:65px">子结构</th>
                 <th style="padding:4px 6px;text-align:center;width:65px">逻辑顺序</th>
-                <th style="padding:4px 6px;text-align:center;width:70px">引用</th>
+                <th style="padding:4px 6px;text-align:center;width:70px">引用列表</th>
                 <th style="padding:4px 6px;text-align:center;width:30px"></th>
               </tr>
             </thead>
@@ -1903,15 +1911,15 @@ body {
         </div>
       </div>
 
-      <!-- 字段意义编辑模态框 -->
+      <!-- 字段要求编辑模态框 -->
       <div class="modal-overlay" id="desc-modal" style="z-index:100">
         <div class="modal-box" style="max-width:500px">
           <div class="modal-header">
-            <h3>编辑字段意义</h3>
+            <h3>编辑字段要求</h3>
             <button class="modal-close" onclick="closeDescModal()">&times;</button>
           </div>
           <div class="modal-body">
-            <p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">描述字段的写作要点或用途，将展示给 LLM 和用户参考。</p>
+            <p style="font-size:13px;color:var(--text-dim);margin-bottom:8px">该字段的写作提示词，将作为"本节要求"确定性注入写作 prompt，指导 LLM 如何撰写此节内容。</p>
             <p style="font-size:12px;color:#f39c12;margin-bottom:8px">如需多级子标题，在描述中写明即可，如："按 章→节→条→款 四级展开，子标题用 ####/#####"</p>
             <textarea id="desc-editor" rows="6" placeholder="输入字段的详细意义..."></textarea>
           </div>
@@ -2360,7 +2368,7 @@ function addMetaRow(field) {
   tr.innerHTML = [
     '<td style="padding:3px 6px"><input type="text" value="' + escHtml(field.name) + '" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" placeholder="字段名"></td>',
     '<td style="padding:3px 6px;text-align:center"><input type="checkbox" ' + (field.show_label ? 'checked' : '') + ' style="accent-color:var(--accent)"></td>',
-    '<td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="' + escHtml(field.desc) + '" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="' + escHtml(field.desc) + '">' + escHtml(field.desc ? field.desc.substring(0,12)+(field.desc.length>12?'...':'') : '点击输入...') + '</span></td>',
+    '<td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="' + escHtml(field.desc) + '" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px" title="' + escHtml(field.desc) + '">' + escHtml(field.desc ? field.desc.substring(0,9)+(field.desc.length>9?'...':'') : '点击输入...') + '</span></td>',
     '<td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px"><option value="user" ' + (field.source==='user'?'selected':'') + '>用户</option><option value="llm" ' + (field.source==='llm'?'selected':'') + '>LLM</option><option value="auto" ' + (field.source==='auto'?'selected':'') + '>自动</option></select></td>',
     '<td style="padding:3px 6px;text-align:center"><button onclick="this.closest(\'tr\').remove()" title="删除此行" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:15px;line-height:1">&times;</button></td>'
   ].join('');
@@ -2381,7 +2389,7 @@ function addContentRow(field) {
   tr.innerHTML = [
     '<td style="padding:3px 6px"><input type="text" value="' + escHtml(field.name) + '" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px" placeholder="字段名"></td>',
     '<td style="padding:3px 6px;text-align:center"><input type="checkbox" ' + (field.show_label ? 'checked' : '') + ' style="accent-color:var(--accent)"></td>',
-    '<td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="' + escHtml(field.desc) + '" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px" title="' + escHtml(field.desc) + '">' + escHtml(field.desc ? field.desc.substring(0,12)+(field.desc.length>12?'...':'') : '点击输入...') + '</span></td>',
+    '<td style="padding:3px 6px"><span class="desc-preview" onclick="openDescModal(this)" data-full-desc="' + escHtml(field.desc) + '" style="display:block;padding:3px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);font-size:12px;min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px" title="' + escHtml(field.desc) + '">' + escHtml(field.desc ? field.desc.substring(0,9)+(field.desc.length>9?'...':'') : '点击输入...') + '</span></td>',
     '<td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px"><option value="leaf" ' + (field.type==='leaf'?'selected':'') + '>无</option><option value="section" ' + (field.type==='section'?'selected':'') + '>有</option></select></td>',
     '<td style="padding:3px 6px"><select style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:3px 4px;color:var(--text);font-size:12px"><option value="" ' + (!lo && lo!==0?'selected':'') + '>自动</option><option value="0" ' + (lo===0?'selected':'') + '>先写</option><option value="1" ' + (lo===1?'selected':'') + '>其次</option><option value="2" ' + (lo===2?'selected':'') + '>最后</option></select></td>',
     '<td style="padding:3px 6px;text-align:center;white-space:nowrap"><input type="checkbox" class="cite-cb" ' + (citeCheck ? 'checked' : '') + ' style="accent-color:var(--accent);width:14px;height:14px;vertical-align:middle"> <input type="text" class="cite-inline" value="' + escHtml(inlineFmt) + '" style="width:38px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:2px 2px;color:var(--text);font-size:10px;text-align:center;vertical-align:middle" placeholder="[x]" title="正文引用格式"> <span style="font-size:11px;color:var(--text-dim);vertical-align:middle">=</span> <input type="text" class="cite-ref" value="' + escHtml(refFmt) + '" style="width:38px;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:2px 2px;color:var(--text);font-size:10px;text-align:center;vertical-align:middle" placeholder="1." title="参考文献条目格式"></td>',
@@ -2583,7 +2591,7 @@ function generateTemplate() {
   });
 }
 
-// ===== 字段意义模态框 =====
+// ===== 字段要求模态框 =====
 let _descModalTarget = null;
 
 function openDescModal(span) {
@@ -2605,7 +2613,7 @@ function saveDescModal() {
   const display = value ? value.substring(0, 12) + (value.length > 12 ? '...' : '') : '点击输入...';
   _descModalTarget.textContent = display;
   _descModalTarget.dataset.fullDesc = value;
-  _descModalTarget.title = value || '点击编辑字段意义';
+  _descModalTarget.title = value || '点击编辑字段要求';
   _descModalTarget.dataset.fullDesc = value;
   closeDescModal();
 }
@@ -3694,11 +3702,12 @@ function startProgressPolling(sid) {
         }
         const p = d.progress;
 
-        // 更新进度条
+        // 更新进度条（writing 阶段封顶 95%：收尾——参考文献格式化/保存无进度单元，避免提前满格）
         const fill = document.querySelector('.progress-bar .fill');
         if (fill && p.total > 0) {
           const pct = Math.round(p.done / p.total * 100);
-          fill.style.width = Math.min(pct, 100) + '%';
+          const capped = (pct >= 100 && p.phase === 'writing') ? 95 : Math.min(pct, 100);
+          fill.style.width = capped + '%';
         }
 
         // 更新状态文本
