@@ -63,7 +63,8 @@ def _build_context_section_prompt(
     aux_text: Optional[str] = None,
     logic_hint: str = "",
     style_hint: str = "",
-    headers_text: Optional[str] = None
+    headers_text: Optional[str] = None,
+    section_desc: str = ""
 ) -> str:
     """构建单节写作 prompt，各区域标识明确，LLM 能区分用途"""
     blocks = []
@@ -90,6 +91,9 @@ def _build_context_section_prompt(
     else:
         sec_reqs.append("字数不限：根据写作要点自由发挥，该节必须输出有效内容，不得留空")
     sec_reqs.append(f"写作要点：\n{section_summary}")
+    # 模板 desc 权威指令：确定性注入，不依赖规划器转述
+    if section_desc:
+        sec_reqs.append(f"本节要求：\n{section_desc}")
     blocks.append(f"【当前章节要求】\n" + "\n".join(sec_reqs))
 
     # ── 引用来源 ──
@@ -140,6 +144,8 @@ def generate_article(
     content_fields = (template or {}).get("content", [])
     logic_prompt = (template or {}).get("logic", "")
     style_prompt = (template or {}).get("style", "")
+    # 模板 desc 权威指令查找表：写作时按节名确定性注入【当前章节要求】
+    desc_by_title = {cf.get("name"): cf.get("desc", "") for cf in content_fields}
 
     # ── 提示词开关：根据 style + content desc 判断是否需要 RAG 文档元数据 ──
     needs_metadata = _needs_metadata(style_prompt)
@@ -269,7 +275,8 @@ def generate_article(
                 aux_text=None,
                 logic_hint=logic_prompt,
                 style_hint=style_prompt,
-                headers_text=leaf_headers_text
+                headers_text=leaf_headers_text,
+                section_desc=desc_by_title.get(section["title"], "")
             )
             messages = [
                 {"role": "system", "content": WRITER_SYSTEM_PROMPT},
@@ -371,7 +378,8 @@ def generate_article(
                 aux_text=sub_aux,
                 logic_hint=logic_prompt,
                 style_hint=style_prompt,
-                headers_text=sub_headers_text
+                headers_text=sub_headers_text,
+                section_desc=desc_by_title.get(section["title"], "")
             )
 
             messages = [

@@ -154,6 +154,23 @@ def parse_outline(text: str) -> Optional[dict]:
     return None
 
 
+def _parse_word_count(cf: dict) -> int:
+    """从模板 content 字段解析字数要求：
+    desc 含 "200-300字" → 取中值；含 "300字" → 取该值；
+    无数字时 leaf=0（字数不限，由 desc 指令约束）、section=800（默认）。
+    leaf 拒绝 800 兜底——关键词这类输出列表的节不能被"约800字"诱导成长文。
+    """
+    _wc = 0 if cf.get("type") == "leaf" else 800
+    _desc = cf.get("desc", "")
+    _m = re.search(r"(\d+)\s*[-~至到]\s*(\d+)\s*字", _desc)
+    if _m:
+        return (int(_m.group(1)) + int(_m.group(2))) // 2
+    _m = re.search(r"(\d+)\s*字", _desc)
+    if _m:
+        return int(_m.group(1))
+    return _wc
+
+
 def _normalize_outline(outline: dict, content_fields: list) -> dict:
     """
     规范化大纲：补默认值、填充 meta。
@@ -172,22 +189,12 @@ def _normalize_outline(outline: dict, content_fields: list) -> dict:
     existing_titles = {s.get("title", "") for s in sections}
     for cf in content_fields:
         if cf["name"] not in existing_titles:
-            # 从 desc 提取字数描述，支持 "200-300字" "约500字" 等格式
-            _wc = 0 if cf.get("type") == "leaf" else 800
-            _desc = cf.get("desc", "")
-            _m = re.search(r"(\d+)\s*[-~至到]\s*(\d+)\s*字", _desc)
-            if _m:
-                _wc = (int(_m.group(1)) + int(_m.group(2))) // 2
-            else:
-                _m = re.search(r"(\d+)\s*字", _desc)
-                if _m:
-                    _wc = int(_m.group(1))
             sections.append({
                 "id": f"s{len(sections)+1}",
                 "title": cf["name"],
                 "subtitle": "",
                 "summary": cf.get("desc", ""),
-                "word_count": _wc,
+                "word_count": _parse_word_count(cf),
                 "is_key": False,
                 "status": "pending",
                 "actual_word_count": 0,
@@ -224,6 +231,11 @@ def _normalize_outline(outline: dict, content_fields: list) -> dict:
             # 引用校验节：字数强制为 0（不走 LLM 写作，由后处理接管）
             if matched[0].get("citation_check"):
                 s["word_count"] = 0
+            # leaf 节：字数按 desc 解析，拒绝 800 兜底
+            # （规划器输出的大纲可能给关键词这类节兜底 800 字，
+            #   导致写作提示变成"约800字"，诱导长文输出）
+            elif matched[0].get("type") == "leaf":
+                s["word_count"] = _parse_word_count(matched[0])
 
         subs = s.get("sub_sections", [])
         s_type = s.get("type", "section")
