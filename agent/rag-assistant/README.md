@@ -1,165 +1,351 @@
-# RAG Assistant
+# RAG Assistant — 本地知识库问答智能体
 
-> 本地知识库问答智能体 — LLM 驱动的组合式语义检索与多库路由。
-> 版本：2.0.0b1 | 作者：wUwproject | 许可证：Apache 2.0
-
-## ⚠️ 从 1.x 升级到 2.x 必须重建 HNSW 索引
-
-**2.x 将向量搜索引擎从 ChromaDB 内置 HNSW 替换为独立 hnswlib 索引，以解决 ChromaDB Rust 后端在 Windows 上的 HNSW 持久化 bug。**
-
-升级后首次搜索会自动触发懒重建（每个 KB 约 1-2 分钟），也可手动点击 🔨 HNSW 按钮，或通过 `POST /api/kb/rebuild-hnsw` API 触发。
-
-- **重建不可跳过**：ChromaDB HNSW 和 hnswlib 索引格式不兼容
-- **旧索引自动清理**：重建后 ChromaDB 的 HNSW 段文件会自动废弃
-- **数据不丢失**：文档文本和 metadata 全部保留，仅重新计算向量索引
-
-基于 local-rag-builder 技能构建的独立 RAG 智能体，支持 LM Studio / Ollama 双后端。
+> 基于 LLM 的组合式语义检索与多库路由智能体。连接本地 LLM，对你的文档库做知识问答——自动识别查询意图、拆分组合检索、跨库路由、精排与语义验证，最终给出带来源的答案。
+>
+> 版本：2.2.10 | 作者：wUwproject | 许可证：Apache 2.0
 
 ---
 
-## 快速开始
+## 目录
+
+- [一、它是什么](#一它是什么)
+- [二、环境要求与依赖](#二环境要求与依赖)
+- [三、搭建步骤](#三搭建步骤)
+- [四、使用流程总览](#四使用流程总览)
+- [五、启动模式](#五启动模式)
+- [六、三端口架构](#六三端口架构)
+- [七、知识库管理](#七知识库管理)
+- [八、查询流程详解](#八查询流程详解)
+- [九、功能开关与配置](#九功能开关与配置)
+- [十、联网搜索](#十联网搜索)
+- [十一、记忆系统](#十一记忆系统)
+- [十二、提示词管理](#十二提示词管理)
+- [十三、插件系统](#十三插件系统)
+- [十四、外部 API（系统集成）](#十四外部-api系统集成)
+- [十五、常见问题](#十五常见问题)
+- [协议](#协议)
+
+---
+
+## 一、它是什么
+
+RAG Assistant 是一个**完全本地运行**的知识库问答智能体。你导入文档、建立知识库，然后像聊天一样提问，它会：
+
+1. 由 LLM **判断意图**：闲聊直接答，知识问题进入检索
+2. 对问题做 **实体/属性拆解**，穷举组合生成多个检索切片，逐片独立检索
+3. 按内容**自动路由**到最合适的知识库，相似度检索后用**重排序器精排**、**NLI 语义验证**过滤矛盾内容
+4. 合并去重后，由 LLM 综合回答，**标注来源**
+
+核心设计理念：**组合式查询（不遗漏任何检索角度）+ 确定性校验（不捏造不矛盾）+ 多库路由（知识分散也能找对）**。
+
+---
+
+## 二、环境要求与依赖
+
+| 依赖 | 说明 | 获取方式 |
+|------|------|---------|
+| **Python** | 3.9 及以上 | python.org |
+| **LLM 推理服务** | LM Studio 或 Ollama，二选一，本机运行 | LM Studio / Ollama 官网 |
+| **嵌入模型** | 文档向量化，**首次启动自动多源下载** | 自动（见下） |
+| **重排序模型**（可选） | 精排，提升检索质量 | 自动（见下） |
+| **NLI 模型**（可选） | 语义三向验证，过滤矛盾 | 自动（见下） |
+
+### 模型下载
+
+嵌入 / 重排序 / NLI 三类模型在需要时**自动下载**，内置多源探测：
+
+| 数据源 | 说明 |
+|--------|------|
+| **ModelScope（魔搭）** | 国内优先，速度快 |
+| **HuggingFace 国内镜像（hf-mirror）** | 国内可直连 |
+| **HuggingFace 官方** | 备用源 |
+
+系统会自动探测可用源并选择最快的。断网环境下需提前手动放置模型文件到 `data/models/`。
+
+> **模型推荐**：嵌入 `BAAI/bge-small-zh-v1.5`（中文友好）、重排序 `BAAI/bge-reranker-base`、NLI `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli`。NLI 与重排序模型较大，如果只做基础检索可以不启用（见「功能开关」）。
+
+### 兼容性说明
+
+- **1.x → 2.x 升级必须重建索引**：2.x 将向量存储从 ChromaDB 内置 HNSW 换成独立 hnswlib（修复 Windows 持久化 bug）。升级后首次搜索自动懒重建（每个库约 1-2 分钟），**不可跳过**，数据不丢失
+
+---
+
+## 三、搭建步骤
+
+### 方式一：Windows 一键启动
+
+```
+1. 确保 LM Studio（或 Ollama）已运行，且已加载一个模型
+2. 双击 setup.bat
+3. 浏览器访问 http://localhost:8765
+```
+
+### 方式二：手动启动
 
 ```bash
 # 1. 安装依赖
 pip install -r requirements.txt
 
-# 2. 启动（需要 LM Studio 或 Ollama 运行中）
+# 2. 启动（首次启动会自动下载嵌入模型）
 python main.py
 
-# 3. 打开浏览器访问 http://localhost:8765
-
-# 同时启动外部 API（可选）
-python main.py --api-port 8767
+# 3. 浏览器访问 http://localhost:8765
 ```
 
----
+### 首次使用配置
 
-## 核心特性
-
-| 特性 | 说明 |
+| 步骤 | 操作 |
 |------|------|
-| **组合式查询** | LLM 自动做 entities/attrs 分词，穷举组合后独立检索，SM3 去重合并，LLM 综合回答 |
-| **多库路由** | 硬编码关键词 + 嵌入模型×KB签名语义回退两级路由 |
-| **三层推理流水线** | 检索 → Reranker 精排 → NLI 三向分类（entailment/neutral/contradiction） |
-| **自修正决策** | LLM 格式错误时自动反馈重试（最多 5 次），重试耗尽时清上下文重来 |
-| **功能运行态切换** | 路由/重排序/NLI/搜索开关无需改配置重启 |
-| **联网搜索** | 5 种后端：DuckDuckGo/Tavily/Google/Bing/自定义 |
+| 1 | 在配置界面填入 LLM 服务地址与模型名（LM Studio / Ollama） |
+| 2 | 创建知识库，导入文档（支持 PDF / 文本，自动 OCR 无文本层 PDF） |
+| 3 | 开始提问 |
 
 ---
 
-## 文件结构
+## 四、使用流程总览
 
 ```
-rag-assistant/
-├── main.py                           # 入口（CLI/Web/Batch/External API 四模式）
-├── setup.bat                         # Windows 一键启动
-├── requirements.txt                  # 依赖清单
-├── CHANGELOG.md                      # 版本更新日志
-│
-├── rag_assistant/                    # 智能体核心
-│   ├── agent.py                      # LLM 决策循环
-│   ├── web_ui.py                     # Web 界面（port 8765）
-│   ├── external_api.py               # 外部接入 API（port 8767）← 新增
-│   ├── llm_client.py                 # LLM 统一客户端（LM Studio / Ollama）
-│   ├── rag_wrapper.py                # 技能封装层
-│   ├── search.py                     # 联网搜索（5 种后端）
-│   ├── memory.py                     # 三层记忆系统
-│   └── _fix_rag.py                   # 破损数据修复工具
-│
-├── engine/                           # 技能引擎（独立副本）
-│   ├── rag_core.py                   # 检索/路由/rerank/NLI 编排
-│   ├── router.py                     # 两级路由 + KB 签名生成
-│   ├── reranker.py                   # 重排序（model/rule/hybrid）
-│   ├── nli_classifier.py             # NLI 三向分类器
-│   ├── knowledge_base_manager.py     # KB CRUD + 备份/恢复/移动
-│   ├── text_splitter.py              # 5 种切分策略 + 5 种守卫
-│   ├── prompt_manager.py             # 提示词管理（模板/插槽/预设）
-│   └── ...
-│
-├── vendor/                           # 内嵌第三方库（bs4/pypdf/markdownify）
-└── data/                             # 运行时数据
-    ├── config/rag_config.json        # 全量配置
-    ├── kb/                           # ChromaDB 知识库
-    ├── models/                       # 嵌入/reranker/NLI 模型
-    ├── sessions/                     # 会话历史
-    ├── memory/                       # 压缩摘要/知识缺口/习惯
-    └── prompts/                      # 自定义模板/预设
+创建知识库 → 导入文档 → 自动切分 → 提问
+                                      ↓
+[LLM 决策层] 闲聊 → 直接回答
+             │
+             └─ 知识库查询 → 实体/属性拆解
+                 → 组合展开（穷举检索角度）
+                 → 逐片检索：路由 → 相似度 → (精排) → (NLI 验证)
+                 → 去重合并 → LLM 综合回答（带来源）
 ```
 
 ---
 
-## 启动模式
+## 五、启动模式
 
-```bash
-python main.py                              # Web UI（port 8765）
-python main.py --api-port 8767              # Web UI + 外部 API
-python main.py --no-web --api-port 8767     # 仅外部 API
-python main.py --no-web                     # CLI 交互模式
-python main.py --batch --input q.json --output r.json   # 批量处理
-cat queries.jsonl | python main.py --jsonl              # 管道模式
-python main.py migrate                      # 从 local-rag-builder 迁移
-```
+| 模式 | 命令 | 用途 |
+|------|------|------|
+| **Web 界面** | `python main.py` | 默认 8765 端口，聊天 + 管理，自动拉起 8766 配置页 |
+| **Web + 外部 API** | `python main.py --api-port 8767` | 给其他系统（如 Structured Writer）提供组件级接口 |
+| **仅外部 API** | `python main.py --no-web --api-port 8767` | 服务器模式，不开界面 |
+| **CLI 交互** | `python main.py --no-web` | 终端问答，支持 `/reset` `/archive` 命令 |
+| **批量处理** | `python main.py --batch --input q.json --output r.json` | 读一批问题，输出一批答案 |
+| **管道模式** | `cat queries.jsonl \| python main.py --jsonl` | 逐行 JSONL 流式处理 |
+| **数据迁移** | `python main.py migrate` | 从 local-rag-builder 技能迁移数据 |
 
----
-
-## 架构概览
-
-```
-用户输入
-  → [LLM 决策层]
-       ├─ 闲聊 → 直接回答
-       └─ 知识库查询 → entities/attrs 分词
-           → [组合展开器] 穷举 entities × attrs
-           → [多切片检索] 每片独立走完整 RAG 流程
-              1. 路由（嵌入模型 × KB签名/关键词）
-              2. 检索（Chroma 相似度）
-              3. (可选) 重排序（reranker）
-              4. (可选) NLI 三向分类（entailment/neutral/contradiction）
-           → [SM3 去重合并]（保留 NLI 标签）
-           → [LLM 综合回答]（带 NLI 标签辅助判断）
-```
+> **通用参数**：`--port`（8765）、`--host`、`--config`（配置文件路径）、`--data-dir`（数据目录）、`--pidfile`。
 
 ---
 
-## 文档导航
+## 六、三端口架构
 
-| 文档 | 用途 |
-|------|------|
-| `PROTOCOL.md` | Web UI API 契约（port 8765）— 聊天/配置/文件交互 |
-| `EXTERNAL_API.md` | 外部接入 API 契约（port 8767）— 功能开关/模型调用/KB管理/提示词/切分 |
-| `rag_assistant/engine/rag-assistant-architecture.md` | 内部架构设计文档 |
-| `CHANGELOG.md` | 完整版本更新日志 |
-| `llms.txt` | AI 可读项目描述（llmstxt.org 规范） |
-
----
-
-## 三端口架构
-
-| 端口 | 模块 | 定位 | 文档 |
+| 端口 | 模块 | 定位 | 说明 |
 |------|------|------|------|
-| 8765 | `web_ui.py` | 人机交互（聊天+配置面板） | `PROTOCOL.md` |
-| 8766 | `rag_web_ui.py`（subprocess） | KB/模型配置 GUI | 架构文档 |
-| 8767 | `external_api.py` | 系统间集成（组件级调用） | `EXTERNAL_API.md` |
+| **8765** | Web 主界面 | 人机交互 | 聊天、知识库管理、配置面板、插件管理 |
+| **8766** | 配置页 GUI | KB/模型配置 | 由 8765 自动拉起，专注模型下载、切分、库配置 |
+| **8767** | 外部 API | 系统间集成 | 组件级调用：检索、建库、切分、功能开关、提示词（供 Structured Writer 等调用） |
+
+> **对外集成只用 8767**：第三方系统（如结构化写作智能体）通过 8767 的 `/api/kb/query` 检索知识库，不接触界面。
 
 ---
 
-## 技术栈
+## 七、知识库管理
 
-- **LLM 后端**：LM Studio（OpenAI 兼容） / Ollama
-- **向量存储**：ChromaDB（langchain-chroma）
-- **嵌入模型**：BCE-embedding-base_v1（本地加载）
-- **Reranker**：BAAI/bge-reranker-base（本地加载）
-- **NLI 分类**：MoritzLaurer/mDeBERTa-v3-base-mnli-xnli（本地加载）
-- **文本切分**：5 种策略 + GuardStack 守卫栈
-- **哈希去重**：SM3 国密哈希
+### 基本操作
 
-## 依赖
+| 操作 | 说明 |
+|------|------|
+| **创建知识库** | 命名即可，支持中文名 |
+| **导入文档** | 支持 PDF（无文本层自动 OCR 回退）、文本文件；上传后自动切分入库 |
+| **删除 / 移动** | 删除整个库；文档可在库间移动（跨库转移） |
+| **备份 / 恢复** | 自动（入库时备份）+ 手动 zip 备份；可从备份恢复 |
+| **自动分类** | 开启后，新导入文档自动按内容路由到最合适的库 |
 
-- LM Studio 或 Ollama（本地 LLM 推理服务）
-- Python 3.9+
-- 嵌入模型（推荐 maidalun1020/bce-embedding-base_v1）
-- ChromaDB（向量存储，自动安装）
+### 文本切分
+
+导入文档时自动切分，内置 **5 种切分策略**：
+
+| 策略 | 适用场景 |
+|------|---------|
+| **fixed（固定长度）** | 通用兜底 |
+| **recursive（递归）** | 长文档，按层级递归切 |
+| **headers（标题感知）** | 结构清晰的文档（标题层级明显） |
+| **sentence（句子）** | 对话、句读明显的文本 |
+| **semantic（语义）** | 按语义断点切分（最智能，开销最大） |
+
+切分前有 **5 道守卫**（mermaid 图 / 代码块 / 数学公式 / 表格 / HTML）——先保护这些特殊块不被切坏，切完再还原。**带公式、代码、表格的文档选 semantic 或 headers 策略效果最好**。
+
+### HNSW 索引
+
+- 每个知识库维护独立的 hnswlib 索引
+- 索引损坏时自动修复 / 懒重建
+- 可在配置页调整 HNSW 参数（`M`、`efConstruction` 等）并手动重建
+
+---
+
+## 八、查询流程详解
+
+### 1. 组合式查询（核心）
+
+LLM 先把问题拆成**实体（entities）**和**属性（attrs）**，然后穷举组合：
+
+```
+问题："张三在2024年发表的论文里，对比了哪两种模型？"
+拆解：entities=[张三, 2024年论文]  attrs=[对比, 模型]
+切片：实体单独查 → 实体×属性两两组合 → 实体关系两两配对
+→ 每片独立走完整检索流程 → SM3 去重合并 → LLM 综合回答
+```
+
+这样不会漏掉任何检索角度——即使提问方式模糊，组合切片也能覆盖。
+
+### 2. 多库路由
+
+问题会被自动路由到最合适的知识库，两级策略：
+
+```
+1. 硬编码关键词规则（快速命中，如"股票"→财经库）
+2. 嵌入模型 × 库签名 语义回退（对每个库生成语义签名，匹配最相似的）
+3. 兜底 default 库
+```
+
+库签名自动归纳：四分采样 → 质心 → 分词 → 嵌入反哺，无需手动维护。
+
+### 3. 三层推理流水线
+
+| 层 | 作用 | 开关 |
+|----|------|------|
+| **检索** | 相似度召回（候选池在精排开启时自动 ×4 扩容） | — |
+| **重排序** | 精排候选，三种模式：model（模型）/ rule（规则：分数/时效/来源权重）/ hybrid（混合） | `reranker.enabled` |
+| **NLI 验证** | 三向分类（entailment 蕴含 / neutral 中立 / contradiction 矛盾），过滤矛盾内容 | `nli.enabled` |
+
+> **NLI 的意义**：检索到的片段可能与问题语义矛盾（如"旧政策已废止"）。NLI 把矛盾片段标注出来，LLM 综合回答时不会被误导。
+
+### 4. 自修正决策
+
+LLM 的动作/格式输出错误时，系统自动反馈重试（最多 5 次）；重试耗尽后清空上下文重来。**防止模型捏造检索参数**——校验 entities/attrs/证据来源必须来自原文。
+
+---
+
+## 九、功能开关与配置
+
+所有开关**运行时可切换，无需重启**（Web 界面或外部 API 均可）：
+
+| 开关 | 默认 | 说明 |
+|------|------|------|
+| **路由（router）** | 开 | 多库自动路由；关闭则全部查默认库 |
+| **重排序（reranker）** | 按配置 | 需要重排序模型；rule 模式不需模型 |
+| **NLI 验证** | 按配置 | 需要 NLI 模型（较大）；关闭则跳过语义验证 |
+| **联网搜索** | 关 | 知识库无结果时是否联网补充 |
+| **自动分类** | 按配置 | 导入文档自动路由到合适库 |
+
+### 查询类型
+
+内置 4 种查询模式：**事实（fact）/ 对比（compare）/ 对立（opposition）/ 分析（analysis）**，可用配置覆盖扩展。不同模式影响检索切片组织方式。
+
+### 检索参数
+
+| 参数 | 说明 |
+|------|------|
+| **top_k** | 每片检索返回的候选数 |
+| **score_threshold** | 相似度阈值，低于此值的结果丢弃 |
+| **候选池扩容** | 重排序开启时检索候选 ×4，给精排留足空间 |
+
+### 极客模式
+
+配置页可切换为 **JSON 编辑模式**（极客模式）——直接编辑完整配置对象，适合高级用户精细调参；普通用户用表单模式即可。
+
+---
+
+## 十、联网搜索
+
+知识库无结果时可选联网补充（总开关 `web_search_enabled`）。**5 种后端**：
+
+| 后端 | 需要配置 | 说明 |
+|------|---------|------|
+| **DuckDuckGo** | 无（免费） | 开箱即用，无需 Key |
+| **Tavily** | API Key | 搜索质量高，适合英文 |
+| **Google** | 搜索 API Key + CSE ID | 需要 Google Custom Search |
+| **Bing** | Bing Key | 微软搜索 API |
+| **自定义** | 自定义 URL | 支持 `{q}`/`{key}` 占位符，接任意搜索服务 |
+
+> 配置都在 `search` 配置段。只想要免费体验就用 DuckDuckGo。
+
+---
+
+## 十一、记忆系统
+
+| 记忆层 | 存储 | 行为 |
+|--------|------|------|
+| **短期记忆** | `sessions/*.txt` | 当前会话上下文 |
+| **压缩摘要** | `memory/compressed_*.txt` | 上下文超限时（token > max_tokens×70%）自动把最旧 40% 交 LLM 摘要压缩，保留长期上下文 |
+| **知识缺口** | `kb_gaps.json` | 相同问题多次查不到答案时累积计数，提示你补文档 |
+| **用户画像** | `user_habits.json` | 记录语言风格偏好 + OCEAN 人格衰减模型，个性化回答风格 |
+
+Web 界面可手动执行：重置记忆 / 强制压缩 / 注入记忆 / 清空。
+
+---
+
+## 十二、提示词管理
+
+| 能力 | 说明 |
+|------|------|
+| **系统前缀锁定** | 核心行为约束不可被覆盖（防注入） |
+| **3 个插槽** | `cite_format`（引用格式）/ `output_style`（输出风格）/ `fallback`（兜底） |
+| **内置预设** | default / structured / compare / friendly，一键切换 |
+| **自定义预设** | 创建 / 应用 / 删除自己的预设 |
+| **模板管理** | 查看、修改、重置系统提示词模板 |
+
+---
+
+## 十三、插件系统
+
+| 项目 | 说明 |
+|------|------|
+| **加载** | 扫描 `plugins/builtin/`（内置）+ `data/plugins/`（用户），读取 `plugin.json`，SM3 签名校验后加载 |
+| **类型** | `input_return`：回答前注入上下文；`input_output`：回答后副作用（如查行情、写文件） |
+| **触发** | 插件接收 6 字段：问题 / 回答草稿 / 思考过程 / RAG 上下文 / 会话 / 插件目录 |
+| **熔断** | 连续 3 次失败自动禁用，防插件拖垮主流程 |
+| **现有插件** | `web_search`（联网搜索）、`web_llm`（网络 LLM 调用）、`stock_realtime_query`（股票实时行情） |
+
+Web 界面可：查看插件列表 / 开关 / 配置 / 刷新 / **AI 生成插件**（用描述让 LLM 生成新插件）。
+
+---
+
+## 十四、外部 API（系统集成）
+
+8767 端口提供 **35 个 REST 端点**，面向系统集成（如 Structured Writer）：
+
+| 类别 | 端点示例 | 用途 |
+|------|---------|------|
+| **健康检查** | `/api/health`、`/api/feature/status` | 服务状态、功能开关状态 |
+| **知识库** | `/api/kb/list`、`/api/kb/create`、`/api/kb/delete`、`/api/kb/move`、`/api/kb/query`、`/api/kb/backup`、`/api/kb/restore`、`/api/kb/rebuild-hnsw` | 建库、检索、备份、索引重建 |
+| **模型** | `/api/model/embed`、`/api/model/rerank`、`/api/model/nli` | 直接调用三类模型 |
+| **功能开关** | `/api/feature/toggle` | 运行时切换路由/重排序/NLI/搜索 |
+| **提示词** | `/api/prompt/template`、`/api/prompt/preset`、`/api/prompt/slots` | 模板与预设管理 |
+| **文本切分** | `/api/input/split`、`/api/input/query-slices` | 切分文本、生成查询切片 |
+
+完整契约见 `EXTERNAL_API.md`。
+
+---
+
+## 十五、常见问题
+
+**Q：首次启动卡在"下载模型"？**
+A：系统会依次尝试 ModelScope → hf-mirror → HuggingFace 官方。如果都失败（完全断网），需手动下载嵌入模型放入 `data/models/`。国内网络一般 ModelScope 可用。
+
+**Q：检索结果不准 / 答非所问？**
+A：按顺序排查：① 文档是否切分合理（公式/表格多的用 semantic 或 headers 策略）；② 是否开了重排序（`reranker.enabled`）；③ 是否开了 NLI（过滤矛盾）；④ top_k 是否太小。
+
+**Q：NLI 开关开了但没生效？**
+A：NLI 需要 mDeBERTa 模型下载完成。模型未就绪时该功能自动降级跳过，检查配置页模型状态。
+
+**Q：从 1.x 升级后搜索报错？**
+A：2.x 需要重建 HNSW 索引。首次搜索自动懒重建，或手动点 🔨 HNSW 按钮 / 调 `/api/kb/rebuild-hnsw`。**不可跳过**。
+
+**Q：怎么让结构化写作工具用我的知识库？**
+A：以 `--no-web --api-port 8767` 启动，然后在 Structured Writer 的配置页填入本程序路径并「冷启动 RAG」即可。
+
+**Q：插件总是被禁用？**
+A：连续 3 次失败会熔断。看插件日志找失败原因（常见：网络不通、API Key 无效），修复后在界面重新启用。
+
+---
 
 ## 协议
 
-Apache 2.0
+Apache 2.0 © wUwproject
