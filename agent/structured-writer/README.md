@@ -1,7 +1,7 @@
 # Structured Writer
 
 > 结构化写作智能体 — 模板驱动的大纲规划 + 串行写作引擎。
-> 版本：1.1.0b13 | 作者：wUwproject | 许可证：Apache 2.0
+> 版本：1.1.0b14 | 作者：wUwproject | 许可证：Apache 2.0
 
 基于 Planner → Writer 双流水线的文档生成工具，支持模板驱动的元数据/内容树分离、大纲交互编辑、逻辑提示词等特性。
 

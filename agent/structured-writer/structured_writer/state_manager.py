@@ -1,6 +1,5 @@
-"""状态管理器 — 会话状态、指纹保护、进度追踪"""
+"""状态管理器 — 会话状态、进度追踪"""
 import json
-import hashlib
 import copy
 from pathlib import Path
 from datetime import datetime
@@ -9,25 +8,6 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SESSIONS_DIR = DATA_DIR / "sessions"
 ARCHIVES_DIR = DATA_DIR / "archives" / "sessions"
 OUTPUTS_DIR = DATA_DIR / "outputs"
-
-# 不可变规划字段（修改触发指纹校验）
-IMMUTABLE_FIELDS = {
-    "outline": {"title"},
-    "section": {"id", "title", "subtitle", "summary", "word_count", "is_key"}
-}
-
-
-def _fingerprint(state: dict) -> str:
-    """提取规划相关字段的 MD5 指纹"""
-    plan_data = {
-        "title": state.get("outline", {}).get("title", ""),
-        "sections": [
-            {k: s.get(k, "") for k in IMMUTABLE_FIELDS["section"]}
-            for s in state.get("outline", {}).get("sections", [])
-        ]
-    }
-    raw = json.dumps(plan_data, sort_keys=True, ensure_ascii=False)
-    return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
 class StateManager:
@@ -55,13 +35,11 @@ class StateManager:
             "user_orders": {},
             "output_file": "",
             "phase": "config",    # config → planning → reviewing → writing → done
-            "fingerprint": ""
         }
         self.save()
 
     def set_outline(self, outline: dict):
         self._state["outline"] = outline
-        self._state["fingerprint"] = _fingerprint(self._state)
         self._state["phase"] = "reviewing"
         self.save()
 
@@ -91,12 +69,6 @@ class StateManager:
                     self.save()
                     return
         self.save()
-
-    def fingerprint_check(self) -> bool:
-        """检查规划字段是否被意外修改"""
-        if not self._state.get("fingerprint"):
-            return True
-        return _fingerprint(self._state) == self._state["fingerprint"]
 
     def get_progress(self) -> dict:
         sections = self._state["outline"].get("sections", [])
