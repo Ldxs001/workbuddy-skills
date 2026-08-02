@@ -1,7 +1,22 @@
 # Skills Repository
 
+> ## ⚠️ 仓库冻结存档声明（2026-08-02 起永久生效）
+>
+> **本仓库已永久冻结，不再接受任何内容更新，也不做任何删除，仅作为历史存档保留。**
+>
+> 除 `skills/` 外的内容已迁移至独立新仓库，后续更新请访问：
+>
+> | 原目录 | 新仓库 | 许可 |
+> |--------|--------|------|
+> | `agent/` | `maby_agent` | Apache License 2.0 |
+> | `Cogito_Scribit/` | `Cogito_Scribit` | CC BY-SA 4.0 |
+> | `architecture/` | `architecture` | CC BY-SA 4.0 |
+> | `skills/`（未来） | `maby_skills` | MIT License |
+>
+> 本仓库的完整提交历史继续保留于此，各新仓库的 README 均已注明历史来源位置。
+
 > **用户技能仓库与智能体仓库** — 由 git-sync 自动同步维护。
-> 最后更新：2026-07-31
+> 最后更新：2026-08-02
 
 本仓库托管 wUwproject 技能合集与智能体项目，码云（Gitee）和 GitHub 双平台同步。
 
